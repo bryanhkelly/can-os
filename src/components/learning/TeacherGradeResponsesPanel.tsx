@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { getTeacherGradeResponses, resolveTeacherGradeResponse } from "@/modules/learning/teacher-grade-response.functions";
+import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 
 export type TeacherGradeResponseItem = Awaited<ReturnType<typeof getTeacherGradeResponses>>["items"][number];
 type Item = TeacherGradeResponseItem;
@@ -20,8 +21,12 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
     <p className="mt-3 text-sm font-semibold">Guardian's question</p>
     <p className="mt-1 whitespace-pre-wrap text-sm">{item.message}</p>
     <p className="mt-2 text-xs capitalize">{item.status.replaceAll("_", " ")}</p>
+    <details className="mt-3 rounded-lg border p-3">
+      <summary className="cursor-pointer text-sm font-semibold">Review original submitted work and attachments · attempt {item.attemptNumber}</summary>
+      <div className="mt-3"><SubmissionEvidence submissionId={item.submissionId} historical/></div>
+    </details>
     <Link to="/teacher/gradebook" search={{ section: item.sectionId, assessment: item.assessmentId, student: item.studentProfileId }}
-      className="mt-2 inline-block text-sm underline">Review graded work</Link>
+      className="mt-3 inline-block text-sm underline">Open current class gradebook</Link>
     {(item.status === "resolved" || savedResponse !== null)
       ? <p className="mt-3 whitespace-pre-wrap text-sm" role="status">School response: {savedResponse ?? item.resolutionNote}</p>
       : <form className="mt-3 space-y-3" onSubmit={async event => {
