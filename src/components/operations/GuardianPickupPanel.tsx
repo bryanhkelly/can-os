@@ -10,6 +10,12 @@ import {
 type Workspace = Awaited<ReturnType<typeof getGuardianPickupWorkspace>>;
 type Student = Workspace["students"][number];
 const keyFor = (student: Student) => student.programId + ":" + student.studentProfileId + ":" + student.householdId;
+// HTML date inputs use local calendar days, not UTC. UTC defaults can silently
+// start tomorrow's authorization on the US West Coast in the afternoon.
+const todayForPickupInput = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+};
 
 /** Family release-authority management and authorized handoff history. */
 export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: string }) {
@@ -137,7 +143,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   </select>
                 </label>
                 <label className="text-xs font-semibold">Valid from
-                  <input type="date" value={startDates[key] ?? new Date().toISOString().slice(0, 10)}
+                  <input type="date" value={startDates[key] ?? todayForPickupInput()}
                     onChange={event => setStartDates(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full rounded border bg-background p-2 text-sm" />
                 </label>
@@ -158,7 +164,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   legalLastName: lastNames[key] ?? "",
                   relationshipLabel: relationships[key] ?? "",
                   identityVerificationMethod: (methods[key] ?? "government_photo_id") as "government_photo_id" | "school_issued_id",
-                  startsOn: startDates[key] ?? new Date().toISOString().slice(0, 10),
+                  startsOn: startDates[key] ?? todayForPickupInput(),
                   expiresOn: expiryDates[key] || null,
                   mutationId: crypto.randomUUID(),
                 } }))}>Save pickup authorization</button>
