@@ -630,10 +630,29 @@ export const resolvePickupCustodyHold = createServerFn({ method: "POST" })
       }
       if (existing.status !== "active") throw new Error("Custody hold is not active");
       const now = new Date();
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + existing.studentProfileId + ":" + existing.programId}))`);
       await tx.update(pickupCustodyHolds).set({
         status: "resolved", resolvedAt: now, resolvedByPersonId: actor.actorPersonId!,
         resolutionNote: data.resolutionNote, updatedAt: now,
       }).where(eq(pickupCustodyHolds.id, existing.id));
+      const followUps=await tx.select({id:actions.id}).from(actions).where(and(
+        eq(actions.type,"onsite_pickup_custody_hold"),
+        eq(actions.subjectId,existing.studentProfileId),
+        eq(actions.programId,existing.programId),
+        inArray(actions.status,["open","in_progress","waiting"]),
+        sql`${actions.metadata}->>'holdId' = ${existing.id}`,
+      ));
+      if(followUps.length){
+        await tx.update(actions).set({status:"resolved",resolvedAt:now,updatedAt:now,
+          resolutionNote:"Custody hold resolved by authorized site leader: "+existing.id,
+        }).where(inArray(actions.id,followUps.map(row=>row.id)));
+        for(const item of followUps)await emitEvent(tx,{
+          eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:item.id,
+          actorPersonId:actor.actorPersonId,organizationId:student.organizationId,
+          siteId:student.siteId,programId:student.programId,
+          payload:{type:"onsite_pickup_custody_hold",holdId:existing.id},
+        });
+      }
       const eventId = await emitEvent(tx, {
         eventType: EventTypes.PickupCustodyHoldResolved,
         aggregateType: "pickup_custody_hold", aggregateId: existing.id,
