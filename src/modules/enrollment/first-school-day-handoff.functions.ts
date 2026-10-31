@@ -58,7 +58,6 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     const futureDays = await db.select({date:academicCalendarDays.calendarDate,
       type:academicCalendarDays.type,
       minutes:academicCalendarDays.instructionalMinutes,
-      calendarId:academicCalendars.id,
       version:academicCalendars.version,
       yearId:schoolYears.id,
       startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
