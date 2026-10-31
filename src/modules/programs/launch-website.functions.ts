@@ -37,9 +37,9 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const [address]=await db.select({slug:sitePublications.slug,status:sitePublications.status})
    .from(sitePublications).where(eq(sitePublications.siteId,school.siteId)).limit(1);
   const host=address?publicSiteHost(address.slug):null;
-  // A published database record is not evidence of a reachable public website.
-  // Probe only our validated canonical hostname; never accept a caller-supplied URL.
   const hostingConfigured=process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true";
+  // Reuse the canonical verifier: a 200 response from an unrelated page
+  // must never count as a successfully published CAN OS school website.
   let publicAvailability:"not_published"|"hosting_disabled"|"live"|"unreachable"="not_published";
   let checkedAt:string|null=null;
   if(address?.status==="published"){
@@ -48,10 +48,12 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
     checkedAt=new Date().toISOString();
     try{
      const response=await fetch(`https://${host}/`,{method:"GET",redirect:"manual",
-      signal:AbortSignal.timeout(4000),headers:{"Accept":"text/html"}});
-     publicAvailability=response.status===200?"live":"unreachable";
-     // A redirect, error page or certificate failure is not a verified publication.
-     await response.body?.cancel();
+      signal:AbortSignal.timeout(5000),headers:{"Accept":"text/html"}});
+     const length=Number(response.headers.get("content-length")??0);
+     if(response.status===200&&response.headers.get("content-type")?.includes("text/html")&&length<=1_000_000){
+      const html=await response.text();
+      publicAvailability=html.includes("Powered by CAN OS")&&html.toLowerCase().includes("<!doctype html")?"live":"unreachable";
+     }else{publicAvailability="unreachable";await response.body?.cancel();}
     }catch{publicAvailability="unreachable";}
    }
   }
