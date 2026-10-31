@@ -293,6 +293,7 @@ function MessagesPage() {
             </nav>
             <section className="rounded-xl border bg-card p-5" aria-label="Conversation">
               {loadingThread && <p className="text-sm" role="status">Loading conversation…</p>}
+              {!loadingThread && !detail && error && <p role="alert" className="text-sm">{error}</p>}
               {!loadingThread && detail && (
                 <>
                   <h2 className="text-lg font-semibold">{detail.thread.subject}</h2>
