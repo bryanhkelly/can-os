@@ -301,7 +301,7 @@ export const finishCommonCartridgeStaticLessonImport=createServerFn({method:"POS
     .where(and(eq(curriculumImportJobs.organizationId,program.organizationId),
       eq(curriculumImportJobs.format,preview.profile),eq(curriculumImportJobs.sha256,digest)))
     .for("update").limit(1);
-   if(!job||job.status==="rejected"||job.metadata.programId!==program.id)
+   if(!job||!["validated","mapped"].includes(job.status)||job.metadata.programId!==program.id)
     throw new Error("Validate this exact cartridge in the selected Program before import.");
    const existing=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
     metadata:curriculumInteropMappings.metadata,entityId:curriculumInteropMappings.entityId})
