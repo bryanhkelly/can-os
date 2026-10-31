@@ -190,7 +190,7 @@ export const getSchoolFamilyAlerts=createServerFn({method:"GET"}).handler(async(
    )):[];
  return {programs,items:alerts.map(row=>({
    id:row.id,title:row.title,description:row.description??"",
-   programId:row.programId,kind:row.metadata.kind,
+   programId:row.programId,kind:alertKinds.safeParse(row.metadata.kind).success ? alertKinds.parse(row.metadata.kind) : "unknown",
    publishedAt:row.createdAt.toISOString(),
    recipients:counts.filter(item=>item.alertId===row.id).length,
    acknowledged:counts.filter(item=>item.alertId===row.id&&item.status==="read").length,
