@@ -181,9 +181,9 @@ export const listGuardianEnrollmentChanges=createServerFn({method:"GET"})
    .innerJoin(s.programs,eq(s.programs.id,s.actions.programId))
    .where(and(
      eq(s.actions.type,actionType),eq(s.actions.subjectType,"student_profile"),
-     inArray(s.programs.id,actor.scope.programIds??[]),
-     inArray(s.programs.siteId,actor.scope.siteIds??[]),
-     inArray(s.programs.organizationId,actor.scope.organizationIds??[]),
+     // A family retains access to its OWN completed request after origin
+     // enrollment ends; the old school's Program scope can be revoked.
+     sql`${s.actions.metadata}->>'requestedByGuardianPersonId' = ${actor.actorPersonId!}`,
      ...(data.studentPersonId?[eq(s.studentProfiles.personId,data.studentPersonId)]:[]),
    )).orderBy(desc(s.actions.createdAt)).limit(50);
   return {items:rows.filter(row=>row.kind.requestedByGuardianPersonId===actor.actorPersonId)
