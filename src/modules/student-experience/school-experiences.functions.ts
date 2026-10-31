@@ -36,7 +36,21 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
       .innerJoin(schema.conferenceSlots,eq(schema.conferenceSlots.id,schema.conferenceBookings.conferenceSlotId))
       .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.id,schema.conferenceBookings.studentProfileId))
-      .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
+      .innerJoin(schema.guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:actor.actorPersonId,
+        studentPersonId:schema.studentProfiles.personId,
+        access:"academic",
+      }))
+      .innerJoin(schema.enrollments,and(
+        eq(schema.enrollments.studentProfileId,schema.studentProfiles.id),
+        eq(schema.enrollments.kind,"program"),eq(schema.enrollments.status,"active"),
+      ))
+      .innerJoin(schema.programs,and(
+        eq(schema.programs.id,schema.enrollments.programId),
+        eq(schema.programs.status,"active"),
+        eq(schema.programs.siteId,schema.conferenceSeries.siteId),
+      ))
+      .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),inArray(schema.programs.id,actor.scope.programIds??[]),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:e.metadata.cancelled===true?"cancelled":"scheduled"})),
