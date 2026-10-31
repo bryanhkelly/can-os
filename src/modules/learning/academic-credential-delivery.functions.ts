@@ -63,24 +63,8 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   const expiry=new Date(data.expiresAt);
   if(expiry.getTime()<=Date.now()||expiry.getTime()>Date.now()+30*86400000)
     throw new AuthorizationError("Release expiry must be within 30 days");
-  const [recipient]=await db.select({id:s.people.id}).from(s.people)
-    .where(eq(s.people.id,data.recipientPersonId)).limit(1);
-  if(!recipient)throw new AuthorizationError("recipient identity not found");
-  // A person record is not proof of a verified email, release instruction or consent.
-  // Keep authorization fail-closed until independent evidence verification is wired.
+  void data.recipientPersonId;
   throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
-  return db.transaction(async tx=>{
-   const [row]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
-    issuingOrganizationId:doc.issuerId,
-    ...(data.kind==="transcript"?{transcriptIssuanceId:data.credentialId}:{diplomaIssuanceId:data.credentialId}),
-    recipientPersonId:data.recipientPersonId,recipientEmail:data.recipientEmail,
-    releasePurpose:data.releasePurpose,instructionReference:data.instructionReference,
-    consentEvidenceReference:data.consentEvidenceReference,
-    authorizedByPersonId:context.actorPersonId!,expiresAt:expiry,
-   }).returning({id:s.academicCredentialReleaseAuthorizations.id});
-   await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"academic_credential.release.authorize",resourceType:"academic_credential_release_authorization",resourceId:row!.id,scope:{organizationId:doc.issuerId},after:{recipientPersonId:data.recipientPersonId,releasePurpose:data.releasePurpose,expiresAt:data.expiresAt},context:{requestId:context.requestId??null}});
-   return {authorizationId:row!.id,deliveryEnabled:false};
-  });
  });
 
 /** Official records must never be mailed as plaintext attachments. Release is
