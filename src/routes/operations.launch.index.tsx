@@ -3,6 +3,8 @@ import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.f
 import { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 import { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
+import {LaunchAcademicYearStep} from "@/components/operations/LaunchAcademicYearStep";
+import {resolveLaunchResume} from "@/domain/launch-resume";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
@@ -234,7 +236,8 @@ function LaunchWizardPage() {
     );
   }
 
-  const invitationSiteId = selection.siteId ?? launches.launches.find(launch => launch.id === selection.programId)?.siteId ?? undefined;
+  const currentLaunch=resolveLaunchResume(launches.launches,selection).launch;
+  const invitationSiteId = selection.siteId ?? currentLaunch?.siteId ?? undefined;
   return (
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
@@ -245,6 +248,7 @@ function LaunchWizardPage() {
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
         <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
 
         <details className="mt-4 rounded-xl border bg-card p-4">
           <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
