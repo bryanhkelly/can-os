@@ -10,6 +10,7 @@ import { inspectCommonCartridgeZip, extractCommonCartridgeWebLink, extractCommon
 import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
+import { authorizeClass, classActor } from "./class-access.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
 import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config, signPrivateObjectUrl } from "@/platform/storage/r2";
@@ -372,7 +373,18 @@ export const readCommonCartridgeStaticLesson=createServerFn({method:"GET"})
  }).strict().parse(value))
  .handler(async({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
-  const {program}=await authorizeHtmlSection(data.programId,data.sectionId);
+  const actor=await classActor();
+  const {section:authorizedSection}=await authorizeClass(actor,data.sectionId);
+  if(authorizedSection.programId!==data.programId)
+   throw new AuthorizationError("Same-program class membership");
+  const [program]=await db.select({id:programs.id,organizationId:programs.organizationId})
+   .from(programs).where(eq(programs.id,data.programId)).limit(1);
+  if(!program)throw new AuthorizationError("Active Program");
+  const [overlay]=await db.select({id:curriculumOverlays.id})
+   .from(curriculumOverlays).where(and(eq(curriculumOverlays.resourceId,data.resourceId),
+     eq(curriculumOverlays.sectionId,data.sectionId),eq(curriculumOverlays.programId,data.programId),
+     eq(curriculumOverlays.status,"active"))).limit(1);
+  if(!overlay)throw new AuthorizationError("Published class resource");
   const [resource]=await db.select({id:curriculumResources.id,
     metadata:curriculumResources.metadata,documentId:curriculumResources.documentId})
     .from(curriculumResources).where(and(eq(curriculumResources.id,data.resourceId),
