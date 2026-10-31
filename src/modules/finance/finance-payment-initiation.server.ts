@@ -14,6 +14,7 @@ export async function initiateGuardianPayment(
   if (identity.viewer !== "guardian") throw new AuthorizationError("Guardian payment required");
   if (!processor.configured) return { kind: "unavailable" as const, reason: "Payment setup required" };
   const amountCents = record.charge.amount.cents - record.capturedCents;
+  if (!Number.isSafeInteger(amountCents)) throw new Error("Invalid outstanding balance");
   if (amountCents <= 0) return { kind: "unavailable" as const, reason: "No unpaid balance" };
   if (!store.reservePaymentAttempt || !store.finishPaymentAttempt)
     throw new Error("Durable payment attempt store required");
