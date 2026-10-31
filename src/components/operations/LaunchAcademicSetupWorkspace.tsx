@@ -28,7 +28,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const effectiveTeacherId=teacherId|| (data.teachingStaff.length===1?data.teachingStaff[0]!.personId:"");
  const [scheduleId,setScheduleId]=useState("");
  const suggestedSchedule=data.scheduleOptions.find(option=>option.schoolYearId===selectedTerm?.schoolYearId);
- const effectiveScheduleId=scheduleId||suggestedSchedule?.id||"";
+ const effectiveScheduleId=data.scheduleOptions.some(option=>option.id===scheduleId&&option.schoolYearId===selectedTerm?.schoolYearId)?scheduleId:suggestedSchedule?.id||"";
  const [courseCredits,setCourseCredits]=useState("");
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
