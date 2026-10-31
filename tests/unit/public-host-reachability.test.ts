@@ -56,6 +56,22 @@ describe("published Site HTTPS verification", () => {
       })).status).toBe("unreachable");
     }
   });
+  it("rejects HTML where a tenant name appears outside the canonical footer", async () => {
+    const forged = `<!doctype html><html><body>${host}<footer>other.can-os.com · Powered by CAN OS</footer></body></html>`;
+    const result = await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(response(forged)),
+    });
+    expect(result.status).toBe("unreachable");
+  });
+  it("rejects UTF-8 bodies larger than one megabyte even without content-length", async () => {
+    const body = goodHtml + "é".repeat(600_000);
+    const r = response(body);
+    r.headers.delete("content-length");
+    const result = await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+    });
+    expect(result.status).toBe("unreachable");
+  });
   it("does not report TLS, DNS or timeout failures as live", async () => {
     const f = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
     const result = await checkPublishedSiteReachability({ host, published: true, hostingConfigured: true, fetcher: f });
