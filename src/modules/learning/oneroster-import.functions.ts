@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { curriculumImportJobs,curriculumInteropMappings,programs,sections } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { previewOneRosterBundle } from "@/domain/oneroster-csv";
+import { planOneRosterReconciliation } from "@/domain/oneroster-reconciliation";
 import { requireActor } from "@/modules/identity/actors.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit,emitEvent } from "@/platform/mutation";
@@ -29,7 +30,9 @@ export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
    throw new AuthorizationError("institutional OneRoster preview");
   const report=previewOneRosterBundle(data.files);
   const digest=createHash("sha256").update(JSON.stringify(data.files)).digest("hex");
+  const reconciliation=planOneRosterReconciliation(report.previews,new Map());
   const serialized={
+   reconciliation,
    kinds:report.previews.map(p=>({kind:p.kind,rows:p.rows.length,headers:p.headers,
      errors:p.errors,warnings:p.warnings})),
    warnings:report.warnings,valid:report.valid,format:"OneRoster 1.2 CSV",
