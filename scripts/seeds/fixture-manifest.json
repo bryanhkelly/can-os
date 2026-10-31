@@ -1549,6 +1549,24 @@
       "downstreamRecords": [
         "church_onboarding_requests"
       ]
+    },
+    "/admissions/my-credentials": {
+      "persona": "verified academic credential recipient",
+      "seeds": [
+        "synthetic-credential-inbox-denial.sql"
+      ],
+      "recordCounts": {
+        "academic_credential_release_authorizations": 1,
+        "transcript_issuances": 1
+      },
+      "interactions": [
+        "authenticated synthetic recipient sees no releases because synthetic grant is ineligible",
+        "attempted direct download as synthetic recipient is denied by server identity and grant checks",
+        "real verified recipient flow must be separately tested in authenticated staging"
+      ],
+      "downstreamRecords": [
+        "audit_events"
+      ]
     }
   }
 }

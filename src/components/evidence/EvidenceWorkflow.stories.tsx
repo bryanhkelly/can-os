@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
 const meta = { title: "Evidence/Workflow", component: EvidenceWorkflow,
   args: { title: "School opening evidence", status: "pending" } } satisfies Meta<typeof EvidenceWorkflow>;

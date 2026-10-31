@@ -157,6 +157,15 @@
       "verification": "pending"
     },
     {
+      "file": "src/routes/admissions.my-credentials.tsx",
+      "route": "/admissions/my-credentials",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Authenticated, verified credential recipient views own active release authorizations and downloads only privately scoped records",
+      "readBoundary": "listMyAcademicCredentialReleases restricts by person, verified active account, grant, unexpired and unrevoked authorization",
+      "writeBoundary": "downloadAuthorizedAcademicCredential requires verified recipient and audits access; synthetic and cross-persona attempts denied"
+    },
+    {
       "file": "src/routes/admissions.transcripts.tsx",
       "route": "/admissions/transcripts",
       "owner": "learning",
