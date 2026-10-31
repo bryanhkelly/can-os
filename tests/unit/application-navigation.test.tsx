@@ -113,7 +113,7 @@ function render(route:{options:{component?:unknown}}){
   }
   if (outcome?.ok && route===Intake && Array.isArray(outcome.data?.records)) {
     successful({...outcome.data,records:{items:outcome.data.records,hasMore:false,nextPage:null},
-      stageCounts:{},existingStudentHasMore:false});
+      stageCounts:[],existingStudentHasMore:false});
   }
   const Page=route.options.component;
   if(typeof Page!=="function")throw new Error("Missing page component");
