@@ -7,7 +7,7 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {RegistrarEnrollmentFormReview} from "@/components/enrollment/EnrollmentForm";
 import {FamilyReadinessOverviewCard} from "@/components/admissions/FamilyReadinessOverviewCard";
 import {familyRequirementKey,isEnrollmentDocumentCandidate} from "@/components/admissions/family-document-state";
-const loadFamilyReadiness=(selection:{siteId?:string;programId?:string;page?:number}={})=>getFamilyReadiness({data:selection});
+const loadFamilyReadiness=(selection:{siteId?:string;programId?:string;page?:number;applicationId?:string}={})=>getFamilyReadiness({data:selection});
 export const Route=createFileRoute("/admissions/families")({
  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;page?:number}=>({
   page:typeof search.page==="number"&&Number.isSafeInteger(search.page)&&search.page>0?search.page:1,
@@ -15,7 +15,7 @@ export const Route=createFileRoute("/admissions/families")({
   programId:typeof search.programId==="string"?search.programId:undefined,
   application:typeof search.application==="string"?search.application:undefined,
  }),
- loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId,page:search.page}),
+ loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId,page:search.page,applicationId:search.application}),
  loader:({deps})=>safeLoader(()=>loadFamilyReadiness(deps),{
   authMessage:"Sign in with an authorized registrar account to view family enrollment readiness.",
  })(),
@@ -24,9 +24,10 @@ export const Route=createFileRoute("/admissions/families")({
 function Families(){
  const outcome=Route.useLoaderData();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Enrollment" title="Family enrollment readiness" outcome={outcome}/>;
- return <FamiliesView apps={outcome.data}/>;
+ return <FamiliesView page={outcome.data}/>;
 }
-function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness>>}){
+function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness>>}){
+ const apps=page.items;
  const router=useRouter();
  const selection=Route.useSearch();
  const visibleApps=apps.filter(app=>!selection.application||app.id===selection.application);
@@ -128,6 +129,7 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
    </article>)}</div>
   </section>)}
+  <nav aria-label="Family readiness pages" className="mt-5 flex gap-4 text-sm">{!selection.application&& (selection.page??1)>1&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)-1}} className="underline">Previous families</Link>}{!selection.application&&page.hasMore&&<Link to="/admissions/families" search={{...selection,page:page.nextPage??(selection.page??1)+1}} className="underline">Next families</Link>}</nav>
   {!families.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No family enrollment cases found in your authorized programs.</p>}
   <nav aria-label="Family enrollment pages" className="mt-5 flex items-center gap-4 text-sm">
    {selection.page&&selection.page>1&&<Link to="/admissions/families" search={{...selection,page:selection.page-1}} className="underline">Previous page</Link>}
