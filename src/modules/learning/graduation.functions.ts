@@ -43,7 +43,7 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     acceptedByIssuer: true,
   }));
 }
-async function transcriptAndRules(db: Awaited<ReturnType<typeof resources>>["db"], s: Awaited<ReturnType<typeof resources>>["s"], transcriptId: string, requirementSetId: string) {
+async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>["db"], "select">, s: Awaited<ReturnType<typeof resources>>["s"], transcriptId: string, requirementSetId: string) {
   const [transcript] = await db.select().from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,transcriptId)).limit(1);
   const [requirementSet] = await db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.id,requirementSetId)).limit(1);
   if (!transcript || !requirementSet || transcript.issuingOrganizationId !== requirementSet.issuingOrganizationId)
@@ -92,7 +92,7 @@ export const decideGraduation = createServerFn({method:"POST"})
  .handler(async ({data}) => {
    const context=await registrar();const {db,s}=await resources();
    return db.transaction(async tx => {
-     const {transcript,requirementSet,evidence}=await transcriptAndRules(tx as typeof db,s,data.transcriptId,data.requirementSetId);
+     const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
      issuerAuthorized(context,transcript.issuingOrganizationId);
      const result=adjudicateGraduation({
        requirementSetId:requirementSet.id,transcriptIssuanceId:transcript.id,
