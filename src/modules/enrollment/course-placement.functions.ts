@@ -4,7 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { admissionOffers, applications, courseTemplateVersions, enrollments, programs, schoolYears, sections, sites, terms } from "@/db/schema";
+import { actions, admissionOffers, applications, courseTemplateVersions, enrollments, programs, schoolYears, sections, sites, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
@@ -35,11 +35,43 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    const actor = await registrar();
    const [app] = await db.select({ programId: applications.programId,
      studentProfileId: applications.studentProfileId,
+     submittedByPersonId:applications.submittedByPersonId,
+     metadata:applications.metadata,
      organizationId:programs.organizationId,siteId:programs.siteId })
      .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
      .where(eq(applications.id, data.applicationId)).limit(1);
    if (!app || !canPlaceInProgram(actor,{id:app.programId,organizationId:app.organizationId,siteId:app.siteId}))
      throw new AuthorizationError("application placement");
+   // Mirror the existing activation guard in the *preview*; otherwise a
+   // registrar sees a ready classroom and can only discover an unfinished
+   // origin-school transfer after attempting to activate the student.
+   let transferBlocker:string|null=null;
+   if(typeof app.metadata.originTransferActionId==="string"){
+     const [origin]=await db.select({
+       id:actions.id,type:actions.type,status:actions.status,
+       subjectType:actions.subjectType,subjectId:actions.subjectId,
+       programId:actions.programId,metadata:actions.metadata,
+     }).from(actions).where(eq(actions.id,app.metadata.originTransferActionId)).limit(1);
+     const valid=!!origin&&origin.type==="guardian_enrollment_change_request"&&
+       origin.subjectType==="student_profile"&&
+       origin.subjectId===app.studentProfileId&&
+       origin.programId!==app.programId&&
+       origin.metadata.kind==="transfer"&&
+       origin.metadata.requestedByGuardianPersonId===app.submittedByPersonId&&
+       origin.metadata.destinationApplicationId===data.applicationId&&
+       origin.metadata.destinationProgramId===app.programId;
+     if(!valid)transferBlocker="Origin transfer does not match this student's verified destination application. Admissions must reconcile the transfer.";
+     else if(origin.status!=="resolved"||origin.metadata.exitCompletedByRegistrar!==true||
+       origin.metadata.exitStatus!=="transferred")
+       transferBlocker="Originating school must complete the institutional transfer before this accepted offer can activate.";
+     else{
+       const [prior]=await db.select({id:enrollments.id}).from(enrollments)
+         .where(and(eq(enrollments.studentProfileId,app.studentProfileId),
+           eq(enrollments.programId,origin.programId),
+           eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
+       if(prior)transferBlocker="An active origin-school Program enrollment remains. Reconcile the departure before destination activation.";
+     }
+   }
    const active = await db.select({ schoolYearId: enrollments.schoolYearId })
      .from(enrollments).where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.programId, app.programId), eq(enrollments.kind, "program"),
@@ -52,7 +84,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      ));
    const yearIds = [...new Set([...active.map(e=>e.schoolYearId),
      ...acceptedOffers.map(offer=>offer.schoolYearId)].filter((id):id is string=>!!id))];
-   if (!yearIds.length) return { active: false, sections: [] };
+   if (!yearIds.length) return { active: false, sections: [], transferBlocker };
    const rows = await db.select({ id: sections.id, title: sections.title,
      code: sections.code, schoolYearId: terms.schoolYearId, siteId: sections.siteId,
      siteTimezone:sites.timezone,yearTimezone:schoolYears.timezone,
@@ -90,7 +122,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
    const assigned = new Set(enrolled.map(e => e.sectionId));
-   return { active: active.length>0, sections: rows.filter(s => actor.scope.siteIds===undefined ||
+   return { active: active.length>0, transferBlocker, sections: rows.filter(s => actor.scope.siteIds===undefined ||
       (!!s.siteId&&actor.scope.siteIds.includes(s.siteId))).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
      staffed: staffedIds.has(s.id),
