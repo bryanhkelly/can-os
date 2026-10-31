@@ -1,3 +1,4 @@
+import { EvidenceReviewForm } from "@/components/evidence/EvidenceReviewForm";
 import { useCallback, useEffect, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
@@ -63,7 +64,6 @@ function EvidenceCard({ model, item, changed }: {
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [expiry, setExpiry] = useState("");
-  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState<{ key: string; input: UploadInput } | null>(null);
@@ -93,7 +93,7 @@ function EvidenceCard({ model, item, changed }: {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Upload failed"); }
     finally { setBusy(false); }
   }
-  async function review(decision: "approve" | "reject") {
+  async function review(decision: "approve" | "reject", reason: string) {
     if (!item.documentId || !item.version || busy) return;
     setBusy(true); setError("");
     try {
@@ -101,7 +101,7 @@ function EvidenceCard({ model, item, changed }: {
         seasonId: model.seasonId, documentId: item.documentId,
         expectedVersion: item.version, reason, decision,
       } });
-      setReason(""); await changed();
+      await changed();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Review failed"); }
     finally { setBusy(false); }
   }
@@ -127,19 +127,8 @@ function EvidenceCard({ model, item, changed }: {
       </button>
     </div>}
     {item.rejectionReason && <p role="alert" className="mt-2">Review: {item.rejectionReason}</p>}
-    {model.canReview && item.documentId && item.status === "pending" && <div className="mt-3 border-t pt-3">
-      <label className="block">Review rationale
-        <textarea className="mt-1 w-full rounded border bg-background p-2"
-          value={reason} minLength={10} maxLength={2000}
-          onChange={e => setReason(e.target.value)}/>
-      </label>
-      <div className="mt-2 flex gap-2">
-        <button type="button" className="rounded border px-2 py-1" disabled={busy || reason.trim().length < 10}
-          onClick={() => void review("approve")}>Approve evidence</button>
-        <button type="button" className="rounded border px-2 py-1" disabled={busy || reason.trim().length < 10}
-          onClick={() => void review("reject")}>Reject and request correction</button>
-      </div>
-    </div>}
+    {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
+      disabled={busy} onReview={review}/>}
     {model.canSubmit && <div className="mt-3 border-t pt-3">
       <p>{item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
