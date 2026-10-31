@@ -38,7 +38,7 @@ export const accessChallenges = pgTable("access_challenges", {
 }, t => [uniqueIndex("access_challenges_hash_uq").on(t.tokenHash),index("access_challenges_account_idx").on(t.accountId)]);
 
 /**
- * Two global safety buckets ("request", "verify"), not per-user or per-IP.
+ * Shared global safety buckets (sign-in request, verification and church application), not per-user or per-IP.
  * Postgres upserts the count atomically; no untrusted proxy headers are used.
  * This is a coarse emergency admission limit until trusted-edge rate limiting
  * can be configured. Fixed-size table: no unbounded attempt log.
