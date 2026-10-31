@@ -266,8 +266,9 @@ export async function requestAdditionalChurchEvidence(actor: AccessContext, requ
       await tx.update(documents).set({ expiresAt: new Date(), updatedAt: new Date() })
         .where(eq(documents.id, request.authorityDocumentId));
     }
+    const requestedAt = new Date();
     await tx.update(churchOnboardingRequests).set({
-      status: "needs_evidence", decisionNote: message, updatedAt: new Date(),
+      status: "needs_evidence", decisionNote: message, updatedAt: requestedAt,
     }).where(eq(churchOnboardingRequests.id, requestId));
     await writeAudit(tx, actor, {
       action: "church.onboarding.evidence.followup.requested",
@@ -275,14 +276,14 @@ export async function requestAdditionalChurchEvidence(actor: AccessContext, requ
       scope: { organizationId: canOrganizationId },
       after: { priorEvidenceInvalidated: !!request.authorityDocumentId, noticePrepared: true },
     });
-    return request.contactEmail;
+    return { recipient: request.contactEmail, requestedAt };
   });
   // Transport happens after transaction commit; an acceptance is NOT final delivery.
   const acceptedByProvider = await sendNotificationEmail({
-    to: recipient, subject: "CAN Academy church partnership: additional evidence needed",
+    to: recipient.recipient, subject: "CAN Academy church partnership: additional evidence needed",
     text: "Thank you for your interest in partnering with CAN Academy. To continue our independent authority review, please provide the following information through your established CAN contact. Do not email student records or sensitive identification documents.\n\n" +
       message + "\n\nThis request is not an approval or invitation to open a school.",
-  }, "church-evidence-followup:" + requestId);
+  }, "church-evidence-followup:" + requestId + ":" + recipient.requestedAt.toISOString());
   await db.transaction(async tx => {
     await writeAudit(tx, actor, {
       action: "church.onboarding.evidence.followup.transport",
@@ -296,7 +297,7 @@ export async function requestAdditionalChurchEvidence(actor: AccessContext, requ
 
 export async function declineChurchApplication(actor: AccessContext, requestId: string, note: string) {
   const canOrganizationId = await requireCANSteward(actor);
-  await db.transaction(async tx => {
+  const recipient = await db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
     if (!request || !["submitted", "needs_evidence", "verified"].includes(request.status))
@@ -315,8 +316,22 @@ export async function declineChurchApplication(actor: AccessContext, requestId: 
       scope: { organizationId: canOrganizationId },
       after: { note, authorityDocumentId: request.authorityDocumentId },
     });
+    return request.contactEmail;
   });
-  return { declined: true as const };
+  const providerAccepted = await sendNotificationEmail({
+    to: recipient,
+    subject: "CAN Academy church partnership application update",
+    text: "Thank you for your interest in partnering with CAN Academy. After review, we are unable to approve your church partnership application at this time. Please contact your established CAN representative if you have questions. Do not send sensitive personal or student records by email.",
+  }, "church-application-declined:" + requestId);
+  await db.transaction(async tx => {
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.decision.notice.transport",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { decision: "declined", providerAccepted, delivered: false },
+    });
+  });
+  return { declined: true as const, providerAccepted, delivered: false as const };
 }
 
 /** Recovery path when the original approved invitation email was not delivered. */
