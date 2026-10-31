@@ -26,7 +26,12 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
  const [error,setError]=useState("");
  async function perform(operation:()=>Promise<unknown>,success:string) {
   setBusy(true);setError("");setMessage("");
-  try {await operation();setMessage(success);await router.invalidate();}
+  try {
+   await operation();
+   setMessage(success);
+   try { await router.invalidate(); }
+   catch { setError("Your change was saved, but the calendar could not refresh. Reopen this page before trying again."); }
+  }
   catch(err){setError(err instanceof Error?err.message:"Unable to save change");}
   finally{setBusy(false);}
  }
