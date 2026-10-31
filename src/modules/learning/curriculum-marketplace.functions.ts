@@ -55,7 +55,7 @@ const url=z.string().url().max(2048).refine(value=>{
 },"Use a HTTPS URL without embedded credentials.");
 export const addMarketplaceSupplement=createServerFn({method:"POST"})
  .validator((input:unknown)=>program.extend({
-   courseVersionId:uuid,sectionId:uuid.optional(),lessonId:z.string().min(1).max(100).optional(),
+   courseVersionId:uuid,academicYearId:uuid.optional(),sectionId:uuid.optional(),lessonId:z.string().min(1).max(100).optional(),
    scope:z.enum(["program","site","section"]),title:z.string().trim().min(3).max(200),
    kind:z.enum(["link","video","pdf","image","audio","document"]),url
  }).strict().parse(input))
