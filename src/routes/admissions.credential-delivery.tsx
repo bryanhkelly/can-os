@@ -39,7 +39,7 @@ function CredentialDeliveryPage(){
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Verified transfer release</h2>
-    <p className="text-sm">A registrar may grant the verified guardian secure access to an issued transcript only when a completed school transfer and that guardian's signed, unrevoked records-release consent match the student. No PDF is emailed.</p>
+    <p className="text-sm">A registrar may grant the verified guardian secure access to an issued transcript only when a completed school transfer and that guardian's signed, unrevoked records-release consent match the student. No PDF is emailed. This is a verified guardian handoff only; direct external school-to-school delivery is not supported.</p>
     <label className="block text-sm">Verified guardian<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={selectedRecipient} onChange={e=>setSelectedRecipient(e.target.value)}><option value="">Select verified identity</option>{recipients.map(row=><option key={row.personId+row.email} value={row.personId+"|"+row.email}>{row.firstName} {row.lastName} ({row.email})</option>)}</select></label>
     {field("Completed transfer action ID",transferActionId,setTransferActionId)}
     {field("Signed transfer consent ID",consentId,setConsentId)}
