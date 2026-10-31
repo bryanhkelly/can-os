@@ -1,3 +1,4 @@
+import { useLaunchModelPresets } from "@/hooks/useLaunchModelPresets";
 import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
 import { LaunchProgramIdentityFields } from "@/components/operations/LaunchProgramIdentityFields";
@@ -175,34 +176,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     }
   }
 
-  function applySchoolModelPreset(model:"elementary"|"middle"|"high"|"k12"|"micro"|"hybrid") {
-    const presets={
-      elementary:{type:"church_hosted_academy",min:"K",max:"5",days:"5",async:false},
-      middle:{type:"church_hosted_academy",min:"6",max:"8",days:"5",async:false},
-      high:{type:"church_hosted_academy",min:"9",max:"12",days:"5",async:false},
-      k12:{type:"full_school",min:"K",max:"12",days:"5",async:false},
-      micro:{type:"microschool",min:"K",max:"8",days:"4",async:true},
-      hybrid:{type:"hybrid_program",min:"6",max:"12",days:"2",async:true},
-    } as const;
-    const choice=presets[model];
-    setType(choice.type);setGradeMin(choice.min);setGradeMax(choice.max);
-    setOnsite(true);setOnsiteDaysPerWeek(choice.days);setAsynchronous(choice.async);setLiveOnline(false);
-  }
-  function applyNinthGradeHybridPreset(){
-    // Explicit form proposal only. No accreditation, staffing, credit issuer,
-    // timetable, attendance or regulatory readiness is silently accepted.
-    setType("high_school_extension");
-    setGradeMin("9");setGradeMax("9");
-    setOnsite(true);setOnsiteDaysPerWeek("2");
-    setAsynchronous(true);setLiveOnline(false);
-  }
-  function applyExtendedLearningPreset(offering: "summer_program" | "summer_enrichment" | "after_school_enrichment") {
-    setType(offering);
-    setSummerCreditBearing(false);
-    setGradeMin("K"); setGradeMax("12");
-    setOnsite(true); setAsynchronous(false); setLiveOnline(false);
-    setOnsiteDaysPerWeek(offering === "after_school_enrichment" ? "3" : "5");
-  }
+  const {applySchoolModelPreset,applyNinthGradeHybridPreset,applyExtendedLearningPreset}=useLaunchModelPresets({setType,setGradeMin,setGradeMax,setOnsite,setOnsiteDaysPerWeek,setAsynchronous,setLiveOnline,setSummerCreditBearing});
 
   if (authError || !options || !launches) {
     return (
