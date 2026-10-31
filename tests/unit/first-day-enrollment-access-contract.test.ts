@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { deriveFirstSchoolDayHandoff } from "../../src/domain/first-school-day-handoff";
 
 const read = (path:string) =>
   readFileSync(new URL("../../"+path,import.meta.url),"utf8");
@@ -71,5 +72,45 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(handoff).toContain("the Program's official attendance roster");
     expect(handoff).toContain('to="/site/day"');
     expect(handoff).toContain("not opening authorization");
+  });
+});
+
+
+describe("future first-day readiness is not physical attendance",()=>{
+  const base={programId:"program",studentProfileId:"student",configuration:"configured",
+    expectedDays:1,students:[{studentProfileId:"student",programId:"program",
+      sectionId:"section",status:"present"}],blocks:[{programId:"program",
+      sectionId:"section",periodId:"period",assignedPlan:true,gaps:[]}],
+    projectionTruncated:false};
+  it("does not accept a future present status as attendance",()=>{
+    const result=deriveFirstSchoolDayHandoff({...base,preparation:true});
+    expect(result.state).toBe("staffing_plan_ready");
+    expect(result.attendanceRecorded).toBe(false);
+    expect(result.supervisionPlanned).toBe(true);
+  });
+  it("recognizes actual same-day recorded attendance separately",()=>{
+    const result=deriveFirstSchoolDayHandoff({...base,preparation:false});
+    expect(result.state).toBe("attendance_recorded");
+    expect(result.attendanceRecorded).toBe(true);
+  });
+  it("fails closed for a missing or different student's Section",()=>{
+    expect(deriveFirstSchoolDayHandoff({...base,students:[],preparation:true}).state)
+      .toBe("not_on_roster");
+    expect(deriveFirstSchoolDayHandoff({...base,students:[{...base.students[0],sectionId:null}],
+      preparation:true}).state).toBe("placement_missing");
+    expect(deriveFirstSchoolDayHandoff({...base,blocks:[{...base.blocks[0],sectionId:"other"}],
+      preparation:true}).state).toBe("supervision_unverified");
+  });
+  it("fails closed on calendar, timetable, absent plan, stale staffing or truncated evidence",()=>{
+    expect(deriveFirstSchoolDayHandoff({...base,configuration:"missing_calendar",preparation:true}).state)
+      .toBe("calendar_not_ready");
+    expect(deriveFirstSchoolDayHandoff({...base,expectedDays:0,preparation:true}).state)
+      .toBe("not_scheduled");
+    expect(deriveFirstSchoolDayHandoff({...base,blocks:[],preparation:true}).state)
+      .toBe("supervision_unverified");
+    expect(deriveFirstSchoolDayHandoff({...base,blocks:[{...base.blocks[0],
+      gaps:["facilitator_grant_revoked"]}],preparation:true}).supervisionPlanned).toBe(false);
+    expect(deriveFirstSchoolDayHandoff({...base,projectionTruncated:true,
+      preparation:true}).supervisionPlanned).toBe(false);
   });
 });
