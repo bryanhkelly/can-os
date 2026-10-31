@@ -19,6 +19,9 @@ const files=z.object({
  enrollments:csv.optional(),academicSessions:csv.optional(),lineItems:csv.optional(),results:csv.optional(),
 }).strict().refine(o=>Object.values(o).some(Boolean),"At least one OneRoster CSV file is required.");
 const input=z.object({programId:z.string().uuid(),files}).strict();
+/** Import identity includes the institutional Program, preventing cross-Program digest reuse. */
+const bundleDigest=(programId:string,files:z.infer<typeof files>)=>
+ createHash("sha256").update(JSON.stringify({programId,files})).digest("hex");
 export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
  .validator((value:unknown)=>input.parse(value))
  .handler(async({data})=>{
@@ -30,7 +33,7 @@ export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
      !actor.scope.siteIds?.includes(program.siteId)||!actor.scope.programIds?.includes(program.id))
    throw new AuthorizationError("same-program institutional OneRoster preview");
   const report=previewOneRosterBundle(data.files);
-  const digest=createHash("sha256").update(JSON.stringify(data.files)).digest("hex");
+  const digest=bundleDigest(data.programId,data.files);
   const reconciliation=planOneRosterReconciliation(report.previews,new Map());
   const serialized={
    reconciliation,
@@ -101,6 +104,7 @@ export const previewOneRosterReconciliation=createServerFn({method:"POST"})
    if(data.classMappings.some(m=>!externalClasses.has(m.sourcedId)))
      throw new Error("Mapped sourcedId must occur in the supplied classes CSV.");
    const ids=[...new Set(data.classMappings.map(m=>m.sectionId))];
+   if(ids.length!==data.classMappings.length)throw new Error("Each external class must map to a distinct Section.");
    if(ids.length){
      const owned=await db.select({id:sections.id,active:sections.active}).from(sections)
        .where(and(inArray(sections.id,ids),eq(sections.programId,program.id),eq(sections.siteId,program.siteId)));
@@ -163,7 +167,7 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
      if(row.status?.toLowerCase()==="tobedeleted")
        throw new Error("Withdrawn external classes cannot be mapped.");
    }
-   const digest=createHash("sha256").update(JSON.stringify(data.files)).digest("hex");
+   const digest=bundleDigest(data.programId,data.files);
    return db.transaction(async tx=>{
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"oneroster-map:"+program.organizationId+":"+data.sourceSystem}))`);
      const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,
