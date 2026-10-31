@@ -226,7 +226,7 @@ export const auditIssuedTranscript = createServerFn({method:"GET"})
  });
 
 export const decideGraduation = createServerFn({method:"POST"})
- .validator((input:unknown) => z.object({transcriptId:uuid,requirementSetId:uuid,decision:z.enum(["approved","denied"])}).parse(input))
+ .validator((input:unknown) => z.object({transcriptId:uuid,requirementSetId:uuid,decision:z.enum(["approved","denied"]),rationale:z.string().trim().min(12).max(2000)}).parse(input))
  .handler(async ({data}) => {
    const context=await registrar();const {db,s}=await resources();
    return db.transaction(async tx => {
@@ -256,7 +256,7 @@ export const decideGraduation = createServerFn({method:"POST"})
        requirementSetId:requirementSet.id,transcriptIssuanceId:transcript.id,decision:result.decision,
        audit:result.audit,decidedByPersonId:context.actorPersonId!,
      }).returning({id:s.graduationDecisions.id});
-     await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"graduation.decide",resourceType:"graduation_decision",resourceId:row!.id,scope:{organizationId:transcript.issuingOrganizationId},after:{decision:data.decision,audit:result.audit},context:{requestId:context.requestId??null}});
+     await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"graduation.decide",resourceType:"graduation_decision",resourceId:row!.id,scope:{organizationId:transcript.issuingOrganizationId},after:{decision:data.decision,audit:result.audit,rationale:data.rationale},context:{requestId:context.requestId??null}});
      return {decisionId:row!.id,audit:result.audit};
    });
  });
