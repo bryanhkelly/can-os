@@ -62,6 +62,11 @@ function GuardianApplyWorkspace({ data }: {
           </p>
           {app.guardianVerified && <Button asChild variant="outline" size="sm" className="mt-4"><Link to="/guardian/admission-offers"
             search={{ application: app.applicationId }}>Resume this student's enrollment checklist →</Link></Button>}
+          <div className="mt-3">
+            <Link to="/messages" className="inline-flex min-h-10 items-center rounded-lg border px-3 py-2 text-sm font-semibold">
+              {app.guardianVerified ? "Ask admissions about this application →" : "Contact admissions about guardian verification →"}
+            </Link>
+          </div>
         </article>)}
       </div> : <EmptyState title="No applications submitted from this family account yet."
         description="Your saved applications and their current school-managed stages will appear here." />}
