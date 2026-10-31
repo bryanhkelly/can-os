@@ -1,27 +1,24 @@
 import { Link } from "@tanstack/react-router";
 import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
-import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
+import type { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admissions-counts.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 
-export function LaunchFamilyProgress({ admissions, enrollmentCounts, familyInvitations, siteId, programId }: {
-  admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
+export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, familyInvitations, siteId, programId }: {
+  admissionsCounts: Awaited<ReturnType<typeof getLaunchAdmissionsCounts>> | null;
   enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
   familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
   siteId?: string;
   programId?: string;
 }) {
-  const scopedAdmissions = admissions?.filter(row => (!programId || row.programId === programId) && (!siteId || row.siteId === siteId));
-  const accepted = scopedAdmissions?.filter(row => row.stage === "accepted").length ?? 0;
-  const awaiting = scopedAdmissions?.filter(row => ["inquiry", "application", "eligibility"].includes(row.stage)).length ?? 0;
   return <>
-        {admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
+        {admissionsCounts&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Admissions progress</h2>
           <p className="mt-1 text-xs text-muted-foreground">Current application records for the selected school; invitation responses are tracked separately.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{scopedAdmissions?.length ?? 0}</strong>Applications recorded</p>
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{accepted}</strong>Accepted applications</p>
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{awaiting}</strong>Awaiting decision</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissionsCounts.total}</strong>Applications recorded</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissionsCounts.accepted}</strong>Accepted applications</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissionsCounts.awaiting}</strong>Awaiting decision</p>
           </div>
         </section>}
         {enrollmentCounts&&<section aria-label="Confirmed student enrollment" className="mt-3 rounded-xl border bg-card p-4">
