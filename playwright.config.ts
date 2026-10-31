@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import {
   DATABASE_URL,
   TEST_ACCESS_TOKEN_PEPPER,
@@ -21,6 +22,15 @@ const branchHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").t
 if (branchHost === process.env.CAN_APPLICATION_DB_HOST.replace(/-pooler(?=\.)/, "").toLowerCase()) {
   throw new Error("Browser tests must not use the application database endpoint.");
 }
+// Even a direct "npx playwright test" invocation must attest the actual
+// nonproduction Neon project/branch before beforeAll fixtures can write.
+execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
+  stdio: "inherit",
+  env: { ...process.env,
+    CAN_ADMISSIONS_TEST_BRANCH_ID:
+      process.env.CAN_ADMISSIONS_TEST_BRANCH_ID ?? process.env.CAN_E2E_TEST_BRANCH_ID,
+  },
+});
 export default defineConfig({
   testDir: "./tests/e2e",
   testIgnore: "admissions.spec.ts",
