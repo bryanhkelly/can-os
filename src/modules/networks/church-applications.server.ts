@@ -315,6 +315,34 @@ export async function requestAdditionalChurchEvidence(actor: AccessContext, requ
   return { requested: true as const, providerAccepted: acceptedByProvider, delivered: false as const };
 }
 
+/** Explicit retry for a recorded evidence request when the provider rejected the first notice. */
+export async function resendChurchEvidenceFollowup(actor: AccessContext, requestId: string) {
+  const canOrganizationId = await requireCANSteward(actor);
+  const [request] = await db.select({
+    status: churchOnboardingRequests.status,
+    contactEmail: churchOnboardingRequests.contactEmail,
+    decisionNote: churchOnboardingRequests.decisionNote,
+    updatedAt: churchOnboardingRequests.updatedAt,
+  }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
+  if (request?.status !== "needs_evidence" || !request.decisionNote)
+    throw new Error("No pending evidence follow-up can be resent");
+  const providerAccepted = await sendNotificationEmail({
+    to: request.contactEmail,
+    subject: "CAN Academy church partnership: additional evidence needed",
+    text: "CAN Academy still needs additional authority evidence before your application can be reviewed. Please provide the following through your established CAN contact. Do not email student records or sensitive identification documents.\n\n" +
+      request.decisionNote + "\n\nThis is not approval to open a school.",
+  }, "church-evidence-followup:" + requestId + ":" + request.updatedAt.toISOString());
+  await db.transaction(async tx => {
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.evidence.followup.retry.transport",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { providerAccepted, delivered: false },
+    });
+  });
+  return { providerAccepted, delivered: false as const };
+}
+
 export async function declineChurchApplication(actor: AccessContext, requestId: string, note: string) {
   const canOrganizationId = await requireCANSteward(actor);
   const recipient = await db.transaction(async tx => {
