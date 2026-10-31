@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
 import { submitRoomPlanSchema } from "@/domain/onsite-room-plan";
-import { submitOnsiteRoomPlan, reviewOnsiteRoomPlan } from "@/modules/operations/onsite-room-plan.server";
+import { submitOnsiteRoomPlan, reviewOnsiteRoomPlan, getOnsiteRoomPlanning } from "@/modules/operations/onsite-room-plan.server";
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], inserts: [] as Record<string, unknown>[],
   updates: [] as Record<string, unknown>[], delegate: vi.fn(), reviewer: vi.fn(), safety: vi.fn(), appointed: true }));
 vi.mock("@/modules/operations/school-opening.server", () => ({
@@ -110,5 +110,13 @@ describe("independent room plan review",()=>{
     expect(await reviewOnsiteRoomPlan(can,{...review,decision:"reject"})).toMatchObject({changed:true});
     expect(state.safety).not.toHaveBeenCalled();
     expect(state.updates[0]).toMatchObject({verifiedAt:null,metadata:expect.objectContaining({reviewStatus:"rejected"})});
+  });
+});
+
+describe("room planning read boundary",()=>{
+  it.each(["room_facilitator","guardian","teacher"])("does not expose planning staff or rationale to %s",async role=>{
+    const value=input();
+    await expect(getOnsiteRoomPlanning({...actor(),role} as AccessContext,{programId:value.programId,date:value.date}))
+      .rejects.toThrow("current local director");
   });
 });

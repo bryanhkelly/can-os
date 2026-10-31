@@ -39,6 +39,7 @@ export type OnsiteSupervisionPlan=Omit<SupervisionSummary,"blocks">&{
   date:string;
   siteId:string;
   projectionTruncated:boolean;
+  canPlanRooms?:boolean;
   blocks:OnsiteSupervisionPlanBlock[];
 };
 export type OnsiteOperationalSupervisionPlan=Omit<OnsiteSupervisionPlan,"blocks">&{
@@ -423,7 +424,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const actor=await getCommandContext(getRequest());
     assertOnsiteAttendanceScope(actor);
     const plan=await loadOnsiteSupervisionPlanForActor(actor,data);
-    return {...plan,blocks:plan.blocks.map(({
+    return {...plan,canPlanRooms:actor.role==="site_leader",blocks:plan.blocks.map(({
       facilitatorPersonId:_facilitatorPersonId,backupPersonId:_backupPersonId,...block
     })=>block)};
   });

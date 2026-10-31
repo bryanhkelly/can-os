@@ -1,3 +1,4 @@
+import { OnsiteRoomPlanningPanel } from "@/components/operations/OnsiteRoomPlanningPanel";
 import { OperatingAgreementEvidencePicker } from "./OperatingAgreementEvidencePicker";
 import { useCallback, useEffect, useState } from "react";
 import { CANAcademicStaffDelegationPanel } from "./CANAcademicStaffDelegationPanel";
@@ -146,6 +147,7 @@ export function CANOperatingAuthorizationDesk() {
       {staffProgramId&&<>
         <SchoolOpeningEvidencePanel key={"evidence:"+staffProgramId} programId={staffProgramId}/>
         <SchoolOpeningReviewPanel key={"opening:"+staffProgramId} programId={staffProgramId}/>
+        <OnsiteRoomPlanningPanel key={"rooms:"+staffProgramId} programId={staffProgramId}/>
         <CANAcademicStaffDelegationPanel key={staffProgramId} programId={staffProgramId}/>
       </>}
     </div>}

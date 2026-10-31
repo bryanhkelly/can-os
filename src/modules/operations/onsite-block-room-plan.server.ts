@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { documents } from "@/db/schema";
 import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverage";
@@ -77,6 +77,7 @@ export async function fetchRoomPlanEvidence(
     eq(documents.subjectType,"section"),
     eq(documents.category,ROOM_COVERAGE_DOCUMENT_CATEGORY),
     inArray(documents.subjectId,[...new Set(sectionIds)]),
+    sql`${documents.metadata}->>'isCurrent' IS DISTINCT FROM 'false'`,
   )).orderBy(desc(documents.createdAt),desc(documents.id))
     .limit(2001);
   return {rows:rows.slice(0,2000),truncated:rows.length>2000};

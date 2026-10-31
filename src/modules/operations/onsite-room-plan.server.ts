@@ -1,7 +1,8 @@
-import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { and, desc, eq, gt, gte, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { academicCalendarDays, academicCalendars, documents, programs, scheduleTemplatePeriods,
-  scheduleTemplates, schoolYears, sections, sites, terms } from "@/db/schema";
+  scheduleTemplates, schoolYears, sections, sites, terms, people, roleAssignments, programResponsibilityAssignments, deliveryArrangements } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { siteDate } from "@/domain/expected-attendance";
@@ -9,11 +10,11 @@ import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverag
 import { roomPlanBlockSchema, submitRoomPlanSchema, reviewRoomPlanSchema } from "@/domain/onsite-room-plan";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
-import { schoolIdentity, verifyCANSchoolApprover, verifyChurchEvidenceSubmitter } from "./school-opening.server";
+import { schoolIdentity, verifyCANSchoolApprover, verifyChurchEvidenceSubmitter, latestConfiguration } from "./school-opening.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { ROOM_COVERAGE_DOCUMENT_CATEGORY } from "./onsite-block-room-plan.server";
 import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator } from "./section-coverage-verification.server";
-import { requireCurrentOnsiteAdultSafety } from "./onsite-block-safety.server";
+import { requireCurrentOnsiteAdultSafety, verifiedAdultSafetyEvidence, verifiedAdultCoversBlock } from "./onsite-block-safety.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import type { z } from "zod";
 
@@ -21,9 +22,11 @@ type Reader = Pick<typeof db, "select">;
 type BlockInput = z.infer<typeof roomPlanBlockSchema>;
 
 /** Exact canonical schedule identity, shared by plan submission and review. */
-export async function scheduledRoomBlock(tx: Reader, input: BlockInput) {
+export async function scheduledRoomBlocks(tx: Reader, input: Pick<BlockInput,"programId"|"date"> & Partial<BlockInput>) {
   const school = await schoolIdentity(tx, input.programId);
-  const [block] = await tx.select({ startsAtLocal: scheduleTemplatePeriods.startsAtLocal,
+  const newerCalendar = alias(academicCalendars,"newer_room_calendar");
+  const blocks = await tx.select({ sectionId: sections.id, periodId: scheduleTemplatePeriods.id,
+    periodLabel: scheduleTemplatePeriods.label, startsAtLocal: scheduleTemplatePeriods.startsAtLocal,
     endsAtLocal: scheduleTemplatePeriods.endsAtLocal, title: sections.title,
   }).from(sections)
     .innerJoin(terms, eq(terms.id, sections.termId))
@@ -33,7 +36,7 @@ export async function scheduledRoomBlock(tx: Reader, input: BlockInput) {
     .innerJoin(academicCalendars, and(eq(academicCalendars.schoolYearId, schoolYears.id),
       eq(academicCalendars.siteId, school.siteId), eq(academicCalendars.active, true)))
     .innerJoin(academicCalendarDays, eq(academicCalendarDays.academicCalendarId, academicCalendars.id))
-    .where(and(eq(sections.id, input.sectionId), eq(sections.programId, input.programId),
+    .where(and(...(input.sectionId ? [eq(sections.id, input.sectionId)] : []), eq(sections.programId, input.programId),
       eq(sections.siteId, school.siteId), eq(sections.active, true),
       eq(schoolYears.organizationId, school.organizationId), eq(schoolYears.siteId, school.siteId),
       or(eq(schoolYears.programId, input.programId), isNull(schoolYears.programId)), eq(schoolYears.status, "active"),
@@ -43,12 +46,20 @@ export async function scheduledRoomBlock(tx: Reader, input: BlockInput) {
       or(eq(scheduleTemplates.programId, input.programId), isNull(scheduleTemplates.programId)),
       eq(scheduleTemplates.active, true), lte(scheduleTemplates.effectiveFrom, input.date),
       or(isNull(scheduleTemplates.effectiveThrough), gte(scheduleTemplates.effectiveThrough, input.date)),
-      eq(scheduleTemplatePeriods.id, input.periodId), eq(scheduleTemplatePeriods.type, "instruction"),
+      ...(input.periodId ? [eq(scheduleTemplatePeriods.id, input.periodId)] : []), eq(scheduleTemplatePeriods.type, "instruction"),
       eq(scheduleTemplatePeriods.dayOfWeek, new Date(input.date + "T12:00:00Z").getUTCDay()),
+      notExists(tx.select({id:newerCalendar.id}).from(newerCalendar).where(and(
+        eq(newerCalendar.schoolYearId,schoolYears.id),eq(newerCalendar.siteId,school.siteId),
+        eq(newerCalendar.active,true),gt(newerCalendar.version,academicCalendars.version)))),
       eq(academicCalendarDays.calendarDate, input.date),
       or(eq(academicCalendarDays.type, "instructional"), and(eq(academicCalendarDays.type, "special"),
         sql`${academicCalendarDays.instructionalMinutes} > 0`)),
-    )).limit(1);
+    )).limit(201);
+  return { school, blocks };
+}
+export async function scheduledRoomBlock(tx: Reader, input: BlockInput) {
+  const { school, blocks } = await scheduledRoomBlocks(tx,input);
+  const block = blocks[0];
   if (!block || block.startsAtLocal >= block.endsAtLocal)
     throw new AuthorizationError("current scheduled instructional Section, period and calendar date");
   return { school, block };
@@ -69,6 +80,7 @@ export function currentRoomPlan(tx: Reader, input: BlockInput) {
     eq(documents.subjectId, input.sectionId), eq(documents.category, ROOM_COVERAGE_DOCUMENT_CATEGORY),
     sql`${documents.metadata}->>'date' = ${input.date}`,
     sql`${documents.metadata}->>'periodId' = ${input.periodId}`,
+    sql`${documents.metadata}->>'isCurrent' IS DISTINCT FROM 'false'`,
   )).orderBy(desc(documents.createdAt), desc(documents.id)).limit(1);
 }
 
@@ -158,7 +170,7 @@ export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<
         { siteId: school.siteId, organizationId: school.organizationId },
         [primary, backup].map(personId => ({ personId, programId: input.programId, sectionId: input.sectionId })));
       for (const personId of [primary, backup]) {
-        if (!scheduledBlockHasNamedFacilitator(appointments, { personId, programId: input.programId, sectionId: input.sectionId, ...scope }))
+        if (!scheduledBlockHasNamedFacilitator(appointments, { personId, programId: input.programId, ...scope }))
           throw new AuthorizationError("current primary and backup Section appointments for the entire block");
         await requireCurrentOnsiteAdultSafety(tx, { personId, ...scope });
       }
@@ -182,4 +194,67 @@ export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<
       resourceType: "program", resourceId: input.programId, eventId }]);
     return { documentId: document.id, changed: true };
   });
+}
+
+/** Role-scoped planning DTO: assigned adults, schedule and current structured
+ * plans only. No student roster or qualification documents are exposed. */
+export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<BlockInput,"programId"|"date">) {
+  const input = roomPlanBlockSchema.pick({ programId:true,date:true }).parse(value);
+  const school = await schoolIdentity(db,input.programId);
+  const canReview = actor.role === "can_network_steward";
+  if (canReview) verifyCANSchoolApprover(actor,school.institutionId);
+  else await authorizeRoomPlanHost(db,actor,school);
+  const { blocks } = await scheduledRoomBlocks(db,input);
+  if (blocks.length > 200) throw new Error("Room planning is incomplete; narrow the school schedule before continuing");
+  const configuration = await latestConfiguration(db,input.programId);
+  const [site] = await db.select({ timezone:sites.timezone }).from(sites).where(eq(sites.id,school.siteId)).limit(1);
+  const sectionIds=[...new Set(blocks.map(block=>block.sectionId))];
+  const [assignments, plans, arrangements] = sectionIds.length ? await Promise.all([
+    db.select({ personId:roleAssignments.personId, name:sql<string>`${people.legalFirstName} || ' ' || ${people.legalLastName}`,
+      key:programResponsibilityAssignments.responsibilityKey,
+    }).from(programResponsibilityAssignments)
+      .innerJoin(roleAssignments,eq(roleAssignments.id,programResponsibilityAssignments.responsibleRoleAssignmentId))
+      .innerJoin(people,eq(people.id,roleAssignments.personId))
+      .where(and(eq(programResponsibilityAssignments.configurationVersionId,configuration.id),
+        eq(roleAssignments.programId,input.programId),eq(roleAssignments.siteId,school.siteId),
+        eq(roleAssignments.roleKey,"room_facilitator"))).limit(501),
+    db.select().from(documents).where(and(eq(documents.subjectType,"section"),inArray(documents.subjectId,sectionIds),
+      eq(documents.category,ROOM_COVERAGE_DOCUMENT_CATEGORY),sql`${documents.metadata}->>'date' = ${input.date}`))
+      .orderBy(desc(documents.createdAt),desc(documents.id)).limit(1001),
+    db.select().from(deliveryArrangements).where(and(inArray(deliveryArrangements.sectionId,sectionIds),
+      eq(deliveryArrangements.status,"active"))).limit(501),
+  ]) : [[],[],[]];
+  if(assignments.length>500||plans.length>1000||arrangements.length>500)
+    throw new Error("Room planning source records are incomplete; no approval is inferred");
+  const candidates=assignments.flatMap(row=>{
+    const [kind,sectionId,personId]=row.key.split(":");
+    return kind==="room_facilitator"&&sectionId&&sectionIds.includes(sectionId)&&personId===row.personId
+      ? [{personId:row.personId,name:row.name,sectionId,programId:input.programId}] : [];
+  });
+  const [appointments,safety]=await Promise.all([
+    verifiedScheduledSectionFacilitators(db,{siteId:school.siteId,organizationId:school.organizationId},candidates),
+    verifiedAdultSafetyEvidence(db,candidates.map(row=>row.personId)),
+  ]);
+  return { programId:input.programId,date:input.date,timezone:site!.timezone,canSubmit:!canReview,canReview,
+    blocks:blocks.map(block=>{
+      const scope={date:input.date,timeZone:site!.timezone,...block};
+      const staff=[...new Map(candidates.filter(row=>row.sectionId===block.sectionId&&
+        scheduledBlockHasNamedFacilitator(appointments,{...row,...scope})&&
+        Object.values(verifiedAdultCoversBlock(safety.get(row.personId),scope)).every(Boolean)
+      ).map(row=>[row.personId,{personId:row.personId,name:row.name}])).values()];
+      const primaries=[...new Set(arrangements.filter(row=>row.sectionId===block.sectionId&&
+        ["onsite","hybrid"].includes(row.modality)&&coversLocalSupervisionBlock({...scope,
+          effectiveFrom:row.effectiveFrom,effectiveThrough:row.effectiveThrough}))
+        .map(row=>row.facilitatorPersonId).filter((id):id is string=>!!id))];
+      const document=plans.find(row=>row.subjectId===block.sectionId&&row.metadata.periodId===block.periodId&&row.metadata.isCurrent!==false);
+      return {...block,staff,assignedPrimaryPersonId:primaries.length===1?primaries[0]:null,
+        current:document?{id:document.id,submittedByPersonId:document.uploadedByPersonId,
+          primaryPersonId:String(document.metadata.primaryPersonId??""),backupPersonId:String(document.metadata.backupPersonId??""),
+          roomLabel:String(document.metadata.roomLabel??""),roomCapacity:Number(document.metadata.roomCapacity??0),
+          rationale:String(document.metadata.rationale??""),expiresAt:document.expiresAt?.toISOString()??null,
+          status:document.metadata.isCurrent===false?"superseded":String(document.metadata.reviewStatus??"legacy"),
+          reason:typeof document.metadata.reviewReason==="string"?document.metadata.reviewReason:null,
+          canReview:canReview&&document.uploadedByPersonId!==actor.actorPersonId&&document.metadata.reviewStatus==="pending",
+        }:null};
+    }) };
 }

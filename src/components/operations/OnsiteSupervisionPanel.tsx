@@ -1,3 +1,4 @@
+import { OnsiteRoomPlanningPanel } from "./OnsiteRoomPlanningPanel";
 import { useEffect, useState } from "react";
 import { Qualifications } from "@/components/profiles/Qualifications";
 import { getOnsiteSupervisionPlan } from "@/modules/operations/onsite-supervision.functions";
@@ -211,6 +212,9 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       {plan.blocks.length>60&&<p className="mt-3 text-sm">
         Showing 60 of {plan.blocks.length} instructional blocks. Use school staffing administration for the complete plan.
       </p>}
+      {plan.canPlanRooms&&[...new Map(plan.blocks.filter(block=>block.requiresSectionDelegation).map(block=>[block.programId,block])).values()]
+        .map(block=><OnsiteRoomPlanningPanel key={block.programId} programId={block.programId} initialDate={date}
+          onChanged={()=>setNonce(value=>value+1)}/>)}
       <p className="mt-3 text-xs text-muted-foreground">{plan.note}</p>
       <details className="mt-5 rounded border p-3">
         <summary className="cursor-pointer font-semibold text-sm">My required safety-screening and safeguarding-training evidence</summary>
