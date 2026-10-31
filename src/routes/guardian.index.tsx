@@ -74,6 +74,9 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
 }){
  const selectedChild=children.find(child=>child.studentPersonId===student);
  const visibleChildren=selectedChild?[selectedChild]:children;
+ // Site-wide notices remain visible; child-specific tasks follow the picker.
+ const visibleNeeds=needs.filter(item=>!selectedChild||!item.studentPersonId||
+  item.studentPersonId===selectedChild.studentPersonId);
  const visibleQuestions=gradeFollowUps.filter(question=>!selectedChild||
   question.studentPersonId===selectedChild.studentPersonId);
  const visibleApprovals=courseApprovals.filter(item=>!selectedChild||
@@ -100,7 +103,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   dueAt:work.dueAt,
   priority:work.status==="returned"?"high":"normal",
  })));
- const prioritized=prioritizeFamilyNeeds([...needs,...approvalNeeds,...schoolworkItems],Date.now());
+ const prioritized=prioritizeFamilyNeeds([...visibleNeeds,...approvalNeeds,...schoolworkItems],Date.now());
  const schoolworkCount=visibleChildren.reduce((total,child)=>total+child.workNeedsAttentionCount,0);
  return <WorkspaceShell
   width="wide"
@@ -139,7 +142,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
-    <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":needs.length+visibleApprovals.length+schoolworkCount}/>
+    <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":visibleNeeds.length+visibleApprovals.length+schoolworkCount}/>
     <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <div className="mt-6">
@@ -150,7 +153,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      empty={action?"The selected action is not available in your current family workspace.":"You are all caught up. Nothing needs your attention right now."}
     />
     {action&&<Link to="/guardian" className="mt-4 inline-block text-sm underline">View all family needs</Link>}
-    {action&&!needsWarning&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
+    {action&&!needsWarning&&!visibleNeeds.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
    </div>
 
    <section aria-label="School responses to your grade questions" className="mt-10">
