@@ -259,6 +259,17 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      inArray(s.actions.siteId,context.scope.siteIds??[]))):[];
  const permittedAssignedActions=new Set(ownedActions.filter(action=>
    !action.programId||(context.scope.programIds??[]).includes(action.programId)).map(action=>action.id));
+ const custodyActionIds=rows.filter(n=>n.type==="pickup_custody_hold_staff_review"&&
+  n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const custodyActions=custodyActionIds.length&&context.role==="site_leader"
+  ?await db.select({id:s.actions.id,programId:s.actions.programId}).from(s.actions)
+    .where(and(inArray(s.actions.id,custodyActionIds),
+      eq(s.actions.type,"onsite_pickup_custody_hold"),
+      eq(s.actions.ownerPersonId,personId),
+      inArray(s.actions.siteId,context.scope.siteIds??[]))):[];
+ const permittedCustodyActions=new Set(custodyActions.filter(action=>
+  !action.programId||(context.scope.programIds??[]).includes(action.programId)
+ ).map(action=>action.id));
  const missingAssessmentByAction=new Map(followUps.filter(a=>typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
  // Thread notifications deep-link only when the recipient currently holds
@@ -355,6 +366,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
+   n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/site/day#pickup":
    ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
