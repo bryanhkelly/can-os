@@ -65,7 +65,7 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
         expectedVersion:item.current.version,decision,reason}});
       await changed(decision==="approve"?"Independent evidence verification recorded.":
         "Evidence rejected with correction instructions for the church.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Evidence review was not recorded");}
+    }catch(cause){setError(cause instanceof Error?cause.message:"Evidence review was not recorded");throw cause;}
     finally{setBusy(false);}
   }
   async function download(documentId:string) {
