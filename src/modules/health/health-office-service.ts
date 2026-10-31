@@ -459,6 +459,7 @@ export async function clearReturnToSchool(
       .limit(1);
 
     if (!current) throw new Error("Return-to-school clearance not found");
+    await assertCurrentHealthStudentScope(tx, context, current.studentProfileId);
     if (current.status === "cleared") return;
 
     const clearedAt = new Date();
