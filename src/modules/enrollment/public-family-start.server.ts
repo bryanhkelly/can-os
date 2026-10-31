@@ -98,6 +98,7 @@ export async function requestVerifiedFamilyStart(
       eq(publicFamilyStartRequests.programId,school.programId),
       eq(publicFamilyStartRequests.emailNormalized,email),
       gt(publicFamilyStartRequests.createdAt,new Date(Date.now()-COOLDOWN_MS)),
+      gt(publicFamilyStartRequests.expiresAt,new Date()),
     )).limit(1);
   if(recent)return {requestId:recent.id,created:false,email};
   const [entry]=await tx.insert(publicFamilyStartRequests).values({
@@ -118,11 +119,18 @@ export async function requestVerifiedFamilyStart(
   return {requestId:entry.id,created:true,email};
  });
  if(!outcome.created)return {requestId:outcome.requestId,created:false};
+ try {
  await sender({
   to:outcome.email,accessUrl:origin.origin+"/family/join#token="+encodeURIComponent(token),
   ...(options.idempotencyKey?{idempotencyKey:options.idempotencyKey}:{}),
   ...(options.subject?{subject:options.subject}:{}),
   ...(options.introduction?{introduction:options.introduction}:{}),
  });
+ } catch (error) {
+  await db.update(publicFamilyStartRequests).set({expiresAt:new Date(0)})
+    .where(and(eq(publicFamilyStartRequests.id,outcome.requestId),
+      eq(publicFamilyStartRequests.tokenHash,tokenHash)));
+  throw error;
+ }
  return {requestId:outcome.requestId,created:true};
 }
