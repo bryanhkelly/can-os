@@ -23,6 +23,27 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
  .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(desc(s.notifications.createdAt)).limit(50);
+ const schoolAlertIds=rows.filter(n=>n.type==="school_family_alert"&&
+   n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const accessibleSchoolAlerts=schoolAlertIds.length&&context.role==="guardian"?
+  await db.selectDistinct({id:s.actions.id}).from(s.actions)
+   .innerJoin(s.enrollments,and(
+     eq(s.enrollments.programId,s.actions.programId),
+     eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+   ))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+      guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,
+      access:"enrollment",
+   }))
+   .where(and(
+     inArray(s.actions.id,schoolAlertIds),eq(s.actions.type,"school_family_bulletin"),
+     eq(s.actions.subjectType,"program"),
+     inArray(s.actions.siteId,context.scope.siteIds??[]),
+     inArray(s.actions.programId,context.scope.programIds??[]),
+     inArray(s.actions.organizationId,context.scope.organizationIds??[]),
+   )):[];
+ const permittedSchoolAlerts=new Set(accessibleSchoolAlerts.map(row=>row.id));
  const handoffIds=rows.filter(n=>n.type==="program_opening_handoff"&&n.resourceType==="action"&&n.resourceId)
   .map(n=>n.resourceId!);
  const handoffs=handoffIds.length&&context.role==="registrar"?await db.select({id:s.actions.id,siteId:s.actions.siteId})
@@ -416,6 +437,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="health_office_visit"?permittedMedicalIds.has(n.resourceId):
+    n.resourceType==="action"&&n.type==="school_family_alert"?permittedSchoolAlerts.has(n.resourceId):
     n.resourceType==="action"&&n.type==="guardian_health_review_completed"?healthGuardianChildByAction.has(n.resourceId):
     n.resourceType==="action"&&n.type==="guardian_enrollment_change_updated"?familyChangeChildByAction.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
@@ -429,6 +451,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
+   n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="guardian_health_review_requested"&&n.resourceType==="action"&&n.resourceId&&healthStaffActionIds.has(n.resourceId)?`/operations/health-review?action=${encodeURIComponent(n.resourceId)}`:
