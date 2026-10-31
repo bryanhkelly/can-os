@@ -7,6 +7,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
+import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
 import {getReceivingSchoolTransferTranscript} from "@/modules/enrollment/transfer-records-handoff.functions";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
 const load=async(interestId?:string)=>{
@@ -72,7 +73,6 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   setBusy(true);setError("");setNotice("");
   try{await fn();await router.invalidate();setNotice(message);}catch(e){setError(e instanceof Error?e.message:"Unable to save");}finally{setBusy(false);}
  }
- const stages=["inquiry","application","eligibility","accepted","declined","withdrawn"];
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
@@ -174,9 +174,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     <button type="submit" disabled={busy||!programId||(!!convertibleInterest&&!contactReviewed)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>
    </form>}
   </section>
-  <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
-   {stages.map(stage=><div key={stage} className="rounded-lg border p-3"><p className="text-xs capitalize text-muted-foreground">{stage}</p><p className="font-serif text-2xl">{scopedRecords.filter(r=>r.stage===stage).length}</p></div>)}
-  </div>
+  <AdmissionsPipelineSummary counts={countAdmissionsStages(scopedRecords)}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
    {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
    {records.map(r=><article key={r.id} className="rounded-xl border bg-card p-5">
