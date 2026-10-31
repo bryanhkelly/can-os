@@ -80,7 +80,48 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
    if(!programSeats.length)
      throw new Error("No active enrollment remains at this school. The school must reconcile this request.");
 
+   const [site]=await tx.select({timezone:s.sites.timezone}).from(s.sites)
+     .where(eq(s.sites.id,action.siteId)).limit(1);
+   if(!site?.timezone)throw new AuthorizationError("school timezone");
    const now=new Date();
+   const localDate=(date:Date)=>new Intl.DateTimeFormat("en-CA",{
+     timeZone:site.timezone,year:"numeric",month:"2-digit",day:"2-digit",
+   }).format(date);
+   const today=localDate(now);
+   const attendanceRows=await tx.select({
+     id:s.attendanceEvents.id,studentProfileId:s.attendanceEvents.studentProfileId,
+     programId:s.attendanceEvents.programId,
+     occurrenceKey:s.attendanceEvents.occurrenceKey,
+     status:s.attendanceEvents.status,recordedAt:s.attendanceEvents.recordedAt,
+     expectedAt:s.attendanceEvents.expectedAt,
+   }).from(s.attendanceEvents).where(and(
+     eq(s.attendanceEvents.studentProfileId,action.subjectId),
+     eq(s.attendanceEvents.programId,action.programId),
+     eq(s.attendanceEvents.siteId,action.siteId),
+     gte(s.attendanceEvents.expectedAt,new Date(now.getTime()-36*60*60*1000)),
+     lte(s.attendanceEvents.expectedAt,new Date(now.getTime()+36*60*60*1000)),
+   ));
+   const onsite=effectiveAttendanceEvents(attendanceRows).some(row=>
+     localDate(row.expectedAt)===today&&(row.status==="present"||row.status==="tardy"));
+   if(onsite){
+     const [released]=await tx.select({id:s.pickupReleaseEvents.id})
+       .from(s.pickupReleaseEvents).where(and(
+         eq(s.pickupReleaseEvents.studentProfileId,action.subjectId),
+         eq(s.pickupReleaseEvents.programId,action.programId),
+         eq(s.pickupReleaseEvents.siteId,action.siteId),
+         eq(s.pickupReleaseEvents.releaseDate,today),
+         eq(s.pickupReleaseEvents.status,"released"),
+       )).limit(1);
+     if(!released)throw new Error("Student remains checked in onsite without a verified release. Complete the supervised handoff before ending enrollment.");
+   }
+   const [activeCustodyHold]=await tx.select({id:s.pickupCustodyHolds.id})
+     .from(s.pickupCustodyHolds).where(and(
+       eq(s.pickupCustodyHolds.studentProfileId,action.subjectId),
+       eq(s.pickupCustodyHolds.programId,action.programId),
+       eq(s.pickupCustodyHolds.siteId,action.siteId),
+       eq(s.pickupCustodyHolds.status,"active"),
+     )).limit(1);
+   if(activeCustodyHold)throw new Error("Resolve the active pickup custody hold with authorized site leadership before ending enrollment.");
    const nextStatus=kind==="transfer"?"transferred" as const:"withdrawn" as const;
    const seatIds=active.map(row=>row.id);
    const ended=await tx.update(s.enrollments).set({
