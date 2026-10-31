@@ -70,7 +70,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   // The student home can link directly to a real published lesson without
   // predicting the publisher's IDs. Empty shell lessons are not first-day
   // instruction, even if they precede the first authored lesson.
-  const { lesson, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
+  const { lesson, lessonIndex, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
   const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
