@@ -11,7 +11,7 @@ export function RubricScoreFields({
   values: Readonly<Record<string, string>>;
   onChange: (criterionId: string, value: string) => void;
   total: number | null;
-  pointsPossible: number | null;
+  pointsPossible: number | null | undefined;
 }) {
   return (
     <fieldset className="space-y-3">
