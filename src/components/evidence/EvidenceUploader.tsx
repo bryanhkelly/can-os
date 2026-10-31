@@ -42,8 +42,13 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
         setPending(attempt);
       }
       await adapter.finish({ ...attempt.input, key: attempt.key });
+      // Finalization succeeded: never retry the same command if refreshing the view fails.
       setPending(null); setFile(null); setExpiry("");
-      await onUploaded();
+      try { await onUploaded(); }
+      catch (cause) {
+        setError(cause instanceof Error ? `Evidence recorded, but refresh failed: ${cause.message}` :
+          "Evidence recorded, but the view could not refresh");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Evidence upload was not recorded");
     } finally { setBusy(false); }
