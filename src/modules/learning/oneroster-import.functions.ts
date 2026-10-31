@@ -92,9 +92,10 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
    // CSV rows are indexable records: require a concrete sourcedId before
    // passing identifiers into Drizzle predicates and persisted mappings.
    const validatedClasses=classes.rows.map(row=>{
-     const sourcedId=row.sourcedId;
-     if(!sourcedId)throw new Error("Every OneRoster class needs a sourcedId.");
-     return {...row,sourcedId};
+     const {sourcedId,classCode,title,courseSourcedId}=row;
+     if(!sourcedId||!classCode||!title||!courseSourcedId)
+       throw new Error("OneRoster class mapping requires its ID, code, title and course ID.");
+     return {sourcedId,classCode,title,courseSourcedId};
    });
    const sourceIds=validatedClasses.map(row=>row.sourcedId);
    const bySource=new Map(data.classMappings.map(row=>[row.sourcedId,row.sectionId]));
