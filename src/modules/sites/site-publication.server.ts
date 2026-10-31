@@ -88,6 +88,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   ]);
   return {
     site,
+    hostingConfigured: process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
     address: address[0] ? {
       host: publicSiteHost(address[0].slug),
       slug: address[0].slug,

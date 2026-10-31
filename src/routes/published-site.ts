@@ -9,7 +9,7 @@ const headers = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
-  "X-Robots-Tag": "noindex, nofollow",
+  "X-Robots-Tag": "index, follow",
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
 };
 
@@ -27,19 +27,19 @@ export const Route = createFileRoute("/published-site")({
           request, process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
         );
         if (!slug) return new Response("Not found", {
-          status: 404, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+          status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
         });
         try {
           const { readPublishedSiteCatalog } = await import("@/modules/sites/site-public-catalog.server");
           const catalog = await readPublishedSiteCatalog(slug);
           if (!catalog) return new Response("Not found", {
-            status: 404, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+            status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
           });
           return new Response(renderPublicSiteHtml(catalog, { makeRequestId: () => crypto.randomUUID() }), { status: 200, headers });
         } catch {
           // Fail closed on a missing migration, database error or unexpected data.
           return new Response("Site temporarily unavailable", {
-            status: 503, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+            status: 503, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
           });
         }
       },
