@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  accessAccounts, admissionSeatPools, applications, guardianRelationships,
+  accessAccounts, admissionSeatPools, applications, actions, guardianRelationships,
   householdMemberships, households, people, programs, schoolYears, studentProfiles,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -35,6 +35,7 @@ const applicationInput = z.object({
   householdId: uuid.optional(),
   schoolYearId: uuid.optional(),
   studentProfileId: uuid.optional(),
+  originTransferActionId: uuid.optional(),
   familyStartRequestId: uuid.optional(),
   studentFirstName: z.string().trim().min(1).max(100),
   studentLastName: z.string().trim().min(1).max(100),
@@ -52,7 +53,7 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
     const organizationIds=actor.scope.organizationIds??[];
     const siteIds=actor.scope.siteIds??[];
     if(!programIds.length || !organizationIds.length || !siteIds.length)
-      return {programs:[],applications:[],households:[],students:[]};
+      return {programs:[],applications:[],households:[],students:[],transferRequests:[]};
     const available=await db.select({
       id:programs.id,name:programs.name,siteId:programs.siteId,
     }).from(programs).where(and(
@@ -169,6 +170,7 @@ export const startGuardianFamilyApplication = createServerFn({method:"POST"})
       ...(data.householdId?{householdId:data.householdId}:{}),
       ...(data.schoolYearId?{schoolYearId:data.schoolYearId}:{}),
       ...(data.studentProfileId?{existingStudentProfileId:data.studentProfileId}:{}),
+      ...(data.originTransferActionId?{originTransferActionId:data.originTransferActionId}:{}),
       ...(data.familyStartRequestId?{familyStartRequestId:data.familyStartRequestId}:{}),
       source:data.familyStartRequestId?"published_site":"family_account",
       student:{legalFirstName:data.studentFirstName,legalLastName:data.studentLastName,
