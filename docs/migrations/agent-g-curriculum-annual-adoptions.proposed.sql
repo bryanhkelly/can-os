@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS curriculum_annual_adoptions (
  program_id uuid NOT NULL REFERENCES programs(id) ON DELETE RESTRICT,
  site_id uuid REFERENCES sites(id) ON DELETE RESTRICT,
  academic_provider_organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
- academic_year_id uuid NOT NULL,
+ academic_year_id uuid NOT NULL REFERENCES school_years(id) ON DELETE RESTRICT,
  pack_id uuid NOT NULL REFERENCES curriculum_packs(id) ON DELETE RESTRICT,
  pack_version_id uuid NOT NULL REFERENCES curriculum_pack_versions(id) ON DELETE RESTRICT,
  entitlement_id uuid NOT NULL REFERENCES curriculum_entitlements(id) ON DELETE RESTRICT,
