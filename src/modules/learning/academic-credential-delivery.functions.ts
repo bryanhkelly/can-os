@@ -5,7 +5,7 @@ import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
-import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, isLatestTranscriptIssuance } from "@/domain/academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, isLatestTranscriptIssuance, canReauthorizeCredentialRelease } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
@@ -196,7 +196,7 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      eq(s.academicCredentialReleaseAuthorizations.consentEvidenceReference,consent!.id),
      isNotNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
     .limit(1);
-   if(previousRevoked)
+   if(!canReauthorizeCredentialRelease(!!previousRevoked))
     throw new AuthorizationError("Revoked release requires new signed transfer consent");
    // A signed consent is bound to this transfer action and recipient.
    const [created]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
