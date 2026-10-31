@@ -142,7 +142,7 @@ export const BlocksRepeatedSubmissionWhileUploading: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const originalFetch = globalThis.fetch;
-    let releaseUpload: (() => void) | undefined;
+    let releaseUpload: () => void = () => {};
     let uploadCount = 0;
     globalThis.fetch = async () => {
       uploadCount++;
@@ -158,7 +158,7 @@ export const BlocksRepeatedSubmissionWhileUploading: Story = {
       const submitting = canvas.getByRole("button", { name: "Submitting…" });
       await expect(submitting).toBeDisabled();
       await expect(uploadCount).toBe(1);
-      releaseUpload?.();
+      releaseUpload();
       await expect(args.adapter.finish).toHaveBeenCalledTimes(1);
     } finally {
       releaseUpload?.();
