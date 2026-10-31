@@ -193,6 +193,9 @@ export const listGuardianEnrollmentChanges=createServerFn({method:"GET"})
       destinationSchoolContactEmail:typeof row.kind.destinationSchoolContactEmail==="string"?row.kind.destinationSchoolContactEmail:null,
       intendedLastDay:typeof row.kind.intendedLastDay==="string"?row.kind.intendedLastDay:null,
       recordsHandoffStatus:typeof row.kind.recordsHandoffStatus==="string"?row.kind.recordsHandoffStatus:null,
+      destinationApplicationId:typeof row.kind.destinationApplicationId==="string"?row.kind.destinationApplicationId:null,
+      destinationEnrollmentActivated:typeof row.kind.destinationEnrollmentId==="string"&&
+        typeof row.kind.destinationActivatedAt==="string",
       schoolName:row.schoolName,studentPersonId:row.studentPersonId,
       title:row.title,status:row.status,
       description:row.description??"",resolutionNote:row.resolutionNote??null,
