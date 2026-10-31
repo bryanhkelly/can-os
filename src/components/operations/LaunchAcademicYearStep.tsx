@@ -78,7 +78,7 @@ export function ReviewAcademicYear({plan}:{plan:Plan}){
   </details>
   <p className="mt-3 text-xs text-muted-foreground">Existing calendar exceptions stay unchanged. Review local holidays and onsite schedules before activating the year. This preparation does not authorize school opening.</p>
   {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-  {saved?<div role="status" className="mt-4 rounded border p-3 text-sm"><p>Academic records saved. You can return and resume this school year.</p><Link to="/sites/$siteId/publish" params={{siteId:plan.siteId}} className="mt-2 inline-block font-semibold underline">Continue to your private school website →</Link></div>:
+  {saved?<div role="status" className="mt-4 rounded border p-3 text-sm"><p>Academic records saved. You can return and resume this school year.</p><a href="#launch-website" className="mt-2 inline-block font-semibold underline">Continue to your private school website →</a></div>:
    <button type="button" disabled={busy||Boolean(plan.years.length&&!existing)||!weekdays.length||!Number.isInteger(minutes)||minutes<1||minutes>1440} onClick={()=>void prepare()} className="mt-4 rounded bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy?"Preparing your academic year…":existing?.status==="active"?"Use this active school year":"Save reviewed academic setup"}</button>}
   <Link to="/operations/school-years" search={{siteId:plan.siteId,programId:plan.programId}} className="ml-3 inline-block text-sm underline">Adjust dates, holidays or detailed settings</Link>
  </section>;

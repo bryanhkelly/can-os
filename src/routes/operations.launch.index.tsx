@@ -4,6 +4,7 @@ import { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.fun
 import { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import {LaunchAcademicYearStep} from "@/components/operations/LaunchAcademicYearStep";
+import {LaunchWebsiteStep} from "@/components/operations/LaunchWebsiteStep";
 import {resolveLaunchResume} from "@/domain/launch-resume";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
@@ -249,6 +250,7 @@ function LaunchWizardPage() {
         )}
         <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
+        {currentLaunch&&<LaunchWebsiteStep programId={currentLaunch.id}/>}
 
         <details className="mt-4 rounded-xl border bg-card p-4">
           <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>

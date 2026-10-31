@@ -118,7 +118,7 @@ export function FamilyInviteImporter({
     </section>;
   }
 
-  return <section className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
+  return <section id="invite-families" className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family outreach · School launch</p>
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
     <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} family contacts, preview your message, and queue school outreach. Before opening authorization, families receive an informational email only; there is no application or account creation. Once the school is active and admissions are authorized, invitations instead use a verified one-time application link. A public website is not required.</p>
