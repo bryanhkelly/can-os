@@ -177,11 +177,39 @@ function GuardianEnrollmentChanges(){
       item.destinationApplicationId?
       "Destination application exists; offer acceptance and actual placement are separate":
       "No linked receiving-school enrollment yet"}</p>}
-    {item.kind==="transfer"&&!item.destinationApplicationId&&<div className="mt-3 rounded-lg border p-3 text-sm">
-      <p>The receiving school must independently invite or authorize your family to apply. Your transfer request does not enroll your child elsewhere.</p>
-      <Link to="/guardian/apply" className="mt-2 inline-block font-semibold underline">
-        Apply or review my destination school invitation →
+    {item.kind==="transfer"&&!item.destinationApplicationId&&<div className="mt-3 space-y-3 rounded-lg border p-4 text-sm">
+      <p className="font-semibold">Continue at the receiving school</p>
+      <p>If the destination is a published CAN school, request a secure email verification link. This provides prospective family application access only. The original school handles enrollment exit and records.</p>
+      {destinations.length>0&&<>
+        <label className="block font-medium">Receiving CAN school
+          <select className="mt-1 w-full rounded border bg-background p-3"
+            value={destinationChoices[item.id]??""}
+            onChange={event=>{
+              setDestinationChoices(old=>({...old,[item.id]:event.target.value}));
+              setDestinationConfirmations(old=>({...old,[item.id]:false}));
+            }}>
+            <option value="">Choose a published CAN school</option>
+            {destinations.map(program=><option key={program.id} value={program.id}>
+              {program.siteName} · {program.name}
+            </option>)}
+          </select>
+        </label>
+        {!!destinationChoices[item.id]&&<label className="flex items-start gap-3">
+          <input type="checkbox" checked={!!destinationConfirmations[item.id]}
+            onChange={event=>setDestinationConfirmations(old=>({...old,[item.id]:event.target.checked}))}
+            className="mt-1"/>
+          <span>I confirm this is the receiving school I wish to contact. My original transfer request names <strong>{item.destinationSchoolName}</strong>. A different school selection does not change that records-release authorization.</span>
+        </label>}
+        <button type="button" disabled={busy||!destinationChoices[item.id]||!destinationConfirmations[item.id]}
+          onClick={()=>void requestDestination(item)}
+          className="rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          {busy?"Requesting…":"Email a secure receiving-school sign-in link"}
+        </button>
+      </>}
+      <Link to="/guardian/apply" className="inline-block font-semibold underline">
+        Review existing school applications →
       </Link>
+      {!destinations.length&&<p className="text-xs text-muted-foreground">No published CAN schools with an active application year are available. Contact the destination school's admissions office or use its official application website.</p>}
     </div>}
     {item.destinationApplicationId&&!item.destinationEnrollmentActivated&&<Link to="/guardian/admission-offers"
       search={{application:item.destinationApplicationId}}
