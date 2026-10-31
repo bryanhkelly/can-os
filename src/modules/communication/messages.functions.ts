@@ -81,6 +81,9 @@ async function listAllowedThreadContacts(
       .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
       .where(and(
         guardianRelationshipPredicate({ guardianPersonId: actorPersonId, access: "academic" }),
+        // A stray active Section seat after Program withdrawal is not a
+        // basis for showing the child's people in the family contact picker.
+        eq(s.enrollments.kind,"program"),
         eq(s.enrollments.status,"active"),
         inArray(s.programs.siteId,siteIds),
         inArray(s.programs.id,programIds),
