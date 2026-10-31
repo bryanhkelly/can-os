@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { listAcademicCredentialDeliveries,listAcademicCredentialReleaseAuthorizations,listVerifiedCredentialRecipients,revokeAcademicCredentialRelease,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
+import { authorizeAcademicCredentialRelease,listAcademicCredentialDeliveries,listAcademicCredentialReleaseAuthorizations,listVerifiedCredentialRecipients,revokeAcademicCredentialRelease,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
 
 export const Route=createFileRoute("/admissions/credential-delivery")({component:CredentialDeliveryPage});
 type Recipient=Awaited<ReturnType<typeof listVerifiedCredentialRecipients>>[number];
@@ -13,6 +13,9 @@ function CredentialDeliveryPage(){
  const [history,setHistory]=useState<Delivery[]>([]);
  const [releases,setReleases]=useState<Release[]>([]);
  const [recipients,setRecipients]=useState<Recipient[]>([]);
+ const [selectedRecipient,setSelectedRecipient]=useState("");
+ const [transferActionId,setTransferActionId]=useState("");
+ const [consentId,setConsentId]=useState("");
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
  async function run(fn:()=>Promise<void>){setBusy(true);setMessage("");try{await fn()}catch(e){setMessage(e instanceof Error?e.message:"Unable to process credential")}finally{setBusy(false)}}
@@ -35,8 +38,22 @@ function CredentialDeliveryPage(){
     </div>
    </section>
    <section className="space-y-3 rounded-xl border p-4">
-    <h2 className="font-semibold">Official records release</h2>
-    <p className="text-sm">External release is temporarily unavailable until verified release instructions, authorized recipient selection, consent evidence and secure access are implemented. Official PDFs must not be emailed as attachments.</p>
+    <h2 className="font-semibold">Verified transfer release</h2>
+    <p className="text-sm">A registrar may grant the verified guardian secure access to an issued transcript only when a completed school transfer and that guardian's signed, unrevoked records-release consent match the student. No PDF is emailed.</p>
+    <label className="block text-sm">Verified guardian<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={selectedRecipient} onChange={e=>setSelectedRecipient(e.target.value)}><option value="">Select verified identity</option>{recipients.map(row=><option key={row.personId+row.email} value={row.personId+"|"+row.email}>{row.firstName} {row.lastName} ({row.email})</option>)}</select></label>
+    {field("Completed transfer action ID",transferActionId,setTransferActionId)}
+    {field("Signed transfer consent ID",consentId,setConsentId)}
+    <button disabled={busy||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
+     const [recipientPersonId,recipientEmail]=selectedRecipient.split("|");
+     await authorizeAcademicCredentialRelease({data:{
+      kind:"transcript",credentialId,recipientPersonId,recipientEmail,
+      releasePurpose:"transfer",instructionReference:transferActionId,
+      consentEvidenceReference:consentId,
+      expiresAt:new Date(Date.now()+7*86400000).toISOString(),
+     }});
+     setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}));
+     setMessage("Secure recipient authorization recorded. The recipient must sign in to access the record.");
+    })}>Authorize seven-day secure access</button>
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Verified recipient candidates</h2>
