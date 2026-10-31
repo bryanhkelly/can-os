@@ -262,6 +262,20 @@ export async function resendChurchInvitation(actor: AccessContext, requestId: st
   }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
   if (request?.status !== "approved" || !request.invitationGrantId)
     throw new AuthorizationError("approved church invitation");
+  // Resend is an invitation-recovery action, not a generic login-link
+  // generator. Once the canonical invitation is accepted, stop retrying it.
+  const [grant] = await db.select({ active: accountPersonGrants.active })
+    .from(accountPersonGrants)
+    .where(eq(accountPersonGrants.id, request.invitationGrantId)).limit(1);
+  if (grant?.active) {
+    const accepted = await db.select({ id: domainEvents.id }).from(domainEvents)
+      .where(and(
+        eq(domainEvents.aggregateType, STAFF_INVITATION_AGGREGATE),
+        eq(domainEvents.aggregateId, request.invitationGrantId),
+        eq(domainEvents.eventType, EventTypes.StaffInvitationAccepted),
+      )).limit(1);
+    if (accepted.length) return { accepted: true as const, deliveryStatus: "already_accepted" as const };
+  }
   const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(request.contactEmail);
   return { accepted: true as const, deliveryStatus };
 }
