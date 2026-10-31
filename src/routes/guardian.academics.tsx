@@ -91,7 +91,13 @@ function GuardianAcademicsPage() {
       <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge>
      </div>
      <p className="mt-3 text-sm text-muted-foreground">Due: {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p>
-     {guardianWorkNeedsAction(item.status) &&
+     {item.revisionLimitReached && <div className="mt-3 rounded-lg border p-3 text-sm" role="status">
+      <p className="font-semibold">No revision attempts remain for this assignment.</p>
+      <p className="mt-1">The teacher's returned feedback is still available, but the student cannot submit another attempt under the current limit. Review the feedback and ask the school about next steps.</p>
+      {!assessment && <Link to="/guardian/academics" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}}
+       className="mt-2 inline-block font-semibold underline">Open feedback and school conversation</Link>}
+     </div>}
+     {!item.revisionLimitReached && guardianWorkNeedsAction(item.status) &&
       (item.workAvailabilityReason==="closed"||item.workAvailabilityReason==="unpublished_or_closed") &&
       <p className="mt-3 rounded-lg border p-3 text-sm" role="status">
        This assignment is no longer accepting student submissions. Review the unfinished work with your school.
