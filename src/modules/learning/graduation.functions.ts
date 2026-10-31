@@ -86,6 +86,14 @@ export const approveGraduationRequirements = createServerFn({method:"POST"})
    if (checked.blockers.some(b=>b.includes("requirement"))) throw new Error(checked.blockers.join("; "));
    const {db,s}=await resources();
    return db.transaction(async tx => {
+     // Serialize policy approvals for an issuer/year to prevent competing active
+     // versions that cannot yet be assigned to an individual cohort.
+     const {sql}=await import("drizzle-orm");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.issuerId + ":" + data.academicYear}))`);
+     const existing=await tx.select({id:s.graduationRequirementSets.id})
+       .from(s.graduationRequirementSets)
+       .where(and(eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId),eq(s.graduationRequirementSets.academicYear,data.academicYear))).limit(1);
+     if(existing.length)throw new AuthorizationError("An approved graduation policy already exists for this academic year. Cohort-specific policy versioning is required before another can be approved.");
      const [row]=await tx.insert(s.graduationRequirementSets).values({
        issuingOrganizationId:data.issuerId,academicYear:data.academicYear,version:data.version,
        requirements:data.requirements,approvedByPersonId:context.actorPersonId!,
