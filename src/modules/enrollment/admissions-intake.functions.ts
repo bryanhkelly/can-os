@@ -221,7 +221,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    // A selected web interest is untrusted contact data, not a Student,
    // Household or verified guardian. Lock it before creating those records,
    // so concurrent registrar attempts cannot create duplicate conversions.
-   let interestToConvert: { id: string; priorStatus: string } | null = null;
+   let interestToConvert: { id: string; priorStatus: string; source: string } | null = null;
    if (data.publicInterestId) {
     if (!program.siteId || data.existingStudent || data.existingApplicationId)
      throw new Error("Public interest conversion requires a newly reviewed student intake");
@@ -239,6 +239,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     const [interest] = await tx.select({
       id:publicAdmissionsInterests.id,
       status:publicAdmissionsInterests.status,
+      source:publicAdmissionsInterests.source,
       applicationId:publicAdmissionsInterests.applicationId,
       siteId:publicAdmissionsInterests.siteId,
       programId:publicAdmissionsInterests.programId,
@@ -278,7 +279,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     if(priorHousehold)throw new Error(
       "An existing school household uses this contact email. Use verified existing-household intake."
     );
-    interestToConvert = { id:interest.id, priorStatus:interest.status };
+    interestToConvert = { id:interest.id, priorStatus:interest.status, source:interest.source };
    }
    let guardianPersonId:string;
    let householdId:string;
@@ -360,7 +361,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     householdId,studentProfileId,programId:data.programId,
     submittedByPersonId:actor.actorPersonId!,stage:"inquiry",
     idempotencyKey,
-    metadata:{synthetic,source:interestToConvert?"published_site":data.source,
+    metadata:{synthetic,source:interestToConvert?interestToConvert.source:data.source,
      notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId,
      ...(interestToConvert?{publicInterestId:interestToConvert.id,contactReviewedByRegistrar:true}:{}),
      ...(data.existingStudent?{existingStudent:true,createdHousehold:data.existingStudent.createHousehold===true}:{})},
