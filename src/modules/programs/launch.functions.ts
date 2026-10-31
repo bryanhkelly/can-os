@@ -294,8 +294,8 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
       if (row.metadata.enrollmentForm !== undefined)
         throw new Error("Enrollment form evidence belongs in the dedicated admissions review workflow");
       const previousStatement = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
-      const pendingDecision = row.evidence.findLastIndex(item => item.kind === "launch_evidence_statement") >
-        row.evidence.findLastIndex(item => item.kind === "launch_evidence_review");
+      const pendingDecision = row.evidence.map(item => item.kind).lastIndexOf("launch_evidence_statement") >
+        row.evidence.map(item => item.kind).lastIndexOf("launch_evidence_review");
       if (pendingDecision && (row.status === "needs_can" || row.metadata.evidenceReviewRequired === true))
         throw new Error("Evidence is already awaiting institutional review");
 
