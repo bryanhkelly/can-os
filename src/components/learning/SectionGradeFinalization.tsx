@@ -181,7 +181,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
         {preview&&<section aria-label="Grading period unfinished work" className="mt-4 rounded-lg border p-4 text-sm">
           <p>{preview.eligible} students ready to finalize. Review is a current snapshot; finalization rechecks the records.</p>
           <p className="mt-2 font-semibold">{submittedBlockers.length} submission{submittedBlockers.length===1?"":"s"} to grade · {followUpBlockers.length} assignment{followUpBlockers.length===1?"":"s"} needing student follow-up</p>
-          {submittedBlockers.length>0&&<p className="mt-2"><Link to="/teacher/gradebook" search={{section:sectionId,student:submittedBlockers[0].studentProfileId,assessment:submittedBlockers[0].assessmentId}} className="underline font-semibold">Grade the first pending submission</Link></p>
+          {submittedBlockers.length>0&&<p className="mt-2"><Link to="/teacher/gradebook" search={{section:sectionId,student:submittedBlockers[0].studentProfileId,assessment:submittedBlockers[0].assessmentId}} className="underline font-semibold">Grade the first pending submission</Link></p>}
           {preview.blockers.length===0?<p className="mt-2">No unfinished scoreable assignments found for students awaiting finalization.</p>:
             <ul className="mt-3 space-y-2">{preview.blockers.map(item=><li key={item.studentProfileId+":"+item.assessmentId}>
               {item.status==="submitted"

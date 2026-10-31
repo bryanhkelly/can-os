@@ -531,7 +531,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const visible=rows.filter(n=>
    n.type!=="enrollment_activated"||
    (!!n.resourceId&&activatedEnrollmentById.has(n.resourceId)))
-  .filter(n=>>
+  .filter(n=>
    n.type!=="transfer_destination_transcript_ready"||
    (!!n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)))
   .filter(n=>n.resourceType!=="safeguarding_concern"||
