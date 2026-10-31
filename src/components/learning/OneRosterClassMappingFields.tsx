@@ -12,7 +12,7 @@ export function OneRosterClassMappingFields({
   onSave: () => void;
 }) {
   const complete = rows.length > 0 &&
-    rows.every(row => Boolean(mappings[row.sourcedId])) &&
+    rows.every(row => sections.some(section => section.id === mappings[row.sourcedId])) &&
     new Set(rows.map(row => mappings[row.sourcedId])).size === rows.length;
   return <div className="space-y-3 rounded border p-3">
     <p className="text-sm font-medium">Match all {rows.length} external classes to the existing classes below.</p>
