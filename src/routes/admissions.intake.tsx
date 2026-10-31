@@ -43,14 +43,13 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const scopedRecords=data.records.filter(row=>(!selected.siteId||row.siteId===selected.siteId)&&
   (!selected.programId||row.programId===selected.programId));
  const records=scopedRecords.filter(row=>!selected.application||row.id===selected.application);
- const selectedInterest=(data.linkedInterest??data.publicInterests.items.find(row=>row.id===selected.interest)) &&
-  (data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest)) &&
-  (!selected.siteId||(data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest))?.siteId===selected.siteId) &&
-  (!selected.programId||(data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest))?.programId===selected.programId) ?
-  (data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest)) : null;
- /* const legacySelectedInterest=data.publicInterests.find(row=>row.id===selected.interest &&
-  (!selected.siteId||row.siteId===selected.siteId) &&
-  (!selected.programId||row.programId===selected.programId)); */
+ const candidateInterest = data.linkedInterest?.id===selected.interest
+  ? data.linkedInterest
+  : data.publicInterests.items.find(row=>row.id===selected.interest);
+ const selectedInterest=candidateInterest &&
+  (!selected.siteId||candidateInterest.siteId===selected.siteId) &&
+  (!selected.programId||candidateInterest.programId===selected.programId)
+  ? candidateInterest : null;
  const convertibleInterest=selectedInterest&&["new","contacted"].includes(selectedInterest.status)?
   selectedInterest:null;
  const [programId,setProgramId]=useState(convertibleInterest?.programId??programs[0]?.id??"");
