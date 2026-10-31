@@ -175,6 +175,15 @@ function TeacherGradebookPage() {
    await gradeSubmission({ data: payload });
    if(draftOnly){
     setNotice("Grading draft saved. The score and feedback have not been released to the student or family.");
+    // Reflect the persisted draft in the queue without closing the review.
+    if(selected){
+     try{
+      const refreshed=await getGradebook({data:{sectionId:selected}});
+      setGradebook(refreshed);
+     }catch{
+      setNotice("Grading draft saved, but the gradebook could not refresh. Reopen this submission to see the saved draft.");
+     }
+    }
     return;
    }
    setNotice("Grade posted.");
