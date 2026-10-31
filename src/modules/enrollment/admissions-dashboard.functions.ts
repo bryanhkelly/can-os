@@ -17,6 +17,8 @@ export const getAdmissionsDashboard=createServerFn({method:"GET"})
  if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {studentName:string;programId:string;disposition:string|null;offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[];activeSectionCount:number;studentAccessStatus:string})[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const records=await db.select({id:s.applications.id,stage:s.applications.stage,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId,
+  studentPersonId:s.studentProfiles.personId,siteId:s.programs.siteId,
+  organizationId:s.programs.organizationId,
   firstName:s.people.legalFirstName,lastName:s.people.legalLastName,preferredName:s.people.preferredName,metadata:s.applications.metadata,
  }).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id))
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.applications.studentProfileId))
@@ -32,6 +34,23 @@ export const getAdmissionsDashboard=createServerFn({method:"GET"})
   status:s.studentAccessConsents.status}).from(s.studentAccessConsents)
   .where(inArray(s.studentAccessConsents.applicationId,ids));
  const accessByApplication=new Map(accessConsents.map(consent=>[consent.applicationId,consent.status]));
+ // An approved consent remains historical after a revocation. Use the
+ // actual currently active student-only grant in this admissions projection.
+ const availableGrants=await db.select({
+   applicationId:s.studentAccessConsents.applicationId,
+   personId:s.accountPersonGrants.personId,
+   organizationId:s.accountPersonGrants.organizationId,
+   siteId:s.accountPersonGrants.siteId,
+ }).from(s.studentAccessConsents)
+   .innerJoin(s.accessAccounts,eq(s.accessAccounts.emailNormalized,s.studentAccessConsents.studentEmail))
+   .innerJoin(s.accountPersonGrants,eq(s.accountPersonGrants.accountId,s.accessAccounts.id))
+   .where(and(inArray(s.studentAccessConsents.applicationId,ids),
+     eq(s.studentAccessConsents.status,"approved"),
+     eq(s.accessAccounts.disabled,false),
+     eq(s.accountPersonGrants.active,true),
+     eq(s.accountPersonGrants.isSynthetic,false),
+     eq(s.accountPersonGrants.role,"student")));
+
  const requirements=journeys.length?await db.select({journeyId:s.journeyRequirements.journeyId,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
  return synthetic.map(x=>({id:x.id,studentName:`${x.preferredName??x.firstName} ${x.lastName}`,programId:x.programId,program:x.program,stage:x.stage,
   disposition:x.metadata.admissionsDisposition==="waitlisted"?"waitlisted":null,
@@ -40,7 +59,11 @@ export const getAdmissionsDashboard=createServerFn({method:"GET"})
       programEnrollment.studentProfileId===x.studentProfileId&&
       programEnrollment.programId===x.programId&&programEnrollment.kind==="program"&&
       programEnrollment.status==="active"&&programEnrollment.schoolYearId===e.schoolYearId)).length,
-  studentAccessStatus:accessByApplication.get(x.id)??"not_requested",
+  studentAccessStatus:accessByApplication.get(x.id)==="approved" &&
+    !availableGrants.some(grant=>grant.applicationId===x.id &&
+      grant.personId===x.studentPersonId && grant.organizationId===x.organizationId &&
+      grant.siteId===x.siteId)
+      ? "access_unavailable" : accessByApplication.get(x.id)??"not_requested",
   submittedAt:x.submittedAt?.toISOString()??null,outstandingRequirements:requirements.filter(req=>req.blocking&&req.status!=="complete"&&journeys.some(j=>j.id===req.journeyId&&j.participantId===x.id)).length,enrollments:enrollmentRows.filter(e=>e.studentProfileId===x.studentProfileId&&e.programId===x.programId&&e.kind==="program"&&e.status==="active").map(e=>({schoolYearId:e.schoolYearId,status:e.status})),offers:offers.filter(o=>o.applicationId===x.id).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()).map(o=>({id:o.id,status:o.status,expiresAt:o.expiresAt?.toISOString()??null,schoolYearId:o.schoolYearId}))}));
 });
 
