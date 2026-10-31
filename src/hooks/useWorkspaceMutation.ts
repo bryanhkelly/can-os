@@ -25,12 +25,12 @@ function asError(error: unknown): Error {
  */
 export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutationOptions<TInput, TResult>) {
   const queryClient = useQueryClient();
-  const inFlight = useRef(false);
+  const inFlight = useRef(false);\n  const optionsRef = useRef(options);\n  optionsRef.current = options;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshError, setRefreshError] = useState<Error | null>(null);
   const mutation = useMutation<TResult, Error, TInput>({
     mutationFn: options.mutationFn,
-    onError: options.onError,
+    onError: (error, input) => optionsRef.current.onError?.(error, input),
   });
   const { mutateAsync } = mutation;
 
@@ -40,19 +40,19 @@ export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutation
     setIsSubmitting(true);
     setRefreshError(null);
     try {
-      const value = await mutateAsync(input);
+      const value = await mutateAsync(input);\n      const current = optionsRef.current;
       let failure: Error | undefined;
       try {
-        await Promise.all((options.invalidateQueries ?? []).map(queryKey =>
+        await Promise.all((current.invalidateQueries ?? []).map(queryKey =>
           queryClient.invalidateQueries({ queryKey })));
-        await options.invalidateRouter?.();
+        await current.invalidateRouter?.();
       } catch (error) {
         failure = asError(error);
         setRefreshError(failure);
-        try { options.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
+        try { current.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
       }
       try {
-        await options.onSuccess?.(value, input);
+        await current.onSuccess?.(value, input);
       } catch (error) {
         // Feedback callbacks run after the domain command has committed.
         // Never turn their failure into a command failure or invite a retry.
@@ -65,7 +65,7 @@ export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutation
       inFlight.current = false;
       setIsSubmitting(false);
     }
-  }, [mutateAsync, options, queryClient]);
+  }, [mutateAsync, queryClient]);
 
   return { ...mutation, submit, isSubmitting, refreshError };
 }
