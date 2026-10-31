@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential,canRedeemTransferCredential,isLatestTranscriptIssuance } from "./academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential,canRedeemTransferCredential,isLatestTranscriptIssuance,canReauthorizeCredentialRelease } from "./academic-credential-release";
 
 const now=new Date("2026-10-31T12:00:00.000Z");
 const good={
@@ -53,4 +53,9 @@ describe("official transcript issuance freshness",()=>{
  it("allows exact latest issuance",()=>expect(isLatestTranscriptIssuance("issued-2","issued-2")).toBe(true));
  it("rejects replaced issuance",()=>expect(isLatestTranscriptIssuance("issued-1","issued-2")).toBe(false));
  it("rejects deleted or missing issuance",()=>expect(isLatestTranscriptIssuance("issued-1",null)).toBe(false));
+});
+
+describe("consent-bound release replay",()=>{
+ it("blocks revoked grant replay with same consent",()=>expect(canReauthorizeCredentialRelease(true)).toBe(false));
+ it("permits independent re-review after expiry without revocation",()=>expect(canReauthorizeCredentialRelease(false)).toBe(true));
 });
