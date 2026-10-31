@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, actions, assessments, enrollments, guardianRelationships,
-  programs, sectionTeachers, sections, studentProfiles, submissions, terms,
+  people, programs, sectionTeachers, sections, studentProfiles, submissions, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -102,6 +102,79 @@ async function relatedResponse(actor: Awaited<ReturnType<typeof guardianActor>>,
     updatedAt: found.updatedAt.toISOString(),
   };
 }
+
+/**
+ * Household school-question history over the same canonical Actions as the
+ * teacher queue. This is not a second inbox or status model.
+ * Only this guardian's own requests and current live academic relationships
+ * are selected by the database, including for older released attempts.
+ */
+export const listGuardianGradeFollowUps = createServerFn({ method: "GET" }).handler(async () => {
+  const actor = await guardianActor();
+  setResponseHeader("Cache-Control", "private, no-store");
+  const activeProgram = alias(enrollments, "guardian_grade_followup_active_program");
+  const rows = await db.select({
+    id: actions.id, status: actions.status, resolutionNote: actions.resolutionNote,
+    updatedAt: actions.updatedAt, metadata: actions.metadata,
+    studentPersonId: studentProfiles.personId,
+    studentName: sql<string>`concat(${people.legalFirstName}, ' ', ${people.legalLastName})`,
+    assessmentId: assessments.id, assessmentTitle: assessments.title,
+    sectionId: sections.id, submissionId: submissions.id,
+  }).from(actions)
+    .innerJoin(submissions, eq(sql<string>`${submissions.id}::text`, sql<string>`${actions.metadata}->>'submissionId'`))
+    .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+    .innerJoin(sections, eq(sections.id, assessments.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(programs, eq(programs.id, sections.programId))
+    .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
+    .innerJoin(people, eq(people.id, studentProfiles.personId))
+    .innerJoin(guardianRelationships, guardianRelationshipPredicate({
+      guardianPersonId: actor.actorPersonId!,
+      studentPersonId: studentProfiles.personId,
+      access: "academic",
+    }))
+    .innerJoin(enrollments, and(
+      eq(enrollments.studentProfileId, studentProfiles.id),
+      eq(enrollments.sectionId, sections.id),
+      eq(enrollments.programId, sections.programId),
+      eq(enrollments.schoolYearId, terms.schoolYearId),
+      eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
+    ))
+    .innerJoin(activeProgram, and(
+      eq(activeProgram.studentProfileId, studentProfiles.id),
+      eq(activeProgram.programId, sections.programId),
+      eq(activeProgram.schoolYearId, terms.schoolYearId),
+      eq(activeProgram.kind, "program"), eq(activeProgram.status, "active"),
+    ))
+    .where(and(
+      eq(actions.type, gradeResponseActionType),
+      eq(actions.subjectType, "student_profile"),
+      eq(actions.subjectId, studentProfiles.id),
+      eq(actions.sectionId, sections.id),
+      sql`${actions.metadata} @> ${JSON.stringify({requestedByGuardianPersonId: actor.actorPersonId})}::jsonb`,
+      inArray(submissions.status, ["graded", "returned"]),
+      eq(sections.active, true),
+      inArray(sections.siteId, actor.scope.siteIds ?? []),
+      inArray(sections.programId, actor.scope.programIds ?? []),
+      inArray(programs.organizationId, actor.scope.organizationIds ?? []),
+      or(inArray(actions.status, ["open", "in_progress", "waiting"]),
+        and(eq(actions.status, "resolved"),
+          gte(actions.resolvedAt, new Date(Date.now() - 30 * 86400000)))),
+    ))
+    .orderBy(sql`case when ${actions.status} = 'resolved' then 1 else 0 end`, desc(actions.updatedAt))
+    .limit(31);
+  return {
+    items: rows.slice(0, 30).map(row => ({
+      id: row.id, status: row.status, studentName: row.studentName,
+      studentPersonId: row.studentPersonId, assessmentId: row.assessmentId,
+      assessmentTitle: row.assessmentTitle, sectionId: row.sectionId,
+      submissionId: row.submissionId,
+      question: typeof row.metadata.requestMessage === "string" ? row.metadata.requestMessage : "",
+      resolutionNote: row.resolutionNote, updatedAt: row.updatedAt.toISOString(),
+    })),
+    truncated: rows.length > 30,
+  };
+});
 
 /** Never return responses submitted by a different guardian, even for the same child. */
 export const getGuardianGradeResponse = createServerFn({ method: "GET" })
