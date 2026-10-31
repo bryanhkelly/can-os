@@ -19,7 +19,35 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
-import { and,eq } from "drizzle-orm";
+import { and,eq,inArray } from "drizzle-orm";
+import { AuthorizationError } from "@/domain/command-context";
+
+type HealthTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Medical authority is student + active Program + real Site, never a bare role. */
+async function assertCurrentHealthStudentScope(
+  tx: HealthTx, context: CommandContext, studentProfileId: string, siteId?: string,
+) {
+  if (!context.actorPersonId || !context.scope.siteIds?.length ||
+      !context.scope.programIds?.length || !context.scope.organizationIds?.length)
+    throw new AuthorizationError("current school medical membership");
+  if (siteId && !context.scope.siteIds.includes(siteId))
+    throw new AuthorizationError("school health Site");
+  const [match] = await tx.select({siteId:programs.siteId}).from(enrollments)
+    .innerJoin(programs,eq(programs.id,enrollments.programId))
+    .where(and(
+      eq(enrollments.studentProfileId,studentProfileId),
+      eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
+      eq(programs.status,"active"),
+      inArray(programs.id,context.scope.programIds),
+      inArray(programs.siteId,context.scope.siteIds),
+      inArray(programs.organizationId,context.scope.organizationIds),
+      ...(siteId?[eq(programs.siteId,siteId)]:[]),
+    )).limit(1);
+  if(!match)throw new AuthorizationError("current student enrollment at authorized health Site");
+  return match.siteId;
+}
+
 
 export async function ensureHealthProfile(
   context: CommandContext,
@@ -301,6 +329,7 @@ export async function recordHealthOfficeVisit(
   const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, input.studentProfileId, input.siteId);
     const [visit] = await tx
       .insert(healthOfficeVisits)
       .values({
@@ -473,6 +502,7 @@ export async function getHealthCase(
   assertCapability(context, "health.read");
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, studentProfileId);
     const [profile] = await tx
       .select()
       .from(healthProfiles)
