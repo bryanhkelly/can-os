@@ -36,6 +36,7 @@ export * from "./learning-participation";
 export * from "./learning-activity";
 
 export * from "./curriculum-marketplace";
+export * from "./curriculum-year-adoptions";
 export * from "./curriculum-resources";
 export * from "./curriculum-units";
 
