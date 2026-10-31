@@ -28,3 +28,13 @@ export const cancelChurchOnboardingRequest = createServerFn({ method: "POST" })
     ]);
     return cancelChurchApplication(await getCommandContext(getRequest()), data);
   });
+
+export const resendChurchEvidenceNotice = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.string().uuid().parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { resendChurchEvidenceFollowup }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-applications.server"),
+    ]);
+    return resendChurchEvidenceFollowup(await getCommandContext(getRequest()), data);
+  });
