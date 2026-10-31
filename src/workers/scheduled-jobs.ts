@@ -2,6 +2,7 @@ import { escalateOverdueSafeguardingConcerns } from "@/modules/safeguarding/safe
 import { markOverdueSubmissionsMissing } from "@/modules/learning/missing-work-service";
 import { processSubscriptionReminders, processQueuedSubscriptionDeliveries, processWeeklyDigests, recoverSubscriptionEventMatches, escalateTerminalDeliveryFailures } from "@/platform/subscriptions";
 import { expireOutstandingSectionOffers } from "@/modules/programs/section-lifecycle-service";
+import { processSchoolFamilyOutboundDeliveries } from "@/modules/communication/school-family-alert-delivery.server";
 import { processPendingDomainEvents } from "./domain-event-worker";
 
 /**
@@ -18,6 +19,7 @@ export async function runScheduledJobs(): Promise<{
   processed: number;
   reminders: number;
   deliveries: number;
+  schoolFamilyDeliveries: number;
   digests: number;
   recovered: number;
   escalated: number;
@@ -29,8 +31,9 @@ export async function runScheduledJobs(): Promise<{
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();
   const deliveries = await processQueuedSubscriptionDeliveries();
+  const schoolFamilyDeliveries = await processSchoolFamilyOutboundDeliveries();
   const escalated = await escalateTerminalDeliveryFailures();
   const digests = await processWeeklyDigests();
   const expiredSectionOffers = await expireOutstandingSectionOffers();
-  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, digests, escalated, expiredSectionOffers };
+  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, schoolFamilyDeliveries, digests, escalated, expiredSectionOffers };
 }
