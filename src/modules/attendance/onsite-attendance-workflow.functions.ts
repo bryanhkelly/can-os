@@ -190,6 +190,8 @@ async function resolveExpectedRoster(actor: AccessContext,
     siteId: sections.siteId, sectionId: sections.id, sectionTitle: sections.title,
     sectionStartsAt:sections.startsAt,sectionEndsAt:sections.endsAt,
     membershipStartsAt:enrollments.startedAt,membershipEndsAt:enrollments.endedAt,
+    programStartsAt:activeProgramEnrollment.startedAt,
+    programEndsAt:activeProgramEnrollment.endedAt,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
   }).from(enrollments)
@@ -226,7 +228,9 @@ async function resolveExpectedRoster(actor: AccessContext,
     return (!row.sectionStartsAt||siteDate(row.sectionStartsAt,timeZone)<=date) &&
       (!row.sectionEndsAt||siteDate(row.sectionEndsAt,timeZone)>=date) &&
       (!row.membershipStartsAt||siteDate(row.membershipStartsAt,timeZone)<=date) &&
-      (!row.membershipEndsAt||siteDate(row.membershipEndsAt,timeZone)>date);
+      (!row.membershipEndsAt||siteDate(row.membershipEndsAt,timeZone)>date) &&
+      (!row.programStartsAt||siteDate(row.programStartsAt,timeZone)<=date) &&
+      (!row.programEndsAt||siteDate(row.programEndsAt,timeZone)>date);
   });
   const byKey = new Map<string, {
     studentProfileId: string; programId: string; studentName: string;
