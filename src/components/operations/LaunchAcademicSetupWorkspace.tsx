@@ -18,14 +18,17 @@ export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const router=useRouter();
  const [termId,setTermId]=useState(data.terms[0]?.id??"");
- const [versionId,setVersionId]=useState(data.catalog[0]?.versionId??"");
+ const [versionId,setVersionId]=useState(data.catalog.find(course=>course.recommendation.recommended)?.versionId??data.catalog[0]?.versionId??"");
  const selectedTerm=data.terms.find(t=>t.id===termId);
  const selectedYear=data.years.find(y=>y.id===selectedTerm?.schoolYearId);
  const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
  const [createdSectionId,setCreatedSectionId]=useState<string|null>(null);
  const [teacherId,setTeacherId]=useState("");
+ const effectiveTeacherId=teacherId|| (data.teachingStaff.length===1?data.teachingStaff[0]!.personId:"");
  const [scheduleId,setScheduleId]=useState("");
+ const suggestedSchedule=data.scheduleOptions.find(option=>option.schoolYearId===selectedTerm?.schoolYearId);
+ const effectiveScheduleId=scheduleId||suggestedSchedule?.id||"";
  const [courseCredits,setCourseCredits]=useState("");
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -85,6 +88,17 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
      className="rounded-lg border px-4 py-2 text-sm font-semibold">Advanced school-year studio</Link>
    </div>
   </section>}
+  <section className="mt-6 rounded-lg border p-4 text-sm" aria-label="Classroom setup guidance">
+   <h2 className="font-semibold">Classroom setup prerequisites</h2>
+   <ul className="mt-2 list-disc space-y-2 pl-5">
+    {!data.terms.length&&<li>Prepare an academic year and its terms using the recommended-year action above.</li>}
+    {!data.scheduleOptions.some(option=>option.schoolYearId===selectedTerm?.schoolYearId)&&<li>No instructional schedule exists for the selected year. <Link to="/operations/school-years" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Configure and review a school-year schedule</Link>.</li>}
+    {!data.catalog.some(course=>course.recommendation.recommended)&&<li>No available published course has an accessible first lesson. <Link to="/operations/curriculum" className="underline">Review and publish instruction-ready curriculum</Link>.</li>}
+    {!data.teachingStaff.length&&<li>Assign an authorized instructor and verify qualifications using the staffing controls below.</li>}
+    {!data.academicAuthority.teacherAssignment&&<li>Complete institutional instructional service authorization before assigning teachers.</li>}
+    {data.terms.length>0&&data.scheduleOptions.some(option=>option.schoolYearId===selectedTerm?.schoolYearId)&&data.catalog.some(course=>course.recommendation.recommended)&&data.teachingStaff.length>0&&data.academicAuthority.teacherAssignment&&<li>Reviewed choices are available. The recommended course and a matching schedule are preselected; a sole authorized instructor is suggested but must be reviewed.</li>}
+   </ul>
+  </section>
   {!data.catalog.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
    No published course templates are available from this program's academic provider. Publish curriculum before creating sections.
   </p>}
@@ -97,7 +111,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
-     code,title,teacherPersonId:teacherId,scheduleTemplateId:scheduleId,
+     code:code.trim()||selectedCourse?.code+"-A",title:title.trim()||selectedCourse?.title||"",teacherPersonId:effectiveTeacherId,scheduleTemplateId:effectiveScheduleId,
      ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class saved. Review its schedule and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
@@ -120,12 +134,12 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       </div>}
       <p className="mt-1 text-xs text-muted-foreground">Adoption eligibility is currently program-scoped, not yet versioned by academic year. Annual adoption rollover is a separate release.</p>
     </div>}
-    <label className="text-sm sm:col-span-2">Instructional schedule<select required value={scheduleId} onChange={e=>setScheduleId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
+    <label className="text-sm sm:col-span-2">Instructional schedule<select required value={effectiveScheduleId} onChange={e=>setScheduleId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose a school-year schedule</option>{data.scheduleOptions.filter(option=>option.schoolYearId===selectedTerm?.schoolYearId).map(option=><option key={option.id} value={option.id}>{option.name}</option>)}
     </select></label>
-    <label className="text-sm">Class code<input value={code} required onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Class title<input value={title} required onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1 block w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm sm:col-span-2">Instructor (required for guided launch)<select required value={teacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
+    <label className="text-sm">Class code<input value={code} onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
+    <label className="text-sm">Class title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1 block w-full rounded border bg-background p-2"/></label>
+    <label className="text-sm sm:col-span-2">Instructor (required for guided launch)<select required value={effectiveTeacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
      <option value="">Assign later</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </select></label>
     <label className="text-sm sm:col-span-2">Course credit units
@@ -134,7 +148,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId||!scheduleId||!teacherId||!selectedCourse?.recommendation.instructionReady||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
+    <button type="submit" disabled={busy||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||!selectedCourse?.recommendation.instructionReady||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
