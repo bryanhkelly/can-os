@@ -37,7 +37,9 @@ export function FamilyInviteImporter({
   const [programId, setProgramId] = useState(initialProgram?.id ?? "");
   const selectedProgram = programs.find(program => program.id === programId) ?? (programs.length === 1 ? programs[0] : undefined);
   const [raw, setRaw] = useState("");
-  const [subject, setSubject] = useState(`${initialProgram?.name ?? "Our school"} is welcoming families`);
+  const [subject, setSubject] = useState(initialProgram?.purpose === "interest"
+    ? `${initialProgram.name} · school launch information`
+    : `${initialProgram?.name ?? "Our school"} is welcoming families`);
   const [introduction, setIntroduction] = useState("We're excited to invite your family to learn about our school.");
   const [preview, setPreview] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -126,7 +128,9 @@ export function FamilyInviteImporter({
         <select value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
           setProgramId(event.target.value);
-          if (program) setSubject(`${program.name} is welcoming families`);
+          if (program) setSubject(program.purpose === "interest"
+            ? `${program.name} · school launch information`
+            : `${program.name} is welcoming families`);
           changed();
         }} className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
           <option value="">Choose your school outreach destination</option>
