@@ -921,6 +921,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
     query: z.string().trim().max(100).default(""),
   }).parse(value ?? {}))
   .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "enrollment:manage");
     if (context.role !== "registrar" || !context.actorPersonId) {
