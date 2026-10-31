@@ -1,4 +1,5 @@
 import {useState} from "react";
+import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,publishLaunchTeacherPolicy,setLaunchSectionCredits} from "@/modules/programs/launch-academics.functions";
 import {safeLoader} from "@/lib/safe-loader";
@@ -72,9 +73,22 @@ function Setup({data}:{data:Snapshot}){
     <LocalSiteDelegationPanel programId={data.program.id}/>
     <SectionFacilitatorPanel programId={data.program.id}/>
   </>}
-  {!data.years.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
-   This program has no configured academic year. <Link to="/operations/school-years" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Set up the school year →</Link>
-  </p>}
+  {!data.years.length&&<section className="mt-6 rounded-lg border p-4">
+   <h2 className="font-semibold">Prepare the recommended school year</h2>
+   <p className="mt-2 text-sm">Use the saved launch date to prepare a school year, standard grading scale,
+    two terms, grading periods and a draft instructional calendar. Review local holidays,
+    teaching schedules and instructional days before activation. This does not approve opening.</p>
+   <div className="mt-3 flex flex-wrap gap-3">
+    <button type="button" disabled={busy||!data.program.siteId}
+     onClick={()=>void run(()=>prepareLaunchAcademicYear({data:{programId:data.program.id}}),
+      "Academic year draft prepared. Review calendar and local operating dates before activation.")}
+     className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+     Prepare recommended year
+    </button>
+    <Link to="/operations/school-years" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}
+     className="rounded-lg border px-4 py-2 text-sm font-semibold">Advanced school-year studio</Link>
+   </div>
+  </section>}
   {!data.catalog.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
    No published course templates are available from this program's academic provider. Publish curriculum before creating sections.
   </p>}
