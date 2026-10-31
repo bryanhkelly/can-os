@@ -150,7 +150,12 @@ export async function installPack(actor: Actor, input:{programId:string;packId:s
  });
 }
 
+/** Legacy Program adoption is historical only. New-year rights must use audited annual rollover. */
 export async function adoptPack(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
+ throw new AuthorizationError("Use year-specific curriculum adoption. Select a school year and verify the publisher license before adopting.");
+}
+
+export async function legacyAdoptPackDisabled(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
   const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
