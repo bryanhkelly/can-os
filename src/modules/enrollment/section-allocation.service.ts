@@ -25,10 +25,13 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  // Staff and self-service registration share one site configuration lock.
  // Acquire BEFORE section FOR UPDATE to avoid inversion with staff attendance.
  const [sectionSite]=await tx.select({siteId:s.sections.siteId,
-  programId:s.sections.programId}).from(s.sections)
+  programId:s.sections.programId,organizationId:s.programs.organizationId})
+  .from(s.sections).innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
   .where(eq(s.sections.id,sectionId)).limit(1);
- if(!sectionSite || !actor.scope.programIds?.includes(sectionSite.programId) ||
-  (sectionSite.siteId!==null && !actor.scope.siteIds?.includes(sectionSite.siteId)))
+ if(!sectionSite || !actor.scope.organizationIds?.includes(sectionSite.organizationId) ||
+  (actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(sectionSite.programId)) ||
+  (actor.scope.siteIds!==undefined&&
+   (!sectionSite.siteId||!actor.scope.siteIds.includes(sectionSite.siteId))))
   throw new Error("Section outside authorized school and program scope");
  // Site-less online sections have no onsite attendance configuration to coordinate.
  if(sectionSite.siteId)await lockAttendanceConfigurationAtSite(tx,sectionSite.siteId);
@@ -55,9 +58,9 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  if(!staffed.has(sectionId))
   throw new Error("Assign an active teacher with verified school access, qualifications and delivery coverage for the instructional term before placing a student in this class");
  await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","curriculum","school_of_record"]);
- if(!actor.scope.programIds?.includes(section.programId)||
-  !actor.scope.organizationIds?.includes(section.organizationId)||
-  (actor.scope.siteIds?.length&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
+ if(!actor.scope.organizationIds?.includes(section.organizationId)||
+  (actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(section.programId))||
+  (actor.scope.siteIds!==undefined&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
   throw new Error("Section outside authorized scope");
  const lock="section-allocation:"+sectionId;
  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lock}))`);
