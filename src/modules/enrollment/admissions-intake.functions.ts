@@ -158,7 +158,11 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
         source.metadata.kind!=="transfer"||
         source.metadata.requestedByGuardianPersonId!==r.submittedByPersonId)
        return "requires_review" as const;
-     return source.metadata.recordsHandoffStatus==="completed"?"completed" as const:
+     return source.metadata.recordsHandoffStatus==="completed"?
+       (source.metadata.recordsReleasedInternally===true &&
+        source.metadata.destinationApplicationId===r.id &&
+        source.metadata.destinationProgramId===r.programId?
+         "available_in_can" as const:"released_externally" as const):
        source.metadata.recordsHandoffStatus==="pending"?"pending_release" as const:
        "not_started" as const;
    })(),
