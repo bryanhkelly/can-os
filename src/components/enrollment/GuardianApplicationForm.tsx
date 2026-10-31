@@ -32,6 +32,7 @@ export interface GuardianApplicationSubmission {
   studentProfileId?: string;
   familyStartRequestId?: string;
   originTransferActionId?: string;
+  confirmedTransferDestination?: true;
 }
 
 export interface GuardianApplicationTransferRequest {
@@ -129,7 +130,8 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         ...(householdId ? { householdId } : {}),
         schoolYearId: selection.year.id,
         ...(studentProfileId ? { studentProfileId } : {}),
-        ...(selectedTransfer ? {originTransferActionId:selectedTransfer.id} : {}),
+        ...(selectedTransfer ? {originTransferActionId:selectedTransfer.id,
+          confirmedTransferDestination:true as const} : {}),
         ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
       setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
