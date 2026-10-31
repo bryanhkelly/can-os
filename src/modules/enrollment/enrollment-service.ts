@@ -102,6 +102,31 @@ export async function startFamilyApplication(
       await requireChurchHostedOperatingServices(tx,input.programId,["admissions","school_of_record"]);
     }
 
+    // An origin transfer belongs to this parent and existing student; it
+    // never authorizes entry into a destination school on its own.
+    let originTransfer: {actionId:string;programId:string;siteId:string|null;destinationSchoolName:string}|null=null;
+    if(input.originTransferActionId){
+      if(!input.existingStudentProfileId)
+        throw new AuthorizationError("Transfer requires a verified existing student");
+      const [origin]=await tx.select({
+        id:actions.id,type:actions.type,status:actions.status,
+        subjectType:actions.subjectType,subjectId:actions.subjectId,
+        siteId:actions.siteId,programId:actions.programId,metadata:actions.metadata,
+      }).from(actions).where(eq(actions.id,input.originTransferActionId)).limit(1);
+      if(!origin||origin.type!=="guardian_enrollment_change_request"||
+         origin.subjectType!=="student_profile"||
+         origin.subjectId!==input.existingStudentProfileId||
+         origin.metadata.kind!=="transfer"||
+         origin.metadata.requestedByGuardianPersonId!==actorPersonId||
+         typeof origin.metadata.recordsReleaseConsentId!=="string"||
+         typeof origin.metadata.destinationSchoolName!=="string"||
+         !origin.metadata.destinationSchoolName.trim()||
+         !origin.programId||origin.programId===input.programId||
+         origin.status==="cancelled")
+        throw new AuthorizationError("Verified origin transfer from this parent and student");
+      originTransfer={actionId:origin.id,programId:origin.programId,siteId:origin.siteId,
+        destinationSchoolName:origin.metadata.destinationSchoolName};
+    }
     const [existing] = await tx
       .select({
         applicationId: applications.id,
@@ -117,6 +142,9 @@ export async function startFamilyApplication(
 
     if (existing) {
       assertApplicationRetryOwnership(existing,actorPersonId,input.programId);
+      if((typeof existing.metadata.originTransferActionId==="string"?
+           existing.metadata.originTransferActionId:null)!==(originTransfer?.actionId??null))
+        throw new Error("Application request ID reused for a different transfer");
       assertFamilyApplicationRetry({application:{...existing,metadata:existing.metadata??{}},
         studentProfileId:input.existingStudentProfileId,
         schoolYearId:input.schoolYearId,familyStartRequestId:input.familyStartRequestId});
@@ -354,6 +382,12 @@ export async function startFamilyApplication(
           contactPersonId:actorPersonId,
           studentIdentityReused:reusedVerifiedStudent,
           ...(source ? {source} : {}),
+          ...(originTransfer?{
+            originTransferActionId:originTransfer.actionId,
+            originTransferProgramId:originTransfer.programId,
+            originTransferSiteId:originTransfer.siteId,
+            originTransferDestinationSchoolName:originTransfer.destinationSchoolName,
+          }:{}),
           ...(program.siteId ? {siteId:program.siteId} : {}),
           ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
           ...(familyStart ? {publicFamilyStartRequestId:familyStart.id} : {}),
