@@ -6,7 +6,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJourneyReadiness, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
-import { validateCommonCartridgeImport, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
+import { validateCommonCartridgeImport, importCommonCartridgeSectionLinks, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
@@ -45,6 +45,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [pdfKey,setPdfKey]=useState(0);
  const [cartridgeFile,setCartridgeFile]=useState<File|null>(null);
  const [cartridgeReport,setCartridgeReport]=useState<Awaited<ReturnType<typeof validateCommonCartridgeImport>>|null>(null);
+ const [cartridgeSection,setCartridgeSection]=useState(""),[cartridgeLinks,setCartridgeLinks]=useState<string[]>([]);
+ const [cartridgeRights,setCartridgeRights]=useState(false);
+ const cartridgeWebLinks=cartridgeReport?.preview.resources.filter(r=>/weblink|imswl/i.test(r.type))??[];
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
@@ -267,7 +270,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      <p className="text-sm text-muted-foreground">Inspect a publisher-supplied 1EdTech Common Cartridge or Thin Common Cartridge (.imscc) without rebuilding it manually. The first stage validates the ZIP manifest, preserves publisher IDs and reports unsupported assessment or application resources. It does not yet publish a course or import embedded files.</p>
      <label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
        <input type="file" accept=".imscc,.zip" disabled={busy} className="mt-2 block"
-         onChange={e=>{setCartridgeReport(null);setCartridgeFile(e.currentTarget.files?.[0]??null);}}/>
+         onChange={e=>{setCartridgeReport(null);setCartridgeLinks([]);setCartridgeSection("");setCartridgeRights(false);setCartridgeFile(e.currentTarget.files?.[0]??null);}}/>
      </label>
      <button type="button" disabled={busy||!cartridgeFile}
        className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
@@ -286,10 +289,41 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      </button>
      {cartridgeReport&&<div className="space-y-2 rounded-lg border p-4 text-sm" role="status">
        <p><strong>Validated source:</strong> {cartridgeReport.preview.profile.replaceAll("_"," ")} · {cartridgeReport.preview.resources.length} resources · {cartridgeReport.preview.outline.length} top-level units</p>
-       <p><strong>Publication:</strong> Validation only. Source package contents are not yet installed as student lessons.</p>
+       <p><strong>Publication:</strong> Source inspection is separate from publishing. Only explicitly selected external web links can be attached to an existing Section. Embedded lessons, QTI and LTI are not converted.</p>
        <ul className="list-disc pl-5">{cartridgeReport.preview.notices.map((n,i)=><li key={i}>{n}</li>)}</ul>
        {!cartridgeReport.preview.notices.length&&<p>No unresolved resource references were detected in the manifest.</p>}
      </div>}
+     {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import supported Common Cartridge web links">
+       <h3 className="font-semibold">Add supported web links to a class</h3>
+       <p className="text-xs text-muted-foreground">Select the original external links you reviewed. Their URLs and source identifiers are preserved in canonical curriculum resources; this does not import a course or lesson package.</p>
+       <label className="block text-sm">Destination class
+        <select className="mt-1 block w-full rounded border bg-background p-2" value={cartridgeSection} onChange={e=>setCartridgeSection(e.target.value)}>
+         <option value="">Select a class</option>
+         {market.sections.map(section=><option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
+        </select>
+       </label>
+       <div className="space-y-2">{cartridgeWebLinks.map(link=><label key={link.identifier} className="flex items-start gap-2 text-sm">
+         <input type="checkbox" checked={cartridgeLinks.includes(link.identifier)}
+          onChange={e=>setCartridgeLinks(old=>e.target.checked?[...old,link.identifier]:old.filter(id=>id!==link.identifier))}/>
+         <span>{link.identifier} · {link.href??link.files[0]??"Link descriptor"}</span>
+       </label>)}</div>
+       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={cartridgeRights}
+        onChange={e=>setCartridgeRights(e.target.checked)}/>
+        <span>I reviewed these external links, their destination class, and rights to share them with students.</span>
+       </label>
+       <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        disabled={busy||!cartridgeFile||!cartridgeSection||!cartridgeRights||!cartridgeLinks.length}
+        onClick={()=>void perform(async()=>{
+         if(!cartridgeFile)throw new Error("Select the validated source package.");
+         const array=new Uint8Array(await cartridgeFile.arrayBuffer());
+         let binary="";
+         for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+         await importCommonCartridgeSectionLinks({data:{
+           programId:market.program.id,sectionId:cartridgeSection,fileName:cartridgeFile.name,
+           base64:btoa(binary),linkIdentifiers:cartridgeLinks,rightsConfirmed:true,
+         }});
+        },"Selected web links added to the class as canonical curriculum resources.")}>Add selected links to class</button>
+      </section>}
      <h3 className="font-semibold">Recent validation jobs</h3>
      <ul className="space-y-1 text-sm">{data.imports.map(item=><li key={item.id}>
        {item.sourceName} · {item.format.replaceAll("_"," ")} · {item.status} · {item.resourceCount} resources · {item.noticeCount} notices
