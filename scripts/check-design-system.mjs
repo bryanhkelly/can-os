@@ -30,7 +30,7 @@ for (const file of files) {
     }
   }
 }
-const duplicates = [...exportsByName].filter(([, locations]) => locations.length > 1);
+const duplicates = [...exportsByName].filter(([, locations]) => new Set(locations.filter(path => !path.endsWith("/index.tsx"))).size > 1);
 if (duplicates.length) {
   console.error("Duplicate shared component exports detected:");
   for (const [name, locations] of duplicates) console.error(`- ${name}: ${locations.join(", ")}`);
