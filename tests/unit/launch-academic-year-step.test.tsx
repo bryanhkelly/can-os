@@ -16,4 +16,10 @@ describe("launch academic year review",()=>{
   const html=renderToStaticMarkup(<ReviewAcademicYear plan={{...plan,years:[{id:"year",name:"Saved School Year",status:"draft",startsOn:"2027-08-23",endsOn:"2028-06-10"}]}}/>);
   expect(html).toContain("Saved School Year");expect(html).toContain("Keep saved grading and terms");
  });
+ it("does not claim a saved year until the canonical command has completed",()=>{
+  const html=renderToStaticMarkup(<ReviewAcademicYear plan={plan} onReload={()=>{}}/>);
+  expect(html).toContain("Save reviewed academic setup");
+  expect(html).not.toContain("Academic setup command accepted");
+  expect(html).not.toContain("Verify saved academic setup");
+ });
 });
