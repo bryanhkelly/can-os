@@ -21,12 +21,12 @@ describe("Stripe processor boundary", () => {
     await expect(processor.verifyWebhook(body, signed(body, now - 1000))).rejects.toThrow("Stale");
   });
   it("does not treat a payment intent submission as capture", async () => {
-    const mock = vi.fn(async () => ({ ok: true, json: async () => ({ id: "pi_123" }) }));
+    const mock = vi.fn(async () => ({ ok: true, json: async () => ({ id: "pi_123", client_secret: "pi_123_secret_fixture" }) }));
     vi.stubGlobal("fetch", mock);
     try {
       await expect(processor.requestPayment({ obligationId: "ob", amountCents: 2000,
         currency: "USD", idempotencyKey: "request-1" })).resolves.toEqual({
-        kind: "submitted", intentId: "pi_123",
+        kind: "submitted", intentId: "pi_123", clientSecret: "pi_123_secret_fixture",
       });
       expect(mock).toHaveBeenCalledOnce();
     } finally { vi.unstubAllGlobals(); }
