@@ -32,7 +32,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
   throw new AuthorizationError("institutional curriculum adoption grant and program scope");
  const resolvedYear=await canonicalYear(executor,program,input.academicYearId);
  const [adoption]=await executor.select().from(curriculumAnnualAdoptions).where(and(
-  eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.year.id),
+  eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.academicYearId),
   eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
  if(!adoption)return {eligible:false,reason:"no_year_adoption" as const};
  const [license]=await executor.select().from(curriculumEntitlements).where(and(
@@ -44,7 +44,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
  const date=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
  const eligible=!!license && !!date(metadata.licenseStartsAt) && !!date(metadata.licenseEndsAt) && annualAdoptionEligible({
   scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
-   academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.year.id},
+   academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId},
   adoption,license:{organizationId:license.organizationId,packId:license.packId,
    publisherOrganizationId:"",status:license.status,startsAt:date(metadata.licenseStartsAt),
    endsAt:date(metadata.licenseEndsAt),withdrawnAt:date(metadata.withdrawnAt)},
@@ -60,7 +60,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
   if(!program||!await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",tx))
    throw new AuthorizationError("institutional curriculum adoption grant and program scope");
-  const resolvedYear=await canonicalYear(tx,program,input.year.id);
+  const resolvedYear=await canonicalYear(tx,program,input.academicYearId);
   const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
    eq(curriculumEntitlements.organizationId,program.organizationId),eq(curriculumEntitlements.packId,input.packId))).limit(1);
   const [version]=await tx.select().from(curriculumPackVersions).where(and(
@@ -68,7 +68,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
    eq(curriculumPackVersions.status,"published"))).limit(1);
   if(!entitlement||!version)throw new AuthorizationError("licensed published curriculum release");
   const [existing]=await tx.select().from(curriculumAnnualAdoptions).where(and(
-   eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.year.id),
+   eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.academicYearId),
    eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
   if(existing){
    if(existing.status==="active"&&existing.packVersionId===input.versionId){
@@ -82,9 +82,9 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   const parse=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
   if(!parse(metadata.licenseStartsAt)||!parse(metadata.licenseEndsAt)||!annualAdoptionEligible({
    scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
-    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.year.id},
+    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId},
    adoption:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
-    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.year.id,
+    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId,
     packId:input.packId,packVersionId:version.id,status:"active",supersededAt:null},
    license:{organizationId:entitlement.organizationId,packId:entitlement.packId,
     publisherOrganizationId:"",status:entitlement.status,startsAt:parse(metadata.licenseStartsAt),
@@ -93,16 +93,16 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   }))throw new AuthorizationError("publisher license must cover the entire target school year");
   const [row]=await tx.insert(curriculumAnnualAdoptions).values({
    organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
-   academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.year.id,
+   academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId,
    packId:input.packId,packVersionId:version.id,entitlementId:entitlement.id,createdByPersonId:actor.actorPersonId,
   }).returning({id:curriculumAnnualAdoptions.id});
   if(!row)throw new Error("Unable to create annual curriculum adoption.");
   await recordAudit(tx,actor,{action:"curriculum.adoption.year_rollover",resourceType:"curriculum_annual_adoption",
    resourceId:row.id,scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
-   after:{academicYearId:input.year.id,packId:input.packId,packVersionId:version.id,entitlementId:entitlement.id}});
+   after:{academicYearId:input.academicYearId,packId:input.packId,packVersionId:version.id,entitlementId:entitlement.id}});
   await emitEvent(tx,{eventType:EventTypes.CurriculumAnnualAdoptionRolledOver,aggregateType:"curriculum_annual_adoption",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
-   siteId:program.siteId,programId:program.id,payload:{academicYearId:input.year.id,packVersionId:version.id}});
+   siteId:program.siteId,programId:program.id,payload:{academicYearId:input.academicYearId,packVersionId:version.id}});
   return {adoptionId:row.id,created:true};
  });
 }
