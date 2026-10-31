@@ -3,7 +3,7 @@ import {
   approveChurchOnboardingRequest, declineChurchOnboardingRequest,
   listChurchOnboardingRequests, verifyChurchOnboardingRequest, resendApprovedChurchInvitation,
 } from "@/modules/networks/network-steward.functions";
-import { requestChurchOnboardingEvidence } from "@/modules/networks/church-applications.functions";
+import { cancelChurchOnboardingRequest, requestChurchOnboardingEvidence } from "@/modules/networks/church-applications.functions";
 
 type Applications = Awaited<ReturnType<typeof listChurchOnboardingRequests>>;
 const field = "mt-1 w-full rounded-lg border bg-background p-2 text-sm";
@@ -32,7 +32,7 @@ export function ChurchApplicationsDesk() {
     void refresh().catch(() => setError("Unable to load church applications."))
       .finally(() => setLoading(false));
   }, []);
-  async function act(id: string, operation: "verify" | "approve" | "decline" | "followup") {
+  async function act(id: string, operation: "verify" | "approve" | "decline" | "followup" | "cancel") {
     setWorking(id); setError(""); setNotice("");
     try {
       if (operation === "verify") {
@@ -43,6 +43,9 @@ export function ChurchApplicationsDesk() {
         setNotice(result.emailSent
           ? "Church and Site prepared. Email accepted by the provider, not confirmed delivered; access starts on secure invitation acceptance."
           : "Church and Site prepared, but email delivery is unconfirmed. Check the mail provider and resend access.");
+      } else if (operation === "cancel") {
+        await cancelChurchOnboardingRequest({ data: id });
+        setNotice("Application canceled. Previous evidence is invalidated; no invitation was issued.");
       } else if (operation === "followup") {
         const result = await requestChurchOnboardingEvidence({ data: { requestId: id, note: followupNote[id] ?? "" } });
         setNotice(result.providerAccepted
@@ -150,6 +153,15 @@ export function ChurchApplicationsDesk() {
               Request evidence and notify applicant
             </button>
           </details>}
+          <details className="mt-4 rounded-lg border p-3">
+            <summary className="cursor-pointer text-sm font-semibold">Cancel duplicate or withdrawn request</summary>
+            <p className="mt-2 text-xs text-muted-foreground">Cancel only after confirming withdrawal or duplication through an established channel. This invalidates prior evidence.</p>
+            <button type="button" disabled={!!working}
+              onClick={()=>void act(request.id,"cancel")}
+              className="mt-2 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">
+              Confirm cancellation
+            </button>
+          </details>
           <details className="mt-4 rounded-lg border p-3">
             <summary className="cursor-pointer text-sm font-semibold">Decline application</summary>
             <label className="mt-2 block text-sm">Reason for decision
