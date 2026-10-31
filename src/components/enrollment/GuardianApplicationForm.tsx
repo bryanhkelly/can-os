@@ -33,6 +33,7 @@ export interface GuardianApplicationSubmission {
   familyStartRequestId?: string;
   originTransferActionId?: string;
   confirmedTransferDestination?: true;
+  destinationRecordsReleaseAuthorized?: true;
 }
 
 export interface GuardianApplicationTransferRequest {
@@ -91,6 +92,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   const [studentProfileId, setStudentProfileId] = useState(linkedStudent?.studentProfileId??"");
   const [originTransferActionId,setOriginTransferActionId] = useState(linkedStudent?linkedTransfer?.id??"":"");
   const [confirmedDestination,setConfirmedDestination] = useState(false);
+  const [authorizedDestinationRecords,setAuthorizedDestinationRecords] = useState(false);
   const [householdId, setHouseholdId] = useState(linkedStudent?.householdId??households[0]?.id??"");
   const [firstName, setFirstName] = useState(linkedStudent?.studentFirstName??"");
   const [lastName, setLastName] = useState(linkedStudent?.studentLastName??"");
@@ -109,7 +111,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
     const student = students.find(item =>
       `${item.studentProfileId}:${item.householdId}` === optionId);
     setStudentProfileId(student?.studentProfileId ?? "");
-    setOriginTransferActionId("");setConfirmedDestination(false);
+    setOriginTransferActionId("");setConfirmedDestination(false);setAuthorizedDestinationRecords(false);
     if (!student) {
       setFirstName(""); setLastName(""); setGrade("");
       return;
@@ -134,7 +136,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
       setError("Choose an available school and its configured academic year before submitting.");
       return;
     }
-    if(selectedTransfer&&!confirmedDestination){
+    if(selectedTransfer&&(!confirmedDestination||!authorizedDestinationRecords)){
       setError("Confirm that you selected the intended destination school before linking this transfer.");
       return;
     }
@@ -149,13 +151,14 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         schoolYearId: selection.year.id,
         ...(studentProfileId ? { studentProfileId } : {}),
         ...(selectedTransfer ? {originTransferActionId:selectedTransfer.id,
-          confirmedTransferDestination:true as const} : {}),
+          confirmedTransferDestination:true as const,
+          destinationRecordsReleaseAuthorized:true as const} : {}),
         ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
       setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
       setRequestId(crypto.randomUUID());
       setStudentProfileId(""); setStudentOptionId("");
-      setOriginTransferActionId("");setConfirmedDestination(false);
+      setOriginTransferActionId("");setConfirmedDestination(false);setAuthorizedDestinationRecords(false);setAuthorizedDestinationRecords(false);
       setFirstName("");
       setLastName("");
       setGrade("");
@@ -235,7 +238,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         {availableTransfers.length>0&&studentProfileId&&<div className="space-y-3 rounded-xl border p-4 sm:col-span-2">
           <Label htmlFor={`${id}-transfer`}>Connecting a move from another school?</Label>
           <Select id={`${id}-transfer`} value={originTransferActionId}
-            onChange={event=>{setOriginTransferActionId(event.target.value);setConfirmedDestination(false);}}>
+            onChange={event=>{setOriginTransferActionId(event.target.value);setConfirmedDestination(false);setAuthorizedDestinationRecords(false);}}>
             <option value="">No, this is a regular application</option>
             {availableTransfers.map(transfer=><option key={transfer.id} value={transfer.id}>
               From {transfer.originSchoolName} to {transfer.destinationSchoolName}
@@ -254,6 +257,14 @@ export function GuardianApplicationForm({ programs, households, students = [], t
                 onChange={event=>setConfirmedDestination(event.target.checked)} className="mt-1" required />
               <span>I confirm that the selected Program is the school I am applying to for this transfer.
                 I understand that the origin-school request does not grant admission to the new school.</span>
+            </label>
+            <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" checked={authorizedDestinationRecords} required
+                onChange={event=>setAuthorizedDestinationRecords(event.target.checked)} className="mt-1"/>
+              <span>I authorize the official transcript from my child's originating CAN school to be made available
+                to this specifically selected receiving-school Program for admissions and academic placement,
+                after the issuing records office has completed its authorized transfer. This does not authorize
+                other schools or grant access to medical, custody or safeguarding records.</span>
             </label>
           </>}
         </div>}
@@ -286,7 +297,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           <p id={`${id}-grade-hint`} className="text-xs leading-5 text-muted-foreground">Use the grade the student is applying to enter.</p>
         </div>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable || !!linkedTransfer&&!linkedStudent || !!selectedTransfer&&!confirmedDestination} aria-busy={busy}>
+          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable || !!linkedTransfer&&!linkedStudent || !!selectedTransfer&&(!confirmedDestination||!authorizedDestinationRecords)} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>
