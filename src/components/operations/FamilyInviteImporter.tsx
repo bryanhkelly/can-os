@@ -87,9 +87,10 @@ export function FamilyInviteImporter({
       setPreview(false);
       setConfirmed(false);
       requestId.current = crypto.randomUUID();
-      await router.invalidate();
+      try { await router.invalidate(); }
+      catch { setError("Invitations were saved by the server, but updated outreach records could not be loaded. Reopen this launch to verify the saved batch; do not send another batch."); }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to queue family invitations");
+      setError(cause instanceof Error ? cause.message : "The invitation command could not be confirmed. Retry with the unchanged recipients and message to reuse the same request ID.");
     } finally {
       setBusy(false);
     }
@@ -103,7 +104,8 @@ export function FamilyInviteImporter({
       setResult(response.retried
         ? `Retry queued for ${response.retried} recipient${response.retried === 1 ? "" : "s"}. Provider acceptance is not inbox delivery.`
         : "No failed recipients are waiting for a retry.");
-      await router.invalidate();
+      try { await router.invalidate(); }
+      catch { setError("The retry command was accepted, but updated delivery records could not be loaded. Reopen this launch before retrying again."); }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to retry failed invitations");
     } finally {
