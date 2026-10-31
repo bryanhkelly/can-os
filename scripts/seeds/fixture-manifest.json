@@ -1549,6 +1549,23 @@
       "downstreamRecords": [
         "church_onboarding_requests"
       ]
+    },
+    "/admissions/my-credentials": {
+      "persona": "verified academic credential recipient",
+      "seeds": [
+        "identity-demo-accounts.sql"
+      ],
+      "recordCounts": {
+        "academic_credential_release_authorizations": 0
+      },
+      "interactions": [
+        "verified recipient views only active academic credential release authorizations tied to the authenticated person",
+        "recipient may securely download a currently authorized PDF",
+        "wrong recipient, expired and revoked authorizations are denied server-side"
+      ],
+      "downstreamRecords": [
+        "audit_events"
+      ]
     }
   }
 }
