@@ -25,12 +25,12 @@ async function canonicalYear(query:Pick<Tx,"select">,program:{id:string;organiza
 }
 /** Caller must resolve the canonical academic year server-side; never infer it from a previous adoption. */
 export async function readAnnualAdoptionEligibility(actor:Actor, input:{
- programId:string;year:Year;packId:string;now?:Date;
+ programId:string;academicYearId:string;packId:string;now?:Date;
 }, executor:Pick<Tx,"select">=db){
  const [program]=await executor.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
  if(!program || !await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",executor))
   throw new AuthorizationError("institutional curriculum adoption grant and program scope");
- const resolvedYear=await canonicalYear(executor,program,input.year.id);
+ const resolvedYear=await canonicalYear(executor,program,input.academicYearId);
  const [adoption]=await executor.select().from(curriculumAnnualAdoptions).where(and(
   eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.year.id),
   eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
@@ -54,7 +54,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
 }
 /** Explicit rollover, one annual record per Program/year/pack. Existing sections are not touched. */
 export async function rolloverCurriculumAdoption(actor:Actor,input:{
- programId:string;year:Year;packId:string;versionId:string;now?:Date;
+ programId:string;academicYearId:string;packId:string;versionId:string;now?:Date;
 }){
  return db.transaction(async tx=>{
   const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
@@ -72,7 +72,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
    eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
   if(existing){
    if(existing.status==="active"&&existing.packVersionId===input.versionId){
-    const current=await readAnnualAdoptionEligibility(actor,{programId:program.id,year:input.year,packId:input.packId,now:input.now},tx);
+    const current=await readAnnualAdoptionEligibility(actor,{programId:program.id,academicYearId:input.academicYearId,packId:input.packId,now:input.now},tx);
     if(!current.eligible)throw new AuthorizationError("existing annual adoption no longer has valid license rights");
     return {adoptionId:existing.id,created:false};
    }
