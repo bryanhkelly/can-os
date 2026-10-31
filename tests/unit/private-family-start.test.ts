@@ -1,6 +1,6 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({authority:vi.fn(),published:vi.fn(),issue:vi.fn(),rows:[] as any[],locks:[] as unknown[]}));
-vi.mock("@/db/schema",()=>Object.fromEntries(["communicationThreads","domainEvents","programs","sites"]
+vi.mock("@/db/schema",()=>Object.fromEntries(["communicationThreads","domainEvents","programs","publicAdmissionsInterests","sites"]
  .map(name=>[name,new Proxy({name},{get:(t,key)=>key==="name"?t.name:String(key)})])));
 vi.mock("@/modules/programs/program-site-authorization.server",()=>({requireChurchHostedOperatingServices:state.authority}));
 vi.mock("@/modules/enrollment/public-family-start.server",()=>({
@@ -8,7 +8,7 @@ vi.mock("@/modules/enrollment/public-family-start.server",()=>({
 }));
 vi.mock("@/domain/access-tokens",()=>({normalizeAccessEmail:(value:string)=>value.trim().toLowerCase()}));
 vi.mock("@/domain/event-types",()=>({EventTypes:{PublicFamilyStartRequested:"family.requested"}}));
-import {requestInvitedFamilyStart,resolvePrivateFamilyStartDestination,resolveRedeemedFamilyStartDestination} from "../../src/modules/enrollment/private-family-start.server";
+import {requestConsentedInterestFamilyStart,requestInvitedFamilyStart,resolvePrivateFamilyStartDestination,resolveRedeemedFamilyStartDestination} from "../../src/modules/enrollment/private-family-start.server";
 const programId="22222222-2222-4222-8222-222222222222";
 const siteId="33333333-3333-4333-8333-333333333333";
 const recipientKey="44444444-4444-4444-8444-444444444444";
@@ -65,6 +65,33 @@ describe("private family invitation destination",()=>{
  it.each([{email:"other@example.test"},{programId:"other"},{siteId:"other"}])("denies changed recipient or destination",async change=>{
   state.rows=[[{payload:{source:"staff_invitation",invitationBatchId:batchId,recipientKey}}],[batch],[school]];
   await expect(resolveRedeemedFamilyStartDestination(reader(),{...intent,...change})).rejects.toThrow("original private");
+ });
+ it("allows a consented pre-opening family to receive the private application link",async()=>{
+  const interest={id:"interest",programId,siteId,status:"new",consentAt:new Date(),
+    firstName:"First",lastName:"Family",email:intent.email};
+  state.rows=[[interest],[school]];state.issue.mockImplementation(prepare=>prepare(reader()));
+  const prepared=await requestConsentedInterestFamilyStart(interest.id,vi.fn());
+  expect(prepared).toMatchObject({
+   school:{programId,siteId},contact:{email:intent.email},
+   evidence:{source:"consented_interest",interestId:interest.id},
+  });
+  expect(state.published).not.toHaveBeenCalled();
+ });
+ it("denies invited follow-up when consent was not personally recorded",async()=>{
+  state.rows=[[{id:"interest",programId,siteId,status:"new",consentAt:null}]];
+  state.issue.mockImplementation(prepare=>prepare(reader()));
+  await expect(requestConsentedInterestFamilyStart("interest",vi.fn())).rejects.toThrow("consented");
+ });
+ it("revalidates the consent, email and Program when the link is redeemed",async()=>{
+  const interest={programId,siteId,status:"contacted",consentAt:new Date(),email:intent.email};
+  state.rows=[[{payload:{source:"consented_interest",interestId:"interest"}}],[interest],[school]];
+  expect(await resolveRedeemedFamilyStartDestination(reader(),intent)).toMatchObject({programId,siteId});
+  expect(state.published).not.toHaveBeenCalled();
+ });
+ it("denies a closed family interest even when an email link was already issued",async()=>{
+  state.rows=[[{payload:{source:"consented_interest",interestId:"interest"}}],
+    [{programId,siteId,status:"closed",consentAt:new Date(),email:intent.email}]];
+  await expect(resolveRedeemedFamilyStartDestination(reader(),intent)).rejects.toThrow("original consented");
  });
  it("does not accept missing private issuance provenance",async()=>{
   state.rows=[[{payload:{source:"staff_invitation"}}]];
