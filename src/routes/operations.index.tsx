@@ -276,6 +276,8 @@ function OperationsPage(){
  {i.type==="guardian_health_information_review"?
   <Link to="/operations/health-review" search={{action:i.id}}
     className="rounded border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
+  i.type==="transfer_academic_records_handoff"?
+  <Link to="/operations/transfer-records" className="rounded border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
   i.enrollmentChangeKind?
   <button type="button" className="rounded border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
     disabled={busy!==null} onClick={()=>void completeEnrollmentExit(i.id,i.enrollmentChangeKind!)}>
