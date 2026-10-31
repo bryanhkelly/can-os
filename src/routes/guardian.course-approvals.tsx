@@ -39,8 +39,9 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
       await decideGuardianCourseApproval({
         data: { requestId, approve, acknowledge: approve && acknowledged[requestId] === true },
       });
-      await router.invalidate();
-      setNotice(approve ? "Your approval was recorded." : "Your decision to decline was recorded.");
+      setNotice(approve ? "Your approval was recorded. The registrar must still finalize the schedule." : "Your decision to decline was recorded.");
+      try { await router.invalidate(); }
+      catch { setError("Your decision was saved, but the list could not refresh. Reopen this page rather than submitting it again."); }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save your decision.");
     } finally {
