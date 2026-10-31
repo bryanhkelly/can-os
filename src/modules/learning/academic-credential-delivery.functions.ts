@@ -5,7 +5,7 @@ import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
-import { canDownloadAuthorizedCredential } from "@/domain/academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
@@ -64,8 +64,17 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   const expiry=new Date(data.expiresAt);
   if(expiry.getTime()<=Date.now()||expiry.getTime()>Date.now()+30*86400000)
     throw new AuthorizationError("Release expiry must be within 30 days");
-  void data.recipientPersonId;
-  throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
+  // The baseline provides no trusted records-release instruction or consent
+  // verification interface. Never interpret caller-supplied reference strings
+  // as independent evidence or create an authorization from them.
+  const approved=canAuthorizeAcademicCredentialRelease({
+    issuerMatches:true, studentMatches:false, verifiedRecipient:false,
+    trustedInstructions:false, validAuthorityEvidence:false,
+    registrarApproved:true, demoActor:!!context.demoFacilitator,
+    purpose:"student_request", expiresAt:expiry, now:new Date(),
+  });
+  if(!approved)throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
+  throw new AuthorizationError("Credential release authorization requires a trusted institution evidence interface");
  });
 
 export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
