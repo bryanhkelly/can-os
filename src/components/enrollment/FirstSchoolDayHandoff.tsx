@@ -30,7 +30,7 @@ function FirstSchoolDayForApplication({applicationId,programId}:{
 
   return <section aria-label="Verified first-day handoff" className="mt-4 rounded-lg border p-3 text-sm">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h4 className="font-semibold">Verify today's supervised school-day handoff</h4>
+      <h4 className="font-semibold">Verify the student's next supervised school day</h4>
       <button type="button" className="rounded border px-2 py-1 text-xs"
         disabled={loading} onClick={()=>setRefresh(value=>value+1)}>
         {loading?"Checking…":"Recheck"}
@@ -39,15 +39,16 @@ function FirstSchoolDayForApplication({applicationId,programId}:{
     {loading&&<p role="status" className="mt-2">Checking the live school-local calendar, this student's expected roster and independently reviewed supervision plan…</p>}
     {error&&<p role="alert" className="mt-2">{error}</p>}
     {result&&<>
-      <p className="mt-2 text-xs text-muted-foreground">Site-local date: {result.date}</p>
+      <p className="mt-2 text-xs text-muted-foreground">Site-local date: {result.date} {result.preview ? '(upcoming — planning only)' : '(today)'}</p>
       <p role="status" className="mt-2">{result.message}</p>
+      {result.preview&&<p className="mt-2 text-xs">Future schedules and staffing plans are not proof of staff arrival, student attendance or custody.</p>}
       <dl className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded border p-2"><dt className="text-xs">Expected onsite</dt>
           <dd className="font-semibold">{result.studentExpected?"Yes":"Not confirmed"}</dd></div>
         <div className="rounded border p-2"><dt className="text-xs">Reviewed staffing plan</dt>
           <dd className="font-semibold">{result.supervisionPlanned?"Ready":"Not confirmed"}</dd></div>
         <div className="rounded border p-2"><dt className="text-xs">Observed attendance</dt>
-          <dd className="font-semibold">{result.attendanceRecorded?"Recorded":"Not recorded"}</dd></div>
+          <dd className="font-semibold">{result.preview?"Not yet observable":result.attendanceRecorded?"Recorded":"Not recorded"}</dd></div>
       </dl>
       {result.outstandingGaps.length>0&&<p className="mt-2 text-xs">
         Plan gaps: {result.outstandingGaps.map(gap=>gap.replaceAll("_"," ")).join("; ")}
