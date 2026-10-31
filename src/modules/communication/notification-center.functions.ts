@@ -52,6 +52,29 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.attendanceEvents.siteId,context.scope.siteIds??[]),
    inArray(s.attendanceEvents.programId,context.scope.programIds??[]))):[];
  const attendanceStudent=new Map(familyAttendance.map(row=>[row.id,row.studentPersonId]));
+ // Health-office notices can outlive enrollment or guardian authorization.
+ // Recheck both at read time before revealing even the notification title.
+ const medicalIds=rows.filter(row=>row.resourceType==="health_office_visit"&&row.resourceId)
+   .map(row=>row.resourceId!);
+ const permittedMedical=medicalIds.length&&context.role==="guardian"?await db.select({id:s.healthOfficeVisits.id})
+  .from(s.healthOfficeVisits)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.healthOfficeVisits.studentProfileId))
+  .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+    guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"academic",
+  }))
+  .innerJoin(s.enrollments,and(
+    eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+    eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+  ))
+  .innerJoin(s.programs,and(
+    eq(s.programs.id,s.enrollments.programId),
+    eq(s.programs.siteId,s.healthOfficeVisits.siteId),eq(s.programs.status,"active"),
+  ))
+  .where(and(inArray(s.healthOfficeVisits.id,medicalIds),
+    inArray(s.healthOfficeVisits.siteId,context.scope.siteIds??[]),
+    inArray(s.enrollments.programId,context.scope.programIds??[])
+  )):[];
+ const permittedMedicalIds=new Set(permittedMedical.map(row=>row.id));
  const pickupRows=rows.filter(row=>pickupNotificationTypes.has(row.type)&&row.resourceId);
  const pickupReleaseIds=pickupRows.filter(row=>row.resourceType==="pickup_release_event").map(row=>row.resourceId!);
  const pickupHoldIds=pickupRows.filter(row=>row.resourceType==="pickup_custody_hold").map(row=>row.resourceId!);
@@ -325,6 +348,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   .filter(n=>context.role!=="guardian"||!n.resourceId||
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
+    n.resourceType==="health_office_visit"?permittedMedicalIds.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
     n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
     n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):
@@ -335,6 +359,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
+   n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?"/messages":
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
