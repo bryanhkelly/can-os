@@ -42,7 +42,7 @@ describe("private evidence upload retry contract", () => {
   it("rejects unsupported file types before requesting a signed URL", async () => {
     const begin = vi.fn(async () => ({ key: "k", uploadUrl: "/signed", uploadHeaders: {} }));
     const finish = vi.fn(async () => {});
-    const invalid = new File(["text"], "bad.txt", { type: "text/plain" }) as unknown as globalThis.File;
+    const invalid = new File(["text"], "bad.txt", { type: "text/plain" });
     await expect(submitEvidenceUpload({ begin, finish }, makeInput, invalid, "2027-05-01", null, () => {}))
       .rejects.toThrow("Only PDF");
     expect(begin).not.toHaveBeenCalled();
