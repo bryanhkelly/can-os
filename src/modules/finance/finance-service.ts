@@ -21,6 +21,8 @@ export interface FinanceStore {
   createInvoice(charge: Charge): Promise<void>;
   /** Returns the current projection for an exact duplicate; rejects conflicting IDs. */
   postVerifiedEvent(event: ProviderEvent): Promise<FinanceRecord>;
+  reservePaymentAttempt?(input: { obligationId: string; idempotencyKey: string; provider: string; amountCents: number }): Promise<{ kind: "reserved" | "existing"; status: "pending" | "submitted" | "failed"; intentId?: string }>;
+  finishPaymentAttempt?(input: { obligationId: string; idempotencyKey: string; status: "submitted" | "failed"; intentId?: string }): Promise<void>;
 }
 export type FinanceViewer = "institution" | "site" | "guardian";
 export type FinanceIdentity = {
