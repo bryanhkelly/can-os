@@ -198,6 +198,31 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           </Select>
           <p className="text-xs leading-5 text-muted-foreground">Existing students appear only through a verified managing relationship and shared household.</p>
         </div>
+        {availableTransfers.length>0&&studentProfileId&&<div className="space-y-3 rounded-xl border p-4 sm:col-span-2">
+          <Label htmlFor={`${id}-transfer`}>Connecting a move from another school?</Label>
+          <Select id={`${id}-transfer`} value={originTransferActionId}
+            onChange={event=>{setOriginTransferActionId(event.target.value);setConfirmedDestination(false);}}>
+            <option value="">No, this is a regular application</option>
+            {availableTransfers.map(transfer=><option key={transfer.id} value={transfer.id}>
+              From {transfer.originSchoolName} to {transfer.destinationSchoolName}
+              {transfer.originExited?" · origin exit completed":" · origin exit pending"}
+            </option>)}
+          </Select>
+          {selectedTransfer&&<>
+            <p className="text-sm">Your transfer request names <strong>{selectedTransfer.destinationSchoolName}</strong>.
+              This application is for <strong>{selectedProgram?.name}</strong>. It will remain subject to this school's
+              admissions decision, seat capacity and a separately accepted offer.</p>
+            {!selectedTransfer.originExited&&<WorkspaceNotice tone="attention">
+              Your original school has not yet completed the official exit. Destination enrollment activation will wait for that decision.
+            </WorkspaceNotice>}
+            <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" checked={confirmedDestination}
+                onChange={event=>setConfirmedDestination(event.target.checked)} className="mt-1" required />
+              <span>I confirm that the selected Program is the school I am applying to for this transfer.
+                I understand that the origin-school request does not grant admission to the new school.</span>
+            </label>
+          </>}
+        </div>}
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-household`}>Family household</Label>
           <Select id={`${id}-household`} name="householdId" value={householdId} disabled={!!studentProfileId}
@@ -227,7 +252,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           <p id={`${id}-grade-hint`} className="text-xs leading-5 text-muted-foreground">Use the grade the student is applying to enter.</p>
         </div>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable} aria-busy={busy}>
+          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable || !!selectedTransfer&&!confirmedDestination} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>
