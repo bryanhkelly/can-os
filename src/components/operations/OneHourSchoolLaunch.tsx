@@ -1,3 +1,4 @@
+import { LaunchTaskDestination } from "@/components/operations/LaunchTaskDestination";
 import { useState } from "react";
 import { resolveLaunchResume } from "@/domain/launch-resume";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -27,29 +28,6 @@ function taskTone(task: LaunchGuidanceTask): "success" | "attention" | "neutral"
   return "neutral";
 }
 
-function TaskDestination({ launch, task }: { launch: Launch; task: LaunchGuidanceTask }) {
-  if (task.requiresRegistrarReview) {
-    return <Link to="/operations/launch/$programId" params={{programId:launch.id}}
-      search={{siteId:launch.siteId??undefined,programId:undefined}}
-      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold">
-      Review requirement details
-    </Link>;
-  }
-  if (task.action === "academics" || task.action === "review") {
-    return <Link to="/operations/launch/$programId" params={{ programId: launch.id }}
-      search={{ siteId: launch.siteId ?? undefined, programId: undefined }}
-      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
-      Open guided setup
-    </Link>;
-  }
-  if (task.action === "admissions") {
-    return <Link to="/admissions/intake" search={{ siteId: launch.siteId ?? undefined, programId: launch.id }}
-      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
-      Open family intake
-    </Link>;
-  }
-  return null;
-}
 
 function SchoolOwnedCompletion({ task, busy, complete }: {
   task: LaunchGuidanceTask;
@@ -441,7 +419,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       {next.state === "waiting_third_party" && <p className="mt-3 text-sm">
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
-      <div className="mt-4"><TaskDestination launch={launch} task={next} /></div>
+      <div className="mt-4"><LaunchTaskDestination launch={launch} task={next} /></div>
       {canReviewSelectedLaunch && next.pendingEvidenceReview && <InstitutionalEvidenceReview key={next.id} task={next} busy={busy} review={reviewEvidence} />}
       <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
@@ -480,7 +458,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.state === "needs_you" && <span className="max-w-48 text-right text-xs text-muted-foreground">School-owned work; confirm completion only after the underlying requirement is met.</span>}
             {task.state === "blocked" && <span className="max-w-48 text-right text-xs text-muted-foreground">Review the canonical requirement record to resolve the blocker.</span>}
             {task.state !== "complete" && task.action !== "opening" &&
-              <TaskDestination launch={launch} task={task} />}
+              <LaunchTaskDestination launch={launch} task={task} />}
             {canReviewSelectedLaunch && task.id !== next?.id && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
             {task.id !== next?.id && (task.evidenceReviewCorrectionPending || (task.state === "needs_can" && !task.pendingEvidenceReview && !task.evidenceStatementCount)) && <LaunchEvidenceStatement key={task.id} task={task} busy={busy} submit={submitEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&
