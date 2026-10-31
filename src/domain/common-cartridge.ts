@@ -155,6 +155,8 @@ export function inspectCommonCartridgeZip(zip:Uint8Array):CartridgePreview {
  const decoder=new TextDecoder("utf-8",{fatal:true});
  let offset=dirOffset;
  let manifest:Uint8Array|null=null;
+ const archivePaths=new Set<string>();
+ let totalExpanded=0;
  for(let i=0;i<count;i++){
   if(offset+46>zip.length||view.getUint32(offset,true)!==0x02014b50)throw new Error("Invalid ZIP directory entry.");
   const flags=view.getUint16(offset+8,true),method=view.getUint16(offset+10,true);
@@ -165,6 +167,14 @@ export function inspectCommonCartridgeZip(zip:Uint8Array):CartridgePreview {
   if(offset+46+nameSize+extra+comment>zip.length)throw new Error("Truncated ZIP entry.");
   const path=decoder.decode(zip.subarray(offset+46,offset+46+nameSize));
   safePath(path.endsWith("/")?path.slice(0,-1):path);
+  if(archivePaths.has(path))throw new Error("Duplicate ZIP archive entry.");
+  archivePaths.add(path);
+  const unixMode=view.getUint32(offset+38,true)>>>16;
+  if((unixMode&0xf000)===0xa000)throw new Error("Symlink ZIP entry unsupported.");
+  totalExpanded+=expanded;
+  if(totalExpanded>50*1024*1024||expanded>20*1024*1024||
+    expanded>Math.max(1,compressed)*100)
+    throw new Error("ZIP archive expansion limit exceeded.");
   if(flags&1||compressed===0xffffffff||expanded===0xffffffff||local===0xffffffff)
     throw new Error("Encrypted and ZIP64 cartridges are not supported.");
   if(path==="imsmanifest.xml"){
@@ -261,4 +271,96 @@ export function extractCommonCartridgeWebLink(zip:Uint8Array,resourcePath:string
   const title=titleMatch?decodeXml(titleMatch[1]!.trim()):url.hostname;
   if(!title||title.length>200)throw new Error("Invalid Common Cartridge web-link title.");
   return {title,url:url.href};
+}
+
+
+/** Narrow, text-only HTML lesson profile. CSS, embedded assets, executable HTML,
+ * active navigation, and cross-file references are intentionally unsupported. */
+export function extractCommonCartridgeStaticLesson(zip:Uint8Array,entry:CartridgeEntry):
+ {title:string;html:string;sourcePath:string} {
+ if(!/^(?:webcontent|imscc_xmlv1p3\/webcontent)$/i.test(entry.type))
+   throw new Error("Only explicit webcontent HTML lessons are supported.");
+ if(!entry.href||!(/\.html?$/i.test(entry.href))||entry.files.length!==1||
+    entry.files[0]!==entry.href)
+   throw new Error("Static lessons require exactly one manifest-declared HTML file.");
+ const htmlPath=safePath(entry.href);
+ const archive=zip;
+ if(archive.length<22||archive.length>maxPackageBytes)throw new Error("Invalid cartridge size.");
+ const view=new DataView(archive.buffer,archive.byteOffset,archive.byteLength);
+ let eocd=-1;
+ for(let p=archive.length-22;p>=Math.max(0,archive.length-65557);p--)
+   if(view.getUint32(p,true)===0x06054b50){eocd=p;break;}
+ if(eocd<0)throw new Error("Missing cartridge ZIP directory.");
+ const count=view.getUint16(eocd+10,true);
+ let offset=view.getUint32(eocd+16,true);
+ const dirSize=view.getUint32(eocd+12,true);
+ if(!count||count>3000||offset+dirSize>eocd)throw new Error("Invalid cartridge ZIP directory.");
+ const decoder=new TextDecoder("utf-8",{fatal:true});
+ let result:string|null=null;
+ const names=new Set<string>();
+ for(let i=0;i<count;i++){
+  if(offset+46>eocd||view.getUint32(offset,true)!==0x02014b50)
+    throw new Error("Malformed cartridge entry.");
+  const flags=view.getUint16(offset+8,true),method=view.getUint16(offset+10,true);
+  const unixMode=view.getUint32(offset+38,true)>>>16;
+  if((unixMode&0xf000)===0xa000)throw new Error("Symlink ZIP entries are unsupported.");
+
+  const crc=view.getUint32(offset+16,true),compressed=view.getUint32(offset+20,true);
+  const expanded=view.getUint32(offset+24,true),nameSize=view.getUint16(offset+28,true);
+  const extra=view.getUint16(offset+30,true),comment=view.getUint16(offset+32,true);
+  const local=view.getUint32(offset+42,true);
+  if(offset+46+nameSize+extra+comment>eocd)throw new Error("Truncated cartridge entry.");
+  const name=decoder.decode(archive.subarray(offset+46,offset+46+nameSize));
+  safePath(name.endsWith("/")?name.slice(0,-1):name);
+  if(names.has(name))throw new Error("Duplicate cartridge archive path.");
+  names.add(name);
+  if(name===htmlPath){
+   if(flags&1||flags&8||compressed===0xffffffff||expanded===0xffffffff||
+      local===0xffffffff||expanded>128*1024||compressed>256*1024||
+      expanded>Math.max(1,compressed)*100)
+     throw new Error("Unsupported or oversized static HTML lesson.");
+   if(local+30>archive.length||view.getUint32(local,true)!==0x04034b50||
+      view.getUint16(local+8,true)!==method)
+     throw new Error("Invalid local HTML entry.");
+   const localSize=view.getUint16(local+26,true),localExtra=view.getUint16(local+28,true);
+   const start=local+30+localSize+localExtra;
+   if(start+compressed>archive.length||decoder.decode(archive.subarray(local+30,local+30+localSize))!==name)
+     throw new Error("HTML entry path or bounds mismatch.");
+   const bytes=archive.subarray(start,start+compressed);
+   const unpacked=method===0?bytes:method===8?
+      inflateRawSync(bytes,{maxOutputLength:128*1024}):null;
+   if(!unpacked||unpacked.length!==expanded||crc32(unpacked)!==crc)
+     throw new Error("Static HTML integrity check failed.");
+   result=decoder.decode(unpacked);
+  }
+  offset+=46+nameSize+extra+comment;
+ }
+ if(result===null)throw new Error("Manifest-declared HTML lesson is missing.");
+ // A deliberately conservative allowlist: reject rather than attempt to repair
+ // complex markup. Preserve only plain paragraph, heading and list semantics.
+ const raw=result;
+ if(/\u0000|\u2028|\u2029/.test(raw))throw new Error("Unsafe control characters in static lesson.");
+ if(raw.length>128*1024)throw new Error("HTML lesson exceeds content limit.");
+ if(/<(?:script|style|iframe|object|embed|svg|math|form|input|button|link|meta|base|template|video|audio|img|canvas)\b/i.test(raw)||
+    /\bon[a-z]+\s*=|\b(?:href|src|srcset|style|id|class|action|formaction)\s*=/i.test(raw)||
+    /<!|<\?|&(?:#|[a-z][a-z0-9]+);/i.test(raw)||
+    /\b(?:javascript|data|vbscript):/i.test(raw))
+   throw new Error("HTML lesson contains unsupported executable, linked, or styled content.");
+ const allowed=new Set(["html","head","body","title","h1","h2","h3","h4","p","br","strong","em","b","i","ul","ol","li","blockquote"]);
+ const tags=raw.match(/<[^>]*>/g)??[];
+ if((raw.match(/</g)??[]).length!==tags.length)
+   throw new Error("Malformed HTML lesson.");
+ for(const t of tags){
+  const match=/^<\/?([a-z][a-z0-9]*)(?:\s*\/?)?>$/i.exec(t);
+  if(!match||!allowed.has(match[1]!.toLowerCase()))
+   throw new Error("HTML lesson contains an unsupported element or attribute.");
+ }
+ const withoutTags=raw.replace(/<[^>]*>/g,"");
+ if(withoutTags.includes("<")||withoutTags.includes(">"))
+   throw new Error("Malformed HTML lesson.");
+ const titleMatch=raw.match(/<title>([^<>]{1,200})<\/title>/i)||
+   raw.match(/<h1>([^<>]{1,200})<\/h1>/i);
+ const title=titleMatch?.[1]?.trim()||entry.identifier;
+ if(title.length>200)throw new Error("Static HTML lesson title is too long.");
+ return {title,html:raw,sourcePath:htmlPath};
 }
