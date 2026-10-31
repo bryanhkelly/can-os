@@ -21,6 +21,12 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,eq } from "drizzle-orm";
+import { schoolYearStructure } from "@/domain/school-year-structure";
+
+type AcademicTimeTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+function withAcademicTimeTransaction<T>(run: (tx: AcademicTimeTransaction) => Promise<T>, tx?: AcademicTimeTransaction): Promise<T> {
+  return tx ? run(tx) : db.transaction(run);
+}
 
 function assertDateRange(startsOn: string, endsOn: string, label: string) {
   if (startsOn > endsOn) {
@@ -143,11 +149,12 @@ export async function createTerm(
     startsOn: string;
     endsOn: string;
   },
+  transaction?: AcademicTimeTransaction,
 ): Promise<string> {
   assertCapability(context, "academic_year.manage");
   assertDateRange(input.startsOn, input.endsOn, "Term");
 
-  return db.transaction(async (tx) => {
+  return withAcademicTimeTransaction(async (tx) => {
     const [year] = await tx
       .select()
       .from(schoolYears)
@@ -201,7 +208,7 @@ export async function createTerm(
       actorPersonId: context.actorPersonId, ...scope, payload: { schoolYearId: year.id },
     });
     return term.id;
-  });
+  }, transaction);
 }
 
 export async function createGradingPeriod(
@@ -216,11 +223,12 @@ export async function createGradingPeriod(
     gradePostingOpensAt?: Date;
     gradePostingClosesAt?: Date;
   },
+  transaction?: AcademicTimeTransaction,
 ): Promise<string> {
   assertCapability(context, "academic_year.manage");
   assertDateRange(input.startsOn, input.endsOn, "GradingPeriod");
 
-  return db.transaction(async (tx) => {
+  return withAcademicTimeTransaction(async (tx) => {
     const [record] = await tx
       .select({
         termId: terms.id,
@@ -277,7 +285,7 @@ export async function createGradingPeriod(
       actorPersonId: context.actorPersonId, ...scope, payload: { termId: input.termId },
     });
     return period.id;
-  });
+  }, transaction);
 }
 
 export async function createAcademicCalendar(
@@ -286,10 +294,11 @@ export async function createAcademicCalendar(
     schoolYearId: string;
     name: string;
   },
+  transaction?: AcademicTimeTransaction,
 ): Promise<string> {
   assertCapability(context, "academic_year.manage");
 
-  return db.transaction(async (tx) => {
+  return withAcademicTimeTransaction(async (tx) => {
     const [year] = await tx
       .select()
       .from(schoolYears)
@@ -329,7 +338,7 @@ export async function createAcademicCalendar(
         siteId: year.siteId }, after: { version: 1, active: true },
     });
     return calendar.id;
-  });
+  }, transaction);
 }
 
 export async function setAcademicCalendarDay(
@@ -558,6 +567,57 @@ export async function createScheduleTemplate(
     });
 
     return template.id;
+  });
+}
+
+/** Prepare real draft records through their canonical commands. Locking the
+ * year makes retries reuse its terms, periods and calendar without overwrites. */
+export async function prepareSchoolYearBasics(
+  context: CommandContext,
+  input: {schoolYearId: string; structure: "full_year" | "semesters"},
+) {
+  assertCapability(context, "academic_year.manage");
+  return db.transaction(async tx => {
+    const [scoped] = await tx.select().from(schoolYears)
+      .where(eq(schoolYears.id, input.schoolYearId)).limit(1);
+    if (!scoped) throw new Error("SchoolYear not found");
+    assertOrganizationScope(context, scoped.organizationId);
+    assertSiteScope(context, scoped.siteId);
+    assertProgramScope(context, scoped.programId);
+    // Use the same Site-before-row lock order as activation and attendance.
+    await lockAttendanceConfigurationAtSite(tx, scoped.siteId);
+    const [year] = await tx.select().from(schoolYears)
+      .where(eq(schoolYears.id, input.schoolYearId)).for("update").limit(1);
+    if (!year || year.siteId !== scoped.siteId) throw new Error("School year changed; refresh before preparing it");
+    assertOrganizationScope(context, year.organizationId);
+    assertSiteScope(context, year.siteId);
+    assertProgramScope(context, year.programId);
+    if (year.status !== "draft") throw new Error("Recommended setup is only available for a draft school year");
+    const planned = schoolYearStructure(year.startsOn, year.endsOn, input.structure);
+    let yearTerms = await tx.select({id:terms.id,name:terms.name,startsOn:terms.startsOn,endsOn:terms.endsOn})
+      .from(terms).where(eq(terms.schoolYearId, year.id));
+    const existingStructure = yearTerms.length > 0;
+    if (!existingStructure) {
+      yearTerms = [];
+      for (const term of planned) {
+        const termId = await createTerm(context, {...term, schoolYearId: year.id}, tx);
+        yearTerms.push({id:termId,name:term.name,startsOn:term.startsOn,endsOn:term.endsOn});
+      }
+    }
+    for (const term of yearTerms) {
+      const [period] = await tx.select({id: gradingPeriods.id}).from(gradingPeriods)
+        .where(eq(gradingPeriods.termId, term.id)).limit(1);
+      if (!period) await createGradingPeriod(context, {
+        termId:term.id,key:"term-grading",name:term.name,sequence:1,
+        startsOn:term.startsOn,endsOn:term.endsOn,
+      }, tx);
+    }
+    const [calendar] = await tx.select({id: academicCalendars.id}).from(academicCalendars)
+      .where(and(eq(academicCalendars.schoolYearId, year.id), eq(academicCalendars.active, true))).limit(1);
+    const calendarId = calendar?.id ?? await createAcademicCalendar(context, {
+      schoolYearId:year.id,name:"Instructional calendar",
+    }, tx);
+    return {schoolYearId:year.id,calendarId,existingStructure};
   });
 }
 

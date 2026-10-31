@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
- getSchoolYearStudio, createStudioGradeScale, createStudioYear, addStudioTerm, addStudioGradingPeriod,
+ getSchoolYearStudio, createStudioGradeScale, createStudioYear, addStudioTerm, addStudioGradingPeriod, prepareStudioYear,
  addStudioCalendar, addStudioCalendarDay, removeStudioCalendarDay, populateStudioInstructionalDays, addStudioSchedule, replaceStudioSchedulePeriods, activateStudioYear,
 } from "@/modules/academic-time/school-year-studio.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
+import { schoolYearStructure } from "@/domain/school-year-structure";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
 export const Route=createFileRoute("/operations/school-years")({
@@ -97,6 +98,8 @@ function Studio({data}:{data:Snapshot}){
  </WorkspaceShell>;
 }
 function YearCard({year:y,busy,run}:{year:Snapshot["years"][number],busy:boolean,run:(fn:()=>Promise<unknown>)=>Promise<void>}){
+ const [structure,setStructure]=useState<"full_year"|"semesters">("full_year");
+ const proposedTerms=y.status==="draft"?schoolYearStructure(y.startsOn,y.endsOn,structure):[];
  const [termName,setTermName]=useState("Fall semester"),[termKey,setTermKey]=useState("fall");
  const [termStart,setTermStart]=useState(y.startsOn),[termEnd,setTermEnd]=useState(y.endsOn);
  const [day,setDay]=useState(y.startsOn),[dayType,setDayType]=useState<"instructional"|"holiday"|"closure"|"special"|"makeup">("holiday");
@@ -107,6 +110,18 @@ function YearCard({year:y,busy,run}:{year:Snapshot["years"][number],busy:boolean
   <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{y.name}</h3><p className="mt-1 text-sm text-muted-foreground">{y.startsOn} to {y.endsOn} · {y.status}</p></div>
    <button disabled={busy||y.status==="active"} onClick={()=>run(()=>activateStudioYear({data:{schoolYearId:y.id}}))} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Activate year</button>
   </div>
+  {y.status==="draft"&&<section aria-label="Recommended academic setup" className="mt-4 rounded-lg border p-4">
+   <h4 className="font-semibold">Prepare your academic year</h4>
+   {!y.terms.length&&<label className="mt-2 block text-sm">Term structure
+    <select value={structure} onChange={e=>setStructure(e.target.value as typeof structure)} className="ml-2 rounded border bg-background p-2">
+     <option value="full_year">One full-year term</option>
+     <option value="semesters" disabled={y.startsOn===y.endsOn}>Two semesters</option>
+    </select>
+   </label>}
+   <p className="mt-2 text-sm">{y.terms.length?"Keep the existing terms and grading periods.":proposedTerms.map(term=>`${term.name}: ${term.startsOn}–${term.endsOn}`).join(" · ")}</p>
+   <p className="mt-2 text-sm text-muted-foreground">Create one grading period for each term that has none, and an instructional calendar if missing. Existing records stay unchanged. Review instructional days, holidays and any onsite schedule below before activation.</p>
+   <button type="button" disabled={busy} onClick={()=>run(()=>prepareStudioYear({data:{schoolYearId:y.id,structure}}))} className="mt-3 rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Prepare terms, grading periods and calendar</button>
+  </section>}
   <div className="mt-5 grid gap-4 lg:grid-cols-2">
    <section className="rounded-lg border p-4"><h4 className="font-semibold">Terms and grading periods</h4>
     {y.terms.map((t,i)=><div key={t.id} className="mt-3 rounded-md bg-muted p-3 text-sm">
@@ -199,4 +214,3 @@ function ScheduleEditor({schedule,busy,run}:{
   </div>
  </div>;
 }
-

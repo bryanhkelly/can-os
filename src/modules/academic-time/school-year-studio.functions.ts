@@ -10,7 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay } from "./school-year-service";
+import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay,prepareSchoolYearBasics } from "./school-year-service";
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -116,6 +116,9 @@ export const createStudioYear = createServerFn({method:"POST"})
 export const addStudioTerm = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({schoolYearId:uuid,key:z.string().min(1),name:z.string().min(2),sequence:z.number().int().positive(),startsOn:day,endsOn:day}).parse(v))
  .handler(async({data})=>({termId:await createTerm(await operator(),data)}));
+export const prepareStudioYear = createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({schoolYearId:uuid,structure:z.enum(["full_year","semesters"])}).strict().parse(v))
+ .handler(async({data})=>prepareSchoolYearBasics(await operator(),data));
 export const addStudioGradingPeriod = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({termId:uuid,key:z.string().min(1),name:z.string().min(2),sequence:z.number().int().positive(),startsOn:day,endsOn:day}).parse(v))
  .handler(async({data})=>({periodId:await createGradingPeriod(await operator(),data)}));
@@ -271,4 +274,3 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
    return {processedDays:rows.length};
   });
  });
-
