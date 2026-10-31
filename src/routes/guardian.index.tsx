@@ -150,7 +150,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
     <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":visibleNeeds.length+visibleApprovals.length+schoolworkCount}/>
-    <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
+    <StatCard label="Overdue unfinished work" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <div className="mt-6">
     {needsWarning && <p role="status" className="mb-3 rounded-xl border p-4 text-sm">{needsWarning}</p>}
@@ -216,12 +216,12 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        </StatusBadge>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
-       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Missing</Link></dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Overdue</Link></dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline">Absences</Link></dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline">Tardies</Link></dt><dd className="text-lg font-semibold">{child.unexcusedTardies}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
       </dl>
-      <p className="mt-4 text-sm text-muted-foreground">{child.missingCount>0?`${child.missingCount} assignment(s) need follow-through.`:child.workNeedsAttentionCount>0?`${child.workNeedsAttentionCount} assignment(s) to complete or revise.`:child.unexcusedAbsences>0||child.unexcusedTardies>0?"Attendance needs your review.":child.awaitingSections?"Your school is arranging class placement.":"No missing work or unexcused attendance cases in this summary."}</p>
+      <p className="mt-4 text-sm text-muted-foreground">{child.missingCount>0?`${child.missingCount} overdue assignment(s) need follow-through.`:child.workNeedsAttentionCount>0?`${child.workNeedsAttentionCount} assignment(s) to complete or revise.`:child.unexcusedAbsences>0||child.unexcusedTardies>0?"Attendance needs your review.":child.awaitingSections?"Your school is arranging class placement.":"No overdue unfinished work or unexcused attendance cases in this summary."}</p>
       {child.workToReview.length>0&&<div className="mt-4 rounded-lg border p-3">
        <p className="text-sm font-semibold">Schoolwork to review · {child.workNeedsAttentionCount}</p>
        <ul className="mt-2 space-y-2">{child.workToReview.map(work=><li key={work.assessmentId} className="text-sm">
