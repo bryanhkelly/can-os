@@ -53,7 +53,7 @@ function FamilyInvitationsWorkspace({data}:{data:Data}){
   setBusy(true);setNotice("");setError("");
   try{
    const result=await retryFamilyInvitationBatch({data:{batchId}});
-   setNotice(result.created?"Retry queued. Previously accepted recipients will not be sent again.":"Retry was already queued.");
+   setNotice(result.retried>0?result.retried+" unaccepted invitation(s) queued for retry. Already accepted recipients will not be sent again.":"No unaccepted failed recipients remain in this batch.");
    await router.invalidate();
   }catch(e){setError(e instanceof Error?e.message:"Could not retry invitations.");}
   finally{setBusy(false);}
