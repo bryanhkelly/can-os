@@ -1549,6 +1549,24 @@
       "downstreamRecords": [
         "church_onboarding_requests"
       ]
+    },
+    "/admissions/my-credentials": {
+      "persona": "verified credential recipient",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "transcript_issuances": 1
+      },
+      "interactions": [
+        "list only live credential-release authorizations for the authenticated verified recipient",
+        "download a released PDF only while authorization and underlying consent remain valid",
+        "reject an unrelated recipient, expired authorization and revoked release"
+      ],
+      "downstreamRecords": [
+        "academic_credential_release_authorizations",
+        "audit_events"
+      ]
     }
   }
 }
