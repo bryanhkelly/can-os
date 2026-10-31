@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, userEvent, within, fn } from "storybook/test";
 import { EvidenceUploader } from "./EvidenceUploader";
 type Upload = { fileName: string; mimeType: "application/pdf" | "image/jpeg" | "image/png";
   size: number; expiresAt: string };
@@ -18,3 +19,29 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 export const UploadsDisabled: Story = { args: { disabled: true } };
+
+
+export const UploadAndFinalize: Story = {
+  args: { onUploaded: fn(async () => {}), adapter: {
+    begin: fn(async () => ({ key: "uploaded-once", uploadUrl: "/mock-private-upload", uploadHeaders: {} })),
+    finish: fn(async () => {}),
+  } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const originalFetch = globalThis.fetch;
+    let byteUploads = 0;
+    globalThis.fetch = async () => { byteUploads++; return new Response(null, { status: 200 }); };
+    try {
+      const fileInput = canvas.getByLabelText("PDF, JPEG or PNG") as HTMLInputElement;
+      const dateInput = canvas.getByLabelText("Evidence expires on") as HTMLInputElement;
+      await userEvent.upload(fileInput, new File(["document"], "approval.pdf", { type: "application/pdf" }));
+      await userEvent.type(dateInput, "2027-05-01");
+      await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
+      await expect(args.adapter.finish).toHaveBeenCalled();
+      await expect(args.onUploaded).toHaveBeenCalled();
+      await expect(byteUploads).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  },
+};
