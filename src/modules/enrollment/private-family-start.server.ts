@@ -1,5 +1,5 @@
 import {and,eq} from "drizzle-orm";
-import {communicationThreads,domainEvents,programs,sites} from "@/db/schema";
+import {communicationThreads,domainEvents,programs,publicAdmissionsInterests,sites} from "@/db/schema";
 import {AuthorizationError} from "@/domain/command-context";
 import {isAcademicMarketingType} from "@/domain/academic-program-publication";
 import {FAMILY_INVITATION_BATCH_KIND,familyInvitationBatchMetadataSchema} from "@/domain/family-invitations";
@@ -54,6 +54,37 @@ export async function requestInvitedFamilyStart(batchId:string,recipientKey:stri
  },sender,options);
 }
 
+/**
+ * A pre-opening family requested follow-up. Once admissions is authorized,
+ * use the normal private verified-email application path without requiring
+ * a published church website. No guardian identity is inferred.
+ */
+export async function requestConsentedInterestFamilyStart(
+ interestId:string,sender:AccessEmailSender,options:FamilyStartEmailOptions={},
+){
+ return requestVerifiedFamilyStart(async tx=>{
+  const [interest]=await tx.select({
+   id:publicAdmissionsInterests.id,
+   programId:publicAdmissionsInterests.programId,
+   siteId:publicAdmissionsInterests.siteId,
+   status:publicAdmissionsInterests.status,
+   consentAt:publicAdmissionsInterests.contactConsentAt,
+   firstName:publicAdmissionsInterests.contactFirstName,
+   lastName:publicAdmissionsInterests.contactLastName,
+   email:publicAdmissionsInterests.contactEmail,
+  }).from(publicAdmissionsInterests).where(eq(publicAdmissionsInterests.id,interestId))
+    .for("share").limit(1);
+  if(!interest||!interest.consentAt||!["new","contacted"].includes(interest.status))
+   throw new AuthorizationError("consented family interest");
+  const school=await resolvePrivateFamilyStartDestination(tx,interest.programId);
+  if(school.siteId!==interest.siteId)throw new AuthorizationError("original interest Site");
+  return {school,contact:{
+    programId:school.programId,firstName:interest.firstName,lastName:interest.lastName,
+    email:normalizeAccessEmail(interest.email),
+   },evidence:{source:"consented_interest" as const,interestId:interest.id}};
+ },sender,options);
+}
+
 /** Only server-recorded issuance evidence selects the private path. A token or
  * client query parameter cannot bypass public publication requirements. */
 export async function resolveRedeemedFamilyStartDestination(tx:Reader,
@@ -62,6 +93,22 @@ export async function resolveRedeemedFamilyStartDestination(tx:Reader,
   eq(domainEvents.aggregateType,"public_family_start_request"),eq(domainEvents.aggregateId,intent.id),
   eq(domainEvents.eventType,EventTypes.PublicFamilyStartRequested),
  )).limit(1);
+ if(event?.payload.source==="consented_interest"){
+  const interestId=event.payload.interestId;
+  if(typeof interestId!=="string")throw new AuthorizationError("consented family interest provenance");
+  const [interest]=await tx.select({
+   programId:publicAdmissionsInterests.programId,siteId:publicAdmissionsInterests.siteId,
+   email:publicAdmissionsInterests.contactEmail,status:publicAdmissionsInterests.status,
+   consentAt:publicAdmissionsInterests.contactConsentAt,
+  }).from(publicAdmissionsInterests).where(eq(publicAdmissionsInterests.id,interestId)).limit(1);
+  if(!interest||!interest.consentAt||interest.status==="closed"||
+   interest.programId!==intent.programId||interest.siteId!==intent.siteId||
+   normalizeAccessEmail(interest.email)!==intent.email)
+   throw new AuthorizationError("original consented family interest destination");
+  const school=await resolvePrivateFamilyStartDestination(tx,intent.programId);
+  if(school.siteId!==interest.siteId)throw new AuthorizationError("original family interest Site");
+  return school;
+ }
  if(event?.payload.source!=="staff_invitation")return resolvePublishedFamilyStartDestination(tx,intent.programId);
  const {invitationBatchId,recipientKey}=event.payload;
  if(typeof invitationBatchId!=="string"||typeof recipientKey!=="string")
