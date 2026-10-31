@@ -252,6 +252,36 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
        inArray(s.programs.organizationId,context.scope.organizationIds??[]),
      )):[];
  const permittedReceivingTranscriptIds=new Set(receivingTranscriptApplications.map(row=>row.id));
+ // An enrollment-confirmed notice must lead to the newly active school,
+ // not expose a child's school details to a revoked parent or former login.
+ const activatedNoticeIds=rows.filter(n=>n.type==="enrollment_activated"&&
+   n.resourceType==="enrollment"&&n.resourceId).map(n=>n.resourceId!);
+ const activatedRows=activatedNoticeIds.length&&["guardian","student"].includes(context.role)?
+   await db.select({
+     id:s.enrollments.id,studentPersonId:s.studentProfiles.personId,
+   }).from(s.enrollments)
+     .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+     .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+     .where(and(
+       inArray(s.enrollments.id,activatedNoticeIds),
+       eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+       inArray(s.enrollments.programId,context.scope.programIds??[]),
+       inArray(s.programs.siteId,context.scope.siteIds??[]),
+       inArray(s.programs.organizationId,context.scope.organizationIds??[]),
+     )):[];
+ const activationGuardianLinks=activatedRows.length&&context.role==="guardian"?
+   await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
+     .from(s.guardianRelationships)
+     .where(and(
+       guardianRelationshipPredicate({guardianPersonId:personId,access:"enrollment"}),
+       inArray(s.guardianRelationships.studentPersonId,
+         [...new Set(activatedRows.map(row=>row.studentPersonId))]),
+     )):[];
+ const activationGuardianStudents=new Set(activationGuardianLinks.map(link=>link.studentPersonId));
+ const activatedEnrollmentById=new Map(activatedRows.filter(row=>
+   context.role==="student"?row.studentPersonId===personId:
+   activationGuardianStudents.has(row.studentPersonId))
+   .map(row=>[row.id,row.studentPersonId]));
  const enrollmentApplicationIds=rows.filter(row=>row.resourceType==="application"&&
   ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected","admissions_stage_changed","student_access_approved"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
  const enrollmentApplications=enrollmentApplicationIds.length&&context.role==="guardian"?
@@ -499,6 +529,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  // its deep link. Staff and student notifications retain their own ownership
  // checks and projection paths.
  const visible=rows.filter(n=>
+   n.type!=="enrollment_activated"||
+   (!!n.resourceId&&activatedEnrollmentById.has(n.resourceId)))
+  .filter(n=>>
    n.type!=="transfer_destination_transcript_ready"||
    (!!n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)))
   .filter(n=>n.resourceType!=="safeguarding_concern"||
@@ -527,6 +560,10 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="transfer_destination_transcript_ready"&&n.resourceType==="application"&&n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)?
    `/admissions/intake?application=${encodeURIComponent(n.resourceId)}`:
+   n.type==="enrollment_activated"&&n.resourceType==="enrollment"&&
+   n.resourceId&&activatedEnrollmentById.has(n.resourceId)?
+   (context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(activatedEnrollmentById.get(n.resourceId)!)}`:
+     context.role==="student"?"/student":null):
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId&&permittedRecordsHandoffs.has(n.resourceId)?"/operations/transfer-records":
