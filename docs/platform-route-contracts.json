@@ -130,6 +130,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/admissions.invite-families.tsx",
+      "route": "/admissions/invite-families",
+      "owner": "enrollment",
+      "roleJourney": "Verified receiving-school registrar queues and retries family application invitations",
+      "readBoundary": "Canonical listFamilyInvitations limits program and batch details to authorized registrar scopes",
+      "writeBoundary": "Invitation commands enforce program/site authority, deduplication, idempotency and provider delivery outbox",
+      "verification": "pending"
+    },
+    {
       "file": "src/routes/admissions.transcripts.tsx",
       "route": "/admissions/transcripts",
       "owner": "learning",
@@ -227,6 +236,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/enrichment-review.tsx",
+      "route": "/enrichment-review",
+      "owner": "activities",
+      "roleJourney": "Independent CAN reviewer selects exact extended learning Season and reviews restricted operational evidence",
+      "readBoundary": "Canonical reviewer service validates institutional scope; restricted evidence details are served by authorized review commands",
+      "writeBoundary": "Independent approval or rejection goes through audited evidence decision service and cannot self-approve",
+      "verification": "pending"
     },
     {
       "file": "src/routes/enrichment.tsx",
