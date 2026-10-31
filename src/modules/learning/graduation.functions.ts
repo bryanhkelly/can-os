@@ -44,6 +44,17 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     // Transfer evidence must carry affirmative issuer acceptance; a snapshot\n    // without acceptance cannot silently confer graduation credit.\n    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
   }));
 }
+/** Check current canonical enrollment custody, not only the immutable transcript snapshot. */
+async function assertNoWithdrawnTranscriptCredits(db:Pick<Awaited<ReturnType<typeof resources>>["db"],"select">,
+ s:Awaited<ReturnType<typeof resources>>["s"],studentProfileId:string,evidence:readonly CreditEvidence[]){
+ const sectionIds=evidence.filter(row=>row.earnedUnits!==null && row.earnedUnits>0).map(row=>row.sectionId);
+ if(!sectionIds.length)return;
+ const withdrawn=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+   .where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.kind,"section"),
+     eq(s.enrollments.status,"withdrawn"),inArray(s.enrollments.sectionId,sectionIds)));
+ if(withdrawn.length)throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
+}
+
 async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>["db"], "select">, s: Awaited<ReturnType<typeof resources>>["s"], transcriptId: string, requirementSetId: string) {
   const [transcript] = await db.select().from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,transcriptId)).limit(1);
   const [requirementSet] = await db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.id,requirementSetId)).limit(1);
@@ -77,7 +88,9 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     throw new AuthorizationError("Selected graduation policy does not apply to student cohort");
   if(institutional[0] && new Date(String(institutional[0].yearStarts)).getTime()>transcript.issuedAt.getTime())
     throw new AuthorizationError("Transcript predates institutional enrollment");
-  return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
+  const evidence=evidenceFromSnapshot(transcript.snapshot,transcript.issuingOrganizationId);
+  await assertNoWithdrawnTranscriptCredits(db,s,transcript.studentProfileId,evidence);
+  return { transcript, requirementSet, evidence };
 }
 
 export const approveGraduationRequirements = createServerFn({method:"POST"})
