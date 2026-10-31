@@ -29,7 +29,7 @@ function GuardianEnrollmentChanges(){
  async function refresh(){
   const [options,records]=await Promise.all([
     getGuardianEnrollmentChangeOptions(),
-    listGuardianEnrollmentChanges({data:{studentPersonId:student}}),
+    listGuardianEnrollmentChanges({data:{}}),
   ]);
   setChoices(options);setRequests(records.items);
   const first=options.find(choice=>choice.studentPersonId===student)??options[0];
@@ -43,7 +43,7 @@ function GuardianEnrollmentChanges(){
   setLoading(true);setError("");setChoices([]);setRequests([]);setSelected("");
   Promise.all([
     getGuardianEnrollmentChangeOptions(),
-    listGuardianEnrollmentChanges({data:{studentPersonId:student}}),
+    listGuardianEnrollmentChanges({data:{}}),
   ]).then(([options,records])=>{
     if(!active)return;
     setChoices(options);setRequests(records.items);
@@ -72,6 +72,7 @@ function GuardianEnrollmentChanges(){
   }catch(e){setError(e instanceof Error?e.message:"Unable to submit family request");}
   finally{setBusy(false);}
  }
+ const visibleRequests=requests.filter(item=>!selected||item.studentPersonId===selected.split(":")[0]);
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment and family changes"
    subtitle="Request a withdrawal, transfer or family record correction from your current school. These requests go to the authorized school office; they never automatically remove a student, alter custody or issue a transcript."
    actions={<Link to="/guardian" search={{student}} className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
@@ -108,13 +109,13 @@ function GuardianEnrollmentChanges(){
   </form>}
   <section className="mt-8 space-y-3">
    <h2 className="text-lg font-semibold">Your requests and school responses</h2>
-   {requests.map(item=><article key={item.id} className="rounded-lg border bg-card p-4">
+   {visibleRequests.map(item=><article key={item.id} className="rounded-lg border bg-card p-4">
     <p className="font-semibold">{item.title} · {item.schoolName}</p>
     <p className="mt-1 text-sm">Status: {item.status.replaceAll("_"," ")} · {new Date(item.createdAt).toLocaleDateString()}</p>
     {item.resolutionNote&&<p className="mt-3 text-sm"><strong>School response:</strong> {item.resolutionNote}</p>}
     <p className="mt-2 text-xs text-muted-foreground">A closed request does not itself confirm that enrollment or academic records changed. Confirm with the school.</p>
    </article>)}
-   {!requests.length&&!loading&&<p className="rounded-lg border p-4 text-sm">No school change requests are recorded for this family selection.</p>}
+   {!visibleRequests.length&&!loading&&<p className="rounded-lg border p-4 text-sm">No school change requests are recorded for this family selection.</p>}
   </section>
  </WorkspaceShell>;
 }
