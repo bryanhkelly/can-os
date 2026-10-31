@@ -75,6 +75,7 @@ function TeacherGradebookPage() {
  // Prioritize work awaiting a grade; reviewed history remains in the grid.
  const reviewQueue=prioritizeSubmittedReviews(gradebook?.cells??[]);
  const pendingReviewCount=reviewQueue.length;
+ const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
  const {previous:previousReview,next:nextReview}=adjacentReviews(reviewQueue,reviewCell?.submissionId);
 
  useEffect(()=>{
