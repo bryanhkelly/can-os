@@ -37,7 +37,8 @@ export const getOperationsActions=createServerFn({method:"GET"})
   id:actions.id,title:actions.title,description:actions.description,type:actions.type,
   siteId:actions.siteId,programId:actions.programId,ownerPersonId:actions.ownerPersonId,
   ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
-  status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt
+  status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt,
+  metadata:actions.metadata
  }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
    asc(actions.dueAt),desc(actions.createdAt)).limit(250);
  const coverageGapOwners=new Map<string,string|null>();
@@ -68,7 +69,9 @@ export const getOperationsActions=createServerFn({method:"GET"})
    dueAt:record?.dueAt?.toISOString()??null,status:record?.status??"open",
    priority:item.priority==="critical"?"critical" as const:
      item.priority==="high"?"high" as const:"normal" as const,
-   managedBySupport:record?.type==="support_referral",openingHandoff:record?.type===openingHandoffType};
+   managedBySupport:record?.type==="support_referral",openingHandoff:record?.type===openingHandoffType,
+   enrollmentChangeKind:record?.type==="guardian_enrollment_change_request"&&
+     (record.metadata.kind==="withdrawal"||record.metadata.kind==="transfer")?record.metadata.kind:null};
  }));
  const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor","site_leader"])));
  const [siteChoices,programChoices]=await Promise.all([
