@@ -3,6 +3,7 @@ import {
   approveChurchOnboardingRequest, declineChurchOnboardingRequest,
   listChurchOnboardingRequests, verifyChurchOnboardingRequest, resendApprovedChurchInvitation,
 } from "@/modules/networks/network-steward.functions";
+import { requestChurchOnboardingEvidence } from "@/modules/networks/church-applications.functions";
 
 type Applications = Awaited<ReturnType<typeof listChurchOnboardingRequests>>;
 const field = "mt-1 w-full rounded-lg border bg-background p-2 text-sm";
@@ -16,6 +17,7 @@ export function ChurchApplicationsDesk() {
   const [evidenceReference, setEvidenceReference] = useState<Record<string, string>>({});
   const [verificationMethod, setVerificationMethod] = useState<Record<string, "signed_authority" | "denominational_confirmation" | "independent_church_confirmation">>({});
   const [declineNote, setDeclineNote] = useState<Record<string, string>>({});
+  const [followupNote, setFollowupNote] = useState<Record<string, string>>({});
   const [reviewChecklist, setReviewChecklist] = useState<Record<string, { source: boolean; authority: boolean; identity: boolean; expiry: boolean }>>({});
   const checklistComplete = (id: string) => {
     const check = reviewChecklist[id];
@@ -30,7 +32,7 @@ export function ChurchApplicationsDesk() {
     void refresh().catch(() => setError("Unable to load church applications."))
       .finally(() => setLoading(false));
   }, []);
-  async function act(id: string, operation: "verify" | "approve" | "decline") {
+  async function act(id: string, operation: "verify" | "approve" | "decline" | "followup") {
     setWorking(id); setError(""); setNotice("");
     try {
       if (operation === "verify") {
@@ -41,11 +43,16 @@ export function ChurchApplicationsDesk() {
         setNotice(result.emailSent
           ? "Church and Site prepared. Email accepted by the provider, not confirmed delivered; access starts on secure invitation acceptance."
           : "Church and Site prepared, but email delivery is unconfirmed. Check the mail provider and resend access.");
+      } else if (operation === "followup") {
+        const result = await requestChurchOnboardingEvidence({ data: { requestId: id, note: followupNote[id] ?? "" } });
+        setNotice(result.providerAccepted
+          ? "Evidence follow-up accepted by the email provider; delivery is not confirmed. Approval is blocked pending fresh verification."
+          : "Evidence follow-up recorded, but the email was not accepted by the provider. Contact the applicant through an independently established channel.");
       } else {
         await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote[id] ?? "" } });
         setNotice("Application declined and any linked authority evidence invalidated.");
       }
-      setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
+      setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setFollowupNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to complete church review.");
@@ -63,7 +70,7 @@ export function ChurchApplicationsDesk() {
     {error&&<p role="alert" className="mt-3 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
     {notice&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">{notice}</p>}
     <div className="mt-4 space-y-4">
-      {applications.filter(x=>x.status==="submitted"||x.status==="verified").map(request =>
+      {applications.filter(x=>x.status==="submitted"||x.status==="needs_evidence"||x.status==="verified").map(request =>
         <article key={request.id} className="rounded-lg border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-lg font-semibold">{request.churchName}</h3>
@@ -73,7 +80,8 @@ export function ChurchApplicationsDesk() {
           <p className="text-sm">{request.firstName} {request.lastName} · {request.leaderTitle} · {request.contactEmail}</p>
           {request.churchWebsite&&<a href={request.churchWebsite} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm underline">Church website</a>}
           <p className="mt-1 text-xs text-muted-foreground">Received {new Date(request.createdAt).toLocaleDateString()} · Request {request.id}</p>
-          {request.status==="submitted" ? <div className="mt-4 space-y-3">
+          {request.status!=="verified" ? <div className="mt-4 space-y-3">
+            {request.status==="needs_evidence" && <p role="status" className="rounded border p-3 text-sm">Additional evidence requested. Fresh independent verification is required before approval. Do not rely on an applicant-submitted claim alone.</p>}
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
             <label className="block text-sm font-semibold">How authority was verified
               <select className={field} value={verificationMethod[request.id] ?? "signed_authority"} onChange={e=>setVerificationMethod(previous=>({...previous,[request.id]:e.target.value as "signed_authority" | "denominational_confirmation" | "independent_church_confirmation"}))}>
@@ -126,6 +134,20 @@ export function ChurchApplicationsDesk() {
               Approve and invite church leader
             </button>
           </div>}
+          {request.status!=="needs_evidence" && <details className="mt-4 rounded-lg border p-3">
+            <summary className="cursor-pointer text-sm font-semibold">Request missing authority evidence</summary>
+            <p className="mt-2 text-xs text-muted-foreground">Send only the minimum missing information. Do not request sensitive IDs or student records by ordinary email. This invalidates previous authority evidence and requires fresh CAN verification.</p>
+            <label className="mt-2 block text-sm">Applicant-facing follow-up details
+              <textarea minLength={15} maxLength={1000} className={field}
+                value={followupNote[request.id] ?? ""}
+                onChange={e=>setFollowupNote(previous=>({...previous,[request.id]:e.target.value}))} />
+            </label>
+            <button type="button" disabled={!!working||(followupNote[request.id] ?? "").trim().length<15}
+              onClick={()=>void act(request.id,"followup")}
+              className="mt-2 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">
+              Request evidence and notify applicant
+            </button>
+          </details>}
           <details className="mt-4 rounded-lg border p-3">
             <summary className="cursor-pointer text-sm font-semibold">Decline application</summary>
             <label className="mt-2 block text-sm">Reason for decision
@@ -138,7 +160,7 @@ export function ChurchApplicationsDesk() {
             </button>
           </details>
         </article>)}
-      {!loading&&!applications.some(x=>x.status==="submitted"||x.status==="verified")&&
+      {!loading&&!applications.some(x=>x.status==="submitted"||x.status==="needs_evidence"||x.status==="verified")&&
         <p className="text-sm text-muted-foreground">No church applications awaiting review.</p>}
     </div>
     {applications.some(x=>x.status==="approved")&&<details className="mt-5 rounded-lg border p-3">
