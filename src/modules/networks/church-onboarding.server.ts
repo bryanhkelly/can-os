@@ -7,7 +7,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
-import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
+import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
 import { listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE } from "@/modules/identity/staff-invitations.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -171,11 +171,16 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
       invitationPending: true, created: newChurch };
   });
 
-  if (!created.invitationPending || options.deferEmail) return { ...created, emailSent: false };
+  if (!created.invitationPending)
+    return { ...created, emailSent: false, invitationDeliveryStatus: "not_required" as const };
+  if (options.deferEmail)
+    return { ...created, emailSent: false, invitationDeliveryStatus: "deferred" as const };
   try {
-    await requestOneTimeAccess(email);
-    return { ...created, emailSent: true };
+    const status = await requestOneTimeAccessWithDeliveryStatus(email);
+    // A generic accepted response can mean cooldown or ineligible; only a
+    // successful sender invocation means we actually dispatched a new email.
+    return { ...created, emailSent: status === "dispatched", invitationDeliveryStatus: status };
   } catch {
-    return { ...created, emailSent: false };
+    return { ...created, emailSent: false, invitationDeliveryStatus: "failed" as const };
   }
 }
