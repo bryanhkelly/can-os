@@ -5,8 +5,13 @@ import type { AccessContext } from "@/domain/access-context";
 import { roleCapabilities } from "@/domain/access-context";
 
 type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
-const state=vi.hoisted(()=>({tx:undefined as Tx|undefined}));
+const state=vi.hoisted(()=>({tx:undefined as Tx|undefined,actor:undefined as AccessContext|undefined}));
 vi.mock("@/db/client",()=>({get db(){if(!state.tx)throw new Error("Rollback transaction required");return state.tx;}}));
+vi.mock("@tanstack/react-start",()=>({createServerOnlyFn:(fn:unknown)=>fn,
+  createServerFn:()=>({parse:(value:unknown)=>value,validator(parse:(value:unknown)=>unknown){this.parse=parse;return this;},
+    handler(fn:(value:{data:unknown})=>unknown){return(value:{data:unknown})=>fn({data:this.parse(value.data)});}})}));
+vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost"),setResponseHeader:vi.fn()}));
+vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>{if(!state.actor)throw new Error("Fixture actor required");return state.actor;}}));
 // This fixture exercises canonical schedule, plan history and independent
 // reviewer authority. Adult eligibility has its own real service coverage;
 // unit tests verify review invokes both appointment and safety gates.
@@ -34,8 +39,8 @@ integration("canonical room-plan lifecycle",()=>{
       const [program]=await tx.insert(s.programs).values({organizationId:church!.id,hostOrganizationId:church!.id,
         siteId:site!.id,jurisdictionId:jurisdiction!.id,academicProviderOrganizationId:can!.id,
         name:"Synthetic school",slug:suffix,type:"full_school",status:"active",gradeRange:{min:"1",max:"12"},deliveryModel:{onsite:true}}).returning();
-      await tx.insert(s.schoolConfigurationVersions).values({programId:program!.id,version:1,deploymentModel:"church_hosted",
-        config:{grades:{min:"1",max:"12"},delivery:{onsite:true,asynchronous:false,liveOnline:false},services:["onsite_supervision"]}});
+      const [configuration]=await tx.insert(s.schoolConfigurationVersions).values({programId:program!.id,version:1,deploymentModel:"church_hosted",
+        config:{grades:{min:"1",max:"12"},delivery:{onsite:true,asynchronous:false,liveOnline:false},services:["onsite_supervision"]}}).returning();
       const [scale]=await tx.insert(s.gradeScales).values({owningOrganizationId:church!.id,name:"Synthetic scale",version:1,configuration:{}}).returning();
       const [schoolYear]=await tx.insert(s.schoolYears).values({organizationId:church!.id,siteId:site!.id,programId:program!.id,
         key:suffix,name:"Synthetic year",status:"active",startsOn:year+"-01-01",endsOn:year+"-12-31",gradeScaleId:scale!.id}).returning();
@@ -57,7 +62,7 @@ integration("canonical room-plan lifecycle",()=>{
         await tx.insert(s.academicCalendarDays).values({academicCalendarId:calendar!.id,calendarDate:date,
           type:calendarVersion===1?"instructional":"closure",instructionalMinutes:calendarVersion===1?60:0});
       }
-      const people=await tx.insert(s.people).values(["host","reviewer","primary","backup","replacement"].map(label=>({legalFirstName:"Synthetic",legalLastName:label}))).returning();
+      const people=await tx.insert(s.people).values(["host","reviewer","primary","backup","replacement","placedLearner","unplacedLearner"].map(label=>({legalFirstName:"Synthetic",legalLastName:label}))).returning();
       const [originalDelivery]=await tx.insert(s.deliveryArrangements).values({sectionId:section!.id,
         academicProviderOrganizationId:can!.id,facilitatorPersonId:people[2]!.id,modality:"onsite",status:"active"}).returning();
       function actor(role:"registrar"|"can_network_steward",index:number):AccessContext{
@@ -101,8 +106,52 @@ integration("canonical room-plan lifecycle",()=>{
       expect(workspace.blocks[0]?.current).toMatchObject({id:substitute.documentId,status:"approved"});
       const events=await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,input.documentId),eq(s.domainEvents.eventType,"OnsiteRoomPlanReviewed")));
       expect(events).toHaveLength(1);
+      // Follow the same director and child from preparing tomorrow into the
+      // live roster. Calendar, enrollments, roles and attendance are real DB
+      // records; only unrelated agreement/adult-credential services are mocked.
+      const [account]=await tx.insert(s.accessAccounts).values({emailNormalized:"director-"+suffix+"@example.invalid",emailVerifiedAt:new Date()}).returning();
+      const [grant]=await tx.insert(s.accountPersonGrants).values({accountId:account!.id,personId:people[0]!.id,
+        role:"site_leader",organizationId:church!.id,siteId:site!.id}).returning();
+      const through=new Date(Date.now()+3*86400_000);
+      const [role]=await tx.insert(s.roleAssignments).values({personId:people[0]!.id,organizationId:church!.id,siteId:site!.id,
+        programId:program!.id,roleKey:"site_leader",capabilities:["onsite.attendance.record"],
+        metadata:{origin:"local_site_delegation",expiresAt:through.toISOString()}}).returning();
+      await tx.insert(s.programResponsibilityAssignments).values({configurationVersionId:configuration!.id,responsibilityKey:"site_director",
+        accountableOrganizationId:church!.id,responsibleRoleAssignmentId:role!.id,effectiveFrom:new Date(Date.now()-60_000),effectiveThrough:through});
+      const learners=await tx.insert(s.studentProfiles).values([5,6].map(index=>({personId:people[index]!.id,gradeLevel:"9"}))).returning();
+      await tx.insert(s.enrollments).values([
+        ...learners.map(student=>({studentProfileId:student.id,organizationId:church!.id,programId:program!.id,
+          schoolYearId:schoolYear!.id,kind:"program" as const,status:"active" as const})),
+        {studentProfileId:learners[0]!.id,organizationId:church!.id,programId:program!.id,schoolYearId:schoolYear!.id,
+          sectionId:section!.id,kind:"section",status:"active"},
+      ]);
+      state.actor={...host,role:"site_leader",accountId:account!.id,sessionId:"synthetic",grantId:grant!.id,
+        capabilities:new Set(roleCapabilities.site_leader)};
+      const {getOnsiteSchoolDayPreparation}=await import("@/modules/operations/onsite-day-preparation.functions");
+      const {markExpectedOnsiteAttendance,listExpectedOnsiteRoster}=await import("@/modules/attendance/onsite-attendance-workflow.functions");
+      const prep=await getOnsiteSchoolDayPreparation({data:{date}});
+      expect(prep.students.map(student=>student.studentProfileId)).toEqual([learners[0]!.id]);
+      expect(prep.sectionMemberships).toContainEqual(expect.objectContaining({studentProfileId:learners[0]!.id,sectionId:section!.id}));
+      expect(prep.unplacedStudents.map(student=>student.studentProfileId)).toEqual([learners[1]!.id]);
+      expect(prep.blocks).toContainEqual(expect.objectContaining({sectionId:section!.id,periodId:period!.id}));
+      const observation={date,programId:program!.id,studentProfileId:learners[0]!.id,status:"present" as const,
+        mutationId:crypto.randomUUID(),expectedPreviousEventId:null};
+      await expect(markExpectedOnsiteAttendance({data:observation})).rejects.toThrow("Future attendance dates cannot be marked");
+      expect(await tx.select().from(s.attendanceEvents).where(eq(s.attendanceEvents.studentProfileId,learners[0]!.id))).toHaveLength(0);
+      await tx.update(s.accountPersonGrants).set({active:false}).where(eq(s.accountPersonGrants.id,grant!.id));
+      await expect(getOnsiteSchoolDayPreparation({data:{date}})).rejects.toThrow("active site-bound onsite attendance assignment");
+      await tx.update(s.accountPersonGrants).set({active:true}).where(eq(s.accountPersonGrants.id,grant!.id));
+      vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(date+"T08:00:00Z"));
+      try{
+        const liveBefore=await listExpectedOnsiteRoster({data:{date}});
+        expect(liveBefore.students).toContainEqual(expect.objectContaining({studentProfileId:learners[0]!.id,status:"unmarked"}));
+        await markExpectedOnsiteAttendance({data:observation});
+        const liveAfter=await listExpectedOnsiteRoster({data:{date}});
+        expect(liveAfter.students).toContainEqual(expect.objectContaining({studentProfileId:learners[0]!.id,status:"present"}));
+        expect(liveAfter.students.some(student=>student.studentProfileId===learners[1]!.id)).toBe(false);
+      }finally{vi.useRealTimers();}
       checked=true;throw rollback;
-    });}catch(error){if(error!==rollback)throw error;}finally{state.tx=undefined;}
+    });}catch(error){if(error!==rollback)throw error;}finally{state.tx=undefined;state.actor=undefined;vi.useRealTimers();}
     expect(checked).toBe(true);
   },120_000);
 });
