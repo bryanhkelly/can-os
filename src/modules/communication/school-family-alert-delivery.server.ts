@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { emailNotificationRecipients, sendNotificationEmail } from "./notification-email.server";
+import { sendNotificationEmail } from "./notification-email.server";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "@/platform/subscriptions/preferences";
 
 const MAX_ATTEMPTS=5;
@@ -115,11 +115,22 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
      let terminal=false;
      let failure="provider_not_accepted";
      if(record.delivery.channel==="email"){
-       const emails=await emailNotificationRecipients([record.recipientPersonId]);
-       const email=emails.get(record.recipientPersonId);
-       if(!email){terminal=true;failure="no_active_email";}
+       const [mail]=await db.select({email:s.accessAccounts.emailNormalized})
+         .from(s.accountPersonGrants)
+         .innerJoin(s.accessAccounts,eq(s.accessAccounts.id,s.accountPersonGrants.accountId))
+         .where(and(
+           eq(s.accountPersonGrants.personId,record.recipientPersonId),
+           eq(s.accountPersonGrants.role,"guardian"),
+           eq(s.accountPersonGrants.organizationId,record.organizationId),
+           or(isNull(s.accountPersonGrants.siteId),
+             eq(s.accountPersonGrants.siteId,record.siteId)),
+           eq(s.accountPersonGrants.active,true),
+           eq(s.accountPersonGrants.isSynthetic,false),
+           eq(s.accessAccounts.disabled,false),
+         )).limit(1);
+       if(!mail?.email){terminal=true;failure="no_active_school_email";}
        else ok=await sendNotificationEmail({
-         to:email,subject:record.title,
+         to:mail.email,subject:record.title,
          text:record.message??record.title,
        },id);
      }else if(record.delivery.channel==="sms"){
