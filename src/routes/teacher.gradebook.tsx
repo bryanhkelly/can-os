@@ -1,3 +1,4 @@
+import { GradebookReviewActions } from "@/components/learning/GradebookReviewActions";
 import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
 import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
 import { GradebookOverview } from "@/components/learning/GradebookOverview";
@@ -377,12 +378,9 @@ function TeacherGradebookPage() {
         <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
        </label>}
        <label className="text-sm font-semibold">Feedback comment<textarea rows={4} maxLength={4000} value={comment} onChange={event=>setComment(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-       <div className="flex flex-wrap gap-3">
-        <button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment,true)}
-         className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Save grading draft</button>
-        <button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment)}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post grade</button>
-        <Link to="/teacher/gradebook" search={{section:selected}} className="rounded-lg border px-4 py-2 text-sm">Close review</Link></div>
+       <GradebookReviewActions busy={busy} sectionId={selected}
+        onSaveDraft={()=>void submitGrade(reviewCell,reviewAssessment,true)}
+        onPostGrade={()=>void submitGrade(reviewCell,reviewAssessment)} />
       </div>:<div className="space-y-3 text-sm">
        <p className="font-semibold">{reviewCell.status==="returned"?"Previous attempt score (awaiting revision)":"Score"}: {reviewCell.score??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
        {reviewAssessment.rubric.map(criterion=><p key={criterion.id}>{criterion.label}: {reviewCell.feedbackRubric.find(item=>item.id===criterion.id)?.points??"—"} / {criterion.maxPoints}</p>)}
