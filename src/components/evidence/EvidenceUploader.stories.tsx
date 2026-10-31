@@ -45,3 +45,27 @@ export const UploadAndFinalize: Story = {
     }
   },
 };
+
+
+export const RefreshFailureDoesNotRepeatFinalization: Story = {
+  args: { onUploaded: fn(async () => { throw new Error("Refresh unavailable"); }),
+    adapter: {
+      begin: fn(async () => ({ key: "recorded", uploadUrl: "/mock-private-upload", uploadHeaders: {} })),
+      finish: fn(async () => {}),
+    } },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(null, { status: 200 });
+    try {
+      await userEvent.upload(canvas.getByLabelText("PDF, JPEG or PNG"),
+        new File(["document"], "approval.pdf", { type: "application/pdf" }));
+      fireEvent.change(canvas.getByLabelText("Evidence expires on"),
+        { target: { value: "2027-05-01" } });
+      await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
+      await expect(canvas.findByRole("alert")).resolves.toHaveTextContent("Evidence recorded, but refresh failed");
+      await expect(args.adapter.finish).toHaveBeenCalledTimes(1);
+      await expect(canvas.getByRole("button", { name: "Submit for review" })).toBeDisabled();
+    } finally { globalThis.fetch = originalFetch; }
+  },
+};
