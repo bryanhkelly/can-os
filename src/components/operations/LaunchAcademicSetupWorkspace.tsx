@@ -109,7 +109,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
-   {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists. Review its saved classroom and instructor assignment below instead of submitting a duplicate.</p>}
+   {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
    <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
