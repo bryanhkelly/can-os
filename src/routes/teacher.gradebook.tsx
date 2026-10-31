@@ -170,12 +170,19 @@ function TeacherGradebookPage() {
    // Refresh the canonical queue before advancing. A classmate may have
    // submitted new work while the teacher was grading this attempt.
    if (selected) {
-    const refreshed=await getGradebook({data:{sectionId:selected}});
-    setGradebook(refreshed);
-    const next=refreshed.cells.find(item=>item.status==="submitted"&&item.submissionId!==cell.submissionId);
-    void navigate({search:next
-     ?{section:selected,assessment:next.assessmentId,student:next.studentProfileId}
-     :{section:selected}});
+    try {
+     const refreshed=await getGradebook({data:{sectionId:selected}});
+     setGradebook(refreshed);
+     const next=refreshed.cells.find(item=>item.status==="submitted"&&item.submissionId!==cell.submissionId);
+     void navigate({search:next
+      ?{section:selected,assessment:next.assessmentId,student:next.studentProfileId}
+      :{section:selected}});
+    } catch {
+     // Posting succeeded; do not imply the grade failed just because the
+     // follow-up refresh was unavailable.
+     setNotice("Grade posted. Refresh the gradebook to continue reviewing.");
+     void navigate({search:{section:selected}});
+    }
    }
   } catch (cause) {
    setNotice(cause instanceof Error ? cause.message : "Unable to post the grade.");
