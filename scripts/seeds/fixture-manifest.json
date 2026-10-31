@@ -214,12 +214,12 @@
         "section_grades": 1
       },
       "interactions": [
-        "render and download an issued transcript or diploma PDF",
-        "send an issued credential to a designated recipient",
-        "review delivery receipts and provider acceptance status"
+        "render and download an issued transcript or diploma PDF as registrar",
+        "review signed transfer consent and verified guardian before approving time-bounded authenticated access",
+        "revoke release and review disclosure history; direct school-to-school delivery remains blocked"
       ],
       "downstreamRecords": [
-        "academic_credential_deliveries",
+        "academic_credential_release_authorizations",
         "audit_events"
       ]
     },
@@ -1549,6 +1549,11 @@
       "downstreamRecords": [
         "church_onboarding_requests"
       ]
+    },
+    "/admissions/my-credentials": {
+      "persona": "verified guardian",
+      "fixtureRequired": false,
+      "rationale": "Authenticated release download requires institution-scoped signed transfer consent, verified account grant and recipient identity; existing synthetic route seeds do not establish these security prerequisites. Connected test fixtures required before acceptance."
     }
   }
 }
