@@ -216,7 +216,7 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
      )).limit(1);
      if(!issuance)throw new AuthorizationError("officially issued transcript for this student and credit issuer");
      let internalDestination:{
-       applicationId:string;programId:string;siteId:string;consentId:string;
+       applicationId:string;programId:string;siteId:string;organizationId:string;consentId:string;
      }|null=null;
      if(data.deliveryMethod==="can_internal_school_records"){
        // A CAN internal handoff is a REAL scoped release of the existing
@@ -267,7 +267,7 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
          throw new AuthorizationError("unrevoked parent consent for this exact CAN receiving school");
        await requireChurchHostedOperatingServices(tx,receiving.programId,["admissions","school_of_record"]);
        internalDestination={applicationId:receiving.id,programId:receiving.programId,
-         siteId:receiving.siteId,consentId};
+         siteId:receiving.siteId,organizationId:receiving.organizationId,consentId};
      }
      const now=new Date();
      const evidence={
@@ -328,7 +328,7 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
            eq(s.accountPersonGrants.role,"registrar"),
            eq(s.accountPersonGrants.active,true),
            eq(s.accountPersonGrants.isSynthetic,false),
-           eq(s.accountPersonGrants.organizationId,receiving!.organizationId),
+           eq(s.accountPersonGrants.organizationId,internalDestination.organizationId),
            or(isNull(s.accountPersonGrants.siteId),
              eq(s.accountPersonGrants.siteId,internalDestination.siteId)),
          ));
