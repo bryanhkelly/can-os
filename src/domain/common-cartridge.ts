@@ -326,6 +326,7 @@ export function extractCommonCartridgeStaticLesson(zip:Uint8Array,entry:Cartridg
  // A deliberately conservative allowlist: reject rather than attempt to repair
  // complex markup. Preserve only plain paragraph, heading and list semantics.
  const raw=result;
+ if(raw.length>128*1024)throw new Error("HTML lesson exceeds content limit.");
  if(/<(?:script|style|iframe|object|embed|svg|math|form|input|button|link|meta|base|template|video|audio|img|canvas)\b/i.test(raw)||
     /\bon[a-z]+\s*=|\b(?:href|src|srcset|style|id|class|action|formaction)\s*=/i.test(raw)||
     /<!|<\?|&(?:#|[a-z][a-z0-9]+);/i.test(raw)||
@@ -333,6 +334,8 @@ export function extractCommonCartridgeStaticLesson(zip:Uint8Array,entry:Cartridg
    throw new Error("HTML lesson contains unsupported executable, linked, or styled content.");
  const allowed=new Set(["html","head","body","title","h1","h2","h3","h4","p","br","strong","em","b","i","ul","ol","li","blockquote"]);
  const tags=raw.match(/<[^>]*>/g)??[];
+ if((raw.match(/</g)??[]).length!==tags.length)
+   throw new Error("Malformed HTML lesson.");
  for(const t of tags){
   const match=/^<\/?([a-z][a-z0-9]*)(?:\s*\/?)?>$/i.exec(t);
   if(!match||!allowed.has(match[1]!.toLowerCase()))
