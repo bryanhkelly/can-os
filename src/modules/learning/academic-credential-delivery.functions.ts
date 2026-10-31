@@ -105,8 +105,8 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   if(!credentialId)throw new AuthorizationError("credential release target");
   const doc=await documentData(db,s,kind,credentialId);
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
-  const pdf=academicDocumentPdf(doc);
   await writeAudit(db,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
+  const pdf=academicDocumentPdf(doc);
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
  });
 
