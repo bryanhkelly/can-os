@@ -85,9 +85,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       ? await loadOnsiteSupervisionPlanForActor(actor,{date,siteId:app.siteId})
       : null;
     const preview = date > today;
-    return {
-      date,preview,
-      ...deriveFirstSchoolDayHandoff({
+    const handoff = deriveFirstSchoolDayHandoff({
         programId:app.programId,
         studentProfileId:app.studentProfileId,
         configuration:programDay?.configuration ?? null,
@@ -95,6 +93,6 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         students:roster.students,
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
-      }),
-    };
+      });
+    return {date,preview,...handoff,attendanceRecorded:preview?false:handoff.attendanceRecorded};
   });
