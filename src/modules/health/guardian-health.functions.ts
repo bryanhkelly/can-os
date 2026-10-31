@@ -47,7 +47,7 @@ export const getGuardianHealthWorkspace = createServerFn({ method: "GET" })
       ))
       .where(and(
         guardianRelationshipPredicate({
-          guardianPersonId: actor.actorPersonId, access: "academic",
+          guardianPersonId: actor.actorPersonId, access: "enrollment",
         }),
         inArray(programs.id, actor.scope.programIds),
         inArray(programs.siteId, actor.scope.siteIds),
