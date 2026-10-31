@@ -56,11 +56,22 @@ describe("guided school launch", () => {
     expect(html).toContain("cannot mark it complete");
     expect(html).not.toContain("Save school completion");
     expect(html).toContain("View the full saved launch path");
-    expect(html).toContain("Optional · Website, outreach and family intake");
+    expect(html).toContain("Prepare your school community");
     expect(html).toContain("Review private school website");
     expect(html).toContain("while opening reviews continue");
+    expect(html).toContain("Continue school preparation");
+    expect(html).toContain("Prepare first classroom");
+    expect(html).not.toContain("Assigned owner ID");
+    expect(html).not.toContain("Saved requirement:");
     expect(html).not.toContain(">Activate</button>");
     expect(html.match(/aria-label="Next launch task"/g)).toHaveLength(1);
+  });
+
+  it("keeps independent CAN approval separate from preparation", () => {
+    const html = render(launch());
+    expect(html).toContain("Opening authority");
+    expect(html).toContain("independent server checks");
+    expect(html).toContain("do not activate enrollment or authorize a supervised school day");
   });
 
   it("resumes from refreshed state instead of preserving a browser-completed checklist", () => {
@@ -75,7 +86,7 @@ describe("guided school launch", () => {
     expect(refreshed).toContain("Review and open the program");
     expect(refreshed).toContain("Receiving site operator (required)");
     expect(refreshed).toContain("Activation is not self-certified");
-    expect(refreshed).toContain("Optional · Website, outreach and family intake");
+    expect(refreshed).toContain("Prepare your school community");
   });
 
   it("resumes the launch selected in the URL across sessions and devices", () => {
