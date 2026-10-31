@@ -73,6 +73,44 @@ Use separate Neon branches for:
 
 Never point integration tests at production.
 
+## Current isolated acceptance configuration (2026-10-31)
+
+The `integration-test` GitHub environment needs secrets scoped to its
+specific Neon branches, not production credentials:
+
+| Workflow | Database secret | Attested branch setting |
+| --- | --- | --- |
+| Admissions and GF1 | `CAN_ADMISSIONS_TEST_DATABASE_URL` | `CAN_ADMISSIONS_TEST_BRANCH_ID` (environment variable) |
+| Curriculum browser and curriculum journey | `CAN_CURRICULUM_TEST_DATABASE_URL` or the workflow's `CURRICULUM_TEST_DATABASE_URL` | `CAN_CURRICULUM_TEST_BRANCH_ID` (environment variable) |
+| FullFlow connected release | `CAN_FULLFLOW_TEST_DATABASE_URL` | Pinned `br-proud-pine-arfju8h2` in code; no caller-provided override |
+
+All require the `CAN_APPLICATION_DB_HOST` environment variable as an
+independent application-endpoint comparison. Other integration runners require
+`CAN_INTEGRATION_TEST_BRANCH_ID` or an applicable suite-specific branch ID.
+Browser configurations now verify the Postgres-reported Neon branch **even
+when Playwright is called directly**, not only when launched by an npm wrapper.
+Offline `--preflight` checks are not database identity or migration proof.
+
+The CAN OS Neon project reached its branch limit during acceptance setup.
+Request a higher limit or explicitly authorize retirement of unused test
+branches before creating a new dedicated admissions/curriculum branch. Never
+delete branches, use production, or silently co-opt the FullFlow release branch
+to satisfy an unrelated acceptance job. GitHub does not expose secrets through
+the configured connector, so these values require environment administration.
+
+## Scheduled delivery and safety monitoring
+
+The Netlify scheduled functions
+`netlify/functions/scheduled-jobs.ts` (every five minutes) and
+`netlify/functions/school-family-alerts.ts` (every minute) **throw** when
+`URL` or `CAN_JOB_SECRET` is absent, or when the authenticated app
+endpoint returns a failure. Configure alerts for failed/missed scheduled
+invocations in Netlify monitoring and verify recent successful invocation
+timestamps against the deployment before opening a school. Application
+outbox health also needs review for terminal events/notifications.
+A build or a deployed schedule definition does not prove delivery.
+Do not include raw family emails, student details or access tokens in logs.
+
 ## Network onboarding acceptance mode
 
 Run `node scripts/run-integration-tests.mjs network-onboarding --preflight` to
