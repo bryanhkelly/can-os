@@ -175,15 +175,16 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px}.card{padding:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .bot-field{display:none}
+header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a{color:inherit;text-underline-offset:4px}html{scroll-behavior:smooth}
 </style>
 </head>
 <body class="theme-${theme}">
-<header><p class="brand">CAN Academy · Local partner site</p><p>${org}</p></header>
+<header><p class="brand">CAN Academy · Local partner site</p><nav aria-label="School website navigation"><a href="#welcome">Welcome</a> <a href="#academic-title">Academics</a> <a href="#programs-title">Enrichment</a> <a href="#contact">Contact</a></nav><p>${org}</p></header>
 <main>
-  <h1>${school}</h1>
+  <div id="welcome" class="public-hero"><p class="tag">Welcome to our school</p><h1>${school}</h1>
   <p class="intro">Discover academic and enrichment opportunities at this location.
   Listings are reviewed marketing information, not accreditation, admission or
-  registration approvals.</p>
+  registration approvals.</p></div>
   ${localSection}
   ${academicCards ? `<section aria-labelledby="academic-title">
     <h2 id="academic-title">Academic programs</h2>
@@ -195,6 +196,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
       ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
       : '<p class="empty">There are no programs to display at this time.</p>'}
   </section>
+  <section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px"><h2 id="contact-title">Connect with our school</h2><p>Explore the published programs above and use their request-information forms to contact the school. Applications are available only when a program is operating and accepting application requests.</p></section>
 </main>
 <footer>${host} · Powered by CAN OS</footer>
 </body>
