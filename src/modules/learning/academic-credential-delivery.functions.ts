@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq } from "drizzle-orm";
+import { and,desc,eq,isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -88,6 +88,18 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    .from(s.people).where(eq(s.people.id,context.actorPersonId)).limit(1);
   if(!canDownloadAuthorizedCredential({actorPersonId:context.actorPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
+  const [verifiedAccount]=await db.select({id:s.accessAccounts.id})
+   .from(s.accessAccounts)
+   .innerJoin(s.accountPersonGrants,eq(s.accountPersonGrants.accountId,s.accessAccounts.id))
+   .where(and(eq(s.accessAccounts.id,context.accountId),
+    eq(s.accessAccounts.disabled,false),
+    isNotNull(s.accessAccounts.emailVerifiedAt),
+    eq(s.accessAccounts.emailNormalized,release.recipientEmail.trim().toLowerCase()),
+    eq(s.accountPersonGrants.personId,context.actorPersonId),
+    eq(s.accountPersonGrants.active,true),
+    eq(s.accountPersonGrants.isSynthetic,false)))
+   .limit(1);
+  if(!verifiedAccount)throw new AuthorizationError("verified recipient account required");
   const kind=release.transcriptIssuanceId?"transcript":"diploma";
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
