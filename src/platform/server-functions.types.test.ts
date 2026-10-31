@@ -1,4 +1,6 @@
-import { expectTypeOf, test } from "vitest";
+import { expectTypeOf, test, vi } from "vitest";
+// Compile-only declarations: importing TanStack wrappers must not initialize Neon.
+vi.mock("@/db/client", () => ({ db: {} }));
 import { z } from "zod";
 import { authenticatedQuery, authenticatedCommand, scopedQuery, institutionalDecision, type SerializableResult } from "./server-functions";
 
