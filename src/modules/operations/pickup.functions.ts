@@ -534,6 +534,14 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
       // A hold cannot appear after the release's safety check but before its write.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + data.studentProfileId + ":" + data.programId}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-holds:" + data.studentProfileId + ":" + data.programId}))`);
+      const [activeHold] = await tx.select({id:pickupCustodyHolds.id})
+        .from(pickupCustodyHolds).where(and(
+          eq(pickupCustodyHolds.studentProfileId,data.studentProfileId),
+          eq(pickupCustodyHolds.programId,data.programId),
+          eq(pickupCustodyHolds.kind,data.kind),
+          eq(pickupCustodyHolds.status,"active"),
+        )).limit(1);
+      if(activeHold) throw new Error("A "+data.kind.replaceAll("_"," ")+" pickup hold is already active. Contact the site leader to review the existing restriction.");
       const [record] = await tx.insert(pickupCustodyHolds).values({
         studentProfileId: data.studentProfileId,
         householdId: data.householdId,
