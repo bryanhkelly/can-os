@@ -263,6 +263,30 @@ export const decideGraduation = createServerFn({method:"POST"})
  });
 
 /** Institution-owned diploma status, never a release authorization. B must additionally authorize the recipient. */
+/** Revocation is append-only state: a revoked diploma is never reactivated. */
+export const revokeDiploma=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({diplomaId:uuid,reason:z.string().trim().min(12).max(2000)}).parse(input))
+ .handler(async ({data})=>{
+   const context=await registrar();const {db,s}=await resources();
+   return db.transaction(async tx=>{
+     const [diploma]=await tx.select().from(s.diplomaIssuances)
+       .where(eq(s.diplomaIssuances.id,data.diplomaId)).limit(1);
+     if(!diploma)throw new AuthorizationError("Diploma not found");
+     const [decision]=await tx.select().from(s.graduationDecisions)
+       .where(eq(s.graduationDecisions.id,diploma.graduationDecisionId)).limit(1);
+     if(!decision)throw new AuthorizationError("Graduation decision unavailable");
+     issuerAuthorized(context,decision.issuingOrganizationId);
+     const [updated]=await tx.update(s.diplomaIssuances)
+       .set({revokedAt:new Date(),revocationReason:data.reason})
+       .where(and(eq(s.diplomaIssuances.id,data.diplomaId),eq(s.diplomaIssuances.graduationDecisionId,decision.id)))
+       .returning({id:s.diplomaIssuances.id});
+     if(!updated)throw new AuthorizationError("Diploma was not revoked");
+     await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"diploma.revoke",resourceType:"diploma_issuance",resourceId:diploma.id,
+       scope:{organizationId:decision.issuingOrganizationId},after:{reason:data.reason},context:{requestId:context.requestId??null}});
+     return {diplomaId:updated.id,status:"revoked" as const};
+   });
+ });
+
 export const getDiplomaFreshness=createServerFn({method:"GET"})
  .validator((input:unknown)=>z.object({diplomaId:uuid}).parse(input))
  .handler(async ({data})=>{
