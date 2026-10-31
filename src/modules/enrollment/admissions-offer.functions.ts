@@ -15,7 +15,18 @@ async function authorizedActor(role:"registrar"|"guardian",capability:string,pro
  const actor=await getCommandContext(getRequest());
  if(actor.role!==role||!actor.actorPersonId)throw new AuthorizationError(role+" admission access");
  assertCapability(actor,capability);
- if(!actor.scope.programIds?.includes(programId))throw new AuthorizationError("admissions program membership");
+ if(role==="guardian"){
+  // Guardian access remains bound to the explicit Program grant and the
+  // verified student relationship checked by the offer command.
+  if(!actor.scope.programIds?.includes(programId))throw new AuthorizationError("admissions program membership");
+ }else{
+  const {programs}=await import("@/db/schema");
+  const [program]=await db.select({organizationId:programs.organizationId,siteId:programs.siteId})
+   .from(programs).where(eq(programs.id,programId)).limit(1);
+  if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
+    (actor.scope.siteIds!==undefined&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
+   throw new AuthorizationError("admissions program membership");
+ }
  assertProgramScope(actor,programId);
  return actor;
 }
