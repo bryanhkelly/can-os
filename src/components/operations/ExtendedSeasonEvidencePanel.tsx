@@ -1,5 +1,4 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceHistory } from "@/components/evidence";
-import { EvidenceReviewForm } from "@/components/evidence/EvidenceReviewForm";
+import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm } from "@/components/evidence";
 import { useCallback, useEffect, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
