@@ -6,26 +6,32 @@ import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.f
 import { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 import { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listExtendedSeasonPlanning } from "@/modules/activities/extended-learning.functions";
+import { safeLoader } from "@/lib/safe-loader";
+import { LoaderFailure } from "@/lib/loader-failure";
 
 export const Route = createFileRoute("/operations/launch/")({
-  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
-  loader: async ({deps}) => {
-    try {
-      return {
-        options: await listLaunchOptions(),
-        launches: await listLaunches(),
-        preparationPrograms:await listAdmissionsPrograms().catch(()=>null),
-        familyInvitations: await listFamilyInvitations().catch(() => null),
-        admissions: await listAdmissionsIntake().catch(() => null),
-        enrollmentCounts: await getActiveEnrollmentCounts({data:deps}).catch(() => null),
-        // A pending migration for extended programs must not prevent core school launch.
-        extendedPlanning: await listExtendedSeasonPlanning().catch(() => null),
-        authError: "",
-      };
-    } catch {
-      return { options: null, launches: null, preparationPrograms:null, familyInvitations: null, admissions: null, enrollmentCounts: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
-    }
-  },
-  component: () => <LaunchWizardPage selection={Route.useSearch()} data={Route.useLoaderData()} />,
+  loaderDeps: ({ search }) => ({ siteId: search.siteId, programId: search.programId }),
+  loader: ({ deps }) => safeLoader(async () => {
+    // Launch identity and canonical launch records are required; peripheral
+    // dashboards and outreach data must not block school setup.
+    const options = await listLaunchOptions();
+    const launches = await listLaunches();
+    const [preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning] = await Promise.all([
+      listAdmissionsPrograms().catch(() => null),
+      listFamilyInvitations().catch(() => null),
+      listAdmissionsIntake().catch(() => null),
+      getActiveEnrollmentCounts({ data: deps }).catch(() => null),
+      listExtendedSeasonPlanning().catch(() => null),
+    ]);
+    return { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError: "" };
+  })(),
+  component: LaunchPage,
 });
 
+function LaunchPage() {
+  const result = Route.useLoaderData();
+  if (!result.ok) {
+    return <LoaderFailure title="Launch a school" eyebrow="CAN OS · Launch" outcome={result} />;
+  }
+  return <LaunchWizardPage selection={Route.useSearch()} data={result.data} />;
+}
