@@ -8,7 +8,7 @@ describe("OneRoster class preview", () => {
   });
 
   it("preserves sourced IDs from canonical CSV parsing", () => {
-    const rows = previewRosterClasses("sourcedId,title,classCode,schoolSourcedId\nclass-1,Algebra I,MATH101,school-1");
+    const rows = previewRosterClasses("sourcedId,title,courseSourcedId,classCode,schoolSourcedId\nclass-1,Algebra I,course-1,MATH101,school-1");
     expect(rows.map((row) => row.sourcedId)).toEqual(["class-1"]);
   });
 });
