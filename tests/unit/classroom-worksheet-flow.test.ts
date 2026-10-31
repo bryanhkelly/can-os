@@ -11,7 +11,7 @@ vi.mock("@tanstack/react-start",()=>({createServerFn:()=>({
 vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>({}),setResponseHeader:vi.fn()}));
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>({
   role:state.role,actorPersonId:state.role==="teacher"?"10000000-0000-4000-8000-000000000001":state.role==="guardian"?"10000000-0000-4000-8000-000000000011":"10000000-0000-4000-8000-000000000002",
-  capabilities:new Set(["assignments:create","assignments:grade","assignments:submit","student:related-read"]),
+  capabilities:new Set(["assignments:create","assignments:grade","assignments:submit","student:related-read","program.read"]),
   scope:{siteIds:["10000000-0000-4000-8000-000000000003"],programIds:["10000000-0000-4000-8000-000000000004"],organizationIds:["10000000-0000-4000-8000-000000000012"]},
 })}));
 // Session/authority and object storage boundaries have separate regressions.
@@ -32,13 +32,14 @@ import {db} from "@/db/client";
 import {createAssessment,getGradebook,getSubmissionReview,gradeSubmission} from "@/modules/learning/gradebook.functions";
 import {getGuardianAssignments} from "@/modules/learning/guardian-academic-queries.functions";
 import {listGuardianGradeFollowUps} from "@/modules/learning/guardian-grade-response.functions";
+import {getScopedPrograms} from "@/modules/operations/program-preview.functions";
 import {getAssignments,saveAssignmentDraft,saveAssignmentResponse} from "@/modules/student-experience/assignments.functions";
 import {createSubmissionAttachmentUpload,attachDocumentToSubmission} from "@/modules/learning/submission-attachments.functions";
 beforeAll(async()=>{
   vi.stubEnv("DATABASE_URL","isolated-pglite-only");
   const dialect=new PgDialect();
   // Use production column types/defaults; relationship gates are tested separately.
-  for(const table of [s.people,s.programs,s.guardianRelationships,s.studentProfiles,s.sections,s.sectionTeachers,s.terms,s.courseTemplateVersions,s.enrollments,s.assessments,s.submissions,s.documents,s.actions]){
+  for(const table of [s.organizations,s.sites,s.people,s.programs,s.guardianRelationships,s.studentProfiles,s.sections,s.sectionTeachers,s.terms,s.courseTemplateVersions,s.enrollments,s.assessments,s.submissions,s.documents,s.actions]){
     const config=getTableConfig(table);
     const columns=config.columns.map(column=>{
       let type=column.getSQLType();
@@ -55,6 +56,8 @@ beforeAll(async()=>{
   }
   await state.client.exec('CREATE UNIQUE INDEX submission_attempt_uq ON submissions(assessment_id,student_profile_id,attempt_number)');
   await db.insert(s.studentProfiles).values({id:id(5),personId:id(2)});
+  await db.insert(s.organizations).values({id:id(12),type:"church",name:"School church",slug:"school-church"});
+  await db.insert(s.sites).values({id:id(3),organizationId:id(12),name:"School campus",slug:"school-campus"});
   await db.insert(s.programs).values({id:id(4),organizationId:id(12),siteId:id(3),jurisdictionId:id(13),type:"full_school",name:"School",slug:"school",gradeRange:{min:"9",max:"12"},academicProviderOrganizationId:id(12)});
   await db.insert(s.people).values({id:id(2),legalFirstName:"Jordan",legalLastName:"Learner"});
   await db.insert(s.guardianRelationships).values({guardianPersonId:id(11),studentPersonId:id(2),relationshipLabel:"parent",canViewAcademics:true,metadata:{verification:"verified"}});
@@ -73,6 +76,7 @@ beforeAll(async()=>{
 });
 afterAll(async()=>{await state.client.close();vi.unstubAllEnvs();});
 it("publishes lesson-linked work, submits a worksheet, preserves it for review and releases the grade",async()=>{
+  expect(await getScopedPrograms()).toEqual([expect.objectContaining({id:id(4),name:"School",siteName:"School campus",counts:expect.objectContaining({sections:1,enrollments:1,teachers:1})})]);
   const assessment=await createAssessment({data:{sectionId:id(6),title:"Equation worksheet",instructions:"Upload the completed worksheet.",
     pointsPossible:10,curriculumLessonId:"lesson-1",dueAt:new Date(Date.now()+86400000).toISOString(),publishNow:true}});
   state.role="student";

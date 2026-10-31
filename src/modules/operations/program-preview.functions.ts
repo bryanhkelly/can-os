@@ -8,8 +8,8 @@ export const getScopedPrograms=createServerFn({method:"GET"}).handler(async()=>{
  if(!actor.scope.organizationIds?.length)return [] as ProgramPreview[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const records=await db.select({id:s.programs.id,name:s.programs.name,status:s.programs.status,type:s.programs.type,gradeRange:s.programs.gradeRange,deliveryModel:s.programs.deliveryModel,metadata:s.programs.metadata,organizationName:s.organizations.name,siteName:s.sites.name})
- .leftJoin(s.sites,eq(s.programs.siteId,s.sites.id))
  .from(s.programs).innerJoin(s.organizations,eq(s.programs.organizationId,s.organizations.id))
+ .leftJoin(s.sites,eq(s.programs.siteId,s.sites.id))
  .where(and(inArray(s.programs.organizationId,actor.scope.organizationIds),
   ...(actor.scope.programIds?[inArray(s.programs.id,actor.scope.programIds)]:[]),
   ...(actor.scope.siteIds?[inArray(s.programs.siteId,actor.scope.siteIds)]:[]))).limit(100);
