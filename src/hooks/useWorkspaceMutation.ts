@@ -25,7 +25,9 @@ function asError(error: unknown): Error {
  */
 export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutationOptions<TInput, TResult>) {
   const queryClient = useQueryClient();
-  const inFlight = useRef(false);\n  const optionsRef = useRef(options);\n  optionsRef.current = options;
+  const inFlight = useRef(false);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshError, setRefreshError] = useState<Error | null>(null);
   const mutation = useMutation<TResult, Error, TInput>({
@@ -40,7 +42,8 @@ export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutation
     setIsSubmitting(true);
     setRefreshError(null);
     try {
-      const value = await mutateAsync(input);\n      const current = optionsRef.current;
+      const value = await mutateAsync(input);
+      const current = optionsRef.current;
       let failure: Error | undefined;
       try {
         await Promise.all((current.invalidateQueries ?? []).map(queryKey =>
