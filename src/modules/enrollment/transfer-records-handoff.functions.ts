@@ -244,3 +244,130 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
      return {completed:true as const,issuanceId:issuance.id};
    });
  });
+
+
+/** An exact receiving-school registrar may view only the OFFICIAL transcript
+ * already issued and recorded as released for this verified transfer. This
+ * never exposes the originating school's editable grades, medical records,
+ * custody information, or unrelated students.
+ */
+export const getReceivingSchoolTransferTranscript=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({applicationId:uuid}).strict().parse(value))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const actor=await getCommandContext(getRequest());
+  if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+   throw new AuthorizationError("real destination-school registrar");
+  assertCapability(actor,"admissions:read");
+  return db.transaction(async tx=>{
+   const [app]=await tx.select({
+     id:s.applications.id,programId:s.applications.programId,
+     studentProfileId:s.applications.studentProfileId,
+     submittedByPersonId:s.applications.submittedByPersonId,
+     metadata:s.applications.metadata,
+     siteId:s.programs.siteId,organizationId:s.programs.organizationId,
+     programName:s.programs.name,siteName:s.sites.name,
+   }).from(s.applications)
+     .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+     .innerJoin(s.sites,eq(s.sites.id,s.programs.siteId))
+     .where(eq(s.applications.id,data.applicationId)).limit(1);
+   if(!app?.siteId||!app.submittedByPersonId||
+      !actor.scope.organizationIds?.includes(app.organizationId)||
+      !actor.scope.siteIds?.includes(app.siteId)||
+      !actor.scope.programIds?.includes(app.programId))
+    throw new AuthorizationError("specific receiving-school application scope");
+   const originId=app.metadata.originTransferActionId;
+   const releaseId=app.metadata.destinationRecordsReleaseConsentId;
+   if(typeof originId!=="string"||typeof releaseId!=="string")
+    throw new AuthorizationError("application requires an explicit destination-school transcript release");
+   const [origin]=await tx.select({
+     id:s.actions.id,status:s.actions.status,type:s.actions.type,
+     subjectId:s.actions.subjectId,programId:s.actions.programId,
+     metadata:s.actions.metadata,
+   }).from(s.actions).where(eq(s.actions.id,originId)).limit(1);
+   if(!origin||origin.type!=="guardian_enrollment_change_request"||
+      origin.subjectId!==app.studentProfileId||
+      origin.programId===app.programId||
+      origin.status!=="resolved"||
+      origin.metadata.kind!=="transfer"||
+      origin.metadata.exitCompletedByRegistrar!==true||
+      origin.metadata.exitStatus!=="transferred"||
+      origin.metadata.recordsHandoffStatus!=="completed"||
+      origin.metadata.destinationApplicationId!==app.id||
+      origin.metadata.destinationProgramId!==app.programId||
+      origin.metadata.requestedByGuardianPersonId!==app.submittedByPersonId||
+      origin.metadata.destinationRecordsReleaseConsentId!==releaseId)
+    throw new AuthorizationError("completed origin-school transfer with exact destination linkage");
+   const [consent]=await tx.select({
+     id:s.consentRecords.id,revokedAt:s.consentRecords.revokedAt,
+     evidence:s.consentRecords.signatureEvidence,
+   }).from(s.consentRecords).where(and(
+     eq(s.consentRecords.id,releaseId),
+     eq(s.consentRecords.subjectType,"application"),
+     eq(s.consentRecords.subjectId,app.id),
+     eq(s.consentRecords.consentType,"academic_records_destination_program_release"),
+     eq(s.consentRecords.signerPersonId,app.submittedByPersonId),
+     isNull(s.consentRecords.revokedAt),
+   )).limit(1);
+   if(!consent||consent.evidence.acknowledged!==true||
+      consent.evidence.scope!=="official_transcript_only"||
+      consent.evidence.originTransferActionId!==origin.id||
+      consent.evidence.destinationApplicationId!==app.id||
+      consent.evidence.destinationProgramId!==app.programId||
+      consent.evidence.destinationSiteId!==app.siteId||
+      consent.evidence.destinationOrganizationId!==app.organizationId||
+      consent.evidence.studentProfileId!==app.studentProfileId||
+      consent.evidence.guardianPersonId!==app.submittedByPersonId)
+    throw new AuthorizationError("current signed guardian release to this exact receiving-school Program");
+   const handoffId=origin.metadata.recordsHandoffActionId;
+   const issuanceId=origin.metadata.recordsIssuedTranscriptId;
+   if(typeof handoffId!=="string"||typeof issuanceId!=="string")
+    throw new AuthorizationError("verified originating-school transcript handoff");
+   const [handoff]=await tx.select({
+     id:s.actions.id,status:s.actions.status,
+     metadata:s.actions.metadata,
+   }).from(s.actions).where(and(
+     eq(s.actions.id,handoffId),
+     eq(s.actions.type,"transfer_academic_records_handoff"),
+     eq(s.actions.subjectType,"student_profile"),
+     eq(s.actions.subjectId,app.studentProfileId),
+   )).limit(1);
+   if(!handoff||handoff.status!=="resolved"||
+      handoff.metadata.originChangeActionId!==origin.id||
+      handoff.metadata.issuedTranscriptId!==issuanceId||
+      typeof handoff.metadata.deliveryReceiptReference!=="string")
+    throw new AuthorizationError("recorded secure originating-school transcript transfer");
+   const [record]=await tx.select({
+     id:s.transcriptIssuances.id,studentProfileId:s.transcriptIssuances.studentProfileId,
+     issuingOrganizationId:s.transcriptIssuances.issuingOrganizationId,
+     issuedAt:s.transcriptIssuances.issuedAt,
+     snapshot:s.transcriptIssuances.snapshot,
+     originCreditIssuer:s.programs.creditIssuingOrganizationId,
+   }).from(s.transcriptIssuances)
+     .innerJoin(s.programs,eq(s.programs.id,origin.programId))
+     .where(eq(s.transcriptIssuances.id,issuanceId)).limit(1);
+   if(!record||record.studentProfileId!==app.studentProfileId||
+      record.issuingOrganizationId!==record.originCreditIssuer)
+    throw new AuthorizationError("exact official student transcript and source credit issuer");
+   const rows=Array.isArray(record.snapshot.rows)?record.snapshot.rows:[];
+   const formatted=rows.filter((row):row is Record<string,unknown>=>
+     !!row&&typeof row==="object"&&!Array.isArray(row)).map(row=>({
+       course:typeof row.sectionTitle==="string"?row.sectionTitle:"Course",
+       term:typeof row.termName==="string"?row.termName:"",
+       schoolYear:typeof row.schoolYearName==="string"?row.schoolYearName:"",
+       grade:typeof row.letterGrade==="string"?row.letterGrade:"Not recorded",
+       creditsAttempted:typeof row.creditsAttempted==="number"?row.creditsAttempted:null,
+       creditsEarned:typeof row.creditsEarned==="number"?row.creditsEarned:null,
+       creditIssuer:typeof row.creditIssuingOrganization==="string"?row.creditIssuingOrganization:"",
+     }));
+   await writeAudit(tx,actor,{
+     action:"transfer.destination_official_transcript.viewed",
+     entityType:"transcript_issuance",entityId:record.id,
+     scope:{organizationId:app.organizationId,siteId:app.siteId,programId:app.programId},
+     after:{applicationId:app.id,originTransferActionId:origin.id,
+       consentId:consent.id,issuedTranscriptId:record.id},
+   });
+   return {applicationId:app.id,programName:app.programName,siteName:app.siteName,
+     issuanceId:record.id,issuedAt:record.issuedAt.toISOString(),rows:formatted};
+  });
+ });
