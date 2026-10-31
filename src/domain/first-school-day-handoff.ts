@@ -62,7 +62,7 @@ export function deriveFirstSchoolDayHandoff(input: {
     return { ...base,state:"not_on_roster",
       message:"This enrolled student is not on today's expected onsite roster. Confirm the active school year, start date and instructional class placement." };
   }
-  const attendanceRecorded = ["present","tardy","absent"].includes(student.status);
+  const attendanceRecorded = ["present","tardy","absent","excused"].includes(student.status);
   if (!student.sectionId) {
     return { ...base,studentExpected:true,attendanceRecorded,state:"placement_missing",
       message:"The student is expected onsite but has no named instructional class. Resolve placement before relying on school-day preparation." };
