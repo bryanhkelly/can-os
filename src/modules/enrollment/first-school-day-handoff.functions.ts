@@ -64,41 +64,46 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       .orderBy(asc(academicCalendarDays.calendarDate)).limit(366);
     const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
       .map(day=>day.date))];
-    let date = dates[0] ?? today;
-    let eligibleDateFound = false;
-    for(const candidate of dates){
-      // The canonical live roster rejects future dates. Until the attendance
-      // owner exposes a registrar-authorized preparation read, do not use the
-      // live roster to assert that a future student is scheduled.
-      if(candidate>today) break;
-      const projected=await loadExpectedOnsiteRosterForActor(actor,{
-        date:candidate,programId:app.programId,siteId:app.siteId,
-      });
-      if(projected.students.some(student=>student.studentProfileId===app.studentProfileId &&
-        student.programId===app.programId)){date=candidate;eligibleDateFound=true;break;}
-    }
+    // Only today's roster may be observed by the live attendance reader.
+    // A future published calendar day is a candidate, not a verified student day.
+    const candidate = dates[0];
+    const date = candidate ?? today;
     const preview = date > today;
-    const roster = !preview ? await loadExpectedOnsiteRosterForActor(actor,{
-      date,programId:app.programId,siteId:app.siteId,
-    }) : null;
+    const roster = !preview && candidate
+      ? await loadExpectedOnsiteRosterForActor(actor,{
+          date,programId:app.programId,siteId:app.siteId,
+        })
+      : null;
     const programDay = roster?.programs.find(program=>program.id===app.programId);
-    const matched = roster?.students.find(student =>
+    const matched = roster?.students.find(student=>
       student.studentProfileId===app.studentProfileId && student.programId===app.programId);
 
-    // Only project staffing after the exact student and named Section are
-    // actually on the canonical date-specific roster.
+    // Never query a future supervision plan through the live-only reader.
+    // Its preparation mode is restricted to site directors. A registrar-scoped
+    // canonical preparation interface is required before claiming future readiness.
     const supervision = matched?.sectionId
       ? await loadOnsiteSupervisionPlanForActor(actor,{date,siteId:app.siteId})
       : null;
     const handoff = deriveFirstSchoolDayHandoff({
-        programId:app.programId,
-        studentProfileId:app.studentProfileId,
-        configuration:programDay?.configuration ?? null,
-        expectedDays:programDay?.expectedDays ?? 0,
-        students:roster?.students ?? [],
-        preparation:preview,
-        blocks:supervision?.blocks ?? [],
-        projectionTruncated:supervision?.projectionTruncated ?? false,
-      });
-    return {date,preview,...handoff,attendanceRecorded:!eligibleDateFound||preview?false:handoff.attendanceRecorded,state:!eligibleDateFound?(dates.length?"not_on_roster":"calendar_not_ready"):preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state,message:eligibleDateFound&&preview&&handoff.state==="attendance_recorded"?"The student is expected on the future instructional roster and the staffing plan is ready. No attendance has been observed or recorded for that future date.":handoff.message,...(!eligibleDateFound?{studentExpected:false,supervisionPlanned:false,message:dates.length?"The next published instructional date is a planning candidate, not a verified first day. A registrar-authorized future roster reader is required to confirm placement, schedule and staffing.":"No upcoming instructional calendar day was found. Review and publish the school-year calendar."}:{})};
+      programId:app.programId,
+      studentProfileId:app.studentProfileId,
+      configuration:programDay?.configuration ?? null,
+      expectedDays:programDay?.expectedDays ?? 0,
+      students:roster?.students ?? [],
+      preparation:preview,
+      blocks:supervision?.blocks ?? [],
+      projectionTruncated:supervision?.projectionTruncated ?? false,
+    });
+    if (!candidate) return {
+      date,preview:false,...handoff,state:"calendar_not_ready" as const,
+      studentExpected:false,supervisionPlanned:false,attendanceRecorded:false,
+      message:"No upcoming instructional calendar day was found. Review and publish the school-year calendar.",
+    };
+    if (preview) return {
+      date,preview:true,...handoff,state:"not_on_roster" as const,
+      studentExpected:false,supervisionPlanned:false,attendanceRecorded:false,
+      outstandingGaps:["future_roster_verification_required"],
+      message:"This is the next published instructional candidate, not a verified first day. Registrar-authorized future enrollment, Section, schedule and staffing verification is required.",
+    };
+    return {date,preview:false,...handoff};
   });
