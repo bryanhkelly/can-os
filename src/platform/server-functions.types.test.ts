@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest";
 import { z } from "zod";
-import { authenticatedQuery, authenticatedCommand, scopedQuery, institutionalDecision } from "./server-functions";
+import { authenticatedQuery, authenticatedCommand, scopedQuery, institutionalDecision, type SerializableResult } from "./server-functions";
 
 // Compile-time framework contract checks. Factories are intentionally not
 // executed in the test process: they depend on TanStack's server runtime.
@@ -26,3 +26,14 @@ test("real TanStack Start factories preserve callable types", () => {
   // TypeScript checks the factory bodies above, including their actual
   // validator and handler generics, without invoking server runtime APIs.
 });
+
+// Compile-time negative contract: transport results cannot contain functions,
+// class instances or other values outside the wrapper's JSON subset.
+function compileInvalidResultContract() {
+  // @ts-expect-error Functions are not valid JSON transport results.
+  return authenticatedCommand(input, async () => ({ invalid: () => 1 }));
+}
+void compileInvalidResultContract;
+
+const validTransportValue = { siteId: "site-1", count: 2 } satisfies SerializableResult;
+void validTransportValue;
