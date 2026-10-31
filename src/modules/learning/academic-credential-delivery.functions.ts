@@ -109,7 +109,8 @@ export const listVerifiedCredentialRecipients=createServerFn({method:"GET"})
     eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
     eq(s.accessAccounts.disabled,false),
     isNotNull(s.accessAccounts.emailVerifiedAt)))
-   .where(and(inArray(s.people.id,ids),eq(s.people.active,true)))
+   .where(and(inArray(s.people.id,ids),eq(s.people.active,true),
+    eq(s.people.email,s.accessAccounts.emailNormalized)))
    .orderBy(s.people.legalLastName,s.people.legalFirstName).limit(100);
  });
 
