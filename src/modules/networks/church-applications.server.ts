@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { churchOnboardingRequests, documents, organizations } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -6,6 +6,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { writeAudit } from "@/platform/mutation";
 import { bootstrapVerifiedChurch } from "./church-onboarding.server";
+import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
 
 export type ChurchApplication = {
   churchName: string;
@@ -34,10 +35,8 @@ export async function submitChurchApplication(data: ChurchApplication) {
     if (url.protocol !== "https:" || !url.hostname.includes(".")) throw new Error("Use an HTTPS website URL");
   }
   await db.transaction(async tx => {
-    await tx.execute(
-      // Serialize repeated applications from the same contact without trusting a request IP.
-      (await import("drizzle-orm")).sql`SELECT pg_advisory_xact_lock(hashtext(${"church-apply:" + email}))`,
-    );
+    // Serialize repeated applications from the same contact without trusting a request IP.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"church-apply:" + email}))`);
     const duplicate = await tx.select({ id: churchOnboardingRequests.id })
       .from(churchOnboardingRequests).where(and(
         eq(churchOnboardingRequests.contactEmail, email),
@@ -124,27 +123,31 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
 /** The approving steward must be distinct from the independent evidence verifier. */
 export async function approveChurchApplication(actor: AccessContext, requestId: string) {
   const canOrganizationId = await requireCANSteward(actor);
-  const [request] = await db.select().from(churchOnboardingRequests)
-    .where(eq(churchOnboardingRequests.id, requestId)).limit(1);
-  if (!request || request.status !== "verified" || !request.authorityDocumentId ||
-      !request.verifiedByPersonId || request.verifiedByPersonId === actor.actorPersonId)
-    throw new AuthorizationError("separately verified church application and independent approver");
+  // Lock the application across provisioning and the final decision. A decline or
+  // second approver cannot race a separately committed organization/site creation.
+  const { result, email } = await db.transaction(async tx => {
+    const [request] = await tx.select().from(churchOnboardingRequests)
+      .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+    if (!request || request.status !== "verified" || !request.authorityDocumentId ||
+        !request.verifiedByPersonId || request.verifiedByPersonId === actor.actorPersonId)
+      throw new AuthorizationError("separately verified church application and independent approver");
 
-  const result = await bootstrapVerifiedChurch(actor, {
-    churchName: request.churchName, churchSlug: request.churchSlug,
-    siteName: request.siteName, siteSlug: request.siteSlug,
-    timezone: request.timezone, contactEmail: request.contactEmail,
-    firstName: request.firstName, lastName: request.lastName,
-    authorityDocumentId: request.authorityDocumentId,
-  });
-  await db.transaction(async tx => {
+    // Canonical bootstrap is idempotent and performs its own validated steward
+    // checks. Defer the email until the approved request is durably committed.
+    const result = await bootstrapVerifiedChurch(actor, {
+      churchName: request.churchName, churchSlug: request.churchSlug,
+      siteName: request.siteName, siteSlug: request.siteSlug,
+      timezone: request.timezone, contactEmail: request.contactEmail,
+      firstName: request.firstName, lastName: request.lastName,
+      authorityDocumentId: request.authorityDocumentId,
+    }, { deferEmail: true });
     const [saved] = await tx.update(churchOnboardingRequests).set({
       status: "approved", approvedByPersonId: actor.actorPersonId,
       approvedAt: new Date(), updatedAt: new Date(),
       churchId: result.churchId, siteId: result.siteId, invitationGrantId: result.grantId,
     }).where(and(eq(churchOnboardingRequests.id, requestId),
       eq(churchOnboardingRequests.status, "verified"),
-      eq(churchOnboardingRequests.verifiedByPersonId, request.verifiedByPersonId!),
+      eq(churchOnboardingRequests.verifiedByPersonId, request.verifiedByPersonId),
     )).returning({ id: churchOnboardingRequests.id });
     if (!saved) throw new Error("Application was already decided; refresh the review desk");
     await writeAudit(tx, actor, {
@@ -154,8 +157,17 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
       after: { authorityDocumentId: request.authorityDocumentId,
         churchId: result.churchId, siteId: result.siteId, grantId: result.grantId },
     });
+    return { result, email: request.contactEmail };
   });
-  return { ...result, approved: true as const };
+  if (!result.invitationPending) return { ...result, approved: true as const, emailSent: false };
+  try {
+    await requestOneTimeAccess(email);
+    return { ...result, approved: true as const, emailSent: true };
+  } catch {
+    // An approved invitation remains pending and can be sent again by the
+    // existing sign-in email flow; failure to send never activates its grant.
+    return { ...result, approved: true as const, emailSent: false };
+  }
 }
 
 export async function declineChurchApplication(actor: AccessContext, requestId: string, note: string) {
