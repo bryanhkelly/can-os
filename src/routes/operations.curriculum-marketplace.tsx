@@ -53,10 +53,15 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [rosterValidated,setRosterValidated]=useState(false);
  const [rosterMap,setRosterMap]=useState<Record<string,string>>({});
  const cartridgeWebLinks=cartridgeReport?.preview.resources.filter(r=>/weblink|imswl/i.test(r.type))??[];
- let rosterClasses:ReturnType<typeof previewOneRosterCsv>["rows"]=[];
+ type RosterClassRow=ReturnType<typeof previewOneRosterCsv>["rows"][number]&{sourcedId:string};
+ let rosterClasses:RosterClassRow[]=[];
  try{if(rosterCsv.trim()){
    const preview=previewOneRosterCsv("classes",rosterCsv);
-   if(!preview.errors.length)rosterClasses=preview.rows;
+   if(!preview.errors.length)rosterClasses=preview.rows.map(row=>{
+     const sourcedId=row.sourcedId;
+     if(!sourcedId)throw new Error("A OneRoster class is missing its sourcedId.");
+     return {...row,sourcedId};
+   });
  }}catch{/* Keep the editor available for incomplete CSV input. */}
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
