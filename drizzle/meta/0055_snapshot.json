@@ -25235,23 +25235,23 @@
       "checkConstraints": {
         "academic_release_exactly_one": {
           "name": "academic_release_exactly_one",
-          "value": "((transcript_issuance_id IS NULL) <> (diploma_issuance_id IS NULL))"
+          "value": "(\"academic_credential_release_authorizations\".\"transcript_issuance_id\" IS NULL) <> (\"academic_credential_release_authorizations\".\"diploma_issuance_id\" IS NULL)"
         },
         "academic_release_valid_expiry": {
           "name": "academic_release_valid_expiry",
-          "value": "(expires_at > authorized_at)"
+          "value": "\"academic_credential_release_authorizations\".\"expires_at\" > \"academic_credential_release_authorizations\".\"authorized_at\""
         },
         "academic_release_purpose_nonempty": {
           "name": "academic_release_purpose_nonempty",
-          "value": "(length(btrim(release_purpose)) > 0)"
+          "value": "length(btrim(\"academic_credential_release_authorizations\".\"release_purpose\")) > 0"
         },
         "academic_release_instructions_nonempty": {
           "name": "academic_release_instructions_nonempty",
-          "value": "(length(btrim(instruction_reference)) > 0)"
+          "value": "length(btrim(\"academic_credential_release_authorizations\".\"instruction_reference\")) > 0"
         },
         "academic_release_consent_nonempty": {
           "name": "academic_release_consent_nonempty",
-          "value": "(length(btrim(consent_evidence_reference)) > 0)"
+          "value": "length(btrim(\"academic_credential_release_authorizations\".\"consent_evidence_reference\")) > 0"
         }
       },
       "isRLSEnabled": false
