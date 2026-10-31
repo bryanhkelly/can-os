@@ -14,7 +14,7 @@ export const getAdmissionsDashboard=createServerFn({method:"GET"})
  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("registrar admissions dashboard");
  assertCapability(actor,"enrollment.decide");
  const scoped=await resolveOperationsSelection(actor,data);
- if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {studentName:string;programId:string;disposition:string|null;offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[]})[];
+ if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {studentName:string;programId:string;disposition:string|null;offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[];activeSectionCount:number;studentAccessStatus:string})[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const records=await db.select({id:s.applications.id,stage:s.applications.stage,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId,
   firstName:s.people.legalFirstName,lastName:s.people.legalLastName,preferredName:s.people.preferredName,metadata:s.applications.metadata,
