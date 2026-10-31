@@ -232,6 +232,8 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const openActions = await db.select({
   id: s.actions.id,
   type: s.actions.type,
+  subjectType: s.actions.subjectType,
+  subjectId: s.actions.subjectId,
   title: s.actions.title,
   description: s.actions.description,
   priority: s.actions.priority,
@@ -252,6 +254,8 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   .limit(20);
 
  const students = await guardianStudents(s, actor, siteIds,context.scope.programIds??[]);
+ const studentPersonByProfile = new Map(students.map(row => [row.studentProfileId, row.studentPersonId]));
+ const authorizedStudentIds = new Set(students.map(row => row.studentPersonId));
  const excuseWindow = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
  const excuseItems: { id: string; title: string; childName: string; studentPersonId: string; expectedAt: string }[] = [];
  for (const student of students) {
@@ -298,9 +302,13 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const visibleNotifications = new Map((await getNotifications()).map(row => [row.id, row]));
  const notificationItems = unread.filter(row => visibleNotifications.has(row.id)).map(row => {
   const visible = visibleNotifications.get(row.id)!;
+  // The notification center has already verified the underlying family link.
+  // Carry the student when present so the child picker can filter its summary.
+  const linkedStudent = new URLSearchParams(visible.href?.split("?")[1]?.split("#")[0] ?? "").get("student");
   return {
    id: row.id,
    kind: "notification" as const,
+   studentPersonId: linkedStudent && authorizedStudentIds.has(linkedStudent) ? linkedStudent : null,
    type: row.type,
    title: visible.title,
    priority:row.type==="school_family_alert"?"urgent" as const:"normal" as const,
@@ -330,6 +338,8 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const actionItems = openActions.filter(row => row.type !== "study_group_consent").map(row => ({
   id: row.id,
   kind: "action" as const,
+  studentPersonId: row.subjectType === "student_profile"
+   ? studentPersonByProfile.get(row.subjectId) ?? null : null,
   type: row.type,
   title: row.title,
   detail: row.description ?? "",
@@ -341,6 +351,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const absenceItems = excuseItems.map(row => ({
   id: row.id,
   kind: "excuse" as const,
+  studentPersonId: row.studentPersonId,
   type: "attendance_excuse",
   title: `${row.childName}: ${row.title}`,
   detail: `Absence on ${new Date(row.expectedAt).toLocaleDateString()} has no excuse yet.`,
