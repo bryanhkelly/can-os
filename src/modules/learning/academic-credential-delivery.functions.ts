@@ -261,10 +261,13 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const context=await getCommandContext(getRequest());
   if(!context.actorPersonId||context.demoFacilitator)throw new AuthorizationError("authenticated recipient");
   const {db,s}=await resources();
-  const [release]=await db.select().from(s.academicCredentialReleaseAuthorizations)
+  return db.transaction(async tx=>{
+  // Share a transaction lock with issuer revocations and read live authority
+  // inside that protected disclosure transaction.
+  const [release]=await tx.select().from(s.academicCredentialReleaseAuthorizations)
    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId)))
-   .limit(1);
+   .for("update").limit(1);
   if(!release||release.revokedAt||release.expiresAt<=new Date())
    throw new AuthorizationError("active recipient authorization");
   const [recipient]=await db.select({email:s.people.email,active:s.people.active})
@@ -341,9 +344,10 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    actionCompleted:action?.metadata.exitCompletedByRegistrar===true,
    issuerMatches:program?.issuerId===doc.issuerId,
   }))throw new AuthorizationError("Original transfer consent or guardian authority no longer valid");
-  await writeAudit(db,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
+  await writeAudit(tx,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
   const pdf=academicDocumentPdf(doc);
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
+  });
  });
 
 /** The authenticated recipient can discover only their own active releases. */
