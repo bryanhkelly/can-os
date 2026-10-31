@@ -41,7 +41,7 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     subject: row.subject,
     earnedUnits: row.creditsEarned,
     finalized: Boolean(row.sectionId && row.letterGrade),
-    // Transfer evidence must carry affirmative issuer acceptance; a snapshot\n    // without acceptance cannot silently confer graduation credit.\n    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
+    // Transfer evidence must carry affirmative issuer acceptance.\n    // A snapshot without acceptance cannot confer graduation credit.\n    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
   }));
 }
 /** Check current canonical enrollment custody, not only the immutable transcript snapshot. */
