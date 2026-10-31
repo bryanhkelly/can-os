@@ -21,6 +21,7 @@ export type ExtendedSeasonApprovalRecord = ExtendedSeasonApprovalScope & {
 
 type SessionRow = {
   id: string; seasonId: string | null; startsAt: Date;
+  endsAt: Date | null; timezone: string;
   metadata: Record<string, unknown>; siteId: string | null;
   programId: string | null; organizationId: string | null;
 };
@@ -32,10 +33,18 @@ function assignedStaff(event: SessionRow): string | null {
   return typeof session.facilitatorPersonId === "string" ? session.facilitatorPersonId : null;
 }
 
-/** Any changed session, timing or facilitator requires staffing re-review. */
+/** Bind approval to the entire material session schedule, not only its start.
+ * Edits to a room, closing time, timezone, facilitator or hosting scope
+ * invalidate staffing clearance until an independent reviewer approves again. */
 export function extendedStaffingSignature(events: readonly SessionRow[]): string {
-  const snapshot = events.map(row => [row.id, row.startsAt.toISOString(), assignedStaff(row)])
-    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  const snapshot = events.map(row => {
+    const session = row.metadata.extendedLearningSession;
+    const location = session && typeof session === "object" && "location" in session
+      && typeof session.location === "string" ? session.location.trim() : null;
+    return [row.id, row.startsAt.toISOString(), row.endsAt?.toISOString() ?? null,
+      row.timezone, location, assignedStaff(row), row.siteId, row.programId,
+      row.organizationId, row.metadata.cancelled === true];
+  }).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
   return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
 }
 
@@ -62,7 +71,8 @@ export async function readExtendedSeasonApprovals(
   )).orderBy(desc(documents.createdAt), desc(documents.id));
   const sessions = await executor.select({
     id: calendarEvents.id, seasonId: calendarEvents.sourceId,
-    startsAt: calendarEvents.startsAt, metadata: calendarEvents.metadata,
+    startsAt: calendarEvents.startsAt, endsAt: calendarEvents.endsAt,
+    timezone: calendarEvents.timezone, metadata: calendarEvents.metadata,
     siteId: calendarEvents.siteId, programId: calendarEvents.programId,
     organizationId: calendarEvents.organizationId,
   }).from(calendarEvents).where(and(
@@ -108,7 +118,8 @@ export async function readExtendedSeasonApprovals(
       const staffId = assignedStaff(row);
       return row.siteId === season.siteId &&
         row.organizationId === season.organizationId && row.programId === season.programId &&
-        row.metadata.cancelled !== true && !!staffId && eligibleStaff.has(staffId);
+        row.metadata.cancelled !== true && !!row.endsAt && row.endsAt > row.startsAt &&
+        !!staffId && eligibleStaff.has(staffId);
     });
     const approved = (category: ExtendedSeasonApprovalCategory) =>
       isCurrentExtendedSeasonApproval(currentDocs.get(category), season, new Set(
