@@ -37,7 +37,7 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
      .for("update").limit(1);
    const kind=action?.metadata.kind;
    if(!action||!(kind==="withdrawal"||kind==="transfer")||
-      !action.siteId||!action.programId||!action.organizationId||
+      !action.subjectId||!action.siteId||!action.programId||!action.organizationId||
       !actor.scope.siteIds?.includes(action.siteId)||
       !actor.scope.organizationIds?.includes(action.organizationId)||
       !actor.scope.programIds?.includes(action.programId))
