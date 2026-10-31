@@ -332,7 +332,8 @@ function TeacherGradebookPage() {
      <StatCard label="Assessments" value={gradebook.assessments.length}/>
      <StatCard label="Needs grading" value={gradebook.cells.filter(cell=>cell.status==="submitted").length}/>
     </div>
-    {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Ungraded work appears first. Choose a student submission to review or grade.">
+    {!reviewCell&&reviewQueue.length===0&&<WorkspacePanel title="All caught up" description="There are no submitted assignments awaiting grading in this section. New student submissions will appear here." />}
+    {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Choose a student submission to review and grade.">
      <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">
       {reviewQueue.map(cell=><Link key={cell.submissionId} to="/teacher/gradebook"
        search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
