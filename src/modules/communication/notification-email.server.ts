@@ -78,6 +78,16 @@ export async function sendNotificationEmail(
   }
 }
 
+/** Defense in depth: account/grant eligibility must survive both the SQL
+ * filter and projection, including if a caller changes the query later. */
+export function eligibleNotificationEmailAccount(record: {
+  accountDisabled:boolean;emailVerifiedAt:Date|null;
+  grantActive:boolean;synthetic:boolean;personActive:boolean;
+}): boolean {
+  return !record.accountDisabled && !!record.emailVerifiedAt &&
+    record.grantActive && !record.synthetic && record.personActive;
+}
+
 /**
  * Resolve notification recipient emails for a set of personIds through their
  * access accounts (people -> account_person_grants -> access_accounts).
@@ -95,6 +105,11 @@ export async function emailNotificationRecipients(
     .select({
       personId: accountPersonGrants.personId,
       email: accessAccounts.emailNormalized,
+      accountDisabled: accessAccounts.disabled,
+      emailVerifiedAt: accessAccounts.emailVerifiedAt,
+      grantActive: accountPersonGrants.active,
+      synthetic: accountPersonGrants.isSynthetic,
+      personActive: people.active,
     })
     .from(accountPersonGrants)
     .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
@@ -111,6 +126,7 @@ export async function emailNotificationRecipients(
     );
 
   for (const row of rows) {
+    if (!eligibleNotificationEmailAccount(row)) continue;
     if (!recipients.has(row.personId)) {
       recipients.set(row.personId, row.email);
     }
