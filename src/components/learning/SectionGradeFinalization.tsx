@@ -127,6 +127,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
 
   const periods = model?.gradingPeriods ?? [];
   const grades = model?.grades ?? [];
+  const periodGrades = grades.filter((grade) => grade.gradingPeriodId === periodId);
   const finalizedForPeriod = (id: string) => grades.filter((grade) => grade.gradingPeriodId === id).length;
 
   return <section aria-label="Grading period finalization" className="mt-8 rounded-xl border bg-card p-5">
@@ -178,11 +179,11 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
           {preview.blockers.some(item=>item.status!=="submitted")&&<p className="mt-3">For unsubmitted or returned work, follow up with the student before finalizing. <Link to="/teacher/missing-work" className="underline">Review overdue missing work and create follow-ups</Link></p>}
         </section>}
         <h3 className="mt-6 text-sm font-semibold">Finalized grades for this section</h3>
-        {grades.length === 0 && <p className="mt-2 text-sm text-muted-foreground">
-          No finalized grades yet. Finalize a grading period above to publish report-card grades.
+        {periodGrades.length === 0 && <p className="mt-2 text-sm text-muted-foreground">
+          No finalized grades for the selected grading period. Review unfinished work above before publishing report-card grades.
         </p>}
-        {grades.length > 0 && <ul className="mt-3 space-y-3">
-          {grades.map((grade) => {
+        {periodGrades.length > 0 && <ul className="mt-3 space-y-3">
+          {periodGrades.map((grade) => {
             const period = periods.find((item) => item.id === grade.gradingPeriodId);
             const correcting = correctingId === grade.id;
             return <li key={grade.id} className="rounded-lg border p-4 text-sm">
