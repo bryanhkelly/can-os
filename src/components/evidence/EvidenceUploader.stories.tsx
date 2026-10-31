@@ -129,3 +129,40 @@ export const ChangeDocumentAfterFailedFinalization: Story = {
     } finally { globalThis.fetch = originalFetch; }
   },
 };
+
+
+export const BlocksRepeatedSubmissionWhileUploading: Story = {
+  args: {
+    adapter: {
+      begin: fn(async () => ({ key: "once", uploadUrl: "/mock-private-upload", uploadHeaders: {} })),
+      finish: fn(async () => {}),
+    },
+    onUploaded: fn(async () => {}),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const originalFetch = globalThis.fetch;
+    let releaseUpload: (() => void) | undefined;
+    let uploadCount = 0;
+    globalThis.fetch = async () => {
+      uploadCount++;
+      await new Promise<void>(resolve => { releaseUpload = resolve; });
+      return new Response(null, { status: 200 });
+    };
+    try {
+      await userEvent.upload(canvas.getByLabelText("PDF, JPEG or PNG"),
+        new File(["document"], "approval.pdf", { type: "application/pdf" }));
+      fireEvent.change(canvas.getByLabelText("Evidence expires on"),
+        { target: { value: "2027-05-01" } });
+      await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
+      const submitting = canvas.getByRole("button", { name: "Submitting…" });
+      await expect(submitting).toBeDisabled();
+      await expect(uploadCount).toBe(1);
+      releaseUpload?.();
+      await expect(args.adapter.finish).toHaveBeenCalledTimes(1);
+    } finally {
+      releaseUpload?.();
+      globalThis.fetch = originalFetch;
+    }
+  },
+};
