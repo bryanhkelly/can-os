@@ -365,6 +365,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    programId:s.actions.programId,organizationId:s.actions.organizationId,
    subjectId:s.actions.subjectId,metadata:s.actions.metadata,
    studentPersonId:s.studentProfiles.personId,assessmentId:s.submissions.assessmentId,
+    submissionId:s.submissions.id,
  }).from(s.actions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
  .innerJoin(s.submissions,and(eq(sql<string>`${s.submissions.id}::text`,sql<string>`${s.actions.metadata}->>'submissionId'`),
    eq(s.submissions.studentProfileId,s.actions.subjectId),inArray(s.submissions.status,["graded","returned"])))
@@ -388,7 +389,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      for(const action of gradeActions)if(permitted.has(action.studentPersonId)&&
        action.metadata.requestedByGuardianPersonId===personId)
        verifiedGradeActions.set(action.id,
-         `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}`);
+         `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}&submission=${encodeURIComponent(action.submissionId)}`);
    }else if(context.role==="registrar"){
      for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
        verifiedGradeActions.set(action.id,`/operations?action=${encodeURIComponent(action.id)}`);
