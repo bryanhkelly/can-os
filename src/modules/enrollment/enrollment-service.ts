@@ -57,6 +57,7 @@ export async function startFamilyApplication(
     existingStudentProfileId?: string;
     /** Existing guardian-requested origin transfer; not destination admission authority. */
     originTransferActionId?: string;
+    confirmedTransferDestination?: true;
     familyStartRequestId?: string;
     source?: "family_account" | "published_site";
     student: {
@@ -106,6 +107,8 @@ export async function startFamilyApplication(
     // never authorizes entry into a destination school on its own.
     let originTransfer: {actionId:string;programId:string;siteId:string|null;destinationSchoolName:string;metadata:Record<string,unknown>}|null=null;
     if(input.originTransferActionId){
+      if(input.confirmedTransferDestination!==true)
+        throw new AuthorizationError("Guardian confirmation of receiving-school destination is required");
       if(!input.existingStudentProfileId)
         throw new AuthorizationError("Transfer requires a verified existing student");
       const [origin]=await tx.select({
@@ -392,6 +395,7 @@ export async function startFamilyApplication(
             originTransferProgramId:originTransfer.programId,
             originTransferSiteId:originTransfer.siteId,
             originTransferDestinationSchoolName:originTransfer.destinationSchoolName,
+            destinationConfirmedByGuardianPersonId:actorPersonId,
           }:{}),
           ...(program.siteId ? {siteId:program.siteId} : {}),
           ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
@@ -460,6 +464,7 @@ export async function startFamilyApplication(
             originTransferProgramId:originTransfer.programId,
             originTransferSiteId:originTransfer.siteId,
             originTransferDestinationSchoolName:originTransfer.destinationSchoolName,
+            destinationConfirmedByGuardianPersonId:actorPersonId,
           }:{}),
           ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
           publicFamilyStartRequestId:familyStart.id,publicInterestId:interest.id,
