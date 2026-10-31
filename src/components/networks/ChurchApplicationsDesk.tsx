@@ -88,7 +88,7 @@ export function ChurchApplicationsDesk() {
           {request.churchWebsite&&<a href={request.churchWebsite} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm underline">Church website</a>}
           <p className="mt-1 text-xs text-muted-foreground">Received {new Date(request.createdAt).toLocaleDateString()} · Request {request.id}</p>
           {request.status!=="verified" ? <div className="mt-4 space-y-3">
-            {request.status==="needs_evidence" && <p role="status" className="rounded border p-3 text-sm">Additional evidence requested. Fresh independent verification is required before approval. Do not rely on an applicant-submitted claim alone.</p>
+            {request.status==="needs_evidence" && <p role="status" className="rounded border p-3 text-sm">Additional evidence requested. Fresh independent verification is required before approval. Do not rely on an applicant-submitted claim alone.</p>}
             {request.status==="needs_evidence" && <button type="button" disabled={!!working} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={async ()=>{
               setWorking(request.id); setError(""); setNotice("");
               try { const result = await resendChurchEvidenceNotice({ data: request.id });
