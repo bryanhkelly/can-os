@@ -218,12 +218,15 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
   });
   // Delivery happens after the approved record, organization and invitation
   // commit. A mail outage cannot change approval or activate the grant.
-  if (!result.invitationPending) return { ...result, approved: true as const, emailSent: false };
+  if (!result.invitationPending)
+    return { ...result, approved: true as const, emailSent: false, invitationDeliveryStatus: "not_required" as const };
   try {
     const status = await requestOneTimeAccessWithDeliveryStatus(request.contactEmail);
-    return { ...result, approved: true as const, emailSent: status === "dispatched" };
+    return { ...result, approved: true as const, emailSent: status === "dispatched",
+      invitationDeliveryStatus: status };
   } catch {
-    return { ...result, approved: true as const, emailSent: false };
+    return { ...result, approved: true as const, emailSent: false,
+      invitationDeliveryStatus: "failed" as const };
   }
 }
 
