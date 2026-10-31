@@ -1,7 +1,7 @@
 import type { CommandContext } from "../../domain/command-context";
 import { AuthorizationError } from "../../domain/command-context";
 import type { Charge, FinanceRecord, ProviderEvent } from "./finance-domain";
-import { applyVerifiedEvent, settlement, validateCharge } from "./finance-domain";
+import { settlement, validateCharge } from "./finance-domain";
 
 /**
  * Finance-specific narrow persistence seam.
@@ -109,8 +109,3 @@ export class NotConfiguredProcessor implements FinanceProcessor {
   }
 }
 
-/** Pure adapter for deterministic tests, never enable as a production processor. */
-export function simulateProcessorEvidence(record: FinanceRecord, event: ProviderEvent): FinanceRecord {
-  if (process.env.NODE_ENV !== "test") throw new Error("Simulation is restricted to test environment");
-  return applyVerifiedEvent(record, event);
-}
