@@ -61,15 +61,15 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
       eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
   const matching = enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId &&
     [row.yearName,row.yearKey,`${row.yearStarts.slice(0,4)}-${row.yearEnds.slice(0,4)}`].includes(requirementSet.academicYear));
-  if(matching.length!==1 || enrollments.some(row=>row.issuer===transcript.issuingOrganizationId &&
+  if(new Set(matching.map(row=>row.yearId)).size!==1 || !matching.length || enrollments.some(row=>row.issuer===transcript.issuingOrganizationId &&
       row.yearId!==matching[0]?.yearId))
     throw new AuthorizationError("No unambiguous applicable graduation academic-year policy for student");
   const approved = await db.select({id:s.graduationRequirementSets.id})
     .from(s.graduationRequirementSets).where(and(
       eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId),
       eq(s.graduationRequirementSets.academicYear,requirementSet.academicYear)));
-  if(approved.length!==1 || approved[0]?.id!==requirementSet.id)
-    throw new AuthorizationError("Graduation policy version is ambiguous; institutional review required");
+  if(!approved.some(row=>row.id===requirementSet.id))
+    throw new AuthorizationError("Graduation policy is not approved for this academic year");
   return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
 }
 
