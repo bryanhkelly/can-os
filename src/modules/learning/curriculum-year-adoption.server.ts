@@ -43,7 +43,12 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
   eq(curriculumPackVersions.id,adoption.packVersionId),eq(curriculumPackVersions.packId,input.packId))).limit(1);
  const metadata=license?.metadata??{};
  const date=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
- const eligible=Boolean(license && pack && metadata.verifiedPublisherOrganizationId===pack.publisherOrganizationId && metadata.verifiedByPersonId && metadata.licenseEvidenceDocumentId && !!date(metadata.licenseStartsAt) && !!date(metadata.licenseEndsAt) && annualAdoptionEligible({
+ const eligible=Boolean(license && pack && version &&
+  adoption.organizationId===program.organizationId &&
+  adoption.siteId===program.siteId &&
+  adoption.academicProviderOrganizationId===program.academicProviderOrganizationId &&
+  adoption.packVersionId===version.id &&
+  metadata.verifiedPublisherOrganizationId===pack.publisherOrganizationId && metadata.verifiedByPersonId && metadata.licenseEvidenceDocumentId && !!date(metadata.licenseStartsAt) && !!date(metadata.licenseEndsAt) && annualAdoptionEligible({
   scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId},
   adoption,license:{organizationId:license.organizationId,packId:license.packId,
