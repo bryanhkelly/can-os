@@ -19,7 +19,7 @@ export interface FinanceStore {
   } | null>;
   readInvoice(obligationId: string): Promise<FinanceRecord | null>;
   createInvoice(charge: Charge): Promise<void>;
-  /** Returns false for exact duplicate provider event, and rejects conflicting IDs. */
+  /** Returns the current projection for an exact duplicate; rejects conflicting IDs. */
   postVerifiedEvent(event: ProviderEvent): Promise<FinanceRecord>;
 }
 export type FinanceViewer = "institution" | "site" | "guardian";
