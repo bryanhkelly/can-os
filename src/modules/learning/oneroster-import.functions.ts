@@ -149,14 +149,16 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
    const canonical=await db.select({id:sections.id,code:sections.code,
       title:sections.title,active:sections.active,termId:sections.termId,
       schoolYearKey:schoolYears.key,schoolYearId:schoolYears.id,
-      schoolYearStatus:schoolYears.status,termKey:terms.key}).from(sections)
+      schoolYearStatus:schoolYears.status,termKey:terms.key,yearProgramId:schoolYears.programId}).from(sections)
      .innerJoin(terms,eq(sections.termId,terms.id))
      .innerJoin(schoolYears,eq(terms.schoolYearId,schoolYears.id))
      .where(and(inArray(sections.id,sectionIds),eq(sections.programId,program.id),
        eq(sections.siteId,program.siteId),eq(schoolYears.organizationId,program.organizationId),
        eq(schoolYears.siteId,program.siteId)));
-   if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active||s.schoolYearStatus==="closed"))
+   if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active||s.schoolYearStatus!=="active"||s.schoolYearId===null))
      throw new AuthorizationError("active Section owned by this Program and Site");
+   if(canonical.some(s=>s.yearProgramId!==program.id))
+     throw new AuthorizationError("SchoolYear must belong to the selected Program");
    const byCanonicalId=new Map(canonical.map(s=>[s.id,s]));
    for(const row of classes.rows){
      const externalId=row.sourcedId;
