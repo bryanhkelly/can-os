@@ -60,7 +60,7 @@ describe("Phase D first onsite school-day handoff",()=>{
     });
   });
   it("records only real observed attendance statuses; expected is not a mark",()=>{
-    for(const status of ["present","tardy","absent"]){
+    for(const status of ["present","tardy","absent","excused"]){
       expect(assess({students:[{programId,studentProfileId,sectionId,status}]}))
         .toMatchObject({state:"attendance_recorded",attendanceRecorded:true});
     }
