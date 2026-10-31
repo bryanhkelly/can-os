@@ -76,6 +76,26 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   )):[];
  const medicalChildByVisit=new Map(permittedMedical.map(row=>[row.id,row.studentPersonId]));
  const permittedMedicalIds=new Set(medicalChildByVisit.keys());
+ // Family enrollment-change decisions stay accessible only to the verified
+ // requesting guardian, even if the original notification was delivered long ago.
+ const familyChangeNoticeIds=rows.filter(n=>n.type==="guardian_enrollment_change_updated"&&
+   n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const familyChangeActions=familyChangeNoticeIds.length&&context.role==="guardian"?
+  await db.select({id:s.actions.id,studentPersonId:s.studentProfiles.personId})
+   .from(s.actions)
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+    guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"enrollment",
+   }))
+   .where(and(inArray(s.actions.id,familyChangeNoticeIds),
+     eq(s.actions.type,"guardian_enrollment_change_request"),
+     eq(s.actions.subjectType,"student_profile"),
+     sql`${s.actions.metadata}->>'requestedByGuardianPersonId' = ${personId}`,
+     inArray(s.actions.siteId,context.scope.siteIds??[]),
+     inArray(s.actions.programId,context.scope.programIds??[]),
+     inArray(s.actions.organizationId,context.scope.organizationIds??[]),
+   )):[];
+ const familyChangeChildByAction=new Map(familyChangeActions.map(row=>[row.id,row.studentPersonId]));
  const pickupRows=rows.filter(row=>pickupNotificationTypes.has(row.type)&&row.resourceId);
  const pickupReleaseIds=pickupRows.filter(row=>row.resourceType==="pickup_release_event").map(row=>row.resourceId!);
  const pickupHoldIds=pickupRows.filter(row=>row.resourceType==="pickup_custody_hold").map(row=>row.resourceId!);
@@ -350,6 +370,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="health_office_visit"?permittedMedicalIds.has(n.resourceId):
+    n.resourceType==="action"&&n.type==="guardian_enrollment_change_updated"?familyChangeChildByAction.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
     n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
     n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):
@@ -361,6 +382,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
+   n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
