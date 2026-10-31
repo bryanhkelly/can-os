@@ -82,6 +82,18 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     throw new AuthorizationError("Conflicting documented graduation cohort overrides");
   // The earliest issuing-institution program year is the entry cohort.
   // A registrar-recorded override is authoritative only when consistent across records.
+  if(documented.length){
+    const evidence=institutional.find(row=>row.metadata?.graduationEntryCohort===documented[0]);
+    const metadata=evidence?.metadata;
+    if(metadata?.graduationEntryCohortReason!=="transfer" ||
+       typeof metadata.graduationEntryCohortEvidenceReference!=="string" ||
+       metadata.graduationEntryCohortEvidenceReference.trim().length<12 ||
+       typeof metadata.graduationEntryCohortConsentReference!=="string" ||
+       metadata.graduationEntryCohortConsentReference.trim().length<12 ||
+       typeof metadata.graduationEntryCohortApprovedByPersonId!=="string" ||
+       !uuid.safeParse(metadata.graduationEntryCohortApprovedByPersonId).success)
+      throw new AuthorizationError("Documented transfer cohort override lacks registrar approval, consent or evidence");
+  }
   const entryCohort=(documented[0] as string|undefined) ?? String(institutional[0]!.yearStarts).slice(0,4);
   const policies=await db.select().from(s.graduationRequirementSets)
     .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
