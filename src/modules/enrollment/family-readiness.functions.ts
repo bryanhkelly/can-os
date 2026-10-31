@@ -8,36 +8,10 @@ import { enrollmentFormState } from "@/domain/enrollment-form";
 import { enrollmentFormRevision } from "./enrollment-form.server";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,eq,inArray,gt,asc,or,ilike } from "drizzle-orm";
+import { and,eq,inArray,asc } from "drizzle-orm";
 import { z } from "zod";
 const registrar=()=>requireActor(["registrar"],"enrollment.decide");
 const requirementInput=z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid()});
-const familyPageInput=operationsSelectionSchema.extend({
- cursor:z.string().uuid().optional(),
- pageSize:z.coerce.number().int().min(1).max(100).default(40),
- search:z.string().trim().max(100).optional(),
-});
-/** Stable, authorization-filtered application pages for multisite registrar views. */
-export const getFamilyReadinessPage=createServerFn({method:"GET"})
- .validator((value:unknown)=>familyPageInput.parse(value??{}))
- .handler(async({data})=>{
-  const actor=await registrar();
-  setResponseHeader("Cache-Control","private, no-store");
-  const scoped=await resolveOperationsSelection(actor,data);
-  if(!scoped.programIds.length||!process.env.DATABASE_URL)return {items:[],nextCursor:null};
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  const rows=await db.select({id:s.applications.id,programId:s.applications.programId,stage:s.applications.stage,
-   householdId:s.applications.householdId,studentProfileId:s.applications.studentProfileId,program:s.programs.name})
-   .from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
-   .where(and(inArray(s.applications.programId,scoped.programIds),
-    data.cursor?gt(s.applications.id,data.cursor):undefined,
-    data.search?or(ilike(s.programs.name,"%"+data.search+"%"),
-     z.string().uuid().safeParse(data.search).success?eq(s.applications.id,data.search):undefined):undefined))
-   .orderBy(asc(s.applications.id)).limit(data.pageSize+1);
-  const hasMore=rows.length>data.pageSize;
-  const items=rows.slice(0,data.pageSize);
-  return {items,nextCursor:hasMore?items[items.length-1]?.id??null:null};
- });
 export const getFamilyReadiness=createServerFn({method:"GET"})
  .validator((value:unknown)=>operationsSelectionSchema.extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
  .handler(async({data})=>{
