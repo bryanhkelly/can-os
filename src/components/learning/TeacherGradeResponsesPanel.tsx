@@ -9,20 +9,23 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: () =>
   const [response, setResponse] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [savedResponse, setSavedResponse] = useState<string | null>(null);
   return <article id={"grade-action-"+item.id} className={"rounded-xl border p-4"+(selected?" ring-2 ring-primary":"")}>
     <p className="font-semibold">{item.studentName} · {item.assessmentTitle}</p>
     <p className="mt-2 whitespace-pre-wrap text-sm">{item.message}</p>
     <p className="mt-2 text-xs capitalize">{item.status.replaceAll("_", " ")}</p>
     <Link to="/teacher/gradebook" search={{ section: item.sectionId, assessment: item.assessmentId, student: item.studentProfileId }}
       className="mt-2 inline-block text-sm underline">Review graded work</Link>
-    {item.status === "resolved"
-      ? <p className="mt-3 whitespace-pre-wrap text-sm">School response: {item.resolutionNote}</p>
+    {(item.status === "resolved" || savedResponse !== null)
+      ? <p className="mt-3 whitespace-pre-wrap text-sm" role="status">School response: {savedResponse ?? item.resolutionNote}</p>
       : <form className="mt-3 space-y-3" onSubmit={async event => {
         event.preventDefault();
         if (busy) return;
         setBusy(true); setError("");
         try {
           await resolveTeacherGradeResponse({ data: { actionId: item.id, response } });
+          // Preserve the confirmed resolution even if refreshing the queue fails.
+          setSavedResponse(response.trim());
           onSaved();
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "Unable to record the school response.");
