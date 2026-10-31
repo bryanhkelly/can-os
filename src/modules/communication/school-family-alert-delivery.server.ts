@@ -13,7 +13,7 @@ const RETRY_MS=(attempt:number)=>Math.min(60_000*2**Math.max(0,attempt-1),3_600_
  * transaction. Notification and original school Action remain authoritative.
  * Each retry verifies current enrollment and verified guardian grant.
  */
-export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit=40){
+export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit=120){
  const ids=await db.transaction(async tx=>{
    const due=await tx.select({id:s.notificationOutboundDeliveries.id})
      .from(s.notificationOutboundDeliveries)
@@ -34,7 +34,7 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
    return due.map(row=>row.id);
  });
  let accepted=0;
- for(const id of ids){
+ const processOne=async(id:string)=>{
    try{
      const [record]=await db.select({
        delivery:s.notificationOutboundDeliveries,
@@ -50,7 +50,7 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
        .innerJoin(s.actions,eq(s.actions.id,s.notifications.resourceId))
        .where(eq(s.notificationOutboundDeliveries.id,id)).limit(1);
      if(!record||record.delivery.status!=="processing"){
-       continue;
+       return;
      }
      const suppress=async(reason:string)=>{
        await db.update(s.notificationOutboundDeliveries).set({
@@ -61,7 +61,7 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
      if(record.notificationType!=="school_family_alert"||
         record.resourceType!=="action"||record.actionType!=="school_family_bulletin"||
         !record.programId||!record.siteId||!record.organizationId){
-       await suppress("invalid_school_alert");continue;
+       await suppress("invalid_school_alert");return;
      }
      // Never use a cached recipient list as ongoing permission. A guardian
      // whose child transferred or lost verified enrollment rights is excluded.
@@ -97,11 +97,11 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
        .where(guardianRelationshipPredicate({
          guardianPersonId:record.recipientPersonId,access:"enrollment",
        })).limit(1);
-     if(!current){await suppress("guardian_enrollment_access_revoked");continue;}
+     if(!current){await suppress("guardian_enrollment_access_revoked");return;}
      const prefs=await getNotificationPreferences(record.recipientPersonId);
      if(record.delivery.channel==="sms"&&
         (!prefs?.smsOptedIn||!prefs.smsVerifiedPhone||!prefs.smsVerifiedAt)){
-       await suppress("sms_opt_in_or_verified_phone_missing");continue;
+       await suppress("sms_opt_in_or_verified_phone_missing");return;
      }
      const quietUntil=prefs?nextAllowedDelivery(now,prefs.timezone,prefs.quietStart,prefs.quietEnd):null;
      if(quietUntil){
@@ -109,7 +109,7 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
          status:"pending",leaseUntil:null,nextAttemptAt:quietUntil,updatedAt:new Date(),
        }).where(and(eq(s.notificationOutboundDeliveries.id,id),
          eq(s.notificationOutboundDeliveries.status,"processing")));
-       continue;
+       return;
      }
      let ok=false;
      let terminal=false;
@@ -156,6 +156,11 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
        updatedAt:new Date(),
      }).where(eq(s.notificationOutboundDeliveries.id,id));
    }
+ };
+ // Bounded parallelism gives school notices prompt delivery without
+ // saturating email/SMS providers.
+ for(let offset=0;offset<ids.length;offset+=6){
+   await Promise.all(ids.slice(offset,offset+6).map(processOne));
  }
  return accepted;
 }
