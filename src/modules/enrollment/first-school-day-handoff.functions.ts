@@ -53,9 +53,16 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
 
     // Derive the calendar date from the Site, not the user's browser clock.
     const today = siteDate(new Date(),app.timezone);
-    // Preview an actual published calendar day, never invent a weekday schedule.
+    // A school-local candidate is never evidence of attendance. Search only
+    // the active institution/Program year and the latest published calendar.
     const futureDays = await db.select({date:academicCalendarDays.calendarDate,
-      type:academicCalendarDays.type}).from(academicCalendarDays)
+      type:academicCalendarDays.type,
+      minutes:academicCalendarDays.instructionalMinutes,
+      calendarId:academicCalendars.id,
+      version:academicCalendars.version,
+      yearId:schoolYears.id,
+      startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
+    }).from(academicCalendarDays)
       .innerJoin(academicCalendars,eq(academicCalendars.id,academicCalendarDays.academicCalendarId))
       .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
       .where(and(eq(academicCalendars.siteId,app.siteId),eq(academicCalendars.active,true),
@@ -65,8 +72,18 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         gte(academicCalendarDays.calendarDate,today),
         gte(schoolYears.endsOn,today)))
       .orderBy(asc(academicCalendarDays.calendarDate)).limit(366);
-    const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
-      .map(day=>day.date))];
+    // Use the latest active calendar version for each academic year; a stale
+    // earlier version cannot re-open a canceled holiday or weekend.
+    const versionByYear=new Map<string,number>();
+    for(const day of futureDays){
+      versionByYear.set(day.yearId,Math.max(versionByYear.get(day.yearId)??-1,day.version));
+    }
+    const dates=[...new Set(futureDays.filter(day=>
+      day.version===versionByYear.get(day.yearId) &&
+      day.date>=day.startsOn && day.date<=day.endsOn &&
+      (day.type==="instructional"||day.type==="makeup"||
+        (day.type==="special"&&(day.minutes??0)>0)) &&
+      day.minutes!==0).map(day=>day.date))].sort();
     // Scan canonical, active, published instructional days for THIS student.
     // The canonical preparation resolver also checks enrollment effective dates,
     // timetable periods, site-local dates and the active Section placement.
