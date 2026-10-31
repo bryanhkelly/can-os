@@ -48,7 +48,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const selected=Route.useSearch();
  const programs=data.programs.filter(program=>(!selected.programId||program.id===selected.programId)&&
   (!selected.siteId||program.siteId===selected.siteId));
- const scopedRecords=data.records.filter(row=>(!selected.siteId||row.siteId===selected.siteId)&&
+ const scopedRecords=data.records.items.filter(row=>(!selected.siteId||row.siteId===selected.siteId)&&
   (!selected.programId||row.programId===selected.programId));
  const records=scopedRecords.filter(row=>!selected.application||row.id===selected.application);
  const candidateInterest = data.linkedInterest?.id===selected.interest
@@ -72,7 +72,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
    <input aria-label="Search admissions" className="rounded border bg-background px-2 py-1" value={searchDraft} onChange={e=>setSearchDraft(e.target.value)} placeholder="Student, program, application ID"/>
    <button className="ml-2 rounded border px-2 py-1" type="submit">Search</button>
   </form>
-  <AdmissionsPageNavigation selection={selected} hasMore={data.records.length===40} kind="applications"/>
+  <AdmissionsPageNavigation selection={selected} hasMore={data.records.hasMore} kind="applications"/>
  </div>;
 
  const studentKey=(student:typeof existingStudents[number])=>
@@ -153,7 +153,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     existingStudents={existingStudents} existingStudent={existingStudent}
     createHouseholdConfirmed={createHouseholdConfirmed} setCreateHouseholdConfirmed={setCreateHouseholdConfirmed}
     existingApplicationId={existingApplicationId} setExistingApplicationId={setExistingApplicationId}
-    records={data.records} studentFirstName={studentFirstName} setStudentFirstName={setStudentFirstName}
+    records={data.records.items} studentFirstName={studentFirstName} setStudentFirstName={setStudentFirstName}
     studentLastName={studentLastName} setStudentLastName={setStudentLastName}
     guardianFirstName={guardianFirstName} setGuardianFirstName={setGuardianFirstName}
     guardianLastName={guardianLastName} setGuardianLastName={setGuardianLastName}
