@@ -366,7 +366,7 @@ function TeacherGradebookPage() {
        search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
        className="rounded-lg border p-3 text-sm hover:bg-muted">
        <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName??"Student"}</span>
-       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title??"Assessment"} · {cell.status}</span>
+       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title??"Assessment"} · {cell.gradingDraft?"Draft saved · not released":cell.status}</span>
       </Link>)}
      </nav>
     </WorkspacePanel>}
@@ -377,7 +377,7 @@ function TeacherGradebookPage() {
        aria-current={cell.submissionId===reviewCell.submissionId?"page":undefined}
        className={"rounded-lg border p-3 text-sm "+(cell.submissionId===reviewCell.submissionId?"bg-muted":"")}>
        <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName}</span>
-       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title} · {cell.status}</span>
+       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title} · {cell.gradingDraft?"Draft saved · not released":cell.status}</span>
       </Link>)}</nav>
      </WorkspacePanel>
      <WorkspacePanel title={`${reviewStudent.displayName} · ${reviewAssessment.title}`} actions={<div className="flex gap-3 text-sm">
