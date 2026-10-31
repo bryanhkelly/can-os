@@ -26,11 +26,25 @@ describe("Phase D live family-to-school handoff contracts",()=>{
   it("never reads a future attendance roster or future staffing as observed presence",()=>{
     const source=read("src/modules/enrollment/first-school-day-handoff.functions.ts");
     expect(source).toContain("const preview = date > today");
-    expect(source).toContain("!preview && candidate");
-    expect(source).toContain("const supervision = matched?.sectionId");
-    expect(source).toContain('future_roster_verification_required');
+    expect(source).toContain("loadExpectedFirstDayPreparationForActor");
+    expect(source).toContain("loadFirstDaySupervisionPreparationForActor");
+    expect(source).toContain('studentProfileId:app.studentProfileId');
     expect(source).not.toContain("insert(attendanceEvents)");
     expect(source).not.toContain("markExpectedOnsiteAttendance");
+  });
+  it("uses only registrar scoped canonical future preparation, never future attendance events",()=>{
+    const attendance=read("src/modules/attendance/onsite-attendance-workflow.functions.ts");
+    const future=attendance.slice(attendance.indexOf("export const loadExpectedFirstDayPreparationForActor="),
+      attendance.indexOf("export const loadExpectedSchoolDayPreparation="));
+    expect(future).toContain('actor.role!=="registrar"');
+    expect(future).toContain('assertCapability(actor,"enrollment.activate")');
+    expect(future).toContain('resolveExpectedRoster(actor,data.date,data.programId,data.studentProfileId,data.siteId,true)');
+    expect(future).not.toContain("attendanceEvents");
+    expect(future).not.toContain("recordAttendanceRevision");
+    const staffing=read("src/modules/operations/onsite-supervision.functions.ts");
+    expect(staffing).toContain("loadFirstDaySupervisionPreparationForActor");
+    expect(staffing).toContain('registrarFirstDay:true');
+    expect(staffing).toContain('eq(sections.id,data.sectionId!)');
   });
   it("keeps active student grants distinct from historic approved guardian consent",()=>{
     const service=read("src/modules/enrollment/student-access-handoff.functions.ts");
