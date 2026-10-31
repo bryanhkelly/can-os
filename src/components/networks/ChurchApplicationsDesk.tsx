@@ -16,6 +16,7 @@ export function ChurchApplicationsDesk() {
   const [evidenceReference, setEvidenceReference] = useState("");
   const [verificationMethod, setVerificationMethod] = useState<"signed_authority" | "denominational_confirmation" | "independent_church_confirmation">("signed_authority");
   const [declineNote, setDeclineNote] = useState("");
+  const [reviewedEvidenceRequestId, setReviewedEvidenceRequestId] = useState<string | null>(null);
 
   async function refresh() {
     const records = await listChurchOnboardingRequests();
@@ -40,7 +41,7 @@ export function ChurchApplicationsDesk() {
         await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote } });
         setNotice("Application declined and any linked authority evidence invalidated.");
       }
-      setEvidenceReference(""); setDeclineNote("");
+      setEvidenceReference(""); setDeclineNote(""); setReviewedEvidenceRequestId(null);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to complete church review.");
@@ -86,9 +87,23 @@ export function ChurchApplicationsDesk() {
               className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
               Record independent verification
             </button>
-          </div> : <div className="mt-4 space-y-2">
-            <p className="text-sm">Authority verified. A second steward must approve and issue the leader's invitation.</p>
-            <button type="button" disabled={!!working} onClick={()=>void act(request.id,"approve")}
+          </div> : <div className="mt-4 space-y-3">
+            <p className="text-sm">Authority recorded by the verifying steward. A different CAN steward must independently review this evidence before issuing access.</p>
+            {request.authorityEvidence ? <div className="rounded-lg border bg-background p-3 text-sm">
+              <p><strong>Verification method:</strong> {request.authorityEvidence.method.replaceAll("_"," ")}</p>
+              <p className="mt-1 break-words"><strong>External evidence reference:</strong> {request.authorityEvidence.reference}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Verified {request.authorityEvidence.verifiedAt ? new Date(request.authorityEvidence.verifiedAt).toLocaleString() : "at an unknown time"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Check the independent source yourself. A reference alone is not proof of church authority.</p>
+            </div> : <p role="alert" className="text-sm text-destructive">Authority evidence is missing; approval is unavailable.</p>}
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={reviewedEvidenceRequestId===request.id}
+                onChange={e=>setReviewedEvidenceRequestId(e.target.checked?request.id:null)} />
+              I independently reviewed the referenced evidence and confirmed this leader is authorized to represent the church.
+            </label>
+            <button type="button" disabled={!!working||!request.authorityEvidence||reviewedEvidenceRequestId!==request.id}
+              onClick={()=>void act(request.id,"approve")}
               className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
               Approve and invite church leader
             </button>
