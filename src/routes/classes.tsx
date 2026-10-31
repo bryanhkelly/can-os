@@ -1,10 +1,11 @@
+import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
 import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
 import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { classResources, type ClassContent } from "@/domain/class-content";
-import { FIRST_PUBLISHED_LESSON_ROUTE, isLearnerFacingInstruction } from "@/domain/first-class-lesson";
+import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
@@ -69,12 +70,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   // The student home can link directly to a real published lesson without
   // predicting the publisher's IDs. Empty shell lessons are not first-day
   // instruction, even if they precede the first authored lesson.
-  const lesson = lessonId===FIRST_PUBLISHED_LESSON_ROUTE
-    ? lessons.find(isLearnerFacingInstruction)
-    : lessons.find(item=>item.id===lessonId);
-  const lessonIndex=lesson?lessons.findIndex(item=>item.id===lesson.id):-1;
-  const previousLesson=lessonIndex>0?lessons[lessonIndex-1]:null;
-  const nextLesson=lessonIndex>=0&&lessonIndex<lessons.length-1?lessons[lessonIndex+1]:null;
+  const { lesson, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
   const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
