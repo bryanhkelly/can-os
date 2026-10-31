@@ -224,7 +224,7 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
        grantsRevoked,sessionsRevoked,reason:data.resolutionNote,requestActionId:action.id},
    });
    await emitEvent(tx,{
-     eventType:"EnrollmentExited",aggregateType:"student_profile",aggregateId:action.subjectId,
+     eventType:EventTypes.EnrollmentExited,aggregateType:"student_profile",aggregateId:action.subjectId,
      actorPersonId:actor.actorPersonId,
      organizationId:action.organizationId,siteId:action.siteId,programId:action.programId,
      payload:{status:nextStatus,actionId:action.id,endedEnrollmentCount:ended.length},
