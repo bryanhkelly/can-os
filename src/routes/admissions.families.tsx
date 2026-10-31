@@ -131,12 +131,6 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   </section>)}
   <nav aria-label="Family readiness pages" className="mt-5 flex gap-4 text-sm">{!selection.application&& (selection.page??1)>1&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)-1}} className="underline">Previous families</Link>}{!selection.application&&page.hasMore&&<Link to="/admissions/families" search={{...selection,page:page.nextPage??(selection.page??1)+1}} className="underline">Next families</Link>}</nav>
   {!families.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No family enrollment cases found in your authorized programs.</p>}
-  <nav aria-label="Family enrollment pages" className="mt-5 flex items-center gap-4 text-sm">
-   {selection.page&&selection.page>1&&<Link to="/admissions/families" search={{...selection,page:selection.page-1}} className="underline">Previous page</Link>}
-   <span>Page {selection.page??1}</span>
-   {apps.length===40&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)+1}} className="underline">Next page</Link>}
-  </nav>
-
   </div>
  </main>;
 }
