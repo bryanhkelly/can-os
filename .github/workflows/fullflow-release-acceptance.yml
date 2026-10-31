@@ -71,15 +71,15 @@ jobs:
       - name: Ensure independent admissions target differs from FullFlow target
         shell: bash
         run: |
-          node --input-type=module -e \'
+          node --input-type=module -e '
             const a = new URL(process.env.TEST_DATABASE_URL);
             const b = new URL(process.env.CAN_ADMISSIONS_TEST_DATABASE_URL);
-            const stripPool = host => host.replace(/-pooler(?=\\.)/, "").toLowerCase();
+            const stripPool = host => host.replace(/-pooler(?=\.)/, "").toLowerCase();
             if (stripPool(a.hostname) === stripPool(b.hostname) && a.pathname === b.pathname) {
               console.error("HOLD: admissions and FullFlow acceptance must not migrate the same isolated database twice.");
               process.exit(1);
             }
-          \'
+          '
       - name: Verify separate admissions database is an attested disposable branch
         env:
           TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
@@ -129,7 +129,7 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Every step above (including separate-branch admissions and safeguarding) must succeed on this exact SHA. Any failure or skip means HOLD."
-            echo "- Status: CONNECTED GATES ONLY. Overall release remains HOLD until independent admissions Neon acceptance, static/schema checks, and operational readiness are verified on the same reviewed commit."
+            echo "- Status: CONNECTED-GATES PASS only when every check succeeds; operational deployment readiness and coordinator approval remain separate."
             echo "- Required independent evidence: Admissions Neon Acceptance run ID, build/typecheck/unit run ID, migration parity, child-safety negative checks, and deployment readiness."
             echo "- This synthetic isolated-branch evidence does not authorize production deployment or certify legal/accreditation compliance."
           } >> "${GITHUB_STEP_SUMMARY}"
