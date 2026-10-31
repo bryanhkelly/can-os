@@ -89,7 +89,8 @@ async function assertReader(actor: AccessContext, season: Awaited<ReturnType<typ
 async function staffingSignature(reader: Reader, seasonId: string) {
   const sessions = await reader.select({
     id: calendarEvents.id, seasonId: calendarEvents.sourceId,
-    startsAt: calendarEvents.startsAt, metadata: calendarEvents.metadata,
+    startsAt: calendarEvents.startsAt, endsAt: calendarEvents.endsAt,
+    timezone: calendarEvents.timezone, metadata: calendarEvents.metadata,
     siteId: calendarEvents.siteId, programId: calendarEvents.programId,
     organizationId: calendarEvents.organizationId,
   }).from(calendarEvents).where(and(
