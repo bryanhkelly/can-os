@@ -7,6 +7,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
+import { AdmissionsInquiryForm } from "@/components/admissions/AdmissionsInquiryForm";
 import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGuardianActions";
 import { AdmissionsDecisionActions } from "@/components/admissions/AdmissionsDecisionActions";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
@@ -127,7 +128,8 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
          is appropriate. Formal guardian verification remains a separate step.</span>
      </label>
    </div>}
-   {(!selected.interest||!!convertibleInterest)&&<form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
+   {(!selected.interest||!!convertibleInterest)&&<AdmissionsInquiryForm
+    onSubmit={e=>{e.preventDefault();void perform(
     async()=>{
      if(existingStudentKey&&!existingStudent)throw new Error("The selected student is no longer available. Choose a student again.");
      if(existingStudent&&!existingStudent.householdId&&!createHouseholdConfirmed)
@@ -146,51 +148,21 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        siteId:convertibleInterest?.siteId??selectedProgram?.siteId??undefined,
        programId,application:created.applicationId,interest:undefined,
      }});
-     setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}>
-    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required disabled={!!convertibleInterest} value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
-     <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-    </select></label>
-    <label className="text-sm sm:col-span-2">Student identity
-     <select className="mt-1 block w-full rounded border bg-background p-2" disabled={!!convertibleInterest} value={existingStudentKey}
-      onChange={e=>{setExistingStudentKey(e.target.value);setExistingApplicationId("");setCreateHouseholdConfirmed(false);}}>
-      <option value="">Create a new student</option>
-      {existingStudents.map(student=><option key={studentKey(student)} value={studentKey(student)}>
-       {student.studentFirstName} {student.studentLastName} — guardian: {student.guardianFirstName} {student.guardianLastName}
-       {!student.householdId?" (new household required)":""}
-      </option>)}
-     </select>
-     <AdmissionsPageNavigation selection={selected} hasMore={data.existingStudentHasMore} kind="students"/>
-     <span className="mt-1 block text-xs text-muted-foreground">
-      Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.
-     </span>
-    </label>
-    {existingStudent&&!existingStudent.householdId&&<label className="text-sm sm:col-span-2">
-     <input type="checkbox" required checked={createHouseholdConfirmed} onChange={e=>setCreateHouseholdConfirmed(e.target.checked)}/>
-     {" "}I confirm creating the missing household for this existing student and managing guardian. Neither currently belongs to a household.
-    </label>}
-    {!existingStudent&&<>
-    <label className="text-sm sm:col-span-2">Existing household (optional, for siblings)
-      <select className="mt-1 block w-full rounded border bg-background p-2"
-        disabled={!!convertibleInterest} value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
-        <option value="">Create new household</option>
-        {data.records.filter(r=>r.programId===programId).map(r=>
-          <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
-      </select>
-      <span className="mt-1 block text-xs text-muted-foreground">
-        Reuses the existing household and guardian only when the contact email matches.
-      </span>
-    </label>
-    <label className="text-sm">Student first name<input required value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Student last name<input required value={studentLastName} onChange={e=>setStudentLastName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Guardian first name<input required value={guardianFirstName} onChange={e=>setGuardianFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Guardian last name<input required value={guardianLastName} onChange={e=>setGuardianLastName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Guardian email<input required type="email" value={guardianEmail} onChange={e=>setGuardianEmail(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Entering grade<input value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    </>}
-    <label className="text-sm">Inquiry source<select value={source} disabled={!!convertibleInterest} onChange={e=>setSource(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></select></label>
-    <label className="text-sm sm:col-span-2">Notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded border bg-background p-2" rows={2}/></label>
-    <button type="submit" disabled={busy||!programId||(!!convertibleInterest&&!contactReviewed)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>
-   </form>}
+     setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}
+    programs={programs} programId={programId} setProgramId={setProgramId}
+    convertibleInterest={!!convertibleInterest} contactReviewed={contactReviewed} busy={busy}
+    existingStudentKey={existingStudentKey} setExistingStudentKey={setExistingStudentKey}
+    existingStudents={existingStudents} existingStudent={existingStudent}
+    createHouseholdConfirmed={createHouseholdConfirmed} setCreateHouseholdConfirmed={setCreateHouseholdConfirmed}
+    existingApplicationId={existingApplicationId} setExistingApplicationId={setExistingApplicationId}
+    records={data.records} studentFirstName={studentFirstName} setStudentFirstName={setStudentFirstName}
+    studentLastName={studentLastName} setStudentLastName={setStudentLastName}
+    guardianFirstName={guardianFirstName} setGuardianFirstName={setGuardianFirstName}
+    guardianLastName={guardianLastName} setGuardianLastName={setGuardianLastName}
+    guardianEmail={guardianEmail} setGuardianEmail={setGuardianEmail}
+    gradeLevel={gradeLevel} setGradeLevel={setGradeLevel} source={source} setSource={setSource}
+    notes={notes} setNotes={setNotes} selection={selected} existingStudentHasMore={data.existingStudentHasMore}/>}
+
   </section>
   <AdmissionsPipelineSummary counts={countAdmissionsStages(scopedRecords)}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
