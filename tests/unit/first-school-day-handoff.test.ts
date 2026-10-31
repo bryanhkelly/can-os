@@ -68,6 +68,20 @@ describe("Phase D first onsite school-day handoff",()=>{
       status:"expected"}]})).toMatchObject({state:"staffing_plan_ready",
       attendanceRecorded:false});
   });
+  it("never treats a future plan as observed attendance, even if a status is supplied",()=>{
+    for (const status of ["present","tardy","absent","excused"]){
+      const view=assess({preparation:true,students:[{programId,studentProfileId,sectionId,status}]});
+      expect(view).toMatchObject({state:"staffing_plan_ready",attendanceRecorded:false,
+        studentExpected:true,supervisionPlanned:true});
+      expect(view.message).toContain("No future attendance");
+    }
+  });
+  it("does not borrow another program or Section's coverage for future preparation",()=>{
+    expect(assess({preparation:true,blocks:[{programId:"other-program",sectionId,
+      periodId:"period",assignedPlan:true,gaps:[]}]})).toMatchObject({state:"supervision_unverified",attendanceRecorded:false});
+    expect(assess({preparation:true,students:[{programId,studentProfileId,
+      sectionId:null,status:"present"}]})).toMatchObject({state:"placement_missing",attendanceRecorded:false});
+  });
   it("rejects mismatched Section staffing plans instead of borrowing another class's coverage",()=>{
     expect(assess({blocks:[{programId,sectionId:"other-section",
       periodId:"period",assignedPlan:true,gaps:[]}]}))
