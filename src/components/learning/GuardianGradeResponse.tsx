@@ -16,13 +16,14 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [savedRequest, setSavedRequest] = useState(false);
 
   useEffect(() => {
     let live = true;
     setLoading(true);
     setError("");
     getGuardianGradeResponse({ data: { submissionId } })
-      .then(result => { if (live) setCurrent(result.response); })
+      .then(result => { if (live) { setCurrent(result.response); setSavedRequest(Boolean(result.response)); } })
       .catch(() => { if (live) setError("School follow-up is unavailable for this grade."); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
@@ -34,6 +35,7 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
     try {
       const result = await getGuardianGradeResponse({ data: { submissionId } });
       setCurrent(result.response);
+      setSavedRequest(Boolean(result.response));
     } catch {
       setError("Could not refresh the school's response. Your existing question was not changed.");
     } finally { setLoading(false); }
@@ -44,10 +46,17 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
     setError(""); setNotice(""); setBusy(true);
     try {
       const result = await requestGuardianGradeResponse({ data: { submissionId, message } });
-      const updated = await getGuardianGradeResponse({ data: { submissionId } });
-      setCurrent(updated.response);
+      // The write has succeeded: a transient status-read failure must not
+      // invite the family to submit a second request.
+      setSavedRequest(true);
       setNotice(result.created ? "Your question was sent to the school." : "Your existing question is already recorded.");
       setMessage("");
+      try {
+        const updated = await getGuardianGradeResponse({ data: { submissionId } });
+        setCurrent(updated.response);
+      } catch {
+        setError("Your question was saved, but its status could not be refreshed. Use Refresh school response to check it.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to submit your question.");
     } finally { setBusy(false); }
@@ -66,7 +75,9 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
         <p className="text-xs text-muted-foreground">Last updated {new Date(current.updatedAt).toLocaleString()}</p>
         {current.requestMessage && <p className="whitespace-pre-wrap text-muted-foreground">Your question: {current.requestMessage}</p>}
         {current.resolutionNote && <p className="rounded-lg bg-muted p-3 whitespace-pre-wrap">School response: {current.resolutionNote}</p>}
-      </div> : <form className="mt-3 space-y-3" onSubmit={request}>
+      </div> : savedRequest ? (
+        <p className="mt-3 text-sm" role="status">Your question is recorded. Refresh the school response to see its current status.</p>
+      ) : <form className="mt-3 space-y-3" onSubmit={request}>
         <label className="block text-sm font-medium">Your question
           <textarea className="mt-2 w-full rounded-lg border bg-background p-3" rows={3}
             value={message} minLength={10} maxLength={1000} required
