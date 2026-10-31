@@ -1,17 +1,18 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { curriculumImportJobs, curriculumInteropMappings, curriculumOverlays, curriculumResources, programs, sections } from "@/db/schema";
+import { curriculumImportJobs, curriculumInteropMappings, curriculumOverlays, curriculumResources, documents, programs, sections } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { inspectCommonCartridgeZip, extractCommonCartridgeWebLink } from "@/domain/common-cartridge";
+import { inspectCommonCartridgeZip, extractCommonCartridgeWebLink, extractCommonCartridgeStaticLesson } from "@/domain/common-cartridge";
 import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
+import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config } from "@/platform/storage/r2";
 import { EventTypes } from "@/domain/event-types";
 const context=z.object({programId:z.string().uuid()}).strict();
 const incoming=context.extend({
@@ -192,4 +193,143 @@ export const importCommonCartridgeSectionLinks=createServerFn({method:"POST"})
      return {importId:job.id,status:"mapped" as const,imported,
        linkedResources:links.length,sectionId:section.id};
    });
+ });
+
+/** The uploaded HTML is a sealed single-file lesson in private storage. This
+ * two-step flow binds a signed single-object upload to the exact sanitized bytes.
+ * No HTML is published as an external URL or inline script. */
+const htmlImportInput=incoming.extend({
+ sectionId:z.string().uuid(),
+ resourceIdentifier:z.string().trim().min(1).max(256),
+ rightsConfirmed:z.literal(true),
+ licenseCode:z.string().trim().min(2).max(80),
+ attribution:z.string().trim().min(1).max(500),
+}).strict();
+const htmlKeyPattern=/^learning\/cartridge-static\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
+function inspectHtmlInput(data:z.infer<typeof htmlImportInput>){
+ const bytes=Buffer.from(data.base64,"base64");
+ if(!bytes.length||bytes.length>2_000_000||bytes.toString("base64")!==data.base64)
+  throw new Error("Cartridge must be an exact base64 archive of at most 2 MB.");
+ const preview=inspectCommonCartridgeZip(bytes);
+ if(preview.resources.filter(r=>r.identifier===data.resourceIdentifier).length!==1)
+  throw new Error("Cartridge resource identifier is missing or duplicated.");
+ const entry=preview.resources.find(r=>r.identifier===data.resourceIdentifier)!;
+ const lesson=extractCommonCartridgeStaticLesson(bytes,entry);
+ const digest=createHash("sha256").update(bytes).digest("hex");
+ const htmlBytes=Buffer.from(lesson.html,"utf8");
+ const htmlHash=createHash("sha256").update(htmlBytes).digest("hex");
+ return {preview,lesson,digest,htmlBytes,htmlHash};
+}
+async function authorizeHtmlSection(programId:string,sectionId:string){
+ const {actor,program}=await authorize(programId);
+ if(!actor.actorPersonId||!program.siteId||!actor.scope.programIds?.includes(program.id)||
+   !actor.scope.siteIds?.includes(program.siteId))
+  throw new AuthorizationError("same-site institutional publisher");
+ const [section]=await db.select({id:sections.id,courseVersionId:sections.courseTemplateVersionId,active:sections.active})
+   .from(sections).where(and(eq(sections.id,sectionId),eq(sections.programId,program.id),
+     eq(sections.siteId,program.siteId))).limit(1);
+ if(!section?.active)throw new AuthorizationError("active Section of this Program and Site");
+ return {actor,program,section};
+}
+export const beginCommonCartridgeStaticLessonImport=createServerFn({method:"POST"})
+ .validator((input:unknown)=>htmlImportInput.parse(input))
+ .handler(async({data})=>{
+  await authorizeHtmlSection(data.programId,data.sectionId);
+  if(process.env.CAN_R2_CURRICULUM_UPLOADS_ENABLED!=="true")
+   throw new Error("Private curriculum uploads are not enabled.");
+  resolveR2Config();
+  const {lesson,digest,htmlBytes,htmlHash}=inspectHtmlInput(data);
+  const resourceId=randomUUID(),key=`learning/cartridge-static/${resourceId}/${randomUUID()}`;
+  return {resourceId,key,content:htmlBytes.toString("base64"),contentType:"text/html",
+   contentLength:htmlBytes.length,htmlSha256:htmlHash,cartridgeSha256:digest,
+   preview:{title:lesson.title,html:lesson.html},expiresInSeconds:180,
+   uploadUrl:createPrivateUploadUrl({key,keyPattern:htmlKeyPattern,contentType:"text/html",
+     contentLength:htmlBytes.length,minContentLength:1,maxContentLength:128*1024,
+     expiresSeconds:180,preventOverwrite:true})};
+ });
+const finishHtmlInput=htmlImportInput.extend({
+ resourceId:z.string().uuid(),
+ key:z.string().regex(htmlKeyPattern),
+ htmlSha256:z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();
+export const finishCommonCartridgeStaticLessonImport=createServerFn({method:"POST"})
+ .validator((input:unknown)=>finishHtmlInput.parse(input))
+ .handler(async({data})=>{
+  const {actor,program,section}=await authorizeHtmlSection(data.programId,data.sectionId);
+  if(process.env.CAN_R2_CURRICULUM_UPLOADS_ENABLED!=="true")
+   throw new Error("Private curriculum uploads are not enabled.");
+  resolveR2Config();
+  const {preview,lesson,digest,htmlBytes,htmlHash}=inspectHtmlInput(data);
+  if(data.htmlSha256!==htmlHash||!data.key.startsWith(`learning/cartridge-static/${data.resourceId}/`))
+   throw new AuthorizationError("matching sanitized lesson upload");
+  await verifyPrivateObject({key:data.key,keyPattern:htmlKeyPattern,
+   expectedSize:htmlBytes.length,expectedContentType:"text/html"});
+  return db.transaction(async tx=>{
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"cartridge-html:"+program.organizationId+":"+digest}))`);
+   const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,
+    metadata:curriculumImportJobs.metadata}).from(curriculumImportJobs)
+    .where(and(eq(curriculumImportJobs.organizationId,program.organizationId),
+      eq(curriculumImportJobs.format,preview.profile),eq(curriculumImportJobs.sha256,digest)))
+    .for("update").limit(1);
+   if(!job||job.status==="rejected"||job.metadata.programId!==program.id)
+    throw new Error("Validate this exact cartridge in the selected Program before import.");
+   const existing=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
+    metadata:curriculumInteropMappings.metadata,entityId:curriculumInteropMappings.entityId})
+    .from(curriculumInteropMappings).where(and(
+      eq(curriculumInteropMappings.organizationId,program.organizationId),
+      eq(curriculumInteropMappings.format,preview.profile),
+      eq(curriculumInteropMappings.sourceSystem,digest),
+      eq(curriculumInteropMappings.externalIdentifier,data.resourceIdentifier))).limit(1);
+   if(existing.length){
+    if(existing[0]!.metadata.sectionId!==section.id)
+     throw new Error("Source content already belongs to another Section.");
+    return {importId:job.id,status:"mapped" as const,imported:0,resourceId:existing[0]!.entityId};
+   }
+   const [doc]=await tx.insert(documents).values({
+    subjectType:"curriculum_resource",subjectId:data.resourceId,
+    category:"curriculum_supplement",fileName:lesson.sourcePath.split("/").at(-1)!,
+    storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:"text/html",
+    sensitivityTier:"standard",verifiedAt:new Date(),verifiedByPersonId:actor.actorPersonId,
+    uploadedByPersonId:actor.actorPersonId,
+    metadata:{size:htmlBytes.length,sanitizedSha256:htmlHash,sourceHash:digest,
+      htmlProfile:"static_text_only",rightsConfirmed:true,licenseCode:data.licenseCode,
+      attribution:data.attribution},
+   }).returning({id:documents.id});
+   if(!doc)throw new Error("Could not record imported lesson.");
+   await tx.insert(curriculumResources).values({
+    id:data.resourceId,ownerOrganizationId:program.organizationId,
+    kind:"html",title:lesson.title,documentId:doc.id,
+    licenseCode:data.licenseCode,attribution:data.attribution,
+    sourceFormat:preview.profile,sourceIdentifier:data.resourceIdentifier,
+    metadata:{importJobId:job.id,programId:program.id,sectionId:section.id,
+      sourceHash:digest,sanitizedSha256:htmlHash,rightsConfirmed:true,
+      source:"common_cartridge_static_html",aiProcessingAllowed:false},
+   });
+   const [overlay]=await tx.insert(curriculumOverlays).values({
+    organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
+    sectionId:section.id,courseTemplateVersionId:section.courseVersionId,
+    title:lesson.title,kind:"html",resourceId:data.resourceId,
+    createdByPersonId:actor.actorPersonId,
+    metadata:{source:"common_cartridge",importJobId:job.id,
+      externalIdentifier:data.resourceIdentifier,sourceHash:digest,scope:"section"},
+   }).returning({id:curriculumOverlays.id});
+   if(!overlay)throw new Error("Could not place imported lesson in Section.");
+   await tx.insert(curriculumInteropMappings).values({
+    organizationId:program.organizationId,importJobId:job.id,
+    format:preview.profile,sourceSystem:digest,externalIdentifier:data.resourceIdentifier,
+    entityType:"curriculum_resource",entityId:data.resourceId,
+    metadata:{programId:program.id,sectionId:section.id,overlayId:overlay.id,
+     sanitizedSha256:htmlHash},
+   });
+   await tx.update(curriculumImportJobs).set({status:"mapped",updatedAt:new Date(),
+    metadata:{...job.metadata,sectionId:section.id,supportedMapping:"static_html",
+     rightsConfirmed:true}}).where(eq(curriculumImportJobs.id,job.id));
+   await writeAudit(tx,actor,{action:"curriculum.interop.cartridge.static_html.import",
+    entityType:"curriculum_import_job",entityId:job.id,
+    scope:{organizationId:program.organizationId,siteId:program.siteId,
+      programId:program.id,sectionId:section.id},
+    after:{sourceHash:digest,resourceIdentifier:data.resourceIdentifier,
+      resourceId:data.resourceId,htmlSha256:htmlHash,rightsConfirmed:true}});
+   return {importId:job.id,status:"mapped" as const,imported:1,resourceId:data.resourceId};
+  });
  });
