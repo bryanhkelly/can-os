@@ -40,8 +40,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  };
  const router=useRouter();
  const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
- const exitMutation=useWorkspaceMutation({mutationFn:(actionId:string)=>completeRegistrarEnrollmentExit({data:{actionId,confirmInstitutionalReview:true,resolutionNote:exitNoteRef.current}}),invalidateRouter:()=>router.invalidate()});
- const exitNoteRef=useRef("");
+ const exitMutation=useWorkspaceMutation({mutationFn:(input:{actionId:string;resolutionNote:string})=>completeRegistrarEnrollmentExit({data:{actionId:input.actionId,confirmInstitutionalReview:true,resolutionNote:input.resolutionNote}}),invalidateRouter:()=>router.invalidate()});
  const [busy,setBusy]=useState<string|null>(null);
  const actionInFlight=useRef(false);
  async function submitAction(id:string, operation:()=>Promise<unknown>){
@@ -73,8 +72,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   if(!window.confirm("Confirm the registrar verified this exit? Active Program and class memberships end immediately. The student login at this school may also be revoked."))return;
   setError("");setNotice("");
   try{
-   exitNoteRef.current=note.trim();
-   const submission=await exitMutation.submit(id);
+   const submission=await exitMutation.submit({actionId:id,resolutionNote:note.trim()});
    if(submission.status === "ignored")return;
    const result=submission.value;
    setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
