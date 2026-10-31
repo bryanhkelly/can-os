@@ -48,3 +48,30 @@ export const provisionDenominationHQOfficer = createServerFn({ method: "POST" })
     ]);
     return provisionHQOfficer(await getCommandContext(getRequest()), data);
   });
+
+const churchBootstrapSchema = z.object({
+  churchName: z.string().trim().min(2).max(160),
+  churchSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  siteName: z.string().trim().min(2).max(160),
+  siteSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  timezone: z.string().trim().min(3).max(80),
+  contactEmail: z.string().trim().email().toLowerCase(),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  authorityDocumentId: uuid,
+}).strict();
+
+/**
+ * A verified CAN steward prepares a new church and a site-bound launch lead.
+ * The access grant remains inactive until the existing email-link invitation
+ * is accepted; school-opening authority is never issued here.
+ */
+export const prepareChurchOnboarding = createServerFn({ method: "POST" })
+  .validator((value: unknown) => churchBootstrapSchema.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { bootstrapVerifiedChurch }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-onboarding.server"),
+    ]);
+    return bootstrapVerifiedChurch(await getCommandContext(getRequest()), data);
+  });
