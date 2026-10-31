@@ -104,7 +104,7 @@ export async function startFamilyApplication(
 
     // An origin transfer belongs to this parent and existing student; it
     // never authorizes entry into a destination school on its own.
-    let originTransfer: {actionId:string;programId:string;siteId:string|null;destinationSchoolName:string}|null=null;
+    let originTransfer: {actionId:string;programId:string;siteId:string|null;destinationSchoolName:string;metadata:Record<string,unknown>}|null=null;
     if(input.originTransferActionId){
       if(!input.existingStudentProfileId)
         throw new AuthorizationError("Transfer requires a verified existing student");
@@ -112,7 +112,7 @@ export async function startFamilyApplication(
         id:actions.id,type:actions.type,status:actions.status,
         subjectType:actions.subjectType,subjectId:actions.subjectId,
         siteId:actions.siteId,programId:actions.programId,metadata:actions.metadata,
-      }).from(actions).where(eq(actions.id,input.originTransferActionId)).limit(1);
+      }).from(actions).where(eq(actions.id,input.originTransferActionId)).for("update").limit(1);
       if(!origin||origin.type!=="guardian_enrollment_change_request"||
          origin.subjectType!=="student_profile"||
          origin.subjectId!==input.existingStudentProfileId||
@@ -125,7 +125,7 @@ export async function startFamilyApplication(
          origin.status==="cancelled")
         throw new AuthorizationError("Verified origin transfer from this parent and student");
       originTransfer={actionId:origin.id,programId:origin.programId,siteId:origin.siteId,
-        destinationSchoolName:origin.metadata.destinationSchoolName};
+        destinationSchoolName:origin.metadata.destinationSchoolName,metadata:origin.metadata};
     }
     const [existing] = await tx
       .select({
