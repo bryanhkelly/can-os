@@ -1,3 +1,4 @@
+import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
@@ -38,7 +39,14 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   void router.navigate({href:"/operations"+(query.size?"?"+query.toString():"")});
  };
  const router=useRouter();
+ const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation()});
  const [busy,setBusy]=useState<string|null>(null);
+ async function submitAction(id:string, operation:()=>Promise<unknown>){
+  if(mutation.isPending)return false;
+  setBusy(id);
+  try{await mutation.submit(operation);return true;}
+  finally{setBusy(null);}
+ }
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
@@ -47,47 +55,44 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   <QueryState error={authError||"Operations data is unavailable. No operational changes were made."}/>
  </WorkspaceShell>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
-  setBusy(id);setError("");
-  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim()){setBusy(null);return;}await updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}});await router.invalidate();}
+  setError("");
+  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}}));await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
-  finally{setBusy(null);}
  }
 
  async function completeEnrollmentExit(id:string,kind:"withdrawal"|"transfer"){
   const note=window.prompt("Record the institutional "+kind+" decision and academic records handoff (at least 20 characters):");
   if(!note?.trim()||note.trim().length<20)return;
   if(!window.confirm("Confirm the registrar verified this exit? Active Program and class memberships end immediately. The student login at this school may also be revoked."))return;
-  setBusy(id);setError("");setNotice("");
+  setError("");setNotice("");
   try{
-   const result=await completeRegistrarEnrollmentExit({data:{
+   const result=await mutation.submit(()=>completeRegistrarEnrollmentExit({data:{
      actionId:id,confirmInstitutionalReview:true,resolutionNote:note.trim(),
-   }});
+   }}));
+   if(!result)return;
    setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
    try{await router.invalidate();}
    catch{setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");}
   }catch(e){setError(e instanceof Error?e.message:"Unable to complete institutional enrollment change");}
-  finally{setBusy(null);}
  }
 
  async function assignAction(id:string,ownerPersonId:string|null,priority:"normal"|"high"|"urgent"){
-  setBusy(id);setError("");
-  try{await assignOperationsAction({data:{id,ownerPersonId,priority}});await router.invalidate();}
+  setError("");
+  try{await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}}));await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to assign action");}
-  finally{setBusy(null);}
  }
 
  async function changeDeadline(id:string,value:string){
    const reason=window.prompt("Reason for the deadline change (required)");
    if(!reason?.trim()||reason.trim().length<5)return;
-   setBusy(id);setError("");
+   setError("");
    try{
-     await setOperationsActionDeadline({data:{
+     await submitAction(id,()=>setOperationsActionDeadline({data:{
        id,dueAt:value?new Date(value).toISOString():null,reason:reason.trim(),
-     }});
+     }}));
      setDueDrafts(prev=>{const next={...prev};delete next[id];return next;});
      await router.invalidate();
    }catch(e){setError(e instanceof Error?e.message:"Unable to save deadline");}
-   finally{setBusy(null);}
  }
  function localDue(iso:string|null){
    if(!iso)return "";
