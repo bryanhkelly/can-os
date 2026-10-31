@@ -50,12 +50,13 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      const [origin]=await db.select({
        id:actions.id,type:actions.type,status:actions.status,
        subjectType:actions.subjectType,subjectId:actions.subjectId,
-       programId:actions.programId,metadata:actions.metadata,
+       programId:actions.programId,siteId:actions.siteId,metadata:actions.metadata,
      }).from(actions).where(eq(actions.id,app.metadata.originTransferActionId)).limit(1);
      const valid=!!origin&&origin.type==="guardian_enrollment_change_request"&&
        origin.subjectType==="student_profile"&&
        origin.subjectId===app.studentProfileId&&
        origin.programId!==app.programId&&
+       !!origin.siteId&&!!app.siteId&&origin.siteId!==app.siteId&&
        origin.metadata.kind==="transfer"&&
        origin.metadata.requestedByGuardianPersonId===app.submittedByPersonId&&
        origin.metadata.destinationApplicationId===data.applicationId&&
