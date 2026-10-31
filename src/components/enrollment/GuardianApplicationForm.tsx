@@ -41,6 +41,8 @@ export interface GuardianApplicationTransferRequest {
   originProgramId:string|null;
   originSchoolName:string;
   destinationSchoolName:string;
+  destinationFamilyStartRequestId:string|null;
+  destinationFamilyStartProgramId:string|null;
   originExited:boolean;
 }
 
@@ -73,14 +75,26 @@ export function GuardianApplicationForm({ programs, households, students = [], t
     requestedProgramId, familyStartRequestId, programId, schoolYearId,
   });
   const selectedProgram = selection.program;
-  const [studentOptionId, setStudentOptionId] = useState("");
-  const [studentProfileId, setStudentProfileId] = useState("");
-  const [originTransferActionId,setOriginTransferActionId] = useState("");
+  // A redeemed transfer email binds the real receiving Program and original
+  // parent-owned transfer Action. Preselect the SAME verified student Person;
+  // never create a duplicate child to continue this journey.
+  const linkedTransfer = familyStartRequestId && requestedProgramId
+    ? transferRequests.find(transfer =>
+        transfer.destinationFamilyStartRequestId===familyStartRequestId &&
+        transfer.destinationFamilyStartProgramId===requestedProgramId)
+    : undefined;
+  const linkedStudent = linkedTransfer
+    ? students.find(student => student.studentProfileId===linkedTransfer.studentProfileId)
+    : undefined;
+  const [studentOptionId, setStudentOptionId] = useState(
+    linkedStudent ? linkedStudent.studentProfileId+":"+linkedStudent.householdId : "");
+  const [studentProfileId, setStudentProfileId] = useState(linkedStudent?.studentProfileId??"");
+  const [originTransferActionId,setOriginTransferActionId] = useState(linkedStudent?linkedTransfer?.id??"":"");
   const [confirmedDestination,setConfirmedDestination] = useState(false);
-  const [householdId, setHouseholdId] = useState(households[0]?.id ?? "");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [grade, setGrade] = useState("");
+  const [householdId, setHouseholdId] = useState(linkedStudent?.householdId??households[0]?.id??"");
+  const [firstName, setFirstName] = useState(linkedStudent?.studentFirstName??"");
+  const [lastName, setLastName] = useState(linkedStudent?.studentLastName??"");
+  const [grade, setGrade] = useState(linkedStudent?.gradeLevel??"");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
