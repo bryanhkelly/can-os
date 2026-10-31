@@ -447,8 +447,10 @@ export const createAssessment = createServerFn({ method: "POST" })
 export const manageAssessment = createServerFn({method:"POST"})
  .validator((input:unknown)=>z.object({
   assessmentId:z.string().uuid(),
-  action:z.enum(["publish","close","reopen","reschedule"]),
-  dueAt:z.string().datetime({offset:true}).optional()
+  action:z.enum(["publish","close","reopen","reschedule","schedule"]),
+  dueAt:z.string().datetime({offset:true}).optional(),
+  availableAt:z.string().datetime({offset:true}).nullable().optional(),
+  closesAt:z.string().datetime({offset:true}).nullable().optional(),
  }).parse(input))
  .handler(async({data})=>{
   const context=await teacherActor();
@@ -473,6 +475,7 @@ export const manageAssessment = createServerFn({method:"POST"})
    const transitions:Record<typeof data.action,readonly string[]>={
     publish:["draft"],close:["published"],reopen:["closed"],
     reschedule:["published","closed"],
+    schedule:["draft","published"],
    };
    if(!transitions[data.action].includes(assessment.status))
     throw new Error("This assessment cannot be "+data.action+"d from its current status");
@@ -482,15 +485,21 @@ export const manageAssessment = createServerFn({method:"POST"})
     throw new Error("A future due date is required");
    const status=data.action==="publish"||data.action==="reopen"?"published":
     data.action==="close"?"closed":assessment.status;
-   const availableAt=data.action==="publish" ? assessment.availableAt??now :
+   const availableAt=data.action==="schedule" && data.availableAt!==undefined
+    ?data.availableAt===null?null:new Date(data.availableAt)
+    :data.action==="publish" ? assessment.availableAt??now :
     (data.action==="reopen"&&(!assessment.availableAt||assessment.availableAt>now))
      ?now:assessment.availableAt;
-   const closesAt=data.action==="reopen"?null:assessment.closesAt;
+   const closesAt=data.action==="schedule" && data.closesAt!==undefined
+    ?data.closesAt===null?null:new Date(data.closesAt)
+    :data.action==="reopen"?null:assessment.closesAt;
+   if(data.action==="schedule"||data.action==="reschedule")
+    assertAssessmentSchedule({availableAt,dueAt,closesAt});
    const [updated]=await tx.update(s.assessments).set({
     status,
     ...(data.action==="publish"||data.action==="reschedule"||(data.action==="reopen"&&data.dueAt)?{dueAt}:{}),
     ...(data.action==="publish"?{availableAt}:{}),
-    ...(data.action==="reopen"?{availableAt,closesAt}:{}),
+    ...(data.action==="reopen"||data.action==="schedule"?{availableAt,closesAt}:{}),
     updatedAt:now
    }).where(and(eq(s.assessments.id,assessment.id),eq(s.assessments.status,assessment.status)))
     .returning({id:s.assessments.id});

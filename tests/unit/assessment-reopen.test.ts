@@ -40,6 +40,23 @@ const reopen=()=> (manageAssessment as unknown as (arg:unknown)=>Promise<unknown
   data:{assessmentId:"assessment",action:"reopen"},
 });
 describe("reopening student work without rewriting its due date",()=>{
+  it("updates release and closure without moving the due date or publishing a draft",async()=>{
+    state.record.status="draft";
+    state.record.dueAt=new Date("2026-11-02");
+    await (manageAssessment as unknown as (arg:unknown)=>Promise<unknown>)({data:{
+      assessmentId:"assessment",action:"schedule",availableAt:"2026-11-01T00:00:00Z",closesAt:"2026-11-03T00:00:00Z",
+    }});
+    expect(state.values).toMatchObject({status:"draft",availableAt:new Date("2026-11-01"),closesAt:new Date("2026-11-03")});
+    expect(state.values).not.toHaveProperty("dueAt");
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({action:"assessment.schedule"}));
+  });
+  it("rejects a deadline moved beyond closure before writing",async()=>{
+    state.record.status="published";
+    await expect((manageAssessment as unknown as (arg:unknown)=>Promise<unknown>)({data:{
+      assessmentId:"assessment",action:"reschedule",dueAt:"2026-11-02T00:00:00Z",
+    }})).rejects.toThrow("Close must be on or after");
+    expect(state.update).not.toHaveBeenCalled();
+  });
   it("preserves an overdue deadline, clears closure and audits the original dates",async()=>{
     await expect(reopen()).resolves.toMatchObject({status:"published"});
     expect(state.values).not.toHaveProperty("dueAt");
