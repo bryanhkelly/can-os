@@ -151,7 +151,7 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
      .where(and(inArray(sections.id,sectionIds),eq(sections.programId,program.id),
        eq(sections.siteId,program.siteId),eq(schoolYears.organizationId,program.organizationId),
        eq(schoolYears.siteId,program.siteId)));
-   if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active))
+   if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active||s.schoolYearStatus==="archived"))
      throw new AuthorizationError("active Section owned by this Program and Site");
    const byCanonicalId=new Map(canonical.map(s=>[s.id,s]));
    for(const row of classes.rows){
