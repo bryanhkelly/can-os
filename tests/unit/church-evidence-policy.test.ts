@@ -41,6 +41,11 @@ describe("church authority evidence policy", () => {
     expect(validateChurchEvidenceReference("vault:church-a/authority", "signed_authority")).toBe("vault:church-a/authority");
     expect(validateChurchEvidenceReference("https://records.example.org/authority/123", "denominational_confirmation")).toContain("https://");
   });
+  it("rejects untraceable free-text and unsupported reference schemes", () => {
+    for (const ref of ["meeting notes from yesterday", "ftp://example.org/evidence", "s3://unapproved-bucket/evidence"]) {
+      expect(() => validateChurchEvidenceReference(ref, "signed_authority")).toThrow();
+    }
+  });
   it("rejects unsupported verification methods", () => {
     expect(() => validateChurchEvidenceReference("vault:church-a/authority", "applicant_self_attestation")).toThrow();
   });
