@@ -76,9 +76,9 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .sort((x,y)=>String(x.yearStarts).localeCompare(String(y.yearStarts)));
   if(!institutional.length) throw new AuthorizationError("Institutional entry cohort not established");
   const documented=institutional.map(row=>row.metadata?.graduationEntryCohort).filter(value=>value!==undefined && value!==null);
-  if(documented.some(v=>typeof v!=="string") || new Set(documented).size>1)
+  if(documented.some(v=>typeof v!=="string" || !/^[0-9]{4}$/.test(v)) || new Set(documented).size>1)
     throw new AuthorizationError("Conflicting documented graduation cohort overrides");
-  const entryCohort=(documented[0] as string|undefined) ?? String(institutional[0]!.yearStarts).slice(0,4);
+  // The earliest issuing-institution program year is the entry cohort.\n  // A registrar-recorded override is authoritative only when consistent across records.\n  const entryCohort=(documented[0] as string|undefined) ?? String(institutional[0]!.yearStarts).slice(0,4);
   const policies=await db.select().from(s.graduationRequirementSets)
     .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
   let applicable;
