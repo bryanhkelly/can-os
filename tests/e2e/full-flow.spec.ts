@@ -660,30 +660,42 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         .getByLabel("Your question")
         .fill("What should our student review before the next checkpoint?");
       await guardian.page.getByRole("button", { name: "Request school follow-up" }).click();
-      await expect
-        .poll(async () =>
-          rowCount(
-            sql,
-            "select id from notifications where type ilike '%follow%' and resource_id = $1",
-            [fixture.assessmentId!],
-          ),
-        )
-        .toBeGreaterThanOrEqual(1);
+      // Follow-up notifications refer to their Action, not the assessment.
+      const submission = await singleRow(sql,
+        "select id from submissions where assessment_id = $1 and student_profile_id = $2",
+        [fixture.assessmentId!, fixture.studentProfileId!],
+      );
+      const followUp = await singleRow(sql,
+        `select id from actions
+         where type = 'guardian_grade_follow_up' and subject_type = 'student_profile'
+           and subject_id = $1 and section_id = $2
+           and metadata->>'requestedByGuardianPersonId' = $3
+           and metadata->>'submissionId' = $4`,
+        [fixture.studentProfileId!, fixture.sectionId!, fixture.guardian.personId, submission.id],
+      );
+      await expect.poll(() => rowCount(sql,
+        `select id from notifications where type = 'guardian_grade_follow_up_requested'
+           and resource_type = 'action' and resource_id = $1`,
+        [followUp.id],
+      )).toBeGreaterThanOrEqual(1);
 
+      await goto(operator.page,
+        `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}&action=${followUp.id}`,
+      );
+      await expect(operator.page.getByText(/Guardian requests grade follow-up/)).toBeVisible();
       operator.page.once("dialog", dialog => {
         void dialog.accept("Followed up with the family and shared review guidance.");
       });
-      await goto(operator.page, `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}`);
-      await operator.page.getByRole("button", { name: "Resolve" }).first().click();
-      await expect
-        .poll(async () =>
-          rowCount(
-            sql,
-            "select id from notifications where recipient_person_id = $1 and type ilike '%follow%'",
-            [fixture.guardian.personId],
-          ),
-        )
-        .toBeGreaterThanOrEqual(1);
+      await operator.page.getByRole("button", { name: "Resolve" }).click();
+      await expect.poll(async () =>
+        (await singleRow(sql, "select status from actions where id = $1", [followUp.id])).status,
+      ).toBe("resolved");
+      await expect.poll(() => rowCount(sql,
+        `select id from notifications
+         where recipient_person_id = $1 and type = 'guardian_grade_follow_up_resolved'
+           and resource_type = 'action' and resource_id = $2`,
+        [fixture.guardian.personId, followUp.id],
+      )).toBeGreaterThanOrEqual(1);
       await guardian.page.reload();
       await waitForAppHydration(guardian.page);
       await expect(guardian.page.getByText(/Followed up with the family/)).toBeVisible();
