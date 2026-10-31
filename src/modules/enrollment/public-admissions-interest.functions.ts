@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, leftJoin } from "drizzle-orm";
 import { db } from "@/db/client";
-import { programs, publicAdmissionsInterests } from "@/db/schema";
+import { applications, programs, publicAdmissionsInterests, publicFamilyStartRequests } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { requestPublicFamilyStart, resolvePublishedFamilyStartDestination } from "./public-family-start.server";
+import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
+import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -40,23 +41,45 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       email: publicAdmissionsInterests.contactEmail,
       message: publicAdmissionsInterests.message,
       status: publicAdmissionsInterests.status,
+      source: publicAdmissionsInterests.source,
+      invitationBatchId: publicAdmissionsInterests.invitationBatchId,
+      invitationRecipientKey: publicAdmissionsInterests.invitationRecipientKey,
+      consentAt: publicAdmissionsInterests.contactConsentAt,
+      familyStartRequestId: publicAdmissionsInterests.familyStartRequestId,
+      emailVerifiedAt: publicFamilyStartRequests.consumedAt,
+      applicationStage: applications.stage,
+      applicationSubmittedAt: applications.submittedAt,
       applicationId: publicAdmissionsInterests.applicationId,
       convertedAt: publicAdmissionsInterests.convertedAt,
       createdAt: publicAdmissionsInterests.createdAt,
       contactedAt: publicAdmissionsInterests.contactedAt,
     }).from(publicAdmissionsInterests)
       .innerJoin(programs, eq(programs.id, publicAdmissionsInterests.programId))
+      .leftJoin(publicFamilyStartRequests,
+        eq(publicFamilyStartRequests.id, publicAdmissionsInterests.familyStartRequestId))
+      .leftJoin(applications, eq(applications.id, publicAdmissionsInterests.applicationId))
       .where(and(
         inArray(publicAdmissionsInterests.programId, actor.scope.programIds),
         inArray(programs.organizationId, actor.scope.organizationIds),
         inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
         eq(publicAdmissionsInterests.siteId, programs.siteId),
       )).orderBy(desc(publicAdmissionsInterests.createdAt)).limit(200);
+    // Admissions authority can change without affecting historical interest.
+    // Resolve the canonical operating gate, not just Program status.
+    const authorized = new Map<string, boolean>();
+    await Promise.all([...new Set(rows.map(row => row.programId))].map(async programId => {
+      try { await resolvePrivateFamilyStartDestination(db, programId); authorized.set(programId, true); }
+      catch { authorized.set(programId, false); }
+    }));
     return rows.map(row => ({
       ...row,
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
+      consentAt: row.consentAt?.toISOString() ?? null,
+      emailVerifiedAt: row.emailVerifiedAt?.toISOString() ?? null,
+      applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
+      admissionsAuthorized: authorized.get(row.programId) === true,
     }));
   });
 
@@ -87,14 +110,15 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
     if (!interest) throw new AuthorizationError("admissions interest scope");
     if (!["new","contacted"].includes(interest.status) || interest.applicationId)
       throw new Error("This inquiry is no longer available for an application invitation");
-    const destination = await resolvePublishedFamilyStartDestination(db,interest.programId);
+    if (!interest.consentAt)
+      throw new Error("The adult has not requested follow-up; an imported address is not consent.");
+    if (interest.familyStartRequestId)
+      return { requestId: interest.familyStartRequestId, created: false };
+    const destination = await resolvePrivateFamilyStartDestination(db,interest.programId);
     if (destination.siteId!==interest.siteId || destination.organizationId!==interest.organizationId)
-      throw new AuthorizationError("published family application destination");
-    const outcome = await requestPublicFamilyStart(destination.slug,{
-      requestId:crypto.randomUUID(),programId:interest.programId,
-      firstName:interest.firstName,lastName:interest.lastName,email:interest.email,
-      contactConsent:"yes",website:"",
-    },undefined,{idempotencyKey:`public-interest:${interest.id}`});
+      throw new AuthorizationError("private family application destination");
+    const outcome = await requestConsentedInterestFamilyStart(interest.id,
+      sendAccessLinkViaResend,{idempotencyKey:`consented-interest:${interest.id}`});
     await db.transaction(async tx => {
       const [current] = await tx.select({id:publicAdmissionsInterests.id,
         status:publicAdmissionsInterests.status,contactedAt:publicAdmissionsInterests.contactedAt})
@@ -105,6 +129,7 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
       if (!current) throw new Error("Inquiry changed while the family invitation was sent");
       const now = new Date();
       await tx.update(publicAdmissionsInterests).set({status:"contacted",
+        familyStartRequestId:outcome.requestId,
         contactedAt:current.contactedAt??now,updatedAt:now})
         .where(eq(publicAdmissionsInterests.id,interest.id));
       await writeAudit(tx,actor,{action:"admissions.public_interest.family_start_invite",
