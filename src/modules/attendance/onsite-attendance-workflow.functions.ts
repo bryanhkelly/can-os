@@ -15,6 +15,7 @@ import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegati
 import { activeFacilitatorSectionIds, requireCurrentSectionFacilitator } from "@/modules/operations/site-section-facilitators.server";
 import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
