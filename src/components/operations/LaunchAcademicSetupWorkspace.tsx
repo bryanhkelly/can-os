@@ -1,3 +1,4 @@
+import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSectionRow } from "@/components/operations/LaunchSectionRow";
 import {useState} from "react";
 import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
@@ -29,12 +30,16 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
  const [policyConfirmed,setPolicyConfirmed]=useState(false);
  const [reviewTeacherId,setReviewTeacherId]=useState("");
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation()});
+ const busy=mutation.isPending;
  async function run(operation:()=>Promise<unknown>,message:string){
-  setBusy(true);setError("");setNotice("");
-  try{await operation();await router.invalidate();setNotice(message);}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
-  finally{setBusy(false);}
+  setError("");setNotice("");
+  try{
+   const result=await mutation.submit(operation);
+   if(result===undefined && mutation.isPending)return;
+   await router.invalidate();setNotice(message);
+  }catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
  }
  return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
   subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
