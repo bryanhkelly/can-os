@@ -54,3 +54,8 @@ export function canRedeemTransferCredential(input:LiveTransferAuthority):boolean
  return Object.values(input).every(value=>value===true);
 }
 export const EXTERNAL_SCHOOL_TO_SCHOOL_RELEASE_SUPPORTED=false as const;
+
+/** Conservative issuance-order check; authoritative credit/policy freshness is Agent A-owned. */
+export function isLatestTranscriptIssuance(requestedId:string,latestId:string|null):boolean {
+ return !!latestId&&requestedId===latestId;
+}
