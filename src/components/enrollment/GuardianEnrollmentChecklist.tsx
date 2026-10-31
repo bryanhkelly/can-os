@@ -22,7 +22,8 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
     setData(null); setError("");
     void Promise.all([
       getGuardianEnrollmentChecklist({ data: { applicationId } }),
-      getEnrollmentDocumentUploadAvailability(),
+      // A storage outage must not block consent forms or the enrollment checklist.
+      getEnrollmentDocumentUploadAvailability().catch(() => ({ live: false, demo: false })),
     ]).then(([checklist, availability]) => {
       if (current) setData({ checklist, availability });
     }).catch(cause => {
