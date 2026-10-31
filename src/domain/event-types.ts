@@ -102,6 +102,7 @@ export const EventTypes = {
   FieldTripApproved: "FieldTripApproved",
   FieldTripStudentInvited: "FieldTripStudentInvited",
   FieldTripPermissionSigned: "FieldTripPermissionSigned",
+  FieldTripPermissionDeclined: "FieldTripPermissionDeclined",
   FieldTripAttendanceRecorded: "FieldTripAttendanceRecorded",
   FieldTripChaperoneAssigned: "FieldTripChaperoneAssigned",
   FieldTripIncidentLinked: "FieldTripIncidentLinked",
