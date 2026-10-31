@@ -25,6 +25,11 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
   familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
 }) {
   return <>
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5">
+          <h2 className="font-serif text-xl">Recorded launch start</h2>
+          <p className="mt-2 text-sm">Program creation: <time dateTime={currentLaunch.createdAt}>{new Date(currentLaunch.createdAt).toLocaleString()}</time>.</p>
+          <p className="mt-2 text-xs text-muted-foreground">This timestamp is from the saved Program, not a browser stopwatch. No completion duration is claimed until a separately persisted completion or opening event is available. CAN review, hosting and third-party response time cannot be counted as school-controlled setup time without independently timestamped events.</p>
+        </section>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section aria-label="Persisted launch journey" className="mt-5 rounded-xl border bg-card p-5">
           <h2 className="font-serif text-2xl">Your school's recorded launch path</h2>
           <p className="mt-2 text-sm text-muted-foreground">This view reads the saved Program, launch requirements and invitation records. Pending review is never treated as approval. Academic year, Section, website publication and safeguarding status must be verified in their authoritative workspaces.</p>
