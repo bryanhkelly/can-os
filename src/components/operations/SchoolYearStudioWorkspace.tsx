@@ -27,12 +27,15 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
  const [key,setKey]=useState(suggestedYear.key);
  const [start,setStart]=useState(suggestedYear.startsOn),[end,setEnd]=useState(suggestedYear.endsOn);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
- const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation()});
- const busy=mutation.isPending;
+ const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
+ const busy=mutation.isSubmitting;
  async function run(operation:()=>Promise<unknown>){
   if(busy)return;
   setError("");setNotice("");
-  try{await mutation.submit(operation);await router.invalidate();setNotice("Saved to school records.");}
+  try{const submission=await mutation.submit(operation);
+   if(submission.status === "ignored")return;
+   if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
+   setNotice("Saved to school records.");}
   catch(e){setError(e instanceof Error?e.message:"Unable to save");}
  }
  const scopedPrograms=data.programs.filter(p=>p.siteId===siteId);
