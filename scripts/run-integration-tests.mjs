@@ -28,6 +28,17 @@ if (process.argv.includes("--preflight")) {
   process.exit(0);
 }
 
+// Admissions mutations must additionally verify the database's Neon-attested
+// project and branch. An arbitrary distinct URL is not sufficient evidence
+// that the target is the approved isolated CI database.
+if (mode === "admissions-offers") {
+  const branchCheck = spawnSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
+    stdio: "inherit", env: process.env,
+  });
+  if (branchCheck.error) throw branchCheck.error;
+  if (branchCheck.status !== 0) fail("Admissions Neon branch identity check failed.");
+}
+
 // Flow A and Journey C share the existing dedicated, non-production FullFlow
 // Neon database. Both must verify the actual branch identity before writing;
 // a caller-supplied TEST_DATABASE_URL label is never sufficient.
