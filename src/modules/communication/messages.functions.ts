@@ -6,7 +6,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,asc,desc,eq,inArray } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -73,6 +73,27 @@ async function listAllowedThreadContacts(
   };
 
   if (role === "guardian") {
+    // Application ownership gives the verified parent a school admissions
+    // contact even before a student has an active class or guardian record.
+    const admissionsContacts = await db.select({
+      personId:s.accountPersonGrants.personId, schoolName:s.programs.name,
+    }).from(s.applications)
+      .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+      .innerJoin(s.accountPersonGrants,and(
+        eq(s.accountPersonGrants.organizationId,s.programs.organizationId),
+        or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,s.programs.siteId)),
+        eq(s.accountPersonGrants.role,"registrar"),eq(s.accountPersonGrants.active,true),
+        eq(s.accountPersonGrants.isSynthetic,false),
+      ))
+      .innerJoin(s.accessAccounts,and(eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
+        eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt)))
+      .innerJoin(s.people,and(eq(s.people.id,s.accountPersonGrants.personId),eq(s.people.active,true)))
+      .where(and(eq(s.applications.submittedByPersonId,actorPersonId),
+        inArray(s.programs.siteId,siteIds),inArray(s.programs.id,programIds)))
+      .limit(100);
+    for(const contact of admissionsContacts)
+      add(contact.personId,"admissions for "+contact.schoolName);
+
     const studentRows = await db
       .select({ studentPersonId: s.guardianRelationships.studentPersonId })
       .from(s.guardianRelationships)
