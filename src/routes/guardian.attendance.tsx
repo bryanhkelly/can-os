@@ -158,6 +158,7 @@ function GuardianAttendancePage() {
                 <p className="font-semibold">The school rejected this excuse.</p>
                 {absence.excuse.reviewNote && <p className="mt-2 whitespace-pre-wrap">School note: {absence.excuse.reviewNote}</p>}
                 <p className="mt-2 text-muted-foreground">Review the reason with your school if this attendance mark still needs to be corrected. This reviewed excuse cannot be submitted again from this page.</p>
+                <Link to="/messages" className="mt-3 inline-block font-semibold underline">Contact the school in Family inbox</Link>
               </div>}
               {absence.excuse.status === "submitted" && <div className="mt-2">
                 <p className="text-sm text-muted-foreground">Waiting for the school to review.</p>
