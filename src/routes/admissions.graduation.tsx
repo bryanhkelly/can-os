@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { approveGraduationRequirements, auditIssuedTranscript, decideGraduation, issueDiploma, listGraduationRequirements } from "@/modules/learning/graduation.functions";
+import { approveGraduationRequirements, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, listGraduationRequirements } from "@/modules/learning/graduation.functions";
 
 export const Route=createFileRoute("/admissions/graduation")({component:GraduationCloseout});
 
 function GraduationCloseout(){
+ const [search,setSearch]=useState("");
+ const [candidates,setCandidates]=useState<Awaited<ReturnType<typeof listGraduationCandidates>>>([]);
  const [issuerId,setIssuerId]=useState("");
  const [academicYear,setAcademicYear]=useState("");
  const [version,setVersion]=useState("1");
@@ -42,8 +44,12 @@ function GraduationCloseout(){
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">2. Credit audit and graduation decision</h2>
     <p className="text-sm">First <Link to="/admissions/transcripts" search={{query:""}} className="underline">issue the student's official transcript</Link>, then enter the immutable issuance ID.</p>
-    {field("Transcript issuance ID",transcriptId,setTranscriptId)}
-    {field("Approved requirements ID",requirementSetId,setRequirementSetId)}
+    <label className="block text-sm">Find student by first name<input className="mt-1 block w-full rounded border bg-background p-2" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+    <button disabled={busy||search.trim().length<2} className="rounded border px-3 py-2" onClick={()=>void perform(async()=>setCandidates(await listGraduationCandidates({data:{query:search}})))}>Find issued transcripts</button>
+    {candidates.map(candidate=><button key={candidate.transcriptId} className="block w-full rounded border p-2 text-left text-sm" onClick={()=>{setTranscriptId(candidate.transcriptId);setIssuerId(candidate.issuerId);setRequirementSetId("");setSets([]);setAudit(null);void perform(async()=>setSets(await listGraduationRequirements({data:{issuerId:candidate.issuerId}})))}}>{candidate.firstName} {candidate.lastName} · Issued {new Date(candidate.issuedAt).toLocaleDateString()}</button>)}
+    {transcriptId&&<p className="text-sm">Selected issued transcript. Choose its applicable approved policy below.</p>}
+    {sets.length>0&&<label className="block text-sm">Approved requirements<select className="mt-1 block w-full rounded border bg-background p-2" value={requirementSetId} onChange={e=>{setRequirementSetId(e.target.value);setAudit(null)}}><option value="">Select requirements</option>{sets.map(set=><option key={set.id} value={set.id}>{set.academicYear} · version {set.version}</option>)}</select></label>}
+
     <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setAudit(await auditIssuedTranscript({data:{transcriptId,requirementSetId}}))})}>Run credit audit</button>
     {audit&&<div className="space-y-2 rounded-lg border p-3 text-sm"><p>Audit: <strong>{audit.audit.status}</strong> · Earned credits: {audit.audit.totalEarned}</p>
       {audit.audit.deficiencies.map(row=><p key={row.subject}>{row.subject}: {row.earned} of {row.required} ({row.missing} missing)</p>)}
@@ -56,8 +62,8 @@ function GraduationCloseout(){
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">3. Diploma issuance</h2>
-    {field("Approved graduation decision ID",decisionId,setDecisionId)}
-    <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setMessage("Diploma credential recorded: "+result.diplomaId)})}>Issue diploma</button>
+    <p className="text-sm">{decisionId?"Graduation decision recorded. Diploma issuance is available below.":"Record an eligible graduation approval above before issuing a diploma."}</p>
+    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setMessage("Diploma credential recorded: "+result.diplomaId)})}>Issue diploma</button>
    </section>
   </div>
  </WorkspaceShell>;
