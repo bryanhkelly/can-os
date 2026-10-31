@@ -11,6 +11,8 @@ const blueprint=read("yearlong-blueprint.json");
 const week1=read("unit01-week01.json");
 const week2=Array.from({length:5},(_,i)=>read(`week02-day0${i+1}-draft.json`));
 const guides=[read("unit01-teacher-guide.json"),...Array.from({length:5},(_,i)=>read(`week02-day0${i+1}-teacher-guide.json`))];
+const week2Assessments=read("week02-assessments-draft.json");
+const week2Keys=read("week02-assessment-teacher-key.json");
 const lessons=[...week1.lessons,...week2.flatMap(w=>w.lessons)];
 const ids=new Set();
 const required=["launch","guided_practice","independent_practice"];
@@ -34,11 +36,19 @@ for(const id of ids)if(!answers.has(id))fail(`Missing teacher answer key: ${id}`
 const answerQuestions=guides.flatMap(g=>g.units?.flatMap(u=>u.lessons?.flatMap(l=>l.workedAnswers||[])||[])||[]);
 if(answerQuestions.some(q=>!q.prompt?.trim()||!q.answer?.trim()||prohibited.test(q.answer)))fail("Incomplete teacher answer");
 if(week1.assessments?.length!==2||week1.assessments.some(a=>!a.instructions?.trim()||!a.rubricCriteria?.length))fail("Week 1 assessment missing");
+if(week2Assessments.readiness!=="teacher_review_required"||week2Assessments.assessments?.length!==2)fail("Week 2 must have two draft assessments");
+if(week2Keys.visibility!=="teacher_only")fail("Assessment answers must be teacher-only");
+const keyedAssessments=new Map(week2Keys.units.flatMap(u=>(u.assessments||[]).map(a=>[a.assessmentKey,a.workedAnswers])));
+for(const a of week2Assessments.assessments){
+ if(!a.key||!a.instructions?.trim()||!a.rubricCriteria?.length||!keyedAssessments.get(a.key)?.length)fail(`Missing assessment or protected key: ${a.key}`);
+ if(a.rubricCriteria.reduce((sum,r)=>sum+r.maxPoints,0)!==a.pointsPossible)fail(`Rubric points mismatch: ${a.key}`);
+ if(keyedAssessments.get(a.key).some(q=>!q.prompt?.trim()||!q.answer?.trim()))fail(`Incomplete assessment key: ${a.key}`);
+}
 const metadata=read("release-metadata.json");
 if(metadata.license!=="LicenseRef-CAN-Original"||metadata.sourceType!=="original")fail("Source/license metadata missing or unapproved");
 if(metadata.releaseStatus!=="review_required"||metadata.creditStatus!=="not_credit_ready")fail("Do not assert publication or credit readiness");
 if(metadata.externalSources?.length)fail("External source licensing must be reviewed before packaging");
-const summary={courseCode:"CAN-ALG1",targetWeeks:36,authoredWeeks:2,authoredLessons:lessons.length,plannedLessons:180,unwrittenLessons:170,reviewStatus:"teacher_review_required",creditStatus:"not_credit_ready",publisherAdoption:"not_authorized",assessmentGap:"Week 2 checkpoint not yet a separately authored/published assessment; subsequent weeks not authored"};
+const summary={courseCode:"CAN-ALG1",targetWeeks:36,authoredWeeks:2,authoredLessons:lessons.length,plannedLessons:180,unwrittenLessons:170,reviewStatus:"teacher_review_required",creditStatus:"not_credit_ready",publisherAdoption:"not_authorized",assessmentGap:"Week 2 standalone assessments drafted but not teacher-approved; Weeks 3–36 assessments missing"};
 if(process.argv.includes("--report"))console.log(JSON.stringify(summary,null,2));
 else if(process.argv.includes("--write")){
  const output=process.argv[process.argv.indexOf("--write")+1];
