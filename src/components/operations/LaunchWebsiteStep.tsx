@@ -29,7 +29,10 @@ export function LaunchWebsitePreview({data}:{data:Website}){
   <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"} · {data.hostingConfigured?"Hosting configured; public availability requires separate verification":"Public hosting disabled"}</p>
   <p role="status" className="mt-2 rounded border p-3 text-sm">Public website: <strong>{data.publicAvailability==="live"?"Live — HTTPS verified":data.publicAvailability==="not_published"?"Not published":data.publicAvailability==="hosting_disabled"?"Hosting not configured":"Published but not reachable"}</strong>{data.checkedAt?` · Checked ${new Date(data.checkedAt).toLocaleString()}`:""}.</p>
   {data.host&&data.publicAvailability==="live"&&<a href={`https://${data.host}/`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline">Open verified public website</a>}
-  {data.publicAvailability==="unreachable"&&<p role="alert" className="mt-2 text-sm">Check DNS routing, TLS certificate and hosting deployment, then refresh verification. Publishing alone does not make the site live.</p>}
+  {data.publicAvailability!=="live"&&<p role="status" className="mt-2 rounded border p-3 text-sm">
+   <strong>Next step: </strong>{data.hostingDiagnostic}
+   {data.publicAvailability==="hosting_disabled"&&" Operator action: attach the approved wildcard domain to the Netlify target, verify wildcard DNS and certificate coverage, deploy the edge gate, then enable the separate server and edge flags. Production settings are not changed here."}
+  </p>}
   {data.includesSuggestions&&<p className="mt-3 rounded border p-3 text-sm">This private preview includes suggested local welcome copy or a planned school listing. Suggestions are not saved editorial revisions or approved public claims.</p>}
   {data.previewHtml&&<iframe title={`${data.programName} private school website preview`} srcDoc={data.previewHtml}
    sandbox="" referrerPolicy="no-referrer" className="mt-4 h-[34rem] w-full rounded-lg border bg-white"/>}
