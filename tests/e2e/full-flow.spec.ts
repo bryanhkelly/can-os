@@ -800,6 +800,9 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // Report cards are also protected student records; possession of the
       // exact student person ID must not grant an unrelated family access.
       await goto(unrelatedGuardian.page, `/guardian/report-cards?student=${fixture.studentPersonId}`);
+      await expect(
+        unrelatedGuardian.page.getByText("No students with academic-viewing permission were found at your school."),
+      ).toBeVisible();
       await expect(unrelatedGuardian.page.getByText(fixture.courseTitle)).toHaveCount(0);
 
       await goto(unrelatedGuardian.page, `/guardian/admission-offers?application=${fixture.applicationId}`);
