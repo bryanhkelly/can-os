@@ -19,9 +19,10 @@ export function EvidenceDocumentLink({
     setBusy(true); setError("");
     // Reserve the browsing context synchronously so popup blockers do not
     // reject the eventual URL after the authorization request completes.
-    const popup = window.open("", "_blank");
-    if (popup) popup.opener = null;
+    let popup: Window | null = null;
     try {
+      popup = window.open("", "_blank");
+      if (popup) popup.opener = null;
       const url = await onGetDownloadUrl();
       if (popup) {
         popup.location.replace(url);
