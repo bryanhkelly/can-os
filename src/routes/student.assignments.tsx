@@ -1,4 +1,5 @@
 import { saveAssignmentWork, submitAssignmentWork } from "@/modules/student-experience/submit-assignment-work";
+import { AssignmentAttemptHistory } from "@/components/student/AssignmentAttemptHistory";
 import {useEffect,useRef,useState} from "react";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -205,7 +206,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      {chosen.revisionFeedbackSubmissionId&&<SubmissionAnnotations
        key={chosen.revisionFeedbackSubmissionId} submissionId={chosen.revisionFeedbackSubmissionId}/>}
      <AssignmentConversation key={`conversation-${chosen.assessmentId}`} assessmentId={chosen.assessmentId}/>
-     {chosen.attempts.length>1&&<div className="mt-4 rounded-lg border p-3"><h3 className="font-semibold text-sm">Submission history</h3>{chosen.attempts.map(attempt=><p key={attempt.attempt} className="mt-1 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?" · "+attempt.score+" points":""}</p>)}</div>}
+     {chosen.attempts.length>1&&<AssignmentAttemptHistory key={chosen.assessmentId} assessmentId={chosen.assessmentId}/>}
      {attachments.length>0&&<div className="mt-4 rounded-lg border p-3"><p className="font-semibold text-sm">Attached files</p>{attachments.map(file=><button type="button" key={file.documentId}
       className="mt-1 block text-xs underline" onClick={async()=>{
        if(!chosen)return;

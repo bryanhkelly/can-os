@@ -5,7 +5,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { createAssessment,gradeSubmission,manageAssessment,returnSubmissionForRevision } from "@/modules/learning/gradebook.functions";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
@@ -227,6 +227,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
 export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
  .validator((value:unknown)=>z.object({assessmentId:z.string().min(1)}).parse(value))
  .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
   const {context,studentId}=await studentActor();
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
