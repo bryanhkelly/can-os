@@ -20,6 +20,13 @@ describe("finance authorization and canonical references", () => {
     await registerCanonicalInvoice(repo,{context:context(["finance.manage"],{organizationIds:["inst"]}),viewer:"institution"},charge);
     expect(repo.createInvoice).toHaveBeenCalledWith(charge);
   });
+  it("requires an explicit CAN grant for site tuition management", () => {
+    const site = {context:context(["finance.manage"],{siteIds:["site"]}),viewer:"site" as const};
+    expect(() => authorizeFinance(site,charge,"manage")).toThrow("CAN tuition authority");
+    expect(() => authorizeFinance({
+      ...site,context:context(["finance.manage","finance.manage.can"],{siteIds:["site"]})
+    },charge,"manage")).not.toThrow();
+  });
   it("denies site in another tenant", () => {
     expect(() => authorizeFinance({context:context(["finance.read"],{siteIds:["other"]}),viewer:"site"},charge,"read")).toThrow();
   });
