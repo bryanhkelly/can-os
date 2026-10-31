@@ -21,7 +21,7 @@ function TeacherMissingWork() {
 function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof loadMissingWork>> }) {
   const { connected, items } = data;
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busyItem, setBusyItem] = useState("");
   const [notice, setNotice] = useState("");
   const studentCount = new Set(items.map(x => x.studentProfileId)).size;
 
@@ -46,10 +46,10 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="mt-1 text-sm">{x.studentName} · {x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button
-              disabled={busy}
+              disabled={Boolean(busyItem)}
               className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
               onClick={async () => {
-                setBusy(true);
+                setBusyItem(x.assessmentId + ":" + x.studentProfileId);
                 try {
                   const result = await createMissingWorkFollowUp({ data: { assessmentId: x.assessmentId, studentProfileId: x.studentProfileId } });
                   setNotice(result.created ? "Follow-up added to Operations." : "An open follow-up already exists.");
@@ -57,10 +57,10 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
                 } catch (e) {
                   setNotice(e instanceof Error ? e.message : "Unable to create follow-up");
                 } finally {
-                  setBusy(false);
+                  setBusyItem("");
                 }
               }}
-            >Create follow-up</button>
+            >{busyItem===x.assessmentId + ":" + x.studentProfileId ? "Creating follow-up…" : "Create follow-up"}</button>
           </article>
         ))}
         {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}
