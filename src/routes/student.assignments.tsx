@@ -1,4 +1,4 @@
-import { submitAssignmentWork } from "@/modules/student-experience/submit-assignment-work";
+import { saveAssignmentWork, submitAssignmentWork } from "@/modules/student-experience/submit-assignment-work";
 import {useEffect,useRef,useState} from "react";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -85,15 +85,15 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   },950);
   return()=>{clearTimeout(task);saveGeneration.current++};
  },[chosen?.assessmentId,chosen?.status,chosen?.responseText,editable,busy,draft]);
- async function submit(){
-  if(!chosen||!editable||draft.trim().length<3)return;
+ async function saveWork(submitFinal:boolean){
+  if(!chosen||!editable||(submitFinal&&draft.trim().length<3))return;
   saveGeneration.current++;
   setBusy(true);setError("");setNotice("");
   try{
-   const receipt=await submitAssignmentWork({
+   const work={
     files:pendingFiles,
     saveDraft:()=>saveAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}}),
-    attach:async(file)=>{
+    attach:async(file:File)=>{
      const contentType=attachmentMime(file.name);
      if(!contentType||file.size<16||file.size>10*1024*1024)
       throw new Error("Unsupported file type or size: "+file.name);
@@ -104,15 +104,21 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      if(!response.ok)throw new Error("Upload failed for "+file.name+". Your draft is saved; retry before submitting.");
      await attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
     },
-    attached:(file)=>setPendingFiles(current=>current.filter(item=>item!==file)),
-    submit:()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}}),
-   });
-   setNotice("Your assignment has been submitted. Receipt: "+receipt.submissionId);
+    attached:(file:File)=>setPendingFiles(current=>current.filter(item=>item!==file)),
+   };
+   if(submitFinal){
+    const receipt=await submitAssignmentWork({...work,submit:()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}})});
+    setNotice("Your assignment has been submitted. Receipt: "+receipt.submissionId);
+   }else{
+    await saveAssignmentWork(work);
+    setDraftStatus("saved");
+    setNotice("Draft and attached files saved. You can return to continue before submitting.");
+   }
    const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
    setAttachments(updatedFiles.attachments);
    await router.invalidate();
   }catch(cause){
-   setError(cause instanceof Error?cause.message:"Unable to submit assignment");
+   setError(cause instanceof Error?cause.message:submitFinal?"Unable to submit assignment":"Unable to save draft");
   }finally{setBusy(false);}
  }
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
@@ -214,9 +220,11 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
           onChange={event=>setPendingFiles(Array.from(event.target.files??[]))}
           className="mt-2 block w-full rounded-lg border p-2 text-xs"/>
         </label>
-        {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Selected: {pendingFiles.map(file=>file.name).join(", ")}</p>}
+        {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Not yet uploaded: {pendingFiles.map(file=>file.name).join(", ")}. Choose Save draft or Submit assignment to save these files.</p>}
        </>
-      <button type="button" disabled={busy||draft.trim().length<3} onClick={submit}
+      <button type="button" disabled={busy} onClick={()=>saveWork(false)}
+       className="mr-3 mt-4 rounded-lg border px-5 py-3 text-sm font-semibold disabled:opacity-40">Save draft</button>
+      <button type="button" disabled={busy||draft.trim().length<3} onClick={()=>saveWork(true)}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit assignment</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
     </article>}
