@@ -28,8 +28,9 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<nav aria-label="School preparation steps" className="mt-4 flex flex-wrap gap-4 rounded-xl border bg-card p-4 text-sm font-semibold">
           <a href="#launch-services" className="underline">1. CAN services</a>
           <a href="#launch-academic-year" className="underline">2. Academic year</a>
-          <a href="#launch-website" className="underline">3. School website</a>
-          <a href="#invite-families" className="underline">4. Invite families</a>
+          <a href="#launch-first-class" className="underline">3. First classroom</a>
+          <a href="#launch-website" className="underline">4. School website</a>
+          <a href="#invite-families" className="underline">5. Invite families</a>
         </nav>}
         {currentSchoolStatus!=="active"&&<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
@@ -38,6 +39,12 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           <a href="#launch-academic-year" className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</a>
         </div>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section id="launch-first-class" className="mt-5 scroll-mt-6 rounded-xl border bg-card p-5" aria-label="Prepare your first classroom">
+          <h2 className="font-serif text-2xl">Prepare your first classroom</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Use the real published curriculum, scheduled term and CAN-authorized instructor. The academic setup will suggest the first eligible course and a matching schedule, then independently verify credentials and service authorization before allowing assignment. Preparing a class never opens the school.</p>
+          <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}} search={{siteId:currentLaunch.siteId??undefined,programId:undefined}} className="mt-3 inline-block text-sm font-semibold underline">Review guided academic setup →</Link>
+          <p className="mt-2 text-xs text-muted-foreground">If the first classroom is still blocked, review the launch task and its named prerequisite rather than creating a placeholder course or teacher.</p>
+        </section>}
         {currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
 
         <details className="mt-4 rounded-xl border bg-card p-4">
