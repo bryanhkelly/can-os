@@ -27,6 +27,7 @@ function GuardianEnrollmentChanges(){
  const [destinationSchoolName,setDestinationSchoolName]=useState("");
  const [destinationSchoolContactEmail,setDestinationSchoolContactEmail]=useState("");
  const [intendedLastDay,setIntendedLastDay]=useState("");
+ const [recordsReleaseAuthorized,setRecordsReleaseAuthorized]=useState(false);
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  async function refresh(){
@@ -59,14 +60,14 @@ function GuardianEnrollmentChanges(){
  async function submit(event:FormEvent){
   event.preventDefault();
   const choice=choices.find(choice=>choice.studentPersonId+":"+choice.programId===selected);
-  if(!choice||reason.trim().length<10||busy||kind==="transfer"&&destinationSchoolName.trim().length<3)return;
+  if(!choice||reason.trim().length<10||busy||kind==="transfer"&&(destinationSchoolName.trim().length<3||!recordsReleaseAuthorized))return;
   if(kind==="withdrawal"&&!window.confirm("Request that the school review withdrawal for "+choice.studentName+"? The request does not immediately unenroll the student."))return;
   setBusy(true);setNotice("");setError("");
   try{
    const result=await requestGuardianEnrollmentChange({data:{
     studentPersonId:choice.studentPersonId,programId:choice.programId,kind,reason,
     ...(kind==="transfer"?{
-      destinationSchoolName:destinationSchoolName.trim(),
+      destinationSchoolName:destinationSchoolName.trim(),recordsReleaseAuthorized,
       ...(destinationSchoolContactEmail.trim()?{destinationSchoolContactEmail:destinationSchoolContactEmail.trim()}:{}),
       ...(intendedLastDay?{intendedLastDay}:{}),
     }:{}),
@@ -74,7 +75,7 @@ function GuardianEnrollmentChanges(){
    setNotice(result.created
     ?"Request sent to the school. Enrollment stays active until the registrar completes the official process."
     :"An open request of this type already exists. The school has your request.");
-   setReason("");setDestinationSchoolName("");setDestinationSchoolContactEmail("");setIntendedLastDay("");
+   setReason("");setDestinationSchoolName("");setDestinationSchoolContactEmail("");setIntendedLastDay("");setRecordsReleaseAuthorized(false);
    try{await refresh();}
    catch{setError("Request saved, but its updated status could not be loaded. Reopen this page before submitting again.");}
   }catch(e){setError(e instanceof Error?e.message:"Unable to submit family request");}
@@ -123,7 +124,12 @@ function GuardianEnrollmentChanges(){
       <input type="date" value={intendedLastDay} onChange={event=>setIntendedLastDay(event.target.value)}
        className="mt-1 w-full rounded-lg border bg-background p-3"/>
     </label>
-    <p className="text-xs text-muted-foreground">Providing the destination helps the registrar coordinate next steps. No transcript is released and no new enrollment is created by this request.</p>
+    <label className="flex items-start gap-3 text-sm">
+      <input type="checkbox" required checked={recordsReleaseAuthorized}
+       onChange={event=>setRecordsReleaseAuthorized(event.target.checked)} className="mt-1"/>
+      <span>I authorize my child's current school, through its authorized records office, to release academic records to the named destination school for this transfer. I understand this request does not issue a transcript or enroll my child at the destination.</span>
+    </label>
+    <p className="text-xs text-muted-foreground">The records office must verify the recipient and use an approved secure delivery channel. This authorization is tied to the school named above and recorded with your request.</p>
    </fieldset>}
    <label className="block text-sm font-medium">Information for the school office
     <textarea required minLength={10} maxLength={1500} rows={4}
@@ -132,7 +138,7 @@ function GuardianEnrollmentChanges(){
       className="mt-1 w-full rounded-lg border bg-background p-3"/>
    </label>
    <p className="text-xs text-muted-foreground">Do not enter medical details, legal custody documents or payment information here. Send confidential records through the school's authorized process.</p>
-   <button type="submit" disabled={busy||reason.trim().length<10||kind==="transfer"&&destinationSchoolName.trim().length<3}
+   <button type="submit" disabled={busy||reason.trim().length<10||kind==="transfer"&&(destinationSchoolName.trim().length<3||!recordsReleaseAuthorized)}
      className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">{busy?"Sending…":"Send request to school"}</button>
   </form>}
   <section className="mt-8 space-y-3">
