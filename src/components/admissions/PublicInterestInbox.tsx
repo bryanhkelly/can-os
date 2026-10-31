@@ -109,6 +109,10 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
           </li>}
           {row.emailVerifiedAt && <li>Family verified email link · {new Date(row.emailVerifiedAt).toLocaleString()} (not guardianship)</li>}
           {row.applicationId && <li>Admissions record linked · {row.applicationStage ?? "Inquiry"}{row.applicationSubmittedAt ? ` · ${new Date(row.applicationSubmittedAt).toLocaleString()}` : ""}</li>}
+          {row.latestOfferStatus && <li>Admissions offer: {row.latestOfferStatus}
+            {row.latestOfferIssuedAt ? ` · Issued ${new Date(row.latestOfferIssuedAt).toLocaleString()}` : ""}
+            {row.latestOfferRespondedAt ? ` · Guardian responded ${new Date(row.latestOfferRespondedAt).toLocaleString()}` : ""}
+          </li>}
           {row.applicationId && <li>{row.activeEnrollment
             ? "School-year enrollment activated"
             : "School-year enrollment not yet active"}</li>}
@@ -124,7 +128,11 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
         {row.applicationId && <div className="mt-3 rounded-lg border bg-background p-3 text-sm">
           <p className="font-semibold">Next school handoff</p>
           {!row.activeEnrollment
-            ? <p className="mt-1">Continue admissions decisions and any accepted-offer activation. An inquiry is not an enrollment.</p>
+            ? <p className="mt-1">{row.latestOfferStatus === "accepted"
+                ? "The family accepted its offer. Admissions must activate school-year enrollment and assign a staffed instructional class."
+                : row.latestOfferStatus === "issued"
+                  ? "The school has issued an offer and is awaiting the verified guardian's response."
+                  : "Continue the admissions review, eligibility requirements and offer decision. An inquiry is not an enrollment."}</p>
             : !row.placedInClass
               ? <p className="mt-1">Enrollment is active. Complete a staffed instructional class assignment before student learning access or onsite attendance.</p>
               : row.studentAccessStatus !== "approved"
@@ -132,7 +140,7 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
                 : <p className="mt-1">Learning access is approved. Confirm the child is expected on the scheduled onsite roster and record actual presence with authorized site staff; placement is not attendance.</p>}
           <div className="mt-2 flex flex-wrap gap-3">
             <Link to="/admissions" search={{siteId:row.siteId,programId:row.programId,application:row.applicationId}}
-              className="font-semibold underline">{!row.activeEnrollment ? "Continue enrollment" : !row.placedInClass ? "Assign instructional class" : row.studentAccessStatus !== "approved" ? "Review student access" : "Review enrollment"} →</Link>
+              className="font-semibold underline">{!row.activeEnrollment ? row.latestOfferStatus === "accepted" ? "Activate accepted offer" : "Continue admissions" : !row.placedInClass ? "Assign instructional class" : row.studentAccessStatus !== "approved" ? "Review student access" : "Review enrollment"} →</Link>
             <Link to="/admissions/families" search={{siteId:row.siteId,programId:row.programId,application:row.applicationId}}
               className="font-semibold underline">Household checklist →</Link>
             {row.activeEnrollment && row.placedInClass &&
