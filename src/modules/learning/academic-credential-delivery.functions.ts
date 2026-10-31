@@ -67,6 +67,36 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
  });
 
+/** Authenticated recipient download. No bearer token, email attachment or public URL.
+ * Only an independently authorized, unexpired and non-revoked ledger entry
+ * can be redeemed by its exact named recipient in a live session. */
+export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({authorizationId:uuid}).strict().parse(value))
+ .handler(async ({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const context=await getCommandContext(getRequest());
+  if(!context.actorPersonId||context.demoFacilitator)throw new AuthorizationError("authenticated recipient");
+  const {db,s}=await resources();
+  const [release]=await db.select().from(s.academicCredentialReleaseAuthorizations)
+   .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
+    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId)))
+   .limit(1);
+  if(!release||release.revokedAt||release.expiresAt<=new Date())
+   throw new AuthorizationError("active recipient authorization");
+  const [recipient]=await db.select({email:s.people.email,active:s.people.active})
+   .from(s.people).where(eq(s.people.id,context.actorPersonId)).limit(1);
+  if(!recipient?.active||!recipient.email||recipient.email.trim().toLowerCase()!==release.recipientEmail.trim().toLowerCase())
+   throw new AuthorizationError("recipient email mismatch");
+  const kind=release.transcriptIssuanceId?"transcript":"diploma";
+  const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
+  if(!credentialId)throw new AuthorizationError("credential release target");
+  const doc=await documentData(db,s,kind,credentialId);
+  if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
+  const pdf=academicDocumentPdf(doc);
+  await writeAudit(db,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
+  return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
+ });
+
 /** Official records must never be mailed as plaintext attachments. Release is
  * disabled until a verified records-request and authenticated download workflow
  * exist. This server guard protects even stale clients and direct POST calls. */
