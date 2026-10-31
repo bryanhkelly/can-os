@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   approveChurchOnboardingRequest, declineChurchOnboardingRequest,
-  listChurchOnboardingRequests, verifyChurchOnboardingRequest, resendApprovedChurchInvitation,
+  listChurchOnboardingRequests, resendApprovedChurchInvitation,
 } from "@/modules/networks/network-steward.functions";
 import { cancelChurchOnboardingRequest, requestChurchOnboardingEvidence, resendChurchEvidenceNotice } from "@/modules/networks/church-applications.functions";
 
@@ -14,8 +14,6 @@ export function ChurchApplicationsDesk() {
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [evidenceReference, setEvidenceReference] = useState<Record<string, string>>({});
-  const [verificationMethod, setVerificationMethod] = useState<Record<string, "signed_authority" | "denominational_confirmation" | "independent_church_confirmation">>({});
   const [declineNote, setDeclineNote] = useState<Record<string, string>>({});
   const [followupNote, setFollowupNote] = useState<Record<string, string>>({});
   const [cancelConfirm, setCancelConfirm] = useState<Record<string, boolean>>({});
@@ -33,13 +31,10 @@ export function ChurchApplicationsDesk() {
     void refresh().catch(() => setError("Unable to load church applications."))
       .finally(() => setLoading(false));
   }, []);
-  async function act(id: string, operation: "verify" | "approve" | "decline" | "followup" | "cancel") {
+  async function act(id: string, operation: "approve" | "decline" | "followup" | "cancel") {
     setWorking(id); setError(""); setNotice("");
     try {
-      if (operation === "verify") {
-        await verifyChurchOnboardingRequest({ data: { requestId: id, evidenceReference: evidenceReference[id] ?? "", verificationMethod: verificationMethod[id] ?? "signed_authority" } });
-        setNotice("Independent authority evidence recorded. Another CAN steward must approve the invitation.");
-      } else if (operation === "approve") {
+      if (operation === "approve") {
         const result = await approveChurchOnboardingRequest({ data: id });
         setNotice(result.emailSent
           ? "Church and Site prepared. Email accepted by the provider, not confirmed delivered; access starts on secure invitation acceptance."
@@ -59,7 +54,7 @@ export function ChurchApplicationsDesk() {
           : "Application declined and authority evidence invalidated. Decision email was not accepted by the provider; follow up through a verified channel.");
       }
       setCancelConfirm(previous => ({ ...previous, [id]: false }));
-      setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setFollowupNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
+      setDeclineNote(previous => ({...previous, [id]: ""})); setFollowupNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to complete church review.");
@@ -70,7 +65,7 @@ export function ChurchApplicationsDesk() {
     <h2 className="font-serif text-2xl">Church partnership applications</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       New churches apply at <a href="/church/apply" className="underline">/church/apply</a>.
-      CAN must independently confirm church authority and record a verifiable external evidence reference.
+      CAN must independently confirm church authority using inspected private evidence; staff-entered links are not acceptable.
       A different CAN steward approves provisioning. No application alone authorizes a school to open.
     </p>
     {loading&&<p role="status" className="mt-3 text-sm">Loading church requests…</p>}
