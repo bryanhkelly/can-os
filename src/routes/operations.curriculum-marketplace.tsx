@@ -1,3 +1,4 @@
+import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
 import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
 import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClassMappingFields";
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
@@ -261,12 +262,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
        onClick={()=>void perform(async()=>{
         if(!cartridgeFile)throw new Error("Select a Common Cartridge file.");
-        if(cartridgeFile.size>2_000_000)throw new Error("Use a package of 2 MB or smaller for direct validation.");
-        const array=new Uint8Array(await cartridgeFile.arrayBuffer());
-        let binary="";
-        for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+        const base64=await encodeCommonCartridge(cartridgeFile);
         const result=await validateCommonCartridgeImport({data:{
-          programId:market.program.id,fileName:cartridgeFile.name,base64:btoa(binary),
+          programId:market.program.id,fileName:cartridgeFile.name,base64,
         }});
         setCartridgeReport(result);
        },"Cartridge manifest validated and audit-staged. Review the notices before publishing any content.")}>
@@ -295,12 +293,10 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
         disabled={busy||!cartridgeFile||!cartridgeSection||!cartridgeRights||!cartridgeLinks.length}
         onClick={()=>void perform(async()=>{
          if(!cartridgeFile)throw new Error("Select the validated source package.");
-         const array=new Uint8Array(await cartridgeFile.arrayBuffer());
-         let binary="";
-         for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+         const base64=await encodeCommonCartridge(cartridgeFile);
          await importCommonCartridgeSectionLinks({data:{
            programId:market.program.id,sectionId:cartridgeSection,fileName:cartridgeFile.name,
-           base64:btoa(binary),linkIdentifiers:cartridgeLinks,rightsConfirmed:true,
+           base64,linkIdentifiers:cartridgeLinks,rightsConfirmed:true,
          }});
         },"Selected web links added to the class as canonical curriculum resources.")}>Add selected links to class</button>
       </section>}
