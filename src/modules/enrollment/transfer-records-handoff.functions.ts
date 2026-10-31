@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
@@ -29,6 +29,8 @@ async function authorizedRegistrar(){
 export const listTransferRecordsHandoffs=createServerFn({method:"GET"}).handler(async()=>{
  setResponseHeader("Cache-Control","private, no-store");
  const actor=await authorizedRegistrar();
+ const delegated=await listDelegatedCANTranscriptPrograms(actor,db);
+ const delegatedIds=delegated.map(row=>row.programId);
  const rows=await db.select({
    id:s.actions.id,status:s.actions.status,title:s.actions.title,
    metadata:s.actions.metadata,createdAt:s.actions.createdAt,
@@ -39,12 +41,21 @@ export const listTransferRecordsHandoffs=createServerFn({method:"GET"}).handler(
  }).from(s.actions)
  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
  .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
- .innerJoin(s.programs,eq(s.programs.id,s.actions.programId))
+ .innerJoin(s.programs,and(
+   eq(s.programs.id,s.actions.programId),
+   eq(s.programs.siteId,s.actions.siteId),
+   eq(s.programs.organizationId,s.actions.organizationId),
+ ))
  .where(and(
    eq(s.actions.type,kind),eq(s.actions.subjectType,"student_profile"),
-   inArray(s.actions.siteId,actor.scope.siteIds??[]),
-   inArray(s.actions.programId,actor.scope.programIds??[]),
-   inArray(s.actions.organizationId,actor.scope.organizationIds??[]),
+   or(
+     and(
+       inArray(s.actions.siteId,actor.scope.siteIds??[]),
+       inArray(s.actions.programId,actor.scope.programIds??[]),
+       inArray(s.actions.organizationId,actor.scope.organizationIds??[]),
+     ),
+     inArray(s.actions.programId,delegatedIds),
+   ),
    inArray(s.actions.status,["open","in_progress","waiting","resolved"]),
  )).orderBy(desc(s.actions.createdAt)).limit(100);
  if(!rows.length)return {items:[]};
