@@ -151,7 +151,7 @@ export async function installPack(actor: Actor, input:{programId:string;packId:s
 }
 
 /** Legacy Program adoption is historical only. New-year rights must use audited annual rollover. */
-export async function adoptPack(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
+export async function adoptPack(_actor: Actor,_input:{programId:string;packId:string;versionId:string}) {
  throw new AuthorizationError("Use year-specific curriculum adoption. Select a school year and verify the publisher license before adopting.");
 }
 
