@@ -36,6 +36,8 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     if (!row.sectionId || sections.has(row.sectionId)) throw new Error("Duplicate or missing terminal section evidence");
     sections.set(row.sectionId,row);
   }
+  if([...sections.values()].some(row=>row.letterGrade?.trim().toUpperCase()==="W" && (row.creditsEarned??0)>0))
+    throw new AuthorizationError("Withdrawn terminal grade cannot confer graduation credit");
   return [...sections.values()].map(row => ({
     sectionId: row.sectionId,
     subject: row.subject,
