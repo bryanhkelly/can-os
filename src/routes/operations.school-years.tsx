@@ -119,8 +119,16 @@ function YearCard({year:y,busy,run}:{year:Snapshot["years"][number],busy:boolean
     </select>
    </label>}
    <p className="mt-2 text-sm">{y.terms.length?"Keep the existing terms and grading periods.":proposedTerms.map(term=>`${term.name}: ${term.startsOn}–${term.endsOn}`).join(" · ")}</p>
-   <p className="mt-2 text-sm text-muted-foreground">Create one grading period for each term that has none, and an instructional calendar if missing. Existing records stay unchanged. Review instructional days, holidays and any onsite schedule below before activation.</p>
-   <button type="button" disabled={busy} onClick={()=>run(()=>prepareStudioYear({data:{schoolYearId:y.id,structure}}))} className="mt-3 rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Prepare terms, grading periods and calendar</button>
+   <p className="mt-2 text-sm text-muted-foreground">Create missing terms, grading periods and an instructional calendar. Add ordinary instructional days using the reviewed pattern below. Existing records, holidays and closures stay unchanged. Review local holidays and any onsite schedule before activation.</p>
+   <fieldset className="mt-3"><legend className="text-sm font-semibold">Recommended instructional weekdays</legend>
+    <div className="mt-2 flex flex-wrap gap-3">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day,index)=><label key={day} className="flex items-center gap-1 text-sm">
+     <input type="checkbox" checked={weekdays.includes(index)} onChange={e=>setWeekdays(current=>e.target.checked?[...current,index]:current.filter(value=>value!==index))}/>{day}
+    </label>)}</div>
+   </fieldset>
+   <label className="mt-3 block text-sm">Instructional minutes per day
+    <input type="number" min={1} max={1440} value={dailyMinutes} onChange={e=>setDailyMinutes(Number(e.target.value))} className="ml-2 w-24 rounded border bg-background p-2"/>
+   </label>
+   <button type="button" disabled={busy||!weekdays.length||!Number.isInteger(dailyMinutes)||dailyMinutes<1||dailyMinutes>1440} onClick={()=>run(()=>prepareStudioYear({data:{schoolYearId:y.id,structure,instructionalDays:{weekdays,instructionalMinutes:dailyMinutes}}}))} className="mt-3 rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Prepare academic year and instructional days</button>
   </section>}
   <div className="mt-5 grid gap-4 lg:grid-cols-2">
    <section className="rounded-lg border p-4"><h4 className="font-semibold">Terms and grading periods</h4>

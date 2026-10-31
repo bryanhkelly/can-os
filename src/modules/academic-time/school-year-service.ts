@@ -595,7 +595,8 @@ export async function createScheduleTemplate(
  * year makes retries reuse its terms, periods and calendar without overwrites. */
 export async function prepareSchoolYearBasics(
   context: CommandContext,
-  input: {schoolYearId: string; structure: "full_year" | "semesters"},
+  input: {schoolYearId: string; structure: "full_year" | "semesters";
+    instructionalDays?: {weekdays:number[];instructionalMinutes:number}},
 ) {
   assertCapability(context, "academic_year.manage");
   return db.transaction(async tx => {
@@ -638,8 +639,59 @@ export async function prepareSchoolYearBasics(
     const calendarId = calendar?.id ?? await createAcademicCalendar(context, {
       schoolYearId:year.id,name:"Instructional calendar",
     }, tx);
+    if (input.instructionalDays) await populateSchoolYearInstructionalDays(context, {
+      academicCalendarId:calendarId,...input.instructionalDays,
+    }, tx);
     return {schoolYearId:year.id,calendarId,existingStructure};
   });
+}
+
+/** The ordinary calendar generator is shared by launch preparation and the
+ * detailed editor. Existing holidays, closures and scheduled days always win. */
+export async function populateSchoolYearInstructionalDays(
+  context:CommandContext,
+  input:{academicCalendarId:string;weekdays:number[];instructionalMinutes:number},
+  transaction?:AcademicTimeTransaction,
+) {
+  assertCapability(context,"academic_year.manage");
+  if (!input.weekdays.length || input.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6) ||
+      !Number.isInteger(input.instructionalMinutes)||input.instructionalMinutes<1||input.instructionalMinutes>1440)
+    throw new Error("Review instructional weekdays and minutes per day");
+  return withAcademicTimeTransaction(async tx=>{
+    const [calendar]=await tx.select({
+      id:academicCalendars.id,startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
+      programId:schoolYears.programId,siteId:schoolYears.siteId,organizationId:schoolYears.organizationId,
+    }).from(academicCalendars).innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
+      .where(eq(academicCalendars.id,input.academicCalendarId)).limit(1);
+    if(!calendar)throw new Error("Academic calendar not found");
+    assertOrganizationScope(context,calendar.organizationId);
+    assertSiteScope(context,calendar.siteId);
+    assertProgramScope(context,calendar.programId);
+    await lockAttendanceConfigurationAtSite(tx,calendar.siteId);
+    const weekdays=new Set(input.weekdays);
+    const rows:{academicCalendarId:string;calendarDate:string;type:"instructional";instructionalMinutes:number}[]=[];
+    const end=Date.parse(calendar.endsOn+"T00:00:00Z");
+    for(let at=Date.parse(calendar.startsOn+"T00:00:00Z");at<=end;at+=86400000){
+      const instant=new Date(at);
+      if(weekdays.has(instant.getUTCDay()))rows.push({academicCalendarId:calendar.id,
+        calendarDate:instant.toISOString().slice(0,10),type:"instructional",instructionalMinutes:input.instructionalMinutes});
+    }
+    const created=rows.length ? await tx.insert(academicCalendarDays).values(rows)
+      .onConflictDoNothing().returning({id:academicCalendarDays.id}) : [];
+    if(created.length){
+      await emitEvent(tx,{
+        eventType:EventTypes.AcademicCalendarChanged,aggregateType:"academic_calendar",aggregateId:calendar.id,
+        actorPersonId:context.actorPersonId,payload:{operation:"populate",weekdays:input.weekdays,
+          scheduledDays:created.length,siteId:calendar.siteId},
+      });
+      await writeAudit(tx,context,{
+        action:"academic_calendar.populate",entityType:"academic_calendar",entityId:calendar.id,
+        scope:{organizationId:calendar.organizationId,siteId:calendar.siteId,programId:calendar.programId},
+        after:{weekdays:input.weekdays,instructionalMinutes:input.instructionalMinutes,scheduledDays:created.length},
+      });
+    }
+    return {processedDays:rows.length,createdDays:created.length};
+  },transaction);
 }
 
 export async function activateSchoolYear(

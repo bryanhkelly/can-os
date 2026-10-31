@@ -10,7 +10,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay,prepareSchoolYearBasics } from "./school-year-service";
+import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay,prepareSchoolYearBasics,populateSchoolYearInstructionalDays } from "./school-year-service";
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -117,7 +117,10 @@ export const addStudioTerm = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({schoolYearId:uuid,key:z.string().min(1),name:z.string().min(2),sequence:z.number().int().positive(),startsOn:day,endsOn:day}).parse(v))
  .handler(async({data})=>({termId:await createTerm(await operator(),data)}));
 export const prepareStudioYear = createServerFn({method:"POST"})
- .validator((v:unknown)=>z.object({schoolYearId:uuid,structure:z.enum(["full_year","semesters"])}).strict().parse(v))
+ .validator((v:unknown)=>z.object({schoolYearId:uuid,structure:z.enum(["full_year","semesters"]),
+  instructionalDays:z.object({weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7),
+   instructionalMinutes:z.number().int().min(1).max(1440)}).strict().optional(),
+ }).strict().parse(v))
  .handler(async({data})=>prepareSchoolYearBasics(await operator(),data));
 export const addStudioGradingPeriod = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({termId:uuid,key:z.string().min(1),name:z.string().min(2),sequence:z.number().int().positive(),startsOn:day,endsOn:day}).parse(v))
@@ -226,51 +229,4 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
   academicCalendarId:uuid,weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7),
   instructionalMinutes:z.number().int().min(1).max(1440),
  }).parse(v))
- .handler(async({data})=>{
-  const actor=await operator();
-  return db.transaction(async tx=>{
-   const [calendar]=await tx.select({
-    id:academicCalendars.id,startsOn:schoolYears.startsOn,
-    endsOn:schoolYears.endsOn,programId:schoolYears.programId,
-    siteId:schoolYears.siteId,organizationId:schoolYears.organizationId,
-   }).from(academicCalendars)
-    .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
-    .where(eq(academicCalendars.id,data.academicCalendarId)).limit(1);
-   if(!calendar||!actor.scope.organizationIds?.includes(calendar.organizationId)||
-    (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(calendar.siteId))||
-    (calendar.programId&&!actor.scope.programIds?.includes(calendar.programId)))
-    throw new AuthorizationError("calendar generation scope");
-   await lockAttendanceConfigurationAtSite(tx,calendar.siteId);
-   const weekdays=new Set(data.weekdays);
-   const start=new Date(calendar.startsOn+"T00:00:00.000Z");
-   const end=new Date(calendar.endsOn+"T00:00:00.000Z");
-   const rows:{academicCalendarId:string;calendarDate:string;
-    type:"instructional";instructionalMinutes:number}[]=[];
-   for(let at=start.getTime();at<=end.getTime();at+=86400000){
-    const instant=new Date(at);
-    if(!weekdays.has(instant.getUTCDay()))continue;
-    rows.push({academicCalendarId:calendar.id,
-     calendarDate:instant.toISOString().slice(0,10),
-     type:"instructional",instructionalMinutes:data.instructionalMinutes});
-   }
-   if(rows.length){
-    // Existing holiday and closure rows always win.
-    await tx.insert(academicCalendarDays).values(rows).onConflictDoNothing();
-   }
-   await emitEvent(tx,{
-    eventType:EventTypes.AcademicCalendarChanged,aggregateType:"academic_calendar",
-    aggregateId:calendar.id,actorPersonId:actor.actorPersonId,
-    payload:{operation:"populate",weekdays:data.weekdays,scheduledDays:rows.length,
-     siteId:calendar.siteId},
-   });
-   await writeAudit(tx,actor,{
-    action:"academic_calendar.populate",
-    entityType:"academic_calendar",entityId:calendar.id,
-    scope:{organizationId:calendar.organizationId,siteId:calendar.siteId,
-     programId:calendar.programId},
-    after:{weekdays:data.weekdays,instructionalMinutes:data.instructionalMinutes,
-     scheduledDays:rows.length},
-   });
-   return {processedDays:rows.length};
-  });
- });
+ .handler(async({data})=>populateSchoolYearInstructionalDays(await operator(),data));
