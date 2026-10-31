@@ -9,12 +9,14 @@ import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
 import {getReceivingSchoolTransferTranscript} from "@/modules/enrollment/transfer-records-handoff.functions";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
-const load=async()=>{
- const [records,programs,existingStudents,publicInterests]=await Promise.all([
+const load=async(interestId?:string)=>{
+ const [records,programs,existingStudents,publicInterests,selectedInterestPage]=await Promise.all([
   listAdmissionsIntake(),listAdmissionsIntakePrograms(),listAdmissionsExistingStudents(),
-  listPublicAdmissionsInterests(),
+  listPublicAdmissionsInterests({data:{}}),
+  interestId?listPublicAdmissionsInterests({data:{interestId}}):Promise.resolve(null),
  ]);
- return {records,programs,existingStudents,publicInterests};
+ return {records,programs,existingStudents,publicInterests,
+  linkedInterest:selectedInterestPage?.items[0]??null};
 };
 export const Route=createFileRoute("/admissions/intake")({
  validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string}=>({
@@ -23,7 +25,8 @@ export const Route=createFileRoute("/admissions/intake")({
   programId:typeof search.programId==="string"?search.programId:undefined,
   interest:typeof search.interest==="string"?search.interest:undefined,
  }),
- loader:safeLoader(load,{authMessage:"Sign in as a registrar to manage admissions."}),
+ loaderDeps:({search})=>({interest:search.interest}),
+ loader:({deps})=>safeLoader(()=>load(deps.interest),{authMessage:"Sign in as a registrar to manage admissions."})(),
  component:IntakePage
 });
 function IntakePage(){
@@ -40,9 +43,14 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const scopedRecords=data.records.filter(row=>(!selected.siteId||row.siteId===selected.siteId)&&
   (!selected.programId||row.programId===selected.programId));
  const records=scopedRecords.filter(row=>!selected.application||row.id===selected.application);
- const selectedInterest=data.publicInterests.find(row=>row.id===selected.interest &&
+ const selectedInterest=(data.linkedInterest??data.publicInterests.items.find(row=>row.id===selected.interest)) &&
+  (data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest)) &&
+  (!selected.siteId||(data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest))?.siteId===selected.siteId) &&
+  (!selected.programId||(data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest))?.programId===selected.programId) ?
+  (data.linkedInterest?.id===selected.interest?data.linkedInterest:data.publicInterests.items.find(row=>row.id===selected.interest)) : null;
+ /* const legacySelectedInterest=data.publicInterests.find(row=>row.id===selected.interest &&
   (!selected.siteId||row.siteId===selected.siteId) &&
-  (!selected.programId||row.programId===selected.programId));
+  (!selected.programId||row.programId===selected.programId)); */
  const convertibleInterest=selectedInterest&&["new","contacted"].includes(selectedInterest.status)?
   selectedInterest:null;
  const [programId,setProgramId]=useState(convertibleInterest?.programId??programs[0]?.id??"");
@@ -72,9 +80,8 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <WorkflowIntro eyebrow="Verified admissions workflow" title="Every applicant, a clear next step." description="Start with a family inquiry, review identity and eligibility, then record decisions in the canonical admissions workflow. A public inquiry never proves guardianship." actions={<a href="#new-inquiry" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">New inquiry <ArrowUpRight className="size-4" /></a>} />
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-  <PublicInterestInbox items={data.publicInterests.filter(row =>
-    (!selected.siteId || row.siteId === selected.siteId) &&
-    (!selected.programId || row.programId === selected.programId))}/>
+  <PublicInterestInbox initialPage={data.publicInterests}
+    siteId={selected.siteId} programId={selected.programId}/>
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">New inquiry</h2>
    {selected.interest&&!selectedInterest&&<p role="alert" className="mt-3 rounded-lg border p-3 text-sm">
