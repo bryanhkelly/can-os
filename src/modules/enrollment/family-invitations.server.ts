@@ -1,12 +1,14 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, leftJoin, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  applications,
   communicationMessages,
   communicationParticipants,
   communicationThreads,
   domainEvents,
   programs,
   sites,
+  publicAdmissionsInterests,
   publicFamilyStartRequests,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -371,6 +373,27 @@ export async function listFamilyInvitationWorkspace(
   )) : [];
 
   const batchIds = parsedBatches.map(batch => batch.id);
+  const interests = batchIds.length ? await db.select({
+    batchId: publicAdmissionsInterests.invitationBatchId,
+    recipientKey: publicAdmissionsInterests.invitationRecipientKey,
+    id: publicAdmissionsInterests.id,
+    source: publicAdmissionsInterests.source,
+    status: publicAdmissionsInterests.status,
+    requestedAt: publicAdmissionsInterests.createdAt,
+    consentedAt: publicAdmissionsInterests.contactConsentAt,
+    contactedAt: publicAdmissionsInterests.contactedAt,
+    applicationId: publicAdmissionsInterests.applicationId,
+    applicationStage: applications.stage,
+    applicationSubmittedAt: applications.submittedAt,
+    verifiedEmailAt: publicFamilyStartRequests.consumedAt,
+  }).from(publicAdmissionsInterests)
+    .leftJoin(publicFamilyStartRequests,
+      eq(publicFamilyStartRequests.id, publicAdmissionsInterests.familyStartRequestId))
+    .leftJoin(applications, eq(applications.id, publicAdmissionsInterests.applicationId))
+    .where(inArray(publicAdmissionsInterests.invitationBatchId, batchIds)) : [];
+  const interestsByRecipient = new Map(interests.map(interest =>
+    [`${interest.batchId}:${interest.recipientKey}`, interest]));
+
   const events = batchIds.length ? await db.select({
     aggregateId: domainEvents.aggregateId,
     status: domainEvents.status,
@@ -412,6 +435,7 @@ export async function listFamilyInvitationWorkspace(
             start.email === recipient.email && start.consumedAt);
           const respondedAt = responses.reduce<Date | null>((latest, start) =>
             !latest || (start.consumedAt && start.consumedAt > latest) ? start.consumedAt : latest, null);
+          const interest = interestsByRecipient.get(`${batch.id}:${recipient.key}`);
           return {
             firstName: recipient.firstName,
             lastName: recipient.lastName,
@@ -421,6 +445,18 @@ export async function listFamilyInvitationWorkspace(
                 recipient.status === "failed" ? "retrying" as const : "queued" as const,
             attempts: recipient.attempts,
             respondedAt: respondedAt?.toISOString() ?? null,
+            interest: interest ? {
+              id: interest.id,
+              source: interest.source,
+              status: interest.status,
+              requestedAt: interest.requestedAt.toISOString(),
+              consentedAt: interest.consentedAt?.toISOString() ?? null,
+              contactedAt: interest.contactedAt?.toISOString() ?? null,
+              verifiedEmailAt: interest.verifiedEmailAt?.toISOString() ?? null,
+              applicationId: interest.applicationId,
+              applicationStage: interest.applicationStage,
+              applicationSubmittedAt: interest.applicationSubmittedAt?.toISOString() ?? null,
+            } : null,
           };
         }),
       };
