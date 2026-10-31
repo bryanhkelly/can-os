@@ -51,7 +51,15 @@ export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutation
         setRefreshError(failure);
         options.onRefreshError?.(failure);
       }
-      await options.onSuccess?.(value, input);
+      try {
+        await options.onSuccess?.(value, input);
+      } catch (error) {
+        // Feedback callbacks run after the domain command has committed.
+        // Never turn their failure into a command failure or invite a retry.
+        failure ??= asError(error);
+        setRefreshError(failure);
+        options.onRefreshError?.(failure);
+      }
       return { status: "completed", value, ...(failure ? { refreshError: failure } : {}) };
     } finally {
       inFlight.current = false;
