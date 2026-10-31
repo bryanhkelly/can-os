@@ -98,6 +98,8 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
       firstName:publicAdmissionsInterests.contactFirstName,
       lastName:publicAdmissionsInterests.contactLastName,
       email:publicAdmissionsInterests.contactEmail,
+      consentAt:publicAdmissionsInterests.contactConsentAt,
+      familyStartRequestId:publicAdmissionsInterests.familyStartRequestId,
     }).from(publicAdmissionsInterests)
       .innerJoin(programs,eq(programs.id,publicAdmissionsInterests.programId))
       .where(and(
