@@ -39,8 +39,8 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   void router.navigate({href:"/operations"+(query.size?"?"+query.toString():"")});
  };
  const router=useRouter();
- const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation()});
- const exitMutation=useWorkspaceMutation({mutationFn:(actionId:string)=>completeRegistrarEnrollmentExit({data:{actionId,confirmInstitutionalReview:true,resolutionNote:exitNoteRef.current}})});
+ const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
+ const exitMutation=useWorkspaceMutation({mutationFn:(actionId:string)=>completeRegistrarEnrollmentExit({data:{actionId,confirmInstitutionalReview:true,resolutionNote:exitNoteRef.current}}),invalidateRouter:()=>router.invalidate()});
  const exitNoteRef=useRef("");
  const [busy,setBusy]=useState<string|null>(null);
  const actionInFlight=useRef(false);
@@ -48,7 +48,10 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   if(actionInFlight.current||exitMutation.isPending)return false;
   actionInFlight.current=true;
   setBusy(id);
-  try{await mutation.submit(operation);return true;}
+  try{const submission=await mutation.submit(operation);
+   if(submission.status === "ignored")return false;
+   if(submission.refreshError)setError("Action saved, but refresh failed. Reopen the action; do not resubmit.");
+   return !submission.refreshError;}
   finally{actionInFlight.current=false;setBusy(null);}
  }
  const [error,setError]=useState("");
@@ -60,7 +63,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  </WorkspaceShell>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
   setError("");
-  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;if(await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}})))await router.invalidate();}
+  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}}));}
   catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
  }
 
@@ -71,17 +74,17 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   setError("");setNotice("");
   try{
    exitNoteRef.current=note.trim();
-   const result=await exitMutation.submit(id);
-   if(!result)return;
+   const submission=await exitMutation.submit(id);
+   if(submission.status === "ignored")return;
+   const result=submission.value;
    setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
-   try{await router.invalidate();}
-   catch{setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");}
+   if(submission.refreshError)setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");
   }catch(e){setError(e instanceof Error?e.message:"Unable to complete institutional enrollment change");}
  }
 
  async function assignAction(id:string,ownerPersonId:string|null,priority:"normal"|"high"|"urgent"){
   setError("");
-  try{if(await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}})))await router.invalidate();}
+  try{await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}}));}
   catch(e){setError(e instanceof Error?e.message:"Unable to assign action");}
  }
 
@@ -95,7 +98,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
      }}));
      if(!saved)return;
      setDueDrafts(prev=>{const next={...prev};delete next[id];return next;});
-     await router.invalidate();
+
    }catch(e){setError(e instanceof Error?e.message:"Unable to save deadline");}
  }
  function localDue(iso:string|null){
