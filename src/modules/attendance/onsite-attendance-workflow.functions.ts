@@ -188,6 +188,8 @@ async function resolveExpectedRoster(actor: AccessContext,
   const sectionsAtSite = await db.select({
     studentProfileId: enrollments.studentProfileId, programId: sections.programId,
     siteId: sections.siteId, sectionId: sections.id, sectionTitle: sections.title,
+    sectionStartsAt:sections.startsAt,sectionEndsAt:sections.endsAt,
+    membershipStartsAt:enrollments.startedAt,membershipEndsAt:enrollments.endedAt,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
   }).from(enrollments)
@@ -209,12 +211,24 @@ async function resolveExpectedRoster(actor: AccessContext,
       eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(sections.active, true), eq(schoolYears.status, "active"),
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
+      lte(terms.startsOn,date),gte(terms.endsOn,date),
+      ...(siteId?[eq(sections.siteId,siteId),eq(schoolYears.siteId,siteId)]:[]),
       inArray(sections.programId, permittedIds),
       ...(actor.scope.siteIds!==undefined?[inArray(sections.siteId,actor.scope.siteIds)]:[]),
       ...(actor.role === "room_facilitator" ? [inArray(sections.id, [...sectionFilter])] : []),
       ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
         []),
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : [])));
+  // Keep effective Section and Section-membership dates distinct from the
+  // Program enrollment's own effective window. All dates use the school zone.
+  const zone=activePrograms.find(row=>row.id===programId)?.timezone;
+  const effectiveSections=sectionsAtSite.filter(row=>{
+    const timeZone=zone??activePrograms.find(program=>program.id===row.programId)?.timezone??"UTC";
+    return (!row.sectionStartsAt||siteDate(row.sectionStartsAt,timeZone)<=date) &&
+      (!row.sectionEndsAt||siteDate(row.sectionEndsAt,timeZone)>=date) &&
+      (!row.membershipStartsAt||siteDate(row.membershipStartsAt,timeZone)<=date) &&
+      (!row.membershipEndsAt||siteDate(row.membershipEndsAt,timeZone)>date);
+  });
   const byKey = new Map<string, {
     studentProfileId: string; programId: string; studentName: string;
     sectionTitle: string | null; siteId: string; sectionId: string | null;
@@ -231,7 +245,7 @@ async function resolveExpectedRoster(actor: AccessContext,
       sectionTitle: null, siteId: host.siteId!, sectionId: null,
     });
   }
-  for (const row of sectionsAtSite) {
+  for (const row of effectiveSections) {
     if (!expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
     const host = activePrograms.find(p => p.id === row.programId);
     if (!host || host.siteId !== row.siteId) continue;
@@ -245,7 +259,7 @@ async function resolveExpectedRoster(actor: AccessContext,
     });
   }
   const memberships=new Map<string,{studentProfileId:string;studentName:string;programId:string;sectionId:string;sectionTitle:string}>();
-  for(const row of sectionsAtSite){
+  for(const row of effectiveSections){
     if(!expectedIds.get(row.programId)?.has(row.studentProfileId))continue;
     const host=activePrograms.find(program=>program.id===row.programId);
     if(!host||host.siteId!==row.siteId)continue;
