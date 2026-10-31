@@ -1,0 +1,229 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u02",
+      "reviewStatus": "draft",
+      "teacherOverview": "Use independent evidence to group students for function definition, domain/range, notation or rate reteaching. Unit transfer is not approved for credit until qualified academic review.",
+      "lessons": [
+        {
+          "lessonId": "u02-w08-d01",
+          "preparation": "Prepare differentiated function tables and rate diagrams for reconcile function definitions across representations; keep answer records out of student routes.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Classify {(−2,5),(0,5),(2,5)}.",
+              "answer": "Function: each input has one output."
+            },
+            {
+              "prompt": "Guided 2: Classify {(3,1),(3,2),(4,1)}.",
+              "answer": "Not a function: input 3 has two outputs."
+            },
+            {
+              "prompt": "Independent 1: Give domain and range of {(1,2),(2,2),(4,6)}.",
+              "answer": "Domain {1,2,4}; range {2,6}."
+            },
+            {
+              "prompt": "Independent 2: Find f(−3) if f(x)=2x+5.",
+              "answer": "−1."
+            },
+            {
+              "prompt": "Independent 3: Explain why (2,3),(3,3) can belong to a function.",
+              "answer": "Different inputs can share the same output."
+            },
+            {
+              "prompt": "Exit: Is {(0,0),(1,1),(0,2)} a function? Why?",
+              "answer": "No, 0 has two outputs."
+            }
+          ],
+          "misconceptions": [
+            "A repeated output is permitted, but a repeated input with different outputs violates the function definition.",
+            "Algebraic and contextual domains are not always the same.",
+            "Average rate over one interval does not imply constant rate over all intervals."
+          ],
+          "interventions": [
+            "Sort examples and nonexamples with mapping arrows and a two-column input/output table.",
+            "Use a difference quotient with labeled units, then check with a second interval."
+          ],
+          "extensions": [
+            "Compare a discrete contextual domain with an unrestricted algebraic domain, and defend the choice."
+          ]
+        },
+        {
+          "lessonId": "u02-w08-d02",
+          "preparation": "Prepare differentiated function tables and rate diagrams for evaluate functions and solve for an input; keep answer records out of student routes.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: For g(x)=3x+2, find g(−2).",
+              "answer": "−4."
+            },
+            {
+              "prompt": "Guided 2: Solve g(x)=17 for g(x)=3x+2.",
+              "answer": "3x+2=17, x=5."
+            },
+            {
+              "prompt": "Independent 1: For h(t)=t²−4t, find h(−1).",
+              "answer": "1+4=5."
+            },
+            {
+              "prompt": "Independent 2: For p(x)=2x−8, solve p(x)=0.",
+              "answer": "x=4."
+            },
+            {
+              "prompt": "Independent 3: Explain why f(2) is not the product f×2.",
+              "answer": "f(2) denotes the function output for input 2."
+            },
+            {
+              "prompt": "Exit: If q(x)=5−2x, solve q(x)=−7.",
+              "answer": "5−2x=−7; x=6."
+            }
+          ],
+          "misconceptions": [
+            "A repeated output is permitted, but a repeated input with different outputs violates the function definition.",
+            "Algebraic and contextual domains are not always the same.",
+            "Average rate over one interval does not imply constant rate over all intervals."
+          ],
+          "interventions": [
+            "Sort examples and nonexamples with mapping arrows and a two-column input/output table.",
+            "Use a difference quotient with labeled units, then check with a second interval."
+          ],
+          "extensions": [
+            "Compare a discrete contextual domain with an unrestricted algebraic domain, and defend the choice."
+          ]
+        },
+        {
+          "lessonId": "u02-w08-d03",
+          "preparation": "Prepare differentiated function tables and rate diagrams for constrain domains and ranges; keep answer records out of student routes.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Find real domain of g(x)=6/(x+5).",
+              "answer": "All real x except −5."
+            },
+            {
+              "prompt": "Guided 2: For 0≤t≤4 and V(t)=20−5t, give range.",
+              "answer": "0≤V≤20 liters."
+            },
+            {
+              "prompt": "Independent 1: A hall seats 25 people at $8 each. State domain and maximum revenue.",
+              "answer": "n∈{0,…,25}; $200."
+            },
+            {
+              "prompt": "Independent 2: State real domain of √(x−3).",
+              "answer": "x≥3."
+            },
+            {
+              "prompt": "Independent 3: For x∈{−1,0,1}, find range of x²+2.",
+              "answer": "{2,3}."
+            },
+            {
+              "prompt": "Exit: A car park has 40 spaces, $6 per car. Give revenue domain and range endpoints.",
+              "answer": "n∈{0,…,40}; revenue from $0 to $240 in $6 steps."
+            }
+          ],
+          "misconceptions": [
+            "A repeated output is permitted, but a repeated input with different outputs violates the function definition.",
+            "Algebraic and contextual domains are not always the same.",
+            "Average rate over one interval does not imply constant rate over all intervals."
+          ],
+          "interventions": [
+            "Sort examples and nonexamples with mapping arrows and a two-column input/output table.",
+            "Use a difference quotient with labeled units, then check with a second interval."
+          ],
+          "extensions": [
+            "Compare a discrete contextual domain with an unrestricted algebraic domain, and defend the choice."
+          ]
+        },
+        {
+          "lessonId": "u02-w08-d04",
+          "preparation": "Prepare differentiated function tables and rate diagrams for synthesize rate evidence and model critique; keep answer records out of student routes.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: For f(x)=3x+4, find rate over [1,4].",
+              "answer": "(16−7)/3=3."
+            },
+            {
+              "prompt": "Guided 2: For g(x)=x², compare rates on [0,2] and [2,4].",
+              "answer": "2 and 6; changing."
+            },
+            {
+              "prompt": "Independent 1: Table (0,5),(3,14),(6,23): constant rate?",
+              "answer": "Yes, both interval rates are 3."
+            },
+            {
+              "prompt": "Independent 2: Table (0,5),(2,13),(5,19): constant rate?",
+              "answer": "No, rates 4 and 2."
+            },
+            {
+              "prompt": "Independent 3: Explain why extrapolation beyond observed data is uncertain.",
+              "answer": "The rate may change beyond the observed interval."
+            },
+            {
+              "prompt": "Exit: A tank falls from 70 L at t=2 to 46 L at t=8. Average rate?",
+              "answer": "(46−70)/6=−4 liters/minute."
+            }
+          ],
+          "misconceptions": [
+            "A repeated output is permitted, but a repeated input with different outputs violates the function definition.",
+            "Algebraic and contextual domains are not always the same.",
+            "Average rate over one interval does not imply constant rate over all intervals."
+          ],
+          "interventions": [
+            "Sort examples and nonexamples with mapping arrows and a two-column input/output table.",
+            "Use a difference quotient with labeled units, then check with a second interval."
+          ],
+          "extensions": [
+            "Compare a discrete contextual domain with an unrestricted algebraic domain, and defend the choice."
+          ]
+        },
+        {
+          "lessonId": "u02-w08-d05",
+          "preparation": "Prepare differentiated function tables and rate diagrams for independent unit transfer and correction; keep answer records out of student routes.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: For f(x)=2x+9, find f(4) and rate.",
+              "answer": "f(4)=17; rate 2."
+            },
+            {
+              "prompt": "Guided 2: Does {(1,4),(2,4),(3,5)} define a function?",
+              "answer": "Yes, unique output per input."
+            },
+            {
+              "prompt": "Independent 1: For h(x)=3x−2, evaluate h(−2).",
+              "answer": "−8."
+            },
+            {
+              "prompt": "Independent 2: For g(x)=x², average rate over [1,3]?",
+              "answer": "(9−1)/2=4."
+            },
+            {
+              "prompt": "Independent 3: A shuttle holds 12 riders and charges $7 each. State feasible domain and R(5).",
+              "answer": "n∈{0,…,12}; R(5)=$35."
+            },
+            {
+              "prompt": "Independent 4: Correct a claim that {(1,2),(1,3)} is a function.",
+              "answer": "Not a function; input 1 has two distinct outputs."
+            },
+            {
+              "prompt": "Exit: Explain one difference between domain and range in a real-world function.",
+              "answer": "Domain describes permitted inputs; range describes attainable outputs."
+            }
+          ],
+          "misconceptions": [
+            "A repeated output is permitted, but a repeated input with different outputs violates the function definition.",
+            "Algebraic and contextual domains are not always the same.",
+            "Average rate over one interval does not imply constant rate over all intervals."
+          ],
+          "interventions": [
+            "Sort examples and nonexamples with mapping arrows and a two-column input/output table.",
+            "Use a difference quotient with labeled units, then check with a second interval."
+          ],
+          "extensions": [
+            "Compare a discrete contextual domain with an unrestricted algebraic domain, and defend the choice."
+          ]
+        }
+      ],
+      "assessments": []
+    }
+  ]
+}
