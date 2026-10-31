@@ -49,8 +49,10 @@ export function ChurchApplicationsDesk() {
           ? "Evidence follow-up accepted by the email provider; delivery is not confirmed. Approval is blocked pending fresh verification."
           : "Evidence follow-up recorded, but the email was not accepted by the provider. Contact the applicant through an independently established channel.");
       } else {
-        await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote[id] ?? "" } });
-        setNotice("Application declined and any linked authority evidence invalidated.");
+        const result = await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote[id] ?? "" } });
+        setNotice(result.providerAccepted
+          ? "Application declined and authority evidence invalidated. Decision notice accepted by the provider, not confirmed delivered."
+          : "Application declined and authority evidence invalidated. Decision email was not accepted by the provider; follow up through a verified channel.");
       }
       setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setFollowupNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
       await refresh();
