@@ -67,6 +67,8 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const nextAttempt=chosen?.status==="returned"?(chosen.attemptNumber??1)+1:chosen?.attemptNumber??1;
  const attemptLimitReached=Boolean(chosen&&chosen.metadata.maxAttempts!==null&&nextAttempt>chosen.metadata.maxAttempts);
  const editable=chosen?.canEdit===true&&!submittedReceipt;
+ const canSubmit=draft.trim().length>=3||pendingFiles.length>0||
+  (chosen?.status==="assigned"&&attachments.length>0);
  useEffect(()=>{
   if(!selected){setAttachments([]);return;}
   let active=true;
@@ -88,7 +90,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   return()=>{clearTimeout(task);saveGeneration.current++};
  },[chosen?.assessmentId,chosen?.status,chosen?.responseText,editable,busy,draft]);
  async function saveWork(submitFinal:boolean){
-  if(!chosen||!editable||(submitFinal&&draft.trim().length<3))return;
+  if(!chosen||!editable||(submitFinal&&!canSubmit))return;
   saveGeneration.current++;
   setBusy(true);setError("");setNotice("");
   try{
@@ -216,7 +218,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open attachment")}
       }}>{file.fileName}</button>)}</div>}
      {editable?<div className="mt-6">
-      <label className="text-sm font-semibold">Your response
+      <label className="text-sm font-semibold">Your response (optional when submitting a file)
        <textarea disabled={busy} rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
       </label>
@@ -231,7 +233,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        </>
       <button type="button" disabled={busy} onClick={()=>saveWork(false)}
        className="mr-3 mt-4 rounded-lg border px-5 py-3 text-sm font-semibold disabled:opacity-40">Save draft</button>
-      <button type="button" disabled={busy||draft.trim().length<3} onClick={()=>saveWork(true)}
+      <button type="button" disabled={busy||!canSubmit} onClick={()=>saveWork(true)}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit assignment</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
     </article>}

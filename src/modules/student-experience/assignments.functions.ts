@@ -12,6 +12,7 @@ import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { assessmentAttemptLimit, assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
 import { assessmentAvailability, assertAssessmentActionable } from "@/domain/assessment-availability";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
+import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 
 
 import { EventTypes } from "@/domain/event-types";
@@ -113,7 +114,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
   const {context,studentId,studentPersonId}=await studentActor();
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const text=data.text.trim();
-  if(text.length<3||text.length>20000)throw new Error("Response must be 3–20,000 characters");
+  if(text.length>20000)throw new Error("Response must be at most 20,000 characters");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,status:s.assessments.status,availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,dueAt:s.assessments.dueAt,metadata:s.assessments.metadata})
@@ -137,6 +138,18 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    assertAssessmentAttemptAllowed(assessment.metadata,prior?.status==="returned"
     ?prior.attemptNumber+1:prior?.attemptNumber??1);
+   if(text.length<3){
+    // A worksheet/photo can be the answer. Only verified files already linked
+    // to this student's current draft count; a returned attempt's old files do not.
+    const fileIds=prior?.status==="assigned"&&Array.isArray(prior.response?.attachments)
+     ?prior.response.attachments.filter((id):id is string=>typeof id==="string"&&z.string().uuid().safeParse(id).success):[];
+    const files=fileIds.length?await tx.select({storageKey:s.documents.storageKey}).from(s.documents)
+     .where(and(inArray(s.documents.id,fileIds),verifiedPrivateDocumentPredicate({
+      subjectType:"assessment",subjectId:assessment.id,category:"assignment_submission",uploadedByPersonId:studentPersonId,
+     }))).limit(fileIds.length):[];
+    if(!files.some(file=>file.storageKey.startsWith(`learning/assignment/${assessment.id}/`)))
+     throw new Error("Write a response of at least 3 characters or attach a verified PDF or image before submitting");
+   }
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const emitSubmission=async(submissionId:string)=>{
     await emitEvent(tx, {eventType:EventTypes.SubmissionReceived,aggregateType:"submission",
