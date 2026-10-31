@@ -1,4 +1,4 @@
-import {createFileRoute} from "@tanstack/react-router";
+import {createFileRoute,Link} from "@tanstack/react-router";
 import {useState} from "react";
 import {LOCAL_DEMO_ACCOUNTS} from "@/domain/local-demo-access";
 export const Route=createFileRoute("/access/")({component:AccessPage});
@@ -37,6 +37,7 @@ function AccessPage(){
    <button disabled={busy} type="submit" className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">{isLocalDemoEmail?"Sign in":"Email me an access link"}</button>
   </form>
   <p role="status">{status}</p>
+  <p className="text-sm"><Link to="/church/apply" className="font-semibold underline">Church leader? Request to launch a school →</Link></p>
   <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
  </main>;
 }
