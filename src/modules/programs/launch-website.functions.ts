@@ -36,9 +36,27 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
    throw new AuthorizationError("school launch website scope");
   const [address]=await db.select({slug:sitePublications.slug,status:sitePublications.status})
    .from(sitePublications).where(eq(sitePublications.siteId,school.siteId)).limit(1);
+  const host=address?publicSiteHost(address.slug):null;
+  // A published database record is not evidence of a reachable public website.
+  // Probe only our validated canonical hostname; never accept a caller-supplied URL.
+  const hostingConfigured=process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true";
+  let publicAvailability:"not_published"|"hosting_disabled"|"live"|"unreachable"="not_published";
+  let checkedAt:string|null=null;
+  if(address?.status==="published"){
+   if(!hostingConfigured)publicAvailability="hosting_disabled";
+   else if(host){
+    checkedAt=new Date().toISOString();
+    try{
+     const response=await fetch(`https://${host}/`,{method:"GET",redirect:"manual",
+      signal:AbortSignal.timeout(4000),headers:{"Accept":"text/html"}});
+     publicAvailability=response.status===200?"live":"unreachable";
+     // A redirect, error page or certificate failure is not a verified publication.
+     await response.body?.cancel();
+    }catch{publicAvailability="unreachable";}
+   }
+  }
   const base={siteId:school.siteId,programId:school.programId,programName:school.programName,
-   host:address?publicSiteHost(address.slug):null,status:address?.status??null,
-   hostingConfigured:process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true"};
+   host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt};
   if(!address)return {...base,previewHtml:null,includesSuggestions:false};
   const [approved,local,enrichment]=await Promise.all([
    readAcademicProgramCatalog(school.siteId),readCurrentLocalContent(school.siteId),readEnrichmentCatalog(school.siteId),
