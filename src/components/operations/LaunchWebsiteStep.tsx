@@ -26,7 +26,7 @@ function WebsiteStep({programId}:{programId:string}){
 export function LaunchWebsitePreview({data}:{data:Website}){
  return <>
   <p className="mt-2 text-sm">Review {data.programName}'s school page here. Church-owned welcome and community copy is edited by your assigned website editor; institutional claims follow their separate approval process.</p>
-  <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"} · {data.hostingConfigured?"Hosting configured; public availability requires separate verification":"Public hosting disabled"}</p>
+  <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"} · {data.hostingConfigured?"Server hosting flag enabled; DNS/TLS and edge deployment require independent verification":"Public hosting disabled"}</p>
   <p role="status" className="mt-2 rounded border p-3 text-sm">Public website: <strong>{data.publicAvailability==="live"?"Live — HTTPS verified":data.publicAvailability==="not_published"?"Not published":data.publicAvailability==="hosting_disabled"?"Hosting not configured":"Published but not reachable"}</strong>{data.checkedAt?` · Checked ${new Date(data.checkedAt).toLocaleString()}`:""}.</p>
   {data.host&&data.publicAvailability==="live"&&<a href={`https://${data.host}/`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline">Open verified public website</a>}
   {data.publicAvailability!=="live"&&<p role="status" className="mt-2 rounded border p-3 text-sm">
