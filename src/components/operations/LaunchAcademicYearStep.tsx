@@ -14,7 +14,7 @@ function AcademicYearStep({programId}:{programId:string}){
  useEffect(()=>{
   let current=true;
   void getLaunchAcademicYearPlan({data:{programId}}).then(value=>{if(current){setPlan(value);setError("");}})
-   .catch(()=>{if(current)setError("Academic setup could not be loaded. Check your school access, then retry.");});
+   .catch(()=>{if(current){setPlan(null);setError("Academic setup could not be loaded. Check your school access, then retry.");}});
   return()=>{current=false;};
  },[programId,attempt]);
  if(!plan)return <section id="launch-academic-year" aria-label="Prepare your academic year" className="mt-5 rounded-xl border bg-card p-5">
