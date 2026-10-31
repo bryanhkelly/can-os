@@ -62,8 +62,9 @@ export function deriveFirstSchoolDayHandoff(input: {
     return { ...base,state:"not_on_roster",
       message:"This enrolled student is not on today's expected onsite roster. Confirm the active school year, start date and instructional class placement." };
   }
+  const attendanceRecorded = ["present","tardy","absent"].includes(student.status);
   if (!student.sectionId) {
-    return { ...base,studentExpected:true,state:"placement_missing",
+    return { ...base,studentExpected:true,attendanceRecorded,state:"placement_missing",
       message:"The student is expected onsite but has no named instructional class. Resolve placement before relying on school-day preparation." };
   }
   const currentBlocks = input.blocks.filter(block =>
@@ -73,11 +74,10 @@ export function deriveFirstSchoolDayHandoff(input: {
     const outstandingGaps = [...new Set(currentBlocks.flatMap(block => block.gaps))];
     if (input.projectionTruncated) outstandingGaps.push("projection_incomplete");
     if (!currentBlocks.length) outstandingGaps.push("scheduled_supervision_missing");
-    return {...base,studentExpected:true,state:"supervision_unverified",
+    return {...base,studentExpected:true,attendanceRecorded,state:"supervision_unverified",
       outstandingGaps,
       message:"The student's scheduled Section lacks a complete independently reviewed supervision plan. The Site director must resolve staffing, room and safeguarding requirements."};
   }
-  const attendanceRecorded = ["present","tardy","absent"].includes(student.status);
   return { ...base,studentExpected:true,supervisionPlanned:true,attendanceRecorded,
     state:attendanceRecorded?"attendance_recorded":"staffing_plan_ready",
     message:attendanceRecorded
