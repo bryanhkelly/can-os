@@ -234,6 +234,24 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  for(const row of pickupReleases)pickupStudents.set("pickup_release_event:"+row.id,row.studentPersonId);
  for(const row of pickupHolds)pickupStudents.set("pickup_custody_hold:"+row.id,row.studentPersonId);
  for(const row of pickupActions)pickupStudents.set("action:"+row.id,row.studentPersonId);
+ // A CAN-to-CAN transcript release is an Admissions notification, never a
+ // general family notification. Recheck the receiving Program, Site and
+ // Organization against the active registrar grant on every notification read.
+ const transcriptNoticeIds=rows.filter(n=>
+   n.type==="transfer_destination_transcript_ready"&&
+   n.resourceType==="application"&&n.resourceId
+ ).map(n=>n.resourceId!);
+ const receivingTranscriptApplications=transcriptNoticeIds.length&&context.role==="registrar"?
+   await db.select({id:s.applications.id})
+     .from(s.applications)
+     .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+     .where(and(
+       inArray(s.applications.id,transcriptNoticeIds),
+       inArray(s.applications.programId,context.scope.programIds??[]),
+       inArray(s.programs.siteId,context.scope.siteIds??[]),
+       inArray(s.programs.organizationId,context.scope.organizationIds??[]),
+     )):[];
+ const permittedReceivingTranscriptIds=new Set(receivingTranscriptApplications.map(row=>row.id));
  const enrollmentApplicationIds=rows.filter(row=>row.resourceType==="application"&&
   ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected","admissions_stage_changed","student_access_approved"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
  const enrollmentApplications=enrollmentApplicationIds.length&&context.role==="guardian"?
@@ -480,7 +498,10 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  // Filter the whole sensitive notification (including title/body), not only
  // its deep link. Staff and student notifications retain their own ownership
  // checks and projection paths.
- const visible=rows.filter(n=>n.resourceType!=="safeguarding_concern"||
+ const visible=rows.filter(n=>
+   n.type!=="transfer_destination_transcript_ready"||
+   (!!n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)))
+  .filter(n=>n.resourceType!=="safeguarding_concern"||
    !!n.resourceId&&permittedSafeguardingIds.has(n.resourceId))
   .filter(n=>context.role!=="guardian"||!n.resourceId||
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
@@ -504,6 +525,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?"/guardian/field-trips":
    n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="registrar"&&staffTripIds.has(n.resourceId)?"/operations/field-trips":
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
+   n.type==="transfer_destination_transcript_ready"&&n.resourceType==="application"&&n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)?
+   `/admissions/intake?application=${encodeURIComponent(n.resourceId)}`:
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId&&permittedRecordsHandoffs.has(n.resourceId)?"/operations/transfer-records":
