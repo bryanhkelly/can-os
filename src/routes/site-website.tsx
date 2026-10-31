@@ -10,25 +10,35 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
+import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 
 export const Route = createFileRoute("/site-website")({
-  loader: safeLoader(
-    () => getPartnerWebsitePreviewView(),
+  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;returnGrantId?:string}=>({
+    siteId:typeof search.siteId==="string"?search.siteId:undefined,
+    programId:typeof search.programId==="string"?search.programId:undefined,
+    returnGrantId:typeof search.returnGrantId==="string"?search.returnGrantId:undefined,
+  }),
+  loaderDeps:({search})=>({siteId:search.siteId}),
+  loader:({deps})=>safeLoader(
+    () => getPartnerWebsitePreviewView({data:{siteId:deps.siteId}}),
     { authMessage: "This website preview requires a verified, Site-specific editor assignment." },
-  ),
+  )(),
   component: PartnerSiteWebsitePage,
 });
 
 function PartnerSiteWebsitePage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Partner website"
-    title="Your Site website" outcome={outcome} />;
+  const selection=Route.useSearch();
+  const returnToLaunch=selection.siteId&&selection.programId&&selection.returnGrantId
+    ?<LaunchWebsiteEditorHandoff siteId={selection.siteId} programId={selection.programId} returnGrantId={selection.returnGrantId} destination="launch"/>:null;
+  if (!outcome.ok) return <>{returnToLaunch}<LoaderFailure eyebrow="CAN OS · Partner website"
+    title="Your Site website" outcome={outcome} /></>;
 
   const data = outcome.data;
   return <WorkspaceShell
     eyebrow="CAN OS · Church partner website"
     title={data.siteName + " · church website"}
-    subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"}>
+    subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"} actions={returnToLaunch}>
     <WorkflowIntro eyebrow="Your community, your voice" title="Make your school feel local." description="Shape your church's welcome and community story while CAN maintains authoritative school programs, academic claims, and admissions information." actions={<div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl border border-border/70 bg-background/90 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><PencilLine className="size-4 text-primary" /> Church-owned content</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Edit and publish local descriptions and theological content without routine CAN approval.</p></div><div className="rounded-2xl border border-border/70 bg-background/90 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><LockKeyhole className="size-4 text-primary" /> CAN institutional content</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Academic listings, launch status, and regulated claims remain controlled by CAN.</p></div></div>} />
     <section className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
       <h2 className="flex items-center gap-2 font-serif text-2xl font-semibold"><Globe2 className="size-5 text-primary" /> Your proposed Site address</h2>
@@ -149,7 +159,7 @@ function LocalWebsiteCopyEditor({
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await publishChurchWebsiteContent({
-        data: { content, expectedRevision: data.currentRevision },
+        data: { content, expectedRevision: data.currentRevision,siteId:data.siteId },
       });
       setNotice(result.status === "review_required"
         ? "Protected institutional language was held for CAN review. Previously published church content remains unchanged."
@@ -166,7 +176,7 @@ function LocalWebsiteCopyEditor({
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await restoreChurchWebsiteContent({
-        data: { expectedRevision: data.currentRevision, restoreRevision: revision },
+        data: { expectedRevision: data.currentRevision, restoreRevision: revision,siteId:data.siteId },
       });
       setNotice(result.status === "review_required"
         ? "Historical copy needs review under current claim rules; existing public content is unchanged."

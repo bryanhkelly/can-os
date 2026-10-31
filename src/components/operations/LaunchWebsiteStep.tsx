@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {Link} from "@tanstack/react-router";
 import {getLaunchWebsitePreparation} from "@/modules/programs/launch-website.functions";
+import {LaunchWebsiteEditorHandoff} from "./LaunchWebsiteEditorHandoff";
 type Website=Awaited<ReturnType<typeof getLaunchWebsitePreparation>>;
 
 export function LaunchWebsiteStep({programId}:{programId:string}){
@@ -30,7 +31,7 @@ export function LaunchWebsitePreview({data}:{data:Website}){
   {data.previewHtml&&<iframe title={`${data.programName} private school website preview`} srcDoc={data.previewHtml}
    sandbox="" referrerPolicy="no-referrer" className="mt-4 h-[34rem] w-full rounded-lg border bg-white"/>}
   <nav aria-label="School website preparation" className="mt-4 flex flex-wrap gap-4 text-sm">
-   <Link to="/site-website" className="underline">Open church website editor</Link>
+   <LaunchWebsiteEditorHandoff siteId={data.siteId} programId={data.programId}/>
    <Link to="/admin" search={{siteId:data.siteId,inviteRole:"site_website_editor"}} className="underline">Invite your church website editor</Link>
    <Link to="/sites/$siteId/publish" params={{siteId:data.siteId}} className="underline">Review address and institutional publishing</Link>
   </nav>

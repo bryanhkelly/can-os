@@ -3,6 +3,7 @@ import {renderToStaticMarkup} from "react-dom/server";
 import {describe,expect,it,vi} from "vitest";
 vi.mock("@tanstack/react-router",()=>({Link:({children,to}:any)=>React.createElement("a",{href:to},children)}));
 vi.mock("@/modules/programs/launch-website.functions",()=>({getLaunchWebsitePreparation:vi.fn()}));
+vi.mock("@/modules/identity/workspace-session.functions",()=>({getWorkspaceSession:vi.fn()}));
 import {LaunchWebsitePreview} from "../../src/components/operations/LaunchWebsiteStep";
 describe("private website preparation in Launch Mode",()=>{
  it("shows the safe preview, real hosting limitation and next family step",()=>{

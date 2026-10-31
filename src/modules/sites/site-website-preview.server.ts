@@ -32,6 +32,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent) : null;
   return {
+    siteId:site.id,
     siteName: site.name,
     organizationName: site.organizationName,
     canPublish: site.canPublish,
