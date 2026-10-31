@@ -35,7 +35,10 @@ export function guardianAssignmentSummary(
  assignments: readonly {status:string;dueAt:string|null;score:string|null}[],
  now:Date,
 ) {
- const needsAction=assignments.filter(item=>item.status==="assigned"||item.status==="returned");
+ // A draft created after a teacher returned an earlier attempt still
+ // requires the learner to finish and resubmit; it is not completed work.
+ const needsAction=assignments.filter(item=>
+  item.status==="assigned"||item.status==="returned"||item.status==="draft");
  return {
   needsAction:needsAction.length,
   overdue:needsAction.filter(item=>item.dueAt!==null && !Number.isNaN(Date.parse(item.dueAt)) && Date.parse(item.dueAt)<now.getTime()).length,
