@@ -6,6 +6,8 @@ import { Route } from "@/routes/operations.launch.index";
 import type { getSiteToday } from "@/modules/operations/site-today.functions";
 
 const state=vi.hoisted(()=>({data:null as unknown}));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=> (options:object)=>({options,useLoaderData:()=>state.data,useSearch:()=>({})}),
   Link:({children}: {children:ReactNode})=><a>{children}</a>,
