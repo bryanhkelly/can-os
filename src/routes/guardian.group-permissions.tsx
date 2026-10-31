@@ -26,8 +26,10 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
  async function decide(actionId:string,approve:boolean){
   setBusy(true);setError("");setNotice("");
   try{const result=await decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===true}});
-   await router.invalidate();
-   setNotice("obsolete" in result&&result.obsolete?"Request cleared — it was no longer active.":approve?"Permission granted.":"Permission declined.");}
+   setNotice("obsolete" in result&&result.obsolete?"Request cleared — it was no longer active.":approve?"Permission granted; facilitator review still applies.":"Permission declined.");
+   try{await router.invalidate();}
+   catch{setError("Your decision was saved, but the permission list could not refresh. Reopen it rather than submitting twice.");}
+  }
   catch(e){setError(e instanceof Error?e.message:"Unable to save permission");}
   finally{setBusy(false);}
  }
