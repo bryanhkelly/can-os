@@ -8,7 +8,7 @@ const evidence = {
   verifiedAt: new Date(when.getTime() - 3600000),
   verifiedByPersonId: "verifier",
   expiresAt: evidenceExpiresAt(when),
-  metadata: { provenance: "can_steward_independently_reviewed", churchRequestId: "request-a", churchSlug: "church-a", authorizedEmailNormalized: "leader@example.org" },
+  metadata: { provenance: "can_steward_independently_reviewed", screeningStatus: "passed", privateObjectVerified: true, churchRequestId: "request-a", churchSlug: "church-a", authorizedEmailNormalized: "leader@example.org" },
 };
 
 describe("church authority evidence policy", () => {
@@ -18,6 +18,12 @@ describe("church authority evidence policy", () => {
   it("rejects applicant-declared or missing independent review provenance", () => {
     expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { ...evidence.metadata, provenance: "applicant_declared" } }, request, "approver", when)).toBe(false);
     expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { churchRequestId: request.id } }, request, "approver", when)).toBe(false);
+  });
+  it("rejects unscreened, uninspected, quarantined and revoked evidence", () => {
+    expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { ...evidence.metadata, screeningStatus: "pending" } }, request, "approver", when)).toBe(false);
+    expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { ...evidence.metadata, screeningStatus: "quarantined" } }, request, "approver", when)).toBe(false);
+    expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { ...evidence.metadata, privateObjectVerified: false } }, request, "approver", when)).toBe(false);
+    expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { ...evidence.metadata, revokedAt: when.toISOString() } }, request, "approver", when)).toBe(false);
   });
   it("rejects approval by the verifying steward", () => {
     expect(currentChurchAuthorityEvidence(evidence, request, "verifier", when)).toBe(false);
