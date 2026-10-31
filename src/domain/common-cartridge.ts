@@ -329,6 +329,7 @@ export function extractCommonCartridgeStaticLesson(zip:Uint8Array,entry:Cartridg
  // A deliberately conservative allowlist: reject rather than attempt to repair
  // complex markup. Preserve only plain paragraph, heading and list semantics.
  const raw=result;
+ if(/\u0000|\u2028|\u2029/.test(raw))throw new Error("Unsafe control characters in static lesson.");
  if(raw.length>128*1024)throw new Error("HTML lesson exceeds content limit.");
  if(/<(?:script|style|iframe|object|embed|svg|math|form|input|button|link|meta|base|template|video|audio|img|canvas)\b/i.test(raw)||
     /\bon[a-z]+\s*=|\b(?:href|src|srcset|style|id|class|action|formaction)\s*=/i.test(raw)||
