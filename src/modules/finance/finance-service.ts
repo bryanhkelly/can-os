@@ -42,6 +42,7 @@ export function authorizeFinance(identity: FinanceIdentity, charge: Charge, acti
         !identity.authorizedHouseholdIds?.includes(charge.householdId)) throw new AuthorizationError("finance guardian");
     return;
   }
+  if (viewer === "site" && action === "manage" && charge.collector === "CAN" && !context.capabilities.has("finance.manage.can")) throw new AuthorizationError("CAN tuition authority");
   const required = action === "read" ? "finance.read" : "finance.manage";
   if (!context.capabilities.has(required)) throw new AuthorizationError(required);
   if (viewer === "institution") {
