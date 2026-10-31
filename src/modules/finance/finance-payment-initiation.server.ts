@@ -21,9 +21,7 @@ export async function initiateGuardianPayment(
     obligationId, idempotencyKey, provider: processor.name, amountCents,
   });
   if (attempt.kind === "existing")
-    return attempt.status === "submitted" && attempt.intentId
-      ? { kind: "submitted" as const, intentId: attempt.intentId }
-      : { kind: "unavailable" as const, reason: "Payment request pending reconciliation" };
+    return { kind: "unavailable" as const, reason: "Existing payment intent requires server-side reconciliation before checkout" };
   const result = await processor.requestPayment({
     obligationId, amountCents, currency: "USD", idempotencyKey,
   });
