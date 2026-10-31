@@ -331,7 +331,7 @@ export async function listExtendedEvidenceReviews(actor: AccessContext) {
     .where(and(
       eq(programs.academicProviderOrganizationId, providerId),
       inArray(programs.type, ["summer_enrichment", "summer_program", "after_school_enrichment"]),
-      eq(activitySeasons.status, "draft"),
+      inArray(activitySeasons.status, ["draft", "registration"]),
     )).limit(200);
 }
 

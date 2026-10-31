@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, calendarEvents, documents, organizations, people,
@@ -84,6 +84,7 @@ export async function readExtendedSeasonApprovals(
       inArray(accountPersonGrants.personId, reviewerIds),
       eq(accountPersonGrants.role, "can_network_steward"),
       eq(accountPersonGrants.active, true),
+      isNull(accountPersonGrants.siteId),
       eq(people.active, true), eq(accessAccounts.disabled, false),
       eq(organizations.type, "can_network"),
     )) : [];

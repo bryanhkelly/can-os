@@ -11,6 +11,7 @@ import { programTypeLabels } from "@/domain/program-offerings";
 import type { EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listEnrichmentSessionRoster } from "@/modules/activities/enrichment-roster.functions";
 import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
+import { ExtendedSeasonEvidencePanel } from "./ExtendedSeasonEvidencePanel";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
 
@@ -31,6 +32,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [readinessOwners, setReadinessOwners] = useState<Record<string,string>>({});
+  const [evidenceSeasonId, setEvidenceSeasonId] = useState("");
   const [scheduleSeasonId, setScheduleSeasonId] = useState("");
   const [scheduleFrom, setScheduleFrom] = useState("");
   const [scheduleThrough, setScheduleThrough] = useState("");
@@ -241,6 +243,14 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
             <li key={season.id} className="rounded-lg border p-3 text-sm">
               <strong>{season.offeringName}</strong> · {season.name} · {season.startsOn} to {season.endsOn}
               <span className="ml-2 text-xs text-muted-foreground">{season.status} · {season.capacity ?? "Uncapped"} seats</span>
+              {(season.status === "draft" || season.status === "registration") && <div className="mt-2">
+                <button type="button" className="text-xs font-semibold underline"
+                  onClick={() => setEvidenceSeasonId(old => old === season.id ? "" : season.id)}>
+                  {evidenceSeasonId === season.id ? "Close operating evidence" : "Submit and review operating evidence"}
+                </button>
+                {evidenceSeasonId === season.id && <ExtendedSeasonEvidencePanel seasonId={season.id}
+                  onChange={() => router.invalidate()}/>}
+              </div>}
               {season.status === "registration" &&
                 <a href="/enrichment" className="ml-3 text-xs underline">View public catalog</a>}
               {season.status === "draft" && (() => {
