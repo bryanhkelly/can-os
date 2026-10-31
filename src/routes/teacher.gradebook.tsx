@@ -1,3 +1,4 @@
+import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
 import { GradebookOverview } from "@/components/learning/GradebookOverview";
 import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
 import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
@@ -225,19 +226,17 @@ function TeacherGradebookPage() {
 
  const liveRubricScore = (assessment: Assessment) => liveRubricTotal(assessment.rubric, rubricInputs);
 
- /** Arrow-key movement across the grade grid. */
+ /** Arrow-key movement across the currently visible, authorized grade grid. */
  const onCellKeyDown = (event: React.KeyboardEvent, row: number, col: number) => {
-  const delta: Record<string, [number, number]> = {
-   ArrowUp: [-1, 0],
-   ArrowDown: [1, 0],
-   ArrowLeft: [0, -1],
-   ArrowRight: [0, 1],
-  };
-  const move = delta[event.key];
-  if (!move) return;
+  const next = nextGradebookCell(
+   event.key, row, col,
+   gradebook?.students.filter(item=>!search.student||item.studentProfileId===search.student).length??0,
+   gradebook?.assessments.filter(item=>!search.assessment||item.id===search.assessment).length??0,
+  );
+  if (!next) return;
   event.preventDefault();
   gridRef.current
-   ?.querySelector<HTMLElement>(`[data-cell="${row + move[0]}:${col + move[1]}"]`)
+   ?.querySelector<HTMLElement>(`[data-cell="${next.row}:${next.column}"]`)
    ?.focus();
  };
 
