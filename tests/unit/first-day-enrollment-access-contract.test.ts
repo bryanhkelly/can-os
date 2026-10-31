@@ -31,6 +31,9 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(source).toContain("loadFirstDaySupervisionPreparationForActor");
     expect(source).toContain("qualified_teacher_missing");
     expect(source).toContain("multiple_section_placements");
+    expect(source).toContain("versionByYear");
+    expect(source).toContain("day.minutes!==0");
+    expect(source).toContain("sectionScheduleMissing");
     expect(source).toContain('studentProfileId:app.studentProfileId');
     expect(source).not.toContain("insert(attendanceEvents)");
     expect(source).not.toContain("markExpectedOnsiteAttendance");
@@ -46,6 +49,8 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(future).toContain("qualifiedTeacherAssigned");
     expect(future).toContain('eq(accountPersonGrants.role,"teacher")');
     expect(future).toContain("program.academicProviderOrganizationId");
+    expect(attendance).toContain("lte(terms.startsOn,date),gte(terms.endsOn,date)");
+    expect(attendance).toContain("effectiveSections=sectionsAtSite.filter");
     expect(future).not.toContain("recordAttendanceRevision");
     const staffing=read("src/modules/operations/onsite-supervision.functions.ts");
     expect(staffing).toContain("loadFirstDaySupervisionPreparationForActor");
