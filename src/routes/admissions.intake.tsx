@@ -184,7 +184,14 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
         "Pending — may review and issue an offer; activation must wait":"Requires review before placement"}.</p>
       {r.transferNamedDestination&&<p className="mt-1">Family's named receiving school: {r.transferNamedDestination}.
         Confirm that this application is for the intended destination.</p>}
-      <p className="mt-1 text-xs text-muted-foreground">This school must independently decide admission, confirm seat capacity, obtain guardian acceptance and activate a real Section. Academic-record delivery is a separate process.</p>
+      <p className="mt-1">Origin academic records: <strong>{r.transferRecordsStatus==="completed"?
+        "Handoff recorded by originating records office":
+        r.transferRecordsStatus==="pending_release"?
+        "Secure transcript handoff pending":
+        r.transferRecordsStatus==="requires_review"?
+        "Origin record authorization requires review":
+        "Not yet started"}</strong>.</p>
+      <p className="mt-1 text-xs text-muted-foreground">An institutional records handoff is separate from receiving-school admission. This school must independently decide admission, confirm seat capacity, obtain guardian acceptance and activate a real Section.</p>
     </div>}
     <p className="mt-3 text-xs text-muted-foreground">
       Guardian verification: <strong>{r.guardianVerified?"Verified":"Required"}</strong> ·
