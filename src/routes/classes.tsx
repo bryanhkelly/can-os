@@ -1,3 +1,4 @@
+import { ClassRosterPanel } from "@/components/learning/ClassRosterPanel";
 import { ClassAssessmentEvidence } from "@/components/learning/ClassAssessmentEvidence";
 import { ClassLearningProgress } from "@/components/learning/ClassLearningProgress";
 import { ClassTeachingTeam } from "@/components/learning/ClassTeachingTeam";
@@ -363,14 +364,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {(!data.content || !classResources(data.content).length) && !supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}
     </WorkspacePanel>}
     {tab === "syllabus" && <WorkspacePanel title="Syllabus"><p className="whitespace-pre-wrap text-sm leading-8">{data.content?.syllabus || "No syllabus has been published."}</p></WorkspacePanel>}
-    {tab === "people" && (data.role === "teacher" ? <WorkspacePanel title="Class roster" description="Only current section enrollments appear. Completion is student-reported, not mastery.">
-      <ul className="divide-y">{data.roster.map(student => <li key={student.profileId} className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <Link to="/staff/students/$personId" params={{ personId: student.personId }} className="text-sm font-semibold underline">{student.name}</Link>
-        <span className="text-sm text-muted-foreground">{student.completedLessons} / {lessons.length} lessons marked complete</span>
-        <Link to="/teacher/gradebook" search={{ section: data.section.id, student: student.profileId }} className="text-sm underline">Review classwork</Link>
-      </li>)}</ul>
-      {!data.roster.length && <p className="text-sm">No students are enrolled in this class.</p>}
-    </WorkspacePanel> : <p role="alert" className="text-sm">Class rosters are available only to the assigned teaching team.</p>)}
+    {tab === "people" && (data.role === "teacher"
+      ? <ClassRosterPanel students={data.roster} lessonCount={lessons.length} sectionId={data.section.id} />
+      : <p role="alert" className="text-sm">Class rosters are available only to the assigned teaching team.</p>)}
     {tab === "teacher-guide" && (data.role === "teacher" ? (
       <div className="grid gap-5">
         {!teacherGuides && <WorkspacePanel title="Teacher guide not published">
