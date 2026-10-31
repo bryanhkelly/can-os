@@ -66,8 +66,6 @@ jobs:
         run: |
           npm run test:integration:full-flow -- --preflight
           npm run db:migrate:fullflow -- --preflight
-      - name: Apply only reviewed migrations to isolated branch
-        run: npm run db:migrate:fullflow
       - name: Ensure independent admissions target differs from FullFlow target
         shell: bash
         run: |
@@ -80,6 +78,8 @@ jobs:
               process.exit(1);
             }
           '
+      - name: Apply only reviewed migrations to isolated FullFlow branch
+        run: npm run db:migrate:fullflow
       - name: Verify separate admissions database is an attested disposable branch
         env:
           TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
@@ -130,6 +130,6 @@ jobs:
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Every step above (including separate-branch admissions and safeguarding) must succeed on this exact SHA. Any failure or skip means HOLD."
             echo "- Status: CONNECTED-GATES PASS only when every check succeeds; operational deployment readiness and coordinator approval remain separate."
-            echo "- Required independent evidence: Admissions Neon Acceptance run ID, build/typecheck/unit run ID, migration parity, child-safety negative checks, and deployment readiness."
+            echo "- This run provides same-SHA admissions, static, schema and Journey C results only when all respective steps pass. Deployment readiness and coordinator approval are separate."
             echo "- This synthetic isolated-branch evidence does not authorize production deployment or certify legal/accreditation compliance."
           } >> "${GITHUB_STEP_SUMMARY}"
