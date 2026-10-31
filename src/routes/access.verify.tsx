@@ -25,7 +25,7 @@ export const Route=createFileRoute("/access/verify")({
       ?await redeemOneTimeAccess(payload.token)
       :null;
     if(!result)return Response.json({error:"Invalid request"},{status:400});
-    return new Response(JSON.stringify({ok:true,role:result.role}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
+    return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch{
     // The credential was not accepted; no account/person may be inferred from
     // an arbitrary token or demo-code attempt. Record only a bounded anonymous
@@ -60,9 +60,11 @@ function VerifyAccess(){
    if(res.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
    setToken(null);
-   const body=await res.json() as {role?:string};
+   const body=await res.json() as {role?:string;launchSiteId?:string};
    const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
-   window.location.replace(home[body.role??""]??"/access");
+   window.location.replace(body.role==="registrar" && body.launchSiteId
+    ? "/operations/launch?siteId="+encodeURIComponent(body.launchSiteId)
+    : home[body.role??""]??"/access");
   }catch{setStatus("Unable to complete sign-in.");}finally{setWorking(false);}
  }
  return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
