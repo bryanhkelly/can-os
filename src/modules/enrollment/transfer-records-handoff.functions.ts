@@ -365,7 +365,7 @@ export const getReceivingSchoolTransferTranscript=createServerFn({method:"POST"}
    }).from(s.actions).where(eq(s.actions.id,originId)).limit(1);
    if(!origin||origin.type!=="guardian_enrollment_change_request"||
       origin.subjectId!==app.studentProfileId||
-      origin.programId===app.programId||
+      !origin.programId||origin.programId===app.programId||
       origin.status!=="resolved"||
       origin.metadata.kind!=="transfer"||
       origin.metadata.exitCompletedByRegistrar!==true||
