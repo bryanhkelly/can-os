@@ -42,8 +42,14 @@ function GuardianAttendancePage() {
       setAbsences(result.absences);
       const excusedIds = result.absences.filter(absence => absence.excuse).map(absence => absence.attendanceEventId);
       if (excusedIds.length) {
-        const counts = await listExcuseAttachmentCounts({ data: { attendanceEventIds: excusedIds } });
-        if (version === requestVersion.current) setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
+        // Counts are optional decoration: a document-service problem must never
+        // conceal attendance cases or prevent a family from submitting an excuse.
+        try {
+          const counts = await listExcuseAttachmentCounts({ data: { attendanceEventIds: excusedIds } });
+          if (version === requestVersion.current) setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
+        } catch {
+          if (version === requestVersion.current) setDocCounts({});
+        }
       } else {
         if (version === requestVersion.current) setDocCounts({});
       }
