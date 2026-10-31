@@ -14,14 +14,17 @@ const guides=[read("unit01-teacher-guide.json"),...Array.from({length:5},(_,i)=>
 const week2Assessments=read("week02-assessments-draft.json");
 const week2Keys=read("week02-assessment-teacher-key.json");
 const week3=read("week03-lessons-draft.json");
+const week4=read("week04-lessons-draft.json");
 const week3Guide=read("week03-teacher-guide.json");
-const lessons=[...week1.lessons,...week2.flatMap(w=>w.lessons),...week3.lessons];
+const week4Guide=read("week04-teacher-guide.json");
+const lessons=[...week1.lessons,...week2.flatMap(w=>w.lessons),...week3.lessons,...week4.lessons];
 const ids=new Set();
 const required=["launch","guided_practice","independent_practice"];
 const prohibited=/\b(?:lorem ipsum|todo|tbd|coming soon|insert lesson|placeholder|sample lesson)\b/i;
 if(blueprint.weeks?.length!==36||blueprint.targetInstructionalWeeks!==36)fail("Blueprint must map 36 instructional weeks");
 for(let i=0;i<36;i++)if(blueprint.weeks[i]?.week!==i+1)fail(`Week ${i+1} missing or out of order`);
-if(lessons.length!==15)fail("Expected 15 genuinely authored lesson days through Week 3");
+if(lessons.length!==20)fail("Expected 20 genuinely authored lesson days through Week 4");
+if(week4.week!==4||week4.unitId!==blueprint.weeks[3].unitId||week4.lessons.length!==5)fail("Week 4 five-day content or unit mapping missing");
 if(week3.week!==3||week3.unitId!==blueprint.weeks[2].unitId||week3.lessons.length!==5||week3.authoredDays!==5)fail("Week 3 five-day content or unit mapping missing");
 if(week2.some(w=>w.lessons?.length!==1))fail("Each Week 2 draft must contain one actual lesson");
 for(const l of lessons){
@@ -33,7 +36,7 @@ for(const l of lessons){
  if(l.activities.reduce((n,a)=>n+(a.estimatedMinutes||0),0)!==55)fail(`Incorrect 55-minute pacing: ${l.id}`);
  if(l.resources?.length)fail(`External resources require explicit per-item licensing review: ${l.id}`);
 }
-guides.push(week3Guide);
+guides.push(week3Guide,week4Guide);
 if(guides.some(g=>g.visibility!=="teacher_only"||g.courseCode!=="CAN-ALG1"))fail("Teacher answer guides must stay teacher-only");
 const answers=new Set(guides.flatMap(g=>g.units?.flatMap(u=>u.lessons?.filter(l=>l.workedAnswers?.length)?.map(l=>l.lessonId)||[])||[]));
 for(const id of ids)if(!answers.has(id))fail(`Missing teacher answer key: ${id}`);
@@ -52,13 +55,13 @@ const metadata=read("release-metadata.json");
 if(metadata.license!=="LicenseRef-CAN-Original"||metadata.sourceType!=="original")fail("Source/license metadata missing or unapproved");
 if(metadata.releaseStatus!=="review_required"||metadata.creditStatus!=="not_credit_ready")fail("Do not assert publication or credit readiness");
 if(metadata.externalSources?.length)fail("External source licensing must be reviewed before packaging");
-const summary={courseCode:"CAN-ALG1",targetWeeks:36,authoredWeeks:3,authoredLessons:lessons.length,plannedLessons:180,unwrittenLessons:165,reviewStatus:"teacher_review_required",creditStatus:"not_credit_ready",publisherAdoption:"not_authorized",assessmentGap:"Week 2 standalone assessments drafted but not teacher-approved; Weeks 3–36 assessments missing"};
+const summary={courseCode:"CAN-ALG1",targetWeeks:36,authoredWeeks:4,authoredLessons:lessons.length,plannedLessons:180,unwrittenLessons:160,reviewStatus:"teacher_review_required",creditStatus:"not_credit_ready",publisherAdoption:"not_authorized",assessmentGap:"Week 2 standalone assessments drafted but not teacher-approved; Weeks 3–36 assessments missing"};
 if(process.argv.includes("--report"))console.log(JSON.stringify(summary,null,2));
 else if(process.argv.includes("--write")){
  const output=process.argv[process.argv.indexOf("--write")+1];
  if(!output||output.startsWith("-"))fail("Pass a destination path after --write");
  const modules=[{id:week1.unitId,title:week1.title,lessons}];
  // This is the existing classContent v1 shape; teacher guides remain separate and must never be bundled into student content.
- writeFileSync(output,JSON.stringify({version:1,syllabus:"CAN Algebra I — DRAFT. Teacher review and CAN institutional adoption required. This package contains only Weeks 1–3 of a 36-week plan.",blueprint,modules,resources:[]},null,2)+"\n");
+ writeFileSync(output,JSON.stringify({version:1,syllabus:"CAN Algebra I — DRAFT. Teacher review and CAN institutional adoption required. This package contains only Weeks 1–4 of a 36-week plan.",blueprint,modules,resources:[]},null,2)+"\n");
  console.log(`Wrote non-adopted classroom draft to ${output}`);
 }else fail("Use --report or --write <output.json>; no implicit publication");
