@@ -103,7 +103,7 @@ describe("Common Cartridge conservative static lesson",()=>{
   const bomb=Buffer.from(archive);
   bomb.writeUInt32LE(21*1024*1024,central+24);
   expect(()=>extractCommonCartridgeStaticLesson(bomb,entry)).toThrow();
-  for(const html of ["<p>Hi\\u0000there</p>","<p>Bad < text</p>","<p>Bad &amp; entity</p>"]){
+  for(const html of ["<p>Hi"+String.fromCharCode(0)+"there</p>","<p>Bad < text</p>","<p>Bad &amp; entity</p>"]){
    expect(()=>extractCommonCartridgeStaticLesson(zipEntry("lessons/a.html",html),entry)).toThrow();
   }
  });
