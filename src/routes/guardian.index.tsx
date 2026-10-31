@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
+import { listGuardianGradeFollowUps } from "@/modules/learning/guardian-grade-response.functions";
 import { WorkspaceShell, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
 import { prioritizeFamilyNeeds } from "@/domain/family-needs";
 import { buildGuardianAttention } from "@/domain/daily-operations";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/guardian/")({
 
 type Child = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 type NeedItem = Awaited<ReturnType<typeof getGuardianNeedsYou>>["items"][number];
+type GradeFollowUp = Awaited<ReturnType<typeof listGuardianGradeFollowUps>>["items"][number];
 
 function FamilyHomePage() {
  const {action,student}=Route.useSearch();
@@ -25,17 +27,24 @@ function FamilyHomePage() {
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
  const [needsWarning, setNeedsWarning] = useState("");
+ const [gradeFollowUps, setGradeFollowUps] = useState<GradeFollowUp[]>([]);
+ const [gradeFollowUpsWarning, setGradeFollowUpsWarning] = useState("");
 
  useEffect(() => {
   let active = true;
   Promise.all([getFamilyHome(), getGuardianNeedsYou().then(
    result => ({items:result.items,unavailable:false}),
    () => ({items:[] as NeedItem[],unavailable:true}),
-  )]).then(([home, needsYou]) => {
+  ), listGuardianGradeFollowUps().then(
+   result => ({items:result.items,unavailable:false}),
+   () => ({items:[] as GradeFollowUp[],unavailable:true}),
+  )]).then(([home, needsYou, schoolQuestions]) => {
    if (!active) return;
    setChildren(home.children);
    setNeeds(needsYou.items);
    setNeedsWarning(needsYou.unavailable ? "Your attention list is temporarily unavailable. You can still review each child, attendance and enrollment." : "");
+   setGradeFollowUps(schoolQuestions.items);
+   setGradeFollowUpsWarning(schoolQuestions.unavailable ? "School question status is temporarily unavailable. Open academics to review your child's feedback." : "");
    setLoading(false);
   }).catch(() => {
    if (active) { setError("Sign in with an authorized guardian account to view your family home."); setLoading(false); }
@@ -43,14 +52,18 @@ function FamilyHomePage() {
   return () => { active = false; };
  }, []);
 
- return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} needsWarning={needsWarning} action={action} student={student}/>;
+ return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} needsWarning={needsWarning}
+  gradeFollowUps={gradeFollowUps} gradeFollowUpsWarning={gradeFollowUpsWarning} action={action} student={student}/>;
 }
 
-export function FamilyHomeView({children,needs,loading,error,needsWarning,action,student}:{
- children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;action?:string;student?:string;
+export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeFollowUps=[],gradeFollowUpsWarning,action,student}:{
+ children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;
+ gradeFollowUps?:GradeFollowUp[];gradeFollowUpsWarning?:string;action?:string;student?:string;
 }){
  const selectedChild=children.find(child=>child.studentPersonId===student);
  const visibleChildren=selectedChild?[selectedChild]:children;
+ const visibleQuestions=gradeFollowUps.filter(question=>!selectedChild||
+  question.studentPersonId===selectedChild.studentPersonId);
  const schoolworkItems=visibleChildren.flatMap(child=>child.workToReview.map(work=>({
   id:child.studentPersonId+":"+work.assessmentId,
   kind:"schoolwork",
