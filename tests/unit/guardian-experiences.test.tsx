@@ -65,7 +65,7 @@ describe("guardian experiences route", () => {
     const loader = (GuardianExperiencesRoute.options as { loader: () => Promise<unknown> }).loader;
     const outcome = await loader() as { ok: boolean; authError?: string | null };
     expect(outcome.ok).toBe(false);
-    expect(outcome.authError).toContain("guardian");
+    expect(outcome.authError).toBe("You do not have permission to view this page.");
   });
 });
 
