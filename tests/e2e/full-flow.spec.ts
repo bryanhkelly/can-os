@@ -810,8 +810,12 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         await expect(denied.getByText(fixture.programName)).toHaveCount(0);
       }
 
-      // Verify that the negative authorization result survives a fresh browser
-      // session, rather than relying on stale client-side state.
+      // Revisit the protected academics URL after the unrelated guardian's
+      // other navigation, then reload that exact route to catch stale-cache leaks.
+      await goto(
+        unrelatedGuardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
       await unrelatedGuardian.page.reload();
       await waitForAppHydration(unrelatedGuardian.page);
       await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
