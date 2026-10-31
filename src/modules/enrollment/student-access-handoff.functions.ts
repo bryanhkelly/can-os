@@ -53,6 +53,7 @@ class StudentLearningBlocker extends AuthorizationError {
  }
 }
 async function requireEligibleStudent(tx:HandoffReader,app:HandoffApplication){
+ if(!app.siteId)throw new AuthorizationError("student application school Site");
  if(app.stage!=="accepted")throw new StudentLearningBlocker("application_not_accepted",
   "The application is not currently accepted.","Review the admissions decision","application","accepted school application required");
  if(app.programStatus!=="active")throw new StudentLearningBlocker("program_inactive",
