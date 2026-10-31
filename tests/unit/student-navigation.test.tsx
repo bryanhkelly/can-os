@@ -17,7 +17,8 @@ const state = vi.hoisted(() => ({
     { assessmentId: "graded", title: "Graded essay", course: "English", status: "graded", timeliness: "on_time", dueAt: null },
     { assessmentId: "returned", title: "Returned essay", course: "English", status: "returned", timeliness: "late", dueAt: null },
   ].map(item=>({...item,responseText:`Saved draft for ${item.title}`,assessmentStatus:"published",
-    metadata:{rubric:""},attempts:[],pointsPossible:100})),
+    metadata:{rubric:"",maxAttempts:null,criteria:[]},attempts:[],pointsPossible:100,
+    workAvailability:{actionable:true,reason:null},canEdit:true,attemptNumber:1})),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
