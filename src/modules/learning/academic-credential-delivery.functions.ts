@@ -76,9 +76,12 @@ export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
    .where(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId)).limit(1);
   if(!row||!context.scope.organizationIds?.includes(row.issuingOrganizationId))
    throw new AuthorizationError("issuer authorization");
-  await db.update(s.academicCredentialReleaseAuthorizations)
-   .set({revokedAt:new Date(),updatedAt:new Date()})
-   .where(eq(s.academicCredentialReleaseAuthorizations.id,row.id));
+  await db.transaction(async tx=>{
+   await tx.update(s.academicCredentialReleaseAuthorizations)
+    .set({revokedAt:new Date(),updatedAt:new Date()})
+    .where(eq(s.academicCredentialReleaseAuthorizations.id,row.id));
+   await writeAudit(tx,context,{action:"academic_credential.release.revoke",entityType:"academic_credential_release_authorization",entityId:row.id,scope:{organizationId:row.issuingOrganizationId}});
+  });
   return {revoked:true};
  });
 
