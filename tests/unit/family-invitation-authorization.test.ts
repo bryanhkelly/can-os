@@ -115,6 +115,9 @@ describe("family invitation authorization", () => {
         email: "family@example.test",
         consumedAt,
       }] }) })
+      .mockReturnValueOnce({ from: () => ({
+        leftJoin: () => ({ leftJoin: () => ({ where: async () => [] }) }),
+      }) })
       .mockReturnValueOnce({ from: () => ({ where: () => ({ orderBy: async () => [] }) }) });
 
     const workspace = await listFamilyInvitationWorkspace(registrar);
