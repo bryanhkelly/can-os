@@ -89,6 +89,7 @@ export const verifySitePublicationReachability = createServerFn({ method: "POST"
       return { status: verified ? "live" as const : "unreachable" as const, url, checkedAt,
         diagnostic: verified ? "Public HTTPS returned CAN site HTML." : "HTTPS responded, but the response was not recognizable as a CAN public site." };
     } catch {
-      return { status: "unreachable" as const, url };
+      return { status: "unreachable" as const, url, checkedAt,
+        diagnostic: "HTTPS request failed; check wildcard DNS, TLS issuance, and Netlify deployment." };
     }
   });
