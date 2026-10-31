@@ -79,6 +79,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,action
       <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted">School &amp; conferences <ArrowUpRight className="size-4"/></Link>
       <Link to="/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><Mail className="size-4" /> Family inbox</Link>
       <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><CalendarDays className="size-4" /> Attendance</Link>
+      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted">Pickup &amp; safety</Link>
      </div>
     </div>
    </section>
@@ -136,6 +137,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,action
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
        <Link to="/guardian/academics" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
        <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
+       <Link to="/guardian/attendance" search={{student:child.studentPersonId}} hash="pickup" className="rounded-full border px-3 py-1 hover:bg-muted">Pickup &amp; safety</Link>
        <Link to="/guardian/report-cards" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
        <Link to="/guardian/admission-offers" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Offers</Link>
       </nav>
