@@ -209,7 +209,7 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
        payload:{type:"transfer_academic_records_handoff",originChangeActionId:action.id},
      });
      await notify(tx,{
-       recipientPersonId:actor.actorPersonId,
+       recipientPersonId:actor.actorPersonId!,
        type:"transfer_academic_records_handoff_requested",
        title:"Destination records handoff requires secure completion",
        body:"The student's origin enrollment has ended. Verify the new school's authority, issue official records and record a secure release.",
