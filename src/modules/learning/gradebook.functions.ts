@@ -188,6 +188,8 @@ export const getGradebook = createServerFn({ method: "GET" })
    title: s.assessments.title,
    status: s.assessments.status,
    dueAt: s.assessments.dueAt,
+   availableAt: s.assessments.availableAt,
+   closesAt: s.assessments.closesAt,
    pointsPossible: s.assessments.pointsPossible,
    metadata: s.assessments.metadata,
   })
