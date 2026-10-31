@@ -1,3 +1,4 @@
+import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
 import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -212,14 +213,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      <button disabled={busy||!courseVersionId||(scope==="section"&&!sectionId)} className="justify-self-start rounded bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Add supplement</button>
      <fieldset className="sm:col-span-2 space-y-3 rounded-lg border p-4">
       <legend className="px-2 text-sm font-semibold">Upload a private PDF</legend>
-      <p className="text-xs text-muted-foreground">Upload a PDF directly to CAN's private storage. It is visible only in the selected program, site or class and downloadable by authorized class members.</p>
-      <input key={pdfKey} type="file" accept=".pdf,application/pdf" disabled={busy||!data.pdfUpload.enabled}
-        onChange={e=>setPdfFile(e.currentTarget.files?.[0]??null)} className="block w-full text-sm" aria-label="Supplemental PDF"/>
-      <label className="flex items-start gap-2 text-xs">
-       <input type="checkbox" checked={rightsConfirmed} disabled={busy||!data.pdfUpload.enabled}
-        onChange={e=>setRightsConfirmed(e.currentTarget.checked)}/>
-       <span>I have permission to share this material with authorized learners. Uploading does not authorize AI training or public redistribution.</span>
-      </label>
+      <CurriculumPdfPicker enabled={data.pdfUpload.enabled} busy={busy} fileKey={pdfKey}
+       selectedFile={pdfFile} rightsConfirmed={rightsConfirmed}
+       onFileChange={setPdfFile} onRightsChange={setRightsConfirmed} />
       <button type="button" disabled={busy||!data.pdfUpload.enabled||!pdfFile||!rightsConfirmed||!courseVersionId||
           !title.trim()||(scope==="section"&&!sectionId)}
        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
