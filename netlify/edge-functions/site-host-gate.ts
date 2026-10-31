@@ -27,6 +27,8 @@ export default function siteHostGate(request: Request): Response | URL | undefin
     status: 404,
     headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
   });
+  // Never accept forwarded Host or user-supplied destination overrides.
+  // The origin must independently authorize the resolved publication.
   if (decision.rewrite) {
     const target=request.method!=="POST"?"/published-site":
       new URL(request.url).pathname==="/apply"
