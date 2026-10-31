@@ -3,7 +3,7 @@ import { and,eq,inArray,sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { curriculumImportJobs,curriculumInteropMappings,programs,sections,terms,schoolYears } from "@/db/schema";
+import { curriculumImportJobs,curriculumInteropMappings,programs,sections,terms,schoolYears,studentProfiles,people,enrollments } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { previewOneRosterBundle } from "@/domain/oneroster-csv";
 import { planOneRosterReconciliation } from "@/domain/oneroster-reconciliation";
@@ -113,6 +113,103 @@ export const previewOneRosterReconciliation=createServerFn({method:"POST"})
    }
    return {valid:report.valid,errors:report.previews.flatMap(p=>p.errors),warnings:report.warnings,
      reconciliation:planOneRosterReconciliation(report.previews,bySource)};
+ });
+
+
+/** Registrar selects an existing CAN Student Profile, never a sourcedId-derived identity.
+ * The student must already have a live Program enrollment. This records a scoped
+ * identity assertion only; it never creates a Person, account or enrollment.
+ */
+const studentMappingInput=input.extend({
+ sourceSystem:z.string().trim().min(2).max(100).regex(/^[A-Za-z0-9._:-]+$/),
+ externalSchoolSourcedId:z.string().trim().min(1).max(256),
+ studentMappings:z.array(z.object({
+  sourcedId:z.string().trim().min(1).max(256),
+  studentProfileId:z.string().uuid(),
+ }).strict()).min(1).max(500),
+}).strict();
+
+export const applyOneRosterStudentMappings=createServerFn({method:"POST"})
+ .validator((value:unknown)=>studentMappingInput.parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["registrar"],"curriculum.publish");
+  await readMarketplace(actor,data.programId);
+  const [program]=await db.select({id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId})
+   .from(programs).where(eq(programs.id,data.programId)).limit(1);
+  if(!program||!program.siteId||!actor.scope.organizationIds?.includes(program.organizationId)||
+    !actor.scope.siteIds?.includes(program.siteId)||!actor.scope.programIds?.includes(program.id))
+    throw new AuthorizationError("same-program registrar student reconciliation");
+  const report=previewOneRosterBundle(data.files);
+  if(!report.valid)throw new Error("Resolve all OneRoster source errors before mapping students.");
+  const users=report.previews.find(p=>p.kind==="users")?.rows??[];
+  const schools=report.previews.find(p=>p.kind==="orgs")?.rows??[];
+  if(schools.length&&!schools.some(s=>s.sourcedId===data.externalSchoolSourcedId&&
+     s.type?.toLowerCase()==="school"&&s.status?.toLowerCase()!=="tobedeleted"))
+    throw new Error("External school must exist as an active school in supplied orgs.");
+  const byUser=new Map(users.map(u=>[u.sourcedId,u]));
+  const externalIds=data.studentMappings.map(m=>m.sourcedId);
+  const profileIds=data.studentMappings.map(m=>m.studentProfileId);
+  if(new Set(externalIds).size!==externalIds.length||new Set(profileIds).size!==profileIds.length)
+    throw new Error("Duplicate external user or CAN student mappings are prohibited.");
+  for(const id of externalIds){
+   const user=byUser.get(id);
+   if(!user||user.role?.toLowerCase()!=="student"||
+      user.enabledUser?.toLowerCase()!=="true"||user.status?.toLowerCase()==="tobedeleted"||
+      (user.orgSourcedIds&&!user.orgSourcedIds.split(",").map(s=>s.trim()).includes(data.externalSchoolSourcedId)))
+     throw new Error("External user must be an active student of the selected external school.");
+  }
+  const digest=bundleDigest(data.programId,data.files);
+  return db.transaction(async tx=>{
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"oneroster-students:"+program.organizationId+":"+data.sourceSystem}))`);
+   const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,metadata:curriculumImportJobs.metadata})
+    .from(curriculumImportJobs).where(and(eq(curriculumImportJobs.organizationId,program.organizationId),
+      eq(curriculumImportJobs.format,"oneroster"),eq(curriculumImportJobs.sha256,digest))).for("update").limit(1);
+   if(!job||job.status==="rejected"||job.metadata.programId!==program.id)
+    throw new Error("Validate this exact OneRoster bundle before registrar approval.");
+   const existing=await tx.select({id:studentProfiles.id,personId:studentProfiles.personId})
+    .from(studentProfiles).innerJoin(people,and(eq(people.id,studentProfiles.personId),eq(people.active,true)))
+    .where(inArray(studentProfiles.id,profileIds));
+   if(existing.length!==profileIds.length)throw new Error("CAN student profile or active Person not found.");
+   const enrolled=await tx.select({studentProfileId:enrollments.studentProfileId})
+    .from(enrollments).where(and(inArray(enrollments.studentProfileId,profileIds),
+      eq(enrollments.organizationId,program.organizationId),eq(enrollments.programId,program.id),
+      eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
+   if(new Set(enrolled.map(e=>e.studentProfileId)).size!==profileIds.length)
+    throw new Error("CAN student must have a current approved Program enrollment.");
+   const identifiers=externalIds.map(id=>"user:"+data.externalSchoolSourcedId+":"+id);
+   const previous=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
+     entityType:curriculumInteropMappings.entityType,entityId:curriculumInteropMappings.entityId,
+     metadata:curriculumInteropMappings.metadata}).from(curriculumInteropMappings).where(and(
+       eq(curriculumInteropMappings.organizationId,program.organizationId),
+       eq(curriculumInteropMappings.format,"oneroster"),eq(curriculumInteropMappings.sourceSystem,data.sourceSystem),
+       inArray(curriculumInteropMappings.externalIdentifier,identifiers)));
+   const byIdentifier=new Map(data.studentMappings.map(m=>["user:"+data.externalSchoolSourcedId+":"+m.sourcedId,m.studentProfileId]));
+   for(const prior of previous)if(prior.entityType!=="student_profile"||
+      prior.entityId!==byIdentifier.get(prior.externalIdentifier)||
+      prior.metadata.programId!==program.id||prior.metadata.siteId!==program.siteId||
+      prior.metadata.sourceHash!==digest)
+     throw new Error("Changed or conflicting student identity mapping requires separate registrar re-review.");
+   const mapped=new Set(previous.map(p=>p.externalIdentifier));
+   let added=0;
+   for(const [identifier,profileId] of byIdentifier){
+    if(mapped.has(identifier))continue;
+    await tx.insert(curriculumInteropMappings).values({
+     organizationId:program.organizationId,importJobId:job.id,format:"oneroster",
+     sourceSystem:data.sourceSystem,externalIdentifier:identifier,
+     entityType:"student_profile",entityId:profileId,
+     metadata:{programId:program.id,siteId:program.siteId,sourceHash:digest,
+       externalSchoolSourcedId:data.externalSchoolSourcedId,approvedByPersonId:actor.actorPersonId},
+    });
+    added++;
+   }
+   await writeAudit(tx,actor,{action:"curriculum.interop.oneroster.students.map",
+    entityType:"curriculum_import_job",entityId:job.id,
+    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+    after:{sourceSystem:data.sourceSystem,externalSchoolSourcedId:data.externalSchoolSourcedId,
+      added,total:data.studentMappings.length,policy:"existing_active_program_students_only"}});
+   return {importId:job.id,added,mappedStudents:data.studentMappings.length,
+     policy:"existing_active_program_students_only" as const};
+  });
  });
 
 export const applyOneRosterClassMappings=createServerFn({method:"POST"})
