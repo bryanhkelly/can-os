@@ -219,7 +219,8 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-student`}>Student identity</Label>
-          <Select id={`${id}-student`} value={studentOptionId} onChange={event => selectStudent(event.target.value)}>
+          <Select id={`${id}-student`} value={studentOptionId} disabled={!!linkedTransfer}
+            onChange={event => selectStudent(event.target.value)}>
             <option value="">A new student</option>
             {students.map(student => <option key={`${student.studentProfileId}:${student.householdId}`}
               value={`${student.studentProfileId}:${student.householdId}`}>
