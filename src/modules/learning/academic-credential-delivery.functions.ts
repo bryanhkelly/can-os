@@ -323,7 +323,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
   const doc=await documentData(tx as unknown as typeof db,s,kind,credentialId);
-  // Do not treat a stale or superseded issuance as an active academic record.
+  // Agent A must supply a canonical supersession policy before broader release.
   // Transcript issuer/student identity is bound to the original signed transfer.
   const [currentIssuance]=await tx.select({
    id:s.transcriptIssuances.id,studentProfileId:s.transcriptIssuances.studentProfileId,
