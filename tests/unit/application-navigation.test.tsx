@@ -19,6 +19,7 @@ import { readinessFromSnapshot } from "@/domain/program-readiness";
 const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
 // Static presentation tests never open a database connection.
 vi.mock("@/db/client", () => ({ db: {} }));
+vi.mock("@/hooks/useWorkspaceMutation", () => ({ useWorkspaceMutation: () => ({ isSubmitting: false, submit: vi.fn() }) }));
 vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=> (options:object)=>({
     options,useSearch:()=>state.search,useLoaderData:()=>state.data,
@@ -105,6 +106,15 @@ vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({
 }));
 
 function render(route:{options:{component?:unknown}}){
+  const outcome=state.data as {ok?:boolean;data?:any}|null;
+  if (outcome && route===Operations && outcome.ok===undefined) successful(outcome);
+  if (outcome?.ok && route===Families && Array.isArray(outcome.data)) {
+    successful({items:outcome.data,nextPage:null});
+  }
+  if (outcome?.ok && route===Intake && Array.isArray(outcome.data?.records)) {
+    successful({...outcome.data,records:{items:outcome.data.records,hasMore:false,nextPage:null},
+      stageCounts:{},existingStudentHasMore:false});
+  }
   const Page=route.options.component;
   if(typeof Page!=="function")throw new Error("Missing page component");
   return renderToStaticMarkup(<Page/>);
