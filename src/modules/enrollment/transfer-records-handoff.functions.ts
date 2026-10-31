@@ -297,7 +297,9 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
      await tx.update(s.actions).set({
        metadata:{...origin.metadata,recordsHandoffStatus:"completed",
          recordsHandoffActionId:handoff.id,
-         recordsIssuedTranscriptId:issuance.id,recordsReleasedAt:now.toISOString()},
+         recordsIssuedTranscriptId:issuance.id,
+         recordsReleasedInternally:internalDestination!==null,
+         recordsReleasedAt:now.toISOString()},
        updatedAt:now,
      }).where(eq(s.actions.id,origin.id));
      await writeAudit(tx,actor,{
