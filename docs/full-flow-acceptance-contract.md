@@ -63,17 +63,26 @@ are excluded; use synthetic users on a disposable, migrated Neon branch.
   multi-role browser journey is green **on the same commit**. Never test or
   migrate the production branch for this acceptance.
 
-## Priority blockers, in order
+## Release gates — in priority order
 
-| Priority | Blocking condition | Resolution and exit evidence |
+| Priority | Gate | Required evidence |
 | --- | --- | --- |
-| P0 | The connected service journey passed at `773b94c2`, but the current instructional-coverage change has not been executed against the migrated disposable database. | Run guarded `--preflight` and `npm run test:integration:full-flow` on the isolated Neon branch. Fix the first failed assertion; no skipped tests count. |
-| P0 | The rollback-only fixture cannot prove persisted UI behavior after refresh, actual session grants, event delivery, or the unified operations view. | Build a persistent but disposable per-run scenario using existing Playwright authentication helpers, test registrar/publisher/teacher/guardian/student in distinct sessions, process the event outbox, verify notifications and operations from the app after reload, then revoke sessions and clean up. |
-| P1 | The current branch-wide unit and type checks are not green even though focused staffing tests and the production build pass. | Triage stale fixtures separately from product regressions; require the full unit suite and typecheck to pass on the acceptance commit. |
-| P1 | Data/authority mismatch may occur at each existing service boundary. | Diagnose from the first actual failing assertion: GF3 → curriculum → admission → student work → teacher/guardian → operations. Fix only the failing canonical command or projection and add a regression. |
-| P1 | Security and audit may be incomplete for some cross-role handoffs. | Require scoped denial and material domain events/audits for all consequential mutations in the same journey. |
-| P2 | Network contracts, denomination HQ creation and site-linking are distinct optional entry channels. | Maintain their existing work but do not expand this subsystem until this primary school journey reaches acceptance, unless an actual blocker in the journey depends on it. |
-| P3 | Styling, extra features, advanced AI, new portal design and contract/product polish. | Defer until the connected journey works end to end. |
+| P0 | FullFlow connected school journey | The real `npm run test:integration:full-flow` and `npm run test:e2e:full-flow` both pass on the **same reviewed commit** against the pinned disposable Neon branch. |
+| P0 | Church-supervised onsite day | `npm run test:integration:journey-c` passes on the same commit, with independently verified child custody, safeguarding, staff presence and authorized attendance evidence. |
+| P0 | Authentication and child-data authorization | Distinct verified sessions and negative cross-tenant/guardian checks pass, including after browser reload and access revocation. |
+| P0 | Admissions/identity handoff | The separate `Admissions Neon Acceptance` workflow passes authenticated enrollment acceptance on an isolated Neon branch. |
+| P1 | Static and schema integrity | CI build, typecheck, route/mutation audits, complete unit suite and incremental Drizzle migration parity pass on the same commit. |
+| P1 | Operational readiness | Netlify scheduled jobs, email provider credentials, urgent-family delivery, alerting and independently verified opening authorization are configured for the deployed environment. |
+
+The manual GitHub workflow `.github/workflows/fullflow-release-acceptance.yml`
+runs the first two connected gates in a single serialized job. Its
+`CAN_FULLFLOW_TEST_DATABASE_URL` GitHub environment secret must point to the
+**pinned** `fullflow-e2e-20261022` Neon branch. The guard compares the
+database-reported project and branch IDs, and refuses the production endpoint.
+Do not weaken this gate to obtain a green badge.
+
+CI success does not constitute release approval. A failed/skipped/missing
+connected acceptance step means **HOLD**, even when every unit test is green.
 
 ## Implementation bite: response loop and connected operations
 
@@ -110,53 +119,53 @@ commit, then connect real verified sessions in a multi-user browser run with
 persistent state and reload. **Do not label this bite end-to-end passed until
 both checks are green on the same commit.**
 
-## Current evidence, not assumptions
+## Current evidence and release decision (2026-10-31)
 
-- **Static and unit checks:** the production build, 86 route contracts and
-  mutation-hygiene checks pass with the shared instructional-coverage change.
-  Focused staffing/placement tests pass. The full suite currently records 43
-  failed tests and typecheck retains 47 diagnostics; these are not acceptance
-  passes. See [draft PR #172](https://github.com/bryanhkelly/can-os/pull/172).
-- **Disposable DB acceptance:** the dedicated branch was reported migrated
-  through 46 migrations. Two connected tests passed at `773b94c2`, including
-  the six-stage school journey and independent church/CAN operating authority.
-  The current instructional-coverage change is **not yet database-verified**.
-- **Connected six-step FullFlow integration:** **EXECUTED AT PRIOR COMMIT /
-  CURRENT COMMIT PENDING**. The rollback-isolated test follows one newly
-  created Site/Program through publishing, adoption, verified teacher
-  assignment, activation, family application, consent, offer acceptance,
-  enrollment/class placement, student work, grading, guardian response and the
-  operational record. Its test actor adapter is not real browser session
-  authorization and cannot satisfy browser acceptance.
-- **One connected authenticated browser journey:** **NOT IMPLEMENTED / NOT RUN**.
-  The rollback integration fixture cannot replace persistent cross-session
-  browser verification. The notification/intervention loop and school
-  dashboard reload are not fully checked in this integration test.
-- **Production release:** **HOLD**. Merging to `main` requires separate user
-  authorization.
+- **Build and unit suite:** GitHub CI on `FullFlow` passed at
+  [run 41207022328](https://github.com/bryanhkelly/can-os/actions/runs/41207022328)
+  after the admissions pagination and Neon entrypoint changes. On the
+  earlier verified baseline, 2,039 tests passed, with no TypeScript or Drizzle
+  migration-generation errors. Always use the most recent CI run for the
+  exact proposed release commit; older green runs are not transferable evidence.
+- **Connected rollback integration:** a connected six-stage transaction was
+  previously reported at `773b94c2`; it does not prove current
+  `FullFlow` behavior. The complete integration test exists at
+  `tests/integration/full-flow.integration.test.ts` but requires a fresh,
+  migration-aligned run.
+- **Authenticated multi-role browser journey:** **IMPLEMENTED, NOT ACCEPTED**.
+  `tests/e2e/full-flow.spec.ts` drives the operator, publisher, teacher,
+  guardian, student and cross-tenant denials, persisting canonical IDs
+  across app sessions and refresh. The guarded runner is
+  `npm run test:e2e:full-flow`; it has **not** been demonstrated green
+  on this document's current commit against an isolated Neon database.
+- **Church-hosted day:** Journey C integration exists, but the separate
+  site-director, safeguarding and child-release browser acceptance evidence
+  is not yet recorded here as a passing release gate.
+- **Admissions/GF1 acceptance:** the workflow currently fails at its
+  missing isolated-test database GitHub secret. No admission or browser tests
+  were executed in that failed run, so it cannot be counted as a regression.
+- **Production release:** **HOLD** until all required connected checks pass,
+  environment delivery is monitored, and the user independently authorizes
+  promotion or merge to `main`.
 
-## Isolated Neon test branch verified
+## Pinned FullFlow Neon branch and runner
 
-- Neon project: `sweet-hall-62441909` (`can-os`).
-- Disposable branch: `fullflow-e2e-20261022`
-  (`br-proud-pine-arfju8h2`), branched from `test01`, **not** the
-  project's default production branch.
-- The dedicated branch was reported migrated through **46** committed
-  migrations and checked against `drizzle.__drizzle_migrations` before the
-  connected run at `773b94c2`. Current schema parity must be checked again by
-  the guarded runner before further acceptance claims. Production data and the
-  primary branch remain excluded from these tests.
-- We are intentionally bypassing GitHub Actions for DB acceptance. The
-  repository CI may still run as a static check.
-- Execute `npm run test:integration:full-flow -- --preflight` (offline,
-  endpoint-isolation only), then `npm run test:integration:full-flow`
-  (connected schema validation and integration fixture) from a runner with
-  Node dependencies,
-  an isolated `TEST_DATABASE_URL`, `CAN_APPLICATION_DB_HOST` set to
-  the main database host, `CAN_TEST_DB_WRITES_ENABLED=true`, and `APP_ENV=test`.
-  Do **not** use the main Neon branch, bypass the endpoint guard or mark
-  skipped/unexecuted tests as passes. The code runner is currently unavailable
-  in this chat's filesystem/network environment.
+- Neon project `sweet-hall-62441909` (`can-os`).
+- Pinned nonproduction branch `fullflow-e2e-20261022`
+  (`br-proud-pine-arfju8h2`) is **not** the production branch.
+- A historical connected run used a smaller committed migration set; current
+  schema parity must be reverified. Never infer that generated Drizzle
+  migrations were applied to Neon.
+- Configure the `integration-test` GitHub environment with secret
+  `CAN_FULLFLOW_TEST_DATABASE_URL` for this branch and environment variable
+  `CAN_APPLICATION_DB_HOST` naming the production database hostname.
+  The dedicated FullFlow release workflow first runs read-only preflights,
+  then the guarded, reviewed migrations, rollback integration, Journey C and
+  authenticated Playwright suite. A missing secret, unexpected Neon branch,
+  absent database migration or failing session must block release.
+- A connected CI workflow is a verification mechanism, **not** authority to
+  create a school or release it to production. Screenshots, seed-only
+  states, and static documentation are not proof of operational acceptance.
 
 ## Execution order once the test runner is available
 
