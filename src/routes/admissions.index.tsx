@@ -204,6 +204,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
   const [sections, setSections] = useState<Awaited<ReturnType<typeof listEnrollmentPlacements>>["sections"]>([]);
   const [loaded, setLoaded] = useState(false);
   const [chosen, setChosen] = useState("");
+  const [transferBlocker,setTransferBlocker]=useState<string|null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // An activated student's eligible classes should be visible immediately.
@@ -212,9 +213,10 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     let current = true;
     setSections([]);
     setChosen("");
+    setTransferBlocker(null);
     setLoaded(false);
     listEnrollmentPlacements({ data: { applicationId } }).then(result => {
-      if (current) { setSections(result.sections); setLoaded(true); }
+      if (current) { setSections(result.sections); setTransferBlocker(result.transferBlocker); setLoaded(true); }
     }).catch(cause => {
       if (current) { setError(cause instanceof Error ? cause.message : "Cannot load course placements"); setLoaded(true); }
     });
@@ -223,6 +225,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
   async function refresh() {
     const result = await listEnrollmentPlacements({ data: { applicationId } });
     setSections(result.sections);
+    setTransferBlocker(result.transferBlocker);
     setLoaded(true);
   }
   async function open() {
@@ -232,7 +235,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     finally { setBusy(false); }
   }
   async function place() {
-    if (!chosen) return;
+    if (!chosen || (acceptedOfferId&&!enrollmentActivated&&transferBlocker)) return;
     setBusy(true); setError("");
     try {
       if(acceptedOfferId&&!enrollmentActivated)
@@ -253,6 +256,12 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       </button>
     </div>
     {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+    {acceptedOfferId&&!enrollmentActivated&&transferBlocker&&
+      <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+        <strong>Receiving-school enrollment blocked:</strong> {transferBlocker}
+        {" "}The family may retain an accepted offer while the origin school finishes its exit.
+        <Link to="/admissions/intake" className="ml-2 font-semibold underline">Review admissions →</Link>
+      </p>}
     {!loaded && !error && <p role="status" className="mt-3 text-xs text-muted-foreground">Loading eligible classes…</p>}
     {loaded && <div className="mt-3 space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -273,7 +282,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
               <option key={s.id} value={s.id}>{s.title} ({s.code})</option>)}
           </select>
         </label>
-        <button type="button" disabled={!chosen || busy} onClick={place}
+        <button type="button" disabled={!chosen || busy || !!(acceptedOfferId&&!enrollmentActivated&&transferBlocker)} onClick={place}
           className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
           {acceptedOfferId&&!enrollmentActivated?"Activate enrollment and assign class":"Assign student"}
         </button>
