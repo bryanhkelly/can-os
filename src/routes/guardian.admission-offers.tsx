@@ -87,6 +87,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
           className="rounded-lg border px-3 py-2 font-semibold">Open your child's classes →</Link>}
         <Link to="/guardian/attendance" search={{student:app.studentPersonId}}
          className="rounded-lg border px-3 py-2">Attendance and excuses →</Link>
+        <Link to="/guardian/attendance" search={{student:app.studentPersonId}} hash="pickup"
+         className="rounded-lg border px-3 py-2">Set up pickup and safety before the first school day →</Link>
         <Link to="/guardian" className="rounded-lg border px-3 py-2">Family home →</Link>
        </div>
      </div>}
