@@ -103,12 +103,17 @@ function MessagesPage() {
       .then(async () => {
         setReply("");
         setSentNotice(true);
-        const [updated, list] = await Promise.all([
-          getThread({ data: { threadId: selectedId } }),
-          listMyThreads(),
-        ]);
-        setDetail(updated);
-        setThreads(list.threads);
+        try {
+          const [updated, list] = await Promise.all([
+            getThread({ data: { threadId: selectedId } }),
+            listMyThreads(),
+          ]);
+          setDetail(updated);
+          setThreads(list.threads);
+        } catch {
+          // The write succeeded; failure to refresh is not a failed send.
+          setError("Message sent, but the conversation could not be refreshed. Reopen it to see the reply.");
+        }
       })
       .catch(() => setError("Your message could not be sent. Please try again."))
       .finally(() => setSending(false));
