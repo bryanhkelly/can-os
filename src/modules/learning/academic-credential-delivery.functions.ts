@@ -153,6 +153,8 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     eq(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,doc.issuerId),
     eq(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,data.credentialId),
     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,data.recipientPersonId),
+    eq(s.academicCredentialReleaseAuthorizations.recipientEmail,data.recipientEmail.trim().toLowerCase()),
+    eq(s.academicCredentialReleaseAuthorizations.releasePurpose,"transfer"),
     eq(s.academicCredentialReleaseAuthorizations.instructionReference,action!.id),
     eq(s.academicCredentialReleaseAuthorizations.consentEvidenceReference,consent!.id),
     isNull(s.academicCredentialReleaseAuthorizations.revokedAt),
