@@ -7,6 +7,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { guardianWorkNeedsAction } from "@/domain/guardian-academics";
 import { assessmentAvailability } from "@/domain/assessment-availability";
+import { assessmentAttemptLimit } from "@/domain/assessment-attempt-policy";
 import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-section-readiness.server";
 
 /**
@@ -108,7 +109,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
   let nextDueAt: string | null = null;
   const workToReview: Array<{
    assessmentId: string; sectionId: string; title: string;
-   status: string; dueAt: string | null;
+   status: string; dueAt: string | null; revisionLimitReached: boolean;
   }> = [];
   if (sectionIds.length) {
    const published = await db.select({
@@ -116,6 +117,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     sectionId: s.assessments.sectionId,
     title: s.assessments.title,
     assessmentStatus: s.assessments.status,
+    metadata: s.assessments.metadata,
     availableAt: s.assessments.availableAt,
     closesAt: s.assessments.closesAt,
     dueAt: s.assessments.dueAt,
@@ -151,12 +153,18 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
      closesAt: row.closesAt,
     }, now).actionable;
     const incomplete = !row.submissionId || guardianWorkNeedsAction(status);
+    // Student submission uses attempt N+1 when a teacher returns attempt N.
+    // Do not imply another revision can be submitted after its allowed limit.
+    const maxAttempts = assessmentAttemptLimit(row.metadata);
+    const revisionLimitReached = status === "returned" &&
+     maxAttempts !== null && (row.attemptNumber ?? 1) >= maxAttempts;
     if (actionable && guardianWorkNeedsAction(status)) {
      workToReview.push({
       assessmentId: row.assessmentId,
       sectionId: row.sectionId,
       title: row.title,
       status,
+      revisionLimitReached,
       dueAt: row.dueAt?.toISOString() ?? null,
      });
     }
