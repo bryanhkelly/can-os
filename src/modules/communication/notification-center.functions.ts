@@ -107,6 +107,30 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.actions.organizationId,context.scope.organizationIds??[]),
   )):[];
  const permittedOperatorChangeIds=new Set(operatorChangeActions.map(row=>row.id));
+ const healthNoticeIds=rows.filter(n=>["guardian_health_review_requested","guardian_health_review_completed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const healthReviewActions=healthNoticeIds.length?await db.select({
+  id:s.actions.id,studentPersonId:s.studentProfiles.personId,
+  requestedBy:s.actions.metadata,
+ }).from(s.actions)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
+  .where(and(inArray(s.actions.id,healthNoticeIds),
+   eq(s.actions.type,"guardian_health_information_review"),
+   eq(s.actions.subjectType,"student_profile"),
+   inArray(s.actions.siteId,context.scope.siteIds??[]),
+   inArray(s.actions.programId,context.scope.programIds??[]),
+   inArray(s.actions.organizationId,context.scope.organizationIds??[]),
+  )):[];
+ const healthStaffActionIds=new Set(context.role==="registrar"?healthReviewActions.map(row=>row.id):[]);
+ const requestedHealthChildren=healthReviewActions.filter(row=>
+  context.role==="guardian"&&row.requestedBy.requestedByGuardianPersonId===personId);
+ const verifiedHealthChildren=requestedHealthChildren.length?await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
+  .from(s.guardianRelationships).where(and(
+   guardianRelationshipPredicate({guardianPersonId:personId,access:"academic"}),
+   inArray(s.guardianRelationships.studentPersonId,requestedHealthChildren.map(row=>row.studentPersonId)),
+  )):[];
+ const permittedHealthPersons=new Set(verifiedHealthChildren.map(row=>row.studentPersonId));
+ const healthGuardianChildByAction=new Map(requestedHealthChildren.filter(row=>
+  permittedHealthPersons.has(row.studentPersonId)).map(row=>[row.id,row.studentPersonId]));
  const registrarCourseDecisionIds=rows.filter(n=>n.type==="course_registration_guardian_decision_for_registrar"&&
   n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
  const registrarCourseActions=registrarCourseDecisionIds.length&&context.role==="registrar"?
@@ -392,6 +416,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="health_office_visit"?permittedMedicalIds.has(n.resourceId):
+    n.resourceType==="action"&&n.type==="guardian_health_review_completed"?healthGuardianChildByAction.has(n.resourceId):
     n.resourceType==="action"&&n.type==="guardian_enrollment_change_updated"?familyChangeChildByAction.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
     n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
@@ -406,6 +431,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="guardian_health_review_requested"&&n.resourceType==="action"&&n.resourceId&&healthStaffActionIds.has(n.resourceId)?`/operations/health-review?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="guardian_health_review_completed"&&n.resourceType==="action"&&n.resourceId&&healthGuardianChildByAction.has(n.resourceId)?`/guardian/health?student=${encodeURIComponent(healthGuardianChildByAction.get(n.resourceId)!)}`:
    n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
