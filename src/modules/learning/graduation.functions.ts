@@ -73,7 +73,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.enrollments.schoolYearId))
     .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
-      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated","transferred","completed"])));
+      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated","transferred","withdrawn"])));
   const institutional=enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId)
     .sort((x,y)=>String(x.yearStarts).localeCompare(String(y.yearStarts)));
   if(!institutional.length) throw new AuthorizationError("Institutional entry cohort not established");
