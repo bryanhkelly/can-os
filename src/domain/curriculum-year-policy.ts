@@ -12,10 +12,11 @@ export type AnnualAdoption = CurriculumYearScope & {
 };
 export function licenseValidForYear(license:AnnualLicense, period:{startsAt:Date;endsAt:Date}, now:Date):boolean {
   return license.status==="active" && !license.withdrawnAt &&
-    (!license.startsAt || license.startsAt<=period.startsAt) &&
-    (!license.endsAt || license.endsAt>=period.endsAt) &&
-    (!license.startsAt || license.startsAt<=now) &&
-    (!license.endsAt || license.endsAt>=now);
+    license.startsAt!==null && license.endsAt!==null &&
+    license.startsAt<=period.startsAt &&
+    license.endsAt>=period.endsAt &&
+    license.startsAt<=now &&
+    license.endsAt>=now;
 }
 /** Adoption alone is never an authorization to use publisher content. */
 export function annualAdoptionEligible(input:{
