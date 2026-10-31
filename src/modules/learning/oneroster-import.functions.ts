@@ -393,11 +393,13 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
    const section=mapped.find(m=>m.externalIdentifier===identifiers[1]&&m.entityType==="section"&&
      m.entityId===data.sectionId&&m.metadata.programId===program.id&&m.metadata.siteId===program.siteId);
    if(!identity||!section)throw new Error("Registrar-approved CAN student and Section mappings are required.");
+   const canonicalSiteId=program.siteId;
+   if(!canonicalSiteId)throw new AuthorizationError("canonical OneRoster Section Site required");
    const [canonical]=await tx.select({year:schoolYears.key,term:terms.key})
     .from(sections).innerJoin(terms,eq(terms.id,sections.termId))
     .innerJoin(schoolYears,eq(schoolYears.id,terms.schoolYearId))
     .where(and(eq(sections.id,data.sectionId),eq(sections.programId,program.id),
-      eq(sections.siteId,program.siteId),eq(schoolYears.programId,program.id),
+      eq(sections.siteId,canonicalSiteId),eq(schoolYears.programId,program.id),
       eq(schoolYears.status,"active"))).limit(1);
    if(!canonical||klass.schoolYear!==canonical.year||
       !klass.termSourcedIds?.split(",").map(v=>v.trim()).includes(canonical.term))
