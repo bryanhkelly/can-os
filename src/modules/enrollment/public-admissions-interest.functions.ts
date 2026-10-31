@@ -3,7 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents, studentProfiles } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
@@ -101,6 +101,28 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         latestOffers.set(offer.applicationId, offer);
     }
     const accessByApplication = new Map(accessConsents.map(consent => [consent.applicationId, consent.status]));
+    const currentGrants = linkedApplicationIds.length ? await db.select({
+      applicationId:studentAccessConsents.applicationId,
+      programId:studentAccessConsents.programId,
+      siteId:studentAccessConsents.siteId,
+      studentProfileId:studentAccessConsents.studentProfileId,
+    }).from(studentAccessConsents)
+      .innerJoin(studentProfiles,eq(studentProfiles.id,studentAccessConsents.studentProfileId))
+      .innerJoin(programs,eq(programs.id,studentAccessConsents.programId))
+      .innerJoin(accessAccounts,eq(accessAccounts.emailNormalized,studentAccessConsents.studentEmail))
+      .innerJoin(accountPersonGrants,eq(accountPersonGrants.accountId,accessAccounts.id))
+      .where(and(
+        inArray(studentAccessConsents.applicationId,linkedApplicationIds),
+        eq(studentAccessConsents.status,"approved"),
+        eq(accountPersonGrants.personId,studentProfiles.personId),
+        eq(accountPersonGrants.organizationId,programs.organizationId),
+        eq(accountPersonGrants.siteId,studentAccessConsents.siteId),
+        eq(accountPersonGrants.role,"student"),
+        eq(accountPersonGrants.active,true),
+        eq(accountPersonGrants.isSynthetic,false),
+        eq(accessAccounts.disabled,false),
+      )) : [];
+
     // Admissions authority can change without affecting historical interest.
     // Resolve the canonical operating gate, not just Program status.
     const authorized = new Map<string, boolean>();
@@ -125,7 +147,12 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       activeEnrollment,
       placedInClass,
       studentAccessStatus: row.applicationId
-        ? accessByApplication.get(row.applicationId) ?? "not_requested"
+        ? accessByApplication.get(row.applicationId)==="approved" &&
+          !currentGrants.some(grant=>grant.applicationId===row.applicationId &&
+            grant.programId===row.programId && grant.siteId===row.siteId &&
+            grant.studentProfileId===row.studentProfileId)
+            ? "access_unavailable"
+            : accessByApplication.get(row.applicationId)??"not_requested"
         : null,
       latestOfferStatus: row.applicationId ? latestOffers.get(row.applicationId)?.status ?? null : null,
       latestOfferIssuedAt: row.applicationId
