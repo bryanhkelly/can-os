@@ -9,6 +9,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { listDelegatedCANTranscriptPrograms } from "@/modules/learning/can-transcript-scope.server";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 
 const kind="transfer_academic_records_handoff";
@@ -112,7 +113,7 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
  .validator((input:unknown)=>z.object({
    handoffActionId:uuid,issuanceId:uuid,
    recipientSchoolName:z.string().trim().min(3).max(160),
-   deliveryMethod:z.enum(["approved_secure_exchange","verified_secure_portal","physical_mail"]),
+   deliveryMethod:z.enum(["approved_secure_exchange","verified_secure_portal","physical_mail","can_internal_school_records"]),
    receiptReference:z.string().trim().min(12).max(400),
    confirmedRecipientVerified:z.literal(true),
    confirmedSecureDelivery:z.literal(true),
@@ -135,8 +136,10 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
      if(!ownsOriginSchool&&!isDelegatedIssuer)
        throw new AuthorizationError("own school or exact CAN institutional record-issuer delegation");
      if(handoff.status==="resolved"){
+       const requestedReceipt=data.deliveryMethod==="can_internal_school_records"?
+         "CAN-RELEASE:"+handoff.id:data.receiptReference;
        if(handoff.metadata.issuedTranscriptId===data.issuanceId&&
-          handoff.metadata.deliveryReceiptReference===data.receiptReference)
+          handoff.metadata.deliveryReceiptReference===requestedReceipt)
          return {completed:false as const,alreadyCompleted:true as const};
        throw new Error("This record handoff was previously completed");
      }
