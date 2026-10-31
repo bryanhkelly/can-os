@@ -327,8 +327,13 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  // the family loses permission. Only the existing verified consent workspace
  // knows whether a request is still actionable or needs dismissal.
  const { listCanonicalGuardianGroupConsents } = await import("@/modules/study-groups/canonical-workspace.functions");
- const groupConsents = await listCanonicalGuardianGroupConsents();
- const groupItems = groupConsents.filter(row => row.status === "open").map(row => ({
+ const consentRead = await listCanonicalGuardianGroupConsents().then(
+  items => ({ items, unavailable: false }),
+  () => ({ items: [] as Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>, unavailable: true }),
+ );
+ // A study-group read failure cannot hide attendance excuses or other
+ // essential family work; surface that partial failure separately.
+ const groupItems = consentRead.items.filter(row => row.status === "open").map(row => ({
   id: row.id,
   kind: "action" as const,
   type: "study_group_consent",
@@ -365,5 +370,8 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   createdAt: row.expectedAt,
  }));
 
- return { items: [...actionItems, ...groupItems, ...absenceItems, ...notificationItems] };
+ return {
+  items: [...actionItems, ...groupItems, ...absenceItems, ...notificationItems],
+  groupConsentsUnavailable: consentRead.unavailable,
+ };
 });
