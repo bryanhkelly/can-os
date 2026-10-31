@@ -151,7 +151,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
         {periods.length > 0 && <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="min-w-64 text-sm font-semibold">Grading period
             <select aria-label="Grading period to finalize" value={periodId} disabled={busy}
-              onChange={(event) => {setPeriodId(event.target.value);setPreview(null);}}
+              onChange={(event) => {setPeriodId(event.target.value);setPreview(null);setCorrectingId("");setCorrectionPercentage("");setCorrectionLetter("");setCorrectionReason("");setError("");}}
               className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
               {periods.map((period) => <option key={period.id} value={period.id}>
                 {period.name} ({new Date(`${period.startsOn}T00:00:00`).toLocaleDateString()} – {new Date(`${period.endsOn}T00:00:00`).toLocaleDateString()})
