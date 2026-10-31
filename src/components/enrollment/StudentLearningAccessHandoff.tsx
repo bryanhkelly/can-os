@@ -82,6 +82,19 @@ function ApplicationLearningAccessHandoff({
    :<Link to="/messages" className="mt-3 inline-block underline">Ask admissions to complete this requirement</Link>}
   <button type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3 rounded border px-3 py-2">Check again</button>
  </section>;
+ if(status==="access_unavailable")return <section aria-label="Student learning account"
+  className="mt-4 rounded-lg border p-4 text-sm">
+  <h4 className="font-semibold">Student learning account · Access needs review</h4>
+  <p role="status" className="mt-2">A prior guardian authorization was approved, but the
+   student's current school login grant is no longer available. A sign-in link
+   cannot restore a revoked grant or disabled account.</p>
+  <p className="mt-2">{role==="registrar"
+    ? "Review the original student grant, account status and school authorization. Restore access only through the independently authorized student-access restoration workflow."
+    : "Contact admissions to review the student's separate school account. Your guardian sign-in does not restore the student's access."}</p>
+  <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
+   onClick={()=>setRetry(value=>value+1)}>Recheck access</button>
+  <Link to="/messages" className="ml-3 inline-block text-sm underline">Contact admissions</Link>
+ </section>;
  if(status==="not_available")return <section aria-label="Student learning account"
   className="mt-4 rounded-lg border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
