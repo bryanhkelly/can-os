@@ -199,9 +199,34 @@ export const getStudentLearningHandoff=createServerFn({method:"GET"})
     programId:app.programId,siteId:app.siteId,applicationId:app.id}};
   }
   const [consent]=await db.select({status:studentAccessConsents.status,
-   studentEmail:studentAccessConsents.studentEmail})
+   studentEmail:studentAccessConsents.studentEmail,
+   studentProfileId:studentAccessConsents.studentProfileId,
+   programId:studentAccessConsents.programId,
+   siteId:studentAccessConsents.siteId})
    .from(studentAccessConsents).where(eq(studentAccessConsents.applicationId,app.id)).limit(1);
-  return {status:consent?.status??"not_requested",studentEmail:consent?.studentEmail??null,blocker:null};
+  if(consent?.status==="approved"){
+   // An approved parent consent is historical. An inactive student grant or
+   // disabled account cannot sign in even though consent remains approved.
+   const [grant]=await db.select({id:accountPersonGrants.id})
+     .from(accessAccounts)
+     .innerJoin(accountPersonGrants,eq(accountPersonGrants.accountId,accessAccounts.id))
+     .where(and(
+       eq(accessAccounts.emailNormalized,normalizeAccessEmail(consent.studentEmail)),
+       eq(accessAccounts.disabled,false),
+       eq(accountPersonGrants.personId,app.studentPersonId),
+       eq(accountPersonGrants.organizationId,app.organizationId),
+       eq(accountPersonGrants.siteId,app.siteId!),
+       eq(accountPersonGrants.role,"student"),
+       eq(accountPersonGrants.active,true),
+       eq(accountPersonGrants.isSynthetic,false),
+     )).limit(1);
+   if(!grant || consent.studentProfileId!==app.studentProfileId ||
+       consent.programId!==app.programId || consent.siteId!==app.siteId)
+     return {status:"access_unavailable" as const,
+       studentEmail:consent.studentEmail,blocker:null};
+  }
+  return {status:consent?.status??"not_requested",
+    studentEmail:consent?.studentEmail??null,blocker:null};
  });
 
 export const provisionStudentLearningAccess=createServerFn({method:"POST"})
