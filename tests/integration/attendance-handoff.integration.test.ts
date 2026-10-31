@@ -83,6 +83,17 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     const outsider=first(await tx.insert(s.people).values({legalFirstName:"Other",legalLastName:"Guardian"}).returning());
     const student=first(await tx.insert(s.studentProfiles).values({personId:learner.id,gradeLevel:"9"}).returning());
     studentId=student.id;
+    // The first-day checkpoint reuses the real accepted Application and
+    // student/Program membership, not a separate onboarding record.
+    const household=first(await tx.insert(s.households).values({
+      displayName:"Attendance handoff family",
+    }).returning());
+    const application=first(await tx.insert(s.applications).values({
+      householdId:household.id,studentProfileId:student.id,programId:program.id,
+      stage:"accepted",submittedByPersonId:guardian.id,
+      idempotencyKey:`first-day-${suffix}`,
+      metadata:{schoolYearId:schoolYear.id},
+    }).returning());
     const relation=first(await tx.insert(s.guardianRelationships).values({guardianPersonId:guardian.id,
      studentPersonId:learner.id,relationshipLabel:"parent",canViewAcademics:true,canSubmitAttendanceExcuse:true}).returning());
     const course=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:org.id,code:suffix,title:"Attendance Science",subject:"Science"}).returning());
@@ -242,6 +253,35 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
       ...dutyRequest,date,
     }})).rejects.toThrow("only today's scheduled duty");
     state.actor=staff;
+    // Same enrolled child, current calendar, roster and independently reviewed
+    // staffing projection. No implicit attendance or onsite opening approval.
+    const firstDay=await import("@/modules/enrollment/first-school-day-handoff.functions");
+    const beforeStart=await firstDay.getFirstSchoolDayHandoff({
+      data:{applicationId:application.id},
+    });
+    expect(beforeStart).toMatchObject({
+      date:todaySite,state:"supervision_unverified",studentExpected:true,
+      supervisionPlanned:false,attendanceRecorded:false,
+    });
+    expect(beforeStart.outstandingGaps).toContain("room_unconfigured");
+    state.actor={...staff,scope:{...staff.scope,siteIds:[]}};
+    await expect(firstDay.getFirstSchoolDayHandoff({
+      data:{applicationId:application.id},
+    })).rejects.toThrow("scope");
+    state.actor=staff;
+    // Preserve a staff-observed fact without misrepresenting outstanding
+    // room/backup requirements as cleared or physical supervision proven.
+    await flow.markExpectedOnsiteAttendance({data:{
+      date:todaySite,studentProfileId:student.id,programId:program.id,
+      status:"present",mutationId:crypto.randomUUID(),
+      expectedPreviousEventId:null,
+    }});
+    expect(await firstDay.getFirstSchoolDayHandoff({
+      data:{applicationId:application.id},
+    })).toMatchObject({
+      state:"supervision_unverified",studentExpected:true,
+      supervisionPlanned:false,attendanceRecorded:true,
+    });
     expect(first((await flow.listExpectedOnsiteRoster({data:{date}})).students).status).toBe("unmarked");
     const onsiteReview=await import("@/modules/operations/onsite-day-review.functions");
     const lead=act("site_leader",siteLeader.id);
