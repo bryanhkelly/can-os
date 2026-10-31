@@ -9,7 +9,7 @@ import { isAcademicMarketingType, publishableAcademicProgram } from "@/domain/ac
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { familyInvitationBatchMetadataSchema } from "@/domain/family-invitations";
 import { invitedFamilyInterestInput, type InvitedFamilyInterestInput } from "@/domain/family-recruitment-interest";
-import { publicAdmissionsInterestInput, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
+import { publicAdmissionsInterestInput, publicInterestRateLimitKeys, type PublicInterestRoute, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -17,18 +17,6 @@ import { EventTypes } from "@/domain/event-types";
 const PER_SITE_BUDGET = 30;
 const GLOBAL_EMERGENCY_BUDGET = 600;
 const INVITATION_BUDGET = 120;
-type PublicInterestRoute = "public_site_inquiry" | "public_site_family_start" | "invited_family_interest";
-
-/** Keys contain a verified published Site ID, never a client-supplied slug,
- * email, IP or arbitrary user identifier. Number of rows is thus bounded
- * by real published Sites and the known route types. */
-export function publicInterestRateLimitKeys(route: PublicInterestRoute, siteId?: string) {
-  return {
-    emergency: route + ":global",
-    site: siteId ? route + ":site:" + siteId : null,
-  };
-}
-
 /** Atomic shared emergency ceiling plus independently scoped school limits.
  * An attack against one school must not exhaust all other schools' 30/minute
  * capacity. The platform ceiling is retained for extreme traffic; trusted-edge
