@@ -6,7 +6,7 @@ import { db } from "@/db/client";
  * auth endpoints. The reverse proxy's client identity has not been verified,
  * so no IP, Origin, forwarded header or submitted email is used as a bucket.
  *
- * Exactly one row per endpoint is maintained. The Postgres upsert atomically
+ * Exactly one row per endpoint is maintained. Church applications have their own budget. The Postgres upsert atomically
  * admits or rejects concurrent requests and resets at each 60-second boundary.
  * A malicious caller can exhaust a shared budget: trusted-edge per-source
  * protection and service-specific operational limits remain mandatory.
