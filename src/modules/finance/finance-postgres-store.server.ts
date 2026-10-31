@@ -3,7 +3,7 @@ import { db } from "../../db/client";
 import { applications } from "../../db/schema/admissions";
 import { financialObligations } from "../../db/schema/governance";
 import { programs } from "../../db/schema/organizations";
-import { financeInvoices, financeProviderEvents, financeReceipts } from "../../db/schema/finance";
+import { financeInvoices, financePaymentAttempts, financeProviderEvents, financeReceipts } from "../../db/schema/finance";
 import { applyVerifiedEvent, type Charge, type FinanceRecord, type ProviderEvent } from "./finance-domain";
 import type { FinanceStore } from "./finance-service";
 
@@ -62,6 +62,45 @@ export const postgresFinanceStore: FinanceStore = {
         amountCents: charge.amount.cents, currency: charge.amount.currency,
         churchShareCents: charge.allocation.churchCents, canShareCents: charge.allocation.canCents,
       });
+    });
+  },
+  async reservePaymentAttempt(input) {
+    return db.transaction(async tx => {
+      const [invoice] = await tx.select().from(financeInvoices)
+        .where(eq(financeInvoices.obligationId, input.obligationId)).limit(1).for("update");
+      if (!invoice) throw new Error("Invoice not found");
+      if (invoice.provider && invoice.provider !== input.provider) throw new Error("Processor conflict");
+      const [prior] = await tx.select().from(financePaymentAttempts)
+        .where(and(eq(financePaymentAttempts.invoiceId, invoice.id),
+          eq(financePaymentAttempts.idempotencyKey, input.idempotencyKey))).limit(1);
+      if (prior) {
+        if (prior.provider !== input.provider || prior.amountCents !== input.amountCents)
+          throw new Error("Payment idempotency conflict");
+        return { kind: "existing" as const, status: prior.status === "requires_configuration" ? "failed" as const : prior.status,
+          ...(prior.providerIntentId ? { intentId: prior.providerIntentId } : {}) };
+      }
+      if (input.amountCents <= 0 || input.amountCents > invoice.amountCents - invoice.capturedCents)
+        throw new Error("Invalid payment attempt amount");
+      await tx.insert(financePaymentAttempts).values({
+        invoiceId: invoice.id, idempotencyKey: input.idempotencyKey,
+        provider: input.provider, amountCents: input.amountCents, status: "pending",
+      });
+      return { kind: "reserved" as const, status: "pending" as const };
+    });
+  },
+  async finishPaymentAttempt(input) {
+    await db.transaction(async tx => {
+      const [invoice] = await tx.select().from(financeInvoices)
+        .where(eq(financeInvoices.obligationId, input.obligationId)).limit(1).for("update");
+      if (!invoice) throw new Error("Invoice not found");
+      const [attempt] = await tx.select().from(financePaymentAttempts)
+        .where(and(eq(financePaymentAttempts.invoiceId, invoice.id),
+          eq(financePaymentAttempts.idempotencyKey, input.idempotencyKey))).limit(1);
+      if (!attempt || attempt.status !== "pending") throw new Error("Payment attempt state conflict");
+      if (input.status === "submitted" && !input.intentId) throw new Error("Missing provider intent");
+      await tx.update(financePaymentAttempts).set({
+        status: input.status, providerIntentId: input.intentId ?? null, updatedAt: new Date(),
+      }).where(eq(financePaymentAttempts.id, attempt.id));
     });
   },
   async postVerifiedEvent(event) {
