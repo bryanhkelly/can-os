@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, text, timestamp, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp, uuid, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createdAt, id } from "./common";
 import { people, studentProfiles } from "./identity";
 import { organizations } from "./organizations";
@@ -13,7 +13,7 @@ export const graduationRequirementSets = pgTable("graduation_requirement_sets", 
   // Inclusive entry-cohort window; NULL bounds preserve legacy policies until explicitly classified.
   cohortStart: text("cohort_start"),
   cohortEnd: text("cohort_end"),
-  supersedesRequirementSetId: uuid("supersedes_requirement_set_id"),
+  supersedesRequirementSetId: uuid("supersedes_requirement_set_id").references(():AnyPgColumn=>graduationRequirementSets.id),
   applicabilityReason: text("applicability_reason"),
   requirements: jsonb("requirements").$type<Array<{subject:string;minimumUnits:number}>>().notNull(),
   approvedByPersonId: uuid("approved_by_person_id").notNull().references(() => people.id),
