@@ -212,7 +212,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
             <p className="text-sm">Your transfer request names <strong>{selectedTransfer.destinationSchoolName}</strong>.
               This application is for <strong>{selectedProgram?.name}</strong>. It will remain subject to this school's
               admissions decision, seat capacity and a separately accepted offer.</p>
-            {!selectedTransfer.originExited&&<WorkspaceNotice tone="attention">
+            {!selectedTransfer.originExited&&<WorkspaceNotice tone="info">
               Your original school has not yet completed the official exit. Destination enrollment activation will wait for that decision.
             </WorkspaceNotice>}
             <label className="flex items-start gap-3 text-sm">
