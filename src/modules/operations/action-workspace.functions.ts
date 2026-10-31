@@ -52,6 +52,13 @@ export const getOperationsActions=createServerFn({method:"GET"})
   siteId:record.siteId,ownerPersonId:record.ownerPersonId,
   detail:record.type==="support_referral"
    ?"Open the authorized support workspace for private details and the domain-owned next step."
+   :record.type==="guardian_enrollment_change_request"&&record.metadata.kind==="transfer"?
+     [record.description??"Guardian requests transfer",
+      "Destination: "+(typeof record.metadata.destinationSchoolName==="string"?record.metadata.destinationSchoolName:"Not specified"),
+      ...(typeof record.metadata.intendedLastDay==="string"?["Requested last day: "+record.metadata.intendedLastDay]:[]),
+      ...(actor.role==="registrar"&&typeof record.metadata.destinationSchoolContactEmail==="string"?
+        ["Destination records contact: "+record.metadata.destinationSchoolContactEmail]:[]),
+     ].join(" · ")
    :record.description??record.type.replaceAll("_"," "),
   priority:record.priority==="urgent"?"critical" as const:record.priority==="high"?"high" as const:"normal" as const,
   createdAt:record.createdAt.toISOString(),
