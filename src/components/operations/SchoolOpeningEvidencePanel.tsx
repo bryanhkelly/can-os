@@ -1,4 +1,4 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceHistory, EvidenceReviewForm } from "@/components/evidence";
+import { EvidenceUploadSection, EvidenceWorkflow, EvidenceHistory, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueryState } from "@/components/workspace";
 import { getChurchSchoolOpeningFn } from "@/modules/operations/school-opening.functions";
@@ -68,29 +68,26 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
     }catch(cause){setError(cause instanceof Error?cause.message:"Evidence review was not recorded");throw cause;}
     finally{setBusy(false);}
   }
-  async function download(documentId:string) {
-    setError("");
-    try{
-      const result=await getSchoolOpeningEvidenceDownloadFn({data:{programId:model.programId,documentId}});
-      window.open(result.downloadUrl,"_blank","noopener,noreferrer");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open private evidence");}
-  }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
     <p className="mt-1 text-xs text-muted-foreground">Responsible: {item.responsibleOwner}</p>
     <p className="mt-3 text-sm">{item.nextAction}</p>
-    {item.current&&<div className="mt-3 rounded border p-3 text-xs">
-      <p><strong>Current v{item.current.version}:</strong> {item.current.fileName}</p>
-      <p className="mt-1">Submitted {new Date(item.current.submittedAt).toLocaleString()} ·
-        {" "}expires {item.current.expiresAt?new Date(item.current.expiresAt).toLocaleDateString():"not recorded"}</p>
-      <button type="button" className="mt-2 underline" onClick={()=>void download(item.current!.id)}>Open private document</button>
-    </div>}
+    {item.current&&<EvidenceDocumentSummary
+      fileName={item.current.fileName} version={item.current.version}
+      submittedAt={item.current.submittedAt} expiresAt={item.current.expiresAt}
+      onGetDownloadUrl={async()=>{
+        const result=await getSchoolOpeningEvidenceDownloadFn({data:{
+          programId:model.programId,documentId:item.current!.id,
+        }});
+        return result.downloadUrl;
+      }}/>}
     {model.canReview&&item.current&&item.status==="pending"&&<EvidenceReviewForm disabled={busy}
       label="Independent review reason" approveLabel="Verify this version"
       onReview={review}/>}
     {model.canSubmit&&<div>
-      <p className="mt-3 text-xs font-medium">{item.current?"Submit a corrected or renewed version":"Submit required evidence"}</p>
+
       {!model.uploadsEnabled&&<p role="status" className="mt-2 text-xs">Private school-opening uploads are disabled in this deployment. Contact the deployment administrator; no approval can be inferred here.</p>}
-      <EvidenceUploader<UploadInput> disabled={!model.uploadsEnabled}
+      <EvidenceUploadSection<UploadInput> disabled={!model.uploadsEnabled}
+        heading={item.current ? "Submit a corrected or renewed version" : "Submit required evidence"}
         adapter={{begin: async input => beginSchoolOpeningEvidenceUploadFn({data:input}),
           finish: async input => finishSchoolOpeningEvidenceUploadFn({data:input})}}
         makeInput={(file,expiresAt)=>({programId:model.programId,configurationId:model.configurationId,

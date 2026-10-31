@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { submitEvidenceUpload } from "./evidence-upload";
 
 export type EvidenceMimeType = "application/pdf" | "image/jpeg" | "image/png";
@@ -23,14 +24,18 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
   const [expiry, setExpiry] = useState("");
   const [pending, setPending] = useState<{ key: string; input: T } | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   async function upload() {
-    if (busy || disabled) return;
+    if (inFlight.current || disabled) return;
+    inFlight.current = true;
     setBusy(true); setError("");
     try {
       await submitEvidenceUpload(adapter, makeInput, file, expiry, pending, setPending);
       // Finalization succeeded: never retry the same command if refreshing the view fails.
       setPending(null); setFile(null); setExpiry("");
+      if (fileInput.current) fileInput.current.value = "";
       try { await onUploaded(); }
       catch (cause) {
         setError(cause instanceof Error ? `Evidence recorded, but refresh failed: ${cause.message}` :
@@ -38,12 +43,12 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Evidence upload was not recorded");
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
   return <div className="mt-3 rounded border p-3 text-xs">
     <div className="grid gap-2 sm:grid-cols-2">
       <label>PDF, JPEG or PNG
-        <input type="file" accept="application/pdf,image/jpeg,image/png" className="mt-1 block w-full"
+        <input ref={fileInput} type="file" accept="application/pdf,image/jpeg,image/png" className="mt-1 block w-full"
           disabled={disabled || busy} onChange={event => { setFile(event.target.files?.[0] ?? null); setPending(null); }}/>
       </label>
       <label>{label}
@@ -52,11 +57,11 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
           onChange={event => { setExpiry(event.target.value); setPending(null); }}/>
       </label>
     </div>
-    <button type="button" className="mt-2 rounded border px-3 py-2 disabled:opacity-50"
+    <Button type="button" variant="outline" size="sm" className="mt-2"
       disabled={disabled || busy || (!pending && (!file || !expiry))}
       onClick={() => void upload()}>
       {busy ? "Submitting…" : pending ? "Retry recording uploaded evidence" : submitLabel}
-    </button>
+    </Button>
     {pending && <p role="status" className="mt-2">The private file is uploaded. Retry recording without uploading the bytes again.</p>}
     {error && <p role="alert" className="mt-2 text-danger">{error}</p>}
   </div>;
