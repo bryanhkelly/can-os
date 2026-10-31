@@ -905,6 +905,7 @@ export async function recordFieldTripAttendance(
       .select({ siteId: fieldTrips.siteId, programId: fieldTrips.programId, status:fieldTrips.status })
       .from(fieldTrips)
       .where(eq(fieldTrips.id, input.fieldTripId))
+      .for("update")
       .limit(1);
 
     if (!trip) throw new Error("Field Trip not found");
@@ -915,6 +916,12 @@ export async function recordFieldTripAttendance(
     // for boarding and return records.
     if(input.status==="boarded"||input.status==="returned"){
       if(trip.status!=="approved")throw new Error("The field trip is not approved");
+      const [participantLock]=await tx.select({id:fieldTripParticipants.id})
+       .from(fieldTripParticipants).where(and(
+        eq(fieldTripParticipants.fieldTripId,input.fieldTripId),
+        eq(fieldTripParticipants.studentProfileId,input.studentProfileId),
+       )).for("update").limit(1);
+      if(!participantLock)throw new AuthorizationError("current trip invitation");
       const [permission]=await tx.select({id:fieldTripParticipants.id})
        .from(fieldTripParticipants)
        .innerJoin(studentProfiles,eq(studentProfiles.id,fieldTripParticipants.studentProfileId))
