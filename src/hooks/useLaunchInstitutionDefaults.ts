@@ -36,8 +36,13 @@ export function useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,
   }, [options, hostOrganizationId, siteId]);
   useEffect(() => {
     const [onlySite] = hostSites;
-    if (siteId || !hostOrganizationId) return;
-    if (hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
+    if (!hostOrganizationId) return;
+    // Never carry a campus from a different host into a new launch.
+    if (siteId && !hostSites.some(site => site.id === siteId)) {
+      setSiteId(hostSites.length === 1 && onlySite ? onlySite.id : "");
+      return;
+    }
+    if (!siteId && hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
   }, [hostSites, hostOrganizationId, siteId]);
 
   useEffect(() => {
