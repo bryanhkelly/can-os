@@ -185,6 +185,19 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     gt(s.academicCredentialReleaseAuthorizations.expiresAt,new Date()),
    )).limit(1);
    if(existing)return {authorizationId:existing.id};
+   // A revoked authorization cannot be replayed with the same signed consent.
+   // A fresh, independently signed and reviewed consent is required.
+   const [previousRevoked]=await tx.select({id:s.academicCredentialReleaseAuthorizations.id})
+    .from(s.academicCredentialReleaseAuthorizations)
+    .where(and(
+     eq(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,doc.issuerId),
+     eq(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,data.credentialId),
+     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,data.recipientPersonId),
+     eq(s.academicCredentialReleaseAuthorizations.consentEvidenceReference,consent!.id),
+     isNotNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
+    .limit(1);
+   if(previousRevoked)
+    throw new AuthorizationError("Revoked release requires new signed transfer consent");
    // A signed consent is bound to this transfer action and recipient.
    const [created]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
     issuingOrganizationId:doc.issuerId,transcriptIssuanceId:data.credentialId,
