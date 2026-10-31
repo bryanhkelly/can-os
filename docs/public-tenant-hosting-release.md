@@ -64,3 +64,6 @@ The **Netlify Edge Function runtime** and the **TanStack server runtime** each r
 
 
 For a separately provisioned **nonproduction** disabled-host fixture, optionally set `CAN_PUBLIC_SMOKE_DISABLED_URL=https://<tenant-on-disabled-deployment>/`. The smoke checks for 404. For a separately provisioned invalid-certificate origin, set `CAN_PUBLIC_SMOKE_INVALID_TLS_URL=https://<approved-test-host>/`. The script accepts only an actual Node TLS certificate validation error; a DNS lookup error or timeout is not a passing TLS test. Neither fixture is created or changed by the script, and both are opt-in. Do not disable production TLS or production hosting to manufacture a passing negative case.
+
+
+**Canonical domain safety:** The current domain routing and origin authorization accept only `*.can-os.com`. The external smoke script now fails before network access when `CAN_PUBLIC_SMOKE_DOMAIN` differs from `can-os.com`, and requires distinct published school names. Supporting another domain requires an explicit coordinated domain-routing change and independent Netlify DNS/TLS approval; it is not enabled by changing a smoke-test environment variable.
