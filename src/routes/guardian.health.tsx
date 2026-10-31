@@ -41,6 +41,25 @@ function GuardianHealthPage() {
     {data && data.children.length === 0 && <p className="mt-6 rounded-lg border p-4">No health records are available for this authorized student. If the child has recently enrolled or transferred, contact the school.</p>}
     {data?.children.map(child => <section key={child.studentPersonId} className="mt-6 space-y-4 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">{child.studentName}</h2>
+      {child.awaitingSchoolHealthReview ? (
+        <p role="status" className="rounded-lg border p-4 text-sm">
+          <strong>School review pending.</strong> Your proposed emergency and medical information has not been approved.
+          The school-recorded instructions below remain authoritative until staff complete their review.
+        </p>
+      ) : child.lastSchoolReview?.status === "approved" ? (
+        <p role="status" className="rounded-lg border p-4 text-sm">
+          <strong>Family update approved.</strong> The school reviewed your request on{" "}
+          {new Date(child.lastSchoolReview.reviewedAt).toLocaleDateString()}.
+          The approved instructions below reflect the school's current record.
+        </p>
+      ) : child.lastSchoolReview?.status === "rejected" ? (
+        <p role="status" className="rounded-lg border p-4 text-sm">
+          <strong>School needs clarification.</strong> Your last proposed health update was not approved
+          ({new Date(child.lastSchoolReview.reviewedAt).toLocaleDateString()}).
+          The school-recorded instructions below have not been replaced. You may correct and
+          resubmit the information or contact the school office.
+        </p>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border p-4">
           <h3 className="font-semibold">School-recorded medical instructions</h3>
