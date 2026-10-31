@@ -2,7 +2,7 @@ import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsExistingStudents,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,listAdmissionsExistingStudentsPage,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
@@ -10,24 +10,29 @@ import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
 import {getReceivingSchoolTransferTranscript} from "@/modules/enrollment/transfer-records-handoff.functions";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
-const load=async(interestId?:string)=>{
- const [records,programs,existingStudents,publicInterests,selectedInterestPage]=await Promise.all([
-  listAdmissionsIntake(),listAdmissionsIntakePrograms(),listAdmissionsExistingStudents(),
+const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string})=>{
+ const [records,programs,existingStudentPage,publicInterests,selectedInterestPage]=await Promise.all([
+  listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.search}}),
+  listAdmissionsIntakePrograms(),
+  listAdmissionsExistingStudentsPage({data:{siteId:selection.siteId,programId:selection.programId,page:selection.studentPage??1}}),
   listPublicAdmissionsInterests({data:{}}),
-  interestId?listPublicAdmissionsInterests({data:{interestId}}):Promise.resolve(null),
+  selection.interest?listPublicAdmissionsInterests({data:{interestId:selection.interest}}):Promise.resolve(null),
  ]);
- return {records,programs,existingStudents,publicInterests,
+ return {records,programs,existingStudents:existingStudentPage.items,existingStudentHasMore:existingStudentPage.nextPage!==null,publicInterests,
   linkedInterest:selectedInterestPage?.items[0]??null};
 };
 export const Route=createFileRoute("/admissions/intake")({
- validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string;page?:number;studentPage?:number;search?:string}=>({
+  page:typeof search.page==="number"&&Number.isSafeInteger(search.page)&&search.page>0?search.page:1,
+  studentPage:typeof search.studentPage==="number"&&Number.isSafeInteger(search.studentPage)&&search.studentPage>0?search.studentPage:1,
+  search:typeof search.search==="string"?search.search.slice(0,100):undefined,
   application:typeof search.application==="string"?search.application:undefined,
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
   programId:typeof search.programId==="string"?search.programId:undefined,
   interest:typeof search.interest==="string"?search.interest:undefined,
  }),
- loaderDeps:({search})=>({interest:search.interest}),
- loader:({deps})=>safeLoader(()=>load(deps.interest),{authMessage:"Sign in as a registrar to manage admissions."})(),
+ loaderDeps:({search})=>({interest:search.interest,siteId:search.siteId,programId:search.programId,page:search.page,studentPage:search.studentPage,search:search.search}),
+ loader:({deps})=>safeLoader(()=>load(deps),{authMessage:"Sign in as a registrar to manage admissions."})(),
  component:IntakePage
 });
 function IntakePage(){
@@ -59,6 +64,17 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const [existingStudentKey,setExistingStudentKey]=useState("");
  const [createHouseholdConfirmed,setCreateHouseholdConfirmed]=useState(false);
  const existingStudents=data.existingStudents.filter(student=>student.programId===programId);
+ const [searchDraft,setSearchDraft]=useState(selected.search??"");
+ const pageNavigation=<nav aria-label="Admissions record pages" className="my-4 flex flex-wrap items-center gap-3 text-sm">
+  <form onSubmit={e=>{e.preventDefault();void router.navigate({to:"/admissions/intake",search:{...selected,search:searchDraft||undefined,page:1}});}}>
+   <input aria-label="Search admissions" className="rounded border bg-background px-2 py-1" value={searchDraft} onChange={e=>setSearchDraft(e.target.value)} placeholder="Student, program, application ID"/>
+   <button className="ml-2 rounded border px-2 py-1" type="submit">Search</button>
+  </form>
+  {Number(selected.page??1)>1&&<Link to="/admissions/intake" search={{...selected,page:(selected.page??1)-1}} className="underline">Previous</Link>}
+  <span>Page {selected.page??1}</span>
+  {data.records.length===40&&<Link to="/admissions/intake" search={{...selected,page:(selected.page??1)+1}} className="underline">Next</Link>}
+ </nav>;
+
  const studentKey=(student:typeof existingStudents[number])=>
   `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
  const existingStudent=existingStudents.find(student=>studentKey(student)===existingStudentKey);
@@ -255,6 +271,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     <p className="mt-2 text-xs text-muted-foreground">Withdraw unaccepted offers before waitlisting, declining or withdrawing an application.
       Accepted offers and active enrollments require their enrollment workflow and cannot be cancelled here.</p>
    </article>)}
+   {pageNavigation}
    {!records.length&&<p role="status" className="rounded-lg border p-5 text-sm text-muted-foreground">{selected.application?
     "This application is unavailable in your authorized programs.":"No applications recorded in your authorized programs."}</p>}
   </section>
