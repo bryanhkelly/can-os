@@ -102,7 +102,7 @@ export interface FinanceProcessor {
   readonly name: string;
   readonly configured: boolean;
   requestPayment(input: { obligationId: string; amountCents: number; currency: "USD"; idempotencyKey: string }):
-    Promise<{ kind: "unavailable"; reason: string } | { kind: "submitted"; intentId: string }>;
+    Promise<{ kind: "unavailable"; reason: string } | { kind: "submitted"; intentId: string; clientSecret?: string }>;
   verifyWebhook(rawPayload: string, signature: string):
     Promise<{ event: ProviderEvent; verification: { verifiedByAdapter: true; provider: string } }>;
 }
