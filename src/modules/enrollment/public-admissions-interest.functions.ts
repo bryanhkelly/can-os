@@ -3,7 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { applications, programs, publicAdmissionsInterests, publicFamilyStartRequests } from "@/db/schema";
+import { applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
@@ -49,6 +49,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       emailVerifiedAt: publicFamilyStartRequests.consumedAt,
       applicationLinkExpiresAt: publicFamilyStartRequests.expiresAt,
       applicationStage: applications.stage,
+      studentProfileId: applications.studentProfileId,
       applicationSubmittedAt: applications.submittedAt,
       applicationId: publicAdmissionsInterests.applicationId,
       convertedAt: publicAdmissionsInterests.convertedAt,
@@ -65,6 +66,29 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
         eq(publicAdmissionsInterests.siteId, programs.siteId),
       )).orderBy(desc(publicAdmissionsInterests.createdAt)).limit(200);
+    // Link the consented interest to the canonical enrollment and access
+    // records, not an assumed outcome from the application or invitation.
+    const linkedApplicationIds = [...new Set(rows.flatMap(row => row.applicationId ? [row.applicationId] : []))];
+    const linkedStudentIds = [...new Set(rows.flatMap(row => row.studentProfileId ? [row.studentProfileId] : []))];
+    const [activeEnrollments, accessConsents] = await Promise.all([
+      linkedStudentIds.length ? db.select({
+        studentProfileId: enrollments.studentProfileId,
+        programId: enrollments.programId,
+        schoolYearId: enrollments.schoolYearId,
+        kind: enrollments.kind,
+      }).from(enrollments).where(and(
+        inArray(enrollments.studentProfileId, linkedStudentIds),
+        eq(enrollments.status, "active"),
+        inArray(enrollments.kind, ["program", "section"]),
+      )) : Promise.resolve([]),
+      linkedApplicationIds.length ? db.select({
+        applicationId: studentAccessConsents.applicationId,
+        status: studentAccessConsents.status,
+      }).from(studentAccessConsents).where(
+        inArray(studentAccessConsents.applicationId, linkedApplicationIds),
+      ) : Promise.resolve([]),
+    ]);
+    const accessByApplication = new Map(accessConsents.map(consent => [consent.applicationId, consent.status]));
     // Admissions authority can change without affecting historical interest.
     // Resolve the canonical operating gate, not just Program status.
     const authorized = new Map<string, boolean>();
@@ -72,8 +96,25 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       try { await resolvePrivateFamilyStartDestination(db, programId); authorized.set(programId, true); }
       catch { authorized.set(programId, false); }
     }));
-    return rows.map(row => ({
+    return rows.map(row => {
+      const programEnrollmentYears = new Set(activeEnrollments.filter(enrollment =>
+        enrollment.studentProfileId === row.studentProfileId &&
+        enrollment.programId === row.programId && enrollment.kind === "program" &&
+        enrollment.schoolYearId,
+      ).map(enrollment => enrollment.schoolYearId));
+      const activeEnrollment = programEnrollmentYears.size > 0;
+      const placedInClass = activeEnrollment && activeEnrollments.some(enrollment =>
+        enrollment.studentProfileId === row.studentProfileId &&
+        enrollment.programId === row.programId && enrollment.kind === "section" &&
+        programEnrollmentYears.has(enrollment.schoolYearId),
+      );
+      return {
       ...row,
+      activeEnrollment,
+      placedInClass,
+      studentAccessStatus: row.applicationId
+        ? accessByApplication.get(row.applicationId) ?? "not_requested"
+        : null,
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
@@ -88,7 +129,8 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
             row.applicationLinkExpiresAt.getTime() <= Date.now())),
       applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
       admissionsAuthorized: authorized.get(row.programId) === true,
-    }));
+      };
+    });
   });
 
 /** Send the canonical adult-only verified-email application entry. The public
