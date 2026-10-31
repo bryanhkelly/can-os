@@ -20,7 +20,7 @@ export type FinanceRecord = {
 };
 export function validateCharge(charge: Charge): void {
   if (!charge.obligationId || !charge.enrollmentId || !charge.householdId || !charge.institutionId || !charge.siteId) throw new Error("Missing canonical reference");
-  if (!Number.isSafeInteger(charge.amount.cents) || charge.amount.cents <= 0) throw new Error("Invalid charge");
+  if (charge.amount.currency !== "USD" || !Number.isSafeInteger(charge.amount.cents) || charge.amount.cents <= 0) throw new Error("Invalid charge");
   const a = charge.allocation;
   if (a.partnerSiteId !== charge.siteId || !a.policyVersion || !Number.isSafeInteger(a.churchCents) || !Number.isSafeInteger(a.canCents) || a.churchCents < 0 || a.canCents < 0 || a.churchCents + a.canCents !== charge.amount.cents) throw new Error("Invalid partner allocation");
 }
