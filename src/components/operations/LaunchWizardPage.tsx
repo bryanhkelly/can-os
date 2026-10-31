@@ -1,3 +1,4 @@
+import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliveryModelFields";
 import { LaunchFamilyProgress } from "@/components/operations/LaunchFamilyProgress";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSchoolModelPicker } from "@/components/operations/LaunchSchoolModelPicker";
@@ -376,39 +377,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
                 </div>
               </fieldset>
 
-              <fieldset>
-                <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Delivery model
-                </legend>
-                <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={onsite} onChange={(e) => setOnsite(e.target.checked)} />
-                    Onsite
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={liveOnline} onChange={(e) => setLiveOnline(e.target.checked)} />
-                    Live online
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={asynchronous} onChange={(e) => setAsynchronous(e.target.checked)} />
-                    Asynchronous
-                  </label>
-                  {onsite && (
-                    <label className="flex items-center gap-2 text-xs">
-                      Onsite days/week
-                      <input
-                        aria-label="Onsite days per week"
-                        type="number"
-                        min={1}
-                        max={7}
-                        className="w-20 rounded-lg border bg-background p-2 text-sm"
-                        value={onsiteDaysPerWeek}
-                        onChange={(e) => setOnsiteDaysPerWeek(e.target.value)}
-                      />
-                    </label>
-                  )}
-                </div>
-              </fieldset>
+              <LaunchDeliveryModelFields {...{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} />
 
               <fieldset>
                 <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
