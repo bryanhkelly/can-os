@@ -165,6 +165,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
           </ul>}
           {onsite&&<p className="mt-2 text-xs" role="status">
             Institutionally authorized opening: {onsite.openingAuthorized?"Yes":"No"}.
+            {" "}Required duties accepted: {onsite.dutiesAccepted?"Yes":"No"}.
             {" "}Your arrival: {onsite.ownPresenceReported?"Reported":"Not reported"}.
             {" "}Independent witness of both adults: {onsite.witnessedBothAdults?"Recorded":"Not recorded"}.
           </p>}

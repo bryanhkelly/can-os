@@ -1,3 +1,4 @@
+import { summarizeNamedDutyResponses } from "@/domain/onsite-duty-policy";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -213,16 +214,18 @@ export const witnessOnsiteBlockPresence=createServerFn({method:"POST"})
         sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
         sql`${actions.metadata}->>'roomEvidenceId' = ${room.id}`))
         .orderBy(desc(actions.createdAt)).limit(20);
-      const [cannotCover]=await tx.select({id:actions.id}).from(actions)
+      const duties=await tx.select({ownerPersonId:actions.ownerPersonId,metadata:actions.metadata}).from(actions)
         .where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
           eq(actions.sectionId,block.sectionId),
           sql`${actions.metadata}->>'date' = ${data.date}`,
           sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
           sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
-          sql`${actions.metadata}->>'response' = 'cannot_cover'`,
-        )).limit(1);
-      if(cannotCover)throw new AuthorizationError(
-        "a reported unresolved staff coverage exception prevents physical coverage witness");
+        )).limit(21);
+      if(duties.length>20)throw new AuthorizationError("complete current named-adult duty records");
+      const duty=summarizeNamedDutyResponses({primaryPersonId:room.primaryPersonId,
+        backupPersonId:room.backupPersonId,requiresBackup:true,actorPersonId:actor.actorPersonId},duties);
+      if(duty.status!=="accepted")throw new AuthorizationError(
+        "both named adults must accept their current duties before coverage is witnessed");
       const primary=reports.find(r=>r.personId===room.primaryPersonId);
       const backup=reports.find(r=>r.personId===room.backupPersonId);
       if(!primary || !backup)
@@ -282,7 +285,7 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
     });
     if(plan.siteId!==site.id || plan.projectionTruncated)
       return {blocks:[],truncated:true,hasWitnessedAllBlocks:false};
-    const [reports,witnesses,exceptions]=await Promise.all([
+    const [reports,witnesses,duties]=await Promise.all([
       db.select({
         sectionId:actions.sectionId,personId:actions.ownerPersonId,
         metadata:actions.metadata,
@@ -294,14 +297,13 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
       }).from(actions).where(and(eq(actions.siteId,site.id),
         eq(actions.type,witnessType),
         sql`${actions.metadata}->>'date' = ${data.date}`)).limit(501),
-      db.select({sectionId:actions.sectionId,metadata:actions.metadata})
+      db.select({sectionId:actions.sectionId,ownerPersonId:actions.ownerPersonId,metadata:actions.metadata})
         .from(actions).where(and(eq(actions.siteId,site.id),
           eq(actions.type,dutyType),
           sql`${actions.metadata}->>'date' = ${data.date}`,
-          sql`${actions.metadata}->>'response' = 'cannot_cover'`,
-        )).limit(501),
+        )).orderBy(desc(actions.createdAt),desc(actions.id)).limit(501),
     ]);
-    const truncated=reports.length>500||witnesses.length>500||exceptions.length>500;
+    const truncated=reports.length>500||witnesses.length>500||duties.length>500;
     const blocks=[];
     for(const block of plan.blocks){
       let opening=false;
@@ -310,11 +312,13 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         opening=true;
       }catch(error){if(!(error instanceof AuthorizationError))throw error;}
       const current=!!block.assignedPlan && opening && !truncated;
-      const unresolvedException=exceptions.some(row=>
-        row.sectionId===block.sectionId &&
-        row.metadata.periodId===block.periodId &&
-        row.metadata.planToken===block.planToken);
-      const matched=current && !unresolvedException && witnesses.some(row=>
+      const exactDuties=duties.filter(row=>row.sectionId===block.sectionId&&
+        row.metadata.periodId===block.periodId&&row.metadata.planToken===block.planToken);
+      const duty=summarizeNamedDutyResponses({primaryPersonId:block.facilitatorPersonId,
+        backupPersonId:block.backupPersonId,requiresBackup:block.requiresSectionDelegation===true,
+        actorPersonId:actor.actorPersonId},exactDuties);
+      const dutiesAccepted=duty.status==="accepted";
+      const matched=current && dutiesAccepted && witnesses.some(row=>
         row.sectionId===block.sectionId &&
         row.metadata.periodId===block.periodId &&
         row.metadata.planToken===block.planToken);
@@ -332,7 +336,8 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         sectionId:block.sectionId,periodId:block.periodId,
         programId:block.programId,
         canReport:current && !!block.canCheckIn,
-        canWitness:current && actor.role==="site_leader",
+        canWitness:current && dutiesAccepted && actor.role==="site_leader",
+        dutiesAccepted,
         ownPresenceReported:ownPresence,witnessedBothAdults:matched,
         reportedAdultCount,requiredAdultReports,
         missingAdultReports:Math.max(0,requiredAdultReports-reportedAdultCount),
