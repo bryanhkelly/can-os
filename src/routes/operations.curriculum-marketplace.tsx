@@ -1,3 +1,4 @@
+import { OneRosterStudentReconciliation } from "@/components/learning/OneRosterStudentReconciliation";
 import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
 import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
 import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClassMappingFields";
@@ -359,6 +360,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
       },"External OneRoster class identities reconciled to canonical CAN Sections.")} />}
      <p className="text-xs text-muted-foreground">This scoped class-reconciliation workflow is not a student roster import or OneRoster certification.</p>
     </section>}
+   {market.canPublish&&<OneRosterStudentReconciliation programId={market.program.id}/>}
   </>}
  </main>;
 }
