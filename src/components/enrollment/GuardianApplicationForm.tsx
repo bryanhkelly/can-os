@@ -126,6 +126,10 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    if(linkedTransfer&&!linkedStudent){
+      setError("This transfer requires the student's existing verified household identity. Contact admissions rather than creating a second student.");
+      return;
+    }
     if (!selectedProgram || !selection.year || selection.unavailable) {
       setError("Choose an available school and its configured academic year before submitting.");
       return;
@@ -177,6 +181,16 @@ export function GuardianApplicationForm({ programs, households, students = [], t
     </div>}>
     {notice && <WorkspaceNotice ref={feedbackRef} tone="success" className="mb-5">{notice}</WorkspaceNotice>}
     {error && <WorkspaceNotice ref={feedbackRef} tone="danger" className="mb-5">{error}</WorkspaceNotice>}
+    {linkedTransfer&&!linkedStudent&&<WorkspaceNotice tone="danger" className="mb-5">
+      This verified receiving-school invitation belongs to an existing student transfer,
+      but the student's household membership cannot be matched. Contact admissions to
+      reconcile the verified household. Do not create a second student identity.
+    </WorkspaceNotice>}
+    {linkedTransfer&&linkedStudent&&<WorkspaceNotice tone="info" className="mb-5">
+      Your receiving-school email is linked to the transfer for {linkedStudent.studentFirstName}
+      {" "}{linkedStudent.studentLastName}. Their existing verified student and household
+      are preselected. Confirm the receiving school before submitting.
+    </WorkspaceNotice>}
     {selection.unavailable ? <WorkspaceNotice tone="danger">
       The school linked to this invitation is unavailable to this verified account.
       Contact that school's admissions team. No other school has been selected.
@@ -271,7 +285,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           <p id={`${id}-grade-hint`} className="text-xs leading-5 text-muted-foreground">Use the grade the student is applying to enter.</p>
         </div>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable || !!selectedTransfer&&!confirmedDestination} aria-busy={busy}>
+          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable || !!linkedTransfer&&!linkedStudent || !!selectedTransfer&&!confirmedDestination} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>
