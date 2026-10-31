@@ -206,8 +206,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       <p className="mt-1 text-xs text-muted-foreground">These are guidance labels, not independent approvals. CAN's saved requirements and authorization services make the final decisions.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {([
-          ["Configuration completed", "Review saved school setup", guidance.tasks.some(task => task.state === "complete")],
-          ["CAN services authorized", "Independent CAN authorization required", guidance.tasks.filter(task => task.state === "needs_can").length === 0 && guidance.tasks.some(task => task.state === "complete")],
+          ["Configuration completed", "Review saved school setup", false],
+          ["CAN services authorized", "Independent CAN authorization required", false],
           ["Safe to open", "Only canonical opening activation confirms this", launch.status === "active"],
           ["Family outreach sent", "Review actual invitation delivery records", false],
           ["First class ready", "Verify the real section and first-week prerequisites", false],
