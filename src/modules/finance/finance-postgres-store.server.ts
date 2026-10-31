@@ -69,6 +69,14 @@ export const postgresFinanceStore: FinanceStore = {
       const [invoice] = await tx.select().from(financeInvoices)
         .where(eq(financeInvoices.obligationId, input.obligationId)).limit(1).for("update");
       if (!invoice) throw new Error("Invoice not found");
+      const [canonical] = await tx.select({ amountCents: financialObligations.amountCents,
+        householdId: financialObligations.householdId, currency: financialObligations.currency,
+        subjectType: financialObligations.subjectType, subjectId: financialObligations.subjectId })
+        .from(financialObligations).where(eq(financialObligations.id, invoice.obligationId)).limit(1);
+      if (!canonical || canonical.amountCents !== invoice.amountCents ||
+          canonical.householdId !== invoice.householdId || canonical.currency !== invoice.currency ||
+          canonical.subjectType !== "application" || canonical.subjectId !== invoice.applicationId)
+        throw new Error("Stale canonical finance obligation");
       if (invoice.provider && invoice.provider !== input.provider) throw new Error("Processor conflict");
       const [prior] = await tx.select().from(financePaymentAttempts)
         .where(and(eq(financePaymentAttempts.invoiceId, invoice.id),
