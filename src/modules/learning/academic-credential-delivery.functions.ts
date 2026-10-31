@@ -286,7 +286,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
     eq(s.accountPersonGrants.personId,context.actorPersonId),
     eq(s.accountPersonGrants.active,true),
     eq(s.accountPersonGrants.isSynthetic,false)))
-   .limit(1);
+   .for("share").limit(1);
   if(!verifiedAccount)throw new AuthorizationError("verified recipient account required");
   // Recheck the live authorization immediately before generating the PDF.
   // Revocation or expiry between initial lookup and rendering must deny access.
