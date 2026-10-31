@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { getGuardianHealthWorkspace } from "@/modules/health/guardian-health.functions";
+import { requestGuardianHealthUpdate } from "@/modules/health/guardian-health-updates.functions";
 
 export const Route = createFileRoute("/guardian/health")({
   validateSearch: (search: Record<string, unknown>): { student?: string } => ({
@@ -75,6 +76,7 @@ function GuardianHealthPage() {
           {!child.clearances.length && <p className="mt-3 text-sm">No return-to-school clearance requirement is recorded.</p>}
         </div>
       </div>
+      <GuardianHealthUpdateForm child={child}/>
       <div className="rounded-lg border p-4">
         <h3 className="font-semibold">Recent health-office visits</h3>
         {child.visits.map((visit, i) => <p key={i} className="mt-2 text-sm">
@@ -85,4 +87,66 @@ function GuardianHealthPage() {
       </div>
     </section>)}
   </WorkspaceShell>;
+}
+
+type Child=Workspace["children"][number];
+
+function GuardianHealthUpdateForm({child}:{child:Child}){
+ const [allergies,setAllergies]=useState(child.profile?.allergySummary??"");
+ const [emergency,setEmergency]=useState(child.profile?.emergencySummary??"");
+ const [accommodations,setAccommodations]=useState(child.profile?.accommodationSummary??"");
+ const [name,setName]=useState(child.approvedEmergencyContact?.name??"");
+ const [phone,setPhone]=useState(child.approvedEmergencyContact?.phone??"");
+ const [relationship,setRelationship]=useState(child.approvedEmergencyContact?.relationship??"");
+ const [busy,setBusy]=useState(false),[submitted,setSubmitted]=useState(false);
+ const [notice,setNotice]=useState(""),[error,setError]=useState("");
+ async function submit(event:FormEvent){
+  event.preventDefault();
+  if(busy||submitted||child.awaitingSchoolHealthReview)return;
+  setBusy(true);setNotice("");setError("");
+  try{
+   await requestGuardianHealthUpdate({data:{
+    studentPersonId:child.studentPersonId,programId:child.programId,
+    allergySummary:allergies,emergencySummary:emergency,
+    accommodationSummary:accommodations,
+    emergencyContactName:name,emergencyContactPhone:phone,
+    emergencyContactRelationship:relationship,
+   }});
+   setSubmitted(true);
+   setNotice("Submitted for school review. Your changes are not yet approved emergency or medical instructions.");
+  }catch(e){setError(e instanceof Error?e.message:"School health information could not be submitted.");}
+  finally{setBusy(false);}
+ }
+ return <form onSubmit={event=>void submit(event)} className="space-y-3 rounded-lg border p-4">
+  <h3 className="font-semibold">Update emergency and health information</h3>
+  <p className="text-sm text-muted-foreground">Request corrections to the existing school medical record. Only authorized school staff can approve them. If your child needs immediate help, call the school directly; this form is not monitored as an emergency service.</p>
+  {child.awaitingSchoolHealthReview?<p role="status" className="rounded border p-3 text-sm">A previous update is pending school review. Contact the office for urgent changes.</p>:<>
+   <label className="block text-sm font-medium">Allergy instructions
+    <textarea value={allergies} onChange={e=>setAllergies(e.target.value)} maxLength={2000} rows={2} className="mt-1 block w-full rounded border bg-background p-2"/>
+   </label>
+   <label className="block text-sm font-medium">Emergency instructions
+    <textarea value={emergency} onChange={e=>setEmergency(e.target.value)} maxLength={2000} rows={2} className="mt-1 block w-full rounded border bg-background p-2"/>
+   </label>
+   <label className="block text-sm font-medium">Accommodations requiring school review
+    <textarea value={accommodations} onChange={e=>setAccommodations(e.target.value)} maxLength={2000} rows={2} className="mt-1 block w-full rounded border bg-background p-2"/>
+   </label>
+   <div className="grid gap-3 sm:grid-cols-2">
+    <label className="block text-sm font-medium">Emergency contact's legal name
+     <input value={name} onChange={e=>setName(e.target.value)} maxLength={150} className="mt-1 block w-full rounded border bg-background p-2"/>
+    </label>
+    <label className="block text-sm font-medium">Emergency contact phone
+     <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} maxLength={40} className="mt-1 block w-full rounded border bg-background p-2"/>
+    </label>
+    <label className="block text-sm font-medium">Relationship to child
+     <input value={relationship} onChange={e=>setRelationship(e.target.value)} maxLength={80} className="mt-1 block w-full rounded border bg-background p-2"/>
+    </label>
+   </div>
+   <button type="submit" disabled={busy||submitted} className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+    {busy?"Submitting…":submitted?"Awaiting school review":"Submit for school review"}
+   </button>
+  </>}
+  {child.approvedEmergencyContact?.phone&&<p className="text-sm"><strong>Current school-approved contact:</strong> {child.approvedEmergencyContact.name} · {child.approvedEmergencyContact.phone} · {child.approvedEmergencyContact.relationship}</p>}
+  {notice&&<p role="status" className="rounded border p-3 text-sm">{notice}</p>}
+  {error&&<p role="alert" className="rounded border p-3 text-sm">{error}</p>}
+ </form>;
 }
