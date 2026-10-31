@@ -17,3 +17,14 @@ export const requestChurchOnboardingEvidence = createServerFn({ method: "POST" }
     ]);
     return requestAdditionalChurchEvidence(await getCommandContext(getRequest()), data.requestId, data.note);
   });
+
+/** Steward cancellation is not exposed to unauthenticated applicants. */
+export const cancelChurchOnboardingRequest = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.string().uuid().parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { cancelChurchApplication }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-applications.server"),
+    ]);
+    return cancelChurchApplication(await getCommandContext(getRequest()), data);
+  });
