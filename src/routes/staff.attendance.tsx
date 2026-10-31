@@ -1,5 +1,5 @@
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
 import { ExcuseAttachments } from "@/components/operations/ExcuseAttachments";
@@ -8,7 +8,14 @@ import {
   listExpectedPendingExcuses, reviewCurrentAttendanceExcuse,
 } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
-export const Route = createFileRoute("/staff/attendance")({ component: StaffAttendancePage });
+export const Route = createFileRoute("/staff/attendance")({
+  validateSearch: (search: Record<string, unknown>): { programId?: string } => ({
+    programId: typeof search.programId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.programId)
+      ? search.programId : undefined,
+  }),
+  component: StaffAttendancePage,
+});
 
 type RosterStudent = Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["students"][number];
 type PendingExcuse = Awaited<ReturnType<typeof listExpectedPendingExcuses>>["excuses"][number];
@@ -39,6 +46,7 @@ function todayLocal(): string {
 }
 
 function StaffAttendancePage() {
+  const { programId } = Route.useSearch();
   const [date, setDate] = useState(todayLocal);
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [programs, setPrograms] = useState<Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["programs"]>([]);
@@ -98,7 +106,7 @@ function StaffAttendancePage() {
     setError("");
     try {
       const [roster, pending] = await Promise.all([
-        listExpectedOnsiteRoster({ data: { date: targetDate } }),
+        listExpectedOnsiteRoster({ data: { date: targetDate, programId } }),
         listExpectedPendingExcuses(),
       ]);
       setStudents(roster.students);
@@ -112,14 +120,14 @@ function StaffAttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [programId]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const [roster, pending] = await Promise.all([
-          listExpectedOnsiteRoster({ data: { date } }),
+          listExpectedOnsiteRoster({ data: { date, programId } }),
           listExpectedPendingExcuses(),
         ]);
         if (!active) return;
@@ -138,7 +146,7 @@ function StaffAttendancePage() {
       }
     })();
     return () => { active = false; };
-  }, [date]);
+  }, [date, programId]);
 
   const mark = async (student: RosterStudent, status: (typeof statusOptions)[number]) => {
     const change:OfflineMark={studentProfileId:student.studentProfileId,programId:student.programId,date,status,
