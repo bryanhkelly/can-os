@@ -1,9 +1,9 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { recommendCourseOption } from "@/domain/first-classroom";
 import {
-  courseTemplates, courseTemplateVersions, curriculumAdoptions,
-  curriculumEntitlements, curriculumPackItems, curriculumPackVersions, curriculumPacks, organizations,
+  courseTemplates, courseTemplateVersions, curriculumAnnualAdoptions, schoolYears,
+  curriculumEntitlements, curriculumPackItems, curriculumPackVersions, curriculumPacks, organizations, programs,
 } from "@/db/schema";
 
 /**
@@ -19,6 +19,8 @@ export async function listLaunchEligibleCourses(program: {
   id: string;
   organizationId: string;
   academicProviderOrganizationId: string | null;
+  siteId?: string | null;
+  schoolYearId?: string | null;
 }, query: Pick<Transaction, "select"> = db) {
   const owners = [...new Set([
     program.organizationId, program.academicProviderOrganizationId,
@@ -36,21 +38,34 @@ export async function listLaunchEligibleCourses(program: {
       inArray(courseTemplates.owningOrganizationId, owners),
     ));
 
+  // Fail closed: publisher content requires an explicit, canonical annual grant.
+  const [actualProgram] = await query.select().from(programs).where(eq(programs.id, program.id)).limit(1);
+  const yearId = program.schoolYearId;
+  const [year] = actualProgram?.siteId && yearId
+    ? await query.select().from(schoolYears).where(and(
+        eq(schoolYears.id, yearId), eq(schoolYears.organizationId, actualProgram.organizationId),
+        eq(schoolYears.siteId, actualProgram.siteId))).limit(1)
+    : [];
+  const validYear = Boolean(actualProgram && year &&
+    actualProgram.organizationId === program.organizationId &&
+    actualProgram.academicProviderOrganizationId === program.academicProviderOrganizationId &&
+    (year!.programId === null || year!.programId === program.id));
   const adopted = await query.select({
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
     subject: courseTemplates.subject, curriculum: courseTemplateVersions.curriculum,
     packName:curriculumPacks.name,publisherName:organizations.name,
   })
-    .from(curriculumAdoptions)
+    .from(curriculumAnnualAdoptions)
     .innerJoin(curriculumEntitlements, and(
-      eq(curriculumEntitlements.organizationId, curriculumAdoptions.organizationId),
-      eq(curriculumEntitlements.packId, curriculumAdoptions.packId),
+      eq(curriculumEntitlements.id, curriculumAnnualAdoptions.entitlementId),
+      eq(curriculumEntitlements.organizationId, curriculumAnnualAdoptions.organizationId),
+      eq(curriculumEntitlements.packId, curriculumAnnualAdoptions.packId),
       eq(curriculumEntitlements.status, "active"),
     ))
     .innerJoin(curriculumPackVersions, and(
-      eq(curriculumPackVersions.id, curriculumAdoptions.packVersionId),
-      eq(curriculumPackVersions.packId, curriculumAdoptions.packId),
+      eq(curriculumPackVersions.id, curriculumAnnualAdoptions.packVersionId),
+      eq(curriculumPackVersions.packId, curriculumAnnualAdoptions.packId),
       eq(curriculumPackVersions.status, "published"),
     ))
     .innerJoin(curriculumPacks,eq(curriculumPacks.id,curriculumPackVersions.packId))
@@ -62,9 +77,12 @@ export async function listLaunchEligibleCourses(program: {
     ))
     .innerJoin(courseTemplates, eq(courseTemplates.id, courseTemplateVersions.courseTemplateId))
     .where(and(
-      eq(curriculumAdoptions.programId, program.id),
-      eq(curriculumAdoptions.organizationId, program.organizationId),
-      eq(curriculumAdoptions.status, "active"),
+      eq(curriculumAnnualAdoptions.programId, program.id),
+      eq(curriculumAnnualAdoptions.organizationId, program.organizationId),
+      eq(curriculumAnnualAdoptions.status, "active"),
+      eq(curriculumAnnualAdoptions.academicYearId, yearId ?? "00000000-0000-0000-0000-000000000000"),
+      eq(curriculumAnnualAdoptions.siteId, actualProgram?.siteId ?? "00000000-0000-0000-0000-000000000000"),
+      eq(curriculumAnnualAdoptions.academicProviderOrganizationId, actualProgram?.academicProviderOrganizationId ?? "00000000-0000-0000-0000-000000000000"),
     ));
 
   // A version may also be owned by the school or appear in more than one pack;
@@ -75,7 +93,12 @@ export async function listLaunchEligibleCourses(program: {
   const deduplicated = new Map<string,CourseChoice>(owned.map(course => [
     course.versionId,{...course,origin:"institution_owned" as const,packName:null,publisherName:null},
   ]));
-  for (const course of adopted) deduplicated.set(course.versionId,{...course,origin:"adopted"});
+  // A current active entitlement is not sufficient without year-wide licensed dates.
+  for (const course of (validYear ? adopted : [])) {
+    // Annual entitlement validity is checked by the shared annual policy reader
+    // before a publisher course is authorized for a new Section.
+    deduplicated.set(course.versionId,{...course,origin:"adopted"});
+  }
   return [...deduplicated.values()].sort((a, b) =>
     a.title.localeCompare(b.title) || a.version - b.version || a.versionId.localeCompare(b.versionId))
     .map(({ curriculum, ...course }) => ({
