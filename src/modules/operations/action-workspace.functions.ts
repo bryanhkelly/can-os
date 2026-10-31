@@ -91,6 +91,9 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(record.type==="onsite_pickup_custody_hold")throw new Error("A site leader must resolve this pickup restriction in the onsite pickup workflow");
+   if(record.type==="guardian_enrollment_change_request"&&data.status==="resolved"&&
+      (record.metadata.kind==="withdrawal"||record.metadata.kind==="transfer"))
+     throw new Error("Complete the official withdrawal or transfer through the registrar enrollment-exit workflow");
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    if(record.type==="onsite_coverage_gap"&&data.status==="resolved")
      throw new Error("The current assigned site director resolves coverage gaps in Site Today");
