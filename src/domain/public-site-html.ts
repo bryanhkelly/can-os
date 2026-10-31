@@ -33,7 +33,6 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
   const localItems = local ? [
-    ["Welcome", local.welcomeMessage],
     ["Our community", local.localDescription],
     ["Denominational identity", local.denomination],
     ["Statement of faith", local.statementOfFaith],
@@ -67,7 +66,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ].filter(Boolean).join(" · ");
     const onsiteDays = program.delivery.onsiteDaysPerWeek;
     const requestId = options?.makeRequestId?.();
-    const applyRequestId = options?.makeRequestId?.();
+    const applyRequestId = program.availability === "operating" ? options?.makeRequestId?.() : undefined;
     // A published active academic Program can invite first-time families to
     // verify their email. The receiving server checks the live operating
     // authorization; this is not a claim of admission or school readiness.
@@ -204,7 +203,7 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a{co
       ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
       : '<p class="empty">There are no programs to display at this time.</p>'}
   </section>
-  <section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px"><h2 id="contact-title">Connect with our school</h2><p>Explore the published programs above and use their request-information forms to contact the school. An application invitation appears only for an eligible operating program; submitting a request does not guarantee admission.</p></section>
+  <section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px"><h2 id="contact-title">Connect with our school</h2><p>${academicCards ? "For academic program questions, use the request-information form on the program listing above." : "Academic inquiries are not available on this website until a school program is published."} An application invitation appears only for an eligible operating program; submitting a request does not guarantee admission.</p></section>
 </main>
 <footer>${host} · Powered by CAN OS</footer>
 </body>
