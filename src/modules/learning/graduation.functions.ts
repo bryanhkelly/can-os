@@ -69,7 +69,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .from(s.graduationRequirementSets).where(and(
       eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId),
       eq(s.graduationRequirementSets.academicYear,requirementSet.academicYear)));
-  if(!approved.some(row=>row.id===requirementSet.id))
+  if(approved.length!==1 || approved[0]?.id!==requirementSet.id)
     throw new AuthorizationError("Graduation policy is not approved for this academic year");
   return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
 }
