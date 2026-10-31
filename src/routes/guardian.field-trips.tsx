@@ -36,8 +36,9 @@ function TripPermissions({ items }: { items: Trip[] }) {
       await signGuardianFieldTripPermission({
         data: { participantId, acknowledged: true },
       });
-      await router.invalidate();
       setNotice("Your field trip permission was recorded.");
+      try { await router.invalidate(); }
+      catch { setError("Your signature was saved, but the invitation list could not refresh. Reopen this page instead of signing again."); }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign permission.");
     } finally {
