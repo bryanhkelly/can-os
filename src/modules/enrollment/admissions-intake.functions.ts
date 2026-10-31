@@ -17,7 +17,7 @@ import { resolvePrivateFamilyStartDestination } from "./private-family-start.ser
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,asc,desc,eq,gt,ilike,inArray,isNull,or,sql } from "drizzle-orm";
+import { and,asc,desc,eq,ilike,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 const uuid=z.string().uuid();
@@ -128,36 +128,6 @@ export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
 export const listAdmissionsExistingStudents=createServerFn({method:"GET"}).handler(async()=>{
  return existingStudentChoices(db,await registrar());
 });
-/** Bounded, server-scoped admissions index. A cursor is never an authorization grant. */
-export const listAdmissionsIntakePage=createServerFn({method:"GET"})
- .validator((value:unknown)=>admissionsPageInput.parse(value??{}))
- .handler(async({data})=>{
-  const actor=await registrar();
-  const permittedPrograms=await db.select({id:programs.id}).from(programs)
-   .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
-    ...(actor.scope.programIds?[inArray(programs.id,actor.scope.programIds)]:[]),
-    ...(actor.scope.siteIds?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
-    data.siteId?eq(programs.siteId,data.siteId):undefined,
-    data.programId?eq(programs.id,data.programId):undefined));
-  if(!permittedPrograms.length)return {items:[],nextCursor:null};
-  const rows=await db.select({
-   id:applications.id,stage:applications.stage,programId:applications.programId,
-   studentProfileId:applications.studentProfileId,programName:programs.name,
-   studentFirst:people.legalFirstName,studentLast:people.legalLastName,
-  }).from(applications)
-   .innerJoin(programs,eq(programs.id,applications.programId))
-   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
-   .innerJoin(people,eq(people.id,studentProfiles.personId))
-   .where(and(inArray(applications.programId,permittedPrograms.map(p=>p.id)),
-    data.cursor?gt(applications.id,data.cursor):undefined,
-    data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),
-      ilike(people.legalLastName,"%"+data.search+"%"),
-      ilike(programs.name,"%"+data.search+"%"),
-      z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined):undefined))
-   .orderBy(asc(applications.id)).limit(data.pageSize+1);
-  const items=rows.slice(0,data.pageSize);
-  return {items,nextCursor:rows.length>data.pageSize?items[items.length-1]?.id??null:null};
- });
 export const listAdmissionsIntake=createServerFn({method:"GET"})
  .validator((value:unknown)=>admissionsPageInput.omit({cursor:true}).extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
  .handler(async({data})=>{
