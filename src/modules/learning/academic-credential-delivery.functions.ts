@@ -64,17 +64,85 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   const expiry=new Date(data.expiresAt);
   if(expiry.getTime()<=Date.now()||expiry.getTime()>Date.now()+30*86400000)
     throw new AuthorizationError("Release expiry must be within 30 days");
-  // The baseline provides no trusted records-release instruction or consent
-  // verification interface. Never interpret caller-supplied reference strings
-  // as independent evidence or create an authorization from them.
+  // External release may be created only from the independently signed
+  // transfer workflow, never from caller-supplied reference text.
+  if(data.kind!=="transcript"||data.releasePurpose!=="transfer")
+   throw new AuthorizationError("Only verified school-transfer transcript releases are supported");
+  const [student]=await db.select({personId:s.studentProfiles.personId})
+   .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).limit(1);
+  if(!student)throw new AuthorizationError("credential student");
+  const [recipient]=await db.select({id:s.people.id,email:s.people.email,active:s.people.active})
+   .from(s.people).where(eq(s.people.id,data.recipientPersonId)).limit(1);
+  const [verified]=await db.select({id:s.accessAccounts.id}).from(s.accessAccounts)
+   .innerJoin(s.accountPersonGrants,and(
+    eq(s.accountPersonGrants.accountId,s.accessAccounts.id),
+    eq(s.accountPersonGrants.personId,data.recipientPersonId),
+    eq(s.accountPersonGrants.active,true),
+    eq(s.accountPersonGrants.isSynthetic,false)))
+   .where(and(eq(s.accessAccounts.disabled,false),
+    isNotNull(s.accessAccounts.emailVerifiedAt),
+    eq(s.accessAccounts.emailNormalized,data.recipientEmail.trim().toLowerCase())))
+   .limit(1);
+  const [relationship]=await db.select({id:s.guardianRelationships.id})
+   .from(s.guardianRelationships).where(and(
+    eq(s.guardianRelationships.studentPersonId,student.personId),
+    eq(s.guardianRelationships.guardianPersonId,data.recipientPersonId),
+    eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
+  // Transfer consent must have been signed by the very same guardian and
+  // linked to a completed institutional transfer action for this student.
+  const [action]=await db.select().from(s.actions).where(and(
+   eq(s.actions.id,data.instructionReference),
+   eq(s.actions.type,"guardian_enrollment_change_request"),
+   eq(s.actions.subjectType,"student_profile"),
+   eq(s.actions.subjectId,doc.studentProfileId),
+   eq(s.actions.status,"resolved"))).limit(1);
+  const [consent]=await db.select().from(s.consentRecords).where(and(
+   eq(s.consentRecords.id,data.consentEvidenceReference),
+   eq(s.consentRecords.subjectType,"student_profile"),
+   eq(s.consentRecords.subjectId,doc.studentProfileId),
+   eq(s.consentRecords.consentType,"academic_records_transfer_release"),
+   eq(s.consentRecords.signerPersonId,data.recipientPersonId),
+   isNull(s.consentRecords.revokedAt))).limit(1);
+  const evidence=consent?.signatureEvidence;
+  const trustedInstructions=!!action&&action.metadata.kind==="transfer"&&
+   action.metadata.exitCompletedByRegistrar===true&&
+   action.metadata.recordsReleaseConsentId===consent?.id&&
+   action.metadata.requestedByGuardianPersonId===data.recipientPersonId;
+  const validAuthorityEvidence=!!consent&&evidence?.acknowledged===true&&
+   evidence.actionId===action?.id&&
+   evidence.guardianPersonId===data.recipientPersonId&&
+   evidence.studentPersonId===student.personId&&
+   evidence.destinationSchoolName===action?.metadata.destinationSchoolName;
   const approved=canAuthorizeAcademicCredentialRelease({
-    issuerMatches:true, studentMatches:false, verifiedRecipient:false,
-    trustedInstructions:false, validAuthorityEvidence:false,
-    registrarApproved:true, demoActor:!!context.demoFacilitator,
-    purpose:"student_request", expiresAt:expiry, now:new Date(),
+   issuerMatches:true,studentMatches:!!student,
+   verifiedRecipient:!!recipient?.active&&
+    recipient.email?.trim().toLowerCase()===data.recipientEmail.trim().toLowerCase()&&
+    !!verified&&!!relationship,
+   trustedInstructions,validAuthorityEvidence,
+   registrarApproved:true,demoActor:!!context.demoFacilitator,
+   purpose:"transfer",expiresAt:expiry,now:new Date(),
   });
-  if(!approved)throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
-  throw new AuthorizationError("Credential release authorization requires a trusted institution evidence interface");
+  if(!approved)throw new AuthorizationError("Verified transfer, guardian consent and recipient identity required");
+  return db.transaction(async tx=>{
+   // A signed consent is bound to this transfer action and recipient.
+   const [created]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
+    issuingOrganizationId:doc.issuerId,transcriptIssuanceId:data.credentialId,
+    recipientPersonId:data.recipientPersonId,
+    recipientEmail:data.recipientEmail.trim().toLowerCase(),
+    releasePurpose:"transfer",instructionReference:action!.id,
+    consentEvidenceReference:consent!.id,
+    authorizedByPersonId:context.actorPersonId!,expiresAt:expiry,
+   }).returning({id:s.academicCredentialReleaseAuthorizations.id});
+   if(!created)throw new Error("Unable to record credential release");
+   await writeAudit(tx,context,{
+    action:"academic_credential.release.authorize",
+    entityType:"academic_credential_release_authorization",entityId:created.id,
+    scope:{organizationId:doc.issuerId},
+    after:{recipientPersonId:data.recipientPersonId,credentialId:data.credentialId,
+     consentId:consent!.id,transferActionId:action!.id,expiresAt:data.expiresAt},
+   });
+   return {authorizationId:created.id};
+  });
  });
 
 
