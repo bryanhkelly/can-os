@@ -72,8 +72,8 @@ export const postgresFinanceStore: FinanceStore = {
       if (!invoice) throw new Error("Invoice not found for processor event");
       const prior = await tx.select().from(financeProviderEvents)
         .where(and(eq(financeProviderEvents.provider, event.provider), eq(financeProviderEvents.eventId, event.eventId))).limit(1);
-      if (prior.length) {
-        const old = prior[0];
+      const old = prior[0];
+      if (old) {
         if (old.invoiceId !== invoice.id || old.eventKind !== event.kind ||
             old.providerPaymentId !== event.providerPaymentId ||
             old.providerRefundId !== (event.providerRefundId ?? null) ||
@@ -94,6 +94,7 @@ export const postgresFinanceStore: FinanceStore = {
         providerRefundId: event.providerRefundId ?? null, amountCents: event.amount.cents,
         currency: event.amount.currency, verifiedAt: new Date(),
       }).returning({ id: financeProviderEvents.id });
+      if (!inserted) throw new Error("Provider event insert did not return an id");
       await tx.update(financeInvoices).set({
         capturedCents: next.capturedCents, refundedCents: next.refundedCents,
         chargebackCents: next.chargebackCents, providerPaymentId: next.providerPaymentId ?? null,
