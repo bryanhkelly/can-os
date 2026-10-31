@@ -41,9 +41,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   const { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, authError } = data;
   const router = useRouter();
-  const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input) });
-  const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input) });
-  const busy = siteMutation.isPending || launchMutation.isPending;
+  const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input), invalidateRouter: () => router.invalidate() });
+  const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input), invalidateRouter: () => router.invalidate() });
+  const busy = siteMutation.isSubmitting || launchMutation.isSubmitting;
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>("church_hosted_academy");
@@ -72,12 +72,14 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     if(!hostOrganizationId)return;
     setError("");
     try{
-      const result=await siteMutation.submit({data:{organizationId:hostOrganizationId,name:newSiteName,
+      const submission=await siteMutation.submit({data:{organizationId:hostOrganizationId,name:newSiteName,
         slug:newSiteSlug,timezone:newSiteTimezone}});
-      if (!result) return;
+      if (submission.status === "ignored") return;
+      const result = submission.value;
       setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host});
       setSiteId(result.siteId);
-      await router.invalidate();setNewSiteName("");setNewSiteSlug("");
+      if (submission.refreshError) setError("Site created, but the page could not refresh. Reopen launch setup; do not create another Site.");
+      setNewSiteName("");setNewSiteSlug("");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
 
   }
@@ -95,7 +97,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     setError("");
     setCreated(null);
     try {
-      const result = await launchMutation.submit({
+      const submission = await launchMutation.submit({
         data: {
           name,
           targetOpeningDate,
@@ -118,9 +120,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           ...(siteId ? { siteId } : {}),
         },
       });
-      if (!result) return;
+      if (submission.status === "ignored") return;
+      const result = submission.value;
       setCreated({...result,programType:type});
-      await router.invalidate();
+      if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
       await router.navigate({
         to: "/operations/launch",
         search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId },
