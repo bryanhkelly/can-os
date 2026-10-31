@@ -333,6 +333,8 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    throw new AuthorizationError("Official transcript issuer or student invalid");
 
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
+  // Diploma delivery is blocked until Agent A defines active/superseded issuance semantics.
+  // Historical transcript release remains bound to its exact immutable issuance snapshot.
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
    throw new AuthorizationError("Only guardian transfer transcript access is supported");
   const [student]=await tx.select({personId:s.studentProfiles.personId})
