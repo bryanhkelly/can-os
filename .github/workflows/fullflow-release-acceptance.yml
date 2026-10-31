@@ -78,14 +78,21 @@ jobs:
               process.exit(1);
             }
           '
-      - name: Apply only reviewed migrations to isolated FullFlow branch
-        run: npm run db:migrate:fullflow
       - name: Verify separate admissions database is an attested disposable branch
         env:
           TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
         run: |
           npm run test:integration:admissions -- --preflight
           node scripts/verify-admissions-neon-branch.mjs
+      - name: Require distinct Postgres-attested Neon branch IDs before any writes
+        shell: bash
+        run: |
+          if [[ "${CAN_ADMISSIONS_TEST_BRANCH_ID}" == "br-proud-pine-arfju8h2" ]]; then
+            echo "::error::HOLD: admissions branch is the pinned FullFlow branch; independent migration is unsafe."
+            exit 1
+          fi
+      - name: Apply only reviewed migrations to isolated FullFlow branch
+        run: npm run db:migrate:fullflow
       - name: Apply admissions migrations on separately guarded disposable branch
         env:
           DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
