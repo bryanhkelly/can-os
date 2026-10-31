@@ -14,7 +14,7 @@ import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate
 import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -39,12 +39,12 @@ const applicant=z.union([
   guardianLastName:z.string().trim().min(1).max(100),guardianEmail:z.string().trim().email(),
  }).strict(),
 ]);
-export async function registrar(){
+export const registrar=createServerOnlyFn(async()=>{
  const actor=await getCommandContext(getRequest());
  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("admissions registrar");
  assertCapability(actor,"enrollment.decide");
  return actor;
-}
+});
 export const listAdmissionsIntakePrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await getCommandContext(getRequest());
  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)
