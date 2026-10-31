@@ -6,6 +6,7 @@ import {
   communicationThreads,
   domainEvents,
   programs,
+  sites,
   publicFamilyStartRequests,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -19,6 +20,7 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import {
   dedupeFamilyInvitationContacts,
+  assertPreopeningFamilyInterestDestination,
   FAMILY_INVITATION_BATCH_KIND,
   familyInvitationBatchMetadataSchema,
   familyInvitationRetryMatches,
@@ -30,6 +32,7 @@ import {
   type FamilyInvitationWorkspace,
 } from "@/domain/family-invitations";
 import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
+import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import {
   requestPublicFamilyStart,
 } from "./public-family-start.server";
@@ -43,6 +46,21 @@ function assertFamilyInvitationRegistrar(context: AccessContext, programId?: str
     throw new AuthorizationError("registrar family outreach workspace");
   }
   if (programId) assertProgramScope(context, programId);
+}
+
+/** Outreach before authorization is informational only: never create a guardian or Application. */
+async function resolvePreopeningInterestDestination(tx: typeof db, programId: string) {
+  const [school] = await tx.select({
+    programId: programs.id, programName: programs.name,
+    organizationId: programs.organizationId, programSiteId: programs.siteId,
+    siteId: sites.id, siteOrganizationId: sites.organizationId,
+    slug: sites.slug, type: programs.type, status: programs.status,
+  }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
+    .where(eq(programs.id, programId)).limit(1);
+  if (!school) throw new Error("School is not eligible for pre-opening family interest outreach");
+  assertPreopeningFamilyInterestDestination(school);
+  return { programId: school.programId, programName: school.programName,
+    organizationId: school.organizationId, siteId: school.siteId, slug: school.slug };
 }
 
 function contactProjection(recipient: {
@@ -68,7 +86,9 @@ export async function sendFamilyInvitationBatch(
   return db.transaction(async tx => {
     // Serializes cross-batch dedupe until the canonical recipient requests exist.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"family-invitation:" + data.programId}))`);
-    const destination = await resolvePrivateFamilyStartDestination(tx, data.programId);
+    const destination = data.purpose === "interest"
+      ? await resolvePreopeningInterestDestination(tx as typeof db, data.programId)
+      : await resolvePrivateFamilyStartDestination(tx, data.programId);
     assertOrganizationScope(context, destination.organizationId);
     assertSiteScope(context, destination.siteId);
     assertProgramScope(context, destination.programId);
@@ -88,7 +108,7 @@ export async function sendFamilyInvitationBatch(
     if (existing) {
       const metadata = familyInvitationBatchMetadataSchema.parse(existing.metadata);
       if (existing.subject !== data.subject || !familyInvitationRetryMatches(
-        metadata, data.subject, data.introduction, parsed.contacts.map(contactProjection),
+        metadata, data.subject, data.introduction, parsed.contacts.map(contactProjection), data.purpose,
       )) {
         throw new Error("This invitation request was already used with different content");
       }
@@ -109,14 +129,17 @@ export async function sendFamilyInvitationBatch(
     const existingEmails = new Set<string>();
     for (const batch of previousBatches) {
       const metadata = familyInvitationBatchMetadataSchema.parse(batch.metadata);
-      for (const recipient of metadata.recipients) existingEmails.add(recipient.email);
+      if ((metadata.destination === "preopening_interest" ? "interest" : "application") === data.purpose) {
+        for (const recipient of metadata.recipients) existingEmails.add(recipient.email);
+      }
     }
 
-    const priorStarts = await tx.select({ email: publicFamilyStartRequests.emailNormalized })
-      .from(publicFamilyStartRequests).where(and(
-        eq(publicFamilyStartRequests.programId, data.programId),
-        inArray(publicFamilyStartRequests.emailNormalized, parsed.contacts.map(contact => contact.email)),
-      ));
+    const priorStarts = data.purpose === "application"
+      ? await tx.select({ email: publicFamilyStartRequests.emailNormalized })
+          .from(publicFamilyStartRequests).where(and(
+            eq(publicFamilyStartRequests.programId, data.programId),
+            inArray(publicFamilyStartRequests.emailNormalized, parsed.contacts.map(contact => contact.email)),
+          )) : [];
     for (const start of priorStarts) existingEmails.add(start.email);
 
     const contacts = dedupeFamilyInvitationContacts(parsed.contacts, existingEmails);
@@ -131,7 +154,7 @@ export async function sendFamilyInvitationBatch(
       version: 1,
       batchRequestId: data.requestId,
       siteSlug: destination.slug,
-      destination: "private_platform",
+      destination: data.purpose === "interest" ? "preopening_interest" : "private_platform",
       siteId: destination.siteId,
       introduction: data.introduction,
       status: "queued",
@@ -173,7 +196,7 @@ export async function sendFamilyInvitationBatch(
       organizationId: destination.organizationId,
       siteId: destination.siteId,
       programId: destination.programId,
-      payload: { recipientCount: contacts.length },
+      payload: { recipientCount: contacts.length, purpose: data.purpose },
     });
     await writeAudit(tx, context, {
       action: "family.invitation_batch.queue",
@@ -187,6 +210,7 @@ export async function sendFamilyInvitationBatch(
       after: {
         status: "queued",
         recipientCount: contacts.length,
+        purpose: data.purpose,
         duplicateRecipientCount: parsed.duplicates + skippedExisting,
       },
     });
@@ -230,6 +254,13 @@ export async function requestFamilyInvitationRetry(
     assertProgramScope(context, thread.contextId);
 
     const metadata = familyInvitationBatchMetadataSchema.parse(thread.metadata);
+    // Retry must not revive pre-opening marketing after the school opens or
+    // release a formal application when current institutional authority is gone.
+    if (metadata.destination === "preopening_interest") {
+      await resolvePreopeningInterestDestination(tx as typeof db, thread.contextId);
+    } else if (metadata.destination === "private_platform") {
+      await resolvePrivateFamilyStartDestination(tx, thread.contextId);
+    }
     const failed = metadata.recipients.filter(recipient => recipient.status === "failed");
     if (!failed.length) return { batchId, retried: 0 };
 
@@ -293,8 +324,13 @@ export async function listFamilyInvitationWorkspace(
       assertSiteScope(context, candidate.siteId);
       scopedPrograms.push(candidate);
       if (!["draft", "launching", "ready", "active"].includes(candidate.status)) continue;
-      const destination = await resolvePrivateFamilyStartDestination(db, candidate.id);
-      eligible.push(destination);
+      if (candidate.status === "active") {
+        const destination = await resolvePrivateFamilyStartDestination(db, candidate.id);
+        eligible.push({ ...destination, purpose: "application" as const });
+      } else {
+        const destination = await resolvePreopeningInterestDestination(db, candidate.id);
+        eligible.push({ ...destination, purpose: "interest" as const });
+      }
     } catch (error) {
       if (error instanceof AuthorizationError ||
         (error instanceof Error && error.message === "School applications not open")) continue;
@@ -353,7 +389,9 @@ export async function listFamilyInvitationWorkspace(
       name: program.programName,
       siteId: program.siteId,
       publishedSiteUrl: "",
-      privateApplicationUrl: `/guardian/apply?programId=${encodeURIComponent(program.programId)}`,
+      privateApplicationUrl: program.purpose === "application"
+        ? `/guardian/apply?programId=${encodeURIComponent(program.programId)}` : undefined,
+      purpose: program.purpose,
     })),
     batches: parsedBatches.map(batch => {
       const programName = programsById.get(batch.programId)?.name ?? "Program";
@@ -366,9 +404,10 @@ export async function listFamilyInvitationWorkspace(
         introduction: batch.metadata.introduction,
         createdAt: batch.createdAt.toISOString(),
         status: batch.metadata.status,
+        purpose: batch.metadata.destination === "preopening_interest" ? "interest" as const : "application" as const,
         outboxStatus: latestEvent.get(batch.id)?.status ?? null,
         recipients: batch.metadata.recipients.map(recipient => {
-          const responses = starts.filter(start => start.programId === batch.programId &&
+          const responses = batch.metadata.destination === "preopening_interest" ? [] : starts.filter(start => start.programId === batch.programId &&
             start.email === recipient.email && start.consumedAt);
           const respondedAt = responses.reduce<Date | null>((latest, start) =>
             !latest || (start.consumedAt && start.consumedAt > latest) ? start.consumedAt : latest, null);
@@ -446,6 +485,22 @@ async function persistRecipientResult(
   });
 }
 
+/** Recheck school state at delivery, not just when the batch was queued.
+ * No login token, Application or self-asserted family consent is created. */
+async function sendPreopeningFamilyInterestEmail(programId: string, batchId: string,
+  recipient: FamilyInvitationBatchMetadata["recipients"][number],
+  subject: string, metadata: FamilyInvitationBatchMetadata) {
+  const school = await resolvePreopeningInterestDestination(db, programId);
+  if (metadata.siteId !== school.siteId) throw new AuthorizationError("original pre-opening Site");
+  const accepted = await sendNotificationEmail({
+    to: recipient.email,
+    subject,
+    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services. Please contact the inviting church directly for updates; no child information is requested by this email.`,
+  }, `${batchId}:${recipient.key}`);
+  if (!accepted) throw new Error("Pre-opening family email was not accepted by the provider");
+  return { requestId: recipient.key, created: true };
+}
+
 /** Domain-outbox consumer. Provider calls are deliberately outside transactions. */
 export async function handleFamilyInvitationBatch(eventId: string): Promise<void> {
   const [event] = await db.select({
@@ -467,7 +522,9 @@ export async function handleFamilyInvitationBatch(eventId: string): Promise<void
 
   const failures = await processFamilyInvitationRecipients(
     metadata.recipients,
-    recipient => metadata.destination === "private_platform"
+    recipient => metadata.destination === "preopening_interest"
+      ? sendPreopeningFamilyInterestEmail(thread.contextId!, thread.id, recipient, thread.subject, metadata)
+      : metadata.destination === "private_platform"
       ? requestInvitedFamilyStart(thread.id, recipient.key, sendAccessLinkViaResend, {
         idempotencyKey: `${thread.id}:${recipient.key}`,
         subject: thread.subject,
