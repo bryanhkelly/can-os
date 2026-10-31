@@ -22,7 +22,8 @@ export function validateChurchEvidenceReference(reference: string, method: strin
     if (parsed.protocol !== "https:" || !parsed.hostname.includes(".") ||
         parsed.username || parsed.password)
       throw new Error("Evidence URLs must use HTTPS without embedded credentials");
-    return trimmed;
+    // A web link is not inspected bytes and must never be an approval credential.
+    throw new Error("External HTTPS links cannot establish independently inspected evidence");
   }
   // Bare strings and unknown URI schemes cannot be dereferenced or audited.
   // Only a canonical internal vault reference or a verified HTTPS record is accepted.
