@@ -1,6 +1,6 @@
 import {and,eq,sql} from "drizzle-orm";
 import {db} from "@/db/client";
-import {programs,schoolYears,curriculumEntitlements,curriculumPackVersions} from "@/db/schema";
+import {programs,schoolYears,curriculumEntitlements,curriculumPacks,curriculumPackVersions} from "@/db/schema";
 import {curriculumAnnualAdoptions} from "@/db/schema/curriculum-year-adoptions";
 import {AuthorizationError} from "@/domain/command-context";
 import {hasInstitutionalProgramCapability} from "@/modules/identity/institutional-capability.server";
@@ -38,15 +38,16 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
  const [license]=await executor.select().from(curriculumEntitlements).where(and(
   eq(curriculumEntitlements.id,adoption.entitlementId),eq(curriculumEntitlements.organizationId,program.organizationId),
   eq(curriculumEntitlements.packId,input.packId))).limit(1);
+ const [pack]=await executor.select().from(curriculumPacks).where(eq(curriculumPacks.id,input.packId)).limit(1);
  const [version]=await executor.select().from(curriculumPackVersions).where(and(
   eq(curriculumPackVersions.id,adoption.packVersionId),eq(curriculumPackVersions.packId,input.packId))).limit(1);
  const metadata=license?.metadata??{};
  const date=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
- const eligible=!!license && !!date(metadata.licenseStartsAt) && !!date(metadata.licenseEndsAt) && annualAdoptionEligible({
+ const eligible=!!license && !!pack && metadata.verifiedPublisherOrganizationId===pack.publisherOrganizationId && metadata.verifiedByPersonId && metadata.licenseEvidenceDocumentId && !!date(metadata.licenseStartsAt) && !!date(metadata.licenseEndsAt) && annualAdoptionEligible({
   scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId},
   adoption,license:{organizationId:license.organizationId,packId:license.packId,
-   publisherOrganizationId:"",status:license.status,startsAt:date(metadata.licenseStartsAt),
+   publisherOrganizationId:pack.publisherOrganizationId,status:license.status,startsAt:date(metadata.licenseStartsAt),
    endsAt:date(metadata.licenseEndsAt),withdrawnAt:date(metadata.withdrawnAt)},
   year:resolvedYear,now:input.now??new Date(),packVersionPublished:version?.status==="published",
  });
@@ -63,10 +64,11 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   const resolvedYear=await canonicalYear(tx,program,input.academicYearId);
   const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
    eq(curriculumEntitlements.organizationId,program.organizationId),eq(curriculumEntitlements.packId,input.packId))).limit(1);
+  const [pack]=await tx.select().from(curriculumPacks).where(eq(curriculumPacks.id,input.packId)).limit(1);
   const [version]=await tx.select().from(curriculumPackVersions).where(and(
    eq(curriculumPackVersions.id,input.versionId),eq(curriculumPackVersions.packId,input.packId),
    eq(curriculumPackVersions.status,"published"))).limit(1);
-  if(!entitlement||!version)throw new AuthorizationError("licensed published curriculum release");
+  if(!entitlement||!version||!pack)throw new AuthorizationError("licensed published curriculum release");
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${program.id}), hashtext(${input.academicYearId + ":" + input.packId}))`);
   const [existing]=await tx.select().from(curriculumAnnualAdoptions).where(and(
    eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.academicYearId),
@@ -81,14 +83,14 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   }
   const metadata=entitlement.metadata??{};
   const parse=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
-  if(!parse(metadata.licenseStartsAt)||!parse(metadata.licenseEndsAt)||!annualAdoptionEligible({
+  if(metadata.verifiedPublisherOrganizationId!==pack.publisherOrganizationId || !metadata.verifiedByPersonId || !metadata.licenseEvidenceDocumentId || !parse(metadata.licenseStartsAt)||!parse(metadata.licenseEndsAt)||!annualAdoptionEligible({
    scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
     academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId},
    adoption:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
     academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.academicYearId,
     packId:input.packId,packVersionId:version.id,status:"active",supersededAt:null},
    license:{organizationId:entitlement.organizationId,packId:entitlement.packId,
-    publisherOrganizationId:"",status:entitlement.status,startsAt:parse(metadata.licenseStartsAt),
+    publisherOrganizationId:pack.publisherOrganizationId,status:entitlement.status,startsAt:parse(metadata.licenseStartsAt),
     endsAt:parse(metadata.licenseEndsAt),withdrawnAt:parse(metadata.withdrawnAt)},
    year:resolvedYear,now:input.now??new Date(),packVersionPublished:true,
   }))throw new AuthorizationError("publisher license must cover the entire target school year");
