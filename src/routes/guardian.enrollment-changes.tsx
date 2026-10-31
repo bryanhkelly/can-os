@@ -152,6 +152,12 @@ function GuardianEnrollmentChanges(){
       item.destinationApplicationId?
       "Destination application exists; offer acceptance and actual placement are separate":
       "No linked receiving-school enrollment yet"}</p>}
+    {item.kind==="transfer"&&!item.destinationApplicationId&&<div className="mt-3 rounded-lg border p-3 text-sm">
+      <p>The receiving school must independently invite or authorize your family to apply. Your transfer request does not enroll your child elsewhere.</p>
+      <Link to="/guardian/apply" className="mt-2 inline-block font-semibold underline">
+        Apply or review my destination school invitation →
+      </Link>
+    </div>}
     {item.destinationApplicationId&&!item.destinationEnrollmentActivated&&<Link to="/guardian/admission-offers"
       search={{application:item.destinationApplicationId}}
       className="mt-2 inline-block text-xs font-semibold underline">Review receiving-school application and offers →</Link>}
