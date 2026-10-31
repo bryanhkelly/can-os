@@ -37,11 +37,20 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
  const nameByProfile=new Map(students.map(p=>[p.profileId,[p.firstName,p.lastName].filter(Boolean).join(" ")]));
  const personByProfile=new Map(profiles.map(p=>[p.id,p.personId]));
  const apps=await db.select({id:s.applications.id,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId,programName:s.programs.name,
-  stage:s.applications.stage,metadata:s.applications.metadata})
+  stage:s.applications.stage,metadata:s.applications.metadata,
+  submittedByPersonId:s.applications.submittedByPersonId})
   .from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
   .where(inArray(s.applications.studentProfileId,profiles.map(p=>p.id)));
  const permitted=apps.filter(app=>actor.scope.programIds?.includes(app.programId));
  if(!permitted.length)return [];
+ const originIds=[...new Set(permitted.map(app=>
+  typeof app.metadata.originTransferActionId==="string"?app.metadata.originTransferActionId:null
+ ).filter((id):id is string=>!!id))];
+ const originTransfers=originIds.length?await db.select({
+  id:s.actions.id,status:s.actions.status,subjectId:s.actions.subjectId,
+  metadata:s.actions.metadata,
+ }).from(s.actions).where(and(eq(s.actions.type,"guardian_enrollment_change_request"),
+  inArray(s.actions.id,originIds))):[];
  const offers=await db.select({id:s.admissionOffers.id,applicationId:s.admissionOffers.applicationId,status:s.admissionOffers.status,expiresAt:s.admissionOffers.expiresAt,schoolYearId:s.admissionOffers.schoolYearId})
   .from(s.admissionOffers).where(inArray(s.admissionOffers.applicationId,permitted.map(a=>a.id)))
   .orderBy(desc(s.admissionOffers.createdAt)).limit(150);
@@ -71,6 +80,16 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
   return {applicationId:app.id,studentPersonId:personByProfile.get(app.studentProfileId)!,
    studentName:nameByProfile.get(app.studentProfileId)??"Student",program:app.programName,
    applicationStage:app.stage,waitlisted:app.metadata.admissionsDisposition==="waitlisted",
+   transferOriginExited:(()=>{
+     if(typeof app.metadata.originTransferActionId!=="string")return null;
+     const original=originTransfers.find(item=>item.id===app.metadata.originTransferActionId);
+     if(!original||original.subjectId!==app.studentProfileId||
+        original.metadata.requestedByGuardianPersonId!==actor.actorPersonId||
+        original.metadata.kind!=="transfer")return null;
+     return original.status==="resolved"&&
+       original.metadata.exitCompletedByRegistrar===true&&
+       original.metadata.exitStatus==="transferred";
+   })(),
    blockers,offers:offers.filter(o=>o.applicationId===app.id).map(o=>{
     const active=enrollments.filter(row=>row.studentProfileId===app.studentProfileId&&row.programId===app.programId&&row.schoolYearId===o.schoolYearId);
     const enrollmentActive=active.some(row=>row.kind==="program");
