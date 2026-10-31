@@ -72,6 +72,7 @@ export function FamilyInviteImporter({
       const response = await sendFamilyInvitations({ data: {
         requestId: requestId.current,
         programId: selectedProgram.id,
+        purpose: selectedProgram.purpose,
         rawContacts: raw,
         subject,
         introduction,
@@ -116,23 +117,25 @@ export function FamilyInviteImporter({
   }
 
   return <section className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
-    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family outreach · Verified application links</p>
+    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family outreach · School launch</p>
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
-    <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} addresses, review the recipients and message, then queue secure email-verification links to the school application. A public website is not required. Existing family identities are reused only after the recipient verifies their email and the existing account resolves to one Person.</p>
+    <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} family contacts, preview your message, and queue school outreach. Before opening authorization, families receive an informational email only; there is no application or account creation. Once the school is active and admissions are authorized, invitations instead use a verified one-time application link. A public website is not required.</p>
 
-    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No invitation-eligible application is available for this selection. The canonical family application requires an active academic Program with current admissions and school-of-record authorization. Complete those requirements in Launch Mode; website publication is separate.</p> : <>
-      <label className="mt-5 block text-sm font-semibold">School application
+    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No authorized school is available for outreach. A draft, launching or ready academic Program can send pre-opening information; application invitations require an active Program with current admissions and school-of-record authorization.</p> : <>
+      <label className="mt-5 block text-sm font-semibold">School outreach destination
         <select value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
           setProgramId(event.target.value);
           if (program) setSubject(`${program.name} is welcoming families`);
           changed();
         }} className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
-          <option value="">Choose the intended school application</option>
-          {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
+          <option value="">Choose your school outreach destination</option>
+          {programs.map(program => <option key={program.id} value={program.id}>{program.name} · {program.purpose === "interest" ? "Pre-opening information" : "Application"}</option>)}
         </select>
       </label>
-      {selectedProgram && <p className="mt-2 text-xs text-muted-foreground">After email verification: <a href={selectedProgram.privateApplicationUrl ?? selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">{selectedProgram.name} family application</a>. Each recipient receives their own single-use verification link.</p>}
+      {selectedProgram && (selectedProgram.purpose === "interest"
+        ? <p className="mt-2 text-xs text-muted-foreground">The school is still preparing to open. The email is informational only and must not claim approved operation, enrollment or school-of-record status. Families can contact their inviting church for more information.</p>
+        : <p className="mt-2 text-xs text-muted-foreground">After email verification: <a href={selectedProgram.privateApplicationUrl ?? selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">{selectedProgram.name} family application</a>. Each recipient receives a single-use verification link.</p>)}
 
       <label className="mt-5 block text-sm font-semibold">Paste families
         <textarea value={raw} onChange={event => { setRaw(event.target.value); changed(); }}
@@ -170,7 +173,7 @@ export function FamilyInviteImporter({
           <textarea rows={3} value={introduction} maxLength={2000} onChange={event => { setIntroduction(event.target.value); changed(); }} className="mt-2 w-full rounded-lg border bg-background p-3 font-normal" />
         </label>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">Email uses the server-approved CAN access-mail sender. A typed sender or reply-to address cannot override it.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Email uses the approved CAN sender. Application links use the CAN access-mail service; pre-opening notices use the notification delivery service. A typed sender address cannot override either.</p>
       <button type="button" disabled={!selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
         onClick={() => { setPreview(true); setConfirmed(false); }}
         className="mt-5 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Preview invitation</button>
@@ -178,7 +181,9 @@ export function FamilyInviteImporter({
         <h3 className="font-semibold">Invitation preview · {parsed.contacts.length} families</h3>
         <p className="mt-2 font-semibold">{subject}</p>
         <p className="mt-4 whitespace-pre-wrap text-sm">{introduction}</p>
-        <p className="mt-3 text-sm">Each email includes a single-use, 10-minute link directly to {selectedProgram?.name}'s verified application.</p>
+        <p className="mt-3 text-sm">{selectedProgram?.purpose === "interest"
+          ? "Each message is a pre-opening notice, not an application. The delivered email includes a standard opening-authorization disclaimer."
+          : `Each email includes a single-use, 10-minute link directly to ${selectedProgram?.name}\u0027s verified application.`}</p>
         <label className="mt-5 flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</label>
         <button type="button" disabled={!selectedProgram || !confirmed || busy} onClick={() => void send()}
           className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving and queueing…" : "Save and queue invitations"}</button>
@@ -196,11 +201,11 @@ export function FamilyInviteImporter({
 
     {batches.length > 0 && <div className="mt-8">
       <h3 className="font-serif text-xl">Invitation responses</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. A response is recorded only when the recipient redeems the verified application link.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. Only formal application invitations produce verified application-link responses; pre-opening emails do not create Applications.</p>
       <div className="mt-3 space-y-3">{batches.map(batch => {
         const progress = familyInvitationProgress(batch);
         return <details key={batch.id} className="rounded-xl border p-4">
-        <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.recipients.length} recipients</summary>
+        <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.purpose === "interest" ? "Pre-opening information" : "Applications"} · {batch.recipients.length} recipients</summary>
         <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {progress.label}</p>
         {progress.canRetry && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
           className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
