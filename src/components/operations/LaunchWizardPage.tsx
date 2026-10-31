@@ -1,11 +1,8 @@
-import { LaunchCreatedHandoff, type LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
+import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
+import type { LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
 import { useLaunchModelPresets } from "@/hooks/useLaunchModelPresets";
 import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
-import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
-import { LaunchProgramIdentityFields } from "@/components/operations/LaunchProgramIdentityFields";
-import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliveryModelFields";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
-import { LaunchSchoolModelPicker } from "@/components/operations/LaunchSchoolModelPicker";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
 import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
@@ -207,31 +204,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         </details>
         <div className="mt-8 grid gap-6">
           {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
-          <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
-            <summary className="cursor-pointer text-lg font-semibold">Launch a school · School Basics</summary>
-            <LaunchCreatedHandoff created={created} />
-            <LaunchSchoolModelPicker onSchoolModel={applySchoolModelPreset} onNinthGradeHybrid={applyNinthGradeHybridPreset} onExtendedLearning={applyExtendedLearningPreset} />
-            <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
-              <LaunchProgramIdentityFields {...{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} />
-
-              <LaunchDeliveryModelFields {...{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} />
-
-              <LaunchHostAndProviderFields {...{ options, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} />
-
-              <button
-                type="submit"
-                className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                disabled={busy || !options.organizations.length}
-              >
-                Start launch
-              </button>
-              {!options.organizations.length && (
-                <p className="text-xs text-muted-foreground">
-                  No organizations are in scope for this registrar grant.
-                </p>
-              )}
-            </form>
-          </details>
+          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
         </div>
     </WorkspaceShell>
