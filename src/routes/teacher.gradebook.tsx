@@ -17,8 +17,6 @@ import {
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
-import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
-import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEditor";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
