@@ -12,6 +12,7 @@ import {
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
+import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -517,6 +518,9 @@ function TeacherGradebookPage() {
           {assessment.availableAt&&" · Releases "+new Date(assessment.availableAt).toLocaleString()}
           {assessment.closesAt?" · Closes "+new Date(assessment.closesAt).toLocaleString():" · No submission close time"}
          </span>
+         {assessment.status!=="closed"&&<AssessmentScheduleEditor
+          key={assessment.id+assessment.availableAt+assessment.closesAt} assessment={assessment}
+          onSaved={()=>loadGradebook(selected)}/>}
          <label className="mt-2 block text-xs font-normal">New due date
           <input aria-label={"Due date for "+assessment.title} type="date"
            value={assessmentDueDates[assessment.id]??""}
