@@ -1,3 +1,4 @@
+import { GradebookOverview } from "@/components/learning/GradebookOverview";
 import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
 import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
@@ -16,7 +17,7 @@ import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
 import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEditor";
-import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { liveRubricTotal } from "@/components/learning/live-rubric-total";
@@ -352,14 +353,7 @@ function TeacherGradebookPage() {
    {!loading && !error && sections.length === 0 && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
 
    {!loading && !error && gradebook?.connected && gradebook.section && <>
-    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-     <StatCard label="Students" value={gradebook.students.length}/>
-     <StatCard label="Assessments" value={gradebook.assessments.length}/>
-     <StatCard label="Needs grading" value={gradebook.cells.filter(cell=>cell.status==="submitted").length}/>
-    </div>
-    {!reviewCell&&reviewQueue.length===0&&<WorkspacePanel title="All caught up">
-     <p className="text-sm text-muted-foreground">There are no submitted assignments awaiting grading in this section. New student submissions will appear here.</p>
-    </WorkspacePanel>}
+    <GradebookOverview studentCount={gradebook.students.length} assessmentCount={gradebook.assessments.length} submittedCount={gradebook.cells.filter(cell=>cell.status==="submitted").length} showQueueEmpty={!reviewCell&&reviewQueue.length===0} />
     {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Choose a student submission to review and grade.">
      <GradebookReviewQueue cells={reviewQueue} students={gradebook.students} assessments={gradebook.assessments} sectionId={selected} />
     </WorkspacePanel>}
