@@ -11,7 +11,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJourneyReadiness, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
-import { validateCommonCartridgeImport, importCommonCartridgeSectionLinks, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
+import { validateCommonCartridgeImport, importCommonCartridgeSectionLinks, listCommonCartridgeImports, beginCommonCartridgeStaticLessonImport, finishCommonCartridgeStaticLessonImport } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
 import { validateOneRosterCsvBundle, applyOneRosterClassMappings } from "@/modules/learning/oneroster-import.functions";
 import { CurriculumProgramNavigation } from "@/components/learning/CurriculumProgramNavigation";
@@ -55,10 +55,12 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [cartridgeReport,setCartridgeReport]=useState<Awaited<ReturnType<typeof validateCommonCartridgeImport>>|null>(null);
  const [cartridgeSection,setCartridgeSection]=useState(""),[cartridgeLinks,setCartridgeLinks]=useState<string[]>([]);
  const [cartridgeRights,setCartridgeRights]=useState(false);
+ const [htmlIdentifier,setHtmlIdentifier]=useState(""),[htmlLicense,setHtmlLicense]=useState(""),[htmlAttribution,setHtmlAttribution]=useState("");
  const [rosterSource,setRosterSource]=useState(""),[rosterCsv,setRosterCsv]=useState("");
  const [rosterValidated,setRosterValidated]=useState(false);
  const [rosterMap,setRosterMap]=useState<Record<string,string>>({});
  const cartridgeWebLinks=cartridgeReport?.preview.resources.filter(r=>/weblink|imswl/i.test(r.type))??[];
+ const cartridgeStaticHtml=cartridgeReport?.preview.resources.filter(r=>/^(webcontent|imscc_xmlv1p3\\/webcontent)$/i.test(r.type)&&r.href?.match(/\\.html?$/i)&&r.files.length===1&&r.files[0]===r.href)??[];
  const rosterClasses=previewRosterClasses(rosterCsv);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
@@ -300,6 +302,36 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
          }});
         },"Selected web links added to the class as canonical curriculum resources.")}>Add selected links to class</button>
       </section>}
+     {cartridgeReport&&cartridgeStaticHtml.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import Common Cartridge static HTML lesson">
+      <h3 className="font-semibold">Import static HTML lesson</h3>
+      <p className="text-xs text-muted-foreground">Only single-file, text-only HTML is accepted. Scripts, linked assets, assessments and application launches are not imported.</p>
+      <label className="block text-sm">Lesson resource
+       <select className="mt-1 block w-full rounded border p-2" value={htmlIdentifier} onChange={e=>setHtmlIdentifier(e.target.value)}>
+        <option value="">Select a lesson</option>
+        {cartridgeStaticHtml.map(item=><option key={item.identifier} value={item.identifier}>{item.identifier} · {item.href}</option>)}
+       </select>
+      </label>
+      <label className="block text-sm">License code<input className="mt-1 block w-full rounded border p-2" value={htmlLicense} onChange={e=>setHtmlLicense(e.target.value)} maxLength={80} placeholder="Publisher license identifier" /></label>
+      <label className="block text-sm">Publisher attribution<input className="mt-1 block w-full rounded border p-2" value={htmlAttribution} onChange={e=>setHtmlAttribution(e.target.value)} maxLength={500} /></label>
+      <p className="text-xs">Destination class: {market.sections.find(section=>section.id===cartridgeSection)?.title??"Select a destination class in the web-link section above."}</p>
+      <label className="flex gap-2 text-sm"><input type="checkbox" checked={cartridgeRights} onChange={e=>setCartridgeRights(e.target.checked)}/>I confirm that the license permits distribution to this class.</label>
+      <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       disabled={busy||!cartridgeFile||!cartridgeSection||!htmlIdentifier||!cartridgeRights||htmlLicense.trim().length<2||!htmlAttribution.trim()}
+       onClick={()=>void perform(async()=>{
+        if(!cartridgeFile)throw new Error("Select the validated cartridge.");
+        const base64=await encodeCommonCartridge(cartridgeFile);
+        const input={programId:market.program.id,sectionId:cartridgeSection,
+         fileName:cartridgeFile.name,base64,resourceIdentifier:htmlIdentifier,
+         rightsConfirmed:true as const,licenseCode:htmlLicense,attribution:htmlAttribution};
+        const pending=await beginCommonCartridgeStaticLessonImport({data:input});
+        const binary=atob(pending.content),bytes=new Uint8Array(binary.length);
+        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+        const uploaded=await fetch(pending.uploadUrl,{method:"PUT",headers:{"Content-Type":"text/html","If-None-Match":"*"},body:bytes});
+        if(!uploaded.ok)throw new Error("Private HTML upload failed.");
+        await finishCommonCartridgeStaticLessonImport({data:{...input,resourceId:pending.resourceId,
+         key:pending.key,htmlSha256:pending.htmlSha256}});
+       },"Static HTML lesson imported into the selected class.")}>Import selected static lesson</button>
+     </section>}
      <h3 className="font-semibold">Recent validation jobs</h3>
      <ul className="space-y-1 text-sm">{data.imports.map(item=><li key={item.id}>
        {item.sourceName} · {item.format.replaceAll("_"," ")} · {item.status} · {item.resourceCount} resources · {item.noticeCount} notices
