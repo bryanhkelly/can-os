@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import {
 accessAccounts,
 admissionSeatPools,
+actions,
 applications,
 enrollments,
 guardianRelationships,
@@ -54,6 +55,8 @@ export async function startFamilyApplication(
     householdDisplayName?: string;
     schoolYearId?: string;
     existingStudentProfileId?: string;
+    /** Existing guardian-requested origin transfer; not destination admission authority. */
+    originTransferActionId?: string;
     familyStartRequestId?: string;
     source?: "family_account" | "published_site";
     student: {
@@ -80,7 +83,7 @@ export async function startFamilyApplication(
     throw new AuthorizationError(`program scope: ${input.programId}`);
   }
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
-  if ((input.existingStudentProfileId || input.familyStartRequestId) && !input.parentSelfService) {
+  if ((input.existingStudentProfileId || input.familyStartRequestId || input.originTransferActionId) && !input.parentSelfService) {
     throw new AuthorizationError("verified guardian application handoff");
   }
   const actorPersonId = context.actorPersonId;
