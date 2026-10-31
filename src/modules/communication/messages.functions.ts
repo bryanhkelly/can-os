@@ -7,6 +7,7 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 /**
@@ -90,6 +91,7 @@ async function listAllowedThreadContacts(
       ));
     const studentIds = [...new Set(studentRows.map(row=>row.studentPersonId))];
     if (studentIds.length) {
+      const programSeat = alias(s.enrollments, "guardian_contact_program_enrollment");
       const teacherRows = await db
         .select({
           personId: s.sectionTeachers.personId,
@@ -101,6 +103,13 @@ async function listAllowedThreadContacts(
           eq(s.studentProfiles.id, s.enrollments.studentProfileId),
         )
         .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+        .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+        .innerJoin(programSeat,and(
+          eq(programSeat.studentProfileId,s.enrollments.studentProfileId),
+          eq(programSeat.kind,"program"),eq(programSeat.status,"active"),
+          eq(programSeat.programId,s.sections.programId),
+          eq(programSeat.schoolYearId,s.terms.schoolYearId),
+        ))
         .innerJoin(
           s.sectionTeachers,
           eq(s.sectionTeachers.sectionId, s.sections.id),
@@ -108,7 +117,12 @@ async function listAllowedThreadContacts(
         .where(
           and(
             inArray(s.studentProfiles.personId, studentIds),
+            eq(s.enrollments.kind, "section"),
             eq(s.enrollments.status, "active"),
+            eq(s.enrollments.programId,s.sections.programId),
+            eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+            eq(s.sections.active,true),
+            eq(s.sectionTeachers.role,"teacher"),
             inArray(s.sections.siteId,siteIds),
             inArray(s.sections.programId,programIds),
           ),
