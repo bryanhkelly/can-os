@@ -95,7 +95,9 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
       eq(s.graduationRequirementSets.academicYear,requirementSet.academicYear)));
   if(approved.length!==1 || approved[0]?.id!==requirementSet.id)
     throw new AuthorizationError("Graduation policy is not approved for this academic year");
-  return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
+  const evidence = evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId);
+  await assertNoWithdrawnTranscriptCredits(db, s, transcript.studentProfileId, evidence);
+  return { transcript, requirementSet, evidence };
 }
 
 export const approveGraduationRequirements = createServerFn({method:"POST"})
