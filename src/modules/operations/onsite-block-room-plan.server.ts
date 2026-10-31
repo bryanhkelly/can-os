@@ -36,6 +36,9 @@ export function parseVerifiedRoomPlan(
   const m=doc.metadata;
   if(doc.subjectType!=="section" || doc.subjectId!==scope.sectionId ||
      doc.category!==ROOM_COVERAGE_DOCUMENT_CATEGORY ||
+     m.isCurrent===false || (m.reviewStatus!==undefined && m.reviewStatus!=="approved") ||
+     (m.startsAtLocal!==undefined && m.startsAtLocal!==scope.startsAtLocal) ||
+     (m.endsAtLocal!==undefined && m.endsAtLocal!==scope.endsAtLocal) ||
      !doc.verifiedAt || !doc.verifiedByPersonId ||
      doc.uploadedByPersonId===doc.verifiedByPersonId ||
      !doc.expiresAt ||
@@ -74,7 +77,7 @@ export async function fetchRoomPlanEvidence(
     eq(documents.subjectType,"section"),
     eq(documents.category,ROOM_COVERAGE_DOCUMENT_CATEGORY),
     inArray(documents.subjectId,[...new Set(sectionIds)]),
-  )).orderBy(desc(documents.verifiedAt),desc(documents.createdAt))
+  )).orderBy(desc(documents.createdAt),desc(documents.id))
     .limit(2001);
   return {rows:rows.slice(0,2000),truncated:rows.length>2000};
 }

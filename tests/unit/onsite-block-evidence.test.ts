@@ -45,6 +45,16 @@ describe("school-day review evidence is not a user checkbox",()=>{
     },scope)).toBeNull();
   });
 
+  it("rejects superseded, rejected and changed-schedule plans",()=>{
+    for(const metadata of [
+      {...doc().metadata,isCurrent:false},
+      {...doc().metadata,reviewStatus:"pending"},
+      {...doc().metadata,reviewStatus:"rejected"},
+      {...doc().metadata,startsAtLocal:"08:00"},
+      {...doc().metadata,endsAtLocal:"11:00"},
+    ])expect(parseVerifiedRoomPlan({...doc(),metadata},scope)).toBeNull();
+  });
+
   it("screens primary and backup evidence for the entire scheduled local block",()=>{
     const complete={
       screening:[{from:new Date("2026-10-22T14:00:00Z"),
