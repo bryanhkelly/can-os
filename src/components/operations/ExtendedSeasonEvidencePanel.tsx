@@ -1,4 +1,4 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm } from "@/components/evidence";
+import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentLink } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
@@ -90,23 +90,16 @@ function EvidenceCard({ model, item, changed }: {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Review failed"); throw cause; }
     finally { setBusy(false); }
   }
-  async function download() {
-    if (!item.documentId) return;
-    setError("");
-    try {
-      const result = await getExtendedEvidenceDownloadFn({ data: {
-        seasonId: model.seasonId, documentId: item.documentId!,
-      } });
-      window.open(result.downloadUrl, "_blank", "noopener,noreferrer");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open evidence"); }
-  }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
     {item.documentId && <div className="mt-2">
       <p>{item.fileName} · version {item.version} · expires {item.expiresAt ?
         new Date(item.expiresAt).toLocaleDateString() : "unknown"}</p>
-      <button type="button" className="mt-1 underline" onClick={() => void download()}>
-        View private document
-      </button>
+      <EvidenceDocumentLink label="View private document" onGetDownloadUrl={async () => {
+        const result = await getExtendedEvidenceDownloadFn({ data: {
+          seasonId: model.seasonId, documentId: item.documentId!,
+        } });
+        return result.downloadUrl;
+      }} />
     </div>}
     {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
       disabled={busy} onReview={review}/>}
