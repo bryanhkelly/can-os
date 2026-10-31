@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+// Eligibility policy tests never connect to Postgres.
+vi.mock("@/db/client", () => ({ db: {} }));
 import { eligibleNotificationEmailAccount } from "@/modules/communication/notification-email.server";
 
 const eligible = {
