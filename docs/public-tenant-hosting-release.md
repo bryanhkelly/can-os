@@ -35,3 +35,29 @@ A status of `unreachable` is **not** a definitive diagnosis of missing DNS or mi
 ## Rollout responsibility
 
 This code does not provision DNS, Netlify domains, or certificates. These remain externally managed operations pending a verified provider API contract and separate authorization. This work must not touch production credentials, production databases, or the shared FullFlow database. The integration coordinator owns final deployed and isolated acceptance evidence.
+
+
+## Required reproducible external acceptance
+
+This is a **read-only** script, not a provider provisioning command. After the release operator has approved and provisioned the Netlify domain, wildcard certificate, environment variables and two separately published Sites, run from an independent network:
+
+```bash
+CAN_PUBLIC_SMOKE_DOMAIN=can-os.com \
+CAN_PUBLIC_SMOKE_TENANT_A=<published-slug-a> \
+CAN_PUBLIC_SMOKE_TENANT_B=<published-slug-b> \
+CAN_PUBLIC_SMOKE_UNPUBLISHED=<reserved-unpublished-slug> \
+CAN_PUBLIC_SMOKE_UNKNOWN=<unused-valid-slug> \
+CAN_PUBLIC_SMOKE_NAME_A="<distinct public school A name>" \
+CAN_PUBLIC_SMOKE_NAME_B="<distinct public school B name>" \
+node scripts/smoke-public-tenant-hosting.mjs
+```
+
+Supply **real test fixtures approved by the operator**; the script deliberately never publishes Sites or performs anonymous POST writes. It verifies two unique tenant identities, an unpublished Site, an unknown Site, isolated private routes, no redirects and correct HTTPS response content. It prints status, tenant identity evidence and exact checked origins without including private credentials. Archive the JSON output under the tested commit SHA and release ID. Check application/inquiry forms manually in an approved staging environment with synthetic consenting contacts and inspect that no unauthorized child records were created.
+
+**Netlify/DNS/TLS operations:** Register `*.can-os.com` on the *same* Netlify site serving the application. Create the authoritative `*` wildcard DNS record pointing to the precise target Netlify displays for the attached domain; do not copy an arbitrary domain target from another deployment. Confirm explicit `app`, `api`, `www` and other existing records remain unchanged. Netlify domain configuration must show the certificate is active and contains `*.can-os.com` as a covered SAN. Verify from a clean public client that the chain validates, SNI is for the exact tenant host and no HTTP downgrade or redirect is required. Do not use `curl -k`, insecure fetch, or forced Host-to-IP tests as evidence.
+
+The **Netlify Edge Function runtime** and the **TanStack server runtime** each require `CAN_PUBLIC_SITE_HOSTING_ENABLED=true`; verify effective values in the deployment rather than assuming build-only environment variables propagate to edge. Check edge execution is enabled and that no bypassable function/route mapping overrides `netlify/edge-functions/site-host-gate.ts`. Check the public route sends `Cache-Control: private, no-store` and `Vary: Host`; do not cache a tenant response across hosts. Keep both flags off until the above domain/TLS routing acceptance has been approved.
+
+**Negative and rollback evidence:** In a nonproduction deployment, set the hosting flag to false in *both* runtimes, redeploy and confirm published tenant hosts return 404, while the platform host continues serving its authenticated app. With the flag restored and authorized, confirm an unknown host and an unpublished published-address reservation return 404. Test a missing/untrusted certificate on an isolated *test* domain; the HTTPS probe must refuse `live`. If host routing, TLS or cross-tenant content fails, disable the edge and server rollout flags, redeploy and retest denial. Never remove a production DNS record or certificate as a test.
+
+**Acceptance boundary:** A mock unit suite, a passing HTTPS GET, or a published DB row individually does not establish full hosting readiness. Real external evidence for both Sites, actual certificate coverage, denied routes, and independently approved DNS configuration is mandatory. No external origin has been tested by Agent I yet.
