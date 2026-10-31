@@ -12,7 +12,7 @@ import { hasInstitutionalProgramCapability } from "@/modules/identity/institutio
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
-import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config } from "@/platform/storage/r2";
+import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config, signPrivateObjectUrl } from "@/platform/storage/r2";
 import { EventTypes } from "@/domain/event-types";
 const context=z.object({programId:z.string().uuid()}).strict();
 const incoming=context.extend({
@@ -264,8 +264,33 @@ export const finishCommonCartridgeStaticLessonImport=createServerFn({method:"POS
    throw new AuthorizationError("matching sanitized lesson upload");
   await verifyPrivateObject({key:data.key,keyPattern:htmlKeyPattern,
    expectedSize:htmlBytes.length,expectedContentType:"text/html"});
-  // Private object HEAD verifies metadata, not content integrity; the signed
-  // upload is untrusted until a full-byte digest can be checked server-side.
+  // Verify the exact stored bytes, not only HEAD metadata. Fail closed if
+  // storage cannot return a bounded, identity-preserving object response.
+  const response=await fetch(signPrivateObjectUrl({method:"GET",key:data.key,
+    keyPattern:htmlKeyPattern,expiresSeconds:30}),{headers:{Range:`bytes=0-${htmlBytes.length-1}`}});
+  if(response.status!==206||
+    response.headers.get("content-range")!==`bytes 0-${htmlBytes.length-1}/${htmlBytes.length}`)
+   throw new Error("Private lesson storage did not honor bounded verification.");
+  const reader=response.body?.getReader();
+  if(!reader)throw new Error("Stored lesson verification has no response body.");
+  const received=Buffer.alloc(htmlBytes.length);
+  let offset=0;
+  try{
+   while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(offset+value.length>received.length)
+     throw new Error("Stored lesson exceeded the declared size.");
+    received.set(value,offset);
+    offset+=value.length;
+   }
+  }finally{
+   await reader.cancel();
+   reader.releaseLock();
+  }
+  if(offset!==received.length||
+     createHash("sha256").update(received).digest("hex")!==htmlHash)
+   throw new Error("Stored lesson does not match sanitized HTML.");
   return db.transaction(async tx=>{
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"cartridge-html:"+program.organizationId+":"+digest}))`);
    const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,
