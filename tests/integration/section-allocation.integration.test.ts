@@ -5,6 +5,8 @@ import * as s from "@/db/schema";
 import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
 import { replaceSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
+import { evaluateLaunchTeacher, evaluateLaunchStaffing } from "@/modules/staffing/launch-staffing.server";
+import { verifiedTeacherSectionIds } from "@/modules/enrollment/verified-section-teachers.server";
 
 describe("section allocation prerequisites", () => {
   it("rejects an explicitly failing D and accepts a custom passing label from the linked scale", async () => {
@@ -95,9 +97,17 @@ describe("section allocation prerequisites", () => {
         scope: { organizationIds: [org!.id], siteIds: [site!.id], programIds: [program!.id] },
       },
     };
-    // A Section teacher link cannot turn disabled, unverified or synthetic
+    // Cross-consumer regression: launch and placement must revoke the same
+    // teacher when verified account authority changes, without cached readiness.
+    expect((await evaluateLaunchTeacher(advanced.id, instructor!.id)).eligible).toBe(true);
+    expect((await evaluateLaunchStaffing(advanced.id)).ready).toBe(true);
+    expect(await verifiedTeacherSectionIds([advanced.id])).toEqual(new Set([advanced.id]));
+        // A Section teacher link cannot turn disabled, unverified or synthetic
     // accounts into a "staffed" class for a newly admitted student.
     await db.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,account!.id));
+    expect((await evaluateLaunchTeacher(advanced.id, instructor!.id)).eligible).toBe(false);
+    expect((await evaluateLaunchStaffing(advanced.id)).ready).toBe(false);
+    expect(await verifiedTeacherSectionIds([advanced.id])).toEqual(new Set());
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Assign an active teacher");
     await db.update(s.accessAccounts).set({disabled:false,emailVerifiedAt:null})
