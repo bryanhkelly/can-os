@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -192,7 +192,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   createdAt: s.notifications.createdAt,
  }).from(s.notifications)
   .where(and(eq(s.notifications.recipientPersonId, actor), eq(s.notifications.status, "unread")))
-  .orderBy(desc(s.notifications.createdAt))
+  .orderBy(sql`CASE WHEN ${s.notifications.type} = 'school_family_alert' AND ${s.notifications.status} = 'unread' THEN 0 ELSE 1 END`,desc(s.notifications.createdAt))
   .limit(20);
 
  const openActions = await db.select({
