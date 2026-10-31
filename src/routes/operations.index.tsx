@@ -273,7 +273,10 @@ function OperationsPage(){
    onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
- {i.enrollmentChangeKind?
+ {i.type==="guardian_health_information_review"?
+  <Link to="/operations/health-review" search={{action:i.id}}
+    className="rounded border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
+  i.enrollmentChangeKind?
   <button type="button" className="rounded border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
     disabled={busy!==null} onClick={()=>void completeEnrollmentExit(i.id,i.enrollmentChangeKind!)}>
     Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
