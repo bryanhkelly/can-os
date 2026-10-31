@@ -1,3 +1,4 @@
+import { EvidenceReviewForm } from "@/components/evidence/EvidenceReviewForm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueryState, StatusBadge } from "@/components/workspace";
 import { getChurchSchoolOpeningFn } from "@/modules/operations/school-opening.functions";
@@ -57,7 +58,6 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
   changed:(message:string)=>Promise<void>}) {
   const [file,setFile]=useState<File|null>(null);
   const [expiry,setExpiry]=useState("");
-  const [reason,setReason]=useState("");
   const [pending,setPending]=useState<{key:string;input:UploadInput}|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -82,12 +82,12 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
     }catch(cause){setError(cause instanceof Error?cause.message:"Evidence upload was not recorded");}
     finally{setBusy(false);}
   }
-  async function review(decision:"approve"|"reject") {
+  async function review(decision:"approve"|"reject", reason:string) {
     if(!item.current||busy)return;setBusy(true);setError("");
     try{
       await reviewSchoolOpeningEvidenceFn({data:{programId:model.programId,documentId:item.current.id,
         expectedVersion:item.current.version,decision,reason}});
-      setReason("");await changed(decision==="approve"?"Independent evidence verification recorded.":
+      await changed(decision==="approve"?"Independent evidence verification recorded.":
         "Evidence rejected with correction instructions for the church.");
     }catch(cause){setError(cause instanceof Error?cause.message:"Evidence review was not recorded");}
     finally{setBusy(false);}
@@ -114,18 +114,9 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
         {" "}expires {item.current.expiresAt?new Date(item.current.expiresAt).toLocaleDateString():"not recorded"}</p>
       <button type="button" className="mt-2 underline" onClick={()=>void download(item.current!.id)}>Open private document</button>
     </div>}
-    {model.canReview&&item.current&&item.status==="pending"&&<div className="mt-3 rounded border p-3">
-      <label className="block text-xs">Independent review reason
-        <textarea className="mt-1 block w-full rounded border bg-background p-2" minLength={10} maxLength={2000}
-          value={reason} onChange={event=>setReason(event.target.value)} disabled={busy}/>
-      </label>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <button type="button" disabled={busy||reason.trim().length<10} onClick={()=>void review("approve")}
-          className="rounded border px-3 py-2 text-xs disabled:opacity-50">Verify this version</button>
-        <button type="button" disabled={busy||reason.trim().length<10} onClick={()=>void review("reject")}
-          className="rounded border px-3 py-2 text-xs disabled:opacity-50">Reject and request correction</button>
-      </div>
-    </div>}
+    {model.canReview&&item.current&&item.status==="pending"&&<EvidenceReviewForm disabled={busy}
+      label="Independent review reason" approveLabel="Verify this version"
+      onReview={review}/>}
     {model.canSubmit&&<div className="mt-3 rounded border p-3">
       <p className="text-xs font-medium">{item.current?"Submit a corrected or renewed version":"Submit required evidence"}</p>
       {!model.uploadsEnabled&&<p className="mt-2 text-xs" role="status">Private school-opening uploads are disabled in this deployment. Contact the deployment administrator; no approval can be inferred here.</p>}
