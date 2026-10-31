@@ -12,7 +12,7 @@ vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>({}),setResponseHead
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>({
   role:state.role,actorPersonId:state.role==="teacher"?"10000000-0000-4000-8000-000000000001":state.role==="guardian"?"10000000-0000-4000-8000-000000000011":"10000000-0000-4000-8000-000000000002",
   capabilities:new Set(["assignments:create","assignments:grade","assignments:submit","student:related-read"]),
-  scope:{siteIds:["10000000-0000-4000-8000-000000000003"],programIds:["10000000-0000-4000-8000-000000000004"]},
+  scope:{siteIds:["10000000-0000-4000-8000-000000000003"],programIds:["10000000-0000-4000-8000-000000000004"],organizationIds:["10000000-0000-4000-8000-000000000012"]},
 })}));
 // Session/authority and object storage boundaries have separate regressions.
 // This case connects real command SQL and persisted evidence in disposable Postgres.
@@ -31,13 +31,14 @@ vi.mock("@/db/client",async()=>{
 import {db} from "@/db/client";
 import {createAssessment,getGradebook,getSubmissionReview,gradeSubmission} from "@/modules/learning/gradebook.functions";
 import {getGuardianAssignments} from "@/modules/learning/guardian-academic-queries.functions";
+import {listGuardianGradeFollowUps} from "@/modules/learning/guardian-grade-response.functions";
 import {getAssignments,saveAssignmentDraft,saveAssignmentResponse} from "@/modules/student-experience/assignments.functions";
 import {createSubmissionAttachmentUpload,attachDocumentToSubmission} from "@/modules/learning/submission-attachments.functions";
 beforeAll(async()=>{
   vi.stubEnv("DATABASE_URL","isolated-pglite-only");
   const dialect=new PgDialect();
   // Use production column types/defaults; relationship gates are tested separately.
-  for(const table of [s.people,s.guardianRelationships,s.studentProfiles,s.sections,s.sectionTeachers,s.terms,s.courseTemplateVersions,s.enrollments,s.assessments,s.submissions,s.documents,s.actions]){
+  for(const table of [s.people,s.programs,s.guardianRelationships,s.studentProfiles,s.sections,s.sectionTeachers,s.terms,s.courseTemplateVersions,s.enrollments,s.assessments,s.submissions,s.documents,s.actions]){
     const config=getTableConfig(table);
     const columns=config.columns.map(column=>{
       let type=column.getSQLType();
@@ -54,6 +55,7 @@ beforeAll(async()=>{
   }
   await state.client.exec('CREATE UNIQUE INDEX submission_attempt_uq ON submissions(assessment_id,student_profile_id,attempt_number)');
   await db.insert(s.studentProfiles).values({id:id(5),personId:id(2)});
+  await db.insert(s.programs).values({id:id(4),organizationId:id(12),siteId:id(3),jurisdictionId:id(13),type:"full_school",name:"School",slug:"school",gradeRange:{min:"9",max:"12"},academicProviderOrganizationId:id(12)});
   await db.insert(s.people).values({id:id(2),legalFirstName:"Jordan",legalLastName:"Learner"});
   await db.insert(s.guardianRelationships).values({guardianPersonId:id(11),studentPersonId:id(2),relationshipLabel:"parent",canViewAcademics:true,metadata:{verification:"verified"}});
   await db.insert(s.terms).values({id:id(7),schoolYearId:id(8),key:"fall",name:"Fall",sequence:1,startsOn:"2026-10-01",endsOn:"2026-12-31"});
@@ -95,6 +97,10 @@ it("publishes lesson-linked work, submits a worksheet, preserves it for review a
   expect((await getAssignments()).assignments[0]).toMatchObject({status:"graded",score:"8.00",feedbackText:"Good reasoning. Check the final subtraction."});
   state.role="guardian";
   expect((await getGuardianAssignments({data:{studentPersonId:id(2)}})).assignments[0]).toMatchObject({status:"graded",score:"8.00",feedback:"Good reasoning. Check the final subtraction."});
+  await db.insert(s.actions).values({id:id(14),type:"guardian_grade_follow_up",title:"Question about worksheet",subjectType:"student_profile",subjectId:id(5),sectionId:id(6),programId:id(4),siteId:id(3),status:"resolved",resolvedAt:new Date(),resolutionNote:"We reviewed the final subtraction together.",metadata:{submissionId:receipt.submissionId,requestedByGuardianPersonId:id(11),requestMessage:"Can you explain the final subtraction?"}});
+  expect((await listGuardianGradeFollowUps()).items).toEqual(expect.arrayContaining([
+    expect.objectContaining({id:id(14),status:"resolved",submissionId:receipt.submissionId,resolutionNote:"We reviewed the final subtraction together."}),
+  ]));
   const [evidence]=await db.select().from(s.submissions).where(eq(s.submissions.id,receipt.submissionId));
   expect(evidence.response).toMatchObject({text:"",attachments:[upload.documentId]});
 },15000);
