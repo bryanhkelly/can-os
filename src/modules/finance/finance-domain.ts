@@ -53,7 +53,7 @@ export function applyVerifiedEvent(record: FinanceRecord, event: ProviderEvent):
 export function settlement(record: FinanceRecord) {
   validateCharge(record.charge);
   const net = record.capturedCents - record.refundedCents - record.chargebackCents;
-  if (net < 0 || net > record.charge.amount.cents) throw new Error("Invalid settlement");
+  if (!Number.isSafeInteger(net) || net < 0 || net > record.charge.amount.cents) throw new Error("Invalid settlement");
   const churchCents = Math.floor(net * record.charge.allocation.churchCents / record.charge.amount.cents);
   return { obligationId: record.charge.obligationId, enrollmentId: record.charge.enrollmentId, policyVersion: record.charge.allocation.policyVersion, netCents: net, churchCents, canCents: net - churchCents };
 }
