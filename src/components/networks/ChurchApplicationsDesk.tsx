@@ -92,13 +92,6 @@ export function ChurchApplicationsDesk() {
               finally { setWorking(null); }
             }}>Retry evidence follow-up notice</button>}
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
-            <label className="block text-sm font-semibold">How authority was verified
-              <select className={field} value={verificationMethod[request.id] ?? "signed_authority"} onChange={e=>setVerificationMethod(previous=>({...previous,[request.id]:e.target.value as "signed_authority" | "denominational_confirmation" | "independent_church_confirmation"}))}>
-                <option value="signed_authority">Reviewed signed authorization</option>
-                <option value="denominational_confirmation">Independent denomination confirmation</option>
-                <option value="independent_church_confirmation">Independent church officer confirmation</option>
-              </select>
-            </label>
             <p role="status" className="rounded border border-amber-500/50 p-3 text-sm">
               Authority verification is paused until applicant-bound private evidence intake,
               content screening, and independent inspection are deployed. Staff-entered vault
