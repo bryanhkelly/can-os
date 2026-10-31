@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   assertPublishedFamilyInvitationDestination,
+  assertPreopeningFamilyInterestDestination,
+  familyInvitationBatchMetadataSchema,
   dedupeFamilyInvitationContacts,
   FAMILY_INVITATION_BATCH_KIND,
   familyInvitationRetryMatches,
@@ -145,5 +147,51 @@ describe("published family invitation destination", () => {
   ])("rejects an unavailable or misleading destination: %j", override => {
     expect(() => assertPublishedFamilyInvitationDestination({ ...published, ...override }))
       .toThrow("School applications not open");
+  });
+});
+
+describe("pre-opening family interest is not an application", () => {
+  const proposed = {
+    type: "full_school" as const,
+    status: "launching",
+    programSiteId: "church-site",
+    siteId: "church-site",
+    programOrganizationId: "church",
+    siteOrganizationId: "church",
+  };
+
+  it("permits informational outreach for a proposed academic school only", () => {
+    expect(() => assertPreopeningFamilyInterestDestination(proposed)).not.toThrow();
+    expect(familyInvitationSendInput.parse({
+      requestId: requestOne, programId: keyTwo,
+      rawContacts: "first@example.test", subject: "School launch",
+      introduction: "Our school is preparing", confirmed: true,
+      purpose: "interest",
+    }).purpose).toBe("interest");
+  });
+
+  it.each([
+    {status: "active"},
+    {status: "closed"},
+    {type: "summer_enrichment" as const},
+    {siteId: "different-site"},
+    {siteOrganizationId: "different-church"},
+    {programSiteId: null},
+  ])("denies unapproved or mis-scoped outreach destination: %j", override => {
+    expect(() => assertPreopeningFamilyInterestDestination({ ...proposed, ...override }))
+      .toThrow("not eligible for pre-opening");
+  });
+
+  it("persists original purpose and forbids replaying interest as an application", () => {
+    const batch: FamilyInvitationBatchMetadata = {
+      ...metadata(), siteId: keyTwo, destination: "preopening_interest",
+    };
+    const contacts = batch.recipients.map(({firstName,lastName,email}) => ({firstName,lastName,email}));
+    expect(familyInvitationBatchMetadataSchema.parse(batch).destination).toBe("preopening_interest");
+    expect(familyInvitationRetryMatches(batch,"Proposed school","Welcome",contacts,"interest")).toBe(true);
+    expect(familyInvitationRetryMatches(batch,"Proposed school","Welcome",contacts,"application")).toBe(false);
+    expect(familyInvitationBatchMetadataSchema.safeParse({
+      ...batch, siteId: undefined,
+    }).success).toBe(false);
   });
 });
