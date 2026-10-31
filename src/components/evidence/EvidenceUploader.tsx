@@ -25,6 +25,7 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
   const [pending, setPending] = useState<{ key: string; input: T } | null>(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   async function upload() {
     if (inFlight.current || disabled) return;
@@ -34,6 +35,7 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
       await submitEvidenceUpload(adapter, makeInput, file, expiry, pending, setPending);
       // Finalization succeeded: never retry the same command if refreshing the view fails.
       setPending(null); setFile(null); setExpiry("");
+      if (fileInput.current) fileInput.current.value = "";
       try { await onUploaded(); }
       catch (cause) {
         setError(cause instanceof Error ? `Evidence recorded, but refresh failed: ${cause.message}` :
@@ -46,7 +48,7 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
   return <div className="mt-3 rounded border p-3 text-xs">
     <div className="grid gap-2 sm:grid-cols-2">
       <label>PDF, JPEG or PNG
-        <input type="file" accept="application/pdf,image/jpeg,image/png" className="mt-1 block w-full"
+        <input ref={fileInput} type="file" accept="application/pdf,image/jpeg,image/png" className="mt-1 block w-full"
           disabled={disabled || busy} onChange={event => { setFile(event.target.files?.[0] ?? null); setPending(null); }}/>
       </label>
       <label>{label}
