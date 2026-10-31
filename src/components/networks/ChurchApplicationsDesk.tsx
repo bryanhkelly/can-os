@@ -18,6 +18,7 @@ export function ChurchApplicationsDesk() {
   const [verificationMethod, setVerificationMethod] = useState<Record<string, "signed_authority" | "denominational_confirmation" | "independent_church_confirmation">>({});
   const [declineNote, setDeclineNote] = useState<Record<string, string>>({});
   const [followupNote, setFollowupNote] = useState<Record<string, string>>({});
+  const [cancelConfirm, setCancelConfirm] = useState<Record<string, boolean>>({});
   const [reviewChecklist, setReviewChecklist] = useState<Record<string, { source: boolean; authority: boolean; identity: boolean; expiry: boolean }>>({});
   const checklistComplete = (id: string) => {
     const check = reviewChecklist[id];
@@ -57,6 +58,7 @@ export function ChurchApplicationsDesk() {
           ? "Application declined and authority evidence invalidated. Decision notice accepted by the provider, not confirmed delivered."
           : "Application declined and authority evidence invalidated. Decision email was not accepted by the provider; follow up through a verified channel.");
       }
+      setCancelConfirm(previous => ({ ...previous, [id]: false }));
       setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setFollowupNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
       await refresh();
     } catch (cause) {
@@ -156,7 +158,12 @@ export function ChurchApplicationsDesk() {
           <details className="mt-4 rounded-lg border p-3">
             <summary className="cursor-pointer text-sm font-semibold">Cancel duplicate or withdrawn request</summary>
             <p className="mt-2 text-xs text-muted-foreground">Cancel only after confirming withdrawal or duplication through an established channel. This invalidates prior evidence.</p>
-            <button type="button" disabled={!!working}
+            <label className="mt-2 flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={cancelConfirm[request.id] ?? false}
+                onChange={e=>setCancelConfirm(previous=>({...previous,[request.id]:e.target.checked}))} />
+              I independently confirmed this request was withdrawn or is a duplicate.
+            </label>
+            <button type="button" disabled={!!working || !cancelConfirm[request.id]}
               onClick={()=>void act(request.id,"cancel")}
               className="mt-2 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">
               Confirm cancellation
