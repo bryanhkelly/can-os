@@ -64,20 +64,25 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       .orderBy(asc(academicCalendarDays.calendarDate)).limit(366);
     const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
       .map(day=>day.date))];
-    let date = today;
+    let date = dates[0] ?? today;
     let eligibleDateFound = false;
     for(const candidate of dates){
+      // The canonical live roster rejects future dates. Until the attendance
+      // owner exposes a registrar-authorized preparation read, do not use the
+      // live roster to assert that a future student is scheduled.
+      if(candidate>today) break;
       const projected=await loadExpectedOnsiteRosterForActor(actor,{
         date:candidate,programId:app.programId,siteId:app.siteId,
       });
       if(projected.students.some(student=>student.studentProfileId===app.studentProfileId &&
         student.programId===app.programId)){date=candidate;eligibleDateFound=true;break;}
     }
-    const roster = await loadExpectedOnsiteRosterForActor(actor,{
+    const preview = date > today;
+    const roster = !preview ? await loadExpectedOnsiteRosterForActor(actor,{
       date,programId:app.programId,siteId:app.siteId,
-    });
-    const programDay = roster.programs.find(program=>program.id===app.programId);
-    const matched = roster.students.find(student =>
+    }) : null;
+    const programDay = roster?.programs.find(program=>program.id===app.programId);
+    const matched = roster?.students.find(student =>
       student.studentProfileId===app.studentProfileId && student.programId===app.programId);
 
     // Only project staffing after the exact student and named Section are
@@ -85,15 +90,15 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     const supervision = matched?.sectionId
       ? await loadOnsiteSupervisionPlanForActor(actor,{date,siteId:app.siteId})
       : null;
-    const preview = date > today;
     const handoff = deriveFirstSchoolDayHandoff({
         programId:app.programId,
         studentProfileId:app.studentProfileId,
         configuration:programDay?.configuration ?? null,
         expectedDays:programDay?.expectedDays ?? 0,
-        students:roster.students,
+        students:roster?.students ?? [],
+        preparation:preview,
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
       });
-    return {date,preview,...handoff,attendanceRecorded:!eligibleDateFound||preview?false:handoff.attendanceRecorded,state:!eligibleDateFound?(dates.length?"not_on_roster":"calendar_not_ready"):preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state,message:eligibleDateFound&&preview&&handoff.state==="attendance_recorded"?"The student is expected on the future instructional roster and the staffing plan is ready. No attendance has been observed or recorded for that future date.":handoff.message,...(!eligibleDateFound?{studentExpected:false,supervisionPlanned:false,message:dates.length?"No upcoming instructional day with this student on the expected onsite roster was found. Review placement and calendar dates.":"No upcoming instructional calendar day was found. Review and publish the school-year calendar."}:{})};
+    return {date,preview,...handoff,attendanceRecorded:!eligibleDateFound||preview?false:handoff.attendanceRecorded,state:!eligibleDateFound?(dates.length?"not_on_roster":"calendar_not_ready"):preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state,message:eligibleDateFound&&preview&&handoff.state==="attendance_recorded"?"The student is expected on the future instructional roster and the staffing plan is ready. No attendance has been observed or recorded for that future date.":handoff.message,...(!eligibleDateFound?{studentExpected:false,supervisionPlanned:false,message:dates.length?"The next published instructional date is a planning candidate, not a verified first day. A registrar-authorized future roster reader is required to confirm placement, schedule and staffing.":"No upcoming instructional calendar day was found. Review and publish the school-year calendar."}:{})};
   });
