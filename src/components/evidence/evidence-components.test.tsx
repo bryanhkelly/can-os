@@ -2,11 +2,20 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
 import { EvidenceStatus } from "./EvidenceStatus";
+import { EvidenceDocumentSummary } from "./EvidenceDocumentSummary";
 import { EvidenceHistory } from "./EvidenceHistory";
 import { EvidenceReviewForm } from "./EvidenceReviewForm";
 import { EvidenceUploader } from "./EvidenceUploader";
 
 describe("shared evidence presentation", () => {
+  it("renders canonical document metadata without guessing missing versions", () => {
+    const html = renderToStaticMarkup(<EvidenceDocumentSummary fileName="evidence.pdf"
+      expiresAt="2027-05-01T00:00:00.000Z" onGetDownloadUrl={async () => "/private"}/>);
+    expect(html).toContain("evidence.pdf");
+    expect(html).toContain("Current document");
+    expect(html).not.toContain("Current v0");
+    expect(html).toContain("Open private document");
+  });
   it("does not classify unknown or missing evidence as rejected", () => {
     const html = renderToStaticMarkup(<EvidenceStatus status="not_submitted"/>);
     expect(html).toContain("not_submitted");
