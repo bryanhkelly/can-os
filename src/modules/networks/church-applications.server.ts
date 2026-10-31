@@ -10,6 +10,7 @@ import { EventTypes } from "@/domain/event-types";
 import { STAFF_INVITATION_AGGREGATE } from "@/modules/identity/staff-invitations.server";
 import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
 import { currentChurchAuthorityEvidence, evidenceExpiresAt, validateChurchEvidenceReference } from "./church-evidence-policy";
+import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 
 export type ChurchApplication = {
   churchName: string;
@@ -44,7 +45,7 @@ export async function submitChurchApplication(data: ChurchApplication) {
       .from(churchOnboardingRequests).where(and(
         eq(churchOnboardingRequests.contactEmail, email),
         eq(churchOnboardingRequests.churchName, data.churchName),
-        inArray(churchOnboardingRequests.status, ["submitted", "verified", "approved"]),
+        inArray(churchOnboardingRequests.status, ["submitted", "needs_evidence", "verified", "approved"]),
       )).limit(1);
     if (duplicate.length) return;
     const recent = await tx.select({ id: churchOnboardingRequests.id })
@@ -143,7 +144,7 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
   return db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, input.requestId)).for("update").limit(1);
-    if (!request || request.status !== "submitted") throw new Error("Application is no longer awaiting verification");
+    if (!request || !["submitted", "needs_evidence"].includes(request.status)) throw new Error("Application is no longer awaiting verification");
     // Serialize registrations for the same external reference to prevent concurrent reuse.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"church-evidence:" + reference}))`);
     const reused = await tx.select({ id: documents.id }).from(documents).where(and(
@@ -250,12 +251,55 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
   }
 }
 
+/** Request further evidence without allowing applicant self-verification or automatic approval. */
+export async function requestAdditionalChurchEvidence(actor: AccessContext, requestId: string, note: string) {
+  const canOrganizationId = await requireCANSteward(actor);
+  const message = note.trim();
+  if (message.length < 15 || message.length > 1000 || /[\u0000-\u0008\u000e-\u001f\u007f]/.test(message))
+    throw new Error("Provide a specific applicant-facing evidence request (15–1000 characters)");
+  const recipient = await db.transaction(async tx => {
+    const [request] = await tx.select().from(churchOnboardingRequests)
+      .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+    if (!request || !["submitted", "verified"].includes(request.status))
+      throw new Error("Application is not awaiting initial evidence review");
+    if (request.authorityDocumentId) {
+      await tx.update(documents).set({ expiresAt: new Date(), updatedAt: new Date() })
+        .where(eq(documents.id, request.authorityDocumentId));
+    }
+    await tx.update(churchOnboardingRequests).set({
+      status: "needs_evidence", decisionNote: message, updatedAt: new Date(),
+    }).where(eq(churchOnboardingRequests.id, requestId));
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.evidence.followup.requested",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { priorEvidenceInvalidated: !!request.authorityDocumentId, noticePrepared: true },
+    });
+    return request.contactEmail;
+  });
+  // Transport happens after transaction commit; an acceptance is NOT final delivery.
+  const acceptedByProvider = await sendNotificationEmail({
+    to: recipient, subject: "CAN Academy church partnership: additional evidence needed",
+    text: "Thank you for your interest in partnering with CAN Academy. To continue our independent authority review, please provide the following information through your established CAN contact. Do not email student records or sensitive identification documents.\n\n" +
+      message + "\n\nThis request is not an approval or invitation to open a school.",
+  }, "church-evidence-followup:" + requestId);
+  await db.transaction(async tx => {
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.evidence.followup.transport",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { providerAccepted: acceptedByProvider, delivered: false },
+    });
+  });
+  return { requested: true as const, providerAccepted: acceptedByProvider, delivered: false as const };
+}
+
 export async function declineChurchApplication(actor: AccessContext, requestId: string, note: string) {
   const canOrganizationId = await requireCANSteward(actor);
   await db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
-    if (!request || !["submitted", "verified"].includes(request.status))
+    if (!request || !["submitted", "needs_evidence", "verified"].includes(request.status))
       throw new Error("Application is already decided");
     if (request.authorityDocumentId) {
       // Evidence tied to a declined application cannot later authorize a manual bootstrap.
