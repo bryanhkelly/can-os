@@ -245,7 +245,7 @@ export const decideGraduation = createServerFn({method:"POST"})
      }
      const [lastDecision]=await tx.select().from(s.graduationDecisions)
        .where(and(eq(s.graduationDecisions.studentProfileId,transcript.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,transcript.issuingOrganizationId)))
-       .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.id)).limit(1);
+       .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.createdAt),desc(s.graduationDecisions.id)).limit(1);
      if(lastDecision?.transcriptIssuanceId===transcript.id && lastDecision.requirementSetId===requirementSet.id && lastDecision.decision===data.decision)
        throw new AuthorizationError("Identical graduation decision already recorded");
      const result=adjudicateGraduation({
