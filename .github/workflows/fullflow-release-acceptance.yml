@@ -24,6 +24,8 @@ jobs:
       CAN_TEST_DB_WRITES_ENABLED: "true"
       CAN_DEMO_WRITES_ENABLED: "true"
       TEST_DATABASE_URL: ${{ secrets.CAN_FULLFLOW_TEST_DATABASE_URL }}
+      CAN_ADMISSIONS_TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+      CAN_ADMISSIONS_TEST_BRANCH_ID: ${{ vars.CAN_ADMISSIONS_TEST_BRANCH_ID }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
     steps:
       - name: Checkout selected FullFlow ref
@@ -35,8 +37,8 @@ jobs:
             echo "::error::FullFlow release acceptance only runs on the reviewed FullFlow branch."
             exit 1
           fi
-          if [[ -z "${TEST_DATABASE_URL}" || -z "${CAN_APPLICATION_DB_HOST}" ]]; then
-            echo "::error::Configure the CAN_FULLFLOW_TEST_DATABASE_URL secret and CAN_APPLICATION_DB_HOST integration-test variable."
+          if [[ -z "${TEST_DATABASE_URL}" || -z "${CAN_APPLICATION_DB_HOST}" || -z "${CAN_ADMISSIONS_TEST_DATABASE_URL}" || -z "${CAN_ADMISSIONS_TEST_BRANCH_ID}" ]]; then
+            echo "::error::HOLD: configure approved FullFlow and admissions disposable Neon secrets, branch IDs, and application endpoint guard in integration-test."
             exit 1
           fi
       - name: Set up Node
@@ -46,18 +48,50 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit route fixture coverage
+        run: node scripts/check-route-fixture-coverage.mjs
+      - name: Verify static code and migration snapshot parity
+        run: |
+          npm run lint
+          npm run build
+          npm run typecheck
+          npm test
+          npm run db:generate
+          if [[ -n "$(git status --porcelain -- drizzle/)" ]]; then
+            echo "::error::HOLD: committed Drizzle migration journal/snapshots do not match generated schema."
+            exit 1
+          fi
       - name: Verify isolated endpoint and Postgres-attested FullFlow branch
         run: |
           npm run test:integration:full-flow -- --preflight
           npm run db:migrate:fullflow -- --preflight
       - name: Apply only reviewed migrations to isolated branch
         run: npm run db:migrate:fullflow
+      - name: Verify separate admissions database is an attested disposable branch
+        env:
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: |
+          npm run test:integration:admissions -- --preflight
+          node scripts/verify-admissions-neon-branch.mjs
+      - name: Apply admissions migrations on separately guarded disposable branch
+        env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: npm run db:migrate
+      - name: Run connected admissions integration
+        env:
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: npm run test:integration:admissions
       - name: Verify complete cross-role school transaction
         run: npm run test:integration:full-flow
       - name: Verify independently supervised church school day
         run: npm run test:integration:journey-c
       - name: Install browser for real authenticated sessions
         run: npx playwright install --with-deps chromium
+      - name: Run authenticated admissions browser acceptance
+        env:
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: npm run test:e2e:admissions
       - name: Verify connected launch, admission, instruction, guardian, and operations browser journey
         run: npm run test:e2e:full-flow
       - name: Preserve browser failure evidence
@@ -79,7 +113,7 @@ jobs:
             echo ""
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- The steps above must ALL succeed on this exact commit to count as connected acceptance."
+            echo "- Every step above (including separate-branch admissions and safeguarding) must succeed on this exact SHA. Any failure or skip means HOLD."
             echo "- Status: CONNECTED GATES ONLY. Overall release remains HOLD until independent admissions Neon acceptance, static/schema checks, and operational readiness are verified on the same reviewed commit."
             echo "- Required independent evidence: Admissions Neon Acceptance run ID, build/typecheck/unit run ID, migration parity, child-safety negative checks, and deployment readiness."
             echo "- This synthetic isolated-branch evidence does not authorize production deployment or certify legal/accreditation compliance."
