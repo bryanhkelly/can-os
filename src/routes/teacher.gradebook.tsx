@@ -167,15 +167,16 @@ function TeacherGradebookPage() {
    setScore("");
    setComment("");
    setRubricInputs({});
-   // Advance directly to the next awaiting submission, rather than
-   // reopening the just-graded record from the old route parameters.
-   const next=reviewQueue.find(item=>item.submissionId!==cell.submissionId);
-   if(next){
-    void navigate({search:{section:selected,assessment:next.assessmentId,student:next.studentProfileId}});
-   }else{
-    void navigate({search:{section:selected}});
+   // Refresh the canonical queue before advancing. A classmate may have
+   // submitted new work while the teacher was grading this attempt.
+   if (selected) {
+    const refreshed=await getGradebook({data:{sectionId:selected}});
+    setGradebook(refreshed);
+    const next=refreshed.cells.find(item=>item.status==="submitted"&&item.submissionId!==cell.submissionId);
+    void navigate({search:next
+     ?{section:selected,assessment:next.assessmentId,student:next.studentProfileId}
+     :{section:selected}});
    }
-   if (selected) await loadGradebook(selected);
   } catch (cause) {
    setNotice(cause instanceof Error ? cause.message : "Unable to post the grade.");
   } finally {
