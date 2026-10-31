@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getSyntheticAssignmentHistory } from "@/modules/student-experience/assignments.functions";
+import { listSubmissionAttachments, getSubmissionAttachmentDownload } from "@/modules/learning/submission-attachments.functions";
 
 type Attempts = Awaited<ReturnType<typeof getSyntheticAssignmentHistory>>;
 
@@ -27,6 +28,30 @@ export function AssignmentAttemptHistory({ assessmentId }: { assessmentId: strin
       {attempt.score !== null && <p className="mt-3 text-sm">Score: {attempt.score}</p>}
       {attempt.feedback && <><p className="mt-3 text-xs font-semibold">Teacher feedback</p>
         <p className="mt-1 whitespace-pre-wrap text-sm">{attempt.feedback}</p></>}
+      <AttemptFiles assessmentId={assessmentId} attemptNumber={attempt.attempt}/>
     </details>)}
   </section>;
+}
+
+function AttemptFiles({assessmentId,attemptNumber}:{assessmentId:string;attemptNumber:number}) {
+  const [files,setFiles]=useState<{documentId:string;fileName:string}[]|null>(null);
+  const [error,setError]=useState("");
+  const [busy,setBusy]=useState(false);
+  async function load() {
+    setBusy(true);setError("");
+    try {setFiles((await listSubmissionAttachments({data:{assessmentId,attemptNumber}})).attachments);}
+    catch {setError("Unable to load files for this attempt.");}
+    finally {setBusy(false);}
+  }
+  async function download(documentId:string) {
+    setError("");
+    try {window.location.assign((await getSubmissionAttachmentDownload({data:{assessmentId,attemptNumber,documentId}})).downloadUrl);}
+    catch {setError("Unable to open this file. Your enrollment or access may have changed.");}
+  }
+  return <div className="mt-3 text-sm">
+    {!files&&<button type="button" disabled={busy} className="underline" onClick={load}>{busy?"Loading files…":"Review files for this attempt"}</button>}
+    {files?.length===0&&<p>No verified attachments on this attempt.</p>}
+    {files?.map(file=><button type="button" key={file.documentId} onClick={()=>download(file.documentId)} className="mt-1 block underline">{file.fileName}</button>)}
+    {error&&<p role="alert" className="mt-2">{error}</p>}
+  </div>;
 }

@@ -10,7 +10,7 @@ import type { Actor } from "@/modules/identity/actors.server";
 import { writeAudit } from "@/platform/mutation";
 import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -246,10 +246,11 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
     });
   });
 
-/** Attached file names on the student's current (latest) attempt. */
+/** Verified file names on the student's exact attempt; defaults to latest. */
 export const listSubmissionAttachments = createServerFn({ method: "GET" })
-  .validator((value: unknown) => z.object({ assessmentId: z.string().min(1) }).parse(value))
+  .validator((value: unknown) => z.object({ assessmentId: z.string().min(1), attemptNumber: z.number().int().positive().optional() }).parse(value))
   .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
     const { context, studentId, studentPersonId } = await studentActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [assessment] = await db.select({ id: s.assessments.id, sectionId: s.assessments.sectionId })
@@ -264,7 +265,8 @@ export const listSubmissionAttachments = createServerFn({ method: "GET" })
       throw error;
     }
     const [latest] = await db.select({ response: s.submissions.response }).from(s.submissions)
-      .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
+      .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId),
+        data.attemptNumber === undefined ? undefined : eq(s.submissions.attemptNumber, data.attemptNumber)))
       .orderBy(desc(s.submissions.attemptNumber)).limit(1);
     const ids = latest && Array.isArray(latest.response.attachments)
       ? (latest.response.attachments as unknown[]).filter((item): item is string => typeof item === "string" && uuidPattern.test(item))
@@ -407,10 +409,11 @@ export const listExcuseAttachmentCounts = createServerFn({ method: "GET" })
     return { counts: [...latest.entries()].map(([attendanceEventId, count]) => ({ attendanceEventId, count })) };
   });
 
-/** Return a short-lived private URL only for a verified file linked to this student's latest attempt. */
+/** Short-lived private URL for a verified file on this student's exact attempt. */
 export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({
-  assessmentId:z.string().uuid(),documentId:z.string().uuid()
+  assessmentId:z.string().uuid(),documentId:z.string().uuid(),
+  attemptNumber:z.number().int().positive().optional()
  }).parse(value))
  .handler(async({data})=>{
   const {context,studentId,studentPersonId}=await studentActor();
@@ -420,10 +423,11 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
     context as Actor,true);
   const [latest]=await tx.select({response:s.submissions.response})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
-    eq(s.submissions.studentProfileId,studentId)))
+    eq(s.submissions.studentProfileId,studentId),
+    data.attemptNumber === undefined ? undefined : eq(s.submissions.attemptNumber,data.attemptNumber)))
    .orderBy(desc(s.submissions.attemptNumber)).limit(1);
   const ids=Array.isArray(latest?.response.attachments)?latest.response.attachments:[];
-  if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to latest student submission");
+  if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to selected student submission");
   const [document]=await tx.select({
    storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
    mimeType:s.documents.mimeType
