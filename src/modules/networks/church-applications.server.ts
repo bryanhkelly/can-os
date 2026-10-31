@@ -89,6 +89,8 @@ export async function listChurchApplications(actor: AccessContext) {
     request.authorityDocumentId ? [request.authorityDocumentId] : []);
   const evidence = evidenceIds.length ? await db.select({
     id: documents.id, storageKey: documents.storageKey, metadata: documents.metadata,
+    category: documents.category, subjectType: documents.subjectType,
+    subjectId: documents.subjectId,
     verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
     expiresAt: documents.expiresAt,
   }).from(documents).where(inArray(documents.id, evidenceIds)) : [];
@@ -105,7 +107,8 @@ export async function listChurchApplications(actor: AccessContext) {
         verifiedAt: document.verifiedAt,
         verifiedByPersonId: document.verifiedByPersonId,
         expiresAt: document.expiresAt,
-        usable: currentChurchAuthorityEvidence({ ...document, category: "church_onboarding_authority" }, request, actor.actorPersonId),
+        usable: document.subjectType === "organization" && document.subjectId === (actor.scope.organizationIds ?? [])[0] &&
+          currentChurchAuthorityEvidence(document, request, actor.actorPersonId),
       } : null,
     };
   });
@@ -193,8 +196,10 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
   const [evidence] = await db.select({ id: documents.id, expiresAt: documents.expiresAt,
     verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
     metadata: documents.metadata, category: documents.category,
+    subjectType: documents.subjectType, subjectId: documents.subjectId,
   }).from(documents).where(eq(documents.id, request.authorityDocumentId)).limit(1);
-  if (!currentChurchAuthorityEvidence(evidence, request, actor.actorPersonId))
+  if (evidence?.subjectType !== "organization" || evidence.subjectId !== canOrganizationId ||
+      !currentChurchAuthorityEvidence(evidence, request, actor.actorPersonId))
     throw new AuthorizationError("current, application-bound independent authority evidence");
 
   // The callback updates the approved request INSIDE the canonical bootstrap
