@@ -190,39 +190,35 @@ export async function createMedicationAuthorization(
     throw new Error("Medication authorization expiry must be after start");
   }
 
-  const [authorization] = await db
-    .insert(medicationAuthorizations)
-    .values({
-      studentProfileId: input.studentProfileId,
-      medicationName: input.medicationName,
-      instructions: input.instructions,
-      status: "active",
-      startsOn: input.startsOn,
-      expiresOn: input.expiresOn,
-      authorizationDocumentId: input.authorizationDocumentId,
-      guardianConsentDocumentId: input.guardianConsentDocumentId,
-      emergencyOnly: input.emergencyOnly ?? false,
-    })
-    .returning({ id: medicationAuthorizations.id });
-
-  if (!authorization) {
-    throw new Error("Failed to create medication authorization");
-  }
-
-  await writeAudit(db, context, {
-    action: "medication.authorization.create",
-    entityType: "medication_authorization",
-    entityId: authorization.id,
-    after: {
-      studentProfileId: input.studentProfileId,
-      medicationName: input.medicationName,
-      startsOn: input.startsOn,
-      expiresOn: input.expiresOn ?? null,
-    },
-    contextExtras: { classification: "medical" },
+  return db.transaction(async tx => {
+    await assertCurrentHealthStudentScope(tx, context, input.studentProfileId);
+    const [authorization] = await tx.insert(medicationAuthorizations)
+      .values({
+        studentProfileId: input.studentProfileId,
+        medicationName: input.medicationName,
+        instructions: input.instructions,
+        status: "active",
+        startsOn: input.startsOn,
+        expiresOn: input.expiresOn,
+        authorizationDocumentId: input.authorizationDocumentId,
+        guardianConsentDocumentId: input.guardianConsentDocumentId,
+        emergencyOnly: input.emergencyOnly ?? false,
+      }).returning({ id: medicationAuthorizations.id });
+    if (!authorization) throw new Error("Failed to create medication authorization");
+    await writeAudit(tx, context, {
+      action: "medication.authorization.create",
+      entityType: "medication_authorization",
+      entityId: authorization.id,
+      after: {
+        studentProfileId: input.studentProfileId,
+        medicationName: input.medicationName,
+        startsOn: input.startsOn,
+        expiresOn: input.expiresOn ?? null,
+      },
+      contextExtras: { classification: "medical" },
+    });
+    return authorization.id;
   });
-
-  return authorization.id;
 }
 
 export async function administerMedication(
