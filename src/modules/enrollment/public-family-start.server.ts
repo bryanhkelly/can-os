@@ -21,7 +21,7 @@ export type FamilyStartTransaction = Parameters<Parameters<typeof db.transaction
 type FamilyStartPreparation = {
  school: Omit<PublishedFamilyStartDestination,"slug">;
  contact: {firstName:string;lastName:string;email:string;programId:string};
- evidence: {source:"published_site"|"staff_invitation";invitationBatchId?:string;recipientKey?:string};
+ evidence: {source:"published_site"|"staff_invitation"|"consented_interest";invitationBatchId?:string;recipientKey?:string;interestId?:string};
 };
 
 /** Resolve the same published, active, independently authorized application
