@@ -13,5 +13,5 @@ function SchoolYearStudio() {
   const result = Route.useLoaderData();
   const selection = Route.useSearch();
   if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Academic time" title="School-year setup" outcome={result} />;
-  return <SchoolYearStudioWorkspace key={JSON.stringify(selection)} data={result.data} />;
+  return <SchoolYearStudioWorkspace key={JSON.stringify(selection)} data={result.data} selection={selection} />;
 }
