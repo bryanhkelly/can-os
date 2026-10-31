@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { submitEvidenceUpload } from "./evidence-upload";
 
 export type EvidenceMimeType = "application/pdf" | "image/jpeg" | "image/png";
 export interface EvidenceUploadAdapter<T> {
@@ -27,21 +28,7 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
     if (busy || disabled) return;
     setBusy(true); setError("");
     try {
-      let attempt = pending;
-      if (!attempt) {
-        if (!file || !expiry) throw new Error("Choose a document and its actual expiry date");
-        if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type))
-          throw new Error("Only PDF, JPEG and PNG evidence is supported");
-        const input = makeInput(file, new Date(expiry + "T23:59:59.999Z").toISOString());
-        const begun = await adapter.begin(input);
-        const response = await fetch(begun.uploadUrl, {
-          method: "PUT", headers: begun.uploadHeaders, body: file,
-        });
-        if (!response.ok) throw new Error("Private upload failed; evidence was not recorded");
-        attempt = { key: begun.key, input };
-        setPending(attempt);
-      }
-      await adapter.finish({ ...attempt.input, key: attempt.key });
+      await submitEvidenceUpload(adapter, makeInput, file, expiry, pending, setPending);
       // Finalization succeeded: never retry the same command if refreshing the view fails.
       setPending(null); setFile(null); setExpiry("");
       try { await onUploaded(); }
