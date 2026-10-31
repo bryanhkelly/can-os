@@ -67,16 +67,17 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
   setBusy(requirementId);setError("");
   try{
    const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
-   const previous=pendingUploads.current.get(requirementId);
+   const uploadIdentity=applicationId+":"+requirementId;
+   const previous=pendingUploads.current.get(uploadIdentity);
    let key=previous?.file===file?previous.key:undefined;
    if(!key){
     const upload=await beginEnrollmentDocumentUpload({data:request});
     const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":file.type},body:file});
     if(!response.ok)throw new Error("Cloudflare R2 upload failed ("+response.status+")");
-    key=upload.key;pendingUploads.current.set(requirementId,{file,key});
+    key=upload.key;pendingUploads.current.set(uploadIdentity,{file,key});
    }
    await finishEnrollmentDocumentUpload({data:{...request,key}});
-   pendingUploads.current.delete(requirementId);
+   pendingUploads.current.delete(uploadIdentity);
    setFiles(previous=>({...previous,[requirementId]:null}));await router.invalidate();
   }catch(e){setError(e instanceof Error?e.message:"Document upload failed");}
   finally{setBusy(null);}
