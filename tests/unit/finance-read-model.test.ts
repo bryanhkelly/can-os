@@ -21,7 +21,7 @@ describe("finance statements", () => {
   it("returns reconciled receipt-independent net settlement for an authorized household", async () => {
     const result = await readFinanceStatement(store, identity(["house"]), "ob", true);
     expect(result?.settlement).toMatchObject({ netCents: 7000, churchCents: 1400, canCents: 5600 });
-    expect(result?.state).toBe("paid");
+    expect(result?.state).toBe("partially_paid");
     expect(result?.accountBalanceCents).toBe(3000);
     expect(result?.outstandingCents).toBe(0);
     expect(result?.returnedCents).toBe(3000);
