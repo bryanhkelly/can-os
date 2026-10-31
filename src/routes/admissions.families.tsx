@@ -64,6 +64,9 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
  }
  async function upload(applicationId:string,requirementId:string){
   const file=files[requirementId];if(!file)return;
+  if(file.size>10*1024*1024||file.size<=0||!["application/pdf","image/png","image/jpeg"].includes(file.type)){
+   setError("Choose a nonempty PDF, PNG, or JPEG document of at most 10 MB.");return;
+  }
   setBusy(requirementId);setError("");
   try{
    const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
