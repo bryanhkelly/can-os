@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { listAcademicCredentialDeliveries,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
+import { listAcademicCredentialDeliveries,listAcademicCredentialReleaseAuthorizations,revokeAcademicCredentialRelease,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
 
 export const Route=createFileRoute("/admissions/credential-delivery")({component:CredentialDeliveryPage});
+type Release=Awaited<ReturnType<typeof listAcademicCredentialReleaseAuthorizations>>[number];
 type Delivery=Awaited<ReturnType<typeof listAcademicCredentialDeliveries>>[number];
 function CredentialDeliveryPage(){
  const [kind,setKind]=useState<"transcript"|"diploma">("transcript");
  const [credentialId,setCredentialId]=useState("");
  const [history,setHistory]=useState<Delivery[]>([]);
+ const [releases,setReleases]=useState<Release[]>([]);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
  async function run(fn:()=>Promise<void>){setBusy(true);setMessage("");try{await fn()}catch(e){setMessage(e instanceof Error?e.message:"Unable to process credential")}finally{setBusy(false)}}
@@ -23,8 +25,8 @@ function CredentialDeliveryPage(){
    <p className="text-sm">Documents are generated from issued transcript snapshots or approved, active diploma records. Email acceptance does not prove delivery to the recipient's inbox.</p>
    {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}
    <section className="space-y-3 rounded-xl border p-4">
-    <label className="block text-sm font-medium">Credential type<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></select></label>
-    {field("Issued credential ID",credentialId,value=>{setCredentialId(value);setHistory([])})}
+    <label className="block text-sm font-medium">Credential type<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([]);setReleases([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></select></label>
+    {field("Issued credential ID",credentialId,value=>{setCredentialId(value);setHistory([]);setReleases([])})}
     <div className="flex flex-wrap gap-2">
      <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{const result=await renderAcademicCredential({data:{kind,credentialId}});download(result.base64,result.filename);setMessage("Document generated for download.")})}>Download official PDF</button>
      <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{setHistory(await listAcademicCredentialDeliveries({data:{kind,credentialId}}))})}>Refresh delivery history</button>
@@ -33,6 +35,25 @@ function CredentialDeliveryPage(){
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Official records release</h2>
     <p className="text-sm">External release is temporarily unavailable until verified release instructions, authorized recipient selection, consent evidence and secure access are implemented. Official PDFs must not be emailed as attachments.</p>
+   </section>
+   <section className="space-y-3 rounded-xl border p-4">
+    <h2 className="font-semibold">Release authorization status</h2>
+    <p className="text-sm">Only CAN registrars may revoke existing authorizations. New external releases remain disabled pending independent evidence verification.</p>
+    <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))})}>Refresh release authorizations</button>
+    {releases.map(row=>{
+     const status=row.revokedAt?"Revoked":new Date(row.expiresAt)<=new Date()?"Expired":"Authorized";
+     return <article key={row.id} className="rounded-lg border p-3 text-sm">
+      <strong>{row.recipientEmail}</strong>
+      <p>Purpose: {row.releasePurpose}</p>
+      <p>Status: {status} · Authorized: {new Date(row.authorizedAt).toLocaleString()} · Expires: {new Date(row.expiresAt).toLocaleString()}</p>
+      {status==="Authorized"&&<button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
+       await revokeAcademicCredentialRelease({data:{authorizationId:row.id}});
+       setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}));
+       setMessage("Release revoked.");
+      })}>Revoke access</button>}
+     </article>;
+    })}
+    {!releases.length&&<p className="text-sm text-muted-foreground">No release authorizations loaded.</p>}
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Delivery history</h2>
