@@ -5,7 +5,7 @@ import { useLaunchModelPresets } from "@/hooks/useLaunchModelPresets";
 import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
-import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
+import type { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admissions-counts.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import {resolveLaunchResume} from "@/domain/launch-resume";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
@@ -31,7 +31,7 @@ export type LaunchWizardData = {
  launches: Awaited<ReturnType<typeof listLaunches>> | null;
  preparationPrograms: Awaited<ReturnType<typeof listAdmissionsPrograms>> | null;
  familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
- admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
+ admissionsCounts: Awaited<ReturnType<typeof getLaunchAdmissionsCounts>> | null;
  enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
  extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
  authError: string;
@@ -39,7 +39,7 @@ export type LaunchWizardData = {
 
 export function LaunchWizardPage({ selection, data }: { selection: {siteId?: string;programId?: string}; data: LaunchWizardData }) {
 
-  const { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError } = data;
+  const { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, authError } = data;
   const router = useRouter();
   const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input) });
   const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input) });
@@ -164,7 +164,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
-        <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissions={admissions} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
+        <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>
