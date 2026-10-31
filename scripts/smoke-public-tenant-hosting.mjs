@@ -53,6 +53,31 @@ try{
   for(const path of ["/operations","/access","/_serverFn","/api","/admin","/assets/index.js"])
    await check(name,path,404);
  }
+ // Optional external negative fixtures MUST belong to approved isolated test deployment.
+ const disabledUrl=process.env.CAN_PUBLIC_SMOKE_DISABLED_URL;
+ if(disabledUrl){
+  const target=new URL(disabledUrl);
+  assert.equal(target.protocol,"https:","Disabled fixture must use HTTPS");
+  const r=await fetch(target,{redirect:"manual",signal:AbortSignal.timeout(8000)});
+  assert.equal(r.status,404,`${target}: disabled hosting must deny anonymous tenant access`);
+  evidence.checks.push({url:String(target),status:r.status,identity:"hosting-disabled denied"});
+  await r.body?.cancel();
+ }
+ const invalidTlsUrl=process.env.CAN_PUBLIC_SMOKE_INVALID_TLS_URL;
+ if(invalidTlsUrl){
+  const target=new URL(invalidTlsUrl);
+  assert.equal(target.protocol,"https:","Invalid-certificate fixture must use HTTPS");
+  let tlsError=false;
+  try{
+   const r=await fetch(target,{redirect:"manual",signal:AbortSignal.timeout(8000)});
+   await r.body?.cancel();
+  }catch(error){
+   const cause=error?.cause?.code??"";
+   tlsError=/^(ERR_TLS_CERT_ALTNAME_INVALID|CERT_HAS_EXPIRED|DEPTH_ZERO_SELF_SIGNED_CERT|UNABLE_TO_VERIFY_LEAF_SIGNATURE|UNABLE_TO_GET_ISSUER_CERT_LOCALLY|SELF_SIGNED_CERT_IN_CHAIN)$/.test(String(cause));
+  }
+  assert.ok(tlsError,`${target}: expected a certificate-validation failure, not DNS or timeout`);
+  evidence.checks.push({url:String(target),status:"TLS_REJECTED",identity:"invalid certificate denied"});
+ }
  process.stdout.write(JSON.stringify({result:"PASS",...evidence},null,2)+"\n");
 }catch(error){
  process.stderr.write(JSON.stringify({result:"FAIL",...evidence,error:String(error)},null,2)+"\n");
