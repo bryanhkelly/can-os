@@ -28,7 +28,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
   eq(curriculumPackVersions.id,adoption.packVersionId),eq(curriculumPackVersions.packId,input.packId))).limit(1);
  const metadata=license?.metadata??{};
  const date=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
- const eligible=!!license&&annualAdoptionEligible({
+ const eligible=!!license && !!date(metadata.licenseStartsAt) && !!date(metadata.licenseEndsAt) && annualAdoptionEligible({
   scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
    academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.year.id},
   adoption,license:{organizationId:license.organizationId,packId:license.packId,
@@ -56,13 +56,16 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
    eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.year.id),
    eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
   if(existing){
-   if(existing.status==="active"&&existing.packVersionId===input.versionId)
+   if(existing.status==="active"&&existing.packVersionId===input.versionId){
+    const current=await readAnnualAdoptionEligibility(actor,{programId:program.id,year:input.year,packId:input.packId,now:input.now},tx);
+    if(!current.eligible)throw new AuthorizationError("existing annual adoption no longer has valid license rights");
     return {adoptionId:existing.id,created:false};
+   }
    throw new Error("Annual adoption is pinned. Revision or rollback requires a separately authorized workflow.");
   }
   const metadata=entitlement.metadata??{};
   const parse=(v:unknown)=>typeof v==="string"&&!Number.isNaN(Date.parse(v))?new Date(v):null;
-  if(!annualAdoptionEligible({
+  if(!parse(metadata.licenseStartsAt)||!parse(metadata.licenseEndsAt)||!annualAdoptionEligible({
    scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
     academicProviderOrganizationId:program.academicProviderOrganizationId,academicYearId:input.year.id},
    adoption:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
