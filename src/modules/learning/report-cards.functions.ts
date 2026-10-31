@@ -200,7 +200,7 @@ export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[n
  * skipped, making re-runs idempotent.
  */
 export const finalizeSectionGrades = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({ sectionId: z.string().min(1), gradingPeriodId: z.string().min(1) }).parse(value))
+  .validator((value: unknown) => z.object({ sectionId: z.string().min(1), gradingPeriodId: z.string().min(1), previewOnly:z.boolean().optional().default(false) }).parse(value))
   .handler(async ({ data }) => {
     const context = await getCommandContext(getRequest());
     assertCapability(context, "assignments:grade");
@@ -283,6 +283,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       const assessmentsInWindow = await tx
         .select({
           id: s.assessments.id,
+          title: s.assessments.title,
           pointsPossible: s.assessments.pointsPossible,
         })
         .from(s.assessments)
@@ -301,6 +302,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         id: section.id, programId: section.programId, schoolYearId: period.schoolYearId,
       });
       if (!assessmentIds.length || !studentIds.length) {
+        if(data.previewOnly)return {preview:true as const,eligible:0,blockers:[] as {studentProfileId:string;studentName:string;assessmentId:string;assessmentTitle:string;status:string}[]};
         return { finalized: 0, skipped: studentIds.length };
       }
 
@@ -310,6 +312,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           studentProfileId: s.submissions.studentProfileId,
           attemptNumber: s.submissions.attemptNumber,
           score: s.submissions.score,
+          status: s.submissions.status,
         })
         .from(s.submissions)
         .where(
@@ -317,8 +320,6 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
             inArray(s.submissions.assessmentId, assessmentIds),
             inArray(s.submissions.studentProfileId, studentIds),
             latestSubmissionCondition(tx),
-            eq(s.submissions.status, "graded"),
-            isNotNull(s.submissions.score),
           ),
         )
         .orderBy(desc(s.submissions.attemptNumber));
@@ -331,8 +332,9 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       const totals = new Map<string, { earned: number; possible: number }>();
       const gradedAssessments = new Map<string, Set<string>>();
       for (const row of graded) {
+        if(row.status!=="graded" || row.score===null)continue;
         const possible = pointsByAssessment.get(row.assessmentId) ?? 0;
-        if (possible <= 0) continue;
+        if (possible <= 0 || !Number.isFinite(Number(row.score))) continue;
         const total = totals.get(row.studentProfileId) ?? { earned: 0, possible: 0 };
         total.earned += Number(row.score ?? 0);
         total.possible += possible;
@@ -365,6 +367,25 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         )
         .for("update");
       const existingByStudent = new Map(existing.map((row) => [row.studentProfileId, row]));
+
+      if(data.previewOnly){
+        const names=await tx.select({id:s.studentProfiles.id,firstName:s.people.legalFirstName,
+          lastName:s.people.legalLastName,preferredName:s.people.preferredName})
+          .from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+          .where(inArray(s.studentProfiles.id,studentIds));
+        const byStudent=new Map(names.map(row=>[row.id,`${row.preferredName??row.firstName} ${row.lastName}`]));
+        const blockers=[] as {studentProfileId:string;studentName:string;assessmentId:string;assessmentTitle:string;status:string}[];
+        for(const studentId of studentIds){
+          if(existingByStudent.get(studentId)?.status==="finalized")continue;
+          for(const assessment of assessmentsInWindow){
+            if(Number(assessment.pointsPossible??0)<=0 || gradedAssessments.get(studentId)?.has(assessment.id))continue;
+            const attempt=graded.find(row=>row.studentProfileId===studentId&&row.assessmentId===assessment.id);
+            blockers.push({studentProfileId:studentId,studentName:byStudent.get(studentId)??"Student",
+              assessmentId:assessment.id,assessmentTitle:assessment.title,status:attempt?.status??"not_started"});
+          }
+        }
+        return {preview:true as const,eligible:[...completeTotals.keys()].filter(id=>existingByStudent.get(id)?.status!=="finalized").length,blockers};
+      }
 
       const now = new Date();
       let finalized = 0;

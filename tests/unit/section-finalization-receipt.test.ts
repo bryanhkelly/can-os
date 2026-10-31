@@ -33,8 +33,9 @@ beforeEach(()=>{
   [{id:periodId,termId:"term",schoolYearId:"year",gradeScaleId:"scale",startsOn:"2026-10-01",endsOn:"2026-10-31"}],
   [{configuration:{entries:[{label:"A",minPercent:90,maxPercent:100}]}}],
   [{timezone:"America/Los_Angeles"}], // School-local grading date.
-  [{id:"assessment",pointsPossible:"10"}],
-  [{assessmentId:"assessment",studentProfileId:"already-finalized",attemptNumber:1,score:"10"}],
+  [{id:"assessment",title:"Essay",pointsPossible:"10"}],
+  [{assessmentId:"assessment",studentProfileId:"already-finalized",attemptNumber:1,score:"10",status:"graded"}],
+  [], // Builder for the correlated latest-attempt NOT EXISTS subquery.
   [{id:"grade",studentProfileId:"already-finalized",status:"finalized"}],
  ];
 });
@@ -42,6 +43,17 @@ const invoke=()=> (finalizeSectionGrades as unknown as (arg:unknown)=>Promise<un
  data:{sectionId,gradingPeriodId:periodId},
 });
 describe("grading-period finalization receipts",()=>{
+ it("previews exact unfinished work without writing grades",async()=>{
+  state.rows.push([{id:"no-submission",firstName:"Ada",lastName:"Lovelace",preferredName:null},
+    {id:"ungraded",firstName:"Grace",lastName:"Hopper",preferredName:null}]);
+  (state.rows[5] as Record<string,unknown>[]).push({assessmentId:"assessment",studentProfileId:"ungraded",attemptNumber:2,score:null,status:"submitted"});
+  const result=await (finalizeSectionGrades as unknown as (arg:unknown)=>Promise<unknown>)({data:{sectionId,gradingPeriodId:periodId,previewOnly:true}});
+  expect(result).toEqual({preview:true,eligible:0,blockers:[
+    {studentProfileId:"no-submission",studentName:"Ada Lovelace",assessmentId:"assessment",assessmentTitle:"Essay",status:"not_started"},
+    {studentProfileId:"ungraded",studentName:"Grace Hopper",assessmentId:"assessment",assessmentTitle:"Essay",status:"submitted"},
+  ]});
+  expect(state.writes).not.toHaveBeenCalled();
+ });
  it("accounts for every active learner, including those with no graded work",async()=>{
   await expect(invoke()).resolves.toEqual({finalized:0,skipped:3});
   expect(state.writes).not.toHaveBeenCalled();
