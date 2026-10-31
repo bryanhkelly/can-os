@@ -406,8 +406,12 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
    if(!canonical||klass.schoolYear!==canonical.year||
       !klass.termSourcedIds?.split(",").map(v=>v.trim()).includes(canonical.term))
     throw new Error("External year and term must match the active canonical Section.");
-   if(identity.metadata.sourceHash!==digest||section.metadata.sourceHash!==digest)
-    throw new Error("Source changed since mapping approval; validate and approve the new bundle.");
+   // Identity and class mappings may be approved from separate CSV subsets.
+   // Their issuer, school, Program and Site bindings must remain exact; do not
+   // mistake different valid source-package hashes for a revocation.
+   if(identity.metadata.externalSchoolSourcedId!==data.externalSchoolSourcedId||
+      !identity.metadata.sourceHash||!section.metadata.sourceHash)
+    throw new Error("Missing or inconsistent registrar mapping provenance.");
    const placement=await activateSectionEnrollment(tx,{
      actor,studentProfileId:data.studentProfileId,sectionId:data.sectionId,
      source:"oneroster_registrar_approved",
