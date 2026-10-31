@@ -22,6 +22,7 @@ function GraduationCloseout(){
  const [transcriptId,setTranscriptId]=useState("");
  const [requirementSetId,setRequirementSetId]=useState("");
  const [decisionId,setDecisionId]=useState("");
+ const [decisionRationale,setDecisionRationale]=useState("");
  const [audit,setAudit]=useState<Awaited<ReturnType<typeof auditIssuedTranscript>>|null>(null);
  const [sets,setSets]=useState<Awaited<ReturnType<typeof listGraduationRequirements>>>([]);
  const [message,setMessage]=useState("");
@@ -62,13 +63,14 @@ function GraduationCloseout(){
     {transcriptId&&<p className="text-sm">Selected issued transcript. Choose its applicable approved policy below.</p>}
     {applicablePolicy&&<p className="rounded border p-3 text-sm">Applicable institution policy: <strong>{applicablePolicy}</strong></p>}
 
+    {field("Graduation decision rationale (required)",decisionRationale,setDecisionRationale)}
     <button disabled={busy||!transcriptId||!requirementSetId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setDecisionId("");setAudit(await auditIssuedTranscript({data:{transcriptId,requirementSetId}}))})}>Run credit audit</button>
     {audit&&<div className="space-y-2 rounded-lg border p-3 text-sm"><p>Audit: <strong>{audit.audit.status}</strong> · Earned credits: {audit.audit.totalEarned}</p>
       {audit.audit.deficiencies.map(row=><p key={row.subject}>{row.subject}: {row.earned} of {row.required} ({row.missing} missing)</p>)}
       {audit.audit.blockers.map((blocker,i)=><p key={i} className="text-red-700">{blocker}</p>)}
       <div className="flex gap-2">
-       <button disabled={busy||audit.audit.status!=="requirements_met"} className="rounded-lg border px-3 py-2 disabled:opacity-50" onClick={()=>void perform(async()=>{const result=await decideGraduation({data:{transcriptId,requirementSetId,decision:"approved"}});setDecisionId(result.decisionId);setMessage("Graduation approved and recorded.")})}>Approve graduation</button>
-       <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await decideGraduation({data:{transcriptId,requirementSetId,decision:"denied"}});setDecisionId("");setAudit(null);setMessage("Graduation denial recorded.")})}>Record denial</button>
+       <button disabled={busy||audit.audit.status!=="requirements_met"||decisionRationale.trim().length<12} className="rounded-lg border px-3 py-2 disabled:opacity-50" onClick={()=>void perform(async()=>{const result=await decideGraduation({data:{transcriptId,requirementSetId,decision:"approved",rationale:decisionRationale}});setDecisionId(result.decisionId);setMessage("Graduation approved and recorded.")})}>Approve graduation</button>
+       <button disabled={busy||decisionRationale.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await decideGraduation({data:{transcriptId,requirementSetId,decision:"denied",rationale:decisionRationale}});setDecisionId("");setAudit(null);setMessage("Graduation denial recorded.")})}>Record denial</button>
       </div>
      </div>}
    </section>
