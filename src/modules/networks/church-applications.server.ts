@@ -1,11 +1,13 @@
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { churchOnboardingRequests, documents, organizations } from "@/db/schema";
+import { accountPersonGrants, churchOnboardingRequests, documents, domainEvents, organizations } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { writeAudit } from "@/platform/mutation";
 import { bootstrapVerifiedChurch } from "./church-onboarding.server";
+import { EventTypes } from "@/domain/event-types";
+import { STAFF_INVITATION_AGGREGATE } from "@/modules/identity/staff-invitations.server";
 import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
 
 export type ChurchApplication = {
@@ -79,8 +81,32 @@ async function requireCANSteward(actor: AccessContext) {
 
 export async function listChurchApplications(actor: AccessContext) {
   await requireCANSteward(actor);
-  return db.select().from(churchOnboardingRequests)
+  const requests = await db.select().from(churchOnboardingRequests)
     .orderBy(desc(churchOnboardingRequests.createdAt)).limit(100);
+  const grantIds = requests.flatMap(request =>
+    request.status === "approved" && request.invitationGrantId ? [request.invitationGrantId] : []);
+  if (!grantIds.length) return requests.map(request => ({ ...request, invitationAcceptedAt: null as Date | null }));
+
+  // Derive acceptance from the real access grant AND immutable invitation
+  // acceptance event. Application approval alone is never proof of sign-in.
+  const [grants, events] = await Promise.all([
+    db.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
+      .from(accountPersonGrants).where(inArray(accountPersonGrants.id, grantIds)),
+    db.select({ grantId: domainEvents.aggregateId, occurredAt: domainEvents.occurredAt })
+      .from(domainEvents).where(and(
+        eq(domainEvents.aggregateType, STAFF_INVITATION_AGGREGATE),
+        eq(domainEvents.eventType, EventTypes.StaffInvitationAccepted),
+        inArray(domainEvents.aggregateId, grantIds),
+      )),
+  ]);
+  const active = new Set(grants.filter(grant => grant.active).map(grant => grant.id));
+  const acceptedAt = new Map(events.map(event => [event.grantId, event.occurredAt]));
+  return requests.map(request => ({
+    ...request,
+    invitationAcceptedAt: request.status === "approved" &&
+      request.invitationGrantId && active.has(request.invitationGrantId)
+      ? acceptedAt.get(request.invitationGrantId) ?? null : null,
+  }));
 }
 
 /** A CAN verifier records *external* evidence actually examined, not a caller's declaration. */
