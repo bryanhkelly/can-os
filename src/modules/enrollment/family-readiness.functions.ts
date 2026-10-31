@@ -31,8 +31,8 @@ export const getFamilyReadinessPage=createServerFn({method:"GET"})
    .from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
    .where(and(inArray(s.applications.programId,scoped.programIds),
     data.cursor?gt(s.applications.id,data.cursor):undefined,
-    data.search?or(ilike(s.programs.name,"%"+data.search+"%"),eq(s.applications.id,
-     z.string().uuid().safeParse(data.search).success?data.search:"00000000-0000-0000-0000-000000000000")):undefined))
+    data.search?or(ilike(s.programs.name,"%"+data.search+"%"),
+     z.string().uuid().safeParse(data.search).success?eq(s.applications.id,data.search):undefined):undefined))
    .orderBy(asc(s.applications.id)).limit(data.pageSize+1);
   const hasMore=rows.length>data.pageSize;
   const items=rows.slice(0,data.pageSize);
