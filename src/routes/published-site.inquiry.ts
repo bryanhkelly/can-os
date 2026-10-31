@@ -29,11 +29,11 @@ export const Route = createFileRoute("/published-site/inquiry")({
         });
       }
 
-      // Global rate admission occurs BEFORE parsing any user-supplied data.
+      // Verified published-Site and global emergency limits apply before parsing submitted data.
       try {
         const { admitPublicAdmissionsInterest } =
           await import("@/modules/enrollment/public-admissions-interest.server");
-        const budget = await admitPublicAdmissionsInterest();
+        const budget = await admitPublicAdmissionsInterest("public_site_inquiry", slug);
         if (!budget.allowed) return new Response("Too many requests. Try again later.", {
           status: 429, headers: { ...commonHeaders,
             "Content-Type": "text/plain; charset=utf-8",
