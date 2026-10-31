@@ -121,6 +121,7 @@ export async function rollbackAnnualCurriculumAdoption(actor:Actor,input:{
   const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
   if(!program||!await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",tx))
    throw new AuthorizationError("institutional curriculum adoption grant and program scope");
+  await canonicalYear(tx,program,input.academicYearId);
   const [existing]=await tx.select().from(curriculumAnnualAdoptions).where(and(
    eq(curriculumAnnualAdoptions.programId,program.id),
    eq(curriculumAnnualAdoptions.academicYearId,input.academicYearId),
