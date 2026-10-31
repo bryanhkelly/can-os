@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { applyOneRosterStudentMappings, validateOneRosterCsvBundle } from "@/modules/learning/oneroster-import.functions";
+import { applyOneRosterStudentMappings, approveOneRosterSectionPlacement, validateOneRosterCsvBundle } from "@/modules/learning/oneroster-import.functions";
 
 /** Explicit registrar assertion. CAN student ID is selected from verified records, never inferred from CSV. */
 export function OneRosterStudentReconciliation({programId}:{programId:string}) {
@@ -11,10 +11,17 @@ export function OneRosterStudentReconciliation({programId}:{programId:string}) {
  const [studentId,setStudentId]=useState("");
  const [validated,setValidated]=useState(false);
  const [approved,setApproved]=useState(false);
+ const [classesCsv,setClassesCsv]=useState("");
+ const [enrollmentsCsv,setEnrollmentsCsv]=useState("");
+ const [externalClass,setExternalClass]=useState("");
+ const [externalEnrollment,setExternalEnrollment]=useState("");
+ const [sectionId,setSectionId]=useState("");
+ const [placementValidated,setPlacementValidated]=useState(false);
+ const [placementApproved,setPlacementApproved]=useState(false);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
  const [error,setError]=useState("");
- const reset=()=>{setValidated(false);setApproved(false);setMessage("");setError("");};
+ const reset=()=>{setValidated(false);setApproved(false);setPlacementValidated(false);setPlacementApproved(false);setMessage("");setError("");};
  const bundle={orgs,users};
  async function execute(action:"validate"|"map") {
   setBusy(true);setError("");setMessage("");
@@ -65,6 +72,18 @@ export function OneRosterStudentReconciliation({programId}:{programId:string}) {
     <span>I verified this student's canonical CAN identity and active Program enrollment independently of external email or sourcedId, and approve this exact mapping.</span>
    </label>
    <button type="button" disabled={busy||!canApprove} onClick={()=>void execute("map")} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">Approve student mapping</button>
+  </div>}
+  {validated&&<div className="space-y-3 rounded border p-3" aria-label="Approve canonical Section placement">
+   <h3 className="font-semibold">Approve Section placement</h3>
+   <p className="text-xs text-muted-foreground">Requires previously approved student and class mappings under this issuer. CAN will enforce teacher readiness, seat limits, term, schedule and prerequisites.</p>
+   <label className="block text-sm">OneRoster classes.csv<textarea className="mt-1 block min-h-20 w-full rounded border bg-background p-2 font-mono text-xs" value={classesCsv} maxLength={500000} onChange={e=>{setClassesCsv(e.target.value);setPlacementValidated(false);setPlacementApproved(false);}}/></label>
+   <label className="block text-sm">OneRoster enrollments.csv<textarea className="mt-1 block min-h-20 w-full rounded border bg-background p-2 font-mono text-xs" value={enrollmentsCsv} maxLength={500000} onChange={e=>{setEnrollmentsCsv(e.target.value);setPlacementValidated(false);setPlacementApproved(false);}}/></label>
+   <label className="block text-sm">External class sourcedId<input className="mt-1 block w-full rounded border bg-background p-2" value={externalClass} onChange={e=>{setExternalClass(e.target.value);setPlacementApproved(false);}}/></label>
+   <label className="block text-sm">External enrollment sourcedId<input className="mt-1 block w-full rounded border bg-background p-2" value={externalEnrollment} onChange={e=>{setExternalEnrollment(e.target.value);setPlacementApproved(false);}}/></label>
+   <label className="block text-sm">Existing CAN Section UUID<input className="mt-1 block w-full rounded border bg-background p-2" value={sectionId} onChange={e=>{setSectionId(e.target.value);setPlacementApproved(false);}}/></label>
+   <button type="button" disabled={busy||!classesCsv.trim()||!enrollmentsCsv.trim()||!orgs.trim()||!users.trim()} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>void (async()=>{setBusy(true);setError("");try{const result=await validateOneRosterCsvBundle({data:{programId,files:{orgs,users,classes:classesCsv,enrollments:enrollmentsCsv}}});if(!result.report.valid)throw new Error("Invalid placement source.");setPlacementValidated(true);setMessage("Exact placement bundle validated. Review identity and Section before approval.");}catch(e){setError(e instanceof Error?e.message:"Unable to validate.");}finally{setBusy(false);}})()}>Validate placement bundle</button>
+   {placementValidated&&<label className="flex gap-2 text-sm"><input type="checkbox" checked={placementApproved} onChange={e=>setPlacementApproved(e.target.checked)}/>I explicitly approve this verified student placement in this CAN Section, subject to all canonical enrollment rules.</label>}
+   <button type="button" className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy||!placementValidated||!placementApproved||!externalClass||!externalEnrollment||!school||!externalUser||!studentId||!sectionId||!sourceValid} onClick={()=>void (async()=>{setBusy(true);setError("");try{const result=await approveOneRosterSectionPlacement({data:{programId,files:{orgs,users,classes:classesCsv,enrollments:enrollmentsCsv},sourceSystem,externalSchoolSourcedId:school,externalUserSourcedId:externalUser,externalClassSourcedId:externalClass,externalEnrollmentSourcedId:externalEnrollment,studentProfileId:studentId,sectionId,approved:true}});setPlacementApproved(false);setMessage(result.created?"Canonical Section enrollment activated.":"Existing active Section enrollment confirmed.");}catch(e){setError(e instanceof Error?e.message:"Placement approval failed.");}finally{setBusy(false);}})()}>Approve canonical placement</button>
   </div>}
   {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
   {message&&<p role="status" className="text-sm">{message}</p>}
