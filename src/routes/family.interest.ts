@@ -76,7 +76,7 @@ export const Route = createFileRoute("/family/interest")({
       try {
         const { admitPublicAdmissionsInterest, recordInvitedFamilyInterest } =
           await import("@/modules/enrollment/public-admissions-interest.server");
-        const budget = await admitPublicAdmissionsInterest();
+        const budget = await admitPublicAdmissionsInterest("invited_family_interest");
         if (!budget.allowed) return html("<h1>Please try again shortly</h1><p>Too many requests have been received.</p>", 429);
         const data = invitedFamilyInterestInput.parse(
           Object.fromEntries((await readSmallUrlEncodedBody(request)).entries()));
