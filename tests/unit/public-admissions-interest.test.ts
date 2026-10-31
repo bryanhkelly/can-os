@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  parsePublicAdmissionsInterest, readSmallUrlEncodedBody,
+  parsePublicAdmissionsInterest, readSmallUrlEncodedBody, publicInterestRateLimitKeys, makeInterestPageCursor, parseInterestPageCursor,
 } from "@/domain/public-admissions-interest";
 
 const base = {
@@ -44,5 +44,22 @@ describe("public admissions interest form boundaries", () => {
       .rejects.toThrow(/large/);
     await expect(readSmallUrlEncodedBody(makeRequest(form().toString()+"&programId=other")))
       .rejects.toThrow(/Duplicate/);
+  });
+
+  it("isolates public school admission limits without unbounded user-derived keys", () => {
+    const a=publicInterestRateLimitKeys("public_site_inquiry","school-a");
+    const b=publicInterestRateLimitKeys("public_site_inquiry","school-b");
+    expect(a.emergency).toBe(b.emergency);
+    expect(a.site).not.toBe(b.site);
+    expect(publicInterestRateLimitKeys("public_site_family_start","school-a").site)
+      .not.toBe(a.site);
+    expect(publicInterestRateLimitKeys("invited_family_interest").site).toBeNull();
+  });
+  it("keeps stable timestamp-and-ID keyset pagination across equal timestamps", () => {
+    const row={createdAt:new Date("2026-10-31T12:00:00.123Z"),id:"00000000-0000-4000-8000-000000000001"};
+    const token=makeInterestPageCursor(row);
+    expect(parseInterestPageCursor(token)).toEqual(row);
+    for(const bad of ["", "2030-01-01|x", "2026-02-30T00:00:00.000Z|"+row.id,token+"|another"])
+      expect(()=>parseInterestPageCursor(bad)).toThrow();
   });
 });
