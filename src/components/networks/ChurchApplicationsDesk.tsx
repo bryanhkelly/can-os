@@ -95,7 +95,7 @@ export function ChurchApplicationsDesk() {
                 setNotice(result.providerAccepted ? "Evidence reminder accepted by the provider; delivery not confirmed." : "Evidence reminder not accepted by the provider. Follow up through an established channel.");
               } catch(cause) { setError(cause instanceof Error ? cause.message : "Unable to resend evidence reminder."); }
               finally { setWorking(null); }
-            }}>Retry evidence follow-up notice</button>}}
+            }}>Retry evidence follow-up notice</button>}
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
             <label className="block text-sm font-semibold">How authority was verified
               <select className={field} value={verificationMethod[request.id] ?? "signed_authority"} onChange={e=>setVerificationMethod(previous=>({...previous,[request.id]:e.target.value as "signed_authority" | "denominational_confirmation" | "independent_church_confirmation"}))}>
