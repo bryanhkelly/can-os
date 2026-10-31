@@ -106,7 +106,7 @@ export const listGraduationCandidates=createServerFn({method:"GET"})
  .handler(async ({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const context=await registrar();const {db,s}=await resources();
-  const {ilike}=await import("drizzle-orm");
+  const {ilike,or}=await import("drizzle-orm");
   const issuerIds=context.scope.organizationIds??[];
   if(!issuerIds.length)return [];
   const {inArray}=await import("drizzle-orm");
@@ -118,7 +118,7 @@ export const listGraduationCandidates=createServerFn({method:"GET"})
    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.transcriptIssuances.studentProfileId))
    .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
    .where(and(inArray(s.transcriptIssuances.issuingOrganizationId,issuerIds),
-     ilike(s.people.legalFirstName,"%"+data.query+"%")))
+     or(ilike(s.people.legalFirstName,"%"+data.query+"%"),ilike(s.people.legalLastName,"%"+data.query+"%"))))
    .orderBy(desc(s.transcriptIssuances.issuedAt)).limit(40);
  });
 
