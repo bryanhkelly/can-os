@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,isNotNull,isNull } from "drizzle-orm";
+import { and,desc,eq,inArray,isNotNull,isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -72,18 +72,25 @@ export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({authorizationId:uuid}).strict().parse(value))
  .handler(async ({data})=>{
   const context=await registrar();const {db,s}=await resources();
-  const [row]=await db.select().from(s.academicCredentialReleaseAuthorizations)
-   .where(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId)).limit(1);
-  if(!row||!context.scope.organizationIds?.includes(row.issuingOrganizationId))
-   throw new AuthorizationError("issuer authorization");
-  await db.transaction(async tx=>{
+  return db.transaction(async tx=>{
    const [changed]=await tx.update(s.academicCredentialReleaseAuthorizations)
     .set({revokedAt:new Date(),updatedAt:new Date()})
-    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,row.id),isNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
-    .returning({id:s.academicCredentialReleaseAuthorizations.id});
-   if(changed)await writeAudit(tx,context,{action:"academic_credential.release.revoke",entityType:"academic_credential_release_authorization",entityId:row.id,scope:{organizationId:row.issuingOrganizationId}});
+    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
+      inArray(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,context.scope.organizationIds??[]),
+      isNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
+    .returning({id:s.academicCredentialReleaseAuthorizations.id,issuerId:s.academicCredentialReleaseAuthorizations.issuingOrganizationId});
+   if(changed){
+    await writeAudit(tx,context,{action:"academic_credential.release.revoke",entityType:"academic_credential_release_authorization",entityId:changed.id,scope:{organizationId:changed.issuerId}});
+    return {revoked:true};
+   }
+   const [existing]=await tx.select({id:s.academicCredentialReleaseAuthorizations.id})
+    .from(s.academicCredentialReleaseAuthorizations)
+    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
+      inArray(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,context.scope.organizationIds??[]),
+      isNotNull(s.academicCredentialReleaseAuthorizations.revokedAt))).limit(1);
+   if(!existing)throw new AuthorizationError("issuer authorization");
+   return {revoked:true};
   });
-  return {revoked:true};
  });
 
 /** Authenticated recipient download. No bearer token, email attachment or public URL.
