@@ -40,6 +40,23 @@ const reopen=()=> (manageAssessment as unknown as (arg:unknown)=>Promise<unknown
   data:{assessmentId:"assessment",action:"reopen"},
 });
 describe("reopening student work without rewriting its due date",()=>{
+  it("saves draft directions without publishing or changing student evidence",async()=>{
+    state.record.status="draft";
+    await (manageAssessment as unknown as (arg:unknown)=>Promise<unknown>)({data:{
+      assessmentId:"assessment",action:"edit_draft",title:"Finished worksheet",instructions:"Upload the completed worksheet.",
+    }});
+    expect(state.values).toMatchObject({status:"draft",title:"Finished worksheet",instructions:"Upload the completed worksheet."});
+    expect(state.values).not.toHaveProperty("dueAt");
+    expect(state.event).not.toHaveBeenCalled();
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({action:"assessment.edit_draft"}));
+  });
+  it.each(["published","closed"])("refuses draft edits after work becomes %s",async(status)=>{
+    state.record.status=status;
+    await expect((manageAssessment as unknown as (arg:unknown)=>Promise<unknown>)({data:{
+      assessmentId:"assessment",action:"edit_draft",title:"Changed instructions",instructions:"New directions",
+    }})).rejects.toThrow("cannot be");
+    expect(state.update).not.toHaveBeenCalled();
+  });
   it("updates release and closure without moving the due date or publishing a draft",async()=>{
     state.record.status="draft";
     state.record.dueAt=new Date("2026-11-02");

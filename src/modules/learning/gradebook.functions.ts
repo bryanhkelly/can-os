@@ -186,6 +186,7 @@ export const getGradebook = createServerFn({ method: "GET" })
   const assessmentRows = await db.select({
    id: s.assessments.id,
    title: s.assessments.title,
+   instructions: s.assessments.instructions,
    status: s.assessments.status,
    dueAt: s.assessments.dueAt,
    availableAt: s.assessments.availableAt,
@@ -242,6 +243,7 @@ export const getGradebook = createServerFn({ method: "GET" })
    assessments: assessmentRows.map(row => ({
     id: row.id,
     title: row.title,
+    instructions:row.instructions??"",
     status: row.status,
     dueAt: row.dueAt?.toISOString() ?? null,
     availableAt: row.availableAt?.toISOString() ?? null,
@@ -449,7 +451,9 @@ export const createAssessment = createServerFn({ method: "POST" })
 export const manageAssessment = createServerFn({method:"POST"})
  .validator((input:unknown)=>z.object({
   assessmentId:z.string().uuid(),
-  action:z.enum(["publish","close","reopen","reschedule","schedule"]),
+  action:z.enum(["publish","close","reopen","reschedule","schedule","edit_draft"]),
+  title:z.string().trim().min(3).max(200).optional(),
+  instructions:z.string().trim().max(20000).optional(),
   dueAt:z.string().datetime({offset:true}).optional(),
   availableAt:z.string().datetime({offset:true}).nullable().optional(),
   closesAt:z.string().datetime({offset:true}).nullable().optional(),
@@ -461,7 +465,7 @@ export const manageAssessment = createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [assessment]=await tx.select({
     id:s.assessments.id,sectionId:s.assessments.sectionId,
-    status:s.assessments.status,dueAt:s.assessments.dueAt,
+    status:s.assessments.status,dueAt:s.assessments.dueAt,title:s.assessments.title,instructions:s.assessments.instructions,
     availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,siteId:s.sections.siteId,
     programId:s.sections.programId,schoolYearId:s.terms.schoolYearId
    }).from(s.assessments)
@@ -478,10 +482,12 @@ export const manageAssessment = createServerFn({method:"POST"})
     publish:["draft"],close:["published"],reopen:["closed"],
     reschedule:["published","closed"],
     schedule:["draft","published"],
+    edit_draft:["draft"],
    };
    if(!transitions[data.action].includes(assessment.status))
     throw new Error("This assessment cannot be "+data.action+"d from its current status");
    const now=new Date();
+   if(data.action==="edit_draft"&&!data.title)throw new Error("Enter a title before saving the draft");
    const dueAt=data.dueAt?new Date(data.dueAt):assessment.dueAt;
    if((data.action==="publish"||data.action==="reschedule")&&(!dueAt||dueAt<=now))
     throw new Error("A future due date is required");
@@ -502,6 +508,7 @@ export const manageAssessment = createServerFn({method:"POST"})
     ...(data.action==="publish"||data.action==="reschedule"||(data.action==="reopen"&&data.dueAt)?{dueAt}:{}),
     ...(data.action==="publish"?{availableAt}:{}),
     ...(data.action==="reopen"||data.action==="schedule"?{availableAt,closesAt}:{}),
+    ...(data.action==="edit_draft"?{title:data.title!,instructions:data.instructions??assessment.instructions}:{}),
     updatedAt:now
    }).where(and(eq(s.assessments.id,assessment.id),eq(s.assessments.status,assessment.status)))
     .returning({id:s.assessments.id});
@@ -547,8 +554,10 @@ export const manageAssessment = createServerFn({method:"POST"})
     action:"assessment."+data.action,resourceType:"assessment",resourceId:assessment.id,
     scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},
     before:{status:assessment.status,dueAt:assessment.dueAt?.toISOString()??null,
+     ...(data.action==="edit_draft"?{title:assessment.title,instructions:assessment.instructions}:{}),
      availableAt:assessment.availableAt?.toISOString()??null,closesAt:assessment.closesAt?.toISOString()??null},
     after:{status,dueAt:dueAt?.toISOString()??null,assignedCount,
+     ...(data.action==="edit_draft"?{title:data.title!,instructions:data.instructions??assessment.instructions}:{}),
      availableAt:availableAt?.toISOString()??null,closesAt:closesAt?.toISOString()??null},
     context:{accountId:context.accountId,sessionId:context.sessionId}
    });
