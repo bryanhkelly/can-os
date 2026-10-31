@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { authorizeAcademicCredentialRelease,listAcademicCredentialDeliveries,listAcademicCredentialReleaseAuthorizations,listVerifiedCredentialRecipients,revokeAcademicCredentialRelease,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
+import { authorizeAcademicCredentialRelease,listAcademicCredentialDeliveries,listAcademicCredentialReleaseAuthorizations,listAcademicCredentialReleaseAccessHistory,listVerifiedCredentialRecipients,revokeAcademicCredentialRelease,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
 
 export const Route=createFileRoute("/admissions/credential-delivery")({component:CredentialDeliveryPage});
 type Recipient=Awaited<ReturnType<typeof listVerifiedCredentialRecipients>>[number];
+type Access=Awaited<ReturnType<typeof listAcademicCredentialReleaseAccessHistory>>[number];
 type Release=Awaited<ReturnType<typeof listAcademicCredentialReleaseAuthorizations>>[number];
 type Delivery=Awaited<ReturnType<typeof listAcademicCredentialDeliveries>>[number];
 function CredentialDeliveryPage(){
@@ -12,6 +13,7 @@ function CredentialDeliveryPage(){
  const [credentialId,setCredentialId]=useState("");
  const [history,setHistory]=useState<Delivery[]>([]);
  const [releases,setReleases]=useState<Release[]>([]);
+ const [accessHistory,setAccessHistory]=useState<Record<string,Access[]>>({});
  const [recipients,setRecipients]=useState<Recipient[]>([]);
  const [selectedRecipient,setSelectedRecipient]=useState("");
  const [transferActionId,setTransferActionId]=useState("");
@@ -74,6 +76,12 @@ function CredentialDeliveryPage(){
       <strong>{row.recipientEmail}</strong>
       <p>Purpose: {row.releasePurpose}</p>
       <p>Status: {status} · Authorized: {new Date(row.authorizedAt).toLocaleString()} · Expires: {new Date(row.expiresAt).toLocaleString()}</p>
+      <button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
+       const rows=await listAcademicCredentialReleaseAccessHistory({data:{authorizationId:row.id}});
+       setAccessHistory(previous=>({...previous,[row.id]:rows}));
+      })}>Review actual downloads</button>
+      {accessHistory[row.id]?.length===0&&<p>No successful download audit entries.</p>}
+      {accessHistory[row.id]?.map(entry=><p key={entry.id}>Downloaded: {new Date(entry.occurredAt).toLocaleString()} · Recipient ID: {entry.actorPersonId}</p>)}
       {status==="Authorized"&&<button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
        await revokeAcademicCredentialRelease({data:{authorizationId:row.id}});
        setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}));
