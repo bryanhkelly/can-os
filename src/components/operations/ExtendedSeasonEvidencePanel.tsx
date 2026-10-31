@@ -92,7 +92,7 @@ function EvidenceCard({ model, item, changed }: {
   }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
     {item.documentId && <EvidenceDocumentSummary
-      fileName={item.fileName ?? "Private evidence"} version={item.version ?? 0}
+      fileName={item.fileName} version={item.version}
       expiresAt={item.expiresAt} downloadLabel="View private document"
       onGetDownloadUrl={async () => {
         const result = await getExtendedEvidenceDownloadFn({ data: {
