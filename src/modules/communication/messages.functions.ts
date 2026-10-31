@@ -112,6 +112,31 @@ async function listAllowedThreadContacts(
       ));
     const studentIds = [...new Set(studentRows.map(row=>row.studentPersonId))];
     if (studentIds.length) {
+      // A parent's school contact must survive the handoff from admissions
+      // to active enrollment, even when the registrar created the application.
+      const schoolContacts = await db.select({
+        personId:s.accountPersonGrants.personId,schoolName:s.programs.name,
+      }).from(s.enrollments)
+        .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+        .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+        .innerJoin(s.accountPersonGrants,and(
+          eq(s.accountPersonGrants.organizationId,s.programs.organizationId),
+          or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,s.programs.siteId)),
+          eq(s.accountPersonGrants.role,"registrar"),eq(s.accountPersonGrants.active,true),
+          eq(s.accountPersonGrants.isSynthetic,false),
+        ))
+        .innerJoin(s.accessAccounts,and(
+          eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
+          eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt),
+        ))
+        .innerJoin(s.people,and(eq(s.people.id,s.accountPersonGrants.personId),eq(s.people.active,true)))
+        .where(and(
+          inArray(s.studentProfiles.personId,studentIds),
+          eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+          inArray(s.programs.siteId,siteIds),inArray(s.programs.id,programIds),
+        )).limit(100);
+      for(const contact of schoolContacts)
+        add(contact.personId,"school office for "+contact.schoolName);
       const programSeat = alias(s.enrollments, "guardian_contact_program_enrollment");
       const teacherRows = await db
         .select({
