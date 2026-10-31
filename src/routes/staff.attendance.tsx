@@ -52,6 +52,7 @@ function StaffAttendancePage() {
   const [programs, setPrograms] = useState<Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["programs"]>([]);
   const [legacyCount, setLegacyCount] = useState(0);
   const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
+  const [excusesWarning, setExcusesWarning] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [correctionNotes,setCorrectionNotes]=useState<Record<string,string>>({});
   const [queued,setQueued]=useState<OfflineMark[]>([]);
@@ -107,11 +108,13 @@ function StaffAttendancePage() {
     try {
       const [roster, pending] = await Promise.all([
         listExpectedOnsiteRoster({ data: { date: targetDate, programId } }),
-        listExpectedPendingExcuses(),
+        listExpectedPendingExcuses().catch(() => null),
       ]);
       setStudents(roster.students);
       setPrograms(roster.programs);
-      setExcuses(pending.excuses);
+      setExcuses(pending?.excuses ?? []);
+      setExcusesWarning(pending ? "" :
+        "Pending excuse review is unavailable. You can still mark the scheduled attendance roster.");
     } catch {
       setStudents([]);
       setPrograms([]);
@@ -128,12 +131,14 @@ function StaffAttendancePage() {
       try {
         const [roster, pending] = await Promise.all([
           listExpectedOnsiteRoster({ data: { date, programId } }),
-          listExpectedPendingExcuses(),
+          listExpectedPendingExcuses().catch(() => null),
         ]);
         if (!active) return;
         setStudents(roster.students);
         setPrograms(roster.programs);
-        setExcuses(pending.excuses);
+        setExcuses(pending?.excuses ?? []);
+        setExcusesWarning(pending ? "" :
+          "Pending excuse review is unavailable. You can still mark the scheduled attendance roster.");
         setError("");
       } catch {
         if (!active) return;
@@ -230,6 +235,7 @@ function StaffAttendancePage() {
         />
       </label>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      {excusesWarning && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{excusesWarning}</p>}
       {conflicts.length>0&&<div className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">
         <strong>Attendance conflicts require review</strong>
         <p className="mt-1">A newer school record exists for {conflicts.length} offline
