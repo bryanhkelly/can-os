@@ -244,6 +244,27 @@ export const listAcademicCredentialReleaseAuthorizations=createServerFn({method:
    .orderBy(desc(s.academicCredentialReleaseAuthorizations.authorizedAt)).limit(100);
  });
 
+/** Registrar-only disclosure history derived from committed audit records.
+ * Provider acceptance and authorization creation are not evidence of access. */
+export const listAcademicCredentialReleaseAccessHistory=createServerFn({method:"GET"})
+ .validator((value:unknown)=>z.object({authorizationId:uuid}).strict().parse(value))
+ .handler(async ({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const context=await registrar();const {db,s}=await resources();
+  const [release]=await db.select({issuerId:s.academicCredentialReleaseAuthorizations.issuingOrganizationId})
+   .from(s.academicCredentialReleaseAuthorizations)
+   .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
+    inArray(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,context.scope.organizationIds??[]))).limit(1);
+  if(!release)throw new AuthorizationError("issuer authorization");
+  return db.select({id:s.auditEvents.id,createdAt:s.auditEvents.createdAt,
+   actorPersonId:s.auditEvents.actorPersonId,action:s.auditEvents.action})
+   .from(s.auditEvents).where(and(
+    eq(s.auditEvents.entityType,"academic_credential_release_authorization"),
+    eq(s.auditEvents.entityId,data.authorizationId),
+    eq(s.auditEvents.action,"academic_credential.release.download")))
+   .orderBy(desc(s.auditEvents.createdAt)).limit(100);
+ });
+
 export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({authorizationId:uuid}).strict().parse(value))
  .handler(async ({data})=>{
