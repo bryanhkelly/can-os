@@ -28,7 +28,7 @@ export type ChurchBootstrapInput = {
  * it neither activates an access grant nor creates an opening authorization.
  * The independent evidence must specifically identify the church and email.
  */
-export async function bootstrapVerifiedChurch(actor: AccessContext, data: ChurchBootstrapInput) {
+export async function bootstrapVerifiedChurch(actor: AccessContext, data: ChurchBootstrapInput, options: { deferEmail?: boolean } = {}) {
   if (actor.demoFacilitator || actor.grantSiteId !== null ||
       actor.scope.organizationIds?.length !== 1 || !actor.actorPersonId)
     throw new AuthorizationError("real organization-wide CAN steward");
@@ -171,7 +171,7 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
       invitationPending: true, created: newChurch };
   });
 
-  if (!created.invitationPending) return { ...created, emailSent: false };
+  if (!created.invitationPending || options.deferEmail) return { ...created, emailSent: false };
   try {
     await requestOneTimeAccess(email);
     return { ...created, emailSent: true };
