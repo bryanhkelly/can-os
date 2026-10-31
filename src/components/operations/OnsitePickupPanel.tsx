@@ -101,6 +101,13 @@ export function OnsitePickupPanel({ date, onChanged }: {
               </div>
             </div>
 
+            {student.emergencyContact?.phone && <div className="mt-4 rounded-lg border p-3 text-sm">
+              <p className="font-semibold">School-approved emergency contact</p>
+              <p className="mt-1">{student.emergencyContact.name} · {student.emergencyContact.relationship}</p>
+              <p className="mt-1"><a className="font-semibold underline" href={"tel:"+student.emergencyContact.phone}>{student.emergencyContact.phone}</a></p>
+              <p className="mt-2 text-xs text-muted-foreground">Emergency contact only. This does not authorize pickup or override custody restrictions.</p>
+            </div>}
+
             {student.release && <div className="mt-4 rounded-lg border border-success/40 bg-success/5 p-3 text-sm">
               <p className="font-semibold">Verified handoff to {student.release.pickupName}</p>
               <p className="mt-1">{new Date(student.release.occurredAt).toLocaleString()} · {student.release.identityVerificationMethod?.replaceAll("_", " ")}</p>
