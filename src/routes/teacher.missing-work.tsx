@@ -22,6 +22,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
   const { connected, items } = data;
   const router = useRouter();
   const [busyItem, setBusyItem] = useState("");
+  const [followedUp, setFollowedUp] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
   const studentCount = new Set(items.map(x => x.studentProfileId)).size;
 
@@ -46,12 +47,13 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="mt-1 text-sm">{x.studentName} · {x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button
-              disabled={Boolean(busyItem)}
+              disabled={Boolean(busyItem) || Boolean(followedUp[x.assessmentId + ":" + x.studentProfileId])}
               className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
               onClick={async () => {
                 setBusyItem(x.assessmentId + ":" + x.studentProfileId);
                 try {
                   const result = await createMissingWorkFollowUp({ data: { assessmentId: x.assessmentId, studentProfileId: x.studentProfileId } });
+                  setFollowedUp(previous => ({...previous, [x.assessmentId + ":" + x.studentProfileId]: true}));
                   setNotice(result.created ? "Follow-up added to Operations." : "An open follow-up already exists.");
                   await router.invalidate();
                 } catch (e) {
@@ -60,7 +62,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
                   setBusyItem("");
                 }
               }}
-            >{busyItem===x.assessmentId + ":" + x.studentProfileId ? "Creating follow-up…" : "Create follow-up"}</button>
+            >{busyItem===x.assessmentId + ":" + x.studentProfileId ? "Creating follow-up…" : followedUp[x.assessmentId + ":" + x.studentProfileId] ? "Follow-up open" : "Create follow-up"}</button>
           </article>
         ))}
         {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}
