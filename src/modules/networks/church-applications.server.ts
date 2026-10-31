@@ -9,6 +9,7 @@ import { bootstrapVerifiedChurch } from "./church-onboarding.server";
 import { EventTypes } from "@/domain/event-types";
 import { STAFF_INVITATION_AGGREGATE } from "@/modules/identity/staff-invitations.server";
 import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
+import { currentChurchAuthorityEvidence, evidenceExpiresAt, validateChurchEvidenceReference } from "./church-evidence-policy";
 
 export type ChurchApplication = {
   churchName: string;
@@ -88,6 +89,7 @@ export async function listChurchApplications(actor: AccessContext) {
   const evidence = evidenceIds.length ? await db.select({
     id: documents.id, storageKey: documents.storageKey, metadata: documents.metadata,
     verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+    expiresAt: documents.expiresAt,
   }).from(documents).where(inArray(documents.id, evidenceIds)) : [];
   const evidenceById = new Map(evidence.map(document => [document.id, document]));
   const withEvidence = requests.map(request => {
@@ -101,6 +103,8 @@ export async function listChurchApplications(actor: AccessContext) {
           ? document.metadata.verificationMethod : "unspecified",
         verifiedAt: document.verifiedAt,
         verifiedByPersonId: document.verifiedByPersonId,
+        expiresAt: document.expiresAt,
+        usable: currentChurchAuthorityEvidence({ ...document, category: "church_onboarding_authority" }, request, actor.actorPersonId),
       } : null,
     };
   });
@@ -135,18 +139,18 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
   requestId: string; evidenceReference: string; verificationMethod: string;
 }) {
   const canOrganizationId = await requireCANSteward(actor);
-  const reference = input.evidenceReference.trim();
-  const allowedMethods = ["signed_authority", "denominational_confirmation", "independent_church_confirmation"];
-  if (!allowedMethods.includes(input.verificationMethod) || reference.length < 8 || reference.length > 500 || /[\u0000-\u001f\u007f]/.test(reference) || /^(?:javascript|data|file):/i.test(reference))
-    throw new Error("A valid independent authority evidence reference and method are required");
+  const reference = validateChurchEvidenceReference(input.evidenceReference, input.verificationMethod);
   return db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, input.requestId)).for("update").limit(1);
     if (!request || request.status !== "submitted") throw new Error("Application is no longer awaiting verification");
+    // Serialize registrations for the same external reference to prevent concurrent reuse.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"church-evidence:" + reference}))`);
     const reused = await tx.select({ id: documents.id }).from(documents).where(and(
       eq(documents.category, "church_onboarding_authority"), eq(documents.storageKey, reference),
     )).limit(1);
     if (reused.length) throw new Error("Evidence reference is already registered; obtain an application-specific independent record");
+    const verifiedAt = new Date();
     const [document] = await tx.insert(documents).values({
       subjectType: "organization", subjectId: canOrganizationId,
       category: "church_onboarding_authority",
@@ -154,16 +158,17 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
       storageProvider: "external_verified_reference", storageKey: reference,
       sensitivityTier: "restricted",
       uploadedByPersonId: actor.actorPersonId!, verifiedByPersonId: actor.actorPersonId!,
-      verifiedAt: new Date(),
+      verifiedAt, expiresAt: evidenceExpiresAt(verifiedAt),
       metadata: {
         churchSlug: request.churchSlug, authorizedEmailNormalized: request.contactEmail,
         churchRequestId: request.id, verificationMethod: input.verificationMethod,
+        provenance: "can_steward_independently_reviewed",
       },
     }).returning({ id: documents.id });
     if (!document) throw new Error("Unable to record verified authority evidence");
     await tx.update(churchOnboardingRequests).set({
       status: "verified", authorityDocumentId: document.id,
-      verifiedByPersonId: actor.actorPersonId, verifiedAt: new Date(), updatedAt: new Date(),
+      verifiedByPersonId: actor.actorPersonId, verifiedAt, updatedAt: verifiedAt,
     }).where(eq(churchOnboardingRequests.id, request.id));
     await writeAudit(tx, actor, {
       action: "church.onboarding.authority.verified",
@@ -188,11 +193,7 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
     verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
     metadata: documents.metadata, category: documents.category,
   }).from(documents).where(eq(documents.id, request.authorityDocumentId)).limit(1);
-  if (!evidence || evidence.category !== "church_onboarding_authority" ||
-      !evidence.verifiedAt || evidence.verifiedByPersonId !== request.verifiedByPersonId ||
-      (evidence.expiresAt && evidence.expiresAt <= new Date()) ||
-      evidence.metadata.churchRequestId !== request.id ||
-      evidence.metadata.authorizedEmailNormalized !== request.contactEmail)
+  if (!currentChurchAuthorityEvidence(evidence, request, actor.actorPersonId))
     throw new AuthorizationError("current, application-bound independent authority evidence");
 
   // The callback updates the approved request INSIDE the canonical bootstrap
