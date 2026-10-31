@@ -17,12 +17,14 @@ import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
 export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const router=useRouter();
- const [termId,setTermId]=useState(data.terms[0]?.id??"");
+ const [termId,setTermId]=useState(data.terms.find(term=>data.scheduleOptions.some(schedule=>schedule.schoolYearId===term.schoolYearId))?.id??data.terms[0]?.id??"");
  const [versionId,setVersionId]=useState(data.catalog.find(course=>course.recommendation.recommended)?.versionId??data.catalog[0]?.versionId??"");
  const selectedTerm=data.terms.find(t=>t.id===termId);
  const selectedYear=data.years.find(y=>y.id===selectedTerm?.schoolYearId);
  const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
+ const matchingSection=data.sections.find(section=>section.termId===termId&&section.code.toLowerCase()===(code.trim()||(selectedCourse?selectedCourse.code+"-A":"")).toLowerCase());
+ const reviewedSectionAlreadyExists=Boolean(matchingSection);
  const [createdSectionId,setCreatedSectionId]=useState<string|null>(null);
  const [teacherId,setTeacherId]=useState("");
  const effectiveTeacherId=teacherId|| (data.teachingStaff.length===1?data.teachingStaff[0]!.personId:"");
@@ -39,7 +41,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   try{
    const submission=await mutation.submit(operation);
    if(submission.status === "ignored") return;
-   if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
+   if(submission.refreshError){setError("The server accepted the command, but fresh records could not be loaded. Reopen this workspace to verify before retrying.");return;}
    setNotice(message);
   }catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
  }
@@ -107,12 +109,13 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
+   {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
    <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
      code:code.trim()||(selectedCourse?selectedCourse.code+"-A":""),title:title.trim()||selectedCourse?.title||"",teacherPersonId:effectiveTeacherId,scheduleTemplateId:effectiveScheduleId,
-     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class saved. Review its schedule and first-week readiness below.");
+     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class command accepted. Verify the saved Section and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
@@ -148,16 +151,16 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||(!selectedCourse?.recommendation.recommended||!selectedCourse?.recommendation.instructionReady)||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
+    <button type="submit" disabled={busy||reviewedSectionAlreadyExists||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||(!selectedCourse?.recommendation.recommended||!selectedCourse?.recommendation.instructionReady)||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and instructor"}</button>
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
-   <strong>Classroom saved.</strong> The schedule, instructor and learner-facing first lesson were checked.
+   <strong>Section command accepted.</strong> The server validated the requested Section and assignment. Confirm the latest persisted readiness after refreshing; this is not an opening approval.
    {data.sections.find(section=>section.id===createdSectionId)?<div className="mt-3">
     <p className="font-medium">Remaining first-day requirements</p>
     {data.sections.find(section=>section.id===createdSectionId)!.classroom.blockers.length?
      <ul className="mt-2 list-inside list-disc space-y-1">{data.sections.find(section=>section.id===createdSectionId)!.classroom.blockers.map(blocker=><li key={blocker.key}>{blocker.message}</li>)}</ul>:
-     <p className="mt-2">First-week classroom checks are satisfied.</p>}
+     <p className="mt-2">First-week classroom checks are satisfied in the currently loaded snapshot. Refresh for the latest state.</p>}
    </div>:<p className="mt-2">Refresh the classroom checklist to see live readiness.</p>}
    <div className="mt-3 flex flex-wrap gap-3">
     <a href={"#classroom-"+createdSectionId} className="rounded border px-3 py-2 font-semibold">Review classroom readiness</a>
