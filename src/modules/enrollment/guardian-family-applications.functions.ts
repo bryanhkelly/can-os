@@ -136,6 +136,32 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       .filter(membership=>membership.studentPersonId===student.studentPersonId)
       .map(membership=>({...student,householdId:membership.householdId,
         gradeLevel:student.gradeLevel??""})));
+    // The guardian's verified relationship remains independent of whether
+    // the origin school still grants a login after the student transfers.
+    const transferRows=verifiedStudents.length?await db.select({
+      id:actions.id,metadata:actions.metadata,status:actions.status,
+      studentProfileId:studentProfiles.id,originProgramId:actions.programId,
+      originSchoolName:programs.name,
+    }).from(actions)
+      .innerJoin(studentProfiles,eq(studentProfiles.id,actions.subjectId))
+      .innerJoin(programs,eq(programs.id,actions.programId))
+      .where(and(eq(actions.type,"guardian_enrollment_change_request"),
+        eq(actions.subjectType,"student_profile"),
+        inArray(actions.subjectId,verifiedStudents.map(row=>row.studentProfileId)),
+      )).orderBy(desc(actions.createdAt)).limit(100):[];
+    const transferRequests=transferRows.filter(row=>
+      row.metadata.kind==="transfer"&&
+      row.metadata.requestedByGuardianPersonId===actor.actorPersonId&&
+      typeof row.metadata.destinationSchoolName==="string"&&
+      typeof row.metadata.recordsReleaseConsentId==="string"&&
+      row.status!=="cancelled"
+    ).map(row=>({
+      id:row.id,studentProfileId:row.studentProfileId,
+      originProgramId:row.originProgramId,
+      originSchoolName:row.originSchoolName,
+      destinationSchoolName:row.metadata.destinationSchoolName as string,
+      originExited:row.status==="resolved"&&row.metadata.exitCompletedByRegistrar===true,
+    }));
     const applicationYearIds=[...new Set(existing.map(row=>
       typeof row.metadata.schoolYearId==="string"?row.metadata.schoolYearId:null)
       .filter((id):id is string=>!!id))];
@@ -150,8 +176,10 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       schoolYearId:typeof row.metadata.schoolYearId==="string"?row.metadata.schoolYearId:null,
       schoolYearName:applicationYears.find(year=>year.id===row.metadata.schoolYearId)?.name??null,
       guardianVerified:verifiedIds.has(row.studentPersonId),
+      originTransferActionId:typeof row.metadata.originTransferActionId==="string"?
+        row.metadata.originTransferActionId:null,
       updatedAt:row.updatedAt.toISOString(),
-    })),households:families,students};
+    })),households:families,students,transferRequests};
   });
 
 /** This calls the existing canonical Application/Journey transaction.
