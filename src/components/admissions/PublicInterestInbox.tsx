@@ -144,7 +144,7 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             <Link to="/admissions/families" search={{siteId:row.siteId,programId:row.programId,application:row.applicationId}}
               className="font-semibold underline">Household checklist →</Link>
             {row.activeEnrollment && row.placedInClass &&
-              <Link to="/staff/attendance" className="font-semibold underline">Scheduled school-day roster →</Link>}
+              <Link to="/staff/attendance" search={{programId:row.programId}} className="font-semibold underline">Scheduled school-day roster →</Link>}
           </div>
         </div>}
         {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
