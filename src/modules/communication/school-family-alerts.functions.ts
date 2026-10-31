@@ -202,3 +202,51 @@ export const getSchoolFamilyAlerts=createServerFn({method:"GET"}).handler(async(
    deliverySuppressed:outbound.filter(item=>item.alertId===row.id&&item.status==="suppressed").length,
  }))};
 });
+
+
+/** Only the owning registrar can explicitly reschedule exhausted provider
+ * attempts for a *recent* published notice. Existing accepted and revoked
+ * deliveries are never resent. Current guardian access is rechecked by worker.
+ */
+export const retryFailedSchoolFamilyAlertDeliveries=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({alertId:uuid,confirmed:z.literal(true)}).strict().parse(input))
+ .handler(async({data})=>{
+  const actor=await registrar();
+  return db.transaction(async tx=>{
+   const [alert]=await tx.select({
+     id:s.actions.id,siteId:s.actions.siteId,
+     programId:s.actions.programId,organizationId:s.actions.organizationId,
+     createdAt:s.actions.createdAt,
+   }).from(s.actions).where(and(
+     eq(s.actions.id,data.alertId),
+     eq(s.actions.type,actionType),
+   )).for("update").limit(1);
+   if(!alert?.programId||!alert.siteId||!alert.organizationId||
+      !actor.scope.programIds?.includes(alert.programId)||
+      !actor.scope.siteIds?.includes(alert.siteId)||
+      !actor.scope.organizationIds?.includes(alert.organizationId))
+     throw new AuthorizationError("own school family bulletin");
+   if(Date.now()-alert.createdAt.getTime()>48*60*60*1000)
+     throw new Error("This bulletin is older than 48 hours. Publish a current update instead of retrying a stale alert.");
+   const due=tx.select({id:s.notifications.id}).from(s.notifications).where(and(
+     eq(s.notifications.type,"school_family_alert"),
+     eq(s.notifications.resourceType,"action"),
+     eq(s.notifications.resourceId,alert.id),
+   ));
+   const retries=await tx.update(s.notificationOutboundDeliveries).set({
+     status:"pending",attempts:0,lastError:null,nextAttemptAt:null,
+     leaseUntil:null,updatedAt:new Date(),
+   }).where(and(
+     inArray(s.notificationOutboundDeliveries.notificationId,due),
+     eq(s.notificationOutboundDeliveries.status,"failed"),
+     sql`${s.notificationOutboundDeliveries.attempts} >= 5`,
+     isNull(s.notificationOutboundDeliveries.nextAttemptAt),
+   )).returning({id:s.notificationOutboundDeliveries.id});
+   await writeAudit(tx,actor,{
+     action:"school.family_alert.retry_exhausted",entityType:"action",entityId:alert.id,
+     scope:{siteId:alert.siteId,programId:alert.programId,organizationId:alert.organizationId},
+     after:{requeued:retries.length},
+   });
+   return {requeued:retries.length};
+  });
+ });
