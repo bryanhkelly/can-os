@@ -4,7 +4,8 @@ import * as s from "@/db/schema";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
 import { isExtendedLearningType } from "@/domain/program-offerings";
-import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
+import { extendedRegistrationOpeningReadiness } from "./registration-policy";
+import { readExtendedSeasonOpeningApprovals } from "./extended-season-opening-evidence.server";
 
 const extended = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 
@@ -16,7 +17,7 @@ const extended = ["summer_enrichment", "summer_program", "after_school_enrichmen
  * Public-safe program catalog: published/open noncredit offerings only.
  * No identity, private staffing details, student data, or draft schedules.
  */
-export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select"> = db) {
+export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select" | "selectDistinctOn"> = db) {
   const rows = await executor.select({
     seasonId: s.activitySeasons.id, name: s.activities.name,
     seasonName: s.activitySeasons.name,
@@ -31,6 +32,8 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     programId: s.programs.id, programName: s.programs.name,
     programType: s.programs.type, programStatus: s.programs.status,
     programSiteId: s.programs.siteId,
+    academicProviderOrganizationId: s.programs.academicProviderOrganizationId,
+    programOrganizationId: s.programs.organizationId,
     creditIssuerId: s.programs.creditIssuingOrganizationId,
     registrationOpensAt: s.activitySeasons.registrationOpensAt,
     registrationClosesAt: s.activitySeasons.registrationClosesAt,
@@ -50,7 +53,12 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     )).orderBy(asc(s.activitySeasons.startsOn)).limit(200);
 
   const now = new Date();
-  const published = rows.flatMap(row => {
+  const approvals = await Promise.all(rows.map(row => readExtendedSeasonOpeningApprovals(executor, {
+    seasonId: row.seasonId, siteId: row.siteId,
+    programId: row.programId, organizationId: row.programOrganizationId,
+    academicProviderOrganizationId: row.academicProviderOrganizationId,
+  })));
+  const published = rows.flatMap((row, index) => {
     const permission = readEnrichmentPublication(row.seasonMetadata) ??
       readEnrichmentPublication(row.activityMetadata);
     // The catalog must not advertise registration on historically published
@@ -61,7 +69,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
       seasonStatus: "draft",
       siteMatchesProgram: row.programSiteId === row.siteId,
       capacity: row.capacity,
-      ...unavailableExtendedSeasonApprovals,
+      ...approvals[index]!,
     }).ready) return [];
     if (!permission || !isExtendedLearningType(row.programType) ||
       row.creditIssuerId !== null || row.programSiteId !== row.siteId ||
