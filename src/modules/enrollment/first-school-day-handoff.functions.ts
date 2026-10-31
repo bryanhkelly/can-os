@@ -73,6 +73,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     let missingCalendar=false;
     let noSchedule=false;
     let ambiguousPlacement=false;
+    let teacherMissing=false;
     for(const candidate of dates.slice(0,180)){
       const projected=await loadExpectedFirstDayPreparationForActor(actor,{
         date:candidate,programId:app.programId,siteId:app.siteId,
@@ -93,6 +94,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         continue;
       }
       selected=projected;
+      teacherMissing=!projected.qualifiedTeacherAssigned;
       selectedDate=candidate;
       break;
     }
@@ -133,6 +135,10 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       preparation:preview,
       blocks:onsite.blocks,projectionTruncated:onsite.projectionTruncated,
     });
-    return {date,preview,...handoff,sectionTitle:student.sectionTitle,
+    return {date,preview,...(teacherMissing ? {
+      ...handoff,state:"supervision_unverified" as const,supervisionPlanned:false,
+      outstandingGaps:[...handoff.outstandingGaps,"qualified_teacher_missing"],
+      message:"This student is scheduled for the selected Section, but no currently verified academic-provider teacher assignment exists. Assign an authorized teacher before the first school day.",
+    } : handoff),sectionTitle:student.sectionTitle,
       programName:selected.program.name};
   });
