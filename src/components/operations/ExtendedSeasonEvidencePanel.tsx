@@ -102,8 +102,7 @@ function EvidenceCard({ model, item, changed }: {
       }}/>}
     {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
       disabled={busy} onReview={review}/>}
-    {model.canSubmit && <div className="mt-3 border-t pt-3">
-
+    {model.canSubmit && <div>
       <EvidenceUploadSection<UploadInput> disabled={!model.uploadsEnabled}
         heading={item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}
         adapter={{begin: async input => beginExtendedEvidenceUploadFn({data:input}),
