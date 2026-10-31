@@ -94,5 +94,5 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
       });
-    return {date,preview,...handoff,attendanceRecorded:preview?false:handoff.attendanceRecorded};
+    return {date,preview,...handoff,attendanceRecorded:preview?false:handoff.attendanceRecorded,state:preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state};
   });
