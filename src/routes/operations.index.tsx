@@ -280,7 +280,7 @@ function OperationsPage(){
   <Link to="/operations/transfer-records" className="rounded border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
   (i.enrollmentChangeKind==="transfer"||i.enrollmentChangeKind==="withdrawal")?
   <button type="button" className="rounded border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
-    disabled={busy!==null} onClick={()=>void completeEnrollmentExit(i.id,i.enrollmentChangeKind!)}>
+    disabled={busy!==null} onClick={()=>{if(i.enrollmentChangeKind==="withdrawal"||i.enrollmentChangeKind==="transfer")void completeEnrollmentExit(i.id,i.enrollmentChangeKind);}}>
     Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
   </button>:
   i.type==="onsite_coverage_gap"&&i.siteId?
