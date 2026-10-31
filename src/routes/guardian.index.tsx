@@ -37,8 +37,8 @@ function FamilyHomePage() {
  useEffect(() => {
   let active = true;
   Promise.all([getFamilyHome(), getGuardianNeedsYou().then(
-   result => ({items:result.items,unavailable:false}),
-   () => ({items:[] as NeedItem[],unavailable:true}),
+   result => ({items:result.items,unavailable:false,groupConsentsUnavailable:result.groupConsentsUnavailable}),
+   () => ({items:[] as NeedItem[],unavailable:true,groupConsentsUnavailable:false}),
   ), listGuardianGradeFollowUps().then(
    result => ({items:result.items,unavailable:false}),
    () => ({items:[] as GradeFollowUp[],unavailable:true}),
@@ -49,7 +49,11 @@ function FamilyHomePage() {
    if (!active) return;
    setChildren(home.children);
    setNeeds(needsYou.items);
-   setNeedsWarning(needsYou.unavailable ? "Your attention list is temporarily unavailable. You can still review each child, attendance and enrollment." : "");
+   setNeedsWarning(needsYou.unavailable
+    ? "Your attention list is temporarily unavailable. You can still review each child, attendance and enrollment."
+    : needsYou.groupConsentsUnavailable
+     ? "Study group permissions could not load. Other family needs are still available; open Group permissions to check pending decisions."
+     : "");
    setGradeFollowUps(schoolQuestions.items);
    setGradeFollowUpsWarning(schoolQuestions.unavailable ? "School question status is temporarily unavailable. Open academics to review your child's feedback." : "");
    setCourseApprovals(classApprovals.items.filter(item=>!item.myDecision));
