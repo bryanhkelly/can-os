@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { classContentSchema } from "../../src/domain/class-content";
+import { curriculumDraftContent, assertPublishableCurriculum } from "../../src/domain/curriculum-authoring";
 
 
 const script = new URL("../../scripts/package-algebra1.mjs", import.meta.url);
@@ -28,6 +32,24 @@ describe("CAN Algebra I packaging controls", () => {
       expect(a.rubricCriteria.reduce((n:number,r:{maxPoints:number})=>n+r.maxPoints,0)).toBe(a.pointsPossible);
       expect(a.rubricCriteria.every((r:{description:string})=>!r.description.includes("x=−8"))).toBe(true);
     }
+  });
+  it("writes a canonical two-unit student draft without teacher-only answers", () => {
+    const dir=mkdtempSync(join(tmpdir(),"can-algebra1-"));
+    try {
+      const output=join(dir,"student-draft.json");
+      run("--write",output);
+      const raw=readFileSync(output,"utf8");
+      const parsed=classContentSchema.parse(JSON.parse(raw));
+      curriculumDraftContent.parse(parsed);
+      assertPublishableCurriculum(parsed);
+      expect(parsed.modules.map(m=>m.id)).toEqual(["algebra1-u01","algebra1-u02"]);
+      expect(parsed.modules.map(m=>m.lessons.length)).toEqual([20,10]);
+      expect(new Set(parsed.modules.flatMap(m=>m.lessons.map(l=>l.id))).size).toBe(30);
+      expect(raw).not.toContain("teacherGuides");
+      expect(raw).not.toContain("workedAnswers");
+      expect(raw).not.toContain("answerGuide");
+      expect(parsed.blueprint?.creditStatus).toBe("not_credit_ready");
+    } finally { rmSync(dir,{recursive:true,force:true}); }
   });
   it("keeps teacher keys out of the student-facing canonical content payload", () => {
     const source = readFileSync(script.pathname, "utf8");
