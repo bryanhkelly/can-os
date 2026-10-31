@@ -92,7 +92,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         studentProfileId:app.studentProfileId,
         configuration:programDay?.configuration ?? null,
         expectedDays:programDay?.expectedDays ?? 0,
-        students:preview?roster.students.map(student=>({...student,status:"unmarked"})):roster.students,
+        students:roster.students,
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
       }),
