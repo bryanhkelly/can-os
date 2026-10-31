@@ -56,6 +56,8 @@ function TeacherGradebookPage() {
  const [points, setPoints] = useState("");
  const [maxAttempts, setMaxAttempts] = useState("");
  const [due, setDue] = useState("");
+ const [releaseAt,setReleaseAt]=useState("");
+ const [closeAt,setCloseAt]=useState("");
  const [publishConfirmed,setPublishConfirmed]=useState(false);
  const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">(
   (search.kind as "homework"|"classwork"|"quiz"|"test"|"project"|"discussion"|undefined)??"classwork");
@@ -264,6 +266,8 @@ function TeacherGradebookPage() {
     publishNow,
     ...(curriculumLessonId?{curriculumLessonId}:{}),
     ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
+    ...(releaseAt?{availableAt:new Date(releaseAt).toISOString()}:{}),
+    ...(closeAt?{closesAt:new Date(closeAt).toISOString()}:{}),
    } });
    setNotice(result.status === "published" ? "Assessment published and assigned to enrolled students." : "Assessment saved as a draft.");
    setTitle("");
@@ -272,6 +276,7 @@ function TeacherGradebookPage() {
    setPoints("");
    setMaxAttempts("");
    setDue("");
+   setReleaseAt("");setCloseAt("");
    setPublishConfirmed(false);
    setCurriculumLessonId("");
    if (selected) await loadGradebook(selected);
@@ -419,6 +424,17 @@ function TeacherGradebookPage() {
       </label>
      </div>
      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <label className="text-sm font-semibold">Release date and time (optional)
+       <input type="datetime-local" value={releaseAt} onChange={event=>setReleaseAt(event.target.value)}
+        className="mt-2 w-full rounded-lg border bg-background p-3"/>
+      </label>
+      <label className="text-sm font-semibold">Close submissions (optional)
+       <input type="datetime-local" value={closeAt} onChange={event=>setCloseAt(event.target.value)}
+        className="mt-2 w-full rounded-lg border bg-background p-3"/>
+      </label>
+      <p className="text-xs text-muted-foreground sm:col-span-2">Times use your device timezone. Publishing without a release time opens work immediately. Work can be submitted after its due date until the close time; no close time leaves submissions open.</p>
+     </div>
+     <div className="mt-4 grid gap-4 sm:grid-cols-2">
        <label className="text-sm font-semibold">Class activity type
         <select aria-label="Class activity type" value={assignmentKind}
           onChange={event=>setAssignmentKind(event.target.value as typeof assignmentKind)}
@@ -498,6 +514,8 @@ function TeacherGradebookPage() {
           {" · "+assessment.kind}
           {" · "+assessment.status}
           {assessment.maxAttempts!==null&&" · "+assessment.maxAttempts+" maximum attempts"}
+          {assessment.availableAt&&" · Releases "+new Date(assessment.availableAt).toLocaleString()}
+          {assessment.closesAt?" · Closes "+new Date(assessment.closesAt).toLocaleString():" · No submission close time"}
          </span>
          <label className="mt-2 block text-xs font-normal">New due date
           <input aria-label={"Due date for "+assessment.title} type="date"

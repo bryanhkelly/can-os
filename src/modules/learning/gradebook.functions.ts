@@ -242,6 +242,8 @@ export const getGradebook = createServerFn({ method: "GET" })
     title: row.title,
     status: row.status,
     dueAt: row.dueAt?.toISOString() ?? null,
+    availableAt: row.availableAt?.toISOString() ?? null,
+    closesAt: row.closesAt?.toISOString() ?? null,
     pointsPossible: row.pointsPossible,
     rubric: readRubric(row.metadata?.rubricCriteria),
     maxAttempts:assessmentAttemptLimit(row.metadata),
