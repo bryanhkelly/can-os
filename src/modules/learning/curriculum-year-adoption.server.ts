@@ -91,3 +91,42 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   return {adoptionId:row.id,created:true};
  });
 }
+
+/** Explicit rollback is terminal; restoration requires a new reviewed adoption process.
+ * Existing Sections keep their original pinned course release.
+ */
+export async function rollbackAnnualCurriculumAdoption(actor:Actor,input:{
+ programId:string;academicYearId:string;packId:string;reason:string;
+}){
+ if(!input.reason.trim())throw new Error("A rollback reason is required.");
+ return db.transaction(async tx=>{
+  const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
+  if(!program||!await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",tx))
+   throw new AuthorizationError("institutional curriculum adoption grant and program scope");
+  const [existing]=await tx.select().from(curriculumAnnualAdoptions).where(and(
+   eq(curriculumAnnualAdoptions.programId,program.id),
+   eq(curriculumAnnualAdoptions.academicYearId,input.academicYearId),
+   eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
+  if(!existing||existing.organizationId!==program.organizationId||
+     existing.siteId!==program.siteId||
+     existing.academicProviderOrganizationId!==program.academicProviderOrganizationId)
+   throw new AuthorizationError("annual adoption scope");
+  if(existing.status==="rolled_back")return {adoptionId:existing.id,rolledBack:false};
+  if(existing.status!=="active")throw new Error("Only active annual adoptions can be rolled back.");
+  const [changed]=await tx.update(curriculumAnnualAdoptions)
+   .set({status:"rolled_back",supersededAt:new Date()})
+   .where(and(eq(curriculumAnnualAdoptions.id,existing.id),eq(curriculumAnnualAdoptions.status,"active")))
+   .returning({id:curriculumAnnualAdoptions.id});
+  if(!changed)throw new Error("Concurrent annual adoption change; retry after refreshing.");
+  await writeAudit(tx,actor,{action:"curriculum.adoption.year_rollback",
+   entityType:"curriculum_annual_adoption",entityId:existing.id,
+   scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+   before:{status:existing.status,packVersionId:existing.packVersionId},
+   after:{status:"rolled_back",reason:input.reason.trim(),academicYearId:input.academicYearId}});
+  await emitEvent(tx,{eventType:"curriculum.adoption.year_rolled_back",
+   aggregateType:"curriculum_annual_adoption",aggregateId:existing.id,
+   actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
+   siteId:program.siteId,programId:program.id,payload:{academicYearId:input.academicYearId}});
+  return {adoptionId:existing.id,rolledBack:true};
+ });
+}
