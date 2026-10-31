@@ -1,9 +1,10 @@
+import { LaunchTeacherQualificationPolicy } from "@/components/operations/LaunchTeacherQualificationPolicy";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSectionRow } from "@/components/operations/LaunchSectionRow";
 import {useState} from "react";
 import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
 import {Link,useRouter} from "@tanstack/react-router";
-import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,publishLaunchTeacherPolicy,setLaunchSectionCredits} from "@/modules/programs/launch-academics.functions";
+import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,setLaunchSectionCredits} from "@/modules/programs/launch-academics.functions";
 import {WorkspaceShell} from "@/components/workspace";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
@@ -12,7 +13,6 @@ import { SectionFacilitatorPanel } from "@/components/operations/SectionFacilita
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
 import {Qualifications} from "@/components/profiles/Qualifications";
 import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
-import {TeacherPolicyRevisions} from "@/components/profiles/TeacherPolicyRevisions";
 
 export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
@@ -27,8 +27,6 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [teacherId,setTeacherId]=useState("");
  const [scheduleId,setScheduleId]=useState("");
  const [courseCredits,setCourseCredits]=useState("");
- const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
- const [policyConfirmed,setPolicyConfirmed]=useState(false);
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation()});
@@ -206,4 +204,5 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   </section>
   <SectionLifecycleWorkspace programId={data.program.id} staff={data.teachingStaff}/>
  </WorkspaceShell>;
-}
+}   <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
+
