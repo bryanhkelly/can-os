@@ -326,6 +326,15 @@ export async function resendChurchEvidenceFollowup(actor: AccessContext, request
   }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
   if (request?.status !== "needs_evidence" || !request.decisionNote)
     throw new Error("No pending evidence follow-up can be resent");
+  // Recheck state immediately before transport. A canceled or approved request
+  // must not receive a stale evidence demand after a reviewer changes its state.
+  const [current] = await db.select({ status: churchOnboardingRequests.status,
+    decisionNote: churchOnboardingRequests.decisionNote,
+    updatedAt: churchOnboardingRequests.updatedAt,
+  }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
+  if (current?.status !== "needs_evidence" || current.decisionNote !== request.decisionNote ||
+      current.updatedAt.getTime() !== request.updatedAt.getTime())
+    throw new Error("Evidence request changed; refresh before retrying");
   const providerAccepted = await sendNotificationEmail({
     to: request.contactEmail,
     subject: "CAN Academy church partnership: additional evidence needed",
