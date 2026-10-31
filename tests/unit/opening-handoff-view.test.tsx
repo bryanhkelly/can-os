@@ -8,6 +8,7 @@ import type { getSiteToday } from "@/modules/operations/site-today.functions";
 const state=vi.hoisted(()=>({data:null as unknown}));
 // Static presentation tests never open a database connection.
 vi.mock("@/db/client", () => ({ db: {} }));
+vi.mock("@/hooks/useWorkspaceMutation", () => ({ useWorkspaceMutation: () => ({ isSubmitting: false, submit: vi.fn() }) }));
 vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=> (options:object)=>({options,useLoaderData:()=>state.data,useSearch:()=>({})}),
   Link:({children}: {children:ReactNode})=><a>{children}</a>,
@@ -76,10 +77,10 @@ describe("opening handoff presentation",()=>{
     expect(html).not.toContain("Acknowledge receipt");
   });
   function renderLaunch(operators:{personId:string;firstName:string;lastName:string}[]){
-    state.data={authError:"",extendedPlanning:null,options:{organizations:[],academicProviderOrganizations:[],creditIssuingOrganizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
+    state.data={ok:true,data:{authError:"",extendedPlanning:null,options:{organizations:[],academicProviderOrganizations:[],creditIssuingOrganizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
       id:"program",name:"Academy",siteId:"site",status:"ready",type:"full_school",
       journey:{id:"journey",status:"ready"},requirements:[],openingOperators:operators,
-    }]}};
+    }]} ,preparationPrograms:null,familyInvitations:null,admissionsCounts:null,enrollmentCounts:null}};
     const Page=Route.options.component;
     if(typeof Page!=="function")throw new Error("Missing launch page");
     return renderToStaticMarkup(<Page/>);
