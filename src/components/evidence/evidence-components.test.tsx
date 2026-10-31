@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
+import { EvidenceStatus } from "./EvidenceStatus";
 import { EvidenceHistory } from "./EvidenceHistory";
 import { EvidenceReviewForm } from "./EvidenceReviewForm";
 import { EvidenceUploader } from "./EvidenceUploader";
 
 describe("shared evidence presentation", () => {
+  it("does not classify unknown or missing evidence as rejected", () => {
+    const html = renderToStaticMarkup(<EvidenceStatus status="not_submitted"/>);
+    expect(html).toContain("not_submitted");
+    expect(html).not.toContain("border-danger");
+  });
   it("announces rejection details and displays canonical status", () => {
     const html = renderToStaticMarkup(<EvidenceWorkflow title="Opening certificate"
       status="rejected" rejectionReason="Document expired"/>);
