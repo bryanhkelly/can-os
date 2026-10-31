@@ -11,6 +11,12 @@ describe("finance reconciliation", () => {
     const refunded = applyVerifiedEvent(captured, { ...paid, eventId: "evt2", kind: "refund_succeeded", providerRefundId: "refund1" });
     expect(settlement(refunded)).toMatchObject({ obligationId: "ob1", enrollmentId: "en1", policyVersion: "2026-v1", netCents: 0, churchCents: 0, canCents: 0 });
   });
+  it("accepts multiple partial captures but refuses overcollection", () => {
+    const first = applyVerifiedEvent(empty(), { ...paid, amount: { currency: "USD", cents: 4000 } });
+    const second = applyVerifiedEvent(first, { ...paid, eventId: "evt2", amount: { currency: "USD", cents: 6000 } });
+    expect(second.capturedCents).toBe(10000);
+    expect(() => applyVerifiedEvent(second, { ...paid, eventId: "evt3", amount: { currency: "USD", cents: 1 } })).toThrow("Capture exceeds invoice");
+  });
   it("deduplicates provider events", () => { const record = applyVerifiedEvent(empty(), paid); expect(applyVerifiedEvent(record, paid)).toBe(record); });
   it("rejects browser claims", () => expect(() => applyVerifiedEvent(empty(), { ...paid, verified: false })).toThrow());
   it("rejects refunds without an original capture", () => expect(() => applyVerifiedEvent(empty(), { ...paid, kind: "refund_succeeded", providerRefundId: "r" })).toThrow());
