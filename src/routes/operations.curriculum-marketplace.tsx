@@ -60,7 +60,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [rosterValidated,setRosterValidated]=useState(false);
  const [rosterMap,setRosterMap]=useState<Record<string,string>>({});
  const cartridgeWebLinks=cartridgeReport?.preview.resources.filter(r=>/weblink|imswl/i.test(r.type))??[];
- const cartridgeStaticHtml=cartridgeReport?.preview.resources.filter(r=>/^(webcontent|imscc_xmlv1p3\\/webcontent)$/i.test(r.type)&&r.href?.match(/\\.html?$/i)&&r.files.length===1&&r.files[0]===r.href)??[];
+  const cartridgeStaticHtml=cartridgeReport?.preview.resources.filter(r=>["webcontent","imscc_xmlv1p3/webcontent"].includes(r.type.toLowerCase())&&typeof r.href==="string"&&/\.html?$/i.test(r.href)&&r.files.length===1&&r.files[0]===r.href)??[];
  const rosterClasses=previewRosterClasses(rosterCsv);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
