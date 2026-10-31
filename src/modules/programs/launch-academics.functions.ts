@@ -7,7 +7,7 @@ qualificationDefinitions,
 sections,
 sectionGrades,
 sectionTeachers,
-scheduleTemplates,courseTemplateVersions,
+scheduleTemplates,scheduleTemplatePeriods,courseTemplateVersions,
 terms
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -171,6 +171,10 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
    if(data.scheduleTemplateId){
     const [template]=await tx.select({schoolYearId:scheduleTemplates.schoolYearId}).from(scheduleTemplates).where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
     if(!template||template.schoolYearId!==term.schoolYearId)throw new Error("Schedule must belong to the selected school year");
+    const periods=await tx.select({dayOfWeek:scheduleTemplatePeriods.dayOfWeek,startsAtLocal:scheduleTemplatePeriods.startsAtLocal,endsAtLocal:scheduleTemplatePeriods.endsAtLocal})
+     .from(scheduleTemplatePeriods).where(and(eq(scheduleTemplatePeriods.scheduleTemplateId,data.scheduleTemplateId),eq(scheduleTemplatePeriods.type,"instruction")));
+    if(!periods.some(period=>period.dayOfWeek>=1&&period.dayOfWeek<=7&&period.startsAtLocal<period.endsAtLocal))
+     throw new Error("Choose a schedule containing at least one valid instructional period");
    }
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,
@@ -203,7 +207,8 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
      action:"launch.section.provision",entityType:"section",entityId:existing.id,
      scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
      after:{code:data.code,title:data.title,termId:data.termId,
-      teacherPersonId:data.teacherPersonId??null,credits:data.credits??null}});
+      teacherPersonId:data.teacherPersonId??null,scheduleTemplateId:data.scheduleTemplateId??null,
+      courseTemplateVersionId:data.courseTemplateVersionId,firstLessonValidated:Boolean(data.requireFirstLesson),credits:data.credits??null}});
    }
    return {sectionId:existing.id,created:Boolean(created)};
   });
