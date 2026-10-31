@@ -160,6 +160,10 @@ export const listGuardianEnrollmentChanges=createServerFn({method:"GET"})
   return {items:rows.filter(row=>row.kind.requestedByGuardianPersonId===actor.actorPersonId)
     .map(row=>({
       id:row.id,kind:row.kind.kind,
+      destinationSchoolName:typeof row.kind.destinationSchoolName==="string"?row.kind.destinationSchoolName:null,
+      destinationSchoolContactEmail:typeof row.kind.destinationSchoolContactEmail==="string"?row.kind.destinationSchoolContactEmail:null,
+      intendedLastDay:typeof row.kind.intendedLastDay==="string"?row.kind.intendedLastDay:null,
+      recordsHandoffStatus:typeof row.kind.recordsHandoffStatus==="string"?row.kind.recordsHandoffStatus:null,
       schoolName:row.schoolName,studentPersonId:row.studentPersonId,
       title:row.title,status:row.status,
       description:row.description??"",resolutionNote:row.resolutionNote??null,
