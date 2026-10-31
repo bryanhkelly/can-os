@@ -15,7 +15,12 @@ const changeKinds=z.enum(["withdrawal","transfer","family_change"]);
 const requestSchema=z.object({
  studentPersonId:uuid,programId:uuid,kind:changeKinds,
  reason:z.string().trim().min(10).max(1500),
-}).strict();
+ destinationSchoolName:z.string().trim().min(3).max(160).optional(),
+ destinationSchoolContactEmail:z.string().trim().email().max(254).optional(),
+ intendedLastDay:z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+}).strict().refine(data=>data.kind!=="transfer"||!!data.destinationSchoolName,{
+ path:["destinationSchoolName"],message:"Name the destination school for a transfer request.",
+});
 const actionType="guardian_enrollment_change_request";
 
 async function parent(){
@@ -76,7 +81,14 @@ export const requestGuardianEnrollmentChange=createServerFn({method:"POST"})
     description:data.reason,organizationId:child.organizationId,
     siteId:child.siteId,programId:child.programId,
     subjectType:"student_profile",subjectId:child.studentProfileId,
-    metadata:{requestedByGuardianPersonId:actor.actorPersonId,kind:data.kind},
+    metadata:{requestedByGuardianPersonId:actor.actorPersonId,kind:data.kind,
+      ...(data.kind==="transfer"?{
+        destinationSchoolName:data.destinationSchoolName,
+        destinationSchoolContactEmail:data.destinationSchoolContactEmail??null,
+        intendedLastDay:data.intendedLastDay??null,
+        recordsHandoffStatus:"not_started",
+      }:{}),
+    },
    }).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create family enrollment request");
    const eventId=await emitEvent(tx,{
@@ -89,7 +101,12 @@ export const requestGuardianEnrollmentChange=createServerFn({method:"POST"})
     action:"guardian.enrollment_change.requested",
     entityType:"action",entityId:action.id,
     scope:{organizationId:child.organizationId,siteId:child.siteId,programId:child.programId},
-    after:{kind:data.kind,studentProfileId:child.studentProfileId},
+    after:{kind:data.kind,studentProfileId:child.studentProfileId,
+      ...(data.kind==="transfer"?{
+        destinationSchoolName:data.destinationSchoolName,
+        intendedLastDay:data.intendedLastDay??null,
+      }:{}),
+    },
    });
    const operators=await tx.selectDistinct({personId:s.accountPersonGrants.personId})
     .from(s.accountPersonGrants)
