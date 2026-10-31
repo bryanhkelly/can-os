@@ -41,7 +41,9 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     subject: row.subject,
     earnedUnits: row.creditsEarned,
     finalized: Boolean(row.sectionId && row.letterGrade),
-    // Transfer evidence must carry affirmative issuer acceptance.\n    // A snapshot without acceptance cannot confer graduation credit.\n    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
+    // Transfer evidence must carry affirmative issuer acceptance.
+    // A snapshot without acceptance cannot confer graduation credit.
+    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
   }));
 }
 /** Check current canonical enrollment custody, not only the immutable transcript snapshot. */
@@ -78,7 +80,9 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   const documented=institutional.map(row=>row.metadata?.graduationEntryCohort).filter(value=>value!==undefined && value!==null);
   if(documented.some(v=>typeof v!=="string" || !/^[0-9]{4}$/.test(v)) || new Set(documented).size>1)
     throw new AuthorizationError("Conflicting documented graduation cohort overrides");
-  // The earliest issuing-institution program year is the entry cohort.\n  // A registrar-recorded override is authoritative only when consistent across records.\n  const entryCohort=(documented[0] as string|undefined) ?? String(institutional[0]!.yearStarts).slice(0,4);
+  // The earliest issuing-institution program year is the entry cohort.
+  // A registrar-recorded override is authoritative only when consistent across records.
+  const entryCohort=(documented[0] as string|undefined) ?? String(institutional[0]!.yearStarts).slice(0,4);
   const policies=await db.select().from(s.graduationRequirementSets)
     .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
   let applicable;
