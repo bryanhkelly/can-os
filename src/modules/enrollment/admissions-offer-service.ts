@@ -212,7 +212,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   // A receiving school may decide an application and the family may accept
   // the offer while the originating school coordinates its exit. Only actual
   // enrollment activation waits for the verified institutional transfer.
-  let transferOrigin: {id:string;metadata:Record<string,unknown>}|null=null;
+  let transferOrigin: {id:string;siteId:string|null;metadata:Record<string,unknown>}|null=null;
   if(typeof app.metadata.originTransferActionId==="string"){
     const [origin]=await tx.select({
       id:actions.id,type:actions.type,status:actions.status,
@@ -237,7 +237,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
         eq(enrollments.programId,origin.programId),
         eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
     if(activeOrigin)throw new Error("The originating school still has an active Program enrollment. Reconcile the transfer before activating the destination.");
-    transferOrigin={id:origin.id,metadata:origin.metadata};
+    transferOrigin={id:origin.id,siteId:origin.siteId,metadata:origin.metadata};
   }
   const recordDestinationActivation=async(enrollmentId:string)=>{
     if(!transferOrigin)return;
@@ -256,10 +256,8 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   if(!programSite||programSite.organizationId!==organizationId)
     throw new Error("Enrollment program must belong to the offer's organization");
   if(transferOrigin){
-    const [sourceSite]=await tx.select({siteId:actions.siteId})
-      .from(actions).where(eq(actions.id,transferOrigin.id)).limit(1);
-    if(!programSite.siteId||!sourceSite?.siteId||
-       sourceSite.siteId===programSite.siteId)
+    if(!programSite.siteId||!transferOrigin.siteId||
+       transferOrigin.siteId===programSite.siteId)
       throw new Error("A transfer destination must be an independently authorized school Site, not another Program at the originating school.");
   }
   // Site-less virtual programs have no onsite roster to coordinate.
