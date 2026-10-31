@@ -126,15 +126,23 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
-      - name: Record evidence limitations
+      - name: Record exact-SHA release evidence and decision
         if: always()
         shell: bash
+        env:
+          GATE_RESULT: ${{ job.status }}
         run: |
           {
             echo "## FullFlow connected release acceptance"
             echo ""
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Job gate result: ${GATE_RESULT}"
+            if [[ "${GATE_RESULT}" == "success" ]]; then
+              echo "- Decision: CONNECTED-GATES PASS for this exact SHA only; separate operational release approval required."
+            else
+              echo "- Decision: HOLD. Inspect the failed/skipped steps; no release acceptance may be inferred."
+            fi
             echo "- Every step above (including separate-branch admissions and safeguarding) must succeed on this exact SHA. Any failure or skip means HOLD."
             echo "- Status: CONNECTED-GATES PASS only when every check succeeds; operational deployment readiness and coordinator approval remain separate."
             echo "- This run provides same-SHA admissions, static, schema and Journey C results only when all respective steps pass. Deployment readiness and coordinator approval are separate."
