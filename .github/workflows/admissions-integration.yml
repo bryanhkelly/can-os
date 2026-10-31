@@ -27,6 +27,7 @@ jobs:
       CAN_TEST_DB_WRITES_ENABLED: "true"
       TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
+      CAN_ADMISSIONS_TEST_BRANCH_ID: ${{ vars.CAN_ADMISSIONS_TEST_BRANCH_ID }}
       CAN_DEMO_WRITES_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +50,8 @@ jobs:
         run: npm ci
       - name: Verify disposable database endpoint before any writes
         run: npm run test:integration:admissions -- --preflight
+      - name: Verify Postgres-attested Neon project and nonproduction branch
+        run: node scripts/verify-admissions-neon-branch.mjs
       - name: Apply committed schema migrations to disposable Neon branch
         env:
           DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
