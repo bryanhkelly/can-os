@@ -18,7 +18,7 @@ export const Route=createFileRoute("/published-site/family-start")({
     return new Response("Not found",{status:404,headers:{"Cache-Control":"no-store"}});
   try{
     const {admitPublicAdmissionsInterest}=await import("@/modules/enrollment/public-admissions-interest.server");
-    const budget=await admitPublicAdmissionsInterest("public_site_family_start");
+    const budget=await admitPublicAdmissionsInterest("public_site_family_start",slug);
     if(!budget.allowed)return new Response("Too many requests. Try again later.",{
       status:429,headers:{"Cache-Control":"no-store","Retry-After":String(budget.retryAfterSeconds)}});
   }catch{
