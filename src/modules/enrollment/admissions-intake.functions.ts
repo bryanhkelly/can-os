@@ -150,6 +150,17 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    })(),
    transferNamedDestination:typeof metadata.originTransferDestinationSchoolName==="string"?
      metadata.originTransferDestinationSchoolName:null,
+   transferRecordsStatus:(()=>{
+     if(typeof metadata.originTransferActionId!=="string")return null;
+     const source=transferOrigins.find(item=>item.id===metadata.originTransferActionId);
+     if(!source||source.subjectId!==r.studentProfileId||
+        source.metadata.kind!=="transfer"||
+        source.metadata.requestedByGuardianPersonId!==r.submittedByPersonId)
+       return "requires_review" as const;
+     return source.metadata.recordsHandoffStatus==="completed"?"completed" as const:
+       source.metadata.recordsHandoffStatus==="pending"?"pending_release" as const:
+       "not_started" as const;
+   })(),
    createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
   };
