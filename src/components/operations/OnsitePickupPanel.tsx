@@ -73,7 +73,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
     }
   }
 
-  return <WorkspacePanel title="Verified pickup & custody release"
+  return <WorkspacePanel id="pickup" title="Verified pickup & custody release"
     description="Match the adult to current family authority, verify identity, and personally witness the handoff. A denied attempt is not a release."
     className="mt-9">
     {notice && <p role="status" className="mb-4 rounded border p-3 text-sm">{notice}</p>}
