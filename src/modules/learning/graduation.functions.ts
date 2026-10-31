@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -279,7 +279,7 @@ export const revokeDiploma=createServerFn({method:"POST"})
      if(diploma.revokedAt)throw new AuthorizationError("Diploma already revoked");
      const [updated]=await tx.update(s.diplomaIssuances)
        .set({revokedAt:new Date(),revocationReason:data.reason})
-       .where(and(eq(s.diplomaIssuances.id,data.diplomaId),eq(s.diplomaIssuances.graduationDecisionId,decision.id)))
+       .where(and(eq(s.diplomaIssuances.id,data.diplomaId),eq(s.diplomaIssuances.graduationDecisionId,decision.id),isNull(s.diplomaIssuances.revokedAt)))
        .returning({id:s.diplomaIssuances.id});
      if(!updated)throw new AuthorizationError("Diploma was not revoked");
      await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"diploma.revoke",resourceType:"diploma_issuance",resourceId:diploma.id,
