@@ -60,7 +60,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   .from(s.healthOfficeVisits)
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.healthOfficeVisits.studentProfileId))
   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
-    guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"academic",
+    guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"enrollment",
   }))
   .innerJoin(s.enrollments,and(
     eq(s.enrollments.studentProfileId,s.studentProfiles.id),
@@ -125,7 +125,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   context.role==="guardian"&&row.requestedBy.requestedByGuardianPersonId===personId);
  const verifiedHealthChildren=requestedHealthChildren.length?await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
   .from(s.guardianRelationships).where(and(
-   guardianRelationshipPredicate({guardianPersonId:personId,access:"academic"}),
+   guardianRelationshipPredicate({guardianPersonId:personId,access:"enrollment"}),
    inArray(s.guardianRelationships.studentPersonId,requestedHealthChildren.map(row=>row.studentPersonId)),
   )):[];
  const permittedHealthPersons=new Set(verifiedHealthChildren.map(row=>row.studentPersonId));
