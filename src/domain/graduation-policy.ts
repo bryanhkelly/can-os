@@ -1,7 +1,7 @@
 export type ApplicablePolicy = { id:string; academicYear:string; cohortStart:string|null; cohortEnd:string|null; supersedesRequirementSetId:string|null };
 /** Resolve only institution-approved cohort policies; never guess from the current school year. */
 export function resolveGraduationPolicy<T extends ApplicablePolicy>(policies: readonly T[], entryCohort:string):T {
- if(!entryCohort || !/^\\d{4}(-\\d{4})?$/.test(entryCohort)) throw new Error("Documented student entry cohort required");
+ if(!entryCohort || !/^[0-9]{4}$/.test(entryCohort)) throw new Error("Documented student entry cohort required");
  const ids=new Set(policies.map(p=>p.id));
  if(ids.size!==policies.length) throw new Error("Duplicate graduation policy identities");
  const replaced=new Set(policies.map(p=>p.supersedesRequirementSetId).filter((v):v is string=>Boolean(v)));
