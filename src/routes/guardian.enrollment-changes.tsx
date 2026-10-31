@@ -5,6 +5,7 @@ import {
   getGuardianEnrollmentChangeOptions, listGuardianEnrollmentChanges,
   requestGuardianEnrollmentChange,
 } from "@/modules/enrollment/guardian-enrollment-changes.functions";
+import {listPublicTransferDestinations,requestTransferDestinationFamilyStart} from "@/modules/enrollment/guardian-transfer-destination.functions";
 
 export const Route = createFileRoute("/guardian/enrollment-changes")({
  validateSearch:(search:Record<string,unknown>):{student?:string}=>({
@@ -16,11 +17,15 @@ export const Route = createFileRoute("/guardian/enrollment-changes")({
 type Choice=Awaited<ReturnType<typeof getGuardianEnrollmentChangeOptions>>[number];
 type Case=Awaited<ReturnType<typeof listGuardianEnrollmentChanges>>["items"][number];
 type Kind="withdrawal"|"transfer"|"family_change";
+type TransferDestination=Awaited<ReturnType<typeof listPublicTransferDestinations>>[number];
 
 function GuardianEnrollmentChanges(){
  const {student}=Route.useSearch();
  const [choices,setChoices]=useState<Choice[]>([]);
  const [requests,setRequests]=useState<Case[]>([]);
+ const [destinations,setDestinations]=useState<TransferDestination[]>([]);
+ const [destinationChoices,setDestinationChoices]=useState<Record<string,string>>({});
+ const [destinationConfirmations,setDestinationConfirmations]=useState<Record<string,boolean>>({});
  const [selected,setSelected]=useState("");
  const [kind,setKind]=useState<Kind>("withdrawal");
  const [reason,setReason]=useState("");
@@ -31,11 +36,12 @@ function GuardianEnrollmentChanges(){
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  async function refresh(){
-  const [options,records]=await Promise.all([
+  const [options,records,published]=await Promise.all([
     getGuardianEnrollmentChangeOptions(),
     listGuardianEnrollmentChanges({data:{}}),
+    listPublicTransferDestinations(),
   ]);
-  setChoices(options);setRequests(records.items);
+  setChoices(options);setRequests(records.items);setDestinations(published);
   const first=options.find(choice=>choice.studentPersonId===student)??options[0];
   setSelected(current=>options.some(choice=>choice.studentPersonId+":"+choice.programId===current)
     ?current:first?first.studentPersonId+":"+first.programId:"");
@@ -48,9 +54,10 @@ function GuardianEnrollmentChanges(){
   Promise.all([
     getGuardianEnrollmentChangeOptions(),
     listGuardianEnrollmentChanges({data:{}}),
-  ]).then(([options,records])=>{
+    listPublicTransferDestinations(),
+  ]).then(([options,records,published])=>{
     if(!active)return;
-    setChoices(options);setRequests(records.items);
+    setChoices(options);setRequests(records.items);setDestinations(published);
     const first=options.find(choice=>choice.studentPersonId===student)??options[0];
     setSelected(first?first.studentPersonId+":"+first.programId:"");
   }).catch(()=>{if(active)setError("Unable to verify your current family enrollment. Contact admissions.");})
@@ -80,6 +87,24 @@ function GuardianEnrollmentChanges(){
    catch{setError("Request saved, but its updated status could not be loaded. Reopen this page before submitting again.");}
   }catch(e){setError(e instanceof Error?e.message:"Unable to submit family request");}
   finally{setBusy(false);}
+ }
+ async function requestDestination(item:Case){
+   if(busy||item.kind!=="transfer"||item.destinationApplicationId)return;
+   const destinationProgramId=destinationChoices[item.id];
+   const school=destinations.find(program=>program.id===destinationProgramId);
+   if(!school||!destinationConfirmations[item.id])return;
+   if(!window.confirm("Send a secure email verification link for "+school.name+"? This requests prospective family application access only; no child record or enrollment is shared."))return;
+   setBusy(true);setError("");setNotice("");
+   try{
+     const result=await requestTransferDestinationFamilyStart({data:{
+       originTransferActionId:item.id,destinationProgramId:school.id,
+       requestId:crypto.randomUUID(),confirmedDestination:true,
+     }});
+     setNotice(result.requested
+       ?"Check your verified family email for a secure sign-in link to "+result.destinationName+". Open it to access the receiving school's application."
+       :"A verification link was already requested recently. Check your email before requesting another.");
+   }catch(e){setError(e instanceof Error?e.message:"Could not request a receiving-school verification link.");}
+   finally{setBusy(false);}
  }
  const visibleRequests=requests.filter(item=>!selected||item.studentPersonId===selected.split(":")[0]);
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment and family changes"
