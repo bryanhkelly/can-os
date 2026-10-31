@@ -17,7 +17,7 @@ const requestSchema=z.object({
  reason:z.string().trim().min(10).max(1500),
  destinationSchoolName:z.string().trim().min(3).max(160).optional(),
  destinationSchoolContactEmail:z.string().trim().email().max(254).optional(),
- intendedLastDay:z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+ intendedLastDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 }).strict().refine(data=>data.kind!=="transfer"||!!data.destinationSchoolName,{
  path:["destinationSchoolName"],message:"Name the destination school for a transfer request.",
 });
