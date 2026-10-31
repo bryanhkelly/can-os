@@ -30,7 +30,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
     <WorkspaceShell
       eyebrow="CAN OS · Teacher"
       title="Missing work"
-      subtitle="Overdue work for actively enrolled students in the classes you teach, within your authorized school and program."
+      subtitle="Overdue missing submissions and returned revisions for actively enrolled students in your classes."
       actions={<p className="mt-2 text-xs"><Link to="/notifications" className="underline">Teacher notifications →</Link></p>}
     >
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
@@ -45,7 +45,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="text-xs text-muted-foreground">{x.course} · due {new Date(x.dueAt).toLocaleDateString()}</p>
             <h2 className="mt-2 font-semibold">{x.title}</h2>
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
-            <p className="mt-1 text-sm">{x.studentName} · {x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
+            <p className="mt-1 text-sm">{x.studentName} · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button
               disabled={Boolean(busyItem) || Boolean(followedUp[x.assessmentId + ":" + x.studentProfileId])}
