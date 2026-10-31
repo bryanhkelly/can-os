@@ -23,6 +23,42 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
  .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(desc(s.notifications.createdAt)).limit(50);
+ const tripNoticeTypes=new Set([
+  "field_trip_permission_requested","field_trip_permission_signed","field_trip_permission_declined",
+ ]);
+ const tripNoticeIds=rows.filter(n=>tripNoticeTypes.has(n.type)&&
+  n.resourceType==="field_trip"&&n.resourceId).map(n=>n.resourceId!);
+ const guardianTripRows=tripNoticeIds.length&&context.role==="guardian"?
+  await db.selectDistinct({id:s.fieldTrips.id}).from(s.fieldTrips)
+   .innerJoin(s.fieldTripParticipants,eq(s.fieldTripParticipants.fieldTripId,s.fieldTrips.id))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.fieldTripParticipants.studentProfileId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+     guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"enrollment",
+   }))
+   .innerJoin(s.enrollments,and(
+     eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+     eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+   ))
+   .innerJoin(s.programs,and(
+     eq(s.programs.id,s.enrollments.programId),
+     eq(s.programs.siteId,s.fieldTrips.siteId),
+   ))
+   .where(and(inArray(s.fieldTrips.id,tripNoticeIds),
+     inArray(s.fieldTrips.siteId,context.scope.siteIds??[]),
+     inArray(s.enrollments.programId,context.scope.programIds??[]),
+     or(isNull(s.fieldTrips.programId),
+       eq(s.fieldTrips.programId,s.enrollments.programId)),
+   )):[];
+ const guardianTripIds=new Set(guardianTripRows.map(row=>row.id));
+ const staffTripRows=tripNoticeIds.length&&context.role==="registrar"?
+  await db.select({id:s.fieldTrips.id}).from(s.fieldTrips)
+   .where(and(inArray(s.fieldTrips.id,tripNoticeIds),
+     eq(s.fieldTrips.proposedByPersonId,personId),
+     inArray(s.fieldTrips.siteId,context.scope.siteIds??[]),
+     or(isNull(s.fieldTrips.programId),
+       inArray(s.fieldTrips.programId,context.scope.programIds??[])),
+   )):[];
+ const staffTripIds=new Set(staffTripRows.map(row=>row.id));
  const schoolAlertIds=rows.filter(n=>n.type==="school_family_alert"&&
    n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
  const accessibleSchoolAlerts=schoolAlertIds.length&&context.role==="guardian"?
@@ -437,6 +473,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="health_office_visit"?permittedMedicalIds.has(n.resourceId):
+    n.resourceType==="field_trip"&&tripNoticeTypes.has(n.type)?guardianTripIds.has(n.resourceId):
     n.resourceType==="action"&&n.type==="school_family_alert"?permittedSchoolAlerts.has(n.resourceId):
     n.resourceType==="action"&&n.type==="guardian_health_review_completed"?healthGuardianChildByAction.has(n.resourceId):
     n.resourceType==="action"&&n.type==="guardian_enrollment_change_updated"?familyChangeChildByAction.has(n.resourceId):
@@ -451,6 +488,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
+   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?"/guardian/field-trips":
+   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="registrar"&&staffTripIds.has(n.resourceId)?"/operations/field-trips":
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
