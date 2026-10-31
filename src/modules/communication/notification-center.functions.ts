@@ -107,6 +107,17 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.actions.organizationId,context.scope.organizationIds??[]),
   )):[];
  const permittedOperatorChangeIds=new Set(operatorChangeActions.map(row=>row.id));
+ const registrarCourseDecisionIds=rows.filter(n=>n.type==="course_registration_guardian_decision_for_registrar"&&
+  n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const registrarCourseActions=registrarCourseDecisionIds.length&&context.role==="registrar"?
+  await db.select({id:s.actions.id}).from(s.actions).where(and(
+   inArray(s.actions.id,registrarCourseDecisionIds),
+   eq(s.actions.type,"course_registration_request"),
+   inArray(s.actions.siteId,context.scope.siteIds??[]),
+   inArray(s.actions.programId,context.scope.programIds??[]),
+   inArray(s.actions.organizationId,context.scope.organizationIds??[]),
+  )):[];
+ const permittedRegistrarCourseActions=new Set(registrarCourseActions.map(row=>row.id));
  const pickupRows=rows.filter(row=>pickupNotificationTypes.has(row.type)&&row.resourceId);
  const pickupReleaseIds=pickupRows.filter(row=>row.resourceType==="pickup_release_event").map(row=>row.resourceId!);
  const pickupHoldIds=pickupRows.filter(row=>row.resourceType==="pickup_custody_hold").map(row=>row.resourceId!);
@@ -395,6 +406,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
