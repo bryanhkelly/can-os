@@ -172,7 +172,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                 and physical attendance. Enrollment never records presence automatically.</li>
             </ol>
             {x.activeSectionCount>0
-              ? <Link to="/staff/attendance" className="mt-2 inline-block font-semibold underline">
+              ? <Link to="/staff/attendance" search={{programId:x.programId}} className="mt-2 inline-block font-semibold underline">
                   Open expected school-day attendance →
                 </Link>
               : <p className="mt-2 text-xs">The school-day attendance handoff opens after a class is assigned.</p>}
