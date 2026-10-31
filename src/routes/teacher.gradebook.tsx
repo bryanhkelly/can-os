@@ -1,3 +1,4 @@
+import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
 import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
 import { GradebookOverview } from "@/components/learning/GradebookOverview";
 import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
@@ -495,35 +496,13 @@ function TeacherGradebookPage() {
       <thead>
        <tr className="border-b text-left">
         <th className="p-3 font-semibold">Student</th>
-        {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment => <th key={assessment.id} className="min-w-32 p-3 font-semibold">
-         <span className="block">{assessment.title}</span>
-         <span className="block text-xs font-normal text-muted-foreground">
-          {assessment.dueAt ? `Due ${new Date(assessment.dueAt).toLocaleDateString()}` : "No due date"} · {assessment.pointsPossible ?? "—"} pts
-          {assessment.rubric.length > 0 && ` · ${assessment.rubric.length} criteria`}
-          {" · "+assessment.kind}
-          {" · "+assessment.status}
-          {assessment.maxAttempts!==null&&" · "+assessment.maxAttempts+" maximum attempts"}
-          {assessment.availableAt&&" · Releases "+new Date(assessment.availableAt).toLocaleString()}
-          {assessment.closesAt?" · Closes "+new Date(assessment.closesAt).toLocaleString():" · No submission close time"}
-         </span>
-         {assessment.status==="draft"&&<AssessmentDraftEditor key={assessment.id+assessment.title+assessment.instructions}
-          assessment={assessment} onSaved={async()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");await loadGradebook(selected);}}/>}
-         {assessment.status!=="closed"&&<AssessmentScheduleEditor
-          key={assessment.id+assessment.availableAt+assessment.closesAt} assessment={assessment}
-          onSaved={()=>loadGradebook(selected)}/>}
-         <label className="mt-2 block text-xs font-normal">New due date
-          <input aria-label={"Due date for "+assessment.title} type="date"
-           value={assessmentDueDates[assessment.id]??""}
-           onChange={event=>setAssessmentDueDates(current=>({...current,[assessment.id]:event.target.value}))}
-           className="mt-1 w-full rounded border bg-background p-1.5 text-xs"/>
-         </label>
-         <div className="mt-2 flex flex-wrap gap-1">
-          {assessment.status==="draft"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"publish")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Publish</button>}
-          {assessment.status==="published"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"close")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Close</button>}
-          {assessment.status==="closed"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"reopen")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Reopen</button>}
-          {assessment.status!=="draft"&&<button disabled={busy||!assessmentDueDates[assessment.id]} onClick={()=>changeAssessment(assessment.id,"reschedule")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Change deadline</button>}
-         </div>
-        </th>)}
+        {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment =>
+         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} busy={busy}
+          dueDate={assessmentDueDates[assessment.id]??""}
+          onDueDateChange={value=>setAssessmentDueDates(current=>({...current,[assessment.id]:value}))}
+          onAction={action=>void changeAssessment(assessment.id,action)}
+          onDraftSaved={async()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");await loadGradebook(selected);}}
+          onScheduleSaved={()=>loadGradebook(selected)}/>)}
        </tr>
       </thead>
       <tbody>
