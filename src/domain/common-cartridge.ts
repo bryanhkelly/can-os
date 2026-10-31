@@ -191,3 +191,74 @@ export function inspectCommonCartridgeZip(zip:Uint8Array):CartridgePreview {
 export function inspectCommonCartridgeManifest(xml:string):CartridgePreview{
  return parseManifest(xml);
 }
+
+/** Read only an explicitly referenced, bounded web-link descriptor from the ZIP.
+ * Do not extract HTML/script payloads or treat the whole archive as publishable. */
+export function extractCommonCartridgeWebLink(zip:Uint8Array,resourcePath:string):
+  {title:string;url:string} {
+  const requested=safePath(resourcePath);
+  if(zip.length<22||zip.length>maxPackageBytes)throw new Error("Cartridge archive size unsupported.");
+  const view=new DataView(zip.buffer,zip.byteOffset,zip.byteLength);
+  let eocd=-1;
+  for(let p=zip.length-22;p>=Math.max(0,zip.length-65557);p--){
+    if(view.getUint32(p,true)===0x06054b50){eocd=p;break;}
+  }
+  if(eocd<0)throw new Error("Invalid cartridge ZIP directory.");
+  const count=view.getUint16(eocd+10,true);
+  const directorySize=view.getUint32(eocd+12,true);
+  let offset=view.getUint32(eocd+16,true);
+  if(!count||count>3000||count===0xffff||offset+directorySize>eocd)
+    throw new Error("Invalid cartridge ZIP directory.");
+  const decoder=new TextDecoder("utf-8",{fatal:true});
+  let descriptor:string|null=null;
+  for(let index=0;index<count;index++){
+    if(offset+46>zip.length||view.getUint32(offset,true)!==0x02014b50)
+      throw new Error("Invalid cartridge ZIP file entry.");
+    const flags=view.getUint16(offset+8,true),method=view.getUint16(offset+10,true);
+    const expectedCrc=view.getUint32(offset+16,true);
+    const compressed=view.getUint32(offset+20,true),expanded=view.getUint32(offset+24,true);
+    const nameLength=view.getUint16(offset+28,true),extra=view.getUint16(offset+30,true);
+    const comment=view.getUint16(offset+32,true),local=view.getUint32(offset+42,true);
+    if(offset+46+nameLength+extra+comment>zip.length)
+      throw new Error("Truncated cartridge ZIP directory.");
+    const name=decoder.decode(zip.subarray(offset+46,offset+46+nameLength));
+    safePath(name.endsWith("/")?name.slice(0,-1):name);
+    if(name===requested){
+      if(descriptor!==null||flags&1||compressed===0xffffffff||expanded===0xffffffff||
+          local===0xffffffff||expanded>64*1024||compressed>128*1024)
+        throw new Error("Unsupported or duplicated web-link resource.");
+      if(local+30>zip.length||view.getUint32(local,true)!==0x04034b50||
+          view.getUint16(local+8,true)!==method)
+        throw new Error("Invalid cartridge ZIP local entry.");
+      const localNameSize=view.getUint16(local+26,true),localExtra=view.getUint16(local+28,true);
+      const start=local+30+localNameSize+localExtra;
+      if(start+compressed>zip.length||
+          decoder.decode(zip.subarray(local+30,local+30+localNameSize))!==requested)
+        throw new Error("Cartridge resource path mismatch.");
+      const data=zip.subarray(start,start+compressed);
+      const inflated=method===0?data:method===8?
+        inflateRawSync(data,{maxOutputLength:64*1024}):null;
+      if(!inflated||inflated.length!==expanded||crc32(inflated)!==expectedCrc)
+        throw new Error("Cartridge resource integrity check failed.");
+      descriptor=decoder.decode(inflated);
+    }
+    offset+=46+nameLength+extra+comment;
+  }
+  if(descriptor===null)throw new Error("Referenced web-link resource is missing.");
+  if(/<!DOCTYPE\b|<!ENTITY\b|<!\[CDATA\[|<\?xml-stylesheet\b/i.test(descriptor))
+    throw new Error("Unsafe web-link XML.");
+  if(!/<(?:[\w.-]+:)?webLink(?:\s|>)/i.test(descriptor))
+    throw new Error("Expected an IMS Common Cartridge web-link descriptor.");
+  const links=[...descriptor.matchAll(/<(?:[\w.-]+:)?url\b([^>]*)\/?\s*>/gi)];
+  if(links.length!==1)throw new Error("Web-link descriptor must have one URL.");
+  const href=attributes(links[0]![1]??"").href;
+  if(!href||href.length>2048)throw new Error("Missing or oversized web-link URL.");
+  const url=new URL(href);
+  if(url.protocol!=="https:"||url.username||url.password||!url.hostname||
+      /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/i.test(url.hostname))
+    throw new Error("Web-link must use a safe HTTPS destination.");
+  const titleMatch=descriptor.match(/<(?:[\w.-]+:)?title\b[^>]*>([^<]*)<\/(?:[\w.-]+:)?title>/i);
+  const title=titleMatch?decodeXml(titleMatch[1]!.trim()):url.hostname;
+  if(!title||title.length>200)throw new Error("Invalid Common Cartridge web-link title.");
+  return {title,url:url.href};
+}
