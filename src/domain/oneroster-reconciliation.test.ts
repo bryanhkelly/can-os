@@ -19,7 +19,7 @@ describe("OneRoster reconciliation is identity-untrusted", () => {
   it("never treats an external student as an approved CAN identity", () => {
     const bundle = previewOneRosterBundle({ users, classes, enrollments });
     const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
-    expect(plan.counts).toEqual({ users: 1, classes: 1, enrollments: 1, blocked: 2 });
+    expect(plan.counts).toEqual({ users: 1, classes: 1, enrollments: 1, blocked: 2, review: 1, approved: 0, applied: 0 });
     const enrollment = plan.rows.find(r => r.kind === "enrollment");
     expect(enrollment?.state).toBe("blocked");
     expect(enrollment?.reasons).toContain("EXTERNAL_IDENTITY_UNVERIFIED");
@@ -83,6 +83,21 @@ describe("OneRoster reconciliation is identity-untrusted", () => {
     const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
     expect(plan.rows.find(row => row.kind === "enrollment")?.reasons)
       .toContain("EXTERNAL_ENROLLMENT_ROLE_NOT_STUDENT");
+  });
+
+  it("flags inactive external identities and linked enrollments", () => {
+    const suspended = users.replace("student,active", "student,inactive");
+    const bundle = previewOneRosterBundle({ users: suspended, classes, enrollments });
+    const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
+    expect(plan.rows.find(r => r.kind === "user")?.reasons).toContain("EXTERNAL_ROW_INACTIVE");
+    expect(plan.rows.find(r => r.kind === "enrollment")?.reasons).toContain("EXTERNAL_ROW_INACTIVE");
+  });
+
+  it("rejects reused sourcedIds across different OneRoster entity kinds", () => {
+    const colliding = enrollments.replace("enrollment-1,class-1", "user-1,class-1");
+    const bundle = previewOneRosterBundle({ users, classes, enrollments: colliding });
+    const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
+    expect(plan.rows.find(r => r.kind === "enrollment")?.reasons).toContain("EXTERNAL_SOURCED_ID_COLLISION");
   });
 
 });
