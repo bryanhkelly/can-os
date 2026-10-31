@@ -93,6 +93,20 @@ describe("Common Cartridge conservative static lesson",()=>{
    {...entry,files:["lessons/a.html","lessons/b.css"]})).toThrow();
   expect(()=>extractCommonCartridgeStaticLesson(zipEntry("different.html","<p>ok</p>"),entry)).toThrow();
  });
+ it("rejects ZIP symlinks, inflated size claims and unsafe HTML controls",()=>{
+  const archive=zipEntry("lessons/a.html","<p>Safe text</p>");
+  const central=archive.lastIndexOf(Buffer.from([0x50,0x4b,0x01,0x02]));
+  expect(central).toBeGreaterThan(0);
+  const symlink=Buffer.from(archive);
+  symlink.writeUInt32LE(0xa1ff0000,central+38);
+  expect(()=>extractCommonCartridgeStaticLesson(symlink,entry)).toThrow("Symlink");
+  const bomb=Buffer.from(archive);
+  bomb.writeUInt32LE(21*1024*1024,central+24);
+  expect(()=>extractCommonCartridgeStaticLesson(bomb,entry)).toThrow();
+  for(const html of ["<p>Hi\\u0000there</p>","<p>Bad < text</p>","<p>Bad &amp; entity</p>"]){
+   expect(()=>extractCommonCartridgeStaticLesson(zipEntry("lessons/a.html",html),entry)).toThrow();
+  }
+ });
  it("rejects unsupported executable assessment resources",()=>{
   expect(()=>extractCommonCartridgeStaticLesson(zipEntry("lessons/a.html","<p>quiz</p>"),
    {...entry,type:"imsqti_xmlv1p2"})).toThrow("webcontent");
