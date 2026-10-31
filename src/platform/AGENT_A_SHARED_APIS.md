@@ -6,8 +6,8 @@ Branch: `refactor/platform-foundations` (based on `FullFlow`).
 
 `useWorkspaceMutation<TInput, TResult>({ mutationFn, invalidateQueries?, onSuccess?, onError? })` from `src/hooks/useWorkspaceMutation.ts`.
 
-Returns TanStack Query mutation state and `submit(input): Promise<TResult | undefined>`.
-Concurrent submissions through `submit` are ignored. Errors from the underlying mutation are propagated; callers should handle rejected promises. Query invalidation completes before the success callback.
+Returns TanStack Query mutation state and `submit(input): Promise<WorkspaceSubmission<TResult>>`. The discriminant is `status: "completed" | "ignored"`; completed results carry `value` and optional `refreshError`.
+Concurrent submissions through `submit` return `{ status: "ignored" }`. Domain-command failures reject and release the guard. Query and optional router invalidation occur only after a successful command; a refresh failure is reported separately and never turns a successful command into a failed command.
 
 Example:
 
@@ -17,7 +17,7 @@ const save = useWorkspaceMutation({
   invalidateQueries: [["site", siteId]],
   onSuccess: () => toast.success("Saved"),
 });
-await save.submit(payload);
+const result = await save.submit(payload);\nif (result.status === "completed") {\n  // Command succeeded, even if result.refreshError is set.\n}
 ```
 
 Use server-side authorization regardless of client mutation state.
@@ -73,3 +73,13 @@ Unit tests added for timezone, loader classification, server-function factories,
 - Run a browser-level test against a real authenticated endpoint before widespread migration.
 
 GitHub connector commits are not proof of successful compilation or tests. No validation results are claimed here.
+
+## Integration update (latest FullFlow)
+
+- The working branch was fast-forwarded to canonical FullFlow commit `310e16d` before these follow-up edits. No merge into FullFlow was performed.
+- `SerializableResult` constrains shared server-function outputs to JSON-compatible values; avoid returning Date, Map, Set, functions, undefined, or class instances. Domain results should be converted to explicit DTOs at the server boundary.
+- Feature agents should migrate only after the real TanStack typecheck and code-verification workflow pass. The older mocked server-function tests are not a substitute for framework type verification.
+- The new `platform-code-verification.yml` runs on PRs targeting FullFlow and pushes to the Agent A branch. It does not use Neon credentials. The manually triggered `fullflow-release-acceptance.yml` remains unchanged, isolated, and gated by preflight.
+- Integration owner should require the code-verification job in FullFlow branch protection and separately require recorded connected acceptance before release, without running connected fixtures on ordinary PRs.
+- Agent D owns admissions-specific connected acceptance. Agents C and E should adopt the typed mutation result discriminant and preserve existing domain authorization.
+- Actual typecheck, unit, lint, and build results are pending CI execution. Do not infer green status from commits alone.
