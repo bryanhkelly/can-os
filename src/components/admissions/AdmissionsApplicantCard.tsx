@@ -4,7 +4,7 @@ import { AdmissionsDecisionActions,type AdmissionsDecision } from "./AdmissionsD
 import { AdmissionsTransferStatus } from "./AdmissionsTransferStatus";
 import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 
-type Applicant=Awaited<ReturnType<typeof listAdmissionsIntake>>[number];
+type Applicant=Awaited<ReturnType<typeof listAdmissionsIntake>>["items"][number];
 export function AdmissionsApplicantCard({r,busy,onVerify,onProvision,onInvite,onDecision}:{
  r:Applicant;busy:boolean;
  onVerify:(id:string)=>void;onProvision:(id:string)=>void;onInvite:(id:string)=>void;
