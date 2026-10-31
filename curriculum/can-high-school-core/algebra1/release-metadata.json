@@ -16,7 +16,8 @@
   "schoolAdoptionStatus": "not_adopted",
   "authoredWeeks": [
     1,
-    2
+    2,
+    3
   ],
   "requiredReview": [
     "Qualified mathematics educator checks all examples, answer keys and scoring criteria",
