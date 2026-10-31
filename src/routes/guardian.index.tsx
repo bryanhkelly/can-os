@@ -80,6 +80,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,action
       <Link to="/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><Mail className="size-4" /> Family inbox</Link>
       <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><CalendarDays className="size-4" /> Attendance</Link>
       <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted">Pickup &amp; safety</Link>
+      <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted">Health &amp; clearance</Link>
      </div>
     </div>
    </section>
@@ -138,6 +139,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,action
        <Link to="/guardian/academics" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
        <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
        <Link to="/guardian/attendance" search={{student:child.studentPersonId}} hash="pickup" className="rounded-full border px-3 py-1 hover:bg-muted">Pickup &amp; safety</Link>
+       <Link to="/guardian/health" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Health &amp; clearance</Link>
        <Link to="/guardian/report-cards" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
        <Link to="/guardian/admission-offers" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Offers</Link>
       </nav>
