@@ -62,12 +62,12 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
       eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated"])));
   const institutional=enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId)
-    .sort((x,y)=>x.yearStarts.localeCompare(y.yearStarts));
+    .sort((x,y)=>String(x.yearStarts).localeCompare(String(y.yearStarts)));
   if(!institutional.length) throw new AuthorizationError("Institutional entry cohort not established");
   const documented=institutional.map(row=>row.metadata?.graduationEntryCohort).filter(value=>value!==undefined && value!==null);
   if(documented.some(v=>typeof v!=="string") || new Set(documented).size>1)
     throw new AuthorizationError("Conflicting documented graduation cohort overrides");
-  const entryCohort=(documented[0] as string|undefined) ?? institutional[0]!.yearStarts.slice(0,4);
+  const entryCohort=(documented[0] as string|undefined) ?? String(institutional[0]!.yearStarts).slice(0,4);
   const policies=await db.select().from(s.graduationRequirementSets)
     .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
   let applicable;
@@ -75,7 +75,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   catch { throw new AuthorizationError("No unambiguous applicable graduation cohort policy"); }
   if(applicable.id!==requirementSet.id)
     throw new AuthorizationError("Selected graduation policy does not apply to student cohort");
-  if(institutional[0] && new Date(institutional[0].yearStarts).getTime()>transcript.issuedAt.getTime())
+  if(institutional[0] && new Date(String(institutional[0].yearStarts)).getTime()>transcript.issuedAt.getTime())
     throw new AuthorizationError("Transcript predates institutional enrollment");
   return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
 }
@@ -207,6 +207,11 @@ export const decideGraduation = createServerFn({method:"POST"})
          .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
        if(latestTranscript?.id!==transcript.id) throw new AuthorizationError("Latest issued transcript required for graduation");
      }
+     const [lastDecision]=await tx.select().from(s.graduationDecisions)
+       .where(and(eq(s.graduationDecisions.studentProfileId,transcript.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,transcript.issuingOrganizationId)))
+       .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.id)).limit(1);
+     if(lastDecision?.transcriptIssuanceId===transcript.id && lastDecision.requirementSetId===requirementSet.id && lastDecision.decision===data.decision)
+       throw new AuthorizationError("Identical graduation decision already recorded");
      const result=adjudicateGraduation({
        requirementSetId:requirementSet.id,transcriptIssuanceId:transcript.id,
        requirementIssuerId:requirementSet.issuingOrganizationId,transcriptIssuerId:transcript.issuingOrganizationId,
