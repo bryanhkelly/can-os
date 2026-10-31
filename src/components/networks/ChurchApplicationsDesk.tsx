@@ -13,9 +13,9 @@ export function ChurchApplicationsDesk() {
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [evidenceReference, setEvidenceReference] = useState("");
-  const [verificationMethod, setVerificationMethod] = useState<"signed_authority" | "denominational_confirmation" | "independent_church_confirmation">("signed_authority");
-  const [declineNote, setDeclineNote] = useState("");
+  const [evidenceReference, setEvidenceReference] = useState<Record<string, string>>({});
+  const [verificationMethod, setVerificationMethod] = useState<Record<string, "signed_authority" | "denominational_confirmation" | "independent_church_confirmation">>({});
+  const [declineNote, setDeclineNote] = useState<Record<string, string>>({});
   const [reviewedEvidenceRequestId, setReviewedEvidenceRequestId] = useState<string | null>(null);
 
   async function refresh() {
@@ -30,18 +30,18 @@ export function ChurchApplicationsDesk() {
     setWorking(id); setError(""); setNotice("");
     try {
       if (operation === "verify") {
-        await verifyChurchOnboardingRequest({ data: { requestId: id, evidenceReference, verificationMethod } });
+        await verifyChurchOnboardingRequest({ data: { requestId: id, evidenceReference: evidenceReference[id] ?? "", verificationMethod: verificationMethod[id] ?? "signed_authority" } });
         setNotice("Independent authority evidence recorded. Another CAN steward must approve the invitation.");
       } else if (operation === "approve") {
         const result = await approveChurchOnboardingRequest({ data: id });
         setNotice(result.emailSent
-          ? "Church and Site prepared. Secure invitation issued; access starts on email acceptance."
+          ? "Church and Site prepared. Email accepted by the provider, not confirmed delivered; access starts on secure invitation acceptance."
           : "Church and Site prepared, but email delivery is unconfirmed. Check the mail provider and resend access.");
       } else {
-        await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote } });
+        await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote[id] ?? "" } });
         setNotice("Application declined and any linked authority evidence invalidated.");
       }
-      setEvidenceReference(""); setDeclineNote(""); setReviewedEvidenceRequestId(null);
+      setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setReviewedEvidenceRequestId(null);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to complete church review.");
@@ -72,17 +72,17 @@ export function ChurchApplicationsDesk() {
           {request.status==="submitted" ? <div className="mt-4 space-y-3">
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
             <label className="block text-sm font-semibold">How authority was verified
-              <select className={field} value={verificationMethod} onChange={e=>setVerificationMethod(e.target.value as typeof verificationMethod)}>
+              <select className={field} value={verificationMethod[request.id] ?? "signed_authority"} onChange={e=>setVerificationMethod(previous=>({...previous,[request.id]:e.target.value as "signed_authority" | "denominational_confirmation" | "independent_church_confirmation"}))}>
                 <option value="signed_authority">Reviewed signed authorization</option>
                 <option value="denominational_confirmation">Independent denomination confirmation</option>
                 <option value="independent_church_confirmation">Independent church officer confirmation</option>
               </select>
             </label>
             <label className="block text-sm font-semibold">External evidence record or reference
-              <input required minLength={8} maxLength={500} className={field} value={evidenceReference}
-                onChange={e=>setEvidenceReference(e.target.value)} placeholder="Document vault reference or verified contact record" />
+              <input required minLength={8} maxLength={500} className={field} value={evidenceReference[request.id] ?? ""}
+                onChange={e=>setEvidenceReference(previous=>({...previous,[request.id]:e.target.value}))} placeholder="Document vault reference or verified contact record" />
             </label>
-            <button type="button" disabled={!!working||evidenceReference.trim().length<8}
+            <button type="button" disabled={!!working||(evidenceReference[request.id] ?? "").trim().length<8}
               onClick={()=>void act(request.id,"verify")}
               className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
               Record independent verification
@@ -111,10 +111,10 @@ export function ChurchApplicationsDesk() {
           <details className="mt-4 rounded-lg border p-3">
             <summary className="cursor-pointer text-sm font-semibold">Decline application</summary>
             <label className="mt-2 block text-sm">Reason for decision
-              <textarea minLength={10} maxLength={1000} className={field} value={declineNote}
-                onChange={e=>setDeclineNote(e.target.value)}/>
+              <textarea minLength={10} maxLength={1000} className={field} value={declineNote[request.id] ?? ""}
+                onChange={e=>setDeclineNote(previous=>({...previous,[request.id]:e.target.value}))}/>
             </label>
-            <button type="button" disabled={!!working||declineNote.trim().length<10}
+            <button type="button" disabled={!!working||(declineNote[request.id] ?? "").trim().length<10}
               onClick={()=>void act(request.id,"decline")} className="mt-2 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">
               Confirm decline
             </button>
