@@ -50,7 +50,7 @@ function Publisher({data}:{data:Data}){
   finally{setBusy(false);}
  }
  return <WorkspaceShell eyebrow="CAN OS · School operations" title="Urgent family communications"
-  subtitle="Publish clear, timely school updates to verified enrolled families. Delivery counts represent in-app notification records, not email/SMS delivery or confirmed family awareness."
+  subtitle="Publish verified family notices through in-app notifications, school email and opt-in SMS. Provider acceptance is not evidence of inbox or phone delivery."
   actions={<Link to="/operations" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
   {notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{notice}</p>}
   {error&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">{error}</p>}
@@ -81,7 +81,7 @@ function Publisher({data}:{data:Data}){
      placeholder="Include the effective date, affected school activities, safety instructions and how to contact the school."
      className="mt-2 w-full rounded border bg-background p-3" />
    </label>
-   <p className="text-xs text-muted-foreground">This communicates a school decision; it does not make a legal closure decision, update calendars or notify emergency services. Contact families by other required channels for urgent safety issues.</p>
+   <p className="text-xs text-muted-foreground">Verified families receive an in-app notice and queued email. Only verified SMS opt-ins receive a text, which tells families to sign in. Quiet hours may delay delivery. This is not an emergency dispatch system, a calendar mutation or authorization to close the school.</p>
    <button type="submit" disabled={busy||!programId||title.trim().length<8||message.trim().length<20}
     className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
     {busy?"Publishing…":"Publish to currently enrolled families"}
@@ -93,7 +93,12 @@ function Publisher({data}:{data:Data}){
     <p className="font-semibold">{item.title}</p>
     <p className="mt-1 text-xs text-muted-foreground">{String(item.kind).replaceAll("_"," ")} · {new Date(item.publishedAt).toLocaleString()}</p>
     <p className="mt-2 whitespace-pre-wrap text-sm">{item.description}</p>
-    <p className="mt-3 text-sm">{item.recipients} in-app recipient records · {item.acknowledged} marked read</p>
+    <p className="mt-3 text-sm">{item.recipients} in-app recipients · {item.acknowledged} marked read</p>
+    <p className="mt-1 text-sm">Email: {item.emailAccepted}/{item.emailQueued} accepted by provider · SMS: {item.smsAccepted}/{item.smsQueued} accepted by provider</p>
+    {(item.deliveryFailed>0||item.deliverySuppressed>0)&&<p className="mt-1 text-sm">
+      {item.deliveryFailed} attempts exhausted · {item.deliverySuppressed} deliveries suppressed after authorization/preference review
+    </p>
+    <p className="mt-2 text-xs text-muted-foreground">Accepted does not mean delivered, read or acknowledged. Urgent safety incidents require direct follow-up.</p>
    </article>)}
    {!data.items.length&&<p className="rounded-lg border p-4 text-sm">No published family notices in your authorized schools.</p>}
   </section>
