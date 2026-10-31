@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
+import { extendedRegistrationOpeningReadiness } from "./registration-policy";
+import { readExtendedSeasonOpeningApprovals } from "./extended-season-opening-evidence.server";
 const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const publishInput = z.object({
@@ -65,6 +66,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   const rows = await db.select({
     id: programs.id, name: programs.name, type: programs.type,
     status: programs.status, siteId: programs.siteId, organizationId: programs.organizationId,
+    academicProviderOrganizationId: programs.academicProviderOrganizationId,
   }).from(programs).where(and(
     inArray(programs.id, ids), inArray(programs.siteId, siteIds),
     inArray(programs.organizationId, orgIds), inArray(programs.type, extendedTypes),
@@ -85,8 +87,13 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   // The immutable facts are read server-side. Unimplemented safeguarding,
   // staffing, emergency, and child-release approval sources FAIL CLOSED.
   // No user checkbox or metadata value can currently open registration.
-  const readiness = seasons.map(season => {
+  const readiness = await Promise.all(seasons.map(async season => {
     const program = rows.find(p => p.id === season.programId);
+    const approvals = program ? await readExtendedSeasonOpeningApprovals(db, {
+      seasonId: season.id, siteId: season.siteId,
+      programId: program.id, organizationId: program.organizationId,
+      academicProviderOrganizationId: program.academicProviderOrganizationId,
+    }) : null;
     return {
       seasonId: season.id,
       ...extendedRegistrationOpeningReadiness({
@@ -94,10 +101,16 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
         seasonStatus: season.status,
         siteMatchesProgram: !!program?.siteId && program.siteId === season.siteId,
         capacity: season.capacity,
-        ...unavailableExtendedSeasonApprovals,
+        ...(approvals ?? {
+          approvedSafeguardingCoverage: false,
+          verifiedOnsiteStaffing: false,
+          emergencyResponsePlanApproved: false,
+          pickupAndReleasePolicyApproved: false,
+          datedSessionsAndCoverageVerified: false,
+        }),
       }),
     };
-  });
+  }));
   const assignments = seasons.length ? await db.select({
     id: actions.id, seasonId: actions.subjectId, ownerPersonId: actions.ownerPersonId,
     status: actions.status, metadata: actions.metadata,
