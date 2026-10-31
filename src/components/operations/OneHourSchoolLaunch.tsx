@@ -196,6 +196,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         : "Opening is recorded."}
     </p>}
 
+    <p className="mt-4 text-sm text-muted-foreground" role="status">You can prepare your website and invite families while CAN reviews opening requirements. Invitations and setup do not activate enrollment or authorize a supervised school day.</p>
     {next ? <article className="mt-6 rounded-2xl border-2 border-primary/30 p-5" aria-label="Next launch task">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -208,14 +209,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       <p className="mt-2 text-xs font-semibold">Responsible: {launchResponsibility(next.state)}</p>
       {next.evidenceInstructions && <p className="mt-2 text-sm">Evidence requested: {next.evidenceInstructions}</p>}
       {Boolean(next.evidenceStatementCount) && <p className="mt-1 text-xs">Statements submitted: {next.evidenceStatementCount} · Recorded for review, not approved.</p>}
-      {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries: {next.evidenceCount ?? 0}{next.ownerPersonId ? ` · Assigned owner ID: ${next.ownerPersonId}` : ""}</p>}
+      {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries: {next.evidenceCount ?? 0}{next.ownerPersonId ? ` · Assigned owner recorded` : ""}</p>}
       {next.requiresRegistrarReview && <p className="mt-2 text-sm font-semibold">This requirement needs the registrar evidence-review workflow; it cannot be self-certified.</p>}
       {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">{next.latestReviewStatus === "rejected" ? "Latest evidence review was rejected; follow up through the registrar workflow." : `${next.rejectedReviewCount} historical rejection(s); latest review: ${next.latestReviewStatus ?? "unknown"}.`}</p>}
       {Boolean(next.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">{next.reviewNoteCount} registrar review note(s) on record.</p>}
       {next.evidenceReviewCorrectionPending && <p role="status" className="mt-2 text-sm font-semibold">Correction required before this evidence can be reviewed again.</p>}
       {next.pendingEvidenceReview && <p role="status" className="mt-2 text-sm font-semibold">Evidence submitted; awaiting a CAN institutional decision.</p>}
       {next.latestReviewStatus === "rejected" && next.latestReviewReason && <p className="mt-2 rounded-lg border p-3 text-sm">Correction requested: {next.latestReviewReason}</p>}
-      {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Saved requirement: <code className="select-all">{next.requirementId}</code></p>}
+      
       {next.state === "needs_can" && <p className="mt-3 text-sm">
         CAN owns this work. Your school cannot mark it complete from this screen.
       </p>}
@@ -244,14 +245,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
               {task.blocking && task.state !== "complete" ? "Blocking opening · " : ""}{task.description}
             </p>
             {task.evidenceInstructions && <p className="mt-1 text-xs">Evidence requested: {task.evidenceInstructions}</p>}
-            {task.ownerPersonId && <p className="mt-1 text-xs text-muted-foreground">Assigned owner ID: <code className="select-all">{task.ownerPersonId}</code></p>}
+            
             {Boolean(task.evidenceStatementCount) && <p className="mt-1 text-xs">Statements submitted: {task.evidenceStatementCount} · Awaiting the relevant requirement decision.</p>}
             {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries on record: {task.evidenceCount ?? 0}</p>}
             {task.requiresRegistrarReview && <p className="mt-1 text-xs font-semibold">Registrar evidence review required — school self-completion is unavailable.</p>}
             {Boolean(task.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">Registrar review notes: {task.reviewNoteCount}</p>}
             {task.latestReviewStatus === "rejected" && task.latestReviewReason && <p className="mt-1 text-xs">Latest correction request: {task.latestReviewReason}</p>}
             {Boolean(task.rejectedReviewCount) && <p className="mt-1 text-xs font-semibold text-destructive">Historical rejected review events: {task.rejectedReviewCount}. Latest review: {task.latestReviewStatus ?? "unknown"}.</p>}
-            {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Requirement reference: <code className="select-all">{task.requirementId}</code></p>}
+            
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
@@ -273,8 +274,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       </ol>
     </details>
 
-    <details className="mt-4 rounded-xl border bg-background p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Optional · Website, outreach and family intake</summary>
+    <section className="mt-5 rounded-xl border bg-background p-4" aria-label="Prepare your school community">
+      <h3 className="text-sm font-semibold">Prepare your school community</h3>
       <p className="mt-3 text-sm text-muted-foreground">
         You can prepare these items while opening reviews continue. These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.
       </p>
@@ -289,7 +290,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         <a href="#invite-families" className="underline">Invite families to apply</a>
         <Link to="/messages" className="underline">Other family communications</Link>
       </nav>
-    </details>
+    </section>
   </section>;
 }
 
