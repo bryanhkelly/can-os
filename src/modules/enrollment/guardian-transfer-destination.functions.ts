@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,asc,eq,isNotNull,or} from "drizzle-orm";
+import {and,asc,eq,isNotNull,isNull,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import * as s from "@/db/schema";
@@ -53,7 +53,7 @@ export const listPublicTransferDestinations=createServerFn({method:"GET"}).handl
   eq(s.schoolYears.status,"active"),
   eq(s.schoolYears.organizationId,s.programs.organizationId),
   eq(s.schoolYears.siteId,s.sites.id),
-  or(eq(s.schoolYears.programId,s.programs.id),
+  or(isNull(s.schoolYears.programId),
    eq(s.schoolYears.programId,s.programs.id)),
  ))
  .where(and(eq(s.programs.status,"active"),
@@ -76,7 +76,7 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
  .handler(async({data})=>{
   const {actor,email}=await verifiedFamily();
   const [origin]=await db.select({
-   id:s.actions.id,status:s.actions.status,
+   id:s.actions.id,status:s.actions.status,programId:s.actions.programId,
    metadata:s.actions.metadata,studentProfileId:s.actions.subjectId,
    studentPersonId:s.studentProfiles.personId,
   }).from(s.actions)
@@ -102,7 +102,7 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
   const destination=await resolvePublishedFamilyStartDestination(db,data.destinationProgramId);
   if(origin.metadata.destinationProgramId===destination.programId)
    throw new Error("This receiving-school application is already linked; continue the existing application.");
-  if(origin.metadata.originProgramId===destination.programId)
+  if(origin.programId===destination.programId)
    throw new Error("Choose a different school from the originating school.");
   const result=await requestPublicFamilyStart(destination.slug,{
    requestId:data.requestId,
@@ -110,7 +110,7 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
    firstName:guardian.firstName,lastName:guardian.lastName,
    email,contactConsent:"yes",website:"",
   });
-  await writeAudit(db,actor,{
+  await db.transaction(async tx=>writeAudit(tx,actor,{
    action:"transfer.destination_family_start_requested",
    entityType:"action",entityId:origin.id,
    scope:{programId:destination.programId,siteId:destination.siteId,
@@ -118,6 +118,6 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
    after:{destinationProgramId:destination.programId,
      verificationRequested:result.created,
      familyStartRequestId:result.requestId},
-  });
+  }));
   return {requested:result.created,destinationName:destination.programName};
  });
