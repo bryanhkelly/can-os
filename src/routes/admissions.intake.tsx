@@ -7,6 +7,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
+import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGuardianActions";
 import { AdmissionsDecisionActions } from "@/components/admissions/AdmissionsDecisionActions";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
@@ -224,40 +225,24 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
           Request authorization from the verified guardian before accessing the official record.
         </p>}
     </div>}
-    <p className="mt-3 text-xs text-muted-foreground">
-      Guardian verification: <strong>{r.guardianVerified?"Verified":"Required"}</strong> ·
-      {" "}Sign-in access: <strong>{r.guardianLoginProvisioned?"Provisioned":"Not provisioned"}</strong>.
-      Verify the relationship independently before granting or inviting access.
-    </p>
-    <div className="mt-3 flex flex-wrap gap-2">
-      <button disabled={busy||r.guardianVerified} onClick={()=>{
-        const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
-        if(!evidenceNote)return;
-        const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
-        if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
-        void perform(()=>verifyAdmissionsGuardianRelationship({data:{
-         applicationId:r.id,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
-        }}),"Guardian relationship verified and family permissions enabled.");
-       }}
-       className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-       {r.guardianVerified?"Relationship verified":"Verify guardian relationship"}
-      </button>
-      <button disabled={busy||!r.guardianVerified||r.guardianLoginProvisioned}
-        onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
-          "Verified guardian sign-in access provisioned.")}
-        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-        {r.guardianLoginProvisioned?"Login provisioned":"Provision guardian login"}
-      </button>
-      <button disabled={busy||!r.guardianLoginProvisioned}
-       onClick={()=>perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId:r.id}}),
-        "A secure email sign-in invitation was requested for this guardian.")}
-       className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-       Send secure guardian invitation
-      </button>
-      {r.disposition==="ready_for_offer" && <Link to="/admissions"
-        search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
-        className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
-    </div>
+    <AdmissionsGuardianActions applicationId={r.id} verified={r.guardianVerified}
+     loginProvisioned={r.guardianLoginProvisioned} busy={busy}
+     onVerify={applicationId=>{
+      const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
+      if(!evidenceNote)return;
+      const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
+      if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
+      void perform(()=>verifyAdmissionsGuardianRelationship({data:{
+       applicationId,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
+      }}),"Guardian relationship verified and family permissions enabled.");
+     }}
+     onProvision={applicationId=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
+      "Verified guardian sign-in access provisioned.")}
+     onInvite={applicationId=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
+      "A secure email sign-in invitation was requested for this guardian.")}/>
+    {r.disposition==="ready_for_offer"&&<Link to="/admissions"
+      search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
+      className="mt-3 inline-block rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
     <AdmissionsDecisionActions stage={r.stage} disposition={r.disposition} busy={busy}
      onDecision={(decision,label)=>void perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision}}),label+" saved.")}/>
     <Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
