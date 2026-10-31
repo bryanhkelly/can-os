@@ -65,6 +65,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      else if(origin.status!=="resolved"||origin.metadata.exitCompletedByRegistrar!==true||
        origin.metadata.exitStatus!=="transferred")
        transferBlocker="Originating school must complete the institutional transfer before this accepted offer can activate.";
+     else if(!origin.programId)transferBlocker="Origin transfer has no source Program.";
      else{
        const [prior]=await db.select({id:enrollments.id}).from(enrollments)
          .where(and(eq(enrollments.studentProfileId,app.studentProfileId),
