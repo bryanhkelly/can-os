@@ -113,6 +113,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     if (today > policy.addDropEndsOn) return null;
     return {
       id: row.id,
+      studentPersonId: row.ownerPersonId,
       sectionTitle: row.sectionTitle,
       sectionCode: row.sectionCode,
       studentName: row.studentName + " " + row.studentLastName,
