@@ -1,5 +1,5 @@
 import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm } from "@/components/evidence";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
   readExtendedEvidenceFn, reviewExtendedEvidenceFn, getExtendedEvidenceDownloadFn,
@@ -19,14 +19,22 @@ export function ExtendedSeasonEvidencePanel({ seasonId, onChange }: {
 }) {
   const [model, setModel] = useState<Model | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const requestSequence = useRef(0);
   const load = useCallback(async () => {
+    const request = ++requestSequence.current;
     setLoading(true); setError("");
-    try { setModel(await readExtendedEvidenceFn({ data: { seasonId } })); }
-    catch (cause) { setModel(null); setError(cause instanceof Error ? cause.message : "Unable to read evidence"); }
-    finally { setLoading(false); }
+    try {
+      const result = await readExtendedEvidenceFn({ data: { seasonId } });
+      if (request === requestSequence.current) setModel(result);
+    } catch (cause) {
+      if (request === requestSequence.current) {
+        setModel(null);
+        setError(cause instanceof Error ? cause.message : "Unable to read evidence");
+      }
+    } finally { if (request === requestSequence.current) setLoading(false); }
   }, [seasonId]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { requestSequence.current++; }; }, [load]);
   async function changed() { await load(); await onChange?.(); }
   return <section className="mt-3 rounded-lg border bg-card p-4" aria-label="Extended-learning operational approvals">
     <h3 className="text-sm font-semibold">Independent operating approval</h3>
