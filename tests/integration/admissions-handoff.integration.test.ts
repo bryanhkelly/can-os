@@ -302,7 +302,10 @@ integration("cross-persona admissions through active classes",()=>{
     for(const action of ["admissions.stage.waitlist","admissions.stage.restore"])
      expect(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,applicationId),eq(s.auditEvents.action,action)))).toHaveLength(1);
     expect(await tx.select().from(s.journeys).where(eq(s.journeys.participantId,applicationId))).toHaveLength(1);
+    // The successful offer must also work under the institution-wide grant.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
     const issued=await offers.issueAdmissionOffer({data:issuance});
+    state.actor=staff;
     withdrawnOfferId=issued.offerId;
     expect(await offers.issueAdmissionOffer({data:issuance})).toEqual(issued);
     for(const decision of ["waitlist","decline","withdraw"] as const)
@@ -463,7 +466,10 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("Guardian is not authorized");
     await tx.update(s.guardianRelationships).set({canManageEnrollment:true})
      .where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),eq(s.guardianRelationships.studentPersonId,student.personId)));
+    // Enrollment activation is the other half of the institutional handoff.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
     const activated=await offers.activateOfferedEnrollment({data:current});
+    state.actor=staff;
     enrollmentId=activated.enrollmentId;
     expect(await offers.activateOfferedEnrollment({data:current})).toEqual(activated);
     state.actor=family;
