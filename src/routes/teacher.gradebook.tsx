@@ -69,7 +69,8 @@ function TeacherGradebookPage() {
  const reviewAssessment=gradebook?.assessments.find(item=>item.id===reviewCell?.assessmentId);
  const reviewStudent=gradebook?.students.find(item=>item.studentProfileId===reviewCell?.studentProfileId);
  // Prioritize work awaiting a grade; reviewed history remains in the grid.
- const reviewQueue=gradebook?.cells.filter(cell=>cell.status==="submitted")??[];
+ const reviewQueue=[...(gradebook?.cells.filter(cell=>cell.status==="submitted")??[])]
+  .sort((a,b)=>Number(Boolean(b.gradingDraft))-Number(Boolean(a.gradingDraft)));
  const pendingReviewCount=reviewQueue.length;
  const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
  const previousReview=reviewIndex>0?reviewQueue[reviewIndex-1]:undefined;
