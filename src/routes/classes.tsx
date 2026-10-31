@@ -1,3 +1,4 @@
+import { ClassLearningProgress } from "@/components/learning/ClassLearningProgress";
 import { ClassTeachingTeam } from "@/components/learning/ClassTeachingTeam";
 import { PublishedLessonNavigation } from "@/components/learning/PublishedLessonNavigation";
 import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
@@ -158,10 +159,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     {tab === "overview" && <div className="grid gap-5">
       {data.role !== "teacher" && <StudentNextStepsPanel nextSteps={nextSteps} search={search} />}
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
-      <WorkspacePanel title="Learning progress" description="Student-reported lesson completion is not a grade, mastery score or attendance record.">
-        <p className="text-sm">{data.role === "teacher" ? `${lessons.length} published lessons · ${data.roster.length} enrolled students` : `${completed.size} / ${lessons.length} published lessons marked complete`}</p>
-        <Link to="/classes" search={{ ...search, tab: "lessons" }} className="mt-3 inline-block text-sm underline">Open lessons</Link>
-      </WorkspacePanel>
+      <ClassLearningProgress search={search} isTeacher={data.role==="teacher"}
+       lessonCount={lessons.length} completedCount={completed.size} studentCount={data.roster.length} />
       <WorkspacePanel title="Assessment evidence" description="Teacher-reviewed submissions are different from lesson completion. Scores shown here are not a mastery decision or course credit.">
         <p className="text-sm">{assessmentEvidence.length} published class assessments
           {data.role !== "teacher" && assessmentSummary ? ` · ${assessmentSummary.graded} graded · ${assessmentSummary.awaitingFeedback} awaiting feedback` : ""}</p>
