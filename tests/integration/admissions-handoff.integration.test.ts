@@ -466,6 +466,14 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("Guardian is not authorized");
     await tx.update(s.guardianRelationships).set({canManageEnrollment:true})
      .where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),eq(s.guardianRelationships.studentPersonId,student.personId)));
+    // An accepted offer may exist before school opening; active enrollment may not.
+    await tx.update(s.programs).set({status:"launching"}).where(eq(s.programs.id,program.id));
+    await expect(offers.activateOfferedEnrollment({data:current}))
+     .rejects.toThrow("School must be activated");
+    expect(await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
+     eq(s.enrollments.studentProfileId,profileId),eq(s.enrollments.programId,program.id),
+     eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")))).toHaveLength(0);
+    await tx.update(s.programs).set({status:"active"}).where(eq(s.programs.id,program.id));
     // Enrollment activation is the other half of the institutional handoff.
     state.actor={...staff,scope:{organizationIds:[org.id]}};
     const activated=await offers.activateOfferedEnrollment({data:current});
