@@ -167,3 +167,103 @@ export const signGuardianFieldTripPermission = createServerFn({ method: "POST" }
       return { saved: true, consentRecordId: consent.id };
     });
   });
+
+
+/** Explicit parental refusal is an immutable signed decision, never a missing
+ * signature or a valid boarding consent. The canonical participant state and
+ * audit/event evidence change together in one transaction.
+ */
+export const declineGuardianFieldTripPermission = createServerFn({ method: "POST" })
+  .validator((value:unknown)=>z.object({
+    participantId:uuid,confirmed:z.literal(true),
+    note:z.string().trim().max(500).default(""),
+  }).strict().parse(value))
+  .handler(async({data})=>{
+   const actor=await requireActor(["guardian"],"enrollment:manage");
+   const sites=actorSiteIds(actor);
+   return db.transaction(async tx=>{
+     const [reference]=await tx.select({tripId:s.fieldTripParticipants.fieldTripId})
+       .from(s.fieldTripParticipants)
+       .where(eq(s.fieldTripParticipants.id,data.participantId)).limit(1);
+     if(!reference)throw new AuthorizationError("field trip invitation");
+     const [trip]=await tx.select().from(s.fieldTrips)
+       .where(eq(s.fieldTrips.id,reference.tripId)).for("update").limit(1);
+     if(!trip||!sites.includes(trip.siteId)||
+        (trip.programId&&!actor.scope.programIds?.includes(trip.programId)))
+       throw new AuthorizationError("authorized field trip");
+     const [participant]=await tx.select().from(s.fieldTripParticipants)
+       .where(and(eq(s.fieldTripParticipants.id,data.participantId),
+         eq(s.fieldTripParticipants.fieldTripId,trip.id))).for("update").limit(1);
+     if(!participant)throw new AuthorizationError("trip invitation");
+     const [student]=await tx.select({personId:s.studentProfiles.personId})
+       .from(s.studentProfiles).where(eq(s.studentProfiles.id,participant.studentProfileId)).limit(1);
+     if(!student)throw new AuthorizationError("student profile");
+     const [guardian]=await tx.select({id:s.guardianRelationships.id})
+       .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+         studentPersonId:student.personId,guardianPersonId:actor.actorPersonId,
+         access:"enrollment",
+       })).limit(1);
+     if(!guardian)throw new AuthorizationError("verified parent trip refusal");
+     const [enrollment]=await tx.select({id:s.enrollments.id})
+       .from(s.enrollments)
+       .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+       .where(and(eq(s.enrollments.studentProfileId,participant.studentProfileId),
+         eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+         eq(s.programs.siteId,trip.siteId),
+         inArray(s.enrollments.programId,actor.scope.programIds??[]),
+         trip.programId?eq(s.enrollments.programId,trip.programId):undefined,
+       )).limit(1);
+     if(!enrollment)throw new AuthorizationError("current child enrollment for trip");
+     if(participant.status==="declined"){
+       const [prior]=await tx.select({signerPersonId:s.consentRecords.signerPersonId,
+         signatureEvidence:s.consentRecords.signatureEvidence})
+        .from(s.consentRecords).where(eq(s.consentRecords.id,participant.consentRecordId??"")).limit(1);
+       if(prior?.signerPersonId===actor.actorPersonId&&
+          prior.signatureEvidence?.decision==="decline")
+         return {saved:false as const,alreadyDeclined:true as const};
+       throw new Error("The family has already declined this invitation.");
+     }
+     if(participant.status!=="invited"||participant.consentRecordId||
+       trip.status!=="approved"||trip.departsAt.getTime()<=Date.now())
+       throw new Error("This field trip invitation is no longer open for a parent decision.");
+     const policy=publishedTripPermission(trip.metadata);
+     if(!policy)throw new Error("School permission language is unavailable for this trip.");
+     const [consent]=await tx.insert(s.consentRecords).values({
+       subjectType:"field_trip_participant",subjectId:participant.id,
+       consentType:"field_trip_permission_declined",signerPersonId:actor.actorPersonId,
+       version:policy.version,signatureEvidence:{
+         decision:"decline",permissionText:policy.text,
+         tripId:trip.id,studentProfileId:participant.studentProfileId,
+         accountId:actor.accountId,sessionId:actor.sessionId,note:data.note,
+       },
+     }).returning({id:s.consentRecords.id});
+     if(!consent)throw new Error("Trip decline record could not be saved");
+     const [updated]=await tx.update(s.fieldTripParticipants).set({
+       status:"declined",consentRecordId:consent.id,updatedAt:new Date(),
+     }).where(and(eq(s.fieldTripParticipants.id,participant.id),
+       eq(s.fieldTripParticipants.status,"invited")))
+       .returning({id:s.fieldTripParticipants.id});
+     if(!updated)throw new Error("Field trip invitation was already decided");
+     await recordAudit(tx,actor,{
+       action:"field_trip.permission.declined",resourceType:"field_trip_participant",
+       resourceId:participant.id,scope:{siteId:trip.siteId,programId:trip.programId},
+       before:{status:"invited"},after:{status:"declined",consentRecordId:consent.id},
+     });
+     await emitEvent(tx,{
+       eventType:EventTypes.FieldTripPermissionDeclined,
+       aggregateType:"field_trip_participant",aggregateId:participant.id,
+       actorPersonId:actor.actorPersonId,
+       payload:{fieldTripId:trip.id,studentProfileId:participant.studentProfileId,
+         consentRecordId:consent.id},
+     });
+     await notify(tx,{
+       recipientPersonId:trip.proposedByPersonId,status:"unread",
+       type:"field_trip_permission_declined",
+       title:"Family declined field trip participation",
+       body:"A parent declined permission for "+trip.title+
+         ". Check the trip roster. Do not board a student without valid permission.",
+       resourceType:"field_trip",resourceId:trip.id,
+     });
+     return {saved:true as const,consentRecordId:consent.id};
+   });
+  });
