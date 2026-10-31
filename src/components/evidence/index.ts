@@ -4,3 +4,5 @@ export { EvidenceReviewForm } from "./EvidenceReviewForm";
 export { EvidenceStatus } from "./EvidenceStatus";
 export { EvidenceHistory } from "./EvidenceHistory";
 export { EvidenceWorkflow } from "./EvidenceWorkflow";
+export { EvidenceDocumentLink } from "./EvidenceDocumentLink";
+export type { EvidenceDocumentLinkProps } from "./EvidenceDocumentLink";
