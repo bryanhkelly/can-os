@@ -42,7 +42,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
- if(authError||!data||!health)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
+ if(authError||!data)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program.">
   <QueryState error={authError||"Operations data is unavailable. No operational changes were made."}/>
  </WorkspaceShell>;
@@ -121,7 +121,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     </label>
    </div>
   </section>
-  <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
+  {health ? <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p> : <p className="mt-4 text-xs text-muted-foreground">Release health is temporarily unavailable; core operations remain accessible.</p>}
   <OutboxHealthPanel/>
   {error&&<WorkspaceNotice tone="danger" className="mt-4">No operational change was completed. {error}</WorkspaceNotice>}
   <AttentionQueue items={attentionItems}/>
