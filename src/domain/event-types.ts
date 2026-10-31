@@ -17,6 +17,8 @@ export const EventTypes = {
   CurriculumDraftCreated: "CurriculumDraftCreated",
   CurriculumDraftSaved: "CurriculumDraftSaved",
   CurriculumPublished: "CurriculumPublished",
+  CurriculumAnnualAdoptionRolledOver: "CurriculumAnnualAdoptionRolledOver",
+  CurriculumAnnualAdoptionRolledBack: "CurriculumAnnualAdoptionRolledBack",
   AssignmentBecameMissing: "AssignmentBecameMissing",
   SubmissionReceived: "SubmissionReceived",
   GradePosted: "GradePosted",
