@@ -3,7 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents } from "@/db/schema";
+import { admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
@@ -70,7 +70,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
     // records, not an assumed outcome from the application or invitation.
     const linkedApplicationIds = [...new Set(rows.flatMap(row => row.applicationId ? [row.applicationId] : []))];
     const linkedStudentIds = [...new Set(rows.flatMap(row => row.studentProfileId ? [row.studentProfileId] : []))];
-    const [activeEnrollments, accessConsents] = await Promise.all([
+    const [activeEnrollments, accessConsents, linkedOffers] = await Promise.all([
       linkedStudentIds.length ? db.select({
         studentProfileId: enrollments.studentProfileId,
         programId: enrollments.programId,
@@ -87,7 +87,19 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       }).from(studentAccessConsents).where(
         inArray(studentAccessConsents.applicationId, linkedApplicationIds),
       ) : Promise.resolve([]),
+      linkedApplicationIds.length ? db.select({
+        applicationId: admissionOffers.applicationId,
+        status: admissionOffers.status,
+        issuedAt: admissionOffers.issuedAt,
+        respondedAt: admissionOffers.respondedAt,
+      }).from(admissionOffers).where(inArray(admissionOffers.applicationId, linkedApplicationIds))
+        .orderBy(desc(admissionOffers.createdAt)) : Promise.resolve([]),
     ]);
+    const latestOffers = new Map<string, typeof linkedOffers[number]>();
+    for (const offer of linkedOffers) {
+      if (!latestOffers.has(offer.applicationId) && offer.status !== "draft")
+        latestOffers.set(offer.applicationId, offer);
+    }
     const accessByApplication = new Map(accessConsents.map(consent => [consent.applicationId, consent.status]));
     // Admissions authority can change without affecting historical interest.
     // Resolve the canonical operating gate, not just Program status.
@@ -115,6 +127,11 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       studentAccessStatus: row.applicationId
         ? accessByApplication.get(row.applicationId) ?? "not_requested"
         : null,
+      latestOfferStatus: row.applicationId ? latestOffers.get(row.applicationId)?.status ?? null : null,
+      latestOfferIssuedAt: row.applicationId
+        ? latestOffers.get(row.applicationId)?.issuedAt?.toISOString() ?? null : null,
+      latestOfferRespondedAt: row.applicationId
+        ? latestOffers.get(row.applicationId)?.respondedAt?.toISOString() ?? null : null,
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
