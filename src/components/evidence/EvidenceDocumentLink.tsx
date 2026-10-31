@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export interface EvidenceDocumentLinkProps {
@@ -11,9 +11,11 @@ export function EvidenceDocumentLink({
   label = "Open private document", onGetDownloadUrl,
 }: EvidenceDocumentLinkProps) {
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState("");
   async function open() {
-    if (busy) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true); setError("");
     // Reserve the browsing context synchronously so popup blockers do not
     // reject the eventual URL after the authorization request completes.
@@ -30,7 +32,7 @@ export function EvidenceDocumentLink({
     } catch (cause) {
       popup?.close();
       setError(cause instanceof Error ? cause.message : "Unable to open private evidence");
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
   return <div className="mt-2">
     <Button variant="ghost" size="sm" disabled={busy} onClick={() => void open()}>
