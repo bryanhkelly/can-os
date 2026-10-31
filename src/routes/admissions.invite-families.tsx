@@ -2,6 +2,7 @@ import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {useState,type FormEvent} from "react";
 import {WorkspaceShell} from "@/components/workspace";
 import {FamilyInvitationBatchList,FamilyInvitationFeedback} from "@/components/admissions/FamilyInvitationBatchList";
+import {FamilyInvitationForm} from "@/components/admissions/FamilyInvitationForm";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {
@@ -63,37 +64,13 @@ function FamilyInvitationsWorkspace({data}:{data:Data}){
   subtitle="Send verified-email enrollment invitations to prospective families, including transfers from another school. The receiving-school registrar controls the invitation; no child identity or admissions decision is inferred."
   actions={<Link to="/admissions" className="rounded border px-3 py-2 text-sm">Admissions</Link>}>
   <FamilyInvitationFeedback notice={notice} error={error}/>
-  {eligible.length>0?<form onSubmit={event=>void submit(event)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
-   <h2 className="font-semibold">Send a private receiving-school application invitation</h2>
-   <label className="block text-sm font-medium">Authorized school Program
-     <select value={programId} required onChange={event=>setProgramId(event.target.value)}
-       className="mt-2 w-full rounded border bg-background p-3">
-       {eligible.map(program=><option value={program.id} key={program.id}>{program.name}</option>)}
-     </select>
-   </label>
-   <label className="block text-sm font-medium">Family contacts · one per line
-     <textarea required rows={5} maxLength={20_000} value={contacts}
-       onChange={event=>setContacts(event.target.value)}
-       placeholder={"Guardian Name,guardian@example.com\nsecond.guardian@example.com"}
-       className="mt-2 w-full rounded border bg-background p-3"/>
-   </label>
-   <p className="text-xs text-muted-foreground">Only include adults who have requested or consented to contact. Do not paste child data, medical records or custody documents. The existing invitation service deduplicates recipients and checks school authorization.</p>
-   <label className="block text-sm font-medium">Email subject
-     <input required minLength={3} maxLength={120} value={subject}
-       onChange={event=>setSubject(event.target.value)} className="mt-2 w-full rounded border bg-background p-3"/>
-   </label>
-   <label className="block text-sm font-medium">School introduction
-     <textarea required rows={3} maxLength={2000} value={introduction}
-       onChange={event=>setIntroduction(event.target.value)}
-       className="mt-2 w-full rounded border bg-background p-3"/>
-   </label>
-   <button type="submit" disabled={busy||!contacts.trim()||!programId||!subject.trim()||!introduction.trim()}
-     className="rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-     {busy?"Queuing…":"Queue secure invitations"}
-   </button>
-  </form>:<p className="mt-6 rounded border p-4 text-sm">
-    No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations.
-  </p>}
+  <FamilyInvitationForm programs={eligible} draft={{programId,contacts,subject,introduction}} busy={busy}
+   onChange={patch=>{
+    if(patch.programId!==undefined)setProgramId(patch.programId);
+    if(patch.contacts!==undefined)setContacts(patch.contacts);
+    if(patch.subject!==undefined)setSubject(patch.subject);
+    if(patch.introduction!==undefined)setIntroduction(patch.introduction);
+   }} onSubmit={event=>void submit(event)}/>
   <FamilyInvitationBatchList batches={data.batches} busy={busy} onRetry={batchId=>void retry(batchId)}/>
  </WorkspaceShell>;
 }
