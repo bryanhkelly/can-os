@@ -2,7 +2,8 @@ import type { ChangeEvent } from "react";
 
 export interface GradebookSectionOption {
   id: string;
-  name: string;
+  title: string;
+  code: string;
 }
 
 export interface GradebookSectionSelectorProps<T extends GradebookSectionOption> {
@@ -19,7 +20,7 @@ export function GradebookSectionSelector<T extends GradebookSectionOption>({
   selectedId,
   onSelect,
   disabled = false,
-  label = "Section",
+  label = "Choose a section",
 }: GradebookSectionSelectorProps<T>) {
   const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const sectionId = event.currentTarget.value;
@@ -27,10 +28,11 @@ export function GradebookSectionSelector<T extends GradebookSectionOption>({
   };
 
   return (
-    <label>
+    <label className="block text-sm font-medium">
       <span>{label}</span>
       <select
         aria-label={label}
+        className="mt-2 w-full rounded-lg border bg-background p-3"
         value={selectedId}
         disabled={disabled || sections.length === 0}
         onChange={handleChange}
@@ -38,7 +40,7 @@ export function GradebookSectionSelector<T extends GradebookSectionOption>({
         {sections.length === 0 && <option value="">No available sections</option>}
         {sections.map((section) => (
           <option key={section.id} value={section.id}>
-            {section.name}
+            {section.title} ({section.code})
           </option>
         ))}
       </select>
