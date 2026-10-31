@@ -12,6 +12,14 @@ if (preflight.error) throw preflight.error;
 if (preflight.status !== 0) process.exit(preflight.status ?? 1);
 if (process.argv.includes("--preflight")) process.exit(0);
 
+// Browser acceptance must independently verify the actual nonproduction Neon
+// branch, not merely trust the provided test database URL.
+const branchCheck = spawnSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
+  stdio: "inherit", env: process.env,
+});
+if (branchCheck.error) throw branchCheck.error;
+if (branchCheck.status !== 0) process.exit(branchCheck.status ?? 1);
+
 const accessMailOutboxDir = mkdtempSync(join(tmpdir(), "can-os-access-mail-"));
 let result;
 try {
