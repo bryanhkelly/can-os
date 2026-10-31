@@ -34,6 +34,9 @@ const stagedTags = [
   "0046_conference_booking_cancellation",
   "0047_ancient_may_parker",
   "0048_many_wasp",
+  "0049_field_trip_decline",
+  "0050_notification_outbound_deliveries",
+  "0051_church_onboarding_requests",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -42,7 +45,8 @@ export function assessFullFlowMigrationReadiness(input) {
     localCopyColumns = [], localCopyIndexes = [], localCopyConstraints = [],
     guardianDefaults = [], familyStartColumns = [], familyStartIndexes = [],
     consentColumns = [], consentIndexes = [], safetyQualificationKeys = [],
-    conferenceBookingIndexes = [], p0SafetyColumns = [], p0SafetyIndexes = [] } = input;
+    conferenceBookingIndexes = [], p0SafetyColumns = [], p0SafetyIndexes = [],
+    onboardingColumns = [], onboardingIndexes = [], outboundIndexes = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying each staged migration, verify that exact
@@ -100,11 +104,50 @@ export function assessFullFlowMigrationReadiness(input) {
     const post0048 = applied === 49 && String(lastTimestamp) === when(48) &&
       hasAll("program_site_authorizations", "site_local_content_versions",
         "public_family_start_requests", "student_access_consents");
+    const declinedEnum = enumValues.has("field_trip_participant_status.declined");
+    const outboundTable = found.has("notification_outbound_deliveries");
+    const onboardingTable = found.has("church_onboarding_requests");
+    const post0049 = applied === 50 && String(lastTimestamp) === when(49) &&
+      declinedEnum && !outboundTable && !onboardingTable;
+    const post0050 = applied === 51 && String(lastTimestamp) === when(50) &&
+      declinedEnum && outboundTable && !onboardingTable;
+    const post0051 = applied === 52 && String(lastTimestamp) === when(51) &&
+      declinedEnum && outboundTable && onboardingTable;
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
       post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
-      post0046 ? 47 : post0047 ? 48 : post0048 ? 49 : 0;
+      post0046 ? 47 : post0047 ? 48 : post0048 ? 49 :
+      post0049 ? 50 : post0050 ? 51 : post0051 ? 52 : 0;
     if (!stage)
-      issues.push("0039-0048 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0051 migration ledger/table state is inconsistent or unexpected");
+    if (stage) {
+      if ((stage >= 50) !== declinedEnum)
+        issues.push("0049 declined participant status disagrees with migration ledger");
+      if ((stage >= 51) !== outboundTable)
+        issues.push("0050 notification delivery table disagrees with migration ledger");
+      if ((stage >= 52) !== onboardingTable)
+        issues.push("0051 church onboarding table disagrees with migration ledger");
+      const outboundIndexSet = new Set(outboundIndexes.map(row => row.indexname));
+      const outboundRequired = ["notification_outbound_recipient_channel_uq", "notification_outbound_status_retry_idx"];
+      if (stage >= 51 && outboundRequired.some(name => !outboundIndexSet.has(name)))
+        issues.push("0050 notification delivery indexes missing");
+      if (stage < 51 && outboundRequired.some(name => outboundIndexSet.has(name)))
+        issues.push("0050 notification delivery indexes present before migration");
+      const onboardingIndexSet = new Set(onboardingIndexes.map(row => row.indexname));
+      const onboardingRequired = ["church_onboarding_requests_status_idx", "church_onboarding_requests_contact_idx"];
+      if (stage >= 52 && onboardingRequired.some(name => !onboardingIndexSet.has(name)))
+        issues.push("0051 church onboarding indexes missing");
+      if (stage < 52 && onboardingRequired.some(name => onboardingIndexSet.has(name)))
+        issues.push("0051 church onboarding indexes present before migration");
+      const onboardingColumnSet = new Set(onboardingColumns.map(row => row.column_name));
+      const onboardingRequiredColumns = ["id","church_name","church_slug","site_name","site_slug",
+        "timezone","leader_title","contact_email","first_name","last_name","status",
+        "authority_document_id","verified_by_person_id","approved_by_person_id",
+        "church_id","site_id","invitation_grant_id","created_at","updated_at"];
+      if (stage >= 52 && onboardingRequiredColumns.some(name => !onboardingColumnSet.has(name)))
+        issues.push("0051 church onboarding columns missing");
+      if (stage < 52 && onboardingColumnSet.size)
+        issues.push("0051 church onboarding columns present before migration");
+    }
     if (stage >= 40) {
       const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
       const requiredColumns = [
@@ -344,20 +387,22 @@ async function main() {
     localCopyColumns,localCopyIndexes,localCopyConstraints,
     guardianDefaults,familyStartColumns,familyStartIndexes,
     consentColumns,consentIndexes,safetyQualificationKeys,conferenceBookingIndexes,
-    p0SafetyColumns,p0SafetyIndexes] = await Promise.all([
+    p0SafetyColumns,p0SafetyIndexes,
+    onboardingColumns,onboardingIndexes,outboundIndexes] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
     query`SELECT t.typname, e.enumlabel FROM pg_type t
           JOIN pg_enum e ON e.enumtypid=t.oid
-          WHERE t.typname IN ('program_type','activity_season_status','school_configuration_status','conference_booking_status')`,
+          WHERE t.typname IN ('program_type','activity_season_status','school_configuration_status','conference_booking_status','field_trip_participant_status')`,
     query`SELECT table_name, column_name, is_nullable FROM information_schema.columns
           WHERE table_schema='public' AND
            ((table_name='programs' AND column_name='credit_issuing_organization_id') OR
             (table_name IN ('activity_seasons','activity_registrations') AND column_name='metadata'))`,
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
-          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents','pickup_authorizations','pickup_custody_holds','pickup_release_events','safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports','safeguarding_site_policies','safeguarding_site_responders')`,
+          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents','pickup_authorizations','pickup_custody_holds','pickup_release_events','safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports','safeguarding_site_policies','safeguarding_site_responders',
+            'notification_outbound_deliveries','church_onboarding_requests')`,
     query`SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='program_site_authorizations'`,
     query`SELECT indexname FROM pg_indexes
@@ -398,6 +443,12 @@ async function main() {
         'safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports',
         'safeguarding_site_policies','safeguarding_site_responders') OR
        (tablename='incident_evidence' AND indexname='incident_evidence_actor_idempotency_uq'))`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='church_onboarding_requests'`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND tablename='church_onboarding_requests'`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND tablename='notification_outbound_deliveries'`,
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal, types, columns, tables,
@@ -406,6 +457,7 @@ async function main() {
     guardianDefaults, familyStartColumns, familyStartIndexes,
     consentColumns, consentIndexes, safetyQualificationKeys, conferenceBookingIndexes,
     p0SafetyColumns, p0SafetyIndexes,
+    onboardingColumns, onboardingIndexes, outboundIndexes,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
