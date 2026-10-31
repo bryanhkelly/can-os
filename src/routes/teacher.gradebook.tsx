@@ -17,6 +17,7 @@ import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEdit
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
+import { liveRubricTotal } from "@/components/learning/live-rubric-total";
 import { prioritizeSubmittedReviews, adjacentReviews } from "@/components/learning/gradebook-review-queue";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
@@ -218,17 +219,7 @@ function TeacherGradebookPage() {
   }
  };
 
- /** Live rubric total for the grading panel; null until every criterion is valid. */
- const liveRubricTotal = (assessment: Assessment): number | null => {
-  if (!assessment.rubric.length) return null;
-  if(assessment.rubric.some(criterion=>!rubricInputs[criterion.id]?.trim()))return null;
-  try {
-   const grades = assessment.rubric.map(criterion => ({ id: criterion.id, points: Number(rubricInputs[criterion.id]) }));
-   return scoreRubric(assessment.rubric, grades).earned;
-  } catch {
-   return null;
-  }
- };
+ const liveRubricScore = (assessment: Assessment) => liveRubricTotal(assessment.rubric, rubricInputs);
 
  /** Arrow-key movement across the grade grid. */
  const onCellKeyDown = (event: React.KeyboardEvent, row: number, col: number) => {
@@ -400,7 +391,7 @@ function TeacherGradebookPage() {
          <input className="mt-2 w-28 rounded-lg border bg-background p-2" type="number" min={0} max={criterion.maxPoints}
           value={rubricInputs[criterion.id]??""} onChange={event=>setRubricInputs(current=>({...current,[criterion.id]:event.target.value}))}/>
         </label>)}
-        <p role="status" className="text-sm font-semibold">Total: {liveRubricTotal(reviewAssessment)??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
+        <p role="status" className="text-sm font-semibold">Total: {liveRubricScore(reviewAssessment)??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
        </fieldset>:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
         <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
        </label>}
