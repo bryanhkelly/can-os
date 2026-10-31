@@ -17,6 +17,7 @@ import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEdit
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
+import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
 
 export const Route = createFileRoute("/teacher/gradebook")({
@@ -350,12 +351,9 @@ function TeacherGradebookPage() {
   breadcrumbs={<><Link to="/teacher" search={{gradeAction:undefined}} className="underline">Teacher Today</Link><span>/</span><span>Gradebook</span></>}>
    <WorkflowIntro eyebrow="Teaching · Assessment" title="Feedback that moves learning forward." description="Review submitted evidence, assess with the published rubric, and give each learner a clear next step. Grade changes stay in the authorized gradebook workflow." />
    {(search.assessment||search.student)&&<Link to="/teacher/gradebook" search={{section:selected||search.section}} className="mt-4 inline-block text-sm underline">View full section gradebook</Link>}
-   {sections.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
-    Section
-    <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{section:event.target.value}})}>
-     {sections.map(section => <option key={section.id} value={section.id}>{section.title} ({section.code})</option>)}
-    </select>
-   </label>}
+   {sections.length > 0 && <div className="mt-8 max-w-sm">
+    <GradebookSectionSelector sections={sections} selectedId={selected} onSelect={section => void navigate({search:{section}})} />
+   </div>}
    {loading && <p className="mt-8 text-sm" role="status">Loading gradebook…</p>}
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
    {notice && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
