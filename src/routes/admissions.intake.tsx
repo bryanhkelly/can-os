@@ -177,6 +177,15 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
     </div>
+    {r.transferOriginStatus&&<div className="mt-3 rounded-lg border p-3 text-sm">
+      <strong>Linked transfer application</strong>
+      <p className="mt-1">Origin school exit: {r.transferOriginStatus==="completed"?
+        "Institutionally completed":r.transferOriginStatus==="pending"?
+        "Pending — may review and issue an offer; activation must wait":"Requires review before placement"}.</p>
+      {r.transferNamedDestination&&<p className="mt-1">Family's named receiving school: {r.transferNamedDestination}.
+        Confirm that this application is for the intended destination.</p>}
+      <p className="mt-1 text-xs text-muted-foreground">This school must independently decide admission, confirm seat capacity, obtain guardian acceptance and activate a real Section. Academic-record delivery is a separate process.</p>
+    </div>}
     <p className="mt-3 text-xs text-muted-foreground">
       Guardian verification: <strong>{r.guardianVerified?"Verified":"Required"}</strong> ·
       {" "}Sign-in access: <strong>{r.guardianLoginProvisioned?"Provisioned":"Not provisioned"}</strong>.
