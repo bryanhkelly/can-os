@@ -31,13 +31,19 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
  const {student,offer,application}=Route.useSearch();
  const [checklist,setChecklist]=useState<string|null>(null);
  const [pending,setBusy]=useState<string|null>(null),[error,setError]=useState("");
+ const [notice,setNotice]=useState("");
  const [interactive,setInteractive]=useState(false);
  useEffect(()=>setInteractive(true),[]);
  const busy=interactive?pending:"hydrating";
  async function respond(offerId:string,decision:"accept"|"decline"){
-  setBusy(offerId);setError("");
-  try{await respondToAdmissionOffer({data:{offerId,decision}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Unable to respond to offer");}
+  if(decision==="decline"&&!window.confirm("Decline this school offer? The school will be notified and you may need to contact admissions to reapply."))return;
+  setBusy(offerId);setError("");setNotice("");
+  try{
+   await respondToAdmissionOffer({data:{offerId,decision}});
+   setNotice(decision==="accept"?"Offer accepted. Your school will complete the remaining enrollment and class placement steps.":"Offer declined. Your school has been notified.");
+   try{await router.invalidate();}
+   catch{setError("Your response was saved, but the offer list could not be refreshed. Reopen this page; do not respond again.");}
+  }catch(e){setError(e instanceof Error?e.message:"Unable to respond to offer");}
   finally{setBusy(null);}
  }
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment offers"
@@ -47,6 +53,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   <div className="space-y-6">
   {student&&<Link to="/guardian/admission-offers" className="inline-block text-xs font-semibold underline">View offers for all children →</Link>}
   {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
+  {notice&&<p role="status" className="rounded-lg border p-3 text-sm">{notice}</p>}
   {offer&&<Link to="/guardian/admission-offers" search={{student}} className="inline-block text-sm underline">View all offers for this child</Link>}
   {offer&&!applications.some(app=>app.offers.some(item=>item.id===offer))&&<WorkspaceNotice tone="danger">This offer is unavailable in your current family workspace.</WorkspaceNotice>}
   {application&&!applications.some(app=>app.applicationId===application)&&<WorkspaceNotice tone="danger">This enrollment application is unavailable in your current family workspace.</WorkspaceNotice>}
