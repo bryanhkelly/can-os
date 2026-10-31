@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
+import { licenseValidForYear } from "@/domain/curriculum-year-policy";
 import { recommendCourseOption } from "@/domain/first-classroom";
 import {
   courseTemplates, courseTemplateVersions, curriculumAnnualAdoptions, schoolYears,
@@ -55,6 +56,8 @@ export async function listLaunchEligibleCourses(program: {
     title: courseTemplates.title, code: courseTemplates.code,
     subject: courseTemplates.subject, curriculum: courseTemplateVersions.curriculum,
     packName:curriculumPacks.name,publisherName:organizations.name,
+    licenseStatus:curriculumEntitlements.status,licenseMetadata:curriculumEntitlements.metadata,
+    adoptionStatus:curriculumAnnualAdoptions.status,supersededAt:curriculumAnnualAdoptions.supersededAt,
   })
     .from(curriculumAnnualAdoptions)
     .innerJoin(curriculumEntitlements, and(
@@ -93,11 +96,18 @@ export async function listLaunchEligibleCourses(program: {
   const deduplicated = new Map<string,CourseChoice>(owned.map(course => [
     course.versionId,{...course,origin:"institution_owned" as const,packName:null,publisherName:null},
   ]));
-  // A current active entitlement is not sufficient without year-wide licensed dates.
-  for (const course of (validYear ? adopted : [])) {
-    // Annual entitlement validity is checked by the shared annual policy reader
-    // before a publisher course is authorized for a new Section.
-    deduplicated.set(course.versionId,{...course,origin:"adopted"});
+  const date=(value:unknown):Date|null=>typeof value==="string" && !Number.isNaN(Date.parse(value)) ? new Date(value):null;
+  const startsAt=year?date(year.startsOn):null;
+  const endsAt=year?date(year.endsOn):null;
+  for (const course of (validYear && startsAt && endsAt ? adopted : [])) {
+    const metadata=course.licenseMetadata;
+    const licenseStart=date(metadata.licenseStartsAt),licenseEnd=date(metadata.licenseEndsAt);
+    if(!licenseStart || !licenseEnd || course.supersededAt || course.adoptionStatus!=="active" ||
+       !licenseValidForYear({organizationId:program.organizationId,packId:"",publisherOrganizationId:"",
+         status:course.licenseStatus,startsAt:licenseStart,endsAt:licenseEnd,
+         withdrawnAt:date(metadata.withdrawnAt)}, {startsAt:startsAt!,endsAt:endsAt!},new Date()))continue;
+    const {licenseMetadata,licenseStatus,adoptionStatus,supersededAt,...choice}=course;
+    deduplicated.set(choice.versionId,{...choice,origin:"adopted"});
   }
   return [...deduplicated.values()].sort((a, b) =>
     a.title.localeCompare(b.title) || a.version - b.version || a.versionId.localeCompare(b.versionId))
