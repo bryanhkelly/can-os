@@ -103,6 +103,8 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
    eq(s.consentRecords.consentType,"academic_records_transfer_release"),
    eq(s.consentRecords.signerPersonId,data.recipientPersonId),
    isNull(s.consentRecords.revokedAt))).limit(1);
+  const [program]=action?.programId?await db.select({issuerId:s.programs.creditIssuingOrganizationId})
+   .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1):[];
   const evidence=consent?.signatureEvidence;
   const trustedInstructions=!!action&&action.metadata.kind==="transfer"&&
    action.metadata.exitCompletedByRegistrar===true&&
@@ -112,9 +114,10 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
    evidence.actionId===action?.id&&
    evidence.guardianPersonId===data.recipientPersonId&&
    evidence.studentPersonId===student.personId&&
-   evidence.destinationSchoolName===action?.metadata.destinationSchoolName;
+   evidence.destinationSchoolName===action?.metadata.destinationSchoolName&&
+   evidence.programId===action?.programId;
   const approved=canAuthorizeAcademicCredentialRelease({
-   issuerMatches:true,studentMatches:!!student,
+   issuerMatches:program?.issuerId===doc.issuerId,studentMatches:!!student,
    verifiedRecipient:!!recipient?.active&&
     recipient.email?.trim().toLowerCase()===data.recipientEmail.trim().toLowerCase()&&
     !!verified&&!!relationship,
