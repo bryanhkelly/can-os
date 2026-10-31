@@ -17,25 +17,25 @@
           "id": "fraction",
           "label": "Fraction equation and check",
           "maxPoints": 5,
-          "description": "x=7; (2(7)+1)/3=5; each equivalence justified."
+          "description": "Correct solution with valid equivalence steps and original-equation substitution."
         },
         {
           "id": "formula",
           "label": "Literal formula and restriction",
           "maxPoints": 5,
-          "description": "t=d/r, r≠0, with algebraic isolation explained."
+          "description": "Correct variable isolation and explicit denominator restriction."
         },
         {
           "id": "linear",
           "label": "Multi-step linear equation",
           "maxPoints": 5,
-          "description": "3x−6=2x+7; x=13, substitution verifies."
+          "description": "Accurate distribution, inverse operations and substitution check."
         },
         {
           "id": "model",
           "label": "Context model and units",
           "maxPoints": 5,
-          "description": "18+7v=74; v=8 visitors; valid nonnegative integer."
+          "description": "Accurate equation, units, feasible whole-number interpretation and check."
         }
       ]
     },
@@ -51,37 +51,37 @@
           "id": "rational",
           "label": "Rational equation",
           "maxPoints": 5,
-          "description": "x=−8; multiplication of both sides and original check."
+          "description": "Correct rational equation steps and original check."
         },
         {
           "id": "multi",
           "label": "Multi-step equation",
           "maxPoints": 5,
-          "description": "x=11; distribution and inverse operations."
+          "description": "Correct distribution, inverse operations and check."
         },
         {
           "id": "classify",
           "label": "Solution set classification",
           "maxPoints": 5,
-          "description": "Identity 5x+7=5x+7, all real numbers."
+          "description": "Correct classification and explanation using equivalent expressions."
         },
         {
           "id": "formula1",
           "label": "Temperature formula",
           "maxPoints": 5,
-          "description": "C=5(F−32)/9; 9 is nonzero."
+          "description": "Correct isolation of temperature variable."
         },
         {
           "id": "formula2",
           "label": "Area formula",
           "maxPoints": 5,
-          "description": "b=2A/h; h≠0."
+          "description": "Correct area-variable isolation and restrictions."
         },
         {
           "id": "constraint",
           "label": "Discrete capacity",
           "maxPoints": 5,
-          "description": "18b≥50, minimum b=3 whole buses."
+          "description": "Correct capacity inequality and whole-number minimum."
         }
       ]
     }
