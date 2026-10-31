@@ -352,6 +352,31 @@ export async function declineChurchApplication(actor: AccessContext, requestId: 
   return { declined: true as const, providerAccepted, delivered: false as const };
 }
 
+/** Cancel an undecided request. No applicant authority or grant is created. */
+export async function cancelChurchApplication(actor: AccessContext, requestId: string) {
+  const canOrganizationId = await requireCANSteward(actor);
+  await db.transaction(async tx => {
+    const [request] = await tx.select().from(churchOnboardingRequests)
+      .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+    if (!request || !["submitted", "needs_evidence", "verified"].includes(request.status))
+      throw new Error("Application cannot be canceled after a final decision");
+    if (request.authorityDocumentId) {
+      await tx.update(documents).set({ expiresAt: new Date(), updatedAt: new Date() })
+        .where(eq(documents.id, request.authorityDocumentId));
+    }
+    await tx.update(churchOnboardingRequests).set({
+      status: "canceled", updatedAt: new Date(),
+    }).where(eq(churchOnboardingRequests.id, requestId));
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.request.canceled",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { priorEvidenceInvalidated: !!request.authorityDocumentId },
+    });
+  });
+  return { canceled: true as const };
+}
+
 /** Recovery path when the original approved invitation email was not delivered. */
 export async function resendChurchInvitation(actor: AccessContext, requestId: string) {
   await requireCANSteward(actor);
