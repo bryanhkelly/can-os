@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -58,13 +58,12 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.enrollments.schoolYearId))
     .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
-      eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated"])));
   // Unrelated host programs must not disqualify an institutional graduate.
   // Applicability is evaluated against the transcript issuing institution only.
   const matching = enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId &&
     [row.yearName,row.yearKey,`${row.yearStarts.slice(0,4)}-${row.yearEnds.slice(0,4)}`].includes(requirementSet.academicYear));
-  if(new Set(matching.map(row=>row.yearId)).size!==1 || !matching.length || enrollments.some(row=>row.issuer===transcript.issuingOrganizationId &&
-      row.yearId!==matching[0]?.yearId))
+  if(new Set(matching.map(row=>row.yearId)).size!==1 || !matching.length)
     throw new AuthorizationError("No unambiguous applicable graduation academic-year policy for student");
   // Historical transcript evidence must not be adjudicated against a school year
   // that starts after the immutable transcript was issued.
