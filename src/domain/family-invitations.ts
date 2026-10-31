@@ -215,6 +215,19 @@ export type FamilyInvitationWorkspace = {
       status: "queued" | "provider_accepted" | "retrying" | "responded";
       attempts: number;
       respondedAt: string | null;
+      /** A self-submitted, unverified adult interest request is separate from provider delivery. */
+      interest: null | {
+        id: string;
+        source: string;
+        status: string;
+        requestedAt: string;
+        consentedAt: string | null;
+        contactedAt: string | null;
+        verifiedEmailAt: string | null;
+        applicationId: string | null;
+        applicationStage: string | null;
+        applicationSubmittedAt: string | null;
+      };
     }>;
   }>;
 };
