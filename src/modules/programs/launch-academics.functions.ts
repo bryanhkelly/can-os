@@ -7,6 +7,7 @@ qualificationDefinitions,
 sections,
 sectionGrades,
 sectionTeachers,
+scheduleTemplates,courseTemplateVersions,
 terms
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -25,6 +26,7 @@ import { hasInstitutionalProgramCapability } from "@/modules/identity/institutio
 import { listLaunchTeacherPolicies,teacherPolicyPublisherCapability } from "./teacher-policy.server";
 import { listLaunchEligibleCourses, assertLaunchEligibleCourse } from "./launch-curriculum-eligibility.server";
 import { requireChurchHostedOperatingServices } from "./program-site-authorization.server";
+import { requireAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { readFirstClassrooms } from "@/modules/learning/first-classroom.server";
 const uuid=z.string().uuid();
 
@@ -138,6 +140,8 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   programId:uuid,termId:uuid,courseTemplateVersionId:uuid,
   code:z.string().trim().min(2).max(32),title:z.string().trim().min(2).max(160),
   teacherPersonId:uuid.optional(),
+  scheduleTemplateId:uuid.optional(),
+  requireFirstLesson:z.boolean().optional(),
   credits:z.number().positive().max(10).refine(v=>verifiedSectionCreditUnits({credits:v})!==null).optional(),
  }).parse(v))
  .handler(async({data})=>{
@@ -156,10 +160,20 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
    await assertLaunchEligibleCourse(program, data.courseTemplateVersionId, tx);
    if(data.credits!==undefined)
     await requireChurchHostedOperatingServices(tx,program.id,creditServices);
+   if(data.requireFirstLesson){
+    const [version]=await tx.select({curriculum:courseTemplateVersions.curriculum}).from(courseTemplateVersions).where(eq(courseTemplateVersions.id,data.courseTemplateVersionId)).limit(1);
+    if(!version)throw new Error("Course version unavailable");
+    requireAccessibleFirstLesson(version.curriculum);
+    if(!data.teacherPersonId)throw new Error("Choose a verified instructor");
+   }
+   if(data.scheduleTemplateId){
+    const [template]=await tx.select({schoolYearId:scheduleTemplates.schoolYearId}).from(scheduleTemplates).where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
+    if(!template||template.schoolYearId!==term.schoolYearId)throw new Error("Schedule must belong to the selected school year");
+   }
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,
     courseTemplateVersionId:data.courseTemplateVersionId,
-    code:data.code,title:data.title,active:true,
+    code:data.code,title:data.title,active:true,scheduleTemplateId:data.scheduleTemplateId??null,
     metadata:data.credits!==undefined?{credits:data.credits}:{},
    }).onConflictDoNothing().returning({id:sections.id,versionId:sections.courseTemplateVersionId,title:sections.title,metadata:sections.metadata});
    const [existing]=created?[created]:await tx.select({id:sections.id,versionId:sections.courseTemplateVersionId,title:sections.title,metadata:sections.metadata}).from(sections)
@@ -170,6 +184,10 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
     throw new Error("Section code is already used by a different class or curriculum version");
    if(data.credits!==undefined&&verifiedSectionCreditUnits(existing.metadata)!==data.credits)
     throw new Error("Existing section code has different academic credit units");
+   if(data.scheduleTemplateId){
+    const [saved]=await tx.select({scheduleTemplateId:sections.scheduleTemplateId}).from(sections).where(eq(sections.id,existing.id)).limit(1);
+    if(saved?.scheduleTemplateId!==data.scheduleTemplateId)throw new Error("Existing class has a different schedule; use the audited schedule-change workflow");
+   }
    if(data.teacherPersonId){
     await assignLaunchInstructor(tx,actor,{programId:program.id,sectionId:existing.id,
      teacherPersonId:data.teacherPersonId});
