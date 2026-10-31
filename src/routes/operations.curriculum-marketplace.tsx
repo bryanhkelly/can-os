@@ -9,7 +9,7 @@ import { z } from "zod";
 import { schoolCurriculumNextActions } from "@/domain/curriculum-next-actions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJourneyReadiness, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
+import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJourneyReadiness, installCurriculumPack, adoptCurriculumPack, rollbackCurriculumPackAdoption, reviewAnnualCurriculumAdoption, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
 import { validateCommonCartridgeImport, importCommonCartridgeSectionLinks, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
@@ -45,6 +45,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
  const [adoptionReview,setAdoptionReview]=useState<string|null>(null);
+ const [adoptionYearId,setAdoptionYearId]=useState("");
+ const [rollbackReason,setRollbackReason]=useState("");
+ const [annualReviewMessage,setAnnualReviewMessage]=useState("");
  const [adoptionConfirmed,setAdoptionConfirmed]=useState<Record<string,boolean>>({});
  const [courseVersionId,setCourseVersionId]=useState(""),[scope,setScope]=useState<"program"|"site"|"section">("site");
  const [sectionId,setSectionId]=useState(""),[lessonId,setLessonId]=useState("");
@@ -166,17 +169,34 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
            <div><dt className="inline text-muted-foreground">Pack: </dt><dd className="inline">{pack.name}, release v{pack.version}</dd></div>
            <div><dt className="inline text-muted-foreground">License classification: </dt><dd className="inline">{pack.licenseCode}</dd></div>
           </dl>
+          <label className="block space-y-1 text-sm">Academic year
+           <select className="w-full rounded border bg-background px-3 py-2" value={adoptionYearId}
+            onChange={e=>{setAdoptionYearId(e.target.value);setAnnualReviewMessage("");}}>
+            <option value="">Choose a school year</option>
+            {market.academicYears.map(year=><option key={year.id} value={year.id}>{year.name} ({year.status})</option>)}
+           </select>
+          </label>
+          <button type="button" disabled={busy||!adoptionYearId} className="rounded border px-3 py-2 text-sm"
+           onClick={()=>perform(async()=>{const result=await reviewAnnualCurriculumAdoption({data:{programId:market.program.id,packId:pack.id,academicYearId:adoptionYearId}});setAnnualReviewMessage(result.eligible?"Annual grant is active.":"Annual grant is not currently eligible: "+result.reason);},"Annual eligibility reviewed.")}>Check annual license and adoption</button>
+          {annualReviewMessage&&<p role="status" className="text-sm">{annualReviewMessage}</p>}
           <p className="text-xs text-muted-foreground">Included publisher course releases: {pack.courses.map(c=>`${c.code} (${c.title})`).join(" · ")}.</p>
-          <p className="text-xs text-muted-foreground">This pins this publisher pack to the selected program. Existing class versions will not change. Academic-year-specific adoption is not yet available; license classification alone is not an executed commercial agreement.</p>
+          <p className="text-xs text-muted-foreground">This pins this publisher pack to the selected program. Existing class versions will not change. Annual adoption requires verified rights covering the full selected school year; a license classification is not an executed commercial agreement.</p>
+          {market.annualAdoptions.filter(a=>a.packId===pack.id).map(a=><div key={a.id} className="space-y-2 rounded border p-3 text-sm">
+           <p>Year: {market.academicYears.find(y=>y.id===a.academicYearId)?.name??a.academicYearId} · Status: {a.status}</p>
+           {a.status==="active"&&<><label className="block">Rollback justification
+            <textarea className="mt-1 w-full rounded border p-2" value={rollbackReason} onChange={e=>setRollbackReason(e.target.value)} />
+           </label><button type="button" className="rounded border px-3 py-2" disabled={busy||rollbackReason.trim().length<8}
+            onClick={()=>perform(()=>rollbackCurriculumPackAdoption({data:{programId:market.program.id,packId:pack.id,academicYearId:a.academicYearId,reason:rollbackReason}}),"Annual adoption rolled back. Existing Section pins are unchanged.")}>Rollback this year's adoption</button></>}
+          </div>)}
           <label className="flex items-start gap-2 text-sm"><input type="checkbox"
             checked={adoptionConfirmed[pack.versionId]??false}
             onChange={e=>setAdoptionConfirmed(v=>({...v,[pack.versionId]:e.target.checked}))}/>
             <span>I reviewed the publisher, exact release, included courses, program, and license conditions.</span>
           </label>
           <div className="flex flex-wrap gap-3">
-           <button type="button" disabled={busy||!adoptionConfirmed[pack.versionId]}
+           <button type="button" disabled={busy||!adoptionYearId||!adoptionConfirmed[pack.versionId]}
             className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
-            onClick={()=>perform(()=>adoptCurriculumPack({data:{programId:market.program.id,packId:pack.id,versionId:pack.versionId}}),"Published pack release adopted by this program.")}>Adopt for this program</button>
+            onClick={()=>perform(()=>adoptCurriculumPack({data:{programId:market.program.id,packId:pack.id,versionId:pack.versionId,academicYearId:adoptionYearId}}),"Published pack release adopted for the selected academic year.")}>Adopt for this program</button>
            <button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>{setAdoptionReview(null);setAdoptionConfirmed(v=>({...v,[pack.versionId]:false}));}}>Cancel</button>
           </div>
          </>}
