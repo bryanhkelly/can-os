@@ -30,7 +30,7 @@ async function requireAdmissionsIntakeReader() {
 const interestPageSize = 50;
 /** Stable keyset cursor: tie-break equal creation timestamps by immutable ID. */
 export function parseInterestPageCursor(cursor: string) {
-  const match = /^(\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z)\\|([0-9a-f-]{36})$/i.exec(cursor);
+  const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)\|([0-9a-f-]{36})$/i.exec(cursor);
   if (!match) throw new Error("Invalid admissions interest page cursor");
   const date = new Date(match[1]!);
   if (Number.isNaN(date.getTime()) || date.toISOString() !== match[1])
