@@ -25,8 +25,8 @@ export async function runScheduledJobs(): Promise<{
   escalated: number;
   expiredSectionOffers: number;
 }> {
-  const schoolFamilyDeliveries = await processSchoolFamilyOutboundDeliveries();
   const safeguarding = await escalateOverdueSafeguardingConcerns();
+  const schoolFamilyDeliveries = await processSchoolFamilyOutboundDeliveries();
   const missing = await markOverdueSubmissionsMissing();
   const processed = await processPendingDomainEvents();
   const recovered = await recoverSubscriptionEventMatches();
