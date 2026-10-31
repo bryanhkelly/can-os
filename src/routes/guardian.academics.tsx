@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {resolveGuardianChild} from "@/domain/guardian-child-context";
 import { useEffect, useState } from "react";
 import { getGuardianAssignments, getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
-import { guardianAssignmentSummary } from "@/domain/guardian-academics";
+import { guardianAssignmentSummary, guardianWorkNeedsAction } from "@/domain/guardian-academics";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, StatCard } from "@/components/workspace";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -80,7 +80,7 @@ function GuardianAcademicsPage() {
    {(section||assessment)&&<Link to="/guardian/academics" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
    {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5 rounded-xl border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Assignment summary">
-    <StatCard label="Needs action" value={summary.needsAction}/>
+    <StatCard label="Unfinished work" value={summary.needsAction}/>
     <StatCard label="Overdue" value={summary.overdue}/>
     <StatCard label="Grades released" value={summary.releasedGrades}/>
    </div>}
@@ -91,6 +91,13 @@ function GuardianAcademicsPage() {
       <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge>
      </div>
      <p className="mt-3 text-sm text-muted-foreground">Due: {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p>
+     {guardianWorkNeedsAction(item.status) &&
+      (item.workAvailabilityReason==="closed"||item.workAvailabilityReason==="unpublished_or_closed") &&
+      <p className="mt-3 rounded-lg border p-3 text-sm" role="status">
+       This assignment is no longer accepting student submissions. Review the unfinished work with your school.
+      </p>}
+     {guardianWorkNeedsAction(item.status) && item.workAvailabilityReason==="unreleased" &&
+      <p className="mt-3 text-sm text-muted-foreground">This assignment has not opened for student work yet.</p>}
      {item.score !== null && <p className="mt-2 text-sm font-semibold">Grade: {item.score} / {item.pointsPossible}</p>}
      {item.feedback && <p className="mt-3 rounded-lg bg-muted p-3 text-sm">Teacher feedback: {item.feedback}</p>}
      {item.revisionFeedback && <p className="mt-3 rounded-lg border p-3 text-sm">
