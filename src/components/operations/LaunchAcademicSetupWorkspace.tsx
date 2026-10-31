@@ -23,7 +23,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const selectedYear=data.years.find(y=>y.id===selectedTerm?.schoolYearId);
  const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
- const matchingSection=data.sections.find(section=>section.code===(code.trim()||(selectedCourse?selectedCourse.code+"-A":"")));
+ const matchingSection=data.sections.find(section=>section.termId===termId&&section.code.toLowerCase()===(code.trim()||(selectedCourse?selectedCourse.code+"-A":"")).toLowerCase());
  const reviewedSectionAlreadyExists=Boolean(matchingSection);
  const [createdSectionId,setCreatedSectionId]=useState<string|null>(null);
  const [teacherId,setTeacherId]=useState("");
