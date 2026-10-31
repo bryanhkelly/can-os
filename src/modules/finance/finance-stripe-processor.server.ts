@@ -11,7 +11,7 @@ export class StripeFinanceProcessor implements FinanceProcessor {
   }
   async requestPayment(input: { obligationId: string; amountCents: number; currency: "USD"; idempotencyKey: string }) {
     if (!this.configured) return { kind: "unavailable" as const, reason: "Stripe setup required" };
-    if (!input.obligationId || !input.idempotencyKey || !Number.isSafeInteger(input.amountCents) || input.amountCents <= 0)
+    if (!input.obligationId || !input.idempotencyKey || input.idempotencyKey.length > 255 || !Number.isSafeInteger(input.amountCents) || input.amountCents <= 0)
       throw new Error("Invalid payment request");
     const body = new URLSearchParams({
       amount: String(input.amountCents), currency: "usd",
