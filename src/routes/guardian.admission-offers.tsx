@@ -84,7 +84,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
      </div>}
      {o.enrollmentActive&&<div className="mt-3 space-y-2">
        <p className="text-sm">{o.sectionCount
-        ? `${o.sectionCount} assigned ${o.sectionCount===1?"class":"classes"} — your child can start learning.`
+        ? `${o.sectionCount} assigned ${o.sectionCount===1?"class":"classes"} — review the separate student sign-in requirements below before your child logs in.`
         : "Enrollment is active; the school has not assigned a class yet."}</p>
        {o.sectionCount>0&&<StudentLearningAccessHandoff
          applicationId={app.applicationId} role="guardian"/>}
