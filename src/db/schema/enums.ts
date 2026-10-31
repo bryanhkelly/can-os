@@ -284,6 +284,7 @@ export const fieldTripStatus = pgEnum("field_trip_status", [
 export const fieldTripParticipantStatus = pgEnum("field_trip_participant_status", [
   "invited",
   "permission_complete",
+  "declined",
 ]);
 
 export const fieldTripAttendanceStatus = pgEnum("field_trip_attendance_status", [
