@@ -2,6 +2,7 @@ import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
 import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
+import {FirstSchoolDayHandoff} from "@/components/enrollment/FirstSchoolDayHandoff";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
@@ -156,6 +157,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                acceptedOfferId={latest?.status==="accepted"?latest.id:undefined}
                enrollmentActivated={activated} />}
           {activated&&<StudentLearningAccessHandoff applicationId={x.id} role="registrar"/>}
+          {activated&&<FirstSchoolDayHandoff applicationId={x.id} programId={x.programId}/>}
           {activated&&<div className="mt-3 rounded-lg border p-3 text-sm">
             <p className="font-semibold">Enrollment → learning → supervised school day</p>
             <ol className="mt-2 space-y-1 text-muted-foreground" aria-label="School start handoff">
