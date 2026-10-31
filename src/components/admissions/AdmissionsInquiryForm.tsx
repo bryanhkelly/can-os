@@ -28,14 +28,16 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
  const [householdSearch,setHouseholdSearch]=useState("");
  const [householdMatches,setHouseholdMatches]=useState<Array<{id:string;programId:string;studentFirst:string;studentLast:string}>>([]);
  const [householdError,setHouseholdError]=useState("");
+ const [householdLoading,setHouseholdLoading]=useState(false);
  useEffect(()=>{
   let active=true;
   if(!programId||householdSearch.trim().length<2){
-   setHouseholdMatches([]);setHouseholdError("");return;
+   setHouseholdMatches([]);setHouseholdError("");setHouseholdLoading(false);return;
   }
+  setHouseholdLoading(true);
   void searchAdmissionsHouseholds({data:{programId,search:householdSearch.trim()}})
-   .then(rows=>{if(active){setHouseholdMatches(rows);setHouseholdError("");}})
-   .catch(()=>{if(active){setHouseholdMatches([]);setHouseholdError("Unable to search authorized households.");}});
+   .then(rows=>{if(active){setHouseholdMatches(rows);setHouseholdError("");setHouseholdLoading(false);}})
+   .catch(()=>{if(active){setHouseholdMatches([]);setHouseholdLoading(false);setHouseholdError("Unable to search authorized households.");}});
   return ()=>{active=false;};
  },[programId,householdSearch]);
  const studentKey=(student:InquiryFormProps["existingStudents"][number])=>
@@ -66,9 +68,10 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
     {!existingStudent&&<>
     <label className="text-sm sm:col-span-2">Find a sibling household (optional)
       <input className="mt-1 block w-full rounded border bg-background p-2" value={householdSearch} onChange={e=>{setHouseholdSearch(e.target.value);setExistingApplicationId("");}} placeholder="Search student name or application ID" />
+      {householdLoading&&<span role="status" className="block text-xs">Searching households…</span>}
       {householdError&&<span role="alert" className="block text-xs">{householdError}</span>}
       <select className="mt-1 block w-full rounded border bg-background p-2"
-        disabled={convertibleInterest} value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
+        disabled={convertibleInterest||householdLoading} value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
         <option value="">Create new household</option>
         {householdMatches.map(r=>
           <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
