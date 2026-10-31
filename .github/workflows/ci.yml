@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - main
+      - FullFlow
 
 jobs:
   verify:
