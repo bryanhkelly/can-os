@@ -60,6 +60,14 @@ export const listTransferRecordsHandoffs=createServerFn({method:"GET"}).handler(
    inArray(s.actions.status,["open","in_progress","waiting","resolved"]),
  )).orderBy(desc(s.actions.createdAt)).limit(100);
  if(!rows.length)return {items:[]};
+ const originIds=rows.map(row=>row.metadata.originChangeActionId)
+   .filter((id):id is string=>typeof id==="string");
+ const linkedOrigins=originIds.length?await db.select({
+   id:s.actions.id,metadata:s.actions.metadata,
+ }).from(s.actions).where(and(
+   eq(s.actions.type,"guardian_enrollment_change_request"),
+   inArray(s.actions.id,originIds),
+ )):[];
  const consents=rows.filter(row=>typeof row.metadata.recordsReleaseConsentId==="string")
    .map(row=>row.metadata.recordsReleaseConsentId as string);
  const [consentRows,issued]=await Promise.all([
@@ -78,6 +86,11 @@ export const listTransferRecordsHandoffs=createServerFn({method:"GET"}).handler(
    )).orderBy(desc(s.transcriptIssuances.issuedAt)).limit(200),
  ]);
  return {items:rows.map(row=>{
+   const origin=linkedOrigins.find(candidate=>candidate.id===row.metadata.originChangeActionId);
+   const destinationApplicationId=origin?.metadata.destinationApplicationId;
+   const internalReleaseAvailable=typeof destinationApplicationId==="string"&&
+     typeof origin?.metadata.destinationProgramId==="string"&&
+     typeof origin?.metadata.destinationRecordsReleaseConsentId==="string";
    const consent=consentRows.find(candidate=>candidate.id===row.metadata.recordsReleaseConsentId);
    const destination=typeof row.metadata.destinationSchoolName==="string"?row.metadata.destinationSchoolName:"";
    const consentRecorded=!!consent&&!consent.revokedAt&&
@@ -91,6 +104,7 @@ export const listTransferRecordsHandoffs=createServerFn({method:"GET"}).handler(
      studentName:row.studentFirstName+" "+row.studentLastName,
      studentPersonId:row.studentPersonId,
      destinationSchoolName:destination,
+     destinationApplicationId:internalReleaseAvailable?destinationApplicationId:null,
      destinationContactEmail:typeof row.metadata.destinationSchoolContactEmail==="string"?
        row.metadata.destinationSchoolContactEmail:null,
      consentRecorded,createdAt:row.createdAt.toISOString(),
