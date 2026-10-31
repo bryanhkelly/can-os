@@ -50,7 +50,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
    publisherOrganizationId:pack.publisherOrganizationId,status:license.status,startsAt:date(metadata.licenseStartsAt),
    endsAt:date(metadata.licenseEndsAt),withdrawnAt:date(metadata.withdrawnAt)},
   year:resolvedYear,now:input.now??new Date(),packVersionPublished:version?.status==="published",
- });
+ }));
  return {eligible,reason:eligible?"active" as const:"invalid_or_expired" as const,versionId:adoption.packVersionId};
 }
 /** Explicit rollover, one annual record per Program/year/pack. Existing sections are not touched. */
