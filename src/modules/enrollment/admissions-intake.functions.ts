@@ -17,7 +17,7 @@ import { resolvePrivateFamilyStartDestination } from "./private-family-start.ser
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
+import { and,asc,desc,eq,ilike,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 const uuid=z.string().uuid();
@@ -85,10 +85,100 @@ async function existingStudentChoices(database:Pick<Database,"selectDistinct">,
     student.householdId?eq(householdMemberships.householdId,student.householdId):undefined):undefined))
   .orderBy(people.legalLastName,people.legalFirstName,studentProfiles.id).limit(300);
 }
-export const listAdmissionsExistingStudents=createServerFn({method:"GET"}).handler(async()=>{
- return existingStudentChoices(db,await registrar());
-});
-export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()=>{
+/** Search active students and verified guardians without loading an unbounded directory. */
+const admissionsPageInput=z.object({
+ siteId:uuid.optional(),programId:uuid.optional(),cursor:uuid.optional(),
+ search:z.string().trim().max(100).optional(),applicationId:uuid.optional(),
+ pageSize:z.coerce.number().int().min(1).max(100).default(40),
+}).strict();
+export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
+ .validator((value:unknown)=>admissionsPageInput.omit({cursor:true}).extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
+ .handler(async({data})=>{
+  const actor=await registrar();
+  const rows=await db.selectDistinct({
+   programId:programs.id,siteId:programs.siteId,studentProfileId:studentProfiles.id,
+   studentFirstName:people.legalFirstName,studentLastName:people.legalLastName,
+   guardianPersonId:intakeGuardian.id,guardianFirstName:intakeGuardian.legalFirstName,
+   guardianLastName:intakeGuardian.legalLastName,householdId:householdMemberships.householdId,
+  }).from(studentProfiles)
+   .innerJoin(people,eq(people.id,studentProfiles.personId))
+   .innerJoin(enrollments,and(eq(enrollments.studentProfileId,studentProfiles.id),eq(enrollments.status,"active")))
+   .innerJoin(programs,and(eq(programs.id,enrollments.programId),eq(programs.organizationId,enrollments.organizationId)))
+   .innerJoin(guardianRelationships,guardianRelationshipPredicate({studentPersonId:people.id,access:"enrollment"}))
+   .innerJoin(intakeGuardian,eq(intakeGuardian.id,guardianRelationships.guardianPersonId))
+   .leftJoin(householdMemberships,eq(householdMemberships.personId,people.id))
+   .leftJoin(guardianHousehold,eq(guardianHousehold.personId,intakeGuardian.id))
+   .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
+    ...(actor.scope.programIds?[inArray(programs.id,actor.scope.programIds)]:[]),
+    ...(actor.scope.siteIds?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
+    data.siteId?eq(programs.siteId,data.siteId):undefined,
+    data.programId?eq(programs.id,data.programId):undefined,
+    eq(people.active,true),eq(intakeGuardian.active,true),
+    or(eq(householdMemberships.householdId,guardianHousehold.householdId),
+     and(isNull(householdMemberships.id),isNull(guardianHousehold.id))),
+    data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),
+     ilike(people.legalLastName,"%"+data.search+"%"),
+     ilike(intakeGuardian.legalLastName,"%"+data.search+"%"),
+     z.string().uuid().safeParse(data.search).success?eq(studentProfiles.id,data.search):undefined):undefined))
+   .orderBy(asc(studentProfiles.id),asc(programs.id),asc(intakeGuardian.id),asc(householdMemberships.householdId))
+   .limit(data.pageSize+1).offset((data.page-1)*data.pageSize);
+  const items=rows.slice(0,data.pageSize);
+  return {items,nextPage:rows.length>data.pageSize?data.page+1:null};
+ });
+/** Legacy endpoint: return a page contract, never silently cap at 300 records. */
+export const listAdmissionsExistingStudents=listAdmissionsExistingStudentsPage;
+/** Totals are computed against the authorized full dataset, never a visible page. */
+export const getAdmissionsStageCounts=createServerFn({method:"GET"})
+ .validator((value:unknown)=>admissionsPageInput.pick({siteId:true,programId:true,search:true}).parse(value??{}))
+ .handler(async({data})=>{
+  const actor=await registrar();
+  const rows=await db.select({stage:applications.stage,count:sql<number>`count(*)::int`})
+   .from(applications)
+   .innerJoin(programs,eq(programs.id,applications.programId))
+   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
+   .innerJoin(people,eq(people.id,studentProfiles.personId))
+   .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
+    ...(actor.scope.programIds?[inArray(applications.programId,actor.scope.programIds)]:[]),
+    ...(actor.scope.siteIds?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
+    data.siteId?eq(programs.siteId,data.siteId):undefined,
+    data.programId?eq(applications.programId,data.programId):undefined,
+    data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),
+      ilike(people.legalLastName,"%"+data.search+"%"),
+      ilike(programs.name,"%"+data.search+"%"),
+      z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined):undefined))
+   .groupBy(applications.stage);
+  return rows.map(row=>({stage:row.stage,count:Number(row.count)}));
+ });
+
+/** Scoped search for sibling reuse; no dependency on the currently visible admissions page. */
+export const searchAdmissionsHouseholds=createServerFn({method:"GET"})
+ .validator(z.object({programId:uuid,search:z.string().trim().min(2).max(100)}).strict())
+ .handler(async({data})=>{
+  const actor=await registrar();
+  const [target]=await db.select({organizationId:programs.organizationId,siteId:programs.siteId})
+    .from(programs).where(eq(programs.id,data.programId)).limit(1);
+  if(!target||!actor.scope.organizationIds?.includes(target.organizationId)||
+    (actor.scope.programIds&&!actor.scope.programIds.includes(data.programId))||
+    (actor.scope.siteIds&&(!target.siteId||!actor.scope.siteIds.includes(target.siteId))))
+    throw new AuthorizationError("admissions program");
+  return db.select({id:applications.id,studentFirst:people.legalFirstName,
+    studentLast:people.legalLastName,programId:applications.programId})
+   .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
+   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
+   .innerJoin(people,eq(people.id,studentProfiles.personId))
+   .where(and(eq(programs.organizationId,target.organizationId),
+     ...(actor.scope.programIds?[inArray(programs.id,actor.scope.programIds)]:[]),
+     ...(actor.scope.siteIds?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
+     or(ilike(people.legalFirstName,"%"+data.search+"%"),
+        ilike(people.legalLastName,"%"+data.search+"%"),
+        z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined)))
+   .orderBy(asc(people.legalLastName),asc(people.legalFirstName),asc(applications.id))
+   .limit(40);
+ });
+
+export const listAdmissionsIntake=createServerFn({method:"GET"})
+ .validator((value:unknown)=>admissionsPageInput.omit({cursor:true}).extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
+ .handler(async({data})=>{
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
   createdAt:applications.createdAt,updatedAt:applications.updatedAt,programId:applications.programId,
@@ -102,8 +192,14 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(people,eq(people.id,studentProfiles.personId))
   .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
    ...(actor.scope.programIds ? [inArray(applications.programId,actor.scope.programIds)] : []),
-   ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : [])))
-  .orderBy(desc(applications.updatedAt)).limit(300);
+   ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : []),
+   data.siteId?eq(programs.siteId,data.siteId):undefined,
+   data.programId?eq(applications.programId,data.programId):undefined,
+   data.applicationId?eq(applications.id,data.applicationId):undefined,
+   data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),ilike(people.legalLastName,"%"+data.search+"%"),ilike(programs.name,"%"+data.search+"%"),z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined):undefined))
+  .orderBy(desc(applications.updatedAt),desc(applications.id)).limit(data.applicationId?1:data.pageSize+1).offset(data.applicationId?0:(data.page-1)*data.pageSize);
+ const hasMore=!data.applicationId&&rows.length>data.pageSize;
+ rows.splice(data.pageSize);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  const sourceIds=[...new Set(rows.map(r=>
    typeof r.metadata.originTransferActionId==="string"?r.metadata.originTransferActionId:null
@@ -130,7 +226,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
  }).from(accountPersonGrants).where(and(
   inArray(accountPersonGrants.personId,contactIds),eq(accountPersonGrants.role,"guardian"),
   eq(accountPersonGrants.active,true))):[];
- return rows.map(r=>{
+ const items=rows.map(r=>{
   const {metadata,...rest}=r;
   const contactId=applicationGuardianContact(metadata,r.submittedByPersonId);
   const verified=relations.some(rel=>rel.guardianPersonId===contactId&&
@@ -171,6 +267,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
   };
  });
+ return {items,hasMore,nextPage:hasMore?data.page+1:null};
 });
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
  .handler(async({data})=>{
