@@ -3,7 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { getSchoolFamilyAlerts, publishSchoolFamilyAlert } from "@/modules/communication/school-family-alerts.functions";
+import { getSchoolFamilyAlerts, publishSchoolFamilyAlert, retryFailedSchoolFamilyAlertDeliveries } from "@/modules/communication/school-family-alerts.functions";
 
 export const Route=createFileRoute("/operations/family-alerts")({
  loader:safeLoader(()=>getSchoolFamilyAlerts(),{
@@ -47,6 +47,17 @@ function Publisher({data}:{data:Data}){
    try{await router.invalidate();}
    catch{setError("The publication was saved but the history failed to refresh. Do not publish the same notice again.");}
   }catch(e){setError(e instanceof Error?e.message:"Unable to publish school notice. No delivery can be assumed.");}
+  finally{setBusy(false);}
+ }
+ async function retry(alertId:string){
+  if(busy)return;
+  if(!window.confirm("Retry exhausted email/SMS provider attempts for this recent notice? Accepted messages will not be resent."))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const result=await retryFailedSchoolFamilyAlertDeliveries({data:{alertId,confirmed:true}});
+   setNotice(result.requeued+" failed delivery attempts requeued. The worker will recheck current family authorization.");
+   await router.invalidate();
+  }catch(e){setError(e instanceof Error?e.message:"Could not retry deliveries.");}
   finally{setBusy(false);}
  }
  return <WorkspaceShell eyebrow="CAN OS · School operations" title="Urgent family communications"
@@ -95,6 +106,7 @@ function Publisher({data}:{data:Data}){
     <p className="mt-2 whitespace-pre-wrap text-sm">{item.description}</p>
     <p className="mt-3 text-sm">{item.recipients} in-app recipients · {item.acknowledged} marked read</p>
     <p className="mt-1 text-sm">Email: {item.emailAccepted}/{item.emailQueued} accepted by provider · SMS: {item.smsAccepted}/{item.smsQueued} accepted by provider</p>
+    {item.deliveryFailed>0&&Date.now()-new Date(item.publishedAt).getTime()<48*60*60*1000&&<button type="button" disabled={busy} className="mt-2 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>void retry(item.id)}>Retry exhausted delivery attempts</button>}
     {(item.deliveryFailed>0||item.deliverySuppressed>0)&&<p className="mt-1 text-sm">
       {item.deliveryFailed} attempts exhausted · {item.deliverySuppressed} deliveries suppressed after authorization/preference review
     </p>
