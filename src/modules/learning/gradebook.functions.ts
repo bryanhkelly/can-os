@@ -113,6 +113,7 @@ export const getTeacherSubmissionAttachment=createServerFn({method:"POST"})
 
 /** Sections the authenticated teacher teaches, for the gradebook section picker. */
 export const getGradebookSections = createServerFn({ method: "GET" }).handler(async () => {
+ setResponseHeader("Cache-Control", "private, no-store");
  const context = await teacherActor();
  if (!process.env.DATABASE_URL) return { connected: false, sections: [] as { id: string; code: string; title: string }[] };
  // An institution's teacher appears only for the Sections authorized in
@@ -126,6 +127,7 @@ export const getGradebookSections = createServerFn({ method: "GET" }).handler(as
 export const getGradebook = createServerFn({ method: "GET" })
  .validator((value: unknown) => z.object({ sectionId: z.string().min(1) }).parse(value))
  .handler(async ({ data }) => {
+  setResponseHeader("Cache-Control", "private, no-store");
   await teacherActor(data.sectionId);
   if (!process.env.DATABASE_URL) return { connected: false as const, section: null, students: [], assessments: [], cells: [], curriculumLessons: [] as Array<{id:string;title:string}> };
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
