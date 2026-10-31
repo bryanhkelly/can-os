@@ -5,6 +5,8 @@ import { Route } from "@/routes/operations.launch.$programId";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
 
 const state = vi.hoisted(() => ({ data: null as unknown }));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useLoaderData: () => state.data }),
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
