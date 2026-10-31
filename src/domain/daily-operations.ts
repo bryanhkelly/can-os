@@ -271,7 +271,9 @@ export function buildGuardianAttention(items: readonly {
       title: item.title,
       detail: item.detail ?? "",
       href: guardianWorkspace ?? item.href,
-      nextStep: item.kind === "excuse" ? "Submit excuse" : item.kind === "schoolwork" ? "Review assignment" :
+      nextStep: item.kind === "excuse" ? "Submit excuse" :
+        item.kind === "attendance_review" ? "Review school decision" :
+        item.kind === "schoolwork" ? "Review assignment" :
         item.kind === "course_approval" ? "Review class request" :
         guardianWorkspace ? "Review permission" : item.kind === "action" ? "Review action" : "View update",
       ownerName: "You",
