@@ -83,12 +83,16 @@ export function FamilyInviteImporter({
       setResult(response.created
         ? `${response.recipientCount} recipients saved and queued. ${response.skippedExisting} already had an invitation or response.`
         : "This invitation batch was already saved; no duplicate batch was created.");
-      setRaw("");
-      setPreview(false);
-      setConfirmed(false);
-      requestId.current = crypto.randomUUID();
-      try { await router.invalidate(); }
-      catch { setError("Invitations were saved by the server, but updated outreach records could not be loaded. Reopen this launch to verify the saved batch; do not send another batch."); }
+      try {
+        await router.invalidate();
+        setRaw("");
+        setPreview(false);
+        setConfirmed(false);
+        requestId.current = crypto.randomUUID();
+      } catch {
+        setConfirmed(false);
+        setError("Invitations were saved by the server, but updated outreach records could not be loaded. Reopen this launch to verify the saved batch; do not send another batch.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The invitation command could not be confirmed. Retry with the unchanged recipients and message to reuse the same request ID.");
     } finally {
