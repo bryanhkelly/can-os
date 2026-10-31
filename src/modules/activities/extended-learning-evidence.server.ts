@@ -210,11 +210,12 @@ export async function reviewExtendedEvidence(actor: AccessContext, input: Review
     )).for("update").limit(1);
     if (!document || document.metadata.version !== input.expectedVersion)
       throw new Error("Evidence version changed; reload before review");
-    const [latest] = await tx.select({ id: documents.id }).from(documents).where(and(
+    const versions = await tx.select({ id: documents.id, metadata: documents.metadata }).from(documents).where(and(
       eq(documents.subjectType, "activity_season"), eq(documents.subjectId, season.seasonId),
       eq(documents.category, document.category),
-    )).orderBy(desc(documents.createdAt), desc(documents.id)).limit(1);
-    if (latest?.id !== document.id || document.metadata.isCurrent !== true ||
+    ));
+    const latestVersion = Math.max(...versions.map(row => Number(row.metadata.version ?? 0)));
+    if (Number(document.metadata.version) !== latestVersion || latestVersion !== input.expectedVersion || document.metadata.isCurrent !== true ||
         document.storageProvider !== "cloudflare_r2" || document.sensitivityTier !== "restricted" ||
         document.metadata.storageVerified !== true ||
         !keyPattern.test(document.storageKey) ||
@@ -292,7 +293,8 @@ export async function readExtendedEvidence(actor: AccessContext, seasonId: strin
       siteMatchesProgram: true, capacity: season.capacity, ...approvals,
     }),
     categories: extendedSeasonApprovalCategories.map(category => {
-      const latest = docs.find(doc => doc.category === category);
+      const latest = docs.filter(doc => doc.category === category)
+        .sort((a, b) => Number(b.metadata.version ?? 0) - Number(a.metadata.version ?? 0))[0];
       return {
         category, title: extendedSeasonApprovalLabels[category],
         status: !latest ? "missing" as const :

@@ -98,7 +98,9 @@ export async function readExtendedSeasonApprovals(
   }
   for (const season of seasons) {
     const currentDocs = new Map<string, (typeof docs)[number]>();
-    for (const doc of docs) if (doc.subjectId === season.seasonId && !currentDocs.has(doc.category))
+    for (const doc of docs) if (doc.subjectId === season.seasonId &&
+        (!currentDocs.has(doc.category) ||
+          Number(doc.metadata.version ?? 0) > Number(currentDocs.get(doc.category)!.metadata.version ?? 0)))
       currentDocs.set(doc.category, doc);
     const actualSessions = sessions.filter(row => row.seasonId === season.seasonId);
     const eligibleStaff = staff.get(`${season.organizationId}:${season.siteId}`) ?? new Set<string>();
