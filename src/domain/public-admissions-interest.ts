@@ -20,6 +20,31 @@ export const publicAdmissionsInterestInput = z.object({
 
 export type PublicAdmissionsInterestInput = z.infer<typeof publicAdmissionsInterestInput>;
 
+export type PublicInterestRoute = "public_site_inquiry" | "public_site_family_start" | "invited_family_interest";
+
+/** Stable, fixed-cardinality platform key plus a verified published Site key. */
+export function publicInterestRateLimitKeys(route: PublicInterestRoute, siteId?: string) {
+  return {emergency:route+":global",site:siteId?route+":site:"+siteId:null};
+}
+
+/** Opaque keyset boundary, validated independently of the database.
+ * A date+UUID tie breaker ensures requests with identical timestamps do not
+ * disappear when the inbox advances to the next page.
+ */
+export function parseInterestPageCursor(cursor:string) {
+  const parts=cursor.split("|");
+  if (parts.length!==2 || !parts[0] || !parts[1]) throw new Error("Invalid admissions interest page cursor");
+  const date=new Date(parts[0]);
+  if (Number.isNaN(date.getTime()) || date.toISOString()!==parts[0])
+    throw new Error("Invalid admissions interest page cursor");
+  return {createdAt:date,id:z.string().uuid().parse(parts[1])};
+}
+
+export function makeInterestPageCursor(row:{createdAt:Date;id:string}) {
+  return row.createdAt.toISOString()+"|"+z.string().uuid().parse(row.id);
+}
+
+
 /** Bound memory BEFORE calling formData() or URLSearchParams(). */
 export async function readSmallUrlEncodedBody(request: Request): Promise<URLSearchParams> {
   const type = request.headers.get("content-type") ?? "";
