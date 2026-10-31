@@ -328,7 +328,10 @@ function TeacherGradebookPage() {
 
  const cellLabel = (cell: Cell | undefined, assessment: Assessment) => {
   if (!cell) return { text: "—", tone: "text-muted-foreground" };
-  if (cell.status === "graded" || cell.status === "returned") {
+  if (cell.status === "returned") {
+   return { text: "Returned · awaiting revision", tone: "font-semibold" };
+  }
+  if (cell.status === "graded") {
    return { text: `${cell.score ?? "—"} / ${assessment.pointsPossible ?? "—"}`, tone: "font-semibold" };
   }
   if (cell.status === "submitted") {
