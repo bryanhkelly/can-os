@@ -39,6 +39,23 @@ if (mode === "admissions-offers") {
   if (branchCheck.status !== 0) fail("Admissions Neon branch identity check failed.");
 }
 
+// Every other integration entrypoint writes fixture rows too. Verify the
+// Neon-attested project and configured nonproduction branch before running
+// Vitest, not just that the URL differs from the application endpoint.
+if (mode !== "admissions-offers" && mode !== "full-flow" && mode !== "journey-c") {
+  const expectedBranchId = process.env.CAN_INTEGRATION_TEST_BRANCH_ID ??
+    process.env.CAN_CURRICULUM_TEST_BRANCH_ID ?? process.env.CAN_ADMISSIONS_TEST_BRANCH_ID;
+  if (!expectedBranchId) {
+    fail("set CAN_INTEGRATION_TEST_BRANCH_ID (or suite-specific test branch ID) for online integration acceptance.");
+  }
+  const branchCheck = spawnSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
+    stdio: "inherit",
+    env: { ...process.env, CAN_ADMISSIONS_TEST_BRANCH_ID: expectedBranchId },
+  });
+  if (branchCheck.error) throw branchCheck.error;
+  if (branchCheck.status !== 0) fail("Integration Neon project/branch identity check failed.");
+}
+
 // Flow A and Journey C share the existing dedicated, non-production FullFlow
 // Neon database. Both must verify the actual branch identity before writing;
 // a caller-supplied TEST_DATABASE_URL label is never sufficient.
