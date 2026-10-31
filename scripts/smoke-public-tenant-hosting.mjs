@@ -6,6 +6,7 @@
  * Node 22+ required. A nonzero exit means evidence was not established.
  */
 import assert from "node:assert/strict";
+import tls from "node:tls";
 
 const domain=process.env.CAN_PUBLIC_SMOKE_DOMAIN;
 const first=process.env.CAN_PUBLIC_SMOKE_TENANT_A;
@@ -43,7 +44,25 @@ async function readLimited(response){
  }
  return new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(parts));
 }
-const evidence={checkedAt:new Date().toISOString(),domain,checks:[]};
+const evidence={checkedAt:new Date().toISOString(),domain,checks:[],tls:[]};
+async function certificateEvidence(slug){
+ const hostname=`${slug}.${domain}`;
+ const certificate=await new Promise((resolve,reject)=>{
+  const socket=tls.connect({host:hostname,port:443,servername:hostname,rejectUnauthorized:true,timeout:8000},()=>{
+   const cert=socket.getPeerCertificate();
+   const authorized=socket.authorized;
+   socket.end();
+   if(!authorized||!cert?.fingerprint256)return reject(new Error(`${hostname}: TLS certificate not verified`));
+   resolve(cert);
+  });
+  socket.on("timeout",()=>socket.destroy(new Error(`${hostname}: TLS timeout`)));
+  socket.on("error",reject);
+ });
+ evidence.tls.push({host:hostname,subject:certificate.subject?.CN??null,
+  san:certificate.subjectaltname??null,validFrom:certificate.valid_from,
+  validTo:certificate.valid_to,fingerprint256:certificate.fingerprint256});
+}
+
 async function check(slug,path,expectedStatus,expectIdentity=null){
  const url=`https://${slug}.${domain}${path}`;
  const response=await fetch(url,{redirect:"manual",signal:AbortSignal.timeout(8000),headers:{Accept:"text/html"}});
@@ -70,11 +89,13 @@ async function check(slug,path,expectedStatus,expectIdentity=null){
   identity:expectIdentity?"expected tenant HTML":"denied"});
 }
 try{
+ await certificateEvidence(first);
+ await certificateEvidence(second);
  await check(first,"/",200,expectedA);
  await check(second,"/",200,expectedB);
  for(const name of [unpublished,unknown])await check(name,"/",404);
  for(const name of [first,second]){
-  for(const path of ["/operations","/access","/_serverFn","/api","/admin","/assets/index.js"])
+  for(const path of ["/operations","/access","/_serverFn","/api","/admin","/assets/index.js","/apply","/inquiry","/published-site/family-start","/published-site/inquiry"])
    await check(name,path,404);
  }
  // Optional external negative fixtures MUST belong to approved isolated test deployment.
