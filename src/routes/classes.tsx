@@ -1,5 +1,6 @@
 import { PublishedLessonContent } from "@/components/learning/PublishedLessonContent";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
+import { CommonCartridgeStaticLesson } from "@/components/learning/CommonCartridgeStaticLesson";
 import { ClassAnnouncementFeed } from "@/components/learning/ClassAnnouncementFeed";
 import { ClassAnnouncementComposer } from "@/components/learning/ClassAnnouncementComposer";
 import { ClassCourseRoadmap } from "@/components/learning/ClassCourseRoadmap";
@@ -190,7 +191,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id).map(item=>
             <li key={item.id} className="rounded border p-3 text-sm">{item.url?
               <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>
-              :item.kind==="pdf"?<button type="button" disabled={busy}
+              :item.kind==="html"&&item.resourceId?<CommonCartridgeStaticLesson programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>\n              :item.kind==="pdf"?<button type="button" disabled={busy}
                 onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
                 {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>} <span className="text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}</li>)}</ul>
         </div>}
@@ -305,7 +306,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">Publisher, school and teacher resources</h3>
         <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
           {item.url?<a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} ({item.kind})</a>
-           :item.kind==="pdf"?<button type="button" disabled={busy}
+           :item.kind==="html"&&item.resourceId?<CommonCartridgeStaticLesson programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>\n              :item.kind==="pdf"?<button type="button" disabled={busy}
               onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
               {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}
           <span className="ml-2 text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}
