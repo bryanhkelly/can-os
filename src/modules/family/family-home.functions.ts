@@ -309,7 +309,25 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    createdAt: row.createdAt.toISOString(),
   };
  });
- const actionItems = openActions.map(row => ({
+ // Group consent Actions can remain open after a membership is withdrawn or
+ // the family loses permission. Only the existing verified consent workspace
+ // knows whether a request is still actionable or needs dismissal.
+ const { listCanonicalGuardianGroupConsents } = await import("@/modules/study-groups/canonical-workspace.functions");
+ const groupConsents = await listCanonicalGuardianGroupConsents();
+ const groupItems = groupConsents.filter(row => row.status === "open").map(row => ({
+  id: row.id,
+  kind: "action" as const,
+  type: "study_group_consent",
+  title: "Study group permission: " + row.groupTitle,
+  detail: row.obsolete ? "The student's group request is no longer active. Dismiss this permission." :
+    "Approve or decline your student's supervised study-group request.",
+  href: "/guardian/group-permissions?action=" + encodeURIComponent(row.id),
+  priority: "normal" as const,
+  dueAt: null,
+  studentPersonId: row.studentPersonId,
+  createdAt: "",
+ }));
+ const actionItems = openActions.filter(row => row.type !== "study_group_consent").map(row => ({
   id: row.id,
   kind: "action" as const,
   type: row.type,
@@ -330,5 +348,5 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   createdAt: row.expectedAt,
  }));
 
- return { items: [...actionItems, ...absenceItems, ...notificationItems] };
+ return { items: [...actionItems, ...groupItems, ...absenceItems, ...notificationItems] };
 });
