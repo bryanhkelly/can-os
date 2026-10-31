@@ -77,6 +77,32 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   throw new AuthorizationError("Credential release authorization requires a trusted institution evidence interface");
  });
 
+
+/** Issuer-scoped registrar release ledger, excluding private evidence contents. */
+export const listAcademicCredentialReleaseAuthorizations=createServerFn({method:"GET"})
+ .validator((value:unknown)=>target.parse(value))
+ .handler(async ({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const context=await registrar();const {db,s}=await resources();
+  const doc=await documentData(db,s,data.kind,data.credentialId);
+  if(!context.scope.organizationIds?.includes(doc.issuerId))
+   throw new AuthorizationError("credential issuer");
+  return db.select({
+   id:s.academicCredentialReleaseAuthorizations.id,
+   recipientEmail:s.academicCredentialReleaseAuthorizations.recipientEmail,
+   releasePurpose:s.academicCredentialReleaseAuthorizations.releasePurpose,
+   authorizedAt:s.academicCredentialReleaseAuthorizations.authorizedAt,
+   expiresAt:s.academicCredentialReleaseAuthorizations.expiresAt,
+   revokedAt:s.academicCredentialReleaseAuthorizations.revokedAt,
+  }).from(s.academicCredentialReleaseAuthorizations)
+   .where(and(
+    eq(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,doc.issuerId),
+    data.kind==="transcript"
+     ?eq(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,data.credentialId)
+     :eq(s.academicCredentialReleaseAuthorizations.diplomaIssuanceId,data.credentialId)))
+   .orderBy(desc(s.academicCredentialReleaseAuthorizations.authorizedAt)).limit(100);
+ });
+
 export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({authorizationId:uuid}).strict().parse(value))
  .handler(async ({data})=>{
