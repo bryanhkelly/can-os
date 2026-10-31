@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { deliverAcademicCredential,listAcademicCredentialDeliveries,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
+import { listAcademicCredentialDeliveries,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
 
 export const Route=createFileRoute("/admissions/credential-delivery")({component:CredentialDeliveryPage});
 type Delivery=Awaited<ReturnType<typeof listAcademicCredentialDeliveries>>[number];
 function CredentialDeliveryPage(){
  const [kind,setKind]=useState<"transcript"|"diploma">("transcript");
  const [credentialId,setCredentialId]=useState("");
- const [recipientName,setRecipientName]=useState("");
- const [recipientEmail,setRecipientEmail]=useState("");
  const [history,setHistory]=useState<Delivery[]>([]);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
@@ -33,10 +31,8 @@ function CredentialDeliveryPage(){
     </div>
    </section>
    <section className="space-y-3 rounded-xl border p-4">
-    <h2 className="font-semibold">Send to designated recipient</h2>
-    {field("Recipient name",recipientName,setRecipientName)}
-    {field("Recipient email",recipientEmail,setRecipientEmail)}
-    <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{const result=await deliverAcademicCredential({data:{kind,credentialId,recipientName,recipientEmail}});setMessage("Email provider status: "+result.status+". Delivery receipt: "+result.deliveryId);setHistory(await listAcademicCredentialDeliveries({data:{kind,credentialId}}))})}>Send credential PDF</button>
+    <h2 className="font-semibold">Official records release</h2>
+    <p className="text-sm">External release is temporarily unavailable until verified release instructions, authorized recipient selection, consent evidence and secure access are implemented. Official PDFs must not be emailed as attachments.</p>
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Delivery history</h2>
