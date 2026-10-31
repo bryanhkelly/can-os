@@ -29,16 +29,14 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Generate TanStack route types
-        run: npx tsr generate
+      - name: Generate TanStack route types and build application
+        run: npm run build
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests
         run: npm test
       - name: Design-system checks
         run: npm run lint
-      - name: Application build
-        run: npm run build
       - name: Record verification evidence
         if: always()
         shell: bash
