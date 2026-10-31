@@ -131,6 +131,22 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
    // and signed transfer. Repeated requests reuse the existing live grant.
    const lockKey=[data.credentialId,data.recipientPersonId,consent!.id].join(":");
    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+   // Re-read and lock consent and action after obtaining the idempotency lock.
+   // Authorization cannot race a revocation made before this transaction.
+   const [liveConsent]=await tx.select().from(s.consentRecords)
+    .where(eq(s.consentRecords.id,consent!.id)).for("share").limit(1);
+   const [liveAction]=await tx.select().from(s.actions)
+    .where(eq(s.actions.id,action!.id)).for("share").limit(1);
+   const [liveGuardian]=await tx.select({id:s.guardianRelationships.id})
+    .from(s.guardianRelationships).where(and(
+     eq(s.guardianRelationships.studentPersonId,student.personId),
+     eq(s.guardianRelationships.guardianPersonId,data.recipientPersonId),
+     eq(s.guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
+   if(!liveConsent||liveConsent.revokedAt||!liveGuardian||
+      liveAction?.status!=="resolved"||liveAction.metadata.exitCompletedByRegistrar!==true||
+      liveAction.metadata.recordsReleaseConsentId!==liveConsent.id||
+      liveConsent.signatureEvidence.actionId!==liveAction.id)
+    throw new AuthorizationError("Transfer release authority changed during review");
    const [existing]=await tx.select({
     id:s.academicCredentialReleaseAuthorizations.id,
    }).from(s.academicCredentialReleaseAuthorizations).where(and(
