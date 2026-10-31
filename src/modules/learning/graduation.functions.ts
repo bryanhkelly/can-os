@@ -23,11 +23,17 @@ async function registrar() {
 function issuerAuthorized(context: Awaited<ReturnType<typeof registrar>>, issuerId: string) {
   if (!context.scope.organizationIds?.includes(issuerId)) throw new AuthorizationError("credit issuing organization");
 }
-type SnapshotRow = {sectionId:string;subject:string;creditsEarned:number|null;terminalPeriod:boolean;letterGrade:string|null};
+type SnapshotRow = {sectionId:string;subject:string;creditsEarned:number|null;terminalPeriod:boolean;letterGrade:string|null;isTransferCredit?:boolean;acceptedByIssuer?:boolean;creditAcceptanceStatus?:string};
 function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: string): CreditEvidence[] {
   if (!Array.isArray(snapshot.rows) || !snapshot.rows.length) throw new Error("Issued transcript has no academic evidence");
   const rows = snapshot.rows as Array<SnapshotRow & {creditIssuingOrganizationId:string}>;
+  // Validate untrusted historical JSON before accessing any row properties.
+  if (rows.some(row => !row || typeof row !== "object" || typeof row.sectionId !== "string" || typeof row.subject !== "string" || typeof row.terminalPeriod !== "boolean" || (row.creditsEarned !== null && (typeof row.creditsEarned !== "number" || !Number.isFinite(row.creditsEarned))) || (row.letterGrade !== null && typeof row.letterGrade !== "string") || typeof row.creditIssuingOrganizationId !== "string"))
+    throw new AuthorizationError("Malformed transcript credit evidence");
   if (rows.some(row => row.creditIssuingOrganizationId !== issuerId)) throw new AuthorizationError("transcript issuer mismatch");
+  // Transfer acceptance must originate from the canonical issuer ledger, not JSON flags.
+  if (rows.some(row => row.isTransferCredit === true || row.acceptedByIssuer !== undefined || row.creditAcceptanceStatus !== undefined))
+    throw new AuthorizationError("Transfer credit requires canonical issuer-accepted ledger evidence");
   // Intermediate grading periods must not count twice. A W is zero earned credit.
   const terminal = rows.filter(row => row.terminalPeriod);
   const sections = new Map<string, typeof terminal[number]>();
@@ -35,14 +41,28 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     if (!row.sectionId || sections.has(row.sectionId)) throw new Error("Duplicate or missing terminal section evidence");
     sections.set(row.sectionId,row);
   }
+  if([...sections.values()].some(row=>row.letterGrade?.trim().toUpperCase()==="W" && (row.creditsEarned??0)>0))
+    throw new AuthorizationError("Withdrawn terminal grade cannot confer graduation credit");
   return [...sections.values()].map(row => ({
     sectionId: row.sectionId,
     subject: row.subject,
     earnedUnits: row.creditsEarned,
     finalized: Boolean(row.sectionId && row.letterGrade),
+    // Issuer-matched canonical Section credit only; transfer flags were rejected above.
     acceptedByIssuer: true,
   }));
 }
+/** Check current canonical enrollment custody, not only the immutable transcript snapshot. */
+async function assertNoWithdrawnTranscriptCredits(db:Pick<Awaited<ReturnType<typeof resources>>["db"],"select">,
+ s:Awaited<ReturnType<typeof resources>>["s"],studentProfileId:string,evidence:readonly CreditEvidence[]){
+ const sectionIds=evidence.filter(row=>row.earnedUnits!==null && row.earnedUnits>0).map(row=>row.sectionId);
+ if(!sectionIds.length)return;
+ const withdrawn=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+   .where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.kind,"section"),
+     eq(s.enrollments.status,"withdrawn"),inArray(s.enrollments.sectionId,sectionIds)));
+ if(withdrawn.length)throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
+}
+
 async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>["db"], "select">, s: Awaited<ReturnType<typeof resources>>["s"], transcriptId: string, requirementSetId: string) {
   const [transcript] = await db.select().from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,transcriptId)).limit(1);
   const [requirementSet] = await db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.id,requirementSetId)).limit(1);
@@ -75,7 +95,9 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
       eq(s.graduationRequirementSets.academicYear,requirementSet.academicYear)));
   if(approved.length!==1 || approved[0]?.id!==requirementSet.id)
     throw new AuthorizationError("Graduation policy is not approved for this academic year");
-  return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
+  const evidence = evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId);
+  await assertNoWithdrawnTranscriptCredits(db, s, transcript.studentProfileId, evidence);
+  return { transcript, requirementSet, evidence };
 }
 
 export const approveGraduationRequirements = createServerFn({method:"POST"})
