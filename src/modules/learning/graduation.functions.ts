@@ -29,7 +29,13 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
   const rows = snapshot.rows as Array<SnapshotRow & {creditIssuingOrganizationId:string}>;
   if (rows.some(row => row.creditIssuingOrganizationId !== issuerId)) throw new AuthorizationError("transcript issuer mismatch");
   // Intermediate grading periods must not count twice. A W is zero earned credit.
-  return rows.filter(row => row.terminalPeriod).map(row => ({
+  const terminal = rows.filter(row => row.terminalPeriod);
+  const sections = new Map<string, typeof terminal[number]>();
+  for (const row of terminal) {
+    if (!row.sectionId || sections.has(row.sectionId)) throw new Error("Duplicate or missing terminal section evidence");
+    sections.set(row.sectionId,row);
+  }
+  return [...sections.values()].map(row => ({
     sectionId: row.sectionId,
     subject: row.subject,
     earnedUnits: row.creditsEarned,
