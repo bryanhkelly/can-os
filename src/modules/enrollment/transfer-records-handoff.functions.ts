@@ -410,11 +410,20 @@ export const getReceivingSchoolTransferTranscript=createServerFn({method:"POST"}
      eq(s.actions.subjectType,"student_profile"),
      eq(s.actions.subjectId,app.studentProfileId),
    )).limit(1);
+   // An externally attested mailing/portal handoff is NOT a CAN-internal
+   // release. Only the exact Program-bound electronic release made by the
+   // origin registrar grants the receiving school in-app transcript access.
    if(!handoff||handoff.status!=="resolved"||
       handoff.metadata.originChangeActionId!==origin.id||
       handoff.metadata.issuedTranscriptId!==issuanceId||
-      typeof handoff.metadata.deliveryReceiptReference!=="string")
-    throw new AuthorizationError("recorded secure originating-school transcript transfer");
+      handoff.metadata.deliveredInCAN!==true||
+      handoff.metadata.deliveryMethod!=="can_internal_school_records"||
+      handoff.metadata.deliveryReceiptReference!=="CAN-RELEASE:"+handoff.id||
+      handoff.metadata.destinationApplicationId!==app.id||
+      handoff.metadata.destinationProgramId!==app.programId||
+      handoff.metadata.destinationSiteId!==app.siteId||
+      handoff.metadata.destinationRecordsReleaseConsentId!==releaseId)
+    throw new AuthorizationError("verified CAN-internal official transcript release to this application");
    const [record]=await tx.select({
      id:s.transcriptIssuances.id,studentProfileId:s.transcriptIssuances.studentProfileId,
      issuingOrganizationId:s.transcriptIssuances.issuingOrganizationId,
