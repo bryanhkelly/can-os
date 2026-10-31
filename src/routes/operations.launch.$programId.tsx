@@ -129,7 +129,7 @@ function Setup({data}:{data:Snapshot}){
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
-     code,title,teacherPersonId:teacherId,scheduleTemplateId:scheduleId,requireFirstLesson:true,
+     code,title,teacherPersonId:teacherId,scheduleTemplateId:scheduleId,
      ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class saved. Review its schedule and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
@@ -169,7 +169,20 @@ function Setup({data}:{data:Snapshot}){
     <button type="submit" disabled={busy||!termId||!versionId||!scheduleId||!teacherId||!selectedCourse?.recommendation.instructionReady||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
    </form>
   </section>
-  {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm"><strong>Classroom saved.</strong> Review the new class in Teaching assignments below for its pinned first lesson and any blockers. The selected schedule and verified teacher are saved with the Section. Enrollment and first-week assessment readiness still require review.</div>}
+  {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
+   <strong>Classroom saved.</strong> The schedule, instructor and learner-facing first lesson were checked.
+   {data.sections.find(section=>section.id===createdSectionId)?<div className="mt-3">
+    <p className="font-medium">Remaining first-day requirements</p>
+    {data.sections.find(section=>section.id===createdSectionId)!.classroom.blockers.length?
+     <ul className="mt-2 list-inside list-disc space-y-1">{data.sections.find(section=>section.id===createdSectionId)!.classroom.blockers.map(blocker=><li key={blocker.key}>{blocker.message}</li>)}</ul>:
+     <p className="mt-2">First-week classroom checks are satisfied.</p>}
+   </div>:<p className="mt-2">Refresh the classroom checklist to see live readiness.</p>}
+   <div className="mt-3 flex flex-wrap gap-3">
+    <a href={"#classroom-"+createdSectionId} className="rounded border px-3 py-2 font-semibold">Review classroom readiness</a>
+    <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="rounded border px-3 py-2">Set enrollment policies</Link>
+    <Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="rounded border px-3 py-2">Return to launch checklist</Link>
+   </div>
+  </div>}
   <div className="mt-6 rounded-lg border p-4 text-sm">
    After provisioning sections, <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="font-semibold underline">
     configure enrollment windows, prerequisites, seat capacity and credit limits →
@@ -177,12 +190,12 @@ function Setup({data}:{data:Snapshot}){
   </div>
   <section className="mt-8 space-y-3">
    <h2 className="font-serif text-2xl">Teaching assignments</h2>
-   {data.sections.map(section=><SectionRow key={section.id+":"+String(section.creditUnits)} section={section}
+   {data.sections.map(section=><div id={"classroom-"+section.id} key={section.id}><SectionRow section={section}
     staff={data.teachingStaff} busy={busy} authority={data.academicAuthority}
     saveCredits={(credits,reason)=>run(()=>setLaunchSectionCredits({data:{
      programId:data.program.id,sectionId:section.id,credits,reason}}),"Academic credit units recorded.")}
     assign={(personId)=>run(()=>assignLaunchTeacher({data:{
-     programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/>)}
+     programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/></div>)}
    {!data.sections.length&&<p className="rounded-lg border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
   </section>
   <section className="mt-7 rounded-xl border bg-card p-5">
