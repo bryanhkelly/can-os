@@ -17,7 +17,7 @@ function AccessPage(){
     if(response.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
     if(!response.ok){setStatus("The access code is invalid or local demo sign-in is disabled.");return;}
     const body=await response.json() as {role?:string};
-    const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
+    const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
     window.location.replace(home[body.role??""]??"/access");
     return;
    }
