@@ -226,6 +226,10 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
        origin.programId===app.programId||
        origin.metadata.kind!=="transfer"||
        origin.metadata.requestedByGuardianPersonId!==app.submittedByPersonId||
+       (typeof origin.metadata.destinationApplicationId==="string"&&
+        origin.metadata.destinationApplicationId!==app.id)||
+       (typeof origin.metadata.destinationProgramId==="string"&&
+        origin.metadata.destinationProgramId!==app.programId)||
        origin.status!=="resolved"||
        origin.metadata.exitCompletedByRegistrar!==true||
        origin.metadata.exitStatus!=="transferred")
