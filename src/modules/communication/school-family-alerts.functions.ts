@@ -176,11 +176,29 @@ export const getSchoolFamilyAlerts=createServerFn({method:"GET"}).handler(async(
    eq(s.notifications.resourceType,"action"),
    inArray(s.notifications.resourceId,alerts.map(row=>row.id)),
  )):[];
+ const outbound=alerts.length?await db.select({
+   alertId:s.notifications.resourceId,
+   channel:s.notificationOutboundDeliveries.channel,
+   status:s.notificationOutboundDeliveries.status,
+   attempts:s.notificationOutboundDeliveries.attempts,
+ }).from(s.notificationOutboundDeliveries)
+   .innerJoin(s.notifications,eq(s.notifications.id,s.notificationOutboundDeliveries.notificationId))
+   .where(and(
+     eq(s.notifications.type,"school_family_alert"),
+     eq(s.notifications.resourceType,"action"),
+     inArray(s.notifications.resourceId,alerts.map(row=>row.id)),
+   )):[];
  return {programs,items:alerts.map(row=>({
    id:row.id,title:row.title,description:row.description??"",
    programId:row.programId,kind:row.metadata.kind,
    publishedAt:row.createdAt.toISOString(),
    recipients:counts.filter(item=>item.alertId===row.id).length,
    acknowledged:counts.filter(item=>item.alertId===row.id&&item.status==="read").length,
+   emailQueued:outbound.filter(item=>item.alertId===row.id&&item.channel==="email").length,
+   emailAccepted:outbound.filter(item=>item.alertId===row.id&&item.channel==="email"&&item.status==="accepted").length,
+   smsQueued:outbound.filter(item=>item.alertId===row.id&&item.channel==="sms").length,
+   smsAccepted:outbound.filter(item=>item.alertId===row.id&&item.channel==="sms"&&item.status==="accepted").length,
+   deliveryFailed:outbound.filter(item=>item.alertId===row.id&&item.status==="failed"&&item.attempts>=5).length,
+   deliverySuppressed:outbound.filter(item=>item.alertId===row.id&&item.status==="suppressed").length,
  }))};
 });
