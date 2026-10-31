@@ -88,7 +88,7 @@ async function existingStudentChoices(database:Pick<Database,"selectDistinct">,
 /** Search active students and verified guardians without loading an unbounded directory. */
 const admissionsPageInput=z.object({
  siteId:uuid.optional(),programId:uuid.optional(),cursor:uuid.optional(),
- search:z.string().trim().max(100).optional(),
+ search:z.string().trim().max(100).optional(),applicationId:uuid.optional(),
  pageSize:z.coerce.number().int().min(1).max(100).default(40),
 }).strict();
 export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
@@ -147,9 +147,10 @@ export const listAdmissionsIntake=createServerFn({method:"GET"})
    ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : []),
    data.siteId?eq(programs.siteId,data.siteId):undefined,
    data.programId?eq(applications.programId,data.programId):undefined,
+   data.applicationId?eq(applications.id,data.applicationId):undefined,
    data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),ilike(people.legalLastName,"%"+data.search+"%"),ilike(programs.name,"%"+data.search+"%"),z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined):undefined))
-  .orderBy(desc(applications.updatedAt),desc(applications.id)).limit(data.pageSize+1).offset((data.page-1)*data.pageSize);
- const hasMore=rows.length>data.pageSize;
+  .orderBy(desc(applications.updatedAt),desc(applications.id)).limit(data.applicationId?1:data.pageSize+1).offset(data.applicationId?0:(data.page-1)*data.pageSize);
+ const hasMore=!data.applicationId&&rows.length>data.pageSize;
  rows.splice(data.pageSize);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  const sourceIds=[...new Set(rows.map(r=>
