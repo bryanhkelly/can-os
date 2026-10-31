@@ -1,5 +1,6 @@
 import {useState} from "react";
 import {CapacityPoolCard} from "@/components/admissions/CapacityPoolCard";
+import {parseSeatCapacity} from "@/components/admissions/seat-capacity";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getAdmissionsCapacity,updateAdmissionsCapacity} from "@/modules/enrollment/capacity-preview.functions";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
@@ -41,8 +42,8 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function save(id:string,current:number){
   const raw=edits[id]??String(current);
-  const value=Number(raw);
-  if(!raw.trim()||!Number.isSafeInteger(value)||value<1||value>100000){
+  const value=parseSeatCapacity(raw);
+  if(value===null){
    setError("Enter a whole-number seat capacity between 1 and 100,000.");return;
   }
   setBusy(id);setError("");setNotice("");
