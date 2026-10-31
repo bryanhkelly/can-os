@@ -207,6 +207,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     <form className="grid gap-4 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(async()=>{
       await addMarketplaceSupplement({data:{
        programId:market.program.id,courseVersionId,scope,
+       ...(scope!=="section"?{academicYearId:adoptionYearId}:{}),
        ...(scope==="section"?{sectionId}:{}),...(lessonId.trim()?{lessonId:lessonId.trim()}:{}),
        title,kind,url,
       }});
@@ -216,6 +217,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        onChange={e=>{setCourseVersionId(e.target.value);setSectionId("");}}>
        <option value="">Select a course</option>{choices.map(c=><option value={c.courseVersionId} key={c.courseVersionId}>{c.code} · {c.title}</option>)}
       </select></label>
+     {scope!=="section"&&<label className="text-sm">Academic year<select required className="mt-1 block w-full rounded border bg-background p-2" value={adoptionYearId} onChange={e=>setAdoptionYearId(e.target.value)}><option value="">Choose an academic year</option>{market.academicYears.map(y=><option key={y.id} value={y.id}>{y.name}</option>)}</select></label>}
      <label className="text-sm">Visibility<select className="mt-1 block w-full rounded border bg-background p-2" value={scope} onChange={e=>setScope(e.target.value as typeof scope)}>
       <option value="program">Entire program</option><option value="site" disabled={!market.program.siteId}>Current school site</option><option value="section">One class section</option>
      </select></label>
