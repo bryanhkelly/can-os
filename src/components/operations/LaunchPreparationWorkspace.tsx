@@ -7,12 +7,12 @@ import { LaunchFamilyProgress } from "@/components/operations/LaunchFamilyProgre
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import type { listLaunches } from "@/modules/programs/launch.functions";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
-import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
+import type { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admissions-counts.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 
-export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, currentSchoolStatus, launches, selection, schoolSelection, hasSchoolPreparation, admissions, enrollmentCounts, familyInvitations }: {
+export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, currentSchoolStatus, launches, selection, schoolSelection, hasSchoolPreparation, admissionsCounts, enrollmentCounts, familyInvitations }: {
   currentLaunch: Launch | null;
   currentProgram: { id: string } | null;
   currentSchoolStatus?: string;
@@ -20,7 +20,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
   selection: { siteId?: string; programId?: string };
   schoolSelection: { siteId?: string; programId?: string };
   hasSchoolPreparation: boolean;
-  admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
+  admissionsCounts: Awaited<ReturnType<typeof getLaunchAdmissionsCounts>> | null;
   enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
   familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
 }) {
@@ -50,7 +50,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
         </details>
 
         {hasSchoolPreparation && <LaunchFamilyProgress
-          admissions={admissions}
+          admissionsCounts={admissionsCounts}
           enrollmentCounts={enrollmentCounts}
           familyInvitations={familyInvitations}
           siteId={schoolSelection.siteId}
