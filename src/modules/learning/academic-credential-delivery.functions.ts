@@ -314,15 +314,15 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    .from(s.guardianRelationships).where(and(
     eq(s.guardianRelationships.studentPersonId,student.personId),
     eq(s.guardianRelationships.guardianPersonId,context.actorPersonId),
-    eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
+    eq(s.guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
   const [action]=await tx.select().from(s.actions).where(and(
    eq(s.actions.id,release.instructionReference),
    eq(s.actions.type,"guardian_enrollment_change_request"),
-   eq(s.actions.subjectType,"student_profile"))).limit(1);
+   eq(s.actions.subjectType,"student_profile"))).for("share").limit(1);
   const [consent]=await tx.select().from(s.consentRecords).where(and(
    eq(s.consentRecords.id,release.consentEvidenceReference),
    eq(s.consentRecords.subjectType,"student_profile"),
-   eq(s.consentRecords.consentType,"academic_records_transfer_release"))).limit(1);
+   eq(s.consentRecords.consentType,"academic_records_transfer_release"))).for("share").limit(1);
   const [program]=action?.programId?await tx.select({issuerId:s.programs.creditIssuingOrganizationId})
    .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1):[];
   const evidence=consent?.signatureEvidence;
