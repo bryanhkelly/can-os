@@ -1,4 +1,4 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceHistory, EvidenceReviewForm } from "@/components/evidence";
+import { EvidenceUploader, EvidenceWorkflow, EvidenceHistory, EvidenceReviewForm, EvidenceDocumentLink } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueryState } from "@/components/workspace";
 import { getChurchSchoolOpeningFn } from "@/modules/operations/school-opening.functions";
@@ -68,13 +68,6 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
     }catch(cause){setError(cause instanceof Error?cause.message:"Evidence review was not recorded");throw cause;}
     finally{setBusy(false);}
   }
-  async function download(documentId:string) {
-    setError("");
-    try{
-      const result=await getSchoolOpeningEvidenceDownloadFn({data:{programId:model.programId,documentId}});
-      window.open(result.downloadUrl,"_blank","noopener,noreferrer");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open private evidence");}
-  }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
     <p className="mt-1 text-xs text-muted-foreground">Responsible: {item.responsibleOwner}</p>
     <p className="mt-3 text-sm">{item.nextAction}</p>
@@ -82,7 +75,10 @@ function EvidenceCategoryCard({item,model,changed}:{item:Item;model:Model;
       <p><strong>Current v{item.current.version}:</strong> {item.current.fileName}</p>
       <p className="mt-1">Submitted {new Date(item.current.submittedAt).toLocaleString()} ·
         {" "}expires {item.current.expiresAt?new Date(item.current.expiresAt).toLocaleDateString():"not recorded"}</p>
-      <button type="button" className="mt-2 underline" onClick={()=>void download(item.current!.id)}>Open private document</button>
+      <EvidenceDocumentLink onGetDownloadUrl={async()=>{
+        const result=await getSchoolOpeningEvidenceDownloadFn({data:{programId:model.programId,documentId:item.current!.id}});
+        return result.downloadUrl;
+      }}/>
     </div>}
     {model.canReview&&item.current&&item.status==="pending"&&<EvidenceReviewForm disabled={busy}
       label="Independent review reason" approveLabel="Verify this version"
