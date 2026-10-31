@@ -1,3 +1,5 @@
+import { useEffect,useState } from "react";
+import { searchAdmissionsHouseholds } from "@/modules/enrollment/admissions-intake.functions";
 import { AdmissionsPageNavigation } from "./AdmissionsPageNavigation";
 type InquiryFormProps={
  children?:never;
@@ -10,7 +12,6 @@ type InquiryFormProps={
  existingStudent:{householdId:string|null}|undefined;
  createHouseholdConfirmed:boolean;setCreateHouseholdConfirmed:(value:boolean)=>void;
  existingApplicationId:string;setExistingApplicationId:(value:string)=>void;
- records:Array<{id:string;programId:string;studentFirst:string;studentLast:string}>;
  studentFirstName:string;setStudentFirstName:(value:string)=>void;
  studentLastName:string;setStudentLastName:(value:string)=>void;
  guardianFirstName:string;setGuardianFirstName:(value:string)=>void;
@@ -23,7 +24,20 @@ type InquiryFormProps={
  existingStudentHasMore:boolean;
 };
 
-export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,convertibleInterest,contactReviewed,busy,existingStudentKey,setExistingStudentKey,existingStudents,existingStudent,createHouseholdConfirmed,setCreateHouseholdConfirmed,existingApplicationId,setExistingApplicationId,records,studentFirstName,setStudentFirstName,studentLastName,setStudentLastName,guardianFirstName,setGuardianFirstName,guardianLastName,setGuardianLastName,guardianEmail,setGuardianEmail,gradeLevel,setGradeLevel,source,setSource,notes,setNotes,selection,existingStudentHasMore}:InquiryFormProps){
+export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,convertibleInterest,contactReviewed,busy,existingStudentKey,setExistingStudentKey,existingStudents,existingStudent,createHouseholdConfirmed,setCreateHouseholdConfirmed,existingApplicationId,setExistingApplicationId,studentFirstName,setStudentFirstName,studentLastName,setStudentLastName,guardianFirstName,setGuardianFirstName,guardianLastName,setGuardianLastName,guardianEmail,setGuardianEmail,gradeLevel,setGradeLevel,source,setSource,notes,setNotes,selection,existingStudentHasMore}:InquiryFormProps){
+ const [householdSearch,setHouseholdSearch]=useState("");
+ const [householdMatches,setHouseholdMatches]=useState<Array<{id:string;programId:string;studentFirst:string;studentLast:string}>>([]);
+ const [householdError,setHouseholdError]=useState("");
+ useEffect(()=>{
+  let active=true;
+  if(!programId||householdSearch.trim().length<2){
+   setHouseholdMatches([]);setHouseholdError("");return;
+  }
+  void searchAdmissionsHouseholds({data:{programId,search:householdSearch.trim()}})
+   .then(rows=>{if(active){setHouseholdMatches(rows);setHouseholdError("");}})
+   .catch(()=>{if(active){setHouseholdMatches([]);setHouseholdError("Unable to search authorized households.");}});
+  return ()=>{active=false;};
+ },[programId,householdSearch]);
  const studentKey=(student:InquiryFormProps["existingStudents"][number])=>
   `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
  return <>
@@ -50,15 +64,17 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
      {" "}I confirm creating the missing household for this existing student and managing guardian. Neither currently belongs to a household.
     </label>}
     {!existingStudent&&<>
-    <label className="text-sm sm:col-span-2">Existing household (optional, for siblings)
+    <label className="text-sm sm:col-span-2">Find a sibling household (optional)
+      <input className="mt-1 block w-full rounded border bg-background p-2" value={householdSearch} onChange={e=>{setHouseholdSearch(e.target.value);setExistingApplicationId("");}} placeholder="Search student name or application ID" />
+      {householdError&&<span role="alert" className="block text-xs">{householdError}</span>}
       <select className="mt-1 block w-full rounded border bg-background p-2"
         disabled={convertibleInterest} value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
         <option value="">Create new household</option>
-        {records.filter(r=>r.programId===programId).map(r=>
+        {householdMatches.map(r=>
           <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
       </select>
       <span className="mt-1 block text-xs text-muted-foreground">
-        Reuses the existing household and guardian only when the contact email matches.
+        Search authorized admissions independently of the visible page. Reuse requires the same guardian email.
       </span>
     </label>
     <label className="text-sm">Student first name<input required value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
