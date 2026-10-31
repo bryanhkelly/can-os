@@ -80,5 +80,7 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- The steps above must ALL succeed on this exact commit to count as connected acceptance."
+            echo "- Status: CONNECTED GATES ONLY. Overall release remains HOLD until independent admissions Neon acceptance, static/schema checks, and operational readiness are verified on the same reviewed commit."
+            echo "- Required independent evidence: Admissions Neon Acceptance run ID, build/typecheck/unit run ID, migration parity, child-safety negative checks, and deployment readiness."
             echo "- This synthetic isolated-branch evidence does not authorize production deployment or certify legal/accreditation compliance."
           } >> "${GITHUB_STEP_SUMMARY}"
