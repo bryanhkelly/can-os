@@ -100,6 +100,8 @@ for (const eventType of [
   EventTypes.CurriculumDraftCreated,
   EventTypes.CurriculumDraftSaved,
   EventTypes.CurriculumPublished,
+  EventTypes.CurriculumAnnualAdoptionRolledOver,
+  EventTypes.CurriculumAnnualAdoptionRolledBack,
   EventTypes.TranscriptIssued,
   EventTypes.StudentLearningGoalReviewed,
   EventTypes.EnrollmentDocumentSubmitted,
