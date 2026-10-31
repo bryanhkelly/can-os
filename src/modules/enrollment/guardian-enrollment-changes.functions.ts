@@ -18,7 +18,10 @@ const requestSchema=z.object({
  destinationSchoolName:z.string().trim().min(3).max(160).optional(),
  destinationSchoolContactEmail:z.string().trim().email().max(254).optional(),
  intendedLastDay:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-}).strict().refine(data=>data.kind!=="transfer"||!!data.destinationSchoolName,{
+ recordsReleaseAuthorized:z.boolean().optional(),
+}).strict().refine(data=>data.kind!=="transfer"||data.recordsReleaseAuthorized===true,{
+ path:["recordsReleaseAuthorized"],message:"Authorize an official academic-record release to the named destination school.",
+}).refine(data=>data.kind!=="transfer"||!!data.destinationSchoolName,{
  path:["destinationSchoolName"],message:"Name the destination school for a transfer request.",
 });
 const actionType="guardian_enrollment_change_request";
@@ -91,6 +94,32 @@ export const requestGuardianEnrollmentChange=createServerFn({method:"POST"})
     },
    }).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create family enrollment request");
+   if(data.kind==="transfer"){
+     const [consent]=await tx.insert(s.consentRecords).values({
+       subjectType:"student_profile",subjectId:child.studentProfileId,
+       consentType:"academic_records_transfer_release",
+       signerPersonId:actor.actorPersonId!,
+       version:"can-school-transfer-release-v1",
+       signatureEvidence:{
+         acknowledged:true,
+         purpose:"Release existing academic records to the verified named destination school only",
+         destinationSchoolName:data.destinationSchoolName,
+         destinationSchoolContactEmail:data.destinationSchoolContactEmail??null,
+         studentPersonId:data.studentPersonId,programId:child.programId,
+         guardianPersonId:actor.actorPersonId,
+         actionId:action.id,accountId:actor.accountId,sessionId:actor.sessionId,
+       },
+     }).returning({id:s.consentRecords.id});
+     if(!consent)throw new Error("Transfer records release authorization was not recorded");
+     await tx.update(s.actions).set({
+       metadata:{requestedByGuardianPersonId:actor.actorPersonId,kind:data.kind,
+         destinationSchoolName:data.destinationSchoolName,
+         destinationSchoolContactEmail:data.destinationSchoolContactEmail??null,
+         intendedLastDay:data.intendedLastDay??null,
+         recordsHandoffStatus:"not_started",recordsReleaseConsentId:consent.id,
+       },
+     }).where(eq(s.actions.id,action.id));
+   }
    const eventId=await emitEvent(tx,{
     eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,
     actorPersonId:actor.actorPersonId,
