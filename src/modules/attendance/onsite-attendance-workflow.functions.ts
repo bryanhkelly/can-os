@@ -221,9 +221,8 @@ async function resolveExpectedRoster(actor: AccessContext,
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : [])));
   // Keep effective Section and Section-membership dates distinct from the
   // Program enrollment's own effective window. All dates use the school zone.
-  const zone=activePrograms.find(row=>row.id===programId)?.timezone;
   const effectiveSections=sectionsAtSite.filter(row=>{
-    const timeZone=zone??activePrograms.find(program=>program.id===row.programId)?.timezone??"UTC";
+    const timeZone=activePrograms.find(program=>program.id===row.programId)?.timezone??"UTC";
     return (!row.sectionStartsAt||siteDate(row.sectionStartsAt,timeZone)<=date) &&
       (!row.sectionEndsAt||siteDate(row.sectionEndsAt,timeZone)>=date) &&
       (!row.membershipStartsAt||siteDate(row.membershipStartsAt,timeZone)<=date) &&
