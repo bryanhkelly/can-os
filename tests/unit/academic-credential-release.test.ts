@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {canDownloadAuthorizedCredential} from "@/domain/academic-credential-release";
+import {canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential} from "@/domain/academic-credential-release";
 const now=new Date("2026-10-31T12:00:00Z");
 const valid={actorPersonId:"recipient-1",recipientPersonId:"recipient-1",recipientEmail:"person@example.org",accountEmail:"PERSON@example.org",recipientActive:true,expiresAt:new Date("2026-11-01T12:00:00Z"),revokedAt:null,now,demoFacilitator:false};
 describe("official academic credential release gate",()=>{
@@ -14,5 +14,24 @@ describe("official academic credential release gate",()=>{
   {revokedAt:new Date("2026-10-31T11:00:00Z")},
  ])("rejects invalid identity or authorization: %j",override=>{
   expect(canDownloadAuthorizedCredential({...valid,...override})).toBe(false);
+ });
+});
+
+describe("independent credential release review",()=>{
+ const valid={issuerMatches:true,studentMatches:true,verifiedRecipient:true,
+  trustedInstructions:true,validAuthorityEvidence:true,registrarApproved:true,
+  demoActor:false,purpose:"transfer" as const,
+  expiresAt:new Date("2026-11-01T12:00:00Z"),now};
+ it("requires every independent verification and registrar approval",()=>{
+  expect(canAuthorizeAcademicCredentialRelease(valid)).toBe(true);
+  for(const field of ["issuerMatches","studentMatches","verifiedRecipient","trustedInstructions","validAuthorityEvidence","registrarApproved"] as const){
+   expect(canAuthorizeAcademicCredentialRelease({...valid,[field]:false})).toBe(false);
+  }
+ });
+ it("rejects demo users, expired/overlong grants and unsupported purposes",()=>{
+  expect(canAuthorizeAcademicCredentialRelease({...valid,demoActor:true})).toBe(false);
+  expect(canAuthorizeAcademicCredentialRelease({...valid,expiresAt:now})).toBe(false);
+  expect(canAuthorizeAcademicCredentialRelease({...valid,expiresAt:new Date("2027-01-01T12:00:00Z")})).toBe(false);
+  expect(canAuthorizeAcademicCredentialRelease({...valid,purpose:"freeform" as never})).toBe(false);
  });
 });
