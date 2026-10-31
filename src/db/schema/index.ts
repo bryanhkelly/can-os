@@ -51,3 +51,5 @@ export * from "./student-access-consents";
 export * from "./church-onboarding";
 export * from "./graduation";
 export * from "./academic-credential-delivery";
+
+export * from "./finance";
