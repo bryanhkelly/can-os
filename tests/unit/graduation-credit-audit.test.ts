@@ -33,6 +33,10 @@ describe("graduation credit audit policy", () => {
     expect(auditGraduationCredits(requirements, [math,math,english]).status).toBe("incomplete");
     expect(auditGraduationCredits([...requirements,requirements[0]], [math,english]).status).toBe("incomplete");
   });
+  it("matches differently capitalized subject evidence without double counting requirements",()=>{
+    expect(auditGraduationCredits(requirements,[{...math,subject:"mathematics"},{...english,subject:"ENGLISH"}]).status).toBe("requirements_met");
+    expect(auditGraduationCredits([...requirements,{subject:"mathEMATICS",minimumUnits:3}],[math,english]).status).toBe("incomplete");
+  });
   it("rejects negative, fractional-beyond-hundredth and nonfinite units", () => {
     for(const units of [-1,0.001,Number.NaN,Number.POSITIVE_INFINITY]){
       expect(auditGraduationCredits(requirements,[{...math,earnedUnits:units},english]).status).toBe("incomplete");
