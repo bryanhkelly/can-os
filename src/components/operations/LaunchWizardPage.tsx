@@ -1,3 +1,4 @@
+import { useLaunchInstitutionDefaults } from "@/hooks/useLaunchInstitutionDefaults";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 import type { LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
 import { useLaunchModelPresets } from "@/hooks/useLaunchModelPresets";
@@ -10,9 +11,8 @@ import {resolveLaunchResume} from "@/domain/launch-resume";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
-import { suggestedLaunchInstitutions } from "@/domain/launch-institution-defaults";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -88,41 +88,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     (newSiteSlug.trim().length > 0 && site.slug === newSiteSlug.trim()) ||
     (newSiteName.trim().length >= 2 && site.name.trim().toLowerCase() === newSiteName.trim().toLowerCase()));
 
-  // Turnkey defaults: when the registrar grant covers exactly one church, and
-  // that church has exactly one Site, preselect both instead of asking the
-  // leader to find records the system already knows. Selections stay editable.
-  useEffect(() => {
-    if (!options) return;
-    const selectedSite = options.sites.find(site => site.id === siteId);
-    if (!hostOrganizationId && selectedSite) {
-      setHostOrganizationId(selectedSite.organizationId);
-      return;
-    }
-    const [onlyOrganization] = options.organizations;
-    if (!hostOrganizationId && options.organizations.length === 1 && onlyOrganization) {
-      setHostOrganizationId(onlyOrganization.id);
-    }
-  }, [options, hostOrganizationId, siteId]);
-  useEffect(() => {
-    const [onlySite] = hostSites;
-    if (siteId || !hostOrganizationId) return;
-    if (hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
-  }, [hostSites, hostOrganizationId, siteId]);
-
-  useEffect(() => {
-    if (!options) return;
-    const suggested = suggestedLaunchInstitutions({
-      type, creditMode, providers: options.academicProviderOrganizations,
-      issuers: options.creditIssuingOrganizations,
-      selectedProviderId: academicProviderOrganizationId,
-    });
-    if (!academicProviderOrganizationId && suggested.providerId)
-      setAcademicProviderOrganizationId(suggested.providerId);
-    if (!creditIssuingOrganizationId && suggested.issuerId)
-      setCreditIssuingOrganizationId(suggested.issuerId);
-    if (!jurisdictionId && options.jurisdictions.length === 1)
-      setJurisdictionId(options.jurisdictions[0]!.id);
-  }, [options, type, creditMode, academicProviderOrganizationId, creditIssuingOrganizationId, jurisdictionId]);
+  useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,hostSites,type,creditMode,academicProviderOrganizationId,creditIssuingOrganizationId,jurisdictionId,setHostOrganizationId,setSiteId,setAcademicProviderOrganizationId,setCreditIssuingOrganizationId,setJurisdictionId});
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
