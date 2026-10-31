@@ -219,6 +219,19 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
         authorityDocumentId: churchOnboardingRequests.authorityDocumentId,
       }).from(churchOnboardingRequests)
         .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+      // Recheck authority inside the provisioning transaction. A concurrent
+      // decline, expiry, or evidence replacement cannot authorize bootstrap.
+      const [currentEvidence] = await tx.select({
+        id: documents.id, category: documents.category,
+        subjectType: documents.subjectType, subjectId: documents.subjectId,
+        verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+        expiresAt: documents.expiresAt, metadata: documents.metadata,
+      }).from(documents).where(eq(documents.id, request.authorityDocumentId!))
+        .for("update").limit(1);
+      if (currentEvidence?.subjectType !== "organization" ||
+          currentEvidence.subjectId !== canOrganizationId ||
+          !currentChurchAuthorityEvidence(currentEvidence, request, actor.actorPersonId))
+        throw new AuthorizationError("current independent evidence required at provisioning");
       if (locked?.status !== "verified" ||
           locked.verifiedByPersonId !== request.verifiedByPersonId ||
           locked.authorityDocumentId !== request.authorityDocumentId)
