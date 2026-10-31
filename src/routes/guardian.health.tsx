@@ -18,6 +18,7 @@ function GuardianHealthPage() {
   const [data, setData] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
     let current = true;
     setLoading(true); setData(null); setError("");
@@ -26,13 +27,17 @@ function GuardianHealthPage() {
       .catch(() => { if (current) setError("Unable to verify family access to school health records."); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [student]);
+  }, [student, refreshKey]);
 
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Family"
     title="Health and return-to-school"
     subtitle="Review the school's recorded health instructions, compliance status and return clearance. Medical decisions and changes require authorized school review."
     breadcrumbs={<><Link to="/guardian" search={{student}} className="underline">Family home</Link><span>/</span><span>Health</span></>}>
     <div className="mt-6 flex flex-wrap gap-3 text-sm">
+      <button type="button" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}
+        className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
+        {loading ? "Checking school review…" : "Refresh school review status"}
+      </button>
       <Link to="/messages" className="rounded-lg border px-4 py-2 font-semibold">Contact the school about a health update</Link>
       <Link to="/guardian/attendance" search={{student}} className="rounded-lg border px-4 py-2">Attendance and excuses</Link>
     </div>
@@ -95,7 +100,7 @@ function GuardianHealthPage() {
           {!child.clearances.length && <p className="mt-3 text-sm">No return-to-school clearance requirement is recorded.</p>}
         </div>
       </div>
-      <GuardianHealthUpdateForm child={child}/>
+      <GuardianHealthUpdateForm child={child} onSubmitted={() => setRefreshKey(current => current + 1)}/>
       <div className="rounded-lg border p-4">
         <h3 className="font-semibold">Recent health-office visits</h3>
         {child.visits.map((visit, i) => <p key={i} className="mt-2 text-sm">
@@ -110,7 +115,7 @@ function GuardianHealthPage() {
 
 type Child=Workspace["children"][number];
 
-function GuardianHealthUpdateForm({child}:{child:Child}){
+function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:()=>void}){
  const [allergies,setAllergies]=useState(child.profile?.allergySummary??"");
  const [emergency,setEmergency]=useState(child.profile?.emergencySummary??"");
  const [accommodations,setAccommodations]=useState(child.profile?.accommodationSummary??"");
@@ -133,6 +138,7 @@ function GuardianHealthUpdateForm({child}:{child:Child}){
    }});
    setSubmitted(true);
    setNotice("Submitted for school review. Your changes are not yet approved emergency or medical instructions.");
+   onSubmitted();
   }catch(e){setError(e instanceof Error?e.message:"School health information could not be submitted.");}
   finally{setBusy(false);}
  }
