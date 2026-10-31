@@ -530,6 +530,9 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
       const student = guardian ? await guardianStudent(tx, actor, data) :
         await staffStudent(tx, actor, data);
       await assertStudentHousehold(tx, data.studentProfileId, data.householdId);
+      // Serialize new custody restrictions against a staff pickup release.
+      // A hold cannot appear after the release's safety check but before its write.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + data.studentProfileId + ":" + data.programId}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-holds:" + data.studentProfileId + ":" + data.programId}))`);
       const [record] = await tx.insert(pickupCustodyHolds).values({
         studentProfileId: data.studentProfileId,
@@ -729,6 +732,9 @@ export const recordVerifiedPickupRelease = createServerFn({ method: "POST" })
         studentProfileId: data.studentProfileId, programId: data.programId,
         sectionId: student!.sectionId,
       });
+      // Pair with custody-hold writes so a checked release is atomic with
+      // respect to family safety restrictions, even on concurrent devices.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + data.studentProfileId + ":" + data.programId}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-release:" + data.studentProfileId + ":" + data.programId + ":" + data.date}))`);
       const sourceKey = source("verified-pickup-release", data.mutationId);
       const [replay] = await tx.select().from(pickupReleaseEvents)
