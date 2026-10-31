@@ -143,9 +143,11 @@ export const applyOneRosterStudentMappings=createServerFn({method:"POST"})
   if(!report.valid)throw new Error("Resolve all OneRoster source errors before mapping students.");
   const users=report.previews.find(p=>p.kind==="users")?.rows??[];
   const schools=report.previews.find(p=>p.kind==="orgs")?.rows??[];
-  if(schools.length&&!schools.some(s=>s.sourcedId===data.externalSchoolSourcedId&&
+  if(!schools.length||!schools.some(s=>s.sourcedId===data.externalSchoolSourcedId&&
      s.type?.toLowerCase()==="school"&&s.status?.toLowerCase()!=="tobedeleted"))
     throw new Error("External school must exist as an active school in supplied orgs.");
+  if(new Set(users.map(u=>u.sourcedId)).size!==users.length)
+    throw new Error("Duplicate external user IDs must be resolved before registrar mapping.");
   const byUser=new Map(users.map(u=>[u.sourcedId,u]));
   const externalIds=data.studentMappings.map(m=>m.sourcedId);
   const profileIds=data.studentMappings.map(m=>m.studentProfileId);
