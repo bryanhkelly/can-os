@@ -87,7 +87,7 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
               Mark contacted
             </button>}
-            {row.status !== "closed" && <button type="button" disabled={busyId !== null}
+            {["new", "contacted"].includes(row.status) && <button type="button" disabled={busyId !== null}
               onClick={() => void changeStatus(row, "closed")}
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
               Close
@@ -109,7 +109,36 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
           </li>}
           {row.emailVerifiedAt && <li>Family verified email link · {new Date(row.emailVerifiedAt).toLocaleString()} (not guardianship)</li>}
           {row.applicationId && <li>Admissions record linked · {row.applicationStage ?? "Inquiry"}{row.applicationSubmittedAt ? ` · ${new Date(row.applicationSubmittedAt).toLocaleString()}` : ""}</li>}
+          {row.applicationId && <li>{row.activeEnrollment
+            ? "School-year enrollment activated"
+            : "School-year enrollment not yet active"}</li>}
+          {row.activeEnrollment && <li>{row.placedInClass
+            ? "Active instructional class placement recorded"
+            : "Class placement still required"}</li>}
+          {row.activeEnrollment && <li>{row.studentAccessStatus === "approved"
+            ? "Separate student learning account approved"
+            : row.studentAccessStatus === "pending_review"
+              ? "Student access consent awaiting independent registrar review"
+              : "Guardian student access authorization still required"}</li>}
         </ol>
+        {row.applicationId && <div className="mt-3 rounded-lg border bg-background p-3 text-sm">
+          <p className="font-semibold">Next school handoff</p>
+          {!row.activeEnrollment
+            ? <p className="mt-1">Continue admissions decisions and any accepted-offer activation. An inquiry is not an enrollment.</p>
+            : !row.placedInClass
+              ? <p className="mt-1">Enrollment is active. Complete a staffed instructional class assignment before student learning access or onsite attendance.</p>
+              : row.studentAccessStatus !== "approved"
+                ? <p className="mt-1">Class placement is active. The guardian and registrar must complete separate student account consent and identity approval.</p>
+                : <p className="mt-1">Learning access is approved. Confirm the child is expected on the scheduled onsite roster and record actual presence with authorized site staff; placement is not attendance.</p>}
+          <div className="mt-2 flex flex-wrap gap-3">
+            <Link to="/admissions" search={{siteId:row.siteId,programId:row.programId,application:row.applicationId}}
+              className="font-semibold underline">{!row.activeEnrollment ? "Continue enrollment" : !row.placedInClass ? "Assign instructional class" : row.studentAccessStatus !== "approved" ? "Review student access" : "Review enrollment"} →</Link>
+            <Link to="/admissions/families" search={{siteId:row.siteId,programId:row.programId,application:row.applicationId}}
+              className="font-semibold underline">Household checklist →</Link>
+            {row.activeEnrollment && row.placedInClass &&
+              <Link to="/staff/attendance" className="font-semibold underline">Scheduled school-day roster →</Link>}
+          </div>
+        </div>
         {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
           <p className="mt-2 text-xs text-muted-foreground">Awaiting family email verification or application. A sent invitation is not an accepted application.</p>}
         {!row.admissionsAuthorized && !row.applicationId && row.status !== "closed" &&
