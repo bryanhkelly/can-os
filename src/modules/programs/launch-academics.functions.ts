@@ -93,7 +93,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    .orderBy(asc(terms.startsOn)):[];
   const scheduleOptions=years.length?await db.select({id:scheduleTemplates.id,name:scheduleTemplates.name,schoolYearId:scheduleTemplates.schoolYearId})
    .from(scheduleTemplates).where(inArray(scheduleTemplates.schoolYearId,years.map(year=>year.id))):[];
-  const catalog=await listLaunchEligibleCourses(program);
+  const catalog=await listLaunchEligibleCourses({...program,schoolYearId:years.find(y=>y.status==="active")?.id ?? null});
   // Reuse the assignment service's authority rule. A church choosing CAN as
   // provider is NOT entitled to list CAN's organization-wide faculty; the
   // external teacher needs an explicit assignment to this Program.
@@ -158,7 +158,7 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
    throw new AuthorizationError("academic term does not belong to this launch");
   return db.transaction(async tx=>{
    await lockAttendanceConfigurationAtSite(tx,program.siteId!);
-   await assertLaunchEligibleCourse(program, data.courseTemplateVersionId, tx);
+   await assertLaunchEligibleCourse({...program,schoolYearId:term.schoolYearId}, data.courseTemplateVersionId, tx);
    if(data.credits!==undefined)
     await requireChurchHostedOperatingServices(tx,program.id,creditServices);
    {
