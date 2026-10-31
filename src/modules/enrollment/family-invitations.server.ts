@@ -391,7 +391,7 @@ export async function listFamilyInvitationWorkspace(
       eq(publicFamilyStartRequests.id, publicAdmissionsInterests.familyStartRequestId))
     .leftJoin(applications, eq(applications.id, publicAdmissionsInterests.applicationId))
     .where(inArray(publicAdmissionsInterests.invitationBatchId, batchIds)) : [];
-  const interestsByRecipient = new Map(interests.map(interest =>
+  const interestsByRecipient = new Map<string, (typeof interests)[number]>(interests.map(interest =>
     [`${interest.batchId}:${interest.recipientKey}`, interest]));
 
   const events = batchIds.length ? await db.select({
