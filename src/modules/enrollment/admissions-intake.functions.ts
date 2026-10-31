@@ -91,7 +91,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
   createdAt:applications.createdAt,updatedAt:applications.updatedAt,programId:applications.programId,
-  submittedByPersonId:applications.submittedByPersonId,
+  submittedByPersonId:applications.submittedByPersonId,studentProfileId:applications.studentProfileId,
   organizationId:programs.organizationId,siteId:programs.siteId,
   studentPersonId:studentProfiles.personId,
   programName:programs.name,studentFirst:people.legalFirstName,studentLast:people.legalLastName})
@@ -142,13 +142,13 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    transferOriginStatus:(()=>{
      if(typeof metadata.originTransferActionId!=="string")return null;
      const source=transferOrigins.find(item=>item.id===metadata.originTransferActionId);
-     if(!source||source.metadata.kind!=="transfer"||
+     if(!source||source.subjectId!==r.studentProfileId||source.metadata.kind!=="transfer"||
        source.metadata.requestedByGuardianPersonId!==r.submittedByPersonId)
        return "requires_review" as const;
      return source.status==="resolved"&&source.metadata.exitCompletedByRegistrar===true&&
        source.metadata.exitStatus==="transferred"?"completed" as const:"pending" as const;
    })(),
-   transferOriginSchool:typeof metadata.originTransferDestinationSchoolName==="string"?
+   transferNamedDestination:typeof metadata.originTransferDestinationSchoolName==="string"?
      metadata.originTransferDestinationSchoolName:null,
    createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
