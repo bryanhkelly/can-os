@@ -11,6 +11,10 @@ describe("annual adoption policy",()=>{
  it("rejects prior-year adoption",()=>expect(annualAdoptionEligible({...base,adoption:{...adoption,academicYearId:"2026"}})).toBe(false));
  it("rejects revoked licenses",()=>expect(annualAdoptionEligible({...base,license:{...license,status:"revoked"}})).toBe(false));
  it("rejects withdrawn licenses",()=>expect(annualAdoptionEligible({...base,license:{...license,withdrawnAt:d("2027-08-02")}})).toBe(false));
+ it("rejects missing effective dates",()=>{
+  expect(licenseValidForYear({...license,startsAt:null},year,d("2027-09-01"))).toBe(false);
+  expect(licenseValidForYear({...license,endsAt:null},year,d("2027-09-01"))).toBe(false);
+ });
  it("rejects expired coverage",()=>expect(licenseValidForYear({...license,endsAt:d("2027-12-31")},year,d("2027-09-01"))).toBe(false));
  it("rejects cross-program and cross-provider use",()=>{
   expect(annualAdoptionEligible({...base,scope:{...scope,programId:"other"}})).toBe(false);
