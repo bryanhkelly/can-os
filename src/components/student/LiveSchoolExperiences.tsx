@@ -62,7 +62,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
      {data.notices.map(notice=><div key={notice.id} className="rounded-xl border border-border p-4">
       <p className="text-sm font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline">{notice.title}</Link></p>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{notice.body}</p>
-      <button disabled={busy||notice.acknowledged} onClick={()=>perform(()=>readNotification({data:{id:notice.id}}),"Acknowledgement saved.")} className="mt-3 rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{notice.acknowledged?"Acknowledged ✓":"Acknowledge"}</button>
+      <button disabled={busy||notice.acknowledged} onClick={()=>perform(()=>readNotification({data:{id:notice.id}}),"Notice marked as read.")} className="mt-3 rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{notice.acknowledged?"Read ✓":"Mark as read"}</button>
      </div>)}
      {data.notices.length===0&&<p className="text-xs text-muted-foreground">No announcements yet.</p>}
     </div>
