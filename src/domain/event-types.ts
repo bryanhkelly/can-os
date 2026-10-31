@@ -204,6 +204,8 @@ export const EventTypes = {
   StaffInvitationAccepted: "StaffInvitationAccepted",
   EnrichmentChildProfileCreated: "EnrichmentChildProfileCreated",
   ExtendedLearningRegistrationPublished: "ExtendedLearningRegistrationPublished",
+  ExtendedLearningEvidenceSubmitted: "ExtendedLearningEvidenceSubmitted",
+  ExtendedLearningEvidenceReviewed: "ExtendedLearningEvidenceReviewed",
   StudyGroupCreated: "StudyGroupCreated",
   StudyGroupMembershipRequested: "StudyGroupMembershipRequested",
   StudyGroupMembershipDecided: "StudyGroupMembershipDecided",
