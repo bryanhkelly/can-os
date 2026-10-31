@@ -112,6 +112,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         <tbody className="divide-y">{rows.filter(row=>!selected.stage||row.stage===selected.stage).map(row=>{
          const offer=selectActionableOffer(row.offers);
          const next=row.enrollments.length && row.activeSectionCount===0?"Assign staffed instructional class":
+          row.enrollments.length && row.studentAccessStatus==="access_unavailable"?"Review revoked student access":
           row.enrollments.length && row.studentAccessStatus==="pending_review"?"Review student sign-in request":
           row.enrollments.length && row.studentAccessStatus==="not_requested"?"Await guardian student sign-in consent":
           row.enrollments.length && row.studentAccessStatus==="approved"?"Prepare scheduled onsite school day":
@@ -167,9 +168,11 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                 : "Assign a staffed instructional class above before starting student learning access."}</li>
               <li>3. {x.studentAccessStatus==="approved"
                 ? "Separate student learning account approved. The student signs in with their own email."
-                : x.studentAccessStatus==="pending_review"
-                  ? "Guardian consent received. Complete the independent registrar identity review above."
-                  : "Guardian must authorize a separate student account; registrar then verifies the student's identity."}</li>
+                : x.studentAccessStatus==="access_unavailable"
+                  ? "Prior approval remains on record, but the actual student login grant is inactive or unavailable. Review the student-access restoration workflow."
+                  : x.studentAccessStatus==="pending_review"
+                    ? "Guardian consent received. Complete the independent registrar identity review above."
+                    : "Guardian must authorize a separate student account; registrar then verifies the student's identity."}</li>
               <li>4. Site staff confirm an actual scheduled school day, expected onsite roster, supervision
                 and physical attendance. Enrollment never records presence automatically.</li>
             </ol>
