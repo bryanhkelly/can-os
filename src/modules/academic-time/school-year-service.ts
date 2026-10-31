@@ -8,6 +8,7 @@ programs,
 scheduleTemplatePeriods,
 scheduleTemplates,
 schoolYears,
+sites,
 terms,
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -20,7 +21,7 @@ type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { and,eq } from "drizzle-orm";
+import { and,eq,isNull,sql } from "drizzle-orm";
 import { schoolYearStructure } from "@/domain/school-year-structure";
 
 type AcademicTimeTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -64,6 +65,11 @@ export async function createSchoolYear(
   assertDateRange(input.startsOn, input.endsOn, "SchoolYear");
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"school-year:" + input.organizationId + ":" + input.siteId + ":" + (input.programId ?? "site-wide") + ":" + input.key}))`);
+    const [site] = await tx.select({organizationId:sites.organizationId}).from(sites)
+      .where(eq(sites.id,input.siteId)).for("share").limit(1);
+    if (!site || site.organizationId !== input.organizationId)
+      throw new Error("Site must belong to SchoolYear organization");
     const [gradeScale] = await tx
       .select({ id: gradeScales.id, organizationId:gradeScales.owningOrganizationId,
         active:gradeScales.active })
@@ -77,15 +83,30 @@ export async function createSchoolYear(
 
     if (input.programId) {
       const [program] = await tx
-        .select({ organizationId: programs.organizationId })
+        .select({ organizationId: programs.organizationId, siteId:programs.siteId })
         .from(programs)
         .where(eq(programs.id, input.programId))
+        .for("share")
         .limit(1);
 
       if (!program) throw new Error("Program not found");
       if (program.organizationId !== input.organizationId) {
         throw new Error("Program must belong to SchoolYear organization");
       }
+      if (program.siteId !== input.siteId) throw new Error("Program must belong to SchoolYear Site");
+    }
+
+    const [existing] = await tx.select().from(schoolYears).where(and(
+      eq(schoolYears.organizationId,input.organizationId),eq(schoolYears.siteId,input.siteId),
+      input.programId ? eq(schoolYears.programId,input.programId) : isNull(schoolYears.programId),
+      eq(schoolYears.key,input.key),
+    )).limit(1);
+    if (existing) {
+      if (existing.name !== input.name || existing.startsOn !== input.startsOn ||
+          existing.endsOn !== input.endsOn || existing.gradeScaleId !== input.gradeScaleId ||
+          existing.timezone !== input.timezone)
+        throw new Error("This school-year key already has different settings. Review the existing year instead of creating another.");
+      return existing.id;
     }
 
     const [year] = await tx
