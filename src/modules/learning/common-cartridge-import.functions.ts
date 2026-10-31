@@ -397,6 +397,7 @@ export const readCommonCartridgeStaticLesson=createServerFn({method:"GET"})
     mimeType:documents.mimeType}).from(documents)
     .where(eq(documents.id,resource.documentId)).limit(1);
   if(!document?.storageKey||document.mimeType!=="text/html"||
+     !document.storageKey.startsWith(`learning/cartridge-static/${data.resourceId}/`)||
      !htmlKeyPattern.test(document.storageKey))
    throw new Error("Imported lesson storage is unavailable.");
   const response=await fetch(signPrivateObjectUrl({method:"GET",
