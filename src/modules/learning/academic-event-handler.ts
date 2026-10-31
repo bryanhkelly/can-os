@@ -25,7 +25,7 @@ import { and,eq } from "drizzle-orm";
  * event processed.
  */
 
-async function loadSubmissionContext(tx: any, submissionId: string) {
+async function loadSubmissionContext(tx: any, submissionId: string, includeTeacherRecipients = false) {
   const [record] = await tx
     .select({
       submissionId: submissions.id,
@@ -68,10 +68,10 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
       .where(guardianRelationshipPredicate({
         studentPersonId: record.studentPersonId, access: "academic",
       })),
-    tx
+    includeTeacherRecipients ? tx
       .select({ personId: sectionTeachers.personId })
       .from(sectionTeachers)
-      .where(and(eq(sectionTeachers.sectionId, record.sectionId), eq(sectionTeachers.role, "teacher"))),
+      .where(and(eq(sectionTeachers.sectionId, record.sectionId), eq(sectionTeachers.role, "teacher"))) : Promise.resolve([]),
   ]);
 
   // Historic, assistant, revoked or unqualified assignments are not an
@@ -108,7 +108,7 @@ export async function handleSubmissionReceivedEvent(eventId: string): Promise<vo
     if (!event || event.status === "processed") return;
     if (event.eventType !== EventTypes.SubmissionReceived) return;
 
-    const context = await loadSubmissionContext(tx, event.aggregateId);
+    const context = await loadSubmissionContext(tx, event.aggregateId, true);
     if (!context) throw new Error("Missing submission context for SubmissionReceived");
     if (!context.activeEnrollment) return;
 
