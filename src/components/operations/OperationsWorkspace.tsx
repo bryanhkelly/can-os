@@ -6,7 +6,7 @@ import { type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
 import { OutboxHealthPanel } from "@/components/operations/OutboxHealthPanel";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
-import {useState} from "react";
+import {useRef,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOperationsActionDeadline} from "@/modules/operations/action-workspace.functions";
@@ -40,11 +40,13 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  };
  const router=useRouter();
  const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation()});
+ const exitMutation=useWorkspaceMutation({mutationFn:(actionId:string)=>completeRegistrarEnrollmentExit({data:{actionId,confirmInstitutionalReview:true,resolutionNote:exitNoteRef.current}})});
+ const exitNoteRef=useRef("");
  const [busy,setBusy]=useState<string|null>(null);
  async function submitAction(id:string, operation:()=>Promise<unknown>){
-  if(mutation.isPending)return false;
+  if(mutation.isPending||exitMutation.isPending)return false;
   setBusy(id);
-  try{await mutation.submit(operation);return true;}
+  try{const result=await mutation.submit(operation);return result!==undefined;}
   finally{setBusy(null);}
  }
  const [error,setError]=useState("");
@@ -56,7 +58,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  </WorkspaceShell>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
   setError("");
-  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}}));await router.invalidate();}
+  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;if(await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}})))await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
  }
 
@@ -66,9 +68,8 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   if(!window.confirm("Confirm the registrar verified this exit? Active Program and class memberships end immediately. The student login at this school may also be revoked."))return;
   setError("");setNotice("");
   try{
-   const result=await mutation.submit(()=>completeRegistrarEnrollmentExit({data:{
-     actionId:id,confirmInstitutionalReview:true,resolutionNote:note.trim(),
-   }}));
+   exitNoteRef.current=note.trim();
+   const result=await exitMutation.submit(id);
    if(!result)return;
    setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
    try{await router.invalidate();}
@@ -78,7 +79,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
 
  async function assignAction(id:string,ownerPersonId:string|null,priority:"normal"|"high"|"urgent"){
   setError("");
-  try{await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}}));await router.invalidate();}
+  try{if(await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}})))await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to assign action");}
  }
 
@@ -87,9 +88,10 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    if(!reason?.trim()||reason.trim().length<5)return;
    setError("");
    try{
-     await submitAction(id,()=>setOperationsActionDeadline({data:{
+     const saved=await submitAction(id,()=>setOperationsActionDeadline({data:{
        id,dueAt:value?new Date(value).toISOString():null,reason:reason.trim(),
      }}));
+     if(!saved)return;
      setDueDrafts(prev=>{const next={...prev};delete next[id];return next;});
      await router.invalidate();
    }catch(e){setError(e instanceof Error?e.message:"Unable to save deadline");}
