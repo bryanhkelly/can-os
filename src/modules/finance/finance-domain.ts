@@ -31,6 +31,8 @@ export function applyVerifiedEvent(record: FinanceRecord, event: ProviderEvent):
   const key = event.provider + ":" + event.eventId;
   if (record.seenEvents.includes(key)) return record;
   if (!Number.isSafeInteger(event.amount.cents) || event.amount.cents <= 0) throw new Error("Invalid event amount");
+  if (!Number.isSafeInteger(record.capturedCents) || !Number.isSafeInteger(record.refundedCents) ||
+      !Number.isSafeInteger(record.chargebackCents)) throw new Error("Invalid stored finance amount");
   const next = { ...record, seenEvents: [...record.seenEvents, key] };
   if (event.kind === "payment_succeeded") {
     if (record.providerPaymentId && record.providerPaymentId !== event.providerPaymentId) throw new Error("Payment identity conflict");
