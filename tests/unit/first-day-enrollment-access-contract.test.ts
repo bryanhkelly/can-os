@@ -55,7 +55,9 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     const staffing=read("src/modules/operations/onsite-supervision.functions.ts");
     expect(staffing).toContain("loadFirstDaySupervisionPreparationForActor");
     expect(staffing).toContain('registrarFirstDay:true');
-    expect(staffing).toContain('eq(sections.id,data.sectionId!)');
+    expect(staffing).toContain('eq(sections.programId,data.programId!)');
+    expect(staffing).toContain("sectionsAtSite.some(row=>row.id===data.sectionId)");
+    expect(staffing).toContain("plan.blocks.filter(block=>block.programId===data.programId");
   });
   it("keeps active student grants distinct from historic approved guardian consent",()=>{
     const service=read("src/modules/enrollment/student-access-handoff.functions.ts");
