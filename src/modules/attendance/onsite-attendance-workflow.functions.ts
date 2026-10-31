@@ -365,8 +365,7 @@ export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(ac
     .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
     .where(and(eq(sectionTeachers.sectionId,matched.sectionId),
       eq(sectionTeachers.role,"teacher"),eq(people.active,true),
-      eq(accessAccounts.disabled,false),isNotNull(accessAccounts.emailVerifiedAt),
-      ))
+      eq(accessAccounts.disabled,false),isNotNull(accessAccounts.emailVerifiedAt)))
     .limit(1):[];
   return {qualifiedTeacherAssigned:qualifiedTeachers.length>0,
     date:data.date,program:{id:program.id,name:program.name,
