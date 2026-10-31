@@ -23,7 +23,9 @@ export type ReconciliationReason =
   | "EXTERNAL_SCHOOL_NOT_FOUND"
   | "DUPLICATE_ENROLLMENT_RELATION"
   | "EXTERNAL_ENROLLMENT_ROLE_NOT_STUDENT"
-  | "EXTERNAL_CLASS_SCHOOL_CONFLICT";
+  | "EXTERNAL_CLASS_SCHOOL_CONFLICT"
+  | "EXTERNAL_ROW_INACTIVE"
+  | "EXTERNAL_SOURCED_ID_COLLISION";
 
 export type ReconciliationRow = {
   kind: "user" | "class" | "enrollment";
@@ -38,7 +40,7 @@ export type ReconciliationRow = {
 export type ReconciliationPlan = {
   policy: "dry_run_only_no_identity_or_enrollment_mutation";
   rows: ReconciliationRow[];
-  counts: { users: number; classes: number; enrollments: number; blocked: number };
+  counts: { users: number; classes: number; enrollments: number; blocked: number; review: number; approved: number; applied: number };
 };
 
 /** All class mappings must be selected explicitly by an authorized registrar. */
@@ -53,6 +55,13 @@ export function planOneRosterReconciliation(
   const classById = new Map(classes.map(r => [r.sourcedId, r]));
   const sessions = new Set(get("academicSessions").map(r => r.sourcedId));
   const seenEnrollmentRelations = new Set<string>();
+  const idCounts = new Map<string, number>();
+  for (const row of [...users, ...classes, ...enrollments]) {
+    const id = row.sourcedId;
+    if (id) idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
+  }
+  const collision = (row: OneRosterRow) => Boolean(row.sourcedId && (idCounts.get(row.sourcedId) ?? 0) > 1);
+  const inactive = (row: OneRosterRow) => Boolean(row.status && row.status.toLowerCase() !== "active");
   const rows: ReconciliationRow[] = [];
   const withdrawn = (r: OneRosterRow) =>
     r.status?.toLowerCase() === "tobedeleted" || r.enabledUser?.toLowerCase() === "false";
@@ -61,9 +70,12 @@ export function planOneRosterReconciliation(
     rows.push({
       kind: "user", sourcedId: user.sourcedId!,
       state: "blocked",
-      reasons: withdrawn(user)
-        ? ["EXTERNAL_ROW_WITHDRAWN", "EXTERNAL_IDENTITY_UNVERIFIED"]
-        : ["EXTERNAL_IDENTITY_UNVERIFIED"],
+      reasons: [
+        ...(withdrawn(user) ? ["EXTERNAL_ROW_WITHDRAWN" as const] : []),
+        ...(inactive(user) ? ["EXTERNAL_ROW_INACTIVE" as const] : []),
+        ...(collision(user) ? ["EXTERNAL_SOURCED_ID_COLLISION" as const] : []),
+        "EXTERNAL_IDENTITY_UNVERIFIED" as const,
+      ],
     });
   }
 
@@ -72,6 +84,8 @@ export function planOneRosterReconciliation(
     const reasons: ReconciliationReason[] = [];
     if (!sectionId) reasons.push("EXTERNAL_CLASS_UNMAPPED");
     if (withdrawn(cls)) reasons.push("EXTERNAL_ROW_WITHDRAWN");
+    if (inactive(cls)) reasons.push("EXTERNAL_ROW_INACTIVE");
+    if (collision(cls)) reasons.push("EXTERNAL_SOURCED_ID_COLLISION");
     if (orgs.size && !orgs.has(cls.schoolSourcedId!)) reasons.push("EXTERNAL_SCHOOL_NOT_FOUND");
     if (sessions.size && cls.termSourcedIds?.split(",").some(id => !sessions.has(id.trim())))
       reasons.push("EXTERNAL_SESSION_MISSING");
@@ -90,6 +104,10 @@ export function planOneRosterReconciliation(
     const user = userById.get(enrollment.userSourcedId!);
     const reasons: ReconciliationReason[] = [];
     if (!cls) reasons.push("EXTERNAL_CLASS_MISSING");
+    if (collision(enrollment) || (cls && collision(cls)) || (user && collision(user)))
+      reasons.push("EXTERNAL_SOURCED_ID_COLLISION");
+    if (inactive(enrollment) || (cls && inactive(cls)) || (user && inactive(user)))
+      reasons.push("EXTERNAL_ROW_INACTIVE");
     if (!user) reasons.push("EXTERNAL_USER_MISSING");
     if (!classMappings.has(enrollment.classSourcedId!)) reasons.push("EXTERNAL_CLASS_UNMAPPED");
     if (cls && cls.schoolSourcedId !== enrollment.schoolSourcedId)
@@ -130,6 +148,9 @@ export function planOneRosterReconciliation(
     counts: {
       users: users.length, classes: classes.length, enrollments: enrollments.length,
       blocked: rows.filter(r => r.state === "blocked").length,
+      review: rows.filter(r => r.state === "review").length,
+      approved: 0,
+      applied: 0,
     },
   };
 }
