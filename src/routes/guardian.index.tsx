@@ -76,6 +76,18 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
  const visibleChildren=selectedChild?[selectedChild]:children;
  const visibleQuestions=gradeFollowUps.filter(question=>!selectedChild||
   question.studentPersonId===selectedChild.studentPersonId);
+ const visibleApprovals=courseApprovals.filter(item=>!selectedChild||
+  item.studentPersonId===selectedChild.studentPersonId);
+ const approvalNeeds=visibleApprovals.map(item=>({
+  id:item.id,
+  kind:"course_approval",
+  type:"course_registration_request",
+  title:item.studentName+": approve class addition",
+  detail:item.sectionTitle+" · reply before registration closes.",
+  href:"/guardian/course-approvals?action="+encodeURIComponent(item.id),
+  dueAt:item.deadline+"T23:59:59",
+  priority:"high",
+ }));
  const schoolworkItems=visibleChildren.flatMap(child=>child.workToReview.map(work=>({
   id:child.studentPersonId+":"+work.assessmentId,
   kind:"schoolwork",
@@ -88,7 +100,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   dueAt:work.dueAt,
   priority:work.status==="returned"?"high":"normal",
  })));
- const prioritized=prioritizeFamilyNeeds([...needs,...schoolworkItems],Date.now());
+ const prioritized=prioritizeFamilyNeeds([...needs,...approvalNeeds,...schoolworkItems],Date.now());
  const schoolworkCount=visibleChildren.reduce((total,child)=>total+child.workNeedsAttentionCount,0);
  return <WorkspaceShell
   width="wide"
@@ -127,11 +139,12 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
-    <StatCard label="Needs your attention" value={needsWarning?"Limited":needs.length+schoolworkCount}/>
+    <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":needs.length+visibleApprovals.length+schoolworkCount}/>
     <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <div className="mt-6">
     {needsWarning && <p role="status" className="mb-3 rounded-xl border p-4 text-sm">{needsWarning}</p>}
+    {courseApprovalsWarning && <p role="status" className="mb-3 rounded-xl border p-4 text-sm">{courseApprovalsWarning}</p>}
     <AttentionQueue
      items={buildGuardianAttention(prioritized.filter(item=>!action||item.kind==="action"&&item.id===action))}
      empty={action?"The selected action is not available in your current family workspace.":"You are all caught up. Nothing needs your attention right now."}
@@ -226,6 +239,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      <Link to="/guardian/group-permissions" className="rounded-full border px-4 py-2 hover:bg-muted">Study group permissions</Link>
      <Link to="/guardian/watching" className="rounded-full border px-4 py-2 hover:bg-muted">Things CAN Is Watching</Link>
      <Link to="/guardian/admission-offers" search={{student:undefined}} className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
+     <Link to="/guardian/course-approvals" className="rounded-full border px-4 py-2 hover:bg-muted">Course approvals</Link>
      <Link to="/messages" className="rounded-full border px-4 py-2 hover:bg-muted">Messages</Link>
      <Link to="/notifications" className="rounded-full border px-4 py-2 hover:bg-muted">Notifications</Link>
     </div>
