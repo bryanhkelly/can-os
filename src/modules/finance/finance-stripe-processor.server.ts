@@ -27,7 +27,7 @@ export class StripeFinanceProcessor implements FinanceProcessor {
       },
       body,
     });
-    if (!response.ok) return { kind: "unavailable" as const, reason: "Processor unavailable" };
+    if (!response.ok) throw new Error("Stripe intent request failed");
     const result: unknown = await response.json();
     const intentId = (result as { id?: unknown } | null)?.id;
     const clientSecret = (result as { client_secret?: unknown } | null)?.client_secret;
