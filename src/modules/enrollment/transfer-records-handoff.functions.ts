@@ -10,7 +10,7 @@ import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { listDelegatedCANTranscriptPrograms } from "@/modules/learning/can-transcript-scope.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
-import { emitEvent, notify, writeAudit } from "@/platform/mutation";
+import { emitEvent, notify, notifyMany, writeAudit } from "@/platform/mutation";
 
 const kind="transfer_academic_records_handoff";
 const uuid=z.string().uuid();
@@ -314,6 +314,32 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
        payload:{subjectType:"student_profile",subjectId:handoff.subjectId,
          transcriptIssuanceId:issuance.id},
      });
+     if(internalDestination){
+       const receivingRegistrars=await tx.selectDistinct({
+         personId:s.accountPersonGrants.personId,
+       }).from(s.accountPersonGrants)
+         .innerJoin(s.people,and(eq(s.people.id,s.accountPersonGrants.personId),
+           eq(s.people.active,true)))
+         .innerJoin(s.accessAccounts,and(
+           eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
+           eq(s.accessAccounts.disabled,false),
+         ))
+         .where(and(
+           eq(s.accountPersonGrants.role,"registrar"),
+           eq(s.accountPersonGrants.active,true),
+           eq(s.accountPersonGrants.isSynthetic,false),
+           eq(s.accountPersonGrants.organizationId,receiving!.organizationId),
+           or(isNull(s.accountPersonGrants.siteId),
+             eq(s.accountPersonGrants.siteId,internalDestination.siteId)),
+         ));
+       await notifyMany(tx,receivingRegistrars.map(registrar=>({
+         recipientPersonId:registrar.personId,
+         type:"transfer_destination_transcript_ready",
+         title:"Authorized transfer transcript ready for admissions review",
+         body:"An officially issued transcript has been released to your school for a linked application.",
+         resourceType:"application",resourceId:internalDestination!.applicationId,
+       })));
+     }
      await notify(tx,{
        recipientPersonId:guardianId,
        type:"guardian_enrollment_change_updated",
