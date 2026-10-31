@@ -13,7 +13,7 @@ describe("continuous family enrollment handoff contracts", () => {
       students={[{studentProfileId:"profile-1",studentFirstName:"Existing",studentLastName:"Learner",
         gradeLevel:"10",householdId:"household-1"},{studentProfileId:"profile-1",
         studentFirstName:"Existing",studentLastName:"Learner",gradeLevel:"10",householdId:"household-2"}]}
-      familyStartRequestId="start-1"
+      familyStartRequestId="start-1" requestedProgramId="program-1"
       onSubmit={async () => ({applicationId:"application-1"})}/>);
     expect(html).toContain("Application academic year");
     expect(html).toContain("2027–2028");
