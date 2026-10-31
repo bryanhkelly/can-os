@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential} from "@/domain/academic-credential-release";
+import {canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential,canRedeemTransferCredential,EXTERNAL_SCHOOL_TO_SCHOOL_RELEASE_SUPPORTED} from "@/domain/academic-credential-release";
 const now=new Date("2026-10-31T12:00:00Z");
 const valid={actorPersonId:"recipient-1",recipientPersonId:"recipient-1",recipientEmail:"person@example.org",accountEmail:"PERSON@example.org",recipientActive:true,expiresAt:new Date("2026-11-01T12:00:00Z"),revokedAt:null,now,demoFacilitator:false};
 describe("official academic credential release gate",()=>{
@@ -33,5 +33,23 @@ describe("independent credential release review",()=>{
   expect(canAuthorizeAcademicCredentialRelease({...valid,expiresAt:now})).toBe(false);
   expect(canAuthorizeAcademicCredentialRelease({...valid,expiresAt:new Date("2027-01-01T12:00:00Z")})).toBe(false);
   expect(canAuthorizeAcademicCredentialRelease({...valid,purpose:"freeform" as never})).toBe(false);
+ });
+});
+
+describe("live guardian transfer authority",()=>{
+ const valid={consentActive:true,consentMatchesStudent:true,
+  consentMatchesGuardian:true,consentMatchesAction:true,
+  consentMatchesDestination:true,consentMatchesProgram:true,
+  relationshipActive:true,actionResolved:true,actionMatchesStudent:true,
+  actionMatchesGuardian:true,actionMatchesConsent:true,
+  actionCompleted:true,issuerMatches:true};
+ it("requires the entire original consent and transfer to remain valid",()=>{
+  expect(canRedeemTransferCredential(valid)).toBe(true);
+  for(const field of Object.keys(valid) as Array<keyof typeof valid>){
+   expect(canRedeemTransferCredential({...valid,[field]:false})).toBe(false);
+  }
+ });
+ it("does not claim external school-to-school delivery",()=>{
+  expect(EXTERNAL_SCHOOL_TO_SCHOOL_RELEASE_SUPPORTED).toBe(false);
  });
 });
