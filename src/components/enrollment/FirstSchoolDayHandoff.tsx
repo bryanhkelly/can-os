@@ -39,9 +39,10 @@ function FirstSchoolDayForApplication({applicationId,programId}:{
     {loading&&<p role="status" className="mt-2">Checking the live school-local calendar, this student's expected roster and independently reviewed supervision plan…</p>}
     {error&&<p role="alert" className="mt-2">{error}</p>}
     {result&&<>
-      <p className="mt-2 text-xs text-muted-foreground">{result.preview ? "Next published instructional candidate" : "Site-local date"}: {result.date} {result.preview ? "(future plan, not verified attendance)" : "(today)"}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{result.preview ? "First verified scheduled instructional day" : "Site-local date"}: {result.date} {result.preview ? "(future plan, not verified attendance)" : "(today)"}</p>
+      {result.programName&&<p className="mt-1 text-xs">Program: {result.programName} · Section: {result.sectionTitle??"Not assigned"}</p>}
       <p role="status" className="mt-2">{result.message}</p>
-      {result.preview&&<p className="mt-2 text-xs">Future plans are not verified student placement, a confirmed staffing assignment, proof of staff arrival, attendance or custody. Recheck after scheduling or staffing changes.</p>}
+      {result.preview&&<p className="mt-2 text-xs">Student placement and scheduling are verified for this date. Planned staffing is a separate review; no future physical presence, attendance, custody or school opening is being attested. Recheck after timetable or staffing changes.</p>}
       <dl className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded border p-2"><dt className="text-xs">Expected onsite</dt>
           <dd className="font-semibold">{result.studentExpected?"Yes":"Not confirmed"}</dd></div>
@@ -51,7 +52,7 @@ function FirstSchoolDayForApplication({applicationId,programId}:{
           <dd className="font-semibold">{result.preview?"Not yet observable":result.attendanceRecorded?"Recorded":"Not recorded"}</dd></div>
       </dl>
       {result.outstandingGaps.length>0&&<p className="mt-2 text-xs">
-        Plan gaps: {result.outstandingGaps.map(gap=>gap.replaceAll("_"," ")).join("; ")}
+        Blockers: {result.outstandingGaps.map(gap=>gap.replaceAll("_"," ")).join("; ")}
       </p>}
       <div className="mt-3 flex flex-wrap gap-3 text-xs">
         <Link to="/staff/attendance" search={{programId}}
