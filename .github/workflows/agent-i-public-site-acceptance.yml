@@ -53,10 +53,24 @@ jobs:
       CAN_PUBLIC_SMOKE_UNKNOWN: ${{ vars.CAN_PUBLIC_SMOKE_UNKNOWN }}
       CAN_PUBLIC_SMOKE_NAME_A: ${{ vars.CAN_PUBLIC_SMOKE_NAME_A }}
       CAN_PUBLIC_SMOKE_NAME_B: ${{ vars.CAN_PUBLIC_SMOKE_NAME_B }}
+      CAN_PUBLIC_SMOKE_DISABLED_URL: ${{ vars.CAN_PUBLIC_SMOKE_DISABLED_URL }}
+      CAN_PUBLIC_SMOKE_INVALID_TLS_URL: ${{ vars.CAN_PUBLIC_SMOKE_INVALID_TLS_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Read-only two-tenant HTTPS acceptance
-        run: node scripts/smoke-public-tenant-hosting.mjs
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p acceptance-evidence
+          node scripts/smoke-public-tenant-hosting.mjs 2>&1 | tee "acceptance-evidence/public-tenant-${{ github.sha }}.json"
+      - name: Upload exact-SHA deployed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-tenant-deployed-${{ github.sha }}
+          path: acceptance-evidence/
+          if-no-files-found: warn
+          retention-days: 30
