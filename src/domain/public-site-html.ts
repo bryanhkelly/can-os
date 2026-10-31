@@ -40,6 +40,13 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ["Spiritual formation", local.spiritualFormation],
   ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
   const image = local?.branding.heroImage;
+  const navigation = [
+    `<a href="#welcome">Welcome</a>`,
+    ...(localItems.length || image ? [`<a href="#church-identity-title">Our community</a>`] : []),
+    ...((page.academicPrograms ?? []).length ? [`<a href="#academic-title">Academics</a>`] : []),
+    `<a href="#programs-title">Enrichment</a>`,
+    `<a href="#contact">Contact</a>`,
+  ].join(" ");
   const localSection = localItems.length || image ? `<section aria-labelledby="church-identity-title" class="church-section">
     <p class="tag">Content provided by the local church</p>
     <h2 id="church-identity-title">Our church and community</h2>
@@ -179,9 +186,10 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a{co
 </style>
 </head>
 <body class="theme-${theme}">
-<header><p class="brand">CAN Academy · Local partner site</p><nav aria-label="School website navigation"><a href="#welcome">Welcome</a> <a href="#academic-title">Academics</a> <a href="#programs-title">Enrichment</a> <a href="#contact">Contact</a></nav><p>${org}</p></header>
+<header><p class="brand">CAN Academy · Local partner site</p><nav aria-label="School website navigation">${navigation}</nav><p>${org}</p></header>
 <main>
   <div id="welcome" class="public-hero"><p class="tag">Welcome to our school</p><h1>${school}</h1>
+  ${local?.welcomeMessage ? `<p class="intro">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
   <p class="intro">Discover academic and enrichment opportunities at this location.
   Listings are reviewed marketing information, not accreditation, admission or
   registration approvals.</p></div>
@@ -196,7 +204,7 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a{co
       ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
       : '<p class="empty">There are no programs to display at this time.</p>'}
   </section>
-  <section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px"><h2 id="contact-title">Connect with our school</h2><p>Explore the published programs above and use their request-information forms to contact the school. Applications are available only when a program is operating and accepting application requests.</p></section>
+  <section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px"><h2 id="contact-title">Connect with our school</h2><p>Explore the published programs above and use their request-information forms to contact the school. An application invitation appears only for an eligible operating program; submitting a request does not guarantee admission.</p></section>
 </main>
 <footer>${host} · Powered by CAN OS</footer>
 </body>
