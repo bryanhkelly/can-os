@@ -5,6 +5,7 @@ import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
+import { canDownloadAuthorizedCredential } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
@@ -85,8 +86,8 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    throw new AuthorizationError("active recipient authorization");
   const [recipient]=await db.select({email:s.people.email,active:s.people.active})
    .from(s.people).where(eq(s.people.id,context.actorPersonId)).limit(1);
-  if(!recipient?.active||!recipient.email||recipient.email.trim().toLowerCase()!==release.recipientEmail.trim().toLowerCase())
-   throw new AuthorizationError("recipient email mismatch");
+  if(!canDownloadAuthorizedCredential({actorPersonId:context.actorPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
+   throw new AuthorizationError("recipient identity or release validity mismatch");
   const kind=release.transcriptIssuanceId?"transcript":"diploma";
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
