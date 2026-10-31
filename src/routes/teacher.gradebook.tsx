@@ -1,3 +1,4 @@
+import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -386,14 +387,13 @@ function TeacherGradebookPage() {
       <AssignmentConversation key={`conversation-${reviewCell.submissionId}`} assessmentId={reviewAssessment.id} studentPersonId={reviewStudent.personId}/>
       {reviewCell.status==="submitted"?<div className="grid gap-4">
        <StatusBadge>Ready for grading</StatusBadge>
-       {reviewAssessment.rubric.length>0?<fieldset className="space-y-3"><legend className="font-semibold">Rubric</legend>
-        {reviewAssessment.rubric.map(criterion=><label key={criterion.id} className="block text-sm font-semibold">{criterion.label} <span className="font-normal text-muted-foreground">(0–{criterion.maxPoints})</span>
-         {criterion.description&&<span className="mt-1 block text-sm font-normal text-muted-foreground">{criterion.description}</span>}
-         <input className="mt-2 w-28 rounded-lg border bg-background p-2" type="number" min={0} max={criterion.maxPoints}
-          value={rubricInputs[criterion.id]??""} onChange={event=>setRubricInputs(current=>({...current,[criterion.id]:event.target.value}))}/>
-        </label>)}
-        <p role="status" className="text-sm font-semibold">Total: {liveRubricScore(reviewAssessment)??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
-       </fieldset>:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
+       {reviewAssessment.rubric.length>0?<RubricScoreFields
+        criteria={reviewAssessment.rubric}
+        values={rubricInputs}
+        onChange={(id,value)=>setRubricInputs(current=>({...current,[id]:value}))}
+        total={liveRubricScore(reviewAssessment)}
+        pointsPossible={reviewAssessment.pointsPossible}
+       />:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
         <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
        </label>}
        <label className="text-sm font-semibold">Feedback comment<textarea rows={4} maxLength={4000} value={comment} onChange={event=>setComment(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
