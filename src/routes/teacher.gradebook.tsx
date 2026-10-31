@@ -383,7 +383,8 @@ function TeacherGradebookPage() {
         onSaveDraft={()=>void submitGrade(reviewCell,reviewAssessment,true)}
         onPostGrade={()=>void submitGrade(reviewCell,reviewAssessment)} />
       </div>:<GradebookReviewedFeedback cell={reviewCell} assessment={reviewAssessment} busy={busy}
-       onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}     </WorkspacePanel>
+       onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}
+     </WorkspacePanel>
     </div>}
     <details className="mt-8 rounded-xl border bg-card p-5" open={search.lesson?true:undefined}>
      <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
