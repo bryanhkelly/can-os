@@ -1,7 +1,8 @@
 import { db } from "@/db/client";
-import { accountPersonGrants,actions,people,programs,sites } from "@/db/schema";
+import { accountPersonGrants,actions,guardianRelationships,people,programs,sites,studentProfiles } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { dedupeQueue,notificationSummary } from "@/domain/notification-triage";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
@@ -110,6 +111,23 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    await tx.update(actions).set({status:data.status,resolvedAt:data.status==="resolved"?now:null,resolutionNote:data.status==="resolved"?data.resolutionNote?.trim():record.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
    await writeAudit(tx,actor,{action:"action.status.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status}});
    if(data.status==="resolved")await emitEvent(tx,{eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
+   if(record.type==="guardian_enrollment_change_request"&&record.subjectType==="student_profile"&&
+      typeof record.metadata.requestedByGuardianPersonId==="string"){
+    const requestedBy=record.metadata.requestedByGuardianPersonId;
+    const [verified]=await tx.select({personId:guardianRelationships.guardianPersonId})
+     .from(studentProfiles)
+     .innerJoin(guardianRelationships,guardianRelationshipPredicate({
+      guardianPersonId:requestedBy,studentPersonId:studentProfiles.personId,access:"enrollment",
+     }))
+     .where(eq(studentProfiles.id,record.subjectId)).limit(1);
+    if(verified)await notify(tx,{
+      recipientPersonId:verified.personId,
+      type:"guardian_enrollment_change_updated",
+      title:data.status==="resolved"?"School responded to your enrollment request":"School enrollment request updated",
+      body:"Review the school response in your family enrollment-change workspace. An update does not by itself change enrollment.",
+      resourceType:"action",resourceId:record.id,
+    });
+   }
    return {saved:true};
   });
  });
