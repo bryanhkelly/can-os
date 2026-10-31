@@ -1,4 +1,5 @@
-import { index, pgTable, text, timestamp, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, index, pgTable, text, timestamp, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import { people } from "./identity";
 import { organizations } from "./organizations";
@@ -21,7 +22,15 @@ export const academicCredentialReleaseAuthorizations=pgTable("academic_credentia
  expiresAt:timestamp("expires_at",{withTimezone:true}).notNull(),
  revokedAt:timestamp("revoked_at",{withTimezone:true}),
  createdAt:createdAt(),updatedAt:updatedAt(),
-},t=>[index("academic_release_issuer_idx").on(t.issuingOrganizationId),index("academic_release_recipient_idx").on(t.recipientPersonId)]);
+},t=>[
+ index("academic_release_issuer_idx").on(t.issuingOrganizationId),
+ index("academic_release_recipient_idx").on(t.recipientPersonId),
+ check("academic_release_exactly_one",sql`(${t.transcriptIssuanceId} IS NULL) <> (${t.diplomaIssuanceId} IS NULL)`),
+ check("academic_release_valid_expiry",sql`${t.expiresAt} > ${t.authorizedAt}`),
+ check("academic_release_purpose_nonempty",sql`length(btrim(${t.releasePurpose})) > 0`),
+ check("academic_release_instructions_nonempty",sql`length(btrim(${t.instructionReference})) > 0`),
+ check("academic_release_consent_nonempty",sql`length(btrim(${t.consentEvidenceReference})) > 0`),
+]);
 
 /** Private, issuer-controlled delivery request and transport receipt. */
 export const academicCredentialDeliveries = pgTable("academic_credential_deliveries", {
