@@ -20,7 +20,7 @@ vi.mock("@/db/client",()=>({db:{select:()=>{
 }}}));
 import { getNotifications } from "@/modules/communication/notification-center.functions";
 const action={id:"action",sectionId:"section",siteId:"site",programId:"program",organizationId:"organization",
-  subjectId:"profile",metadata:{requestedByGuardianPersonId:"guardian"},studentPersonId:"student",assessmentId:"assessment"};
+  subjectId:"profile",metadata:{requestedByGuardianPersonId:"guardian"},studentPersonId:"student",assessmentId:"assessment",submissionId:"submission"};
 const notification={id:"notice",type:"guardian_grade_follow_up_resolved",title:"School response",body:"Review the school response.",
   status:"unread",resourceType:"action",resourceId:"action",createdAt:new Date("2026-10-29")};
 beforeEach(()=>{
@@ -40,7 +40,7 @@ describe("guardian grade Action notification destinations",()=>{
   it("opens the exact child's assessment for the requesting guardian",async()=>{
     state.role="guardian";state.person="guardian";state.results.push([{studentPersonId:"student"}]);
     await expect(getNotifications()).resolves.toMatchObject([{
-      href:"/guardian/academics?student=student&section=section&assessment=assessment",
+      href:"/guardian/academics?student=student&section=section&assessment=assessment&submission=submission",
     }]);
   });
   it("hides the sensitive notice when the guardian relationship is revoked",async()=>{

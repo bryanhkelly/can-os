@@ -65,7 +65,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     {app.transferOriginExited===true&&<p role="status" className="mt-2 text-sm">
       Origin-school exit completed. Your receiving school still must complete the independent offer and class placement process.
     </p>}
-    {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>
+    {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
     <button type="button" aria-expanded={checklist===app.applicationId||application===app.applicationId}
       className="mt-3 rounded border px-3 py-2 text-sm" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</button>

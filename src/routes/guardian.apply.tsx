@@ -49,8 +49,8 @@ function GuardianApplyWorkspace({ data }: {
               {app.guardianVerified ? "Guardian verified" : "Verification pending"}
             </StatusBadge>
           </div>
-          {app.applicationId === requestedApplicationId && <p role="status" className="mt-2 text-sm font-semibold">Your saved application</p>
-          {app.originTransferActionId&&<p className="mt-2 text-sm font-semibold">Linked to your verified prior-school transfer request. Admission and placement remain subject to the receiving school.</p>}}
+          {app.applicationId === requestedApplicationId && <p role="status" className="mt-2 text-sm font-semibold">Your saved application</p>}
+          {app.originTransferActionId&&<p className="mt-2 text-sm font-semibold">Linked to your verified prior-school transfer request. Admission and placement remain subject to the receiving school.</p>}
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             {app.guardianVerified
               ? "Review your enrollment checklist and any offers. Verification does not itself activate enrollment."

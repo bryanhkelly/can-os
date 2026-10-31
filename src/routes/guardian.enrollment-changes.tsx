@@ -184,7 +184,7 @@ function GuardianEnrollmentChanges(){
       {item.destinationFamilyStartRequestedAt&&<p className="rounded border p-3 text-sm" role="status">
         Secure sign-in email requested for {item.destinationFamilyStartProgramName??"the receiving school"} on {new Date(item.destinationFamilyStartRequestedAt).toLocaleDateString()}.
         Check your verified email and open its link to start or resume an application. A requested email is not proof of receipt.
-      </p>
+      </p>}
       <p>If the destination is a published CAN school, request a secure email verification link. This provides prospective family application access only. The original school handles enrollment exit and records.</p>
       {destinations.length>0&&<>
         <label className="block font-medium">Receiving CAN school

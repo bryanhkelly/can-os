@@ -109,7 +109,7 @@ function Publisher({data}:{data:Data}){
     {item.deliveryFailed>0&&Date.now()-new Date(item.publishedAt).getTime()<48*60*60*1000&&<button type="button" disabled={busy} className="mt-2 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>void retry(item.id)}>Retry exhausted delivery attempts</button>}
     {(item.deliveryFailed>0||item.deliverySuppressed>0)&&<p className="mt-1 text-sm">
       {item.deliveryFailed} attempts exhausted · {item.deliverySuppressed} deliveries suppressed after authorization/preference review
-    </p>
+    </p>}
     <p className="mt-2 text-xs text-muted-foreground">Accepted does not mean delivered, read or acknowledged. Urgent safety incidents require direct follow-up.</p>
    </article>)}
    {!data.items.length&&<p className="rounded-lg border p-4 text-sm">No published family notices in your authorized schools.</p>}

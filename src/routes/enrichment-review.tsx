@@ -28,5 +28,5 @@ function EnrichmentReview() {
         {selected === season.seasonId && <ExtendedSeasonEvidencePanel seasonId={season.seasonId}/>}
       </div>)}
     </div>
-  </Workspace>;
+  </WorkspaceShell>;
 }

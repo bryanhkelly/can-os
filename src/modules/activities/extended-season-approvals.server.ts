@@ -53,7 +53,7 @@ export async function readExtendedSeasonApprovals(
   const result = new Map<string, Pick<ExtendedSeasonOpeningEvidence,
     "approvedSafeguardingCoverage" | "verifiedOnsiteStaffing" |
     "emergencyResponsePlanApproved" | "pickupAndReleasePolicyApproved" |
-    "datedSessionsAndCoverageVerified">();
+    "datedSessionsAndCoverageVerified">>();
   if (!seasons.length) return result;
   const ids = seasons.map(item => item.seasonId);
   const docs = await executor.select().from(documents).where(and(
