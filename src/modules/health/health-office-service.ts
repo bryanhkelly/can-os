@@ -245,6 +245,9 @@ export async function administerMedication(
       .limit(1);
 
     if (!authorization) throw new Error("Medication authorization not found");
+    // A valid medication authorization is not permission to administer it
+    // at an unrelated campus or after the student's withdrawal.
+    await assertCurrentHealthStudentScope(tx, context, authorization.studentProfileId, input.siteId);
     if (authorization.status !== "active") {
       throw new Error("Medication authorization is not active");
     }
