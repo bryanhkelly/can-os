@@ -24,10 +24,22 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
   enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
   familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
 }) {
+  const scopedInvitationTimes=currentLaunch&&familyInvitations
+    ? familyInvitations.batches.filter(batch=>batch.programId===currentLaunch.id&&batch.siteId===currentLaunch.siteId)
+      .map(batch=>new Date(batch.createdAt).getTime()).filter(Number.isFinite).sort((a,b)=>a-b)
+    : [];
+  const firstInvitationTime=scopedInvitationTimes[0];
+  const launchStart=currentLaunch?new Date(currentLaunch.createdAt).getTime():NaN;
+  const recordedOutreachMinutes=firstInvitationTime!==undefined&&Number.isFinite(launchStart)&&firstInvitationTime>=launchStart
+    ? Math.floor((firstInvitationTime-launchStart)/60000):null;
   return <>
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5">
           <h2 className="font-serif text-xl">Recorded launch start</h2>
           <p className="mt-2 text-sm">Program creation: <time dateTime={currentLaunch.createdAt}>{new Date(currentLaunch.createdAt).toLocaleString()}</time>.</p>
+          {firstInvitationTime!==undefined&&<p className="mt-2 text-sm">First saved invitation batch: <time dateTime={new Date(firstInvitationTime).toISOString()}>{new Date(firstInvitationTime).toLocaleString()}</time>.</p>}
+          {recordedOutreachMinutes!==null&&<p className="mt-2 text-sm" role="status">Elapsed from Program creation to first saved outreach batch: <strong>{recordedOutreachMinutes} whole minutes</strong>. This includes unmeasured waiting and is not hands-on setup time or evidence of inbox delivery.</p>}
+          {firstInvitationTime===undefined&&<p className="mt-2 text-sm">No saved invitation batch timestamp is available for this Program and Site; elapsed outreach time is not yet measurable.</p>}
+          {firstInvitationTime!==undefined&&recordedOutreachMinutes===null&&<p role="alert" className="mt-2 text-sm">Saved invitation timestamp cannot be reconciled with Program creation; no elapsed time is reported.</p>}
           {currentLaunch.journey?.status==="ready"&&<p className="mt-2 text-sm">Independent review of opening is the next institutional handoff; journey readiness is not an opening timestamp.</p>}
           <p className="mt-2 text-xs text-muted-foreground">This timestamp is from the saved Program, not a browser stopwatch. No completion duration is claimed until a separately persisted completion or opening event is available. CAN review, hosting and third-party response time cannot be counted as school-controlled setup time without independently timestamped events.</p>
         </section>}
