@@ -42,7 +42,7 @@ function IntakePage(){
  const outcome=Route.useLoaderData();
  const selected=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Admissions" title="Inquiry and decision pipeline" outcome={outcome}/>;
- return <Intake key={`${selected.siteId??""}:${selected.programId??""}:${selected.interest??""}`} data={outcome.data}/>;
+ return <Intake key={`${selected.siteId??""}:${selected.programId??""}:${selected.interest??""}:${selected.studentPage??1}`} data={outcome.data}/>;
 }
 function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const router=useRouter();
