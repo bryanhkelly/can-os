@@ -28,13 +28,13 @@ type SnapshotRow = {sectionId:string;subject:string;creditsEarned:number|null;te
 function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: string): CreditEvidence[] {
   if (!Array.isArray(snapshot.rows) || !snapshot.rows.length) throw new Error("Issued transcript has no academic evidence");
   const rows = snapshot.rows as Array<SnapshotRow & {creditIssuingOrganizationId:string}>;
+  // Validate untrusted historical JSON before accessing any row properties.
+  if (rows.some(row => !row || typeof row !== "object" || typeof row.sectionId !== "string" || typeof row.subject !== "string" || typeof row.terminalPeriod !== "boolean" || (row.creditsEarned !== null && (typeof row.creditsEarned !== "number" || !Number.isFinite(row.creditsEarned))) || (row.letterGrade !== null && typeof row.letterGrade !== "string") || typeof row.creditIssuingOrganizationId !== "string"))
+    throw new AuthorizationError("Malformed transcript credit evidence");
   if (rows.some(row => row.creditIssuingOrganizationId !== issuerId)) throw new AuthorizationError("transcript issuer mismatch");
-  // The canonical transcript issuer does not yet support cross-issuer transfer
-  // acceptance. Never treat caller-supplied snapshot flags as an authorization.
+  // Transfer acceptance must originate from the canonical issuer ledger, not JSON flags.
   if (rows.some(row => row.isTransferCredit === true || row.acceptedByIssuer !== undefined || row.creditAcceptanceStatus !== undefined))
     throw new AuthorizationError("Transfer credit requires canonical issuer-accepted ledger evidence");
-  if (rows.some(row => !row || typeof row !== "object" || typeof row.sectionId !== "string" || typeof row.subject !== "string" || typeof row.terminalPeriod !== "boolean" || (row.creditsEarned !== null && (typeof row.creditsEarned !== "number" || !Number.isFinite(row.creditsEarned))) || (row.letterGrade !== null && typeof row.letterGrade !== "string")))
-    throw new AuthorizationError("Malformed transcript credit evidence");
   // Intermediate grading periods must not count twice. A W is zero earned credit.
   const terminal = rows.filter(row => row.terminalPeriod);
   const sections = new Map<string, typeof terminal[number]>();
@@ -49,9 +49,8 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     subject: row.subject,
     earnedUnits: row.creditsEarned,
     finalized: Boolean(row.sectionId && row.letterGrade),
-    // Transfer evidence must carry affirmative issuer acceptance.
-    // A snapshot without acceptance cannot confer graduation credit.
-    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
+    // Issuer-matched canonical Section credit only; transfer flags were rejected above.
+    acceptedByIssuer: true,
   }));
 }
 /** Check current canonical enrollment custody, not only the immutable transcript snapshot. */
