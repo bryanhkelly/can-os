@@ -93,7 +93,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
     }catch(e){setError(e instanceof Error?e.message:"Unable to record physical presence");}
     finally{setPresenceBusy("");}
   }
-  return <section className="mt-10" aria-label="Planned onsite supervision">
+  return <section id="supervision" className="mt-10" aria-label="Planned onsite supervision">
     <h2 className="font-serif text-2xl">Instructional supervision plan</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Planned section times and assigned adults from the existing school schedule.

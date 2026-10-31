@@ -1,3 +1,5 @@
+vi.mock("@/modules/operations/onsite-day-preparation.functions",()=>({getOnsiteSchoolDayPreparation:vi.fn()}));
+vi.mock("@/modules/operations/onsite-room-plan.functions",()=>({getOnsiteRoomPlanningFn:vi.fn(),submitOnsiteRoomPlanFn:vi.fn(),reviewOnsiteRoomPlanFn:vi.fn()}));
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { SiteDayPage } from "@/routes/site.day";

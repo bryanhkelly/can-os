@@ -1,7 +1,9 @@
+import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
+import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
 import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
@@ -33,6 +35,8 @@ export function SiteDayPage() {
     Awaited<ReturnType<typeof getOnsiteStaffDayContext>> | null>(null);
   const [date, setDate] = useState("");
   const [roster, setRoster] = useState<Roster | null>(null);
+  const [preparing,setPreparing]=useState(false);
+  const [preparation,setPreparation]=useState<Awaited<ReturnType<typeof getOnsiteSchoolDayPreparation>>|null>(null);
   const [openings, setOpenings] = useState<OpeningStatuses>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -40,14 +44,22 @@ export function SiteDayPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const load = useCallback(async (targetDate: string) => {
-    setLoading(true); setError(""); setRoster(null);
+  const loadSequence=useRef(0);
+  const load = useCallback(async (targetDate: string, prepare=false) => {
+    const sequence=++loadSequence.current;
+    setLoading(true); setError(""); setRoster(null); setPreparation(null);
     try {
-      const result = await listExpectedOnsiteRoster({ data: { date: targetDate } });
-      setRoster(result);
+      if(prepare){
+        const result=await getOnsiteSchoolDayPreparation({data:{date:targetDate}});
+        if(sequence===loadSequence.current)setPreparation(result);
+      }else{
+        const result=await listExpectedOnsiteRoster({data:{date:targetDate}});
+        if(sequence===loadSequence.current)setRoster(result);
+      }
     } catch {
-      setError("Unable to load scheduled onsite attendance. Verify your active site membership and calendar.");
-    } finally { setLoading(false); }
+      if(sequence!==loadSequence.current)return;
+      setError(prepare?"Unable to load school-day preparation. Verify your current director appointment and calendar.":"Unable to load scheduled onsite attendance. Verify your active site membership and calendar.");
+    } finally { if(sequence===loadSequence.current)setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -128,20 +140,33 @@ export function SiteDayPage() {
         </ul>
       </section>}
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
+    {context&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap gap-3">
+      <button type="button" aria-pressed={!preparing} className="rounded border px-3 py-2 text-sm font-semibold"
+        onClick={()=>{setPreparing(false);setDate(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</button>
+      {context.canPrepareSchoolDays&&<button type="button" aria-pressed={preparing} className="rounded border px-3 py-2 text-sm font-semibold"
+        onClick={()=>{const day=new Date(context.date+"T12:00:00Z");day.setUTCDate(day.getUTCDate()+1);
+          const target=day.toISOString().slice(0,10);setPreparing(true);setDate(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</button>}
+      {!preparing&&<><a href="#attendance" className="px-2 py-2 text-sm underline">Record attendance</a>
+        <a href="#supervision" className="px-2 py-2 text-sm underline">Staff duties and arrival</a>
+        <a href="#pickup" className="px-2 py-2 text-sm underline">Student pickup</a>
+        <a href="#day-review" className="px-2 py-2 text-sm underline">Reconcile the day</a></>}
+    </nav>}
+    {preparing&&<p role="status" className="mt-4 rounded border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
     {context && <label className="mt-6 block max-w-sm text-sm font-semibold">
-      School-local attendance date
-      <input type="date" value={date} max={context.date}
+      {preparing?"School-local preparation date":"School-local attendance date"}
+      <input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
         className="mt-2 w-full rounded border bg-background p-3"
         onChange={event => {
           setDate(event.target.value); setNotice(""); setNotes({});
-          if (event.target.value) void load(event.target.value);
+          if (event.target.value) void load(event.target.value,preparing);
         }} />
       <span className="mt-1 block text-xs text-muted-foreground">{context.timeZone}</span>
     </label>}
     {notice && <p role="status" className="mt-4 rounded border p-3 text-sm">{notice}</p>}
     {error && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
     {loading && !error && <p role="status" className="mt-5 text-sm">Loading scheduled roster…</p>}
-    {roster && <>
+    {preparing&&preparation&&<SchoolDayPreparationPanel preparation={preparation} onChanged={()=>void load(date,true)}/>}
+    {roster && !preparing && <>
       <p className="mt-3 text-xs text-muted-foreground">
         These are expected student-program attendance entries, not a deduplicated headcount or proof
         of physical presence until a staff member records the observation. Corrections are limited
@@ -166,7 +191,7 @@ export function SiteDayPage() {
           <h2 className="font-semibold">Needs attention</h2>
           <p className="mt-1 text-sm">Some expected roster entries have no staff-observed mark. Review the roster below; do not infer absence from an unmarked record.</p>
         </section>}
-      <h2 className="mt-8 font-serif text-2xl font-semibold">Expected roster and attendance</h2>
+      <h2 id="attendance" className="mt-8 font-serif text-2xl font-semibold">Expected roster and attendance</h2>
       {!roster.students.length && <p className="mt-6 text-sm">
         No verified scheduled onsite students for this date under your current site grant.
         This is not evidence that students were absent.
@@ -203,8 +228,8 @@ export function SiteDayPage() {
       <button type="button" onClick={() => void load(date)}
         className="mt-6 text-sm underline">Refresh school roster</button>
     </>}
-    {roster && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
-    {roster && <OnsiteDayReconciliationPanel date={date} roster={roster} />}
-    {context && date && <OnsiteSupervisionPanel date={date} />}
+    {roster && !preparing && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
+    {roster && !preparing && <div id="day-review"><OnsiteDayReconciliationPanel date={date} roster={roster} /></div>}
+    {context && date && !preparing && <OnsiteSupervisionPanel date={date} />}
   </WorkspaceShell>;
 }
