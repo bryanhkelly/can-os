@@ -15,12 +15,17 @@ export function LaunchOrientationTask({ launch, busy, save }: {
   const timezone = launch.siteTimezone ?? "America/Los_Angeles";
   const [timeError, setTimeError] = useState("");
   function useRecommendation() {
-    const start = new Date(Date.now() + 7 * 24 * 60 * 60_000);
-    const siteDay = dateTimeInputValue(start.toISOString(), timezone).slice(0, 10);
-    const suggestedStart = unambiguousInstant(`${siteDay}T18:00`, timezone);
-    const end = new Date(Date.parse(suggestedStart) + 45 * 60_000);
-    setStartsAt(`${siteDay}T18:00`);
-    setEndsAt(dateTimeInputValue(end.toISOString(), timezone));
+    try {
+      const start = new Date(Date.now() + 7 * 24 * 60 * 60_000);
+      const siteDay = dateTimeInputValue(start.toISOString(), timezone).slice(0, 10);
+      const suggestedStart = unambiguousInstant(`${siteDay}T18:00`, timezone);
+      const end = new Date(Date.parse(suggestedStart) + 45 * 60_000);
+      setStartsAt(`${siteDay}T18:00`);
+      setEndsAt(dateTimeInputValue(end.toISOString(), timezone));
+      setTimeError("");
+    } catch (error) {
+      setTimeError(error instanceof Error ? error.message : "Unable to suggest an orientation time");
+    }
   }
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
