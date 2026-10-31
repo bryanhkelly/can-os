@@ -621,6 +621,12 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
       if (data.letterGrade && scaleEntries.length &&
           !scaleEntries.some(entry => entry.label === data.letterGrade))
         throw new Error("Corrected letter grade must belong to the finalized grade scale");
+      // A caller supplying both values cannot override the official scale
+      // with contradictory percentage and letter-grade evidence. A letter-only
+      // correction remains available for an authorized manual adjustment.
+      if (data.percentage !== undefined && data.letterGrade && scaleEntries.length &&
+          gradeLabelForPercentage(data.percentage, scaleEntries) !== data.letterGrade)
+        throw new Error("Corrected percentage and letter grade disagree with the finalized grade scale");
       const newLetterGrade =
         data.letterGrade ??
         (data.percentage !== undefined && scaleEntries.length
