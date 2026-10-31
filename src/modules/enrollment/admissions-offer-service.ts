@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { admissionOffers,admissionSeatPools,applications,auditEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles } from "@/db/schema";
+import { admissionOffers,admissionSeatPools,applications,actions,auditEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { transitionAdmissionsOffer,type OfferStatus } from "@/domain/admissions-offer-lifecycle";
 import { calculateSeatOccupancy } from "@/domain/admissions-seat-occupancy";
@@ -209,6 +209,32 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   assertApplicationOffersAllowed(app);
   await assertGuardian(tx,offer!.respondedByPersonId,app.studentProfileId);
   assertRecordWriteAllowed(app.metadata,"registrar");
+  // A receiving school may decide an application and the family may accept
+  // the offer while the originating school coordinates its exit. Only actual
+  // enrollment activation waits for the verified institutional transfer.
+  if(typeof app.metadata.originTransferActionId==="string"){
+    const [origin]=await tx.select({
+      id:actions.id,type:actions.type,status:actions.status,
+      subjectType:actions.subjectType,subjectId:actions.subjectId,
+      programId:actions.programId,metadata:actions.metadata,
+    }).from(actions).where(eq(actions.id,app.metadata.originTransferActionId))
+      .for("share").limit(1);
+    if(!origin||origin.type!=="guardian_enrollment_change_request"||
+       origin.subjectType!=="student_profile"||
+       origin.subjectId!==app.studentProfileId||
+       origin.programId===app.programId||
+       origin.metadata.kind!=="transfer"||
+       origin.metadata.requestedByGuardianPersonId!==app.submittedByPersonId||
+       origin.status!=="resolved"||
+       origin.metadata.exitCompletedByRegistrar!==true||
+       origin.metadata.exitStatus!=="transferred")
+       throw new Error("Originating school must complete the official student transfer before the receiving school can activate enrollment.");
+    const [activeOrigin]=await tx.select({id:enrollments.id}).from(enrollments)
+      .where(and(eq(enrollments.studentProfileId,app.studentProfileId),
+        eq(enrollments.programId,origin.programId),
+        eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
+    if(activeOrigin)throw new Error("The originating school still has an active Program enrollment. Reconcile the transfer before activating the destination.");
+  }
   const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
   if(!programSite||programSite.organizationId!==organizationId)
