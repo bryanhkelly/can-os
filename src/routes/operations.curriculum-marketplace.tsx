@@ -8,6 +8,8 @@ import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJo
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
 import { validateCommonCartridgeImport, importCommonCartridgeSectionLinks, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
+import { validateOneRosterCsvBundle, applyOneRosterClassMappings } from "@/modules/learning/oneroster-import.functions";
+import { previewOneRosterCsv } from "@/domain/oneroster-csv";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
@@ -47,7 +49,15 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [cartridgeReport,setCartridgeReport]=useState<Awaited<ReturnType<typeof validateCommonCartridgeImport>>|null>(null);
  const [cartridgeSection,setCartridgeSection]=useState(""),[cartridgeLinks,setCartridgeLinks]=useState<string[]>([]);
  const [cartridgeRights,setCartridgeRights]=useState(false);
+ const [rosterSource,setRosterSource]=useState(""),[rosterCsv,setRosterCsv]=useState("");
+ const [rosterValidated,setRosterValidated]=useState(false);
+ const [rosterMap,setRosterMap]=useState<Record<string,string>>({});
  const cartridgeWebLinks=cartridgeReport?.preview.resources.filter(r=>/weblink|imswl/i.test(r.type))??[];
+ let rosterClasses:ReturnType<typeof previewOneRosterCsv>["rows"]=[];
+ try{if(rosterCsv.trim()){
+   const preview=previewOneRosterCsv("classes",rosterCsv);
+   if(!preview.errors.length)rosterClasses=preview.rows;
+ }}catch{/* Keep the editor available for incomplete CSV input. */}
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
@@ -353,6 +363,47 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        This is a roster-profile implementation, not a claim of complete OneRoster or gradebook conformance.
      </p>
    </section>
+   {market.canPublish&&<section className="space-y-3 rounded-xl border p-5" aria-label="Reconcile OneRoster classes">
+     <h2 className="font-serif text-2xl">Match OneRoster classes</h2>
+     <p className="text-sm text-muted-foreground">Paste a OneRoster 1.2 classes.csv to connect external sourced IDs to existing CAN classes. No child profiles, enrollments, teacher accounts or grades are changed. Match every class explicitly and review the destination before saving.</p>
+     <label className="block text-sm">Source system
+      <input className="mt-1 block w-full rounded border bg-background p-2" value={rosterSource}
+       placeholder="district-sis" maxLength={100} onChange={e=>{setRosterSource(e.target.value);setRosterValidated(false);}}/>
+     </label>
+     <label className="block text-sm">OneRoster classes.csv
+      <textarea className="mt-1 block min-h-28 w-full rounded border bg-background p-2 font-mono text-xs"
+       value={rosterCsv} maxLength={500000}
+       placeholder={"sourcedId,title,courseSourcedId,classCode,schoolSourcedId"}
+       onChange={e=>{setRosterCsv(e.target.value);setRosterValidated(false);setRosterMap({});}}/>
+     </label>
+     <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+      disabled={busy||!rosterSource.trim()||!rosterCsv.trim()||!rosterClasses.length||rosterClasses.length>500}
+      onClick={()=>void perform(async()=>{
+       const result=await validateOneRosterCsvBundle({data:{programId:market.program.id,files:{classes:rosterCsv}}});
+       if(!result.report.valid)throw new Error("The OneRoster CSV contains validation errors.");
+       setRosterValidated(true);
+      },"OneRoster classes validated. Choose the corresponding CAN classes.")}>Validate class CSV</button>
+     {rosterValidated&&<div className="space-y-3 rounded border p-3">
+       <p className="text-sm font-medium">Match all {rosterClasses.length} external classes to the existing classes below.</p>
+       {rosterClasses.map(row=><label key={row.sourcedId} className="block text-sm">
+         {row.title} ({row.sourcedId})
+         <select value={rosterMap[row.sourcedId]??""} className="mt-1 block w-full rounded border bg-background p-2"
+          onChange={e=>setRosterMap(old=>({...old,[row.sourcedId]:e.target.value}))}>
+           <option value="">Select CAN class</option>
+           {market.sections.map(section=><option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
+         </select>
+       </label>)}
+       <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+        disabled={busy||!rosterClasses.length||rosterClasses.some(row=>!rosterMap[row.sourcedId])||
+          new Set(rosterClasses.map(row=>rosterMap[row.sourcedId])).size!==rosterClasses.length}
+        onClick={()=>void perform(async()=>{
+         await applyOneRosterClassMappings({data:{programId:market.program.id,
+           sourceSystem:rosterSource,files:{classes:rosterCsv},
+           classMappings:rosterClasses.map(row=>({sourcedId:row.sourcedId,sectionId:rosterMap[row.sourcedId]!}))}});
+        },"External OneRoster class identities reconciled to canonical CAN Sections.")}>Save class mappings</button>
+     </div>}
+     <p className="text-xs text-muted-foreground">This scoped class-reconciliation workflow is not a student roster import or OneRoster certification.</p>
+    </section>}
   </>}
  </main>;
 }
