@@ -53,7 +53,7 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  for(const sub of submissions){const key=sub.assessmentId+":"+sub.studentId;const prev=latest.get(key);if(!prev||sub.attempt>prev.attempt)latest.set(key,sub);}
  const items=due.flatMap(a=>eligible.filter(student=>student.sectionId===a.sectionId).flatMap(student=>{
   const sub=latest.get(a.id+":"+student.studentId);
-  if(sub&&sub.status!=="assigned")return [];
+  if(sub&&sub.status!=="assigned"&&sub.status!=="returned")return [];
   return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),studentProfileId:student.studentId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started"}];
  })).sort((a,b)=>a.dueAt.localeCompare(b.dueAt));
  return {connected:true,items};
@@ -92,7 +92,7 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
    if(!programMembership)throw new AuthorizationError("current active student school-year enrollment");
    const attempts=await tx.select({status:s.submissions.status}).from(s.submissions)
     .where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,student.id)));
-   if(attempts.some(a=>a.status!=="assigned"))throw new Error("Work has already been submitted");
+   if(attempts.some(a=>a.status!=="assigned"&&a.status!=="returned"))throw new Error("Work is already submitted or graded");
    const existing=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),assessment.siteId?eq(s.actions.siteId,assessment.siteId):isNull(s.actions.siteId),eq(s.actions.programId,assessment.programId)));
    const open=existing.find(a=>a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
