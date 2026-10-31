@@ -262,6 +262,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    kind: "notification" as const,
    type: row.type,
    title: visible.title,
+   priority:row.type==="school_family_alert"?"urgent" as const:"normal" as const,
    detail: visible.body,
    href: visible.href ?? `/notifications?notification=${encodeURIComponent(row.id)}`,
    createdAt: row.createdAt.toISOString(),
