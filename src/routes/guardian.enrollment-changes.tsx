@@ -32,8 +32,9 @@ function GuardianEnrollmentChanges(){
     listGuardianEnrollmentChanges({data:{studentPersonId:student}}),
   ]);
   setChoices(options);setRequests(records.items);
+  const first=options.find(choice=>choice.studentPersonId===student)??options[0];
   setSelected(current=>options.some(choice=>choice.studentPersonId+":"+choice.programId===current)
-    ?current:((first)=>first?first.studentPersonId+":"+first.programId:"")(options.find(choice=>choice.studentPersonId===student)??options[0]):"");
+    ?current:first?first.studentPersonId+":"+first.programId:"");
  }
  useEffect(()=>{
   let active=true;
