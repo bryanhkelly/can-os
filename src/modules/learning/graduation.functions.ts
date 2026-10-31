@@ -9,7 +9,7 @@ import { auditGraduationCredits, type CreditEvidence, type CreditRequirement } f
 import { writeAudit } from "@/platform/mutation";
 
 const uuid = z.string().uuid();
-const rules = z.array(z.object({ subject: z.string().trim().min(1), minimumUnits: z.number().positive().finite() })).min(1);
+const rules = z.array(z.object({ subject: z.string().trim().min(1), minimumUnits: z.number().positive().finite() })).min(1).refine(rows=>new Set(rows.map(row=>row.subject.toLocaleLowerCase())).size===rows.length,"Duplicate graduation subjects are not allowed");
 async function resources() {
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return { db, s };
