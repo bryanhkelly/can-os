@@ -88,8 +88,10 @@ export async function ingestSignedWebhook(
 export function invoiceStatus(record: FinanceRecord, configured: boolean) {
   const totals = settlement(record);
   if (!configured) return { state: "not_configured" as const, ...totals };
-  if (!record.providerPaymentId) return { state: "due" as const, ...totals };
-  return { state: totals.netCents === 0 ? "refunded" as const : "paid" as const, ...totals };
+  if (record.capturedCents === 0) return { state: "due" as const, ...totals };
+  if (totals.netCents === 0) return { state: "refunded" as const, ...totals };
+  if (record.capturedCents < record.charge.amount.cents) return { state: "partially_paid" as const, ...totals };
+  return { state: "paid" as const, ...totals };
 }
 
 /** Provider abstraction. No implicit test-double fallback in production. */
