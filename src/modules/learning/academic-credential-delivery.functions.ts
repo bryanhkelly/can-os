@@ -68,6 +68,20 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
  });
 
+export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({authorizationId:uuid}).strict().parse(value))
+ .handler(async ({data})=>{
+  const context=await registrar();const {db,s}=await resources();
+  const [row]=await db.select().from(s.academicCredentialReleaseAuthorizations)
+   .where(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId)).limit(1);
+  if(!row||!context.scope.organizationIds?.includes(row.issuingOrganizationId))
+   throw new AuthorizationError("issuer authorization");
+  await db.update(s.academicCredentialReleaseAuthorizations)
+   .set({revokedAt:new Date(),updatedAt:new Date()})
+   .where(eq(s.academicCredentialReleaseAuthorizations.id,row.id));
+  return {revoked:true};
+ });
+
 /** Authenticated recipient download. No bearer token, email attachment or public URL.
  * Only an independently authorized, unexpired and non-revoked ledger entry
  * can be redeemed by its exact named recipient in a live session. */
