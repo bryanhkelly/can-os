@@ -209,6 +209,13 @@ export async function startFamilyApplication(
       .limit(1);
     if (!program) throw new Error("Program not found");
     requireEnrollmentProgramScope(context, input.programId);
+    if(originTransfer){
+      if(!program.siteId||originTransfer.siteId===program.siteId)
+        throw new Error("Transfer admission must be for a different school Site from the origin");
+      const priorDestination=originTransfer.metadata.destinationFamilyStartProgramId;
+      if(typeof priorDestination==="string"&&priorDestination!==program.id)
+        throw new Error("This transfer's verified family invitation was for a different receiving school. Contact admissions to reconcile the destination before submitting.");
+    }
 
     if (input.schoolYearId) {
       const [year] = await tx.select({id:schoolYears.id,organizationId:schoolYears.organizationId,
