@@ -556,8 +556,17 @@ integration("cross-persona admissions through active classes",()=>{
     await tx.insert(s.qualificationVerificationEvents).values({
       claimId:teacherQualification.claimId,sequence:3,decision:"approve",actorPersonId:registrar.id,
     });
+    // The same organization-wide registrar who issued the offer and
+    // activated enrollment must be able to finish classroom placement.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+     .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,readyForPlacement:true})]));
     await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
     expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
+    state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()]}};
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+     .rejects.toThrow("placement program scope");
+    state.actor=staff;
     // Once the single-seat Section is occupied, the registrar must not
     // advertise an extra seat even while teacher + curriculum remain valid.
     expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
