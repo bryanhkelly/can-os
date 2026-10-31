@@ -11,7 +11,7 @@ function GraduationCloseout(){
  const [issuerId,setIssuerId]=useState("");
  const [academicYear,setAcademicYear]=useState("");
  const [version,setVersion]=useState("1");
- const [requirements,setRequirements]=useState([{subject:"Mathematics",minimumUnits:"3"},{subject:"English",minimumUnits:"4"}]);
+ const [requirements,setRequirements]=useState([{subject:"",minimumUnits:""}]);
  const [transcriptId,setTranscriptId]=useState("");
  const [requirementSetId,setRequirementSetId]=useState("");
  const [decisionId,setDecisionId]=useState("");
@@ -26,7 +26,7 @@ function GraduationCloseout(){
  const field=(title:string,value:string,change:(value:string)=>void)=><label className="block text-sm font-medium">{title}<input className="mt-1 block w-full rounded-lg border bg-background p-2" value={value} onChange={e=>change(e.target.value)}/></label>;
  return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Institutional graduation closeout" subtitle="Approve institutional requirements, audit issued transcripts, decide graduation, and issue diplomas. Each action requires an authorized issuer registrar.">
   <div className="space-y-6 py-6">
-   <Link to="/admissions/credential-delivery" className="inline-block rounded-lg border px-3 py-2 text-sm">Download and deliver official credentials</Link>
+   <Link to="/admissions/credential-delivery" className="inline-block rounded-lg border px-3 py-2 text-sm">Download official credentials</Link>
    <p className="rounded-lg border p-3 text-sm">An issued transcript does not automatically certify graduation. Only institution-approved requirements and a passing credit audit permit graduation approval. Diploma issuance is a separate recorded action.</p>
    {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}
    <section className="space-y-3 rounded-xl border p-4">
@@ -35,7 +35,7 @@ function GraduationCloseout(){
     {field("Institution ID (policy administration)",issuerId,setIssuerId)}
     {field("Academic year",academicYear,setAcademicYear)}
     {field("Requirements version",version,setVersion)}
-    <div className="space-y-2"><p className="text-sm font-medium">Required credits by subject</p>{requirements.map((rule,index)=><div key={index} className="flex flex-wrap items-center gap-2"><input aria-label={"Subject "+(index+1)} className="rounded border bg-background p-2" value={rule.subject} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,subject:e.target.value}:item))}/><input aria-label={"Minimum units for "+rule.subject} type="number" min="0.01" step="0.01" className="w-28 rounded border bg-background p-2" value={rule.minimumUnits} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,minimumUnits:e.target.value}:item))}/><button type="button" disabled={requirements.length===1} className="rounded border px-2 py-1" onClick={()=>setRequirements(previous=>previous.filter((_,i)=>i!==index))}>Remove</button></div>)}<button type="button" className="rounded border px-3 py-2" onClick={()=>setRequirements(previous=>[...previous,{subject:"",minimumUnits:"1"}])}>Add subject</button></div>
+    <div className="space-y-2"><p className="text-sm font-medium">Required credits by subject</p>{requirements.map((rule,index)=><div key={index} className="flex flex-wrap items-center gap-2"><input aria-label={"Subject "+(index+1)} className="rounded border bg-background p-2" value={rule.subject} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,subject:e.target.value}:item))}/><input aria-label={"Minimum units for "+rule.subject} type="number" min="0.01" step="0.01" className="w-28 rounded border bg-background p-2" value={rule.minimumUnits} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,minimumUnits:e.target.value}:item))}/><button type="button" disabled={requirements.length===1} className="rounded border px-2 py-1" onClick={()=>setRequirements(previous=>previous.filter((_,i)=>i!==index))}>Remove</button></div>)}<button type="button" className="rounded border px-3 py-2" onClick={()=>setRequirements(previous=>[...previous,{subject:"",minimumUnits:""}])}>Add subject</button></div>
     <div className="flex flex-wrap gap-2">
      <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await approveGraduationRequirements({data:{issuerId,academicYear,version,requirements:requirements.map(rule=>({subject:rule.subject.trim(),minimumUnits:Number(rule.minimumUnits)}))}});setRequirementSetId(result.requirementSetId);setMessage("Requirements version approved.")})}>Approve requirements</button>
      <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setSets(await listGraduationRequirements({data:{issuerId}}))})}>Load approved versions</button>
@@ -57,14 +57,14 @@ function GraduationCloseout(){
       {audit.audit.blockers.map((blocker,i)=><p key={i} className="text-red-700">{blocker}</p>)}
       <div className="flex gap-2">
        <button disabled={busy||audit.audit.status!=="requirements_met"} className="rounded-lg border px-3 py-2 disabled:opacity-50" onClick={()=>void perform(async()=>{const result=await decideGraduation({data:{transcriptId,requirementSetId,decision:"approved"}});setDecisionId(result.decisionId);setMessage("Graduation approved and recorded.")})}>Approve graduation</button>
-       <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await decideGraduation({data:{transcriptId,requirementSetId,decision:"denied"}});setDecisionId("");setAudit(null);setMessage("Graduation denial recorded.")})}>Record denial</button>
+       <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await decideGraduation({data:{transcriptId,requirementSetId,decision:"denied"}});setDecisionId("");setAudit(null);setMessage("Graduation denial recorded.")})}>Record denial</button>
       </div>
      </div>}
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">3. Diploma issuance</h2>
     <p className="text-sm">{decisionId?"Graduation decision recorded. Diploma issuance is available below.":"Record an eligible graduation approval above before issuing a diploma."}</p>
-    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setMessage("Diploma credential recorded.")})}>Issue diploma</button>
+    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await issueDiploma({data:{decisionId}});setDecisionId("");setMessage("Diploma credential recorded.")})}>Issue diploma</button>
    </section>
   </div>
  </WorkspaceShell>;
