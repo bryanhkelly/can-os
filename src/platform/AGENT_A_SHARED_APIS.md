@@ -83,3 +83,10 @@ GitHub connector commits are not proof of successful compilation or tests. No va
 - Integration owner should require the code-verification job in FullFlow branch protection and separately require recorded connected acceptance before release, without running connected fixtures on ordinary PRs.
 - Agent D owns admissions-specific connected acceptance. Agents C and E should adopt the typed mutation result discriminant and preserve existing domain authorization.
 - Actual typecheck, unit, lint, and build results are pending CI execution. Do not infer green status from commits alone.
+
+## Reusable loader presentation (component extraction)
+
+- `LoaderErrorState` from `@/lib/loader-error-state` is a shell-free component for embedded panels, modals, and route content. It accepts the `safeLoader` failure outcome and optional `onRetry` / `retrying` props.
+- `LoaderFailure` from `@/lib/loader-failure` remains the page-level adapter that composes `WorkspaceShell` with `LoaderErrorState`. Existing page consumers retain their interface.
+- Retry is offered only when `outcome.retryable` is true; authentication failures retain the sign-in link and authorization denials do not imply missing login.
+- Agents C, D, E: use the shell-free component inside an existing workspace page; use `LoaderFailure` only when the route needs the complete page shell. Do not duplicate the classification or sign-in logic.
