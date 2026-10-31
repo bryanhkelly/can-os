@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { listGuardianGradeFollowUps } from "@/modules/learning/guardian-grade-response.functions";
+import { listGuardianCourseApprovals } from "@/modules/learning/guardian-course-approval.functions";
 import { WorkspaceShell, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
 import { prioritizeFamilyNeeds } from "@/domain/family-needs";
 import { buildGuardianAttention } from "@/domain/daily-operations";
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/guardian/")({
 type Child = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 type NeedItem = Awaited<ReturnType<typeof getGuardianNeedsYou>>["items"][number];
 type GradeFollowUp = Awaited<ReturnType<typeof listGuardianGradeFollowUps>>["items"][number];
+type CourseApproval = Awaited<ReturnType<typeof listGuardianCourseApprovals>>[number];
 
 function FamilyHomePage() {
  const {action,student}=Route.useSearch();
@@ -29,6 +31,8 @@ function FamilyHomePage() {
  const [needsWarning, setNeedsWarning] = useState("");
  const [gradeFollowUps, setGradeFollowUps] = useState<GradeFollowUp[]>([]);
  const [gradeFollowUpsWarning, setGradeFollowUpsWarning] = useState("");
+ const [courseApprovals, setCourseApprovals] = useState<CourseApproval[]>([]);
+ const [courseApprovalsWarning, setCourseApprovalsWarning] = useState("");
 
  useEffect(() => {
   let active = true;
@@ -38,13 +42,18 @@ function FamilyHomePage() {
   ), listGuardianGradeFollowUps().then(
    result => ({items:result.items,unavailable:false}),
    () => ({items:[] as GradeFollowUp[],unavailable:true}),
-  )]).then(([home, needsYou, schoolQuestions]) => {
+  ), listGuardianCourseApprovals().then(
+   items => ({items,unavailable:false}),
+   () => ({items:[] as CourseApproval[],unavailable:true}),
+  )]).then(([home, needsYou, schoolQuestions, classApprovals]) => {
    if (!active) return;
    setChildren(home.children);
    setNeeds(needsYou.items);
    setNeedsWarning(needsYou.unavailable ? "Your attention list is temporarily unavailable. You can still review each child, attendance and enrollment." : "");
    setGradeFollowUps(schoolQuestions.items);
    setGradeFollowUpsWarning(schoolQuestions.unavailable ? "School question status is temporarily unavailable. Open academics to review your child's feedback." : "");
+   setCourseApprovals(classApprovals.items.filter(item=>!item.myDecision));
+   setCourseApprovalsWarning(classApprovals.unavailable ? "Course approval status is unavailable. Open course approvals to check student requests." : "");
    setLoading(false);
   }).catch(() => {
    if (active) { setError("Sign in with an authorized guardian account to view your family home."); setLoading(false); }
@@ -53,12 +62,15 @@ function FamilyHomePage() {
  }, []);
 
  return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} needsWarning={needsWarning}
-  gradeFollowUps={gradeFollowUps} gradeFollowUpsWarning={gradeFollowUpsWarning} action={action} student={student}/>;
+  gradeFollowUps={gradeFollowUps} gradeFollowUpsWarning={gradeFollowUpsWarning}
+  courseApprovals={courseApprovals} courseApprovalsWarning={courseApprovalsWarning} action={action} student={student}/>;
 }
 
-export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeFollowUps=[],gradeFollowUpsWarning,action,student}:{
+export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeFollowUps=[],gradeFollowUpsWarning,
+ courseApprovals=[],courseApprovalsWarning,action,student}:{
  children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;
- gradeFollowUps?:GradeFollowUp[];gradeFollowUpsWarning?:string;action?:string;student?:string;
+ gradeFollowUps?:GradeFollowUp[];gradeFollowUpsWarning?:string;
+ courseApprovals?:CourseApproval[];courseApprovalsWarning?:string;action?:string;student?:string;
 }){
  const selectedChild=children.find(child=>child.studentPersonId===student);
  const visibleChildren=selectedChild?[selectedChild]:children;
