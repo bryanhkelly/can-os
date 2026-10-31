@@ -45,8 +45,15 @@ export async function resolveOperationsSelection(
     )).limit(1);
     if (!site) throw new AuthorizationError("selected school");
   }
+  // A school exists before its first Program. Derive visible Sites from their
+  // own ownership records, not from the existence of child Programs.
+  const visibleSites = await db.select({ id: sites.id }).from(sites).where(and(
+    inArray(sites.organizationId, authorizedOrganizations),
+    ...(authorizedSites ? [inArray(sites.id, authorizedSites)] : []),
+    ...(selection.siteId ? [eq(sites.id, selection.siteId)] : []),
+  ));
   return {
-    siteIds: selection.siteId ? [selection.siteId] : [...new Set(candidates.map(program => program.siteId).filter((id): id is string => id !== null))],
+    siteIds: visibleSites.map(site => site.id),
     programIds: candidates.map(program => program.id),
   };
 }
