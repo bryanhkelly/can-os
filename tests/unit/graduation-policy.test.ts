@@ -20,6 +20,10 @@ describe("institutional graduation policy applicability",()=>{
  it("fails closed for incomplete supersession lineage",()=>{
   expect(()=>resolveGraduationPolicy([policy("v2","2024","2024","missing")],"2024")).toThrow(/incomplete/);
  });
+ it("rejects cycles and competing successor policies",()=>{
+  expect(()=>resolveGraduationPolicy([policy("a","2024","2024","b"),policy("b","2024","2024","a")],"2024")).toThrow(/cycle/);
+  expect(()=>resolveGraduationPolicy([policy("a","2024","2024"),policy("b","2024","2024","a"),policy("c","2024","2024","a")],"2024")).toThrow(/Competing/);
+ });
  it("rejects malformed cohort evidence and duplicate identities",()=>{
   expect(()=>resolveGraduationPolicy([policy("a","2024","2024")],"unknown")).toThrow(/cohort/);
   expect(()=>resolveGraduationPolicy([policy("a","2024","2024"),policy("a","2024","2024")],"2024")).toThrow(/Duplicate/);
