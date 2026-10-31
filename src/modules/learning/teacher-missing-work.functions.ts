@@ -102,7 +102,9 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
    if(open)return {actionId:open.id,created:false};
    const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,programId:assessment.programId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{source:"teacher_missing_work",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create follow-up");
-   await notify(tx, {recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:"Your teacher flagged overdue work. Open the assignment to review and submit it.",resourceType:"action",resourceId:action.id});
+   await notify(tx, {recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:latestAttempt?.status==="returned"
+    ?"Your teacher flagged an overdue revision. Open the returned assignment, review the feedback, and resubmit it."
+    :"Your teacher flagged overdue work. Open the assignment to review and submit it.",resourceType:"action",resourceId:action.id});
    await emitEvent(tx, {eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:context.actorPersonId!,payload:{assessmentId:assessment.id,studentProfileId:student.id}});
    await writeAudit(tx, {actorPersonId:context.actorPersonId!,action:"missing_work.follow_up",resourceType:"action",resourceId:action.id,scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},after:{assessmentId:assessment.id,studentProfileId:student.id},context:{accountId:context.accountId,sessionId:context.sessionId}});
    return {actionId:action.id,created:true};
