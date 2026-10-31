@@ -45,7 +45,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  const [busy,setBusy]=useState<string|null>(null);
  const actionInFlight=useRef(false);
  async function submitAction(id:string, operation:()=>Promise<unknown>){
-  if(actionInFlight.current||exitMutation.isPending)return false;
+  if(actionInFlight.current||exitMutation.isSubmitting)return false;
   actionInFlight.current=true;
   setBusy(id);
   try{const submission=await mutation.submit(operation);
