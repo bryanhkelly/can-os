@@ -1499,6 +1499,18 @@
         "observe an empty review queue when no genuine current seasons are awaiting review"
       ],
       "downstreamRecords": []
+    },
+    "/church/apply": {
+      "fixtureRequired": false,
+      "persona": "public church representative",
+      "rationale": "Public church application entry does not require existing CAN organization, site, staff grant or synthetic records. CAN review/verification and authenticated setup happen after submission.",
+      "interactions": [
+        "submit a new church onboarding request without pre-existing CAN identifiers",
+        "check the neutral request acknowledgement without privileged access"
+      ],
+      "downstreamRecords": [
+        "church_onboarding_requests"
+      ]
     }
   }
 }
