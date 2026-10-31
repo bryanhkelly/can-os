@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { DATABASE_URL, TEST_ACCESS_TOKEN_PEPPER, baseURL } from "./tests/e2e/env";
 
 if (!DATABASE_URL || DATABASE_URL !== process.env.TEST_DATABASE_URL ||
@@ -13,6 +14,10 @@ const accessMailOutboxDir = process.env.CAN_ACCESS_MAIL_OUTBOX_DIR;
 if (!accessMailOutboxDir)
   throw new Error("Browser acceptance requires an isolated local access-mail outbox.");
 
+// Guard direct Playwright invocation, not just the npm wrapper.
+execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
+  stdio: "inherit", env: process.env,
+});
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "admissions.spec.ts",
