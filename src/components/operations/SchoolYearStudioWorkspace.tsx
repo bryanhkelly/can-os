@@ -2,8 +2,7 @@ import { SchoolYearCard } from "@/components/operations/SchoolYearCard";
 import { useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
- getSchoolYearStudio, createStudioGradeScale, createStudioYear, addStudioTerm, addStudioGradingPeriod, prepareStudioYear,
-
+ getSchoolYearStudio, createStudioGradeScale, createStudioYear,
 } from "@/modules/academic-time/school-year-studio.functions";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { WorkspaceShell } from "@/components/workspace";
