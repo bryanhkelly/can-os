@@ -59,9 +59,8 @@ describe("guided school launch", () => {
     expect(html).toContain("Prepare your school community");
     expect(html).toContain("Review private school website");
     expect(html).toContain("while opening reviews continue");
-    expect(html).toContain("Your opening milestones");
-    expect(html).toContain("Family outreach sent");
-    expect(html).toContain("First class ready");
+    expect(html).toContain("Continue school preparation");
+    expect(html).toContain("Prepare first classroom");
     expect(html).not.toContain("Assigned owner ID");
     expect(html).not.toContain("Saved requirement:");
     expect(html).not.toContain(">Activate</button>");
@@ -70,8 +69,8 @@ describe("guided school launch", () => {
 
   it("keeps independent CAN approval separate from preparation", () => {
     const html = render(launch());
-    expect(html).toContain("CAN services authorized");
-    expect(html).toContain("Not confirmed here");
+    expect(html).toContain("Opening authority");
+    expect(html).toContain("independent server checks");
     expect(html).toContain("do not activate enrollment or authorize a supervised school day");
   });
 
