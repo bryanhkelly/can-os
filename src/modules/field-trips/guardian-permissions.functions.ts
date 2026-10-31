@@ -66,7 +66,7 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
         status: row.status,
         permissionText: policy?.text ?? null,
         permissionVersion: policy?.version ?? null,
-        canDecline: row.status==="invited" && row.tripStatus==="approved" && row.departsAt.getTime()>Date.now() && !row.consentRecordId && !!policy,
+        canDecline: ["invited","permission_complete"].includes(row.status) && row.tripStatus==="approved" && row.departsAt.getTime()>Date.now() && !!policy,
         canSign: !row.consentRecordId && permissionCanBeSigned({
           tripStatus: row.tripStatus, participantStatus: row.status,
           departsAt: row.departsAt, permissionDueAt: row.permissionDueAt,
@@ -223,9 +223,31 @@ export const declineGuardianFieldTripPermission = createServerFn({ method: "POST
          return {saved:false as const,alreadyDeclined:true as const};
        throw new Error("The family has already declined this invitation.");
      }
-     if(participant.status!=="invited"||participant.consentRecordId||
+     if(!["invited","permission_complete"].includes(participant.status)||
        trip.status!=="approved"||trip.departsAt.getTime()<=Date.now())
        throw new Error("This field trip invitation is no longer open for a parent decision.");
+     const [boarded]=await tx.select({id:s.fieldTripAttendance.id})
+       .from(s.fieldTripAttendance).where(and(
+         eq(s.fieldTripAttendance.fieldTripId,trip.id),
+         eq(s.fieldTripAttendance.studentProfileId,participant.studentProfileId),
+         eq(s.fieldTripAttendance.checkpoint,"departure"),
+         eq(s.fieldTripAttendance.status,"boarded"),
+       )).limit(1);
+     if(boarded)throw new Error("The school has already recorded boarding. Contact the school immediately to coordinate a safe return.");
+     if(participant.status==="permission_complete"){
+       if(!participant.consentRecordId)throw new Error("Existing signed permission record is missing.");
+       const [priorConsent]=await tx.select().from(s.consentRecords)
+         .where(and(eq(s.consentRecords.id,participant.consentRecordId),
+           eq(s.consentRecords.subjectType,"field_trip_participant"),
+           eq(s.consentRecords.subjectId,participant.id),
+           eq(s.consentRecords.consentType,"field_trip_permission"),
+         )).for("update").limit(1);
+       if(!priorConsent||priorConsent.revokedAt)
+         throw new Error("Current school permission must be reconciled before changing it.");
+       await tx.update(s.consentRecords).set({
+         revokedAt:new Date(),updatedAt:new Date(),
+       }).where(eq(s.consentRecords.id,priorConsent.id));
+     }
      const policy=publishedTripPermission(trip.metadata);
      if(!policy)throw new Error("School permission language is unavailable for this trip.");
      const [consent]=await tx.insert(s.consentRecords).values({
@@ -241,13 +263,14 @@ export const declineGuardianFieldTripPermission = createServerFn({ method: "POST
      const [updated]=await tx.update(s.fieldTripParticipants).set({
        status:"declined",consentRecordId:consent.id,updatedAt:new Date(),
      }).where(and(eq(s.fieldTripParticipants.id,participant.id),
-       eq(s.fieldTripParticipants.status,"invited")))
+       eq(s.fieldTripParticipants.status,participant.status)))
        .returning({id:s.fieldTripParticipants.id});
      if(!updated)throw new Error("Field trip invitation was already decided");
      await recordAudit(tx,actor,{
        action:"field_trip.permission.declined",resourceType:"field_trip_participant",
        resourceId:participant.id,scope:{siteId:trip.siteId,programId:trip.programId},
-       before:{status:"invited"},after:{status:"declined",consentRecordId:consent.id},
+       before:{status:participant.status,priorConsentRecordId:participant.consentRecordId},
+       after:{status:"declined",consentRecordId:consent.id},
      });
      await emitEvent(tx,{
        eventType:EventTypes.FieldTripPermissionDeclined,
