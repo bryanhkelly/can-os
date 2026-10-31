@@ -803,7 +803,13 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // child's cases to an unrelated guardian supplied the exact person ID.
       await goto(unrelatedGuardian.page,
         `/guardian/attendance?student=${fixture.studentPersonId}`);
-      await expect(unrelatedGuardian.page.getByRole("alert")).toBeVisible();
+      // This canonical reader deliberately returns an empty authorized
+      // collection rather than an error for an unrelated student's ID.
+      // Wait for the settled empty state: absence of rows while loading
+      // would otherwise be a false positive.
+      await expect(unrelatedGuardian.page.getByText(
+        "No recent absence or tardy cases were found for your students.",
+      )).toBeVisible();
       await expect(unrelatedGuardian.page.getByText(
         `${fixture.studentFirstName} ${fixture.studentLastName}`,
       )).toHaveCount(0);
