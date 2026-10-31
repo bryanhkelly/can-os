@@ -1,4 +1,4 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentLink } from "@/components/evidence";
+import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
@@ -91,16 +91,15 @@ function EvidenceCard({ model, item, changed }: {
     finally { setBusy(false); }
   }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
-    {item.documentId && <div className="mt-2">
-      <p>{item.fileName} · version {item.version} · expires {item.expiresAt ?
-        new Date(item.expiresAt).toLocaleDateString() : "unknown"}</p>
-      <EvidenceDocumentLink label="View private document" onGetDownloadUrl={async () => {
+    {item.documentId && <EvidenceDocumentSummary
+      fileName={item.fileName ?? "Private evidence"} version={item.version ?? 0}
+      expiresAt={item.expiresAt} downloadLabel="View private document"
+      onGetDownloadUrl={async () => {
         const result = await getExtendedEvidenceDownloadFn({ data: {
           seasonId: model.seasonId, documentId: item.documentId!,
         } });
         return result.downloadUrl;
-      }} />
-    </div>}
+      }}/>}
     {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
       disabled={busy} onReview={review}/>}
     {model.canSubmit && <div className="mt-3 border-t pt-3">
