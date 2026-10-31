@@ -193,6 +193,11 @@ export async function startFamilyApplication(
       };
     }
 
+    // One origin transfer points to one receiving-school application.
+    // A second destination requires a fresh parent request and review.
+    if(originTransfer&&typeof originTransfer.metadata.destinationApplicationId==="string")
+      throw new Error("This transfer already has a destination school application. Continue the existing application.");
+
     const [program] = await tx
       .select({ id: programs.id, organizationId: programs.organizationId,
         siteId: programs.siteId, metadata: programs.metadata })
@@ -408,6 +413,17 @@ export async function startFamilyApplication(
       ownerPersonId: actorPersonId,
       insertErrorLabel: "Enrollment",
     });
+
+    if(originTransfer){
+      await tx.update(actions).set({
+        metadata:{...originTransfer.metadata,
+          destinationApplicationId:application.id,
+          destinationProgramId:input.programId,
+          destinationApplicationSubmittedAt:new Date().toISOString(),
+        },
+        updatedAt:new Date(),
+      }).where(eq(actions.id,originTransfer.actionId));
+    }
 
     if (familyStart && program.siteId) {
       // A matching public inquiry is provenance only. The email challenge and
