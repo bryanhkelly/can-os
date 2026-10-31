@@ -1,6 +1,6 @@
-import { TeacherGradeResponsesPanel } from "@/components/learning/TeacherGradeResponsesPanel";
+import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, ClipboardCheck, GraduationCap } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
@@ -33,6 +33,10 @@ function TeacherTodayPage() {
  const [data, setData] = useState<Today | null>(null);
  const [activity, setActivity] = useState<Evidence | null>(null);
  const [activityError, setActivityError] = useState("");
+ const [gradeQuestions, setGradeQuestions] = useState<TeacherGradeResponseItem[] | null>(null);
+ const onQuestionsChange = useCallback((items: TeacherGradeResponseItem[] | null) => {
+  setGradeQuestions(items);
+ }, []);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
 
@@ -74,10 +78,11 @@ function TeacherTodayPage() {
    {data && !data.connected && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
    {ready && <>
-    <div className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Today summary">
+    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Today summary">
      <Link to="/classes"><StatCard label="Sections" value={data.sections.length} /></Link>
      <Link to="/teacher/gradebook"><StatCard label="Needs grading" value={data.ungraded.length} /></Link>
      <Link to="/teacher/missing-work"><StatCard label="Missing work" value={data.missingWork.length} /></Link>
+     <a href="#grade-follow-ups"><StatCard label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length} /></a>
     </div>
 
     <TeacherDaySchedule sections={data.sections} />
@@ -91,7 +96,10 @@ function TeacherTodayPage() {
      </div>
     </section>
 
-    <AttentionQueue items={buildTeacherAttention(data)} empty="No grading, missing-work follow-up or assigned notices need your attention."/>
+    <AttentionQueue items={buildTeacherAttention({...data,guardianQuestions:gradeQuestions??[]})}
+      empty="No grading, missing-work follow-up or assigned notices need your attention."/>
+
+    <TeacherGradeResponsesPanel selectedAction={gradeAction} onQuestionsChange={onQuestionsChange}/>
 
     <section className="mt-10" aria-label="Observed learning participation">
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Learning participation</p>
@@ -122,8 +130,6 @@ function TeacherTodayPage() {
         <p className="mt-3 text-sm">Use existing <Link to="/teacher/missing-work" className="underline">missing-work follow-up</Link> and authorized support referrals for human-reviewed interventions.</p>
       </>}
     </section>
-
-    <TeacherGradeResponsesPanel selectedAction={gradeAction}/>
 
     <TeacherLearningFollowUpsPanel />
 
