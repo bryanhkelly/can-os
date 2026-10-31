@@ -10,7 +10,8 @@ import { isExtendedLearningType } from "@/domain/program-offerings";
 import { enrichmentPublicationSchema, readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { verifyEnrichmentPackages, readEnrichmentPackages, type EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listExtendedSessionStaff } from "./extended-learning-sessions.server";
-import { assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals } from "./registration-policy";
+import { assertVerifiedExtendedSeasonOpening } from "./registration-policy";
+import { readExtendedSeasonOpeningApprovals } from "./extended-season-opening-evidence.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -50,6 +51,7 @@ export async function publishExtendedSeason(
       programId: programs.id, type: programs.type,
       programStatus: programs.status, creditIssuerId: programs.creditIssuingOrganizationId,
       organizationId: programs.organizationId, programSiteId: programs.siteId,
+      academicProviderOrganizationId: programs.academicProviderOrganizationId,
     }).from(activitySeasons)
       .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
       .innerJoin(programs, eq(programs.id, activities.programId))
@@ -71,13 +73,17 @@ export async function publishExtendedSeason(
       throw new AuthorizationError("verified hosting site");
     // The UI's readiness warning is not authorization. Fail closed in the
     // mutation itself, including an otherwise idempotent published-season retry.
-    // These five approvals currently have no authoritative server-side source.
+    const approvals = await readExtendedSeasonOpeningApprovals(tx, {
+      seasonId: season.id, siteId: season.programSiteId,
+      programId: season.programId, organizationId: season.organizationId,
+      academicProviderOrganizationId: season.academicProviderOrganizationId,
+    });
     assertVerifiedExtendedSeasonOpening({
       programStatus: season.programStatus,
       seasonStatus: season.status,
       siteMatchesProgram: season.programSiteId === season.activitySiteId,
       capacity: season.capacity,
-      ...unavailableExtendedSeasonApprovals,
+      ...approvals,
     }, season.status === "registration" ? "register" : "publish");
     if (season.status === "registration") {
       const existing = readEnrichmentPublication(season.seasonMetadata) ??
