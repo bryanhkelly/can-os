@@ -278,19 +278,20 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   setResponseHeader("Cache-Control","private, no-store");
   const context=await getCommandContext(getRequest());
   if(!context.actorPersonId||context.demoFacilitator)throw new AuthorizationError("authenticated recipient");
+  const recipientPersonId=context.actorPersonId;
   const {db,s}=await resources();
   return db.transaction(async tx=>{
   // Share a transaction lock with issuer revocations and read live authority
   // inside that protected disclosure transaction.
   const [release]=await tx.select().from(s.academicCredentialReleaseAuthorizations)
    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
-    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId)))
+    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,recipientPersonId)))
    .for("update").limit(1);
   if(!release||release.revokedAt||release.expiresAt<=new Date())
    throw new AuthorizationError("active recipient authorization");
   const [recipient]=await tx.select({email:s.people.email,active:s.people.active})
-   .from(s.people).where(eq(s.people.id,context.actorPersonId)).limit(1);
-  if(!canDownloadAuthorizedCredential({actorPersonId:context.actorPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
+   .from(s.people).where(eq(s.people.id,recipientPersonId)).limit(1);
+  if(!canDownloadAuthorizedCredential({actorPersonId:recipientPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
   if(!context.accountId||!context.sessionId||!context.grantId)throw new AuthorizationError("verified active recipient session");
   const [verifiedAccount]=await tx.select({id:s.accessAccounts.id})
@@ -301,7 +302,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
     isNotNull(s.accessAccounts.emailVerifiedAt),
     eq(s.accessAccounts.emailNormalized,release.recipientEmail.trim().toLowerCase()),
     eq(s.accountPersonGrants.id,context.grantId),
-    eq(s.accountPersonGrants.personId,context.actorPersonId),
+    eq(s.accountPersonGrants.personId,recipientPersonId),
     eq(s.accountPersonGrants.active,true),
     eq(s.accountPersonGrants.isSynthetic,false)))
    .for("share").limit(1);
@@ -311,7 +312,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const [stillActive]=await tx.select({id:s.academicCredentialReleaseAuthorizations.id})
    .from(s.academicCredentialReleaseAuthorizations)
    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,release.id),
-    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId),
+    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,recipientPersonId),
     eq(s.academicCredentialReleaseAuthorizations.recipientEmail,release.recipientEmail),
     gt(s.academicCredentialReleaseAuthorizations.expiresAt,new Date()),
     isNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
@@ -321,7 +322,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const kind=release.transcriptIssuanceId?"transcript":"diploma";
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
-  const doc=await documentData(tx as typeof db,s,kind,credentialId);
+  const doc=await documentData(tx as unknown as typeof db,s,kind,credentialId);
   // Do not treat a stale or superseded issuance as an active academic record.
   // Transcript issuer/student identity is bound to the original signed transfer.
   const [currentIssuance]=await tx.select({
@@ -345,7 +346,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const [relationship]=await tx.select({id:s.guardianRelationships.id})
    .from(s.guardianRelationships).where(and(
     eq(s.guardianRelationships.studentPersonId,student.personId),
-    eq(s.guardianRelationships.guardianPersonId,context.actorPersonId),
+    eq(s.guardianRelationships.guardianPersonId,recipientPersonId),
     eq(s.guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
   const [action]=await tx.select().from(s.actions).where(and(
    eq(s.actions.id,release.instructionReference),
@@ -362,8 +363,8 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    consentActive:!!consent&&!consent.revokedAt&&evidence?.acknowledged===true,
    consentMatchesStudent:consent?.subjectId===doc.studentProfileId&&
     evidence?.studentPersonId===student.personId,
-   consentMatchesGuardian:consent?.signerPersonId===context.actorPersonId&&
-    evidence?.guardianPersonId===context.actorPersonId,
+   consentMatchesGuardian:consent?.signerPersonId===recipientPersonId&&
+    evidence?.guardianPersonId===recipientPersonId,
    consentMatchesAction:evidence?.actionId===action?.id,
    consentMatchesDestination:typeof action?.metadata.destinationSchoolName==="string"&&
     evidence?.destinationSchoolName===action.metadata.destinationSchoolName,
@@ -371,13 +372,13 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    relationshipActive:!!relationship,
    actionResolved:action?.status==="resolved"&&action?.metadata.kind==="transfer",
    actionMatchesStudent:action?.subjectId===doc.studentProfileId,
-   actionMatchesGuardian:action?.metadata.requestedByGuardianPersonId===context.actorPersonId,
+   actionMatchesGuardian:action?.metadata.requestedByGuardianPersonId===recipientPersonId,
    actionMatchesConsent:action?.metadata.recordsReleaseConsentId===consent?.id,
    actionCompleted:action?.metadata.exitCompletedByRegistrar===true,
    issuerMatches:program?.issuerId===doc.issuerId,
   }))throw new AuthorizationError("Original transfer consent or guardian authority no longer valid");
   const pdf=academicDocumentPdf(doc);
-  await writeAudit(tx,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
+  await writeAudit(tx,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:recipientPersonId,credentialId}});
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
   });
  });
