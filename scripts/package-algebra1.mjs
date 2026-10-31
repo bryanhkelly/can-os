@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Publisher-format Algebra I packaging; validation is intentionally stricter than generic LMS publication.
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
