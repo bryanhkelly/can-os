@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { familyInvitationLaunchScope } from "../../src/domain/family-invitation-launch-scope";
-const school = { id: "school", name: "School", siteId: "site", publishedSiteUrl: "https://school.example.test" };
+const school = { id: "school", name: "School", siteId: "site", publishedSiteUrl: "https://school.example.test", purpose: "application" as const };
 const other = { ...school, id: "other", siteId: "other-site" };
 function batch(programId: string, siteId: string) {
   return { id: programId, programId, siteId, programName: "School", subject: "Invitation",
-    introduction: "Welcome", createdAt: "2026-10-29T12:00:00Z", status: "queued" as const,
+    introduction: "Welcome", createdAt: "2026-10-29T12:00:00Z", status: "queued" as const, purpose: "application" as const,
     outboxStatus: "pending" as const, recipients: [] };
 }
 const workspace = { programs: [school, other], batches: [batch(school.id, school.siteId), batch(other.id, other.siteId)] };
