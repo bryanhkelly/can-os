@@ -185,6 +185,44 @@
         "domainEvents:TranscriptIssued"
       ]
     },
+    "/admissions/graduation": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "load issuer-approved graduation requirement versions",
+        "audit an issued transcript against credit requirements",
+        "record a graduation decision and issue an approved diploma"
+      ],
+      "downstreamRecords": [
+        "graduation_requirement_sets",
+        "graduation_decisions",
+        "diploma_issuances",
+        "audit_events"
+      ]
+    },
+    "/admissions/credential-delivery": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "render and download an issued transcript or diploma PDF",
+        "send an issued credential to a designated recipient",
+        "review delivery receipts and provider acceptance status"
+      ],
+      "downstreamRecords": [
+        "academic_credential_deliveries",
+        "audit_events"
+      ]
+    },
     "/admissions/capacity": {
       "persona": "registrar",
       "seeds": [
