@@ -85,6 +85,41 @@ async function existingStudentChoices(database:Pick<Database,"selectDistinct">,
     student.householdId?eq(householdMemberships.householdId,student.householdId):undefined):undefined))
   .orderBy(people.legalLastName,people.legalFirstName,studentProfiles.id).limit(300);
 }
+/** Search active students and verified guardians without loading an unbounded directory. */
+export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
+ .validator((value:unknown)=>admissionsPageInput.parse(value??{}))
+ .handler(async({data})=>{
+  const actor=await registrar();
+  const rows=await db.selectDistinct({
+   programId:programs.id,siteId:programs.siteId,studentProfileId:studentProfiles.id,
+   studentFirstName:people.legalFirstName,studentLastName:people.legalLastName,
+   guardianPersonId:intakeGuardian.id,guardianFirstName:intakeGuardian.legalFirstName,
+   guardianLastName:intakeGuardian.legalLastName,householdId:householdMemberships.householdId,
+  }).from(studentProfiles)
+   .innerJoin(people,eq(people.id,studentProfiles.personId))
+   .innerJoin(enrollments,and(eq(enrollments.studentProfileId,studentProfiles.id),eq(enrollments.status,"active")))
+   .innerJoin(programs,and(eq(programs.id,enrollments.programId),eq(programs.organizationId,enrollments.organizationId)))
+   .innerJoin(guardianRelationships,guardianRelationshipPredicate({studentPersonId:people.id,access:"enrollment"}))
+   .innerJoin(intakeGuardian,eq(intakeGuardian.id,guardianRelationships.guardianPersonId))
+   .leftJoin(householdMemberships,eq(householdMemberships.personId,people.id))
+   .leftJoin(guardianHousehold,eq(guardianHousehold.personId,intakeGuardian.id))
+   .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
+    ...(actor.scope.programIds?[inArray(programs.id,actor.scope.programIds)]:[]),
+    ...(actor.scope.siteIds?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
+    data.siteId?eq(programs.siteId,data.siteId):undefined,
+    data.programId?eq(programs.id,data.programId):undefined,
+    eq(people.active,true),eq(intakeGuardian.active,true),
+    or(eq(householdMemberships.householdId,guardianHousehold.householdId),
+     and(isNull(householdMemberships.id),isNull(guardianHousehold.id))),
+    data.cursor?gt(studentProfiles.id,data.cursor):undefined,
+    data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),
+     ilike(people.legalLastName,"%"+data.search+"%"),
+     ilike(intakeGuardian.legalLastName,"%"+data.search+"%"),
+     z.string().uuid().safeParse(data.search).success?eq(studentProfiles.id,data.search):undefined):undefined))
+   .orderBy(asc(studentProfiles.id),asc(programs.id),asc(intakeGuardian.id)).limit(data.pageSize+1);
+  const items=rows.slice(0,data.pageSize);
+  return {items,nextCursor:rows.length>data.pageSize?items[items.length-1]?.studentProfileId??null:null};
+ });
 export const listAdmissionsExistingStudents=createServerFn({method:"GET"}).handler(async()=>{
  return existingStudentChoices(db,await registrar());
 });
