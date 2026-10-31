@@ -1,3 +1,4 @@
+import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
@@ -135,24 +136,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        <h3 className="font-serif text-2xl">{pack.name}</h3>
        <p className="text-sm text-muted-foreground">{pack.description}</p>
        <p className="text-sm">{pack.courses.length} published course versions</p>
-       <details className="text-sm"><summary className="cursor-pointer underline">Review included courses and outlines</summary>
-        <p className="mt-2 text-xs text-muted-foreground">Discovery previews show publisher-provided course structure, not lesson text, restricted teacher guides, or a guarantee of academic credit.</p>
-        <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">{pack.courses.map(c=><li key={c.courseVersionId} className="rounded border p-3">
-          <p className="font-medium">{c.code}: {c.title} · {c.subject}</p>
-          <p className="mt-2 text-xs font-semibold">{c.recommendation.recommended?"Recommended first-class option":"Not yet recommended"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{c.recommendation.explanation}</p>
-          <p className="mt-1 text-xs">Available · {c.recommendation.licensed?"Licensed":"License needed"} · {c.recommendation.adopted?"Adopted":"Adoption needed"} · {c.recommendation.instructionReady?"Instruction-ready":"Lesson needed"}</p>
-          {c.preview ? <details className="mt-2">
-            <summary className="cursor-pointer underline">{c.preview.moduleCount} units · {c.preview.lessonCount} lessons{c.preview.weeksPlanned ? ` · ${c.preview.weeksPlanned} planned instructional weeks` : ""}</summary>
-            {c.preview.syllabusSummary&&<p className="mt-2 whitespace-pre-wrap text-xs">{c.preview.syllabusSummary}{c.preview.syllabusSummary.length===240?"…":""}</p>}
-            <ol className="mt-2 list-inside list-decimal space-y-2">{c.preview.modules.map(module=><li key={module.id}>
-              <span className="font-medium">{module.title} · {module.lessonCount} lessons</span>
-              {module.lessonTitles.length>0&&<p className="ml-5 text-xs text-muted-foreground">{module.lessonTitles.join(" · ")}{module.lessonCount>module.lessonTitles.length?" …":""}</p>}
-            </li>)}</ol>
-            {c.preview.outlineTruncated&&<p className="mt-2 text-xs text-muted-foreground">Additional units omitted from this preview.</p>}
-          </details>:<p className="mt-2 text-xs text-muted-foreground">Publisher course outline not yet available for review.</p>}
-        </li>)}</ul>
-       </details>
+       <CurriculumCourseOutline courses={pack.courses} />
        {pack.entitlement && pack.entitlement!=="active"?
         <p role="status" className="text-sm text-muted-foreground">License status: {pack.entitlement}. Publisher review is required to restore this organization's entitlement. Accepting terms again cannot reactivate it.</p>:
         pack.entitlement!=="active"?<>
