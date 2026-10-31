@@ -73,7 +73,13 @@ export const postgresFinanceStore: FinanceStore = {
         householdId: financialObligations.householdId, currency: financialObligations.currency,
         subjectType: financialObligations.subjectType, subjectId: financialObligations.subjectId })
         .from(financialObligations).where(eq(financialObligations.id, invoice.obligationId)).limit(1);
-      if (!canonical || canonical.amountCents !== invoice.amountCents ||
+      const [currentApplication] = await tx.select({ householdId: applications.householdId,
+        institutionId: programs.organizationId, siteId: programs.siteId })
+        .from(applications).innerJoin(programs, eq(programs.id, applications.programId))
+        .where(eq(applications.id, invoice.applicationId)).limit(1);
+      if (!currentApplication || currentApplication.householdId !== invoice.householdId ||
+          currentApplication.institutionId !== invoice.institutionId || currentApplication.siteId !== invoice.siteId ||
+          !canonical || canonical.amountCents !== invoice.amountCents ||
           canonical.householdId !== invoice.householdId || canonical.currency !== invoice.currency ||
           canonical.subjectType !== "application" || canonical.subjectId !== invoice.applicationId)
         throw new Error("Stale canonical finance obligation");
