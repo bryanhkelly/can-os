@@ -56,7 +56,7 @@ export class StripeFinanceProcessor implements FinanceProcessor {
     // PaymentIntent carries the canonical metadata and captured amount.
     if (envelope.type !== "payment_intent.succeeded") throw new Error("Unsupported Stripe event type");
     const obligationId = (obj.metadata as { obligationId?: unknown } | undefined)?.obligationId;
-    if (typeof obligationId !== "string" || typeof obj.id !== "string" ||
+    if (typeof obligationId !== "string" || !obligationId || typeof obj.id !== "string" ||
       obj.currency !== "usd" || !Number.isSafeInteger(obj.amount_received) ||
       (obj.amount_received as number) <= 0) throw new Error("Invalid Stripe payment evidence");
     return {
