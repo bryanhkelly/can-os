@@ -100,7 +100,7 @@ describe("canonical admission offer server functions", () => {
     { ...registrar, scope: { programIds: [] } },
   ])("denies issuance without the required registrar grant: %j", async actor => {
     getCommandContext.mockResolvedValue(actor);
-    select.mockReturnValueOnce(rows([application]));
+    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram]));
     await expect(issueAdmissionOffer({ data: input })).rejects.toThrow(AuthorizationError);
     expect(issue).not.toHaveBeenCalled();
   });
