@@ -41,8 +41,9 @@ async function staff(capability: string) {
     if (!["registrar", "teacher"].includes(actor.role))
       throw new AuthorizationError("verified attendance staff role");
   }
-  if (!actor.actorPersonId || !actor.scope.programIds?.length ||
-      !actor.scope.siteIds?.length || !actor.scope.organizationIds?.length)
+  if (!actor.actorPersonId || !actor.scope.organizationIds?.length ||
+      (isOnsiteAttendanceRole(actor.role) &&
+       (!actor.scope.programIds?.length || !actor.scope.siteIds?.length)))
     throw new AuthorizationError("verified attendance staff grant");
   return actor;
 }
@@ -84,9 +85,10 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
     timezone: sites.timezone,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
     .where(and(
-      inArray(programs.id, actor.scope.programIds!),
       inArray(programs.organizationId, actor.scope.organizationIds!),
-      inArray(programs.siteId, actor.scope.siteIds!),
+      eq(programs.status,"active"),
+      ...(actor.scope.programIds!==undefined?[inArray(programs.id,actor.scope.programIds)]:[]),
+      ...(actor.scope.siteIds!==undefined?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
       ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
       ...(siteId ? [eq(programs.siteId, siteId)] : []),
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
@@ -205,7 +207,7 @@ async function resolveExpectedRoster(actor: AccessContext,
       eq(sections.active, true), eq(schoolYears.status, "active"),
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
       inArray(sections.programId, permittedIds),
-      inArray(sections.siteId, actor.scope.siteIds!),
+      ...(actor.scope.siteIds!==undefined?[inArray(sections.siteId,actor.scope.siteIds)]:[]),
       ...(actor.role === "room_facilitator" ? [inArray(sections.id, [...sectionFilter])] : []),
       ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
         []),
