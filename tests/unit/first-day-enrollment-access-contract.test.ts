@@ -18,14 +18,14 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     const source=read("src/modules/enrollment/first-school-day-handoff.functions.ts");
     expect(source).toContain("loadExpectedOnsiteRosterForActor");
     expect(source).toContain("loadOnsiteSupervisionPlanForActor");
-    expect(source).toContain('student.studentProfileId===app.studentProfileId');
+    expect(source).toContain('studentProfileId:app.studentProfileId');
     expect(source).toContain("deriveFirstSchoolDayHandoff");
     expect(source).not.toContain("insert(attendanceEvents)");
     expect(source).not.toContain("recordAttendanceRevision");
   });
   it("never reads a future attendance roster or future staffing as observed presence",()=>{
     const source=read("src/modules/enrollment/first-school-day-handoff.functions.ts");
-    expect(source).toContain("const preview = date > today");
+    expect(source).toContain("const preview=date>today");
     expect(source).toContain("loadExpectedFirstDayPreparationForActor");
     expect(source).toContain("loadFirstDaySupervisionPreparationForActor");
     expect(source).toContain('studentProfileId:app.studentProfileId');
