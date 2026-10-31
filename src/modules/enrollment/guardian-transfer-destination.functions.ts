@@ -100,8 +100,8 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
   // A separate publication/academic-authorization check occurs again in the
   // canonical start transaction when the email token is issued.
   const destination=await resolvePublishedFamilyStartDestination(db,data.destinationProgramId);
-  if(origin.metadata.destinationProgramId===destination.programId)
-   throw new Error("This receiving-school application is already linked; continue the existing application.");
+  if(typeof origin.metadata.destinationApplicationId==="string")
+   throw new Error("This transfer already has a receiving-school application. Continue that application instead of requesting another invitation.");
   if(origin.programId===destination.programId)
    throw new Error("Choose a different school from the originating school.");
   const result=await requestPublicFamilyStart(destination.slug,{
@@ -110,14 +110,34 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
    firstName:guardian.firstName,lastName:guardian.lastName,
    email,contactConsent:"yes",website:"",
   });
-  await db.transaction(async tx=>writeAudit(tx,actor,{
-   action:"transfer.destination_family_start_requested",
-   entityType:"action",entityId:origin.id,
-   scope:{programId:destination.programId,siteId:destination.siteId,
-     organizationId:destination.organizationId},
-   after:{destinationProgramId:destination.programId,
-     verificationRequested:result.created,
-     familyStartRequestId:result.requestId},
-  }));
+  await db.transaction(async tx=>{
+   const [current]=await tx.select({id:s.actions.id,
+    status:s.actions.status,metadata:s.actions.metadata,
+   }).from(s.actions).where(and(
+    eq(s.actions.id,origin.id),
+    eq(s.actions.type,"guardian_enrollment_change_request"),
+   )).for("update").limit(1);
+   if(!current||current.metadata.kind!=="transfer"||
+      current.metadata.requestedByGuardianPersonId!==actor.actorPersonId||
+      current.status==="cancelled")
+    throw new AuthorizationError("original family transfer still authorized");
+   await tx.update(s.actions).set({
+    metadata:{...current.metadata,
+      destinationFamilyStartProgramId:destination.programId,
+      destinationFamilyStartProgramName:destination.programName,
+      destinationFamilyStartRequestId:result.requestId,
+      destinationFamilyStartRequestedAt:new Date().toISOString(),
+    },updatedAt:new Date(),
+   }).where(eq(s.actions.id,current.id));
+   await writeAudit(tx,actor,{
+    action:"transfer.destination_family_start_requested",
+    entityType:"action",entityId:origin.id,
+    scope:{programId:destination.programId,siteId:destination.siteId,
+      organizationId:destination.organizationId},
+    after:{destinationProgramId:destination.programId,
+      verificationRequested:result.created,
+      familyStartRequestId:result.requestId},
+   });
+  });
   return {requested:result.created,destinationName:destination.programName};
  });
