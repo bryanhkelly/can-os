@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children }: { children: ReactNode }) => createElement("a", { href: "/access" }, children),
+}));
+
 import { LoaderErrorState } from "./loader-error-state";
 
 describe("LoaderErrorState", () => {
