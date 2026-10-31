@@ -194,3 +194,17 @@ export async function declineChurchApplication(actor: AccessContext, requestId: 
   });
   return { declined: true as const };
 }
+
+/** Recovery path when the original approved invitation email was not delivered. */
+export async function resendChurchInvitation(actor: AccessContext, requestId: string) {
+  await requireCANSteward(actor);
+  const [request] = await db.select({
+    status: churchOnboardingRequests.status,
+    contactEmail: churchOnboardingRequests.contactEmail,
+    invitationGrantId: churchOnboardingRequests.invitationGrantId,
+  }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
+  if (request?.status !== "approved" || !request.invitationGrantId)
+    throw new AuthorizationError("approved church invitation");
+  await requestOneTimeAccess(request.contactEmail);
+  return { accepted: true as const };
+}
