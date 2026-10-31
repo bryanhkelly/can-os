@@ -1553,15 +1553,16 @@
     "/admissions/my-credentials": {
       "persona": "verified academic credential recipient",
       "seeds": [
-        "identity-demo-accounts.sql"
+        "synthetic-credential-inbox-denial.sql"
       ],
       "recordCounts": {
-        "academic_credential_release_authorizations": 0
+        "academic_credential_release_authorizations": 1,
+        "transcript_issuances": 1
       },
       "interactions": [
-        "verified recipient views only active academic credential release authorizations tied to the authenticated person",
-        "recipient may securely download a currently authorized PDF",
-        "wrong recipient, expired and revoked authorizations are denied server-side"
+        "authenticated synthetic recipient sees no releases because synthetic grant is ineligible",
+        "attempted direct download as synthetic recipient is denied by server identity and grant checks",
+        "real verified recipient flow must be separately tested in authenticated staging"
       ],
       "downstreamRecords": [
         "audit_events"
