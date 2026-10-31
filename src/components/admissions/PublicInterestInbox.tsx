@@ -1,15 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
   invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
   setPublicAdmissionsInterestStatus,
 } from "@/modules/enrollment/public-admissions-interest.functions";
 
-type Row = Awaited<ReturnType<typeof listPublicAdmissionsInterests>>[number];
+type Page = Awaited<ReturnType<typeof listPublicAdmissionsInterests>>;
+type Row = Page["items"][number];
 
 /** These records contain unverified parent-supplied contact data. */
-export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
+export function PublicInterestInbox({ initialPage, siteId, programId }: {
+  initialPage: Page; siteId?: string; programId?: string;
+}) {
   const router = useRouter();
+  const [olderRows,setOlderRows] = useState<Row[]>([]);
+  const [nextCursor,setNextCursor] = useState<string|null>(initialPage.nextCursor);
+  const [loadingMore,setLoadingMore] = useState(false);
+  const [loadError,setLoadError] = useState("");
+  useEffect(() => {
+    setOlderRows([]);
+    setNextCursor(initialPage.nextCursor);
+  }, [initialPage]);
+  const seen = new Set<string>();
+  const items = [...initialPage.items,...olderRows].filter(row => {
+    if ((siteId&&row.siteId!==siteId)||(programId&&row.programId!==programId)||
+      seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);setLoadError("");
+    try {
+      const page=await listPublicAdmissionsInterests({data:{cursor:nextCursor}});
+      setOlderRows(current=>[...current,...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch (cause) {
+      setLoadError(cause instanceof Error ? cause.message : "Unable to load older inquiries.");
+    } finally {setLoadingMore(false);}
+  }
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -158,8 +187,14 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
         {row.message && <p className="mt-3 whitespace-pre-wrap text-sm">{row.message}</p>}
       </article>)}
       {items.length === 0 && <p className="text-sm text-muted-foreground">
-        No family interest requests in your authorized programs yet.
+        {nextCursor ? "No matching inquiries on this page. Load older records to continue."
+          : "No family interest requests in your authorized programs yet."}
       </p>}
     </div>
+    {loadError&&<p role="alert" className="mt-3 text-sm">{loadError}</p>}
+    {nextCursor&&<button type="button" disabled={loadingMore||busyId!==null}
+      onClick={()=>void loadMore()} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+      {loadingMore?"Loading older inquiries…":"Load older inquiries"}
+    </button>}
   </section>;
 }
