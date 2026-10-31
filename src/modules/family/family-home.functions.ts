@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -242,8 +242,10 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    // Ownership alone is not authority after a family changes or leaves schools.
    // Apply the current school grant before loading titles or descriptions.
    inArray(s.actions.siteId, siteIds),
-   inArray(s.actions.programId, context.scope.programIds??[]),
-   inArray(s.actions.organizationId, context.scope.organizationIds??[]),
+   // Site-wide group consents legitimately carry no Program or organization;
+   // permit those only at an already authorized Site.
+   or(isNull(s.actions.programId), inArray(s.actions.programId, context.scope.programIds??[])),
+   or(isNull(s.actions.organizationId), inArray(s.actions.organizationId, context.scope.organizationIds??[])),
    inArray(s.actions.status, ["open", "in_progress"]),
   ))
   .orderBy(desc(s.actions.createdAt))
