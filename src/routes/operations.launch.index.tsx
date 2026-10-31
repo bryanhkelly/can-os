@@ -8,6 +8,7 @@ import {LaunchWebsiteStep} from "@/components/operations/LaunchWebsiteStep";
 import {resolveLaunchResume} from "@/domain/launch-resume";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
+import {ProgramSiteAuthorizationPanel} from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
@@ -259,7 +260,18 @@ function LaunchWizardPage() {
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<nav aria-label="School preparation steps" className="mt-4 flex flex-wrap gap-4 rounded-xl border bg-card p-4 text-sm font-semibold">
+          <a href="#launch-services" className="underline">1. CAN services</a>
+          <a href="#launch-academic-year" className="underline">2. Academic year</a>
+          <a href="#launch-website" className="underline">3. School website</a>
+          <a href="#invite-families" className="underline">4. Invite families</a>
+        </nav>}
         {currentSchool?.status!=="active"&&<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>}
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
+          <ProgramSiteAuthorizationPanel key={currentLaunch.id} programId={currentLaunch.id}/>
+          <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
+          <a href="#launch-academic-year" className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</a>
+        </div>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
         {currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
 
