@@ -1,11 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
@@ -65,6 +67,7 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
 
    // A registrar must not end a child's school membership while a second
    // process is provisioning access or changing their seats concurrently.
+   await lockAttendanceConfigurationAtSite(tx,action.siteId);
    const active=await tx.select({id:s.enrollments.id,kind:s.enrollments.kind,
      schoolYearId:s.enrollments.schoolYearId,sectionId:s.enrollments.sectionId})
      .from(s.enrollments).where(and(
