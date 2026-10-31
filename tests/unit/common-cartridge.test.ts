@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import { deflateRawSync } from "node:zlib";
-import { inspectCommonCartridgeManifest,inspectCommonCartridgeZip,extractCommonCartridgeWebLink } from "@/domain/common-cartridge";
+import { inspectCommonCartridgeManifest,inspectCommonCartridgeZip,extractCommonCartridgeWebLink,extractCommonCartridgeStaticLesson } from "@/domain/common-cartridge";
 
 const xml=`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns="http://www.imsglobal.org/xsd/imsccv1p3/imscp_v1p1">
@@ -75,5 +75,26 @@ describe("Common Cartridge bounded import preview",()=>{
   corrupted[corrupted.length-23]^=1;
   expect(()=>inspectCommonCartridgeZip(corrupted)).toThrow();
   expect(()=>inspectCommonCartridgeManifest(xml.replace('identifier="R-QTI"','identifier="R-1"'))).toThrow("duplicate");
+ });
+});
+
+describe("Common Cartridge conservative static lesson",()=>{
+ const entry={identifier:"lesson-1",type:"webcontent",href:"lessons/a.html",files:["lessons/a.html"]};
+ it("extracts a small text-only instructional lesson",()=>{
+  const file=zipEntry("lessons/a.html","<html><body><h1>Cells</h1><p>Study the cell.</p></body></html>");
+  expect(extractCommonCartridgeStaticLesson(file,entry).title).toBe("Cells");
+ });
+ it("rejects scripts, events, linked assets and duplicate or missing manifest files",()=>{
+  for(const html of ['<script>alert(1)</script>','<p onclick="run()">Bad</p>',
+   '<img src="a.png">','<a href="https://example.com">Click</a>','<p>&#60;script&gt;</p>']){
+   expect(()=>extractCommonCartridgeStaticLesson(zipEntry("lessons/a.html",html),entry)).toThrow();
+  }
+  expect(()=>extractCommonCartridgeStaticLesson(zipEntry("lessons/a.html","<p>ok</p>"),
+   {...entry,files:["lessons/a.html","lessons/b.css"]})).toThrow();
+  expect(()=>extractCommonCartridgeStaticLesson(zipEntry("different.html","<p>ok</p>"),entry)).toThrow();
+ });
+ it("rejects unsupported executable assessment resources",()=>{
+  expect(()=>extractCommonCartridgeStaticLesson(zipEntry("lessons/a.html","<p>quiz</p>"),
+   {...entry,type:"imsqti_xmlv1p2"})).toThrow("webcontent");
  });
 });
