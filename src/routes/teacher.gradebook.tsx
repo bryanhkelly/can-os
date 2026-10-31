@@ -411,7 +411,7 @@ function TeacherGradebookPage() {
         className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post grade</button>
         <Link to="/teacher/gradebook" search={{section:selected}} className="rounded-lg border px-4 py-2 text-sm">Close review</Link></div>
       </div>:<div className="space-y-3 text-sm">
-       <p className="font-semibold">Score: {reviewCell.score??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
+       <p className="font-semibold">{reviewCell.status==="returned"?"Previous attempt score (awaiting revision)":"Score"}: {reviewCell.score??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
        {reviewAssessment.rubric.map(criterion=><p key={criterion.id}>{criterion.label}: {reviewCell.feedbackRubric.find(item=>item.id===criterion.id)?.points??"—"} / {criterion.maxPoints}</p>)}
        <p className="whitespace-pre-wrap">{reviewCell.feedbackComment||"No feedback comment recorded."}</p>
        {reviewCell.status==="graded"&&reviewAssessment.maxAttempts!==null&&reviewCell.attemptNumber>=reviewAssessment.maxAttempts
