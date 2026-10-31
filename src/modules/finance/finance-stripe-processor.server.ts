@@ -30,8 +30,11 @@ export class StripeFinanceProcessor implements FinanceProcessor {
     if (!response.ok) return { kind: "unavailable" as const, reason: "Processor unavailable" };
     const result: unknown = await response.json();
     const intentId = (result as { id?: unknown } | null)?.id;
+    const clientSecret = (result as { client_secret?: unknown } | null)?.client_secret;
     if (typeof intentId !== "string" || !intentId.startsWith("pi_")) throw new Error("Invalid Stripe intent response");
-    return { kind: "submitted" as const, intentId };
+    if (typeof clientSecret !== "string" || !clientSecret.startsWith(intentId + "_secret_"))
+      throw new Error("Missing Stripe client secret");
+    return { kind: "submitted" as const, intentId, clientSecret };
   }
   async verifyWebhook(rawPayload: string, signature: string): Promise<{
     event: ProviderEvent; verification: { verifiedByAdapter: true; provider: string };
