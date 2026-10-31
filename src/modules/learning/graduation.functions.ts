@@ -24,7 +24,7 @@ async function registrar() {
 function issuerAuthorized(context: Awaited<ReturnType<typeof registrar>>, issuerId: string) {
   if (!context.scope.organizationIds?.includes(issuerId)) throw new AuthorizationError("credit issuing organization");
 }
-type SnapshotRow = {sectionId:string;subject:string;creditsEarned:number|null;terminalPeriod:boolean;letterGrade:string|null};
+type SnapshotRow = {sectionId:string;subject:string;creditsEarned:number|null;terminalPeriod:boolean;letterGrade:string|null;isTransferCredit?:boolean;acceptedByIssuer?:boolean;creditAcceptanceStatus?:string};
 function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: string): CreditEvidence[] {
   if (!Array.isArray(snapshot.rows) || !snapshot.rows.length) throw new Error("Issued transcript has no academic evidence");
   const rows = snapshot.rows as Array<SnapshotRow & {creditIssuingOrganizationId:string}>;
@@ -41,7 +41,7 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
     subject: row.subject,
     earnedUnits: row.creditsEarned,
     finalized: Boolean(row.sectionId && row.letterGrade),
-    acceptedByIssuer: true,
+    // Transfer evidence must carry affirmative issuer acceptance; a snapshot\n    // without acceptance cannot silently confer graduation credit.\n    acceptedByIssuer: row.isTransferCredit === true ? row.acceptedByIssuer === true && row.creditAcceptanceStatus === "accepted" : true,
   }));
 }
 async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>["db"], "select">, s: Awaited<ReturnType<typeof resources>>["s"], transcriptId: string, requirementSetId: string) {
