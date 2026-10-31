@@ -373,6 +373,8 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
      (user.orgSourcedIds&&!user.orgSourcedIds.split(",").map(s=>s.trim()).includes(school.sourcedId!))||
      [enrollment,user,klass,school].some(row=>row.status&&row.status.toLowerCase()!=="active"))
     throw new Error("OneRoster student, class, school and enrollment must be active and consistent.");
+  const duplicateRelations=get("enrollments").filter(row=>row.classSourcedId===data.externalClassSourcedId&&row.userSourcedId===data.externalUserSourcedId&&row.role?.toLowerCase()==="student");
+  if(duplicateRelations.length!==1)throw new Error("Duplicate external enrollment relationship requires registrar review.");
   const digest=bundleDigest(data.programId,data.files);
   return db.transaction(async tx=>{
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"oneroster-place:"+program.organizationId+":"+data.sourceSystem}))`);
@@ -404,6 +406,8 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
    if(!canonical||klass.schoolYear!==canonical.year||
       !klass.termSourcedIds?.split(",").map(v=>v.trim()).includes(canonical.term))
     throw new Error("External year and term must match the active canonical Section.");
+   if(identity.metadata.sourceHash!==digest||section.metadata.sourceHash!==digest)
+    throw new Error("Source changed since mapping approval; validate and approve the new bundle.");
    const placement=await activateSectionEnrollment(tx,{
      actor,studentProfileId:data.studentProfileId,sectionId:data.sectionId,
      source:"oneroster_registrar_approved",
