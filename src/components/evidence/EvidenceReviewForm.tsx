@@ -47,10 +47,10 @@ export function EvidenceReviewForm({
         disabled={busy || reason.trim().length < 10 || reason.trim().length > 2000} onClick={() => void submit("approve")}>
         {pending ? "Recording review…" : approveLabel}
       </Button>
-      <button type="button" className="rounded border px-3 py-2 disabled:opacity-50"
-        disabled={busy || reason.trim().length < 10} onClick={() => void submit("reject")}>
+      <Button type="button" variant="outline" size="sm"
+        disabled={busy || reason.trim().length < 10 || reason.trim().length > 2000} onClick={() => void submit("reject")}>
         {rejectLabel}
-      </button>
+      </Button>
     </div>
     {error && <p role="alert" className="mt-2 text-danger">{error}</p>}
   </div>;
