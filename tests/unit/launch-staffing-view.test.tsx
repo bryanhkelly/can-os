@@ -25,7 +25,7 @@ type Snapshot = Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 const snapshot: Snapshot = {
   program: { id: "program", name: "School", status: "launching", organizationId: "org",
     academicProviderOrganizationId: "org", siteId: "site", deliveryModel: { onsite: true } },
-  years: [], terms: [], catalog: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
+  years: [], terms: [], catalog: [], scheduleOptions: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
   qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,canPublishTeacherPolicy:true,
   teacherPolicies: [], canReviseTeacherPolicy: false,
   academicAuthority: { teacherAssignment: true, creditConfiguration: true },
