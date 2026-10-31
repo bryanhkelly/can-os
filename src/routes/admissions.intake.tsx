@@ -13,7 +13,6 @@ import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGua
 import { AdmissionsDecisionActions } from "@/components/admissions/AdmissionsDecisionActions";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
-import {getReceivingSchoolTransferTranscript} from "@/modules/enrollment/transfer-records-handoff.functions";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
 const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string})=>{
  const [records,programs,existingStudentPage,publicInterests,selectedInterestPage]=await Promise.all([
