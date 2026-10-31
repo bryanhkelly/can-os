@@ -320,6 +320,18 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
   const doc=await documentData(tx as typeof db,s,kind,credentialId);
+  // Do not treat a stale or superseded issuance as an active academic record.
+  // Transcript issuer/student identity is bound to the original signed transfer.
+  const [currentIssuance]=await tx.select({
+   id:s.transcriptIssuances.id,studentProfileId:s.transcriptIssuances.studentProfileId,
+   issuerId:s.transcriptIssuances.issuingOrganizationId,
+  }).from(s.transcriptIssuances)
+   .where(eq(s.transcriptIssuances.id,credentialId)).for("share").limit(1);
+  if(kind!=="transcript"||!currentIssuance||
+     currentIssuance.studentProfileId!==doc.studentProfileId||
+     currentIssuance.issuerId!==release.issuingOrganizationId)
+   throw new AuthorizationError("Official transcript issuer or student invalid");
+
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
    throw new AuthorizationError("Only guardian transfer transcript access is supported");
