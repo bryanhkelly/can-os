@@ -95,5 +95,5 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
       });
-    return {date,preview,...handoff,attendanceRecorded:preview?false:handoff.attendanceRecorded,state:!eligibleDateFound?"not_on_roster":preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state,...(!eligibleDateFound?{studentExpected:false,supervisionPlanned:false,message:dates.length?"No upcoming instructional day with this student on the expected onsite roster was found. Review placement and calendar dates.":"No upcoming instructional calendar day was found. Review and publish the school-year calendar."}:{})};
+    return {date,preview,...handoff,attendanceRecorded:!eligibleDateFound||preview?false:handoff.attendanceRecorded,state:!eligibleDateFound?(dates.length?"not_on_roster":"calendar_not_ready"):preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state,...(!eligibleDateFound?{studentExpected:false,supervisionPlanned:false,message:dates.length?"No upcoming instructional day with this student on the expected onsite roster was found. Review placement and calendar dates.":"No upcoming instructional calendar day was found. Review and publish the school-year calendar."}:{})};
   });
