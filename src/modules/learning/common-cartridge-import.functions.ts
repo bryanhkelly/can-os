@@ -264,6 +264,8 @@ export const finishCommonCartridgeStaticLessonImport=createServerFn({method:"POS
    throw new AuthorizationError("matching sanitized lesson upload");
   await verifyPrivateObject({key:data.key,keyPattern:htmlKeyPattern,
    expectedSize:htmlBytes.length,expectedContentType:"text/html"});
+  // Private object HEAD verifies metadata, not content integrity; the signed
+  // upload is untrusted until a full-byte digest can be checked server-side.
   return db.transaction(async tx=>{
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"cartridge-html:"+program.organizationId+":"+digest}))`);
    const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,
