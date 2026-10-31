@@ -5,7 +5,7 @@ import { getTeacherGradeResponses, resolveTeacherGradeResponse } from "@/modules
 export type TeacherGradeResponseItem = Awaited<ReturnType<typeof getTeacherGradeResponses>>["items"][number];
 type Item = TeacherGradeResponseItem;
 
-function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: () => void; selected: boolean }) {
+function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: string, answer: string) => void; selected: boolean }) {
   const [response, setResponse] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +26,7 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: () =>
           await resolveTeacherGradeResponse({ data: { actionId: item.id, response } });
           // Preserve the confirmed resolution even if refreshing the queue fails.
           setSavedResponse(response.trim());
-          onSaved();
+          onSaved(item.id, response.trim());
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "Unable to record the school response.");
         } finally { setBusy(false); }
@@ -63,12 +63,28 @@ export function TeacherGradeResponsesPanel({ selectedAction, onQuestionsChange }
     });
   }, [onQuestionsChange]);
   useEffect(load, [load]);
+  const markAnswered = (id: string, answer: string) => {
+    if (!data) return;
+    // The command confirmed the write. Update this canonical read model in
+    // the UI immediately rather than leave a resolved family question open.
+    const next = {
+      ...data,
+      items: data.items.map(item => item.id === id
+        ? { ...item, status: "resolved", resolutionNote: answer } : item),
+    };
+    setData(next);
+    onQuestionsChange?.(next.items);
+  };
   useEffect(() => {
     if (data && selectedAction)
       document.getElementById("grade-action-"+selectedAction)?.scrollIntoView({block:"center"});
   }, [data, selectedAction]);
   return <section id="grade-follow-ups" aria-label="Guardian grade questions" className="mt-10">
-    <h2 className="text-lg font-semibold">Guardian grade questions</h2>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-lg font-semibold">Guardian grade questions</h2>
+      <button type="button" className="rounded-lg border px-3 py-2 text-sm font-semibold"
+        onClick={load}>Refresh questions</button>
+    </div>
     {data && <p className="mt-2 text-sm text-muted-foreground">
       {data.items.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length} awaiting your school's response
     </p>}
@@ -78,6 +94,6 @@ export function TeacherGradeResponsesPanel({ selectedAction, onQuestionsChange }
     {data && selectedAction && !data.items.some(item=>item.id===selectedAction) &&
       <p role="alert" className="mt-3 text-sm">This guardian question is unavailable in your current academic queue.</p>}
     {data?.truncated && <p className="mt-3 text-sm">Showing the first 50 questions.</p>}
-    <div className="mt-4 space-y-3">{data?.items.map(item => <GradeResponse key={item.id} item={item} onSaved={load} selected={item.id===selectedAction}/>)}</div>
+    <div className="mt-4 space-y-3">{data?.items.map(item => <GradeResponse key={item.id} item={item} onSaved={markAnswered} selected={item.id===selectedAction}/>)}</div>
   </section>;
 }
