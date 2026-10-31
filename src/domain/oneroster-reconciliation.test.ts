@@ -63,7 +63,7 @@ describe("OneRoster reconciliation is identity-untrusted", () => {
   });
 
   it("flags repeated enrollment relations rather than silently applying duplicates", () => {
-    const duplicate = enrollments + "\\nenrollment-2,class-1,school-1,user-1,student";
+    const duplicate = enrollments + "\nenrollment-2,class-1,school-1,user-1,student";
     const bundle = previewOneRosterBundle({ users, classes, enrollments: duplicate });
     const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
     expect(plan.rows.find(r => r.sourcedId === "enrollment-2")?.reasons)
@@ -71,7 +71,7 @@ describe("OneRoster reconciliation is identity-untrusted", () => {
   });
 
   it("flags missing external academic sessions", () => {
-    const sessions = "sourcedId,title,type,startDate,endDate\\nterm-2,Fall,term,2026-08-01,2026-12-20";
+    const sessions = "sourcedId,title,type,startDate,endDate\nterm-2,Fall,term,2026-08-01,2026-12-20";
     const bundle = previewOneRosterBundle({ classes, academicSessions: sessions });
     const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
     expect(plan.rows.find(r => r.kind === "class")?.reasons)
