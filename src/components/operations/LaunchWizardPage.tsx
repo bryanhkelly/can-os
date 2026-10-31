@@ -1,6 +1,6 @@
+import { LaunchFamilyProgress } from "@/components/operations/LaunchFamilyProgress";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSchoolModelPicker } from "@/components/operations/LaunchSchoolModelPicker";
-import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
 import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
@@ -267,33 +267,13 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           </nav>
         </details>
 
-        {hasSchoolPreparation&&admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
-          <h2 className="text-sm font-semibold">Admissions progress</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Current application records for the selected school; invitation responses are tracked separately.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!schoolSelection.programId||row.programId===schoolSelection.programId)&&(!schoolSelection.siteId||row.siteId===schoolSelection.siteId)).length}</strong>Applications recorded</p>
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!schoolSelection.programId||row.programId===schoolSelection.programId)&&(!schoolSelection.siteId||row.siteId===schoolSelection.siteId)&&row.stage==="accepted").length}</strong>Accepted applications</p>
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!schoolSelection.programId||row.programId===schoolSelection.programId)&&(!schoolSelection.siteId||row.siteId===schoolSelection.siteId)&&["inquiry","application","eligibility"].includes(row.stage)).length}</strong>Awaiting decision</p>
-          </div>
-        </section>}
-        {hasSchoolPreparation&&enrollmentCounts&&<section aria-label="Confirmed student enrollment" className="mt-3 rounded-xl border bg-card p-4">
-          <h2 className="text-sm font-semibold">Confirmed enrollment</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Distinct students with active program enrollments, including those enrolled without an admissions application. Counts are across authorized programs when no program is selected.</p>
-          <p className="mt-3 text-sm"><strong className="mr-2 text-2xl">{enrollmentCounts.filter(row=>!schoolSelection.programId||row.programId===schoolSelection.programId).reduce((total,row)=>total+row.activeStudents,0)}</strong>Active program enrollments</p>
-          <Link to="/admissions" search={{siteId:schoolSelection.siteId,programId:schoolSelection.programId,application:undefined}} className="mt-2 inline-block text-sm font-semibold underline">Review enrollment records</Link>
-        </section>}
-        {hasSchoolPreparation&&<nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
-          <span className="text-sm font-semibold">After inviting families</span>
-          <Link to="/admissions/intake" search={{siteId:schoolSelection.siteId,programId:schoolSelection.programId}}
-            className="text-sm font-semibold underline">Review inquiries and applications</Link>
-          <Link to="/admissions" search={{siteId:schoolSelection.siteId,programId:schoolSelection.programId,application:undefined}}
-            className="text-sm font-semibold underline">Manage offers and enrollment</Link>
-        </nav>}
-        {hasSchoolPreparation&&<details open className="mt-5 rounded-xl border bg-card p-5">
-          <summary className="cursor-pointer text-sm font-semibold">Family invitations and outreach progress</summary>
-          <FamilyInviteImporter key={`${schoolSelection.siteId ?? ""}:${schoolSelection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={schoolSelection.programId} selectedSiteId={schoolSelection.siteId}/>
-        </details>}
-
+        {hasSchoolPreparation && <LaunchFamilyProgress
+          admissions={admissions}
+          enrollmentCounts={enrollmentCounts}
+          familyInvitations={familyInvitations}
+          siteId={schoolSelection.siteId}
+          programId={schoolSelection.programId}
+        />}
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>
