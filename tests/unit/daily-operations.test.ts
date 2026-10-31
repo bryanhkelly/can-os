@@ -225,9 +225,8 @@ describe("role-scoped attention adapters", () => {
       href: "/guardian/attendance?absence=absence-1",
     }]);
     expect(items[0]).toMatchObject({
-      href: "/guardian?action=consent-1",
-      secondaryHref: "/guardian/group-permissions?action=consent-1",
-      secondaryLabel: "Open the owning workspace",
+      href: "/guardian/group-permissions?action=consent-1",
+      nextStep: "Review permission",
       priority: "critical",
       dueAt: "2026-10-29T10:00:00.000Z",
     });
