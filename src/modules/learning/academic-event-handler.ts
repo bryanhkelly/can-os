@@ -1,12 +1,15 @@
 import { db } from "@/db/client";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { currentSectionStudentIds } from "./current-section-enrollment.server";
 import {
 assessments,
 domainEvents,
 guardianRelationships,
 people,
 sectionTeachers,
+sections,
 studentProfiles,
+terms,
 submissions
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
@@ -26,6 +29,9 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
       submissionId: submissions.id,
       assessmentTitle: assessments.title,
       sectionId: assessments.sectionId,
+      programId: sections.programId,
+      schoolYearId: terms.schoolYearId,
+      studentProfileId: submissions.studentProfileId,
       studentPersonId: studentProfiles.personId,
       studentPreferredName: people.preferredName,
       studentLegalFirstName: people.legalFirstName,
@@ -34,12 +40,24 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
     })
     .from(submissions)
     .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+    .innerJoin(sections, eq(sections.id, assessments.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
     .where(eq(submissions.id, submissionId))
     .limit(1);
 
   if (!record) return null;
+
+  // The event may be processed after a transfer or withdrawal. Do not emit
+  // a new child-specific notice from stale Section-only membership.
+  const enrolled = await currentSectionStudentIds(tx, {
+    id: record.sectionId, programId: record.programId, schoolYearId: record.schoolYearId,
+  }, record.studentProfileId);
+  if (!enrolled.includes(record.studentProfileId)) return {
+    ...record, activeEnrollment: false, guardianPersonIds: [] as string[],
+    teacherPersonIds: [] as string[], studentName: record.studentPreferredName ?? record.studentLegalFirstName,
+  };
 
   const [guardians, teachers] = await Promise.all([
     tx
@@ -56,6 +74,7 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
 
   return {
     ...record,
+    activeEnrollment: true,
     studentName: record.studentPreferredName ?? record.studentLegalFirstName,
     guardianPersonIds: guardians.map((row: { personId: string }) => row.personId),
     teacherPersonIds: teachers.map((row: { personId: string }) => row.personId),
@@ -75,6 +94,7 @@ export async function handleSubmissionReceivedEvent(eventId: string): Promise<vo
 
     const context = await loadSubmissionContext(tx, event.aggregateId);
     if (!context) throw new Error("Missing submission context for SubmissionReceived");
+    if (!context.activeEnrollment) return;
 
     const payload = event.payload as Record<string, unknown>;
     const timeliness =
@@ -115,6 +135,7 @@ export async function handleGradePostedEvent(eventId: string): Promise<void> {
 
     const context = await loadSubmissionContext(tx, event.aggregateId);
     if (!context) throw new Error("Missing submission context for GradePosted");
+    if (!context.activeEnrollment) return;
 
     const recipients = new Set<string>([
       String(context.studentPersonId),
