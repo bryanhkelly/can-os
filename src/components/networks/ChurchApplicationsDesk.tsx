@@ -16,7 +16,11 @@ export function ChurchApplicationsDesk() {
   const [evidenceReference, setEvidenceReference] = useState<Record<string, string>>({});
   const [verificationMethod, setVerificationMethod] = useState<Record<string, "signed_authority" | "denominational_confirmation" | "independent_church_confirmation">>({});
   const [declineNote, setDeclineNote] = useState<Record<string, string>>({});
-  const [reviewedEvidenceRequestId, setReviewedEvidenceRequestId] = useState<string | null>(null);
+  const [reviewChecklist, setReviewChecklist] = useState<Record<string, { source: boolean; authority: boolean; identity: boolean; expiry: boolean }>>({});
+  const checklistComplete = (id: string) => {
+    const check = reviewChecklist[id];
+    return !!check && check.source && check.authority && check.identity && check.expiry;
+  };
 
   async function refresh() {
     const records = await listChurchOnboardingRequests();
@@ -41,7 +45,7 @@ export function ChurchApplicationsDesk() {
         await declineChurchOnboardingRequest({ data: { requestId: id, note: declineNote[id] ?? "" } });
         setNotice("Application declined and any linked authority evidence invalidated.");
       }
-      setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setReviewedEvidenceRequestId(null);
+      setEvidenceReference(previous => ({...previous, [id]: ""})); setDeclineNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to complete church review.");
@@ -68,7 +72,7 @@ export function ChurchApplicationsDesk() {
           <p className="mt-1 text-sm">{request.siteName} · {request.timezone}</p>
           <p className="text-sm">{request.firstName} {request.lastName} · {request.leaderTitle} · {request.contactEmail}</p>
           {request.churchWebsite&&<a href={request.churchWebsite} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm underline">Church website</a>}
-          <p className="mt-1 text-xs text-muted-foreground">Received {new Date(request.createdAt).toLocaleDateString()}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Received {new Date(request.createdAt).toLocaleDateString()} · Request {request.id}</p>
           {request.status==="submitted" ? <div className="mt-4 space-y-3">
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
             <label className="block text-sm font-semibold">How authority was verified
@@ -95,14 +99,28 @@ export function ChurchApplicationsDesk() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Verified {request.authorityEvidence.verifiedAt ? new Date(request.authorityEvidence.verifiedAt).toLocaleString() : "at an unknown time"}
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">Expires {request.authorityEvidence.expiresAt ? new Date(request.authorityEvidence.expiresAt).toLocaleString() : "not recorded"}</p>
+              {!request.authorityEvidence.usable && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">Evidence is expired, unbound, or cannot be approved by this steward. Approval is blocked.</p>}
               <p className="mt-1 text-xs text-muted-foreground">Check the independent source yourself. A reference alone is not proof of church authority.</p>
             </div> : <p role="alert" className="text-sm text-destructive">Authority evidence is missing; approval is unavailable.</p>}
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={reviewedEvidenceRequestId===request.id}
-                onChange={e=>setReviewedEvidenceRequestId(e.target.checked?request.id:null)} />
-              I independently reviewed the referenced evidence and confirmed this leader is authorized to represent the church.
-            </label>
-            <button type="button" disabled={!!working||!request.authorityEvidence||reviewedEvidenceRequestId!==request.id}
+            <fieldset className="space-y-2 rounded-lg border p-3 text-sm" disabled={!!working || !request.authorityEvidence?.usable}>
+              <legend className="px-1 font-semibold">Independent approval checklist</legend>
+              {([
+                ["source", "Confirmed the evidence source independently; not from application-submitted contact details"],
+                ["authority", "Confirmed this person is authorized to represent the church"],
+                ["identity", "Matched church, named representative, and invitation email to the verified record"],
+                ["expiry", "Checked evidence provenance, authenticity, and expiration"],
+              ] as const).map(([key, label]) => <label key={key} className="flex items-start gap-2">
+                <input type="checkbox" checked={reviewChecklist[request.id]?.[key] ?? false}
+                  onChange={e=>setReviewChecklist(previous=>({
+                    ...previous,
+                    [request.id]: { source: false, authority: false, identity: false, expiry: false,
+                      ...previous[request.id], [key]: e.target.checked },
+                  }))} />
+                {label}
+              </label>)}
+            </fieldset>
+            <button type="button" disabled={!!working||!request.authorityEvidence?.usable||!checklistComplete(request.id)}
               onClick={()=>void act(request.id,"approve")}
               className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
               Approve and invite church leader
