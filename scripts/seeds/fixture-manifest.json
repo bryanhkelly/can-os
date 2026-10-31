@@ -1369,6 +1369,107 @@
         "domainEvents:ConferenceBooked",
         "domainEvents:ConferenceCancelled"
       ]
+    },
+    "/api/family-alert-delivery": {
+      "persona": "authenticated scheduled-job caller",
+      "fixtureRequired": false,
+      "rationale": "Protected transport worker route requires a live job secret, scheduled invocation and queued email/SMS provider receipts. Existing static seeds do not establish provider acceptance or guardian delivery.",
+      "interactions": [
+        "reject an unauthenticated or invalid job secret",
+        "process due authorized family notifications while preserving per-recipient delivery receipts and retries"
+      ],
+      "downstreamRecords": [
+        "notification_outbound_deliveries",
+        "audit_events"
+      ]
+    },
+    "/guardian/enrollment-changes": {
+      "persona": "verified guardian",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1,
+        "enrollments": 1
+      },
+      "interactions": [
+        "request a school transfer or withdrawal for an authorized enrolled child",
+        "authorize destination-bound records release and follow the original school Action"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "consent_records",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/guardian/health": {
+      "persona": "verified guardian",
+      "seeds": [
+        "synthetic-profiles-compliance.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "review only related children's recorded health requirements",
+        "submit an emergency contact or health instruction update for restricted review"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/family-alerts": {
+      "persona": "verified registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "publish a scoped urgent school-family notice",
+        "inspect provider acceptance, suppression and failed-delivery retries"
+      ],
+      "downstreamRecords": [
+        "notifications",
+        "notification_outbound_deliveries",
+        "domain_events"
+      ]
+    },
+    "/operations/health-review": {
+      "persona": "restricted school medical reviewer",
+      "fixtureRequired": false,
+      "rationale": "Medical review requires separately authorized clinical/school-review membership and a genuine pending guardian health-change Action. General fixture seeds cannot prove restricted document access or independent medical review.",
+      "interactions": [
+        "approve or reject the exact pending guardian health update",
+        "deny unrelated school and unauthorized registrar access"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/transfer-records": {
+      "persona": "authorized institutional records registrar",
+      "fixtureRequired": false,
+      "rationale": "An official handoff requires a completed original transfer, verified guardian destination release, issued transcript and independently evidenced external delivery. Existing synthetic fixtures do not create these prerequisites.",
+      "interactions": [
+        "review only institutionally authorized destination handoffs",
+        "attest an actually completed secure transfer against an official issuance and delivery receipt"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "transcript_issuances",
+        "audit_events",
+        "domain_events"
+      ]
     }
   }
 }
