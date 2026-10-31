@@ -55,7 +55,7 @@ for (const name of canonicalEvidence) {
 for (const name of ["EvidenceUploader", "EvidenceReviewForm"]) {
   const path = join(root, "evidence", name + ".tsx");
   const source = readFileSync(path, "utf8");
-  if (!source.includes('from "@/components/ui/button"') || /<button(?:\\s|>)/.test(source)) {
+  if (!source.includes('from "@/components/ui/button"') || /<button(?:\s|>)/.test(source)) {
     console.error(`${name} must use the shared Button primitive for its actions`);
     process.exitCode = 1;
   }
