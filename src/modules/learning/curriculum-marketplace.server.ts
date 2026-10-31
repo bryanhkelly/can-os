@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
  curriculumAdoptions, curriculumAnnualAdoptions, schoolYears, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
@@ -78,7 +78,9 @@ export async function readMarketplace(actor: Actor, programId: string) {
  const annualAdoptions=await db.select().from(curriculumAnnualAdoptions)
   .where(eq(curriculumAnnualAdoptions.programId,program.id));
  const years=program.siteId?await db.select({id:schoolYears.id,name:schoolYears.name,status:schoolYears.status})
-  .from(schoolYears).where(eq(schoolYears.siteId,program.siteId)):[];
+  .from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
+   eq(schoolYears.organizationId,program.organizationId),
+   or(isNull(schoolYears.programId),eq(schoolYears.programId,program.id)))):[];
  const adoptions=await db.select().from(curriculumAdoptions)
   .where(eq(curriculumAdoptions.programId,program.id));
  const overlayRows=await db.select({
