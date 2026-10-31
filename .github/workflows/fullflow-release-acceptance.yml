@@ -75,7 +75,7 @@ jobs:
             const a = new URL(process.env.TEST_DATABASE_URL);
             const b = new URL(process.env.CAN_ADMISSIONS_TEST_DATABASE_URL);
             const stripPool = host => host.replace(/-pooler(?=\\.)/, "").toLowerCase();
-            if (stripPool(a.host) === stripPool(b.host) && a.pathname === b.pathname) {
+            if (stripPool(a.hostname) === stripPool(b.hostname) && a.pathname === b.pathname) {
               console.error("HOLD: admissions and FullFlow acceptance must not migrate the same isolated database twice.");
               process.exit(1);
             }
