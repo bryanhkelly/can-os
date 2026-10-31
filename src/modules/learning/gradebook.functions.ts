@@ -26,6 +26,17 @@ function readRubricScores(value: unknown): Array<{ id: string; points: number }>
   typeof v.points === "number" && Number.isFinite(v.points));
 }
 
+/** Only the authorized teacher gradebook projects private draft grading. */
+function readGradingDraft(value: unknown) {
+ if(!value || typeof value!=="object")return null;
+ const draft=value as Record<string,unknown>;
+ const feedback=draft.feedback && typeof draft.feedback==="object" ? draft.feedback as Record<string,unknown> : {};
+ if(typeof draft.score!=="string" || !Number.isFinite(Number(draft.score)))return null;
+ return {score:draft.score,comment:typeof feedback.comment==="string"?feedback.comment:"",
+  rubricScores:readRubricScores((feedback.rubric as Record<string,unknown>|undefined)?.scores),
+  savedAt:typeof draft.savedAt==="string"?draft.savedAt:null};
+}
+
 /** The gradebook uses the same exact-Section authority as the class workspace.
  * CAN academic teachers keep their original institution grant and NEVER receive
  * a host church-wide Site or Program grant through this path.
@@ -248,6 +259,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     feedbackRubric: readRubricScores(
       (row.feedback?.rubric as Record<string, unknown> | undefined)?.scores,
     ),
+    gradingDraft: row.status === "submitted" ? readGradingDraft(row.feedback?.gradingDraft) : null,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     gradedAt: row.gradedAt?.toISOString() ?? null,
    })),
@@ -260,6 +272,7 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   submissionId: z.string().min(1),
   score: z.number().finite().optional(),
   feedbackComment: z.string().max(4000).optional().default(""),
+  draftOnly: z.boolean().optional().default(false),
   rubricScores: z.array(z.object({
    id: z.string().min(1).max(100),
    points: z.number().finite().min(0).max(1000),
@@ -305,7 +318,7 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   await missingWork.gradeSubmission(
    { ...context, capabilities: new Set([...context.capabilities, "submission.grade"]) },
    data.submissionId,
-   { score: String(finalScore), feedback },
+   { score: String(finalScore), feedback, draftOnly:data.draftOnly },
   );
   return { submissionId: data.submissionId };
  });

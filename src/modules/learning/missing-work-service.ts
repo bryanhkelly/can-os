@@ -300,6 +300,7 @@ export async function gradeSubmission(
   input: {
     score: string;
     feedback?: Record<string, unknown>;
+    draftOnly?: boolean;
   },
 ): Promise<void> {
   assertCapability(context, "submission.grade");
@@ -352,6 +353,22 @@ export async function gradeSubmission(
       throw new Error("Assessment has no valid point value");
     if (!Number.isFinite(score) || score < 0 || score > possible)
       throw new Error("Score must be from 0 to "+possible);
+
+    if (input.draftOnly) {
+      const [draft] = await tx.update(submissions).set({
+        feedback: { gradingDraft: { score: String(score), feedback: input.feedback ?? {}, savedAt: new Date().toISOString() } },
+        updatedAt: new Date(),
+      }).where(and(eq(submissions.id,submissionId),eq(submissions.status,"submitted"),latestSubmissionCondition(tx)))
+        .returning({id:submissions.id});
+      if (!draft) throw new Error("Submission changed or a newer attempt exists; reload before saving grading");
+      await writeAudit(tx, { actorPersonId:context.actorPersonId,action:"submission.grading_draft_save",
+        resourceType:"submission",resourceId:submissionId,scope:{sectionId:current.sectionId},
+        after:{status:"submitted",draftSaved:true},context:{requestId:context.requestId??null} });
+      await emitEvent(tx,{eventType:EventTypes.SubmissionGradingDraftSaved,aggregateType:"submission",
+        aggregateId:submissionId,actorPersonId:context.actorPersonId,
+        payload:{sectionId:current.sectionId,assessmentId:current.assessmentId}});
+      return;
+    }
 
     const gradedAt = new Date();
 

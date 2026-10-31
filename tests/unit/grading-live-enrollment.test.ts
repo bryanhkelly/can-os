@@ -4,7 +4,7 @@ const state=vi.hoisted(()=>({
 }));
 vi.mock("@/modules/learning/current-section-enrollment.server",()=>({currentSectionStudentIds:state.members}));
 vi.mock("@/modules/learning/class-access.server",()=>({authorizeClass:state.authority}));
-vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event}));
+vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event,notify:vi.fn()}));
 vi.mock("@/db/client",()=>({db:{transaction:async(fn:(tx:unknown)=>unknown)=>fn({
   select:()=>{
     const chain:Record<string,unknown>={};
@@ -26,6 +26,24 @@ beforeEach(()=>{
   state.update.mockReturnValue({set:()=>({where:()=>({returning:async()=>[{id:"submission"}]})})});
 });
 describe("grading requires the current student enrollment relationship",()=>{
+  it("saves private grading without changing submission status, score or releasing feedback",async()=>{
+    const write=vi.fn((_values:Record<string,unknown>)=>({where:()=>({returning:async()=>[{id:"submission"}]})}));
+    state.update.mockReturnValue({set:write});
+    await gradeSubmission(context,"submission",{score:"8",feedback:{comment:"Private draft"},draftOnly:true});
+    expect(write).toHaveBeenCalledWith(expect.objectContaining({feedback:{gradingDraft:expect.objectContaining({
+      score:"8",feedback:{comment:"Private draft"},
+    })}}));
+    const values=write.mock.calls[0][0] as Record<string,unknown>;
+    expect(values).not.toHaveProperty("score");
+    expect(values).not.toHaveProperty("status");
+    expect(values).not.toHaveProperty("gradedAt");
+    expect(state.event).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({eventType:"SubmissionGradingDraftSaved"}));
+  });
+  it("does not save a private grading draft for a withdrawn learner",async()=>{
+    state.members.mockResolvedValue([]);
+    await expect(gradeSubmission(context,"submission",{score:"8",draftOnly:true})).rejects.toThrow("current Program and Section");
+    expect(state.update).not.toHaveBeenCalled();
+  });
   it("rejects a stale submission after Program or Section enrollment ends",async()=>{
     state.members.mockResolvedValue([]);
     await expect(gradeSubmission(context,"submission",{score:"8"})).rejects.toThrow("current Program and Section");
