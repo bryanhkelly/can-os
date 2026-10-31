@@ -163,9 +163,18 @@ function TeacherGradebookPage() {
    await gradeSubmission({ data: payload });
    setNotice("Grade posted.");
    setGradingKey("");
+   setDetailKey("");
    setScore("");
    setComment("");
    setRubricInputs({});
+   // Advance directly to the next awaiting submission, rather than
+   // reopening the just-graded record from the old route parameters.
+   const next=reviewQueue.find(item=>item.submissionId!==cell.submissionId);
+   if(next){
+    void navigate({search:{section:selected,assessment:next.assessmentId,student:next.studentProfileId}});
+   }else{
+    void navigate({search:{section:selected}});
+   }
    if (selected) await loadGradebook(selected);
   } catch (cause) {
    setNotice(cause instanceof Error ? cause.message : "Unable to post the grade.");
