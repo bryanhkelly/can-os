@@ -23,18 +23,18 @@ describe("useWorkspaceMutation", () => {
     let release!: (value: string) => void;
     const deferred = new Promise<string>(resolve => { release = resolve; });
     mocks.mutateAsync.mockReset().mockImplementationOnce(() => deferred).mockResolvedValueOnce("second");
-    let submit!: (value: string) => Promise<string | undefined>;
+    let submit!: (value: string) => Promise<import("./useWorkspaceMutation").WorkspaceSubmission<string>>;
     function Harness() {
       submit = useWorkspaceMutation<string, string>({ mutationFn: async value => value }).submit;
       return null;
     }
     renderToString(createElement(Harness));
     const first = submit("first");
-    expect(await submit("duplicate")).toBeUndefined();
+    expect(await submit("duplicate")).toEqual({ status: "ignored" });
     expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
     release("first");
-    expect(await first).toBe("first");
-    expect(await submit("second")).toBe("second");
+    expect(await first).toEqual({ status: "completed", value: "first" });
+    expect(await submit("second")).toEqual({ status: "completed", value: "second" });
     expect(mocks.mutateAsync).toHaveBeenCalledTimes(2);
   });
 
@@ -47,25 +47,24 @@ describe("useWorkspaceMutation", () => {
     }
     renderToString(createElement(Harness));
     await expect(submit("fail")).rejects.toThrow("failed");
-    await expect(submit("retry")).resolves.toBe("recovered");
+    await expect(submit("retry")).resolves.toEqual({ status: "completed", value: "recovered" });
   });
 
-  it("invalidates all supplied keys before notifying success", async () => {
-    mocks.invalidateQueries.mockClear();
-    const onSuccess = vi.fn();
+  it("reports refresh failure without retrying a successful command", async () => {
+    mocks.mutateAsync.mockReset().mockResolvedValue("saved");
+    mocks.invalidateQueries.mockReset().mockRejectedValueOnce(new Error("offline"));
+    let submit!: (value: string) => Promise<import("./useWorkspaceMutation").WorkspaceSubmission<string>>;
     function Harness() {
-      useWorkspaceMutation({
-        mutationFn: async (value: string) => value,
-        invalidateQueries: [["site", "a"], ["family", "b"]],
-        onSuccess,
-      });
+      submit = useWorkspaceMutation<string, string>({
+        mutationFn: async value => value,
+        invalidateQueries: [["site"]],
+      }).submit;
       return null;
     }
     renderToString(createElement(Harness));
-    const callbacks = mocks.options.current as { onSuccess: (value: string, input: string) => Promise<void> };
-    await callbacks.onSuccess("ok", "input");
-    expect(mocks.invalidateQueries).toHaveBeenCalledTimes(2);
-    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["site", "a"] });
-    expect(onSuccess).toHaveBeenCalledWith("ok", "input");
+    const result = await submit("save");
+    expect(result.status).toBe("completed");
+    if (result.status === "completed") expect(result.refreshError?.message).toBe("offline");
+    expect(mocks.mutateAsync).toHaveBeenCalledOnce();
   });
 });
