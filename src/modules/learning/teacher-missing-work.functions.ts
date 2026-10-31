@@ -90,9 +90,12 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
        eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
        eq(s.enrollments.programId,assessment.programId))).limit(1);
    if(!programMembership)throw new AuthorizationError("current active student school-year enrollment");
-   const attempts=await tx.select({status:s.submissions.status}).from(s.submissions)
+   const attempts=await tx.select({status:s.submissions.status,attempt:s.submissions.attemptNumber}).from(s.submissions)
     .where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,student.id)));
-   if(attempts.some(a=>a.status!=="assigned"&&a.status!=="returned"))throw new Error("Work is already submitted or graded");
+   const latestAttempt=attempts.reduce<(typeof attempts)[number]|undefined>(
+    (latest,item)=>!latest||item.attempt>latest.attempt?item:latest,undefined);
+   if(latestAttempt&&!["assigned","returned"].includes(latestAttempt.status))
+    throw new Error("Work is already submitted or graded");
    const existing=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),assessment.siteId?eq(s.actions.siteId,assessment.siteId):isNull(s.actions.siteId),eq(s.actions.programId,assessment.programId)));
    const open=existing.find(a=>a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
