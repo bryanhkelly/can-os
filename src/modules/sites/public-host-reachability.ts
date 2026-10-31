@@ -1,5 +1,36 @@
 import { publicSiteHost, slugFromPublicSiteHost } from "@/domain/public-site-address";
 
+const MAX_HTML_BYTES = 1_000_000;
+
+/** Stop reading immediately once the response exceeds the acceptance limit. */
+async function readBoundedHtml(response: Response): Promise<string | null> {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_HTML_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 export type PublicHostAvailability = "not_published" | "hosting_disabled" | "live" | "unreachable";
 export type PublicHostCheck = {
   status: PublicHostAvailability;
@@ -39,15 +70,14 @@ export async function checkPublishedSiteReachability(input: {
     const lengthHeader = response.headers.get("content-length");
     const length = lengthHeader === null ? null : Number(lengthHeader);
     if (response.status !== 200 || !response.headers.get("content-type")?.toLowerCase().includes("text/html") ||
-      (length !== null && (!Number.isFinite(length) || length > 1_000_000))) {
+      (length !== null && (!Number.isFinite(length) || length > MAX_HTML_BYTES))) {
       await response.body?.cancel();
       return { status: "unreachable", url, checkedAt,
         diagnostic: `HTTPS returned HTTP ${response.status} or an invalid HTML content type/size.` };
     }
-    // Bound the actual body, not just the untrusted Content-Length header.
-    // UTF-8 byte length is the relevant network limit, not JS code units.
-    const html = await response.text();
-    const verified = new TextEncoder().encode(html).byteLength <= 1_000_000 &&
+    // Bound actual bytes while streaming; never buffer an unlimited response.
+    const html = await readBoundedHtml(response);
+    const verified = html !== null &&
       html.toLowerCase().includes("<!doctype html>") &&
       html.includes("Powered by CAN OS") &&
       html.includes(`<footer>${input.host} · Powered by CAN OS</footer>`);
