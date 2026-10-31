@@ -201,11 +201,72 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
        eq(s.transcriptIssuances.issuingOrganizationId,program.issuerId),
      )).limit(1);
      if(!issuance)throw new AuthorizationError("officially issued transcript for this student and credit issuer");
+     let internalDestination:{
+       applicationId:string;programId:string;siteId:string;consentId:string;
+     }|null=null;
+     if(data.deliveryMethod==="can_internal_school_records"){
+       // A CAN internal handoff is a REAL scoped release of the existing
+       // immutable issuance. It is not an assertion of external delivery.
+       const applicationId=origin.metadata.destinationApplicationId;
+       const receivingProgramId=origin.metadata.destinationProgramId;
+       const consentId=origin.metadata.destinationRecordsReleaseConsentId;
+       if(typeof applicationId!=="string"||
+          typeof receivingProgramId!=="string"||
+          typeof consentId!=="string")
+         throw new AuthorizationError("receiving-school application and exact signed record release");
+       const [receiving]=await tx.select({
+         id:s.applications.id,programId:s.applications.programId,
+         studentProfileId:s.applications.studentProfileId,
+         submittedByPersonId:s.applications.submittedByPersonId,
+         metadata:s.applications.metadata,siteId:s.programs.siteId,
+         organizationId:s.programs.organizationId,status:s.programs.status,
+       }).from(s.applications)
+         .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+         .where(eq(s.applications.id,applicationId)).limit(1);
+       if(!receiving?.siteId||receiving.status!=="active"||
+          receiving.siteId===handoff.siteId||
+          receiving.studentProfileId!==handoff.subjectId||
+          receiving.programId!==receivingProgramId||
+          receiving.submittedByPersonId!==guardianId||
+          receiving.metadata.originTransferActionId!==origin.id||
+          receiving.metadata.destinationRecordsReleaseConsentId!==consentId)
+         throw new AuthorizationError("verified receiving-school application for this student");
+       const [approved]=await tx.select({
+         evidence:s.consentRecords.signatureEvidence,
+       }).from(s.consentRecords).where(and(
+         eq(s.consentRecords.id,consentId),
+         eq(s.consentRecords.subjectType,"application"),
+         eq(s.consentRecords.subjectId,receiving.id),
+         eq(s.consentRecords.consentType,"academic_records_destination_program_release"),
+         eq(s.consentRecords.signerPersonId,guardianId),
+         isNull(s.consentRecords.revokedAt),
+       )).limit(1);
+       if(!approved||approved.evidence.acknowledged!==true||
+          approved.evidence.scope!=="official_transcript_only"||
+          approved.evidence.originTransferActionId!==origin.id||
+          approved.evidence.destinationApplicationId!==receiving.id||
+          approved.evidence.destinationProgramId!==receiving.programId||
+          approved.evidence.destinationSiteId!==receiving.siteId||
+          approved.evidence.destinationOrganizationId!==receiving.organizationId||
+          approved.evidence.studentProfileId!==receiving.studentProfileId||
+          approved.evidence.guardianPersonId!==guardianId)
+         throw new AuthorizationError("unrevoked parent consent for this exact CAN receiving school");
+       await requireChurchHostedOperatingServices(tx,receiving.programId,["admissions","school_of_record"]);
+       internalDestination={applicationId:receiving.id,programId:receiving.programId,
+         siteId:receiving.siteId,consentId};
+     }
      const now=new Date();
      const evidence={
        issuedTranscriptId:issuance.id,
        deliveryMethod:data.deliveryMethod,
-       deliveryReceiptReference:data.receiptReference,
+       deliveryReceiptReference:internalDestination?"CAN-RELEASE:"+handoff.id:data.receiptReference,
+       ...(internalDestination?{
+         destinationApplicationId:internalDestination.applicationId,
+         destinationProgramId:internalDestination.programId,
+         destinationSiteId:internalDestination.siteId,
+         destinationRecordsReleaseConsentId:internalDestination.consentId,
+         deliveredInCAN:true,
+       }:{}),
        recipientSchoolName:destination,
        recipientVerifiedByPersonId:actor.actorPersonId,
        completedByPersonId:actor.actorPersonId,
