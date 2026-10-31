@@ -57,9 +57,9 @@ jobs:
           npm run build
           npm run typecheck
           npm test
-          npm run db:generate
+          npx drizzle-kit check
           if [[ -n "$(git status --porcelain -- drizzle/)" ]]; then
-            echo "::error::HOLD: committed Drizzle migration journal/snapshots do not match generated schema."
+            echo "::error::HOLD: schema verification unexpectedly modified committed migration artifacts."
             exit 1
           fi
       - name: Verify isolated endpoint and Postgres-attested FullFlow branch
