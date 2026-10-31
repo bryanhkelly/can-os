@@ -43,12 +43,12 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
   }
 
   return <section className="mt-8 rounded-xl border bg-card p-5">
-    <h2 className="font-serif text-2xl">Public program interest</h2>
+    <h2 className="font-serif text-2xl">Family recruitment and inquiries</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Requests from published program pages. A registrar may review a contact,
-      confirm the new student identity and carry these details into the normal
-      admissions inquiry. Any guardian relationship remains pending verification;
-      a public request never grants school access.
+      Track family-initiated requests from pre-opening invitations and published school pages.
+      Follow-up requires the adult's affirmative consent. Once CAN authorizes
+      admissions, send a verified-email application invitation or continue reviewed
+      registrar intake. An inquiry never proves guardianship or grants school access.
     </p>
     {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-3 text-sm">{notice}</p>}
@@ -60,7 +60,7 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             <p className="text-sm text-muted-foreground">{row.programName}</p>
             <p className="mt-1 text-sm">{row.email}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {new Date(row.createdAt).toLocaleString()} · {row.status}
+              {new Date(row.createdAt).toLocaleString()} · {row.status} · {row.source === "staff_invitation" ? "Pre-opening invitation response" : "Public website inquiry"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -76,6 +76,7 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
               Review and create inquiry
             </Link>}
             {!row.applicationId && ["new","contacted"].includes(row.status) &&
+              row.admissionsAuthorized && Boolean(row.consentAt) && !row.familyStartRequestId &&
               <button type="button" disabled={busyId !== null}
                 onClick={() => void inviteToApply(row)}
                 className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
@@ -93,10 +94,26 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             </button>}
           </div>
         </div>
+        <ol className="mt-3 space-y-1 border-l pl-4 text-xs text-muted-foreground" aria-label="Family relationship history">
+          {row.invitationBatchId && <li>Pre-opening invitation recorded · Provider receipt does not prove delivery or consent.</li>}
+          <li>Family inquiry received · {new Date(row.createdAt).toLocaleString()}</li>
+          <li>{row.consentAt
+            ? `Follow-up requested by family · ${new Date(row.consentAt).toLocaleString()}`
+            : "No affirmative follow-up consent recorded"}</li>
+          {row.contactedAt && <li>Registrar follow-up recorded · {new Date(row.contactedAt).toLocaleString()}</li>}
+          <li>{row.admissionsAuthorized ? "CAN admissions and school-of-record services authorized" : "Application invitations blocked until CAN authorization"}</li>
+          {row.familyStartRequestId && <li>Verified-email application invitation requested · Delivery is not confirmed</li>}
+          {row.emailVerifiedAt && <li>Family verified email link · {new Date(row.emailVerifiedAt).toLocaleString()} (not guardianship)</li>}
+          {row.applicationId && <li>Admissions record linked · {row.applicationStage ?? "Inquiry"}{row.applicationSubmittedAt ? ` · ${new Date(row.applicationSubmittedAt).toLocaleString()}` : ""}</li>}
+        </ol>
+        {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
+          <p className="mt-2 text-xs text-muted-foreground">Awaiting family email verification or application. A sent invitation is not an accepted application.</p>}
+        {!row.admissionsAuthorized && !row.applicationId && row.status !== "closed" &&
+          <p className="mt-2 text-xs text-muted-foreground">The family's interest is saved. Application invitations become available after CAN authorizes this school.</p>}
         {row.message && <p className="mt-3 whitespace-pre-wrap text-sm">{row.message}</p>}
       </article>)}
       {items.length === 0 && <p className="text-sm text-muted-foreground">
-        No public information requests in your authorized programs.
+        No family interest requests in your authorized programs yet.
       </p>}
     </div>
   </section>;
