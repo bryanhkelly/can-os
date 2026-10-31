@@ -30,10 +30,6 @@ The input format is `YYYY-MM-DDTHH:mm`. The ambiguity policy defaults to `reject
 
 Agent C can replace launch-specific time conversions after validating the desired overlap policy.
 
-## Pending coordination
-
-Server function wrappers and loader error classification require further review of existing auth and loader contracts. Do not migrate feature endpoints until those contracts are published and tested. This branch does not change any feature routes.
-
 ## Verified server functions
 
 Import from `@/platform/server-functions`:
@@ -67,4 +63,13 @@ Unexpected errors can be reported through `onUnexpectedError`; user-facing messa
 
 ## Validation and remaining adoption
 
-Unit tests added for timezone and loader classification. No feature routes were modified. Full repository TypeScript, Vitest, and lint commands require a checked-out workspace with dependencies; they have **not** been executed by the GitHub connector. Run `npm run typecheck`, `npx vitest run src/lib/safe-loader.test.ts src/modules/calendar/site-local-time.test.ts`, and focused ESLint before merging. Feature-agent adoption and further tests of the React mutation hook are outstanding.
+Unit tests added for timezone, loader classification, server-function factories, and the shared mutation hook. No feature routes were modified. Full repository TypeScript, Vitest, and lint commands require a checked-out workspace with dependencies; they have **not** been executed by the GitHub connector. Run `npm run typecheck`, `npx vitest run src/lib/safe-loader.test.ts src/modules/calendar/site-local-time.test.ts`, and focused ESLint before merging. Feature-agent adoption remains outstanding. The mutation-hook tests exercise the submit guard and invalidation callbacks; a browser-mounted integration test is still recommended.
+
+## Final integration checklist
+
+- `npm run typecheck`
+- `npx vitest run src/platform/server-functions.test.ts src/lib/safe-loader.test.ts src/hooks/useWorkspaceMutation.test.tsx src/modules/calendar/site-local-time.test.ts`
+- `npx eslint src/platform/server-functions.ts src/platform/server-functions.test.ts src/lib/safe-loader.ts src/lib/safe-loader.test.ts src/lib/loader-failure.tsx src/hooks/useWorkspaceMutation.ts src/hooks/useWorkspaceMutation.test.tsx src/modules/calendar/site-local-time.ts src/modules/calendar/site-local-time.test.ts`
+- Run a browser-level test against a real authenticated endpoint before widespread migration.
+
+GitHub connector commits are not proof of successful compilation or tests. No validation results are claimed here.
