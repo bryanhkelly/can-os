@@ -545,7 +545,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // identity and place that exact student in this Program's Section.
       const activated = await singleRow(
         sql,
-        `select sp.person_id, e.program_id
+        `select distinct sp.person_id, e.program_id
          from enrollments e
          join student_profiles sp on sp.id = e.student_profile_id
          where e.student_profile_id = $1 and e.program_id = $2
