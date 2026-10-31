@@ -48,7 +48,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
   }
   async function decline(participantId:string,studentName:string){
     if(busy)return;
-    if(!window.confirm("Decline field-trip permission for "+studentName+"? The school will be notified and this child cannot board without valid permission."))return;
+    if(!window.confirm("Decline or withdraw field-trip permission for "+studentName+"? The school will be notified and this child cannot board without valid permission. If your child has already boarded, contact the school immediately."))return;
     setBusy(participantId);setNotice("");setError("");
     try{
       const result=await declineGuardianFieldTripPermission({data:{participantId,confirmed:true,note:""}});
@@ -86,7 +86,13 @@ function TripPermissions({ items }: { items: Trip[] }) {
               <dd>{item.feeAmountCents ? money(item.feeAmountCents) : "No fee"}</dd></div>
           </dl>
           {item.status === "permission_complete"
-            ? <p className="mt-4 rounded-lg border p-3 text-sm">Permission recorded.</p>
+            ? <div className="mt-4 space-y-3 rounded-lg border p-3 text-sm">
+                <p>Permission recorded.</p>
+                {item.canDecline&&<button type="button" disabled={!!busy}
+                  className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  onClick={()=>void decline(item.participantId,item.studentName)}>Withdraw permission before boarding</button>}
+                {!item.canDecline&&<p className="text-xs text-muted-foreground">Contact the school immediately if your plans change.</p>}
+              </div>
             : item.status === "declined"
               ? <p className="mt-4 rounded-lg border p-3 text-sm">Permission declined. The school was notified; this child is not authorized to board.</p>
             : item.permissionText
