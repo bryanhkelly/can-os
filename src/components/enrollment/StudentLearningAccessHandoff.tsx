@@ -1,4 +1,5 @@
 import { useEffect,useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
  consentToStudentLearningAccount, getStudentLearningHandoff,
  provisionStudentLearningAccess,
@@ -78,6 +79,7 @@ function ApplicationLearningAccessHandoff({
    Admissions can confirm classroom placement and account eligibility. No invitation has been sent by this screen.</p>
   <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
    onClick={()=>setRetry(value=>value+1)}>Check again</button>
+  <Link to="/messages" className="ml-3 inline-block text-sm underline">Ask admissions for help</Link>
  </section>;
  return <section className="mt-4 rounded-lg border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
@@ -103,6 +105,7 @@ function ApplicationLearningAccessHandoff({
     </>:status==="pending_review"?<>
      <p>Guardian authorization received. A registrar must verify the student's
       identity and email destination before access is granted.</p>
+     {role==="guardian"&&<Link to="/messages" className="mt-3 inline-block underline">Ask admissions about student access</Link>}
      {role==="registrar"&&<>
       <p>Guardian-approved student address: <strong>{email}</strong></p>
       <label className="block">Independent student identity check
@@ -125,8 +128,8 @@ function ApplicationLearningAccessHandoff({
       </button>
      </>}
     </>:status==="approved"?<>
-     <p>Student access is approved. The student signs in through CAN OS using a
-      separate short-lived email link, then opens their assigned classes.</p>
+     <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>
+     {role==="guardian"&&<Link to="/access" className="mt-3 inline-block rounded border px-3 py-2 font-semibold">Open student sign-in</Link>}
      {role==="registrar"&&<button disabled={busy}
        className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
        {busy?"Requesting…":"Request student sign-in link again"}
