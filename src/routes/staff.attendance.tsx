@@ -214,6 +214,11 @@ function StaffAttendancePage() {
         Mark students expected onsite at your school and review guardian-submitted excuses.
         Approved excuses correct the attendance record without erasing history.
       </p>
+      {programId && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
+        Showing the expected onsite roster for the selected Program. Pending guardian excuses
+        still cover all students in your authorized review queue.
+        <Link to="/staff/attendance" className="ml-2 font-semibold underline">Show all permitted Programs</Link>
+      </div>}
       <WorkflowIntro eyebrow="School day · Attendance" title="A reliable record of who is here." description="Mark observed attendance, review excuses and reconcile changes without replacing the underlying history. Offline entries remain pending until synchronized." />
       <label className="mt-8 block max-w-sm text-sm font-semibold">
         Attendance date
