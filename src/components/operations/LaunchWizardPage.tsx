@@ -1,19 +1,15 @@
+import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
 import { LaunchProgramIdentityFields } from "@/components/operations/LaunchProgramIdentityFields";
 import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliveryModelFields";
-import { LaunchFamilyProgress } from "@/components/operations/LaunchFamilyProgress";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSchoolModelPicker } from "@/components/operations/LaunchSchoolModelPicker";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
 import type { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
-import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
-import {LaunchAcademicYearStep} from "@/components/operations/LaunchAcademicYearStep";
-import {LaunchWebsiteStep} from "@/components/operations/LaunchWebsiteStep";
 import {resolveLaunchResume} from "@/domain/launch-resume";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
-import {ProgramSiteAuthorizationPanel} from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
@@ -230,7 +226,6 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const currentProgram=currentSchool??currentLaunch;
   const schoolSelection={siteId:selection.siteId??currentProgram?.siteId??undefined,programId:selection.programId??currentProgram?.id};
   const hasSchoolPreparation=schools.length>0||launches.launches.length>0;
-  const invitationSiteId = schoolSelection.siteId;
   return (
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
@@ -241,37 +236,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<nav aria-label="School preparation steps" className="mt-4 flex flex-wrap gap-4 rounded-xl border bg-card p-4 text-sm font-semibold">
-          <a href="#launch-services" className="underline">1. CAN services</a>
-          <a href="#launch-academic-year" className="underline">2. Academic year</a>
-          <a href="#launch-website" className="underline">3. School website</a>
-          <a href="#invite-families" className="underline">4. Invite families</a>
-        </nav>}
-        {currentSchool?.status!=="active"&&<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
-          <ProgramSiteAuthorizationPanel key={currentLaunch.id} programId={currentLaunch.id}/>
-          <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
-          <a href="#launch-academic-year" className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</a>
-        </div>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
-        {currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
-
-        <details className="mt-4 rounded-xl border bg-card p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
-          <p className="mt-2 text-sm text-muted-foreground">An authorized administrator can invite a school registrar to complete setup, or a website editor to prepare church-owned content. Choose the exact Site in the invitation workspace. Access starts only after secure email acceptance; institutional approval remains separate.</p>
-          <nav aria-label="School launch staff invitations" className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
-            <Link to="/admin" search={{siteId:invitationSiteId,inviteRole:"registrar"}} className="underline">Invite a school setup lead</Link>
-            <Link to="/admin" search={{siteId:invitationSiteId,inviteRole:"site_website_editor"}} className="underline">Invite a church website editor</Link>
-          </nav>
-        </details>
-
-        {hasSchoolPreparation && <LaunchFamilyProgress
-          admissions={admissions}
-          enrollmentCounts={enrollmentCounts}
-          familyInvitations={familyInvitations}
-          siteId={schoolSelection.siteId}
-          programId={schoolSelection.programId}
-        />}
+        <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissions={admissions} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>
