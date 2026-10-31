@@ -76,11 +76,11 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
               Review and create inquiry
             </Link>}
             {!row.applicationId && ["new","contacted"].includes(row.status) &&
-              row.admissionsAuthorized && Boolean(row.consentAt) && !row.familyStartRequestId &&
+              row.canSendApplicationInvitation &&
               <button type="button" disabled={busyId !== null}
                 onClick={() => void inviteToApply(row)}
                 className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
-                Invite to apply
+                {row.familyStartRequestId ? "Resend expired application link" : "Invite to apply"}
               </button>}
             {row.status === "new" && <button type="button" disabled={busyId !== null}
               onClick={() => void changeStatus(row, "contacted")}
@@ -102,7 +102,11 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             : "No affirmative follow-up consent recorded"}</li>
           {row.contactedAt && <li>Registrar follow-up recorded · {new Date(row.contactedAt).toLocaleString()}</li>}
           <li>{row.admissionsAuthorized ? "CAN admissions and school-of-record services authorized" : "Application invitations blocked until CAN authorization"}</li>
-          {row.familyStartRequestId && <li>Verified-email application invitation requested · Delivery is not confirmed</li>}
+          {row.familyStartRequestId && <li>Verified-email application invitation requested · Delivery is not confirmed
+            {row.applicationLinkExpiresAt && !row.emailVerifiedAt &&
+              (new Date(row.applicationLinkExpiresAt).getTime() <= Date.now() ? " · Link expired" :
+                ` · Link expires ${new Date(row.applicationLinkExpiresAt).toLocaleString()}`)}
+          </li>}
           {row.emailVerifiedAt && <li>Family verified email link · {new Date(row.emailVerifiedAt).toLocaleString()} (not guardianship)</li>}
           {row.applicationId && <li>Admissions record linked · {row.applicationStage ?? "Inquiry"}{row.applicationSubmittedAt ? ` · ${new Date(row.applicationSubmittedAt).toLocaleString()}` : ""}</li>}
         </ol>
