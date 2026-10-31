@@ -210,10 +210,23 @@ export function buildTeacherAttention(data: {
     studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string;
   }[];
   notices: readonly { id: string; title: string; body: string | null; createdAt: string }[];
+  guardianQuestions?: readonly { id: string; studentName: string; assessmentTitle: string; status: string }[];
 }): DailyAttentionItem[] {
   const classroomHref = (item: { sectionId: string; assessmentId: string; studentProfileId: string }) =>
     `/teacher/gradebook?section=${encodeURIComponent(item.sectionId)}&assessment=${encodeURIComponent(item.assessmentId)}&student=${encodeURIComponent(item.studentProfileId)}`;
   return [
+    ...(data.guardianQuestions ?? []).filter(item=>item.status!=="resolved" && item.status!=="cancelled")
+      .map(item=>({
+        id: "grade-follow-up:" + item.id,
+        category: "family" as const,
+        title: "Guardian question: " + item.assessmentTitle,
+        detail: item.studentName + " · a family is awaiting the school's response to released feedback",
+        href: "/teacher?gradeAction=" + encodeURIComponent(item.id) + "#grade-follow-ups",
+        nextStep: "Respond to guardian",
+        ownerName: "Teaching team",
+        dueAt: null,
+        priority: "high" as const,
+      })),
     ...data.ungraded.map(item => ({
       id: `grading:${item.assessmentId}:${item.studentProfileId}`,
       category: "academic" as const,
