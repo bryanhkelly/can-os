@@ -144,7 +144,7 @@ export const applyOneRosterStudentMappings=createServerFn({method:"POST"})
   const users=report.previews.find(p=>p.kind==="users")?.rows??[];
   const schools=report.previews.find(p=>p.kind==="orgs")?.rows??[];
   if(!schools.length||!schools.some(s=>s.sourcedId===data.externalSchoolSourcedId&&
-     s.type?.toLowerCase()==="school"&&s.status?.toLowerCase()!=="tobedeleted"))
+     s.type?.toLowerCase()==="school"&&(!s.status||s.status.toLowerCase()==="active")))
     throw new Error("External school must exist as an active school in supplied orgs.");
   if(new Set(users.map(u=>u.sourcedId)).size!==users.length)
     throw new Error("Duplicate external user IDs must be resolved before registrar mapping.");
@@ -156,7 +156,8 @@ export const applyOneRosterStudentMappings=createServerFn({method:"POST"})
   for(const id of externalIds){
    const user=byUser.get(id);
    if(!user||user.role?.toLowerCase()!=="student"||
-      user.enabledUser?.toLowerCase()!=="true"||user.status?.toLowerCase()==="tobedeleted"||
+      user.enabledUser?.toLowerCase()!=="true"||
+      (user.status&&user.status.toLowerCase()!=="active")||
       (user.orgSourcedIds&&!user.orgSourcedIds.split(",").map(s=>s.trim()).includes(data.externalSchoolSourcedId)))
      throw new Error("External user must be an active student of the selected external school.");
   }
