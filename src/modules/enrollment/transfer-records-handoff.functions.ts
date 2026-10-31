@@ -120,15 +120,20 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
  .handler(async({data})=>{
    const actor=await authorizedRegistrar();
    return db.transaction(async tx=>{
+     const delegated=await listDelegatedCANTranscriptPrograms(actor,tx);
      const [handoff]=await tx.select().from(s.actions)
        .where(and(eq(s.actions.id,data.handoffActionId),
          eq(s.actions.type,kind),eq(s.actions.subjectType,"student_profile")))
        .for("update").limit(1);
-     if(!handoff?.programId||!handoff.siteId||!handoff.organizationId||
-        !actor.scope.programIds?.includes(handoff.programId)||
-        !actor.scope.siteIds?.includes(handoff.siteId)||
-        !actor.scope.organizationIds?.includes(handoff.organizationId))
-       throw new AuthorizationError("own scoped institutional transfer records handoff");
+     if(!handoff?.programId||!handoff.siteId||!handoff.organizationId)
+       throw new AuthorizationError("existing institutional transfer records handoff");
+     const ownsOriginSchool=actor.scope.programIds?.includes(handoff.programId)&&
+       actor.scope.siteIds?.includes(handoff.siteId)&&
+       actor.scope.organizationIds?.includes(handoff.organizationId);
+     const isDelegatedIssuer=delegated.some(program=>program.programId===handoff.programId&&
+       program.siteId===handoff.siteId);
+     if(!ownsOriginSchool&&!isDelegatedIssuer)
+       throw new AuthorizationError("own school or exact CAN institutional record-issuer delegation");
      if(handoff.status==="resolved"){
        if(handoff.metadata.issuedTranscriptId===data.issuanceId&&
           handoff.metadata.deliveryReceiptReference===data.receiptReference)
