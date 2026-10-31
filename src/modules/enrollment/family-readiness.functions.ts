@@ -39,7 +39,7 @@ export const getFamilyReadinessPage=createServerFn({method:"GET"})
   return {items,nextCursor:hasMore?items[items.length-1]?.id??null:null};
  });
 export const getFamilyReadiness=createServerFn({method:"GET"})
- .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
+ .validator((value:unknown)=>operationsSelectionSchema.extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
  .handler(async({data})=>{
  const actor=await registrar();
  setResponseHeader("Cache-Control","private, no-store");
@@ -47,7 +47,7 @@ export const getFamilyReadiness=createServerFn({method:"GET"})
  if(!scoped.programIds.length)return [];
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,scoped.programIds)).limit(150);
+ const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,scoped.programIds)).orderBy(asc(s.applications.id)).limit(40).offset((data.page-1)*40);
  const synthetic=apps;
  if(!synthetic.length)return [];
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),inArray(s.journeys.participantId,synthetic.map(x=>x.id))));
