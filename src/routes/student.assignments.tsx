@@ -44,6 +44,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const {filter="all",assessment,section}=Route.useSearch();
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
+ const [submittedReceipt,setSubmittedReceipt]=useState<string|null>(null);
  const [error,setError]=useState("");
  const [draftStatus,setDraftStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const [pendingFiles,setPendingFiles]=useState<File[]>([]);
@@ -64,7 +65,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const [draft,setDraft]=useState(()=>chosen?.responseText??"");
  const nextAttempt=chosen?.status==="returned"?(chosen.attemptNumber??1)+1:chosen?.attemptNumber??1;
  const attemptLimitReached=Boolean(chosen&&chosen.metadata.maxAttempts!==null&&nextAttempt>chosen.metadata.maxAttempts);
- const editable=chosen?.canEdit===true;
+ const editable=chosen?.canEdit===true&&!submittedReceipt;
  useEffect(()=>{
   if(!selected){setAttachments([]);return;}
   let active=true;
@@ -108,15 +109,20 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
    };
    if(submitFinal){
     const receipt=await submitAssignmentWork({...work,submit:()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}})});
+    setSubmittedReceipt(receipt.submissionId);
     setNotice("Your assignment has been submitted. Receipt: "+receipt.submissionId);
    }else{
     await saveAssignmentWork(work);
     setDraftStatus("saved");
     setNotice("Draft and attached files saved. You can return to continue before submitting.");
    }
-   const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
-   setAttachments(updatedFiles.attachments);
-   await router.invalidate();
+   try{
+    const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
+    setAttachments(updatedFiles.attachments);
+    await router.invalidate();
+   }catch{
+    setNotice(current=>current+" The latest view could not load. Reload to review your saved work.");
+   }
   }catch(cause){
    setError(cause instanceof Error?cause.message:submitFinal?"Unable to submit assignment":"Unable to save draft");
   }finally{setBusy(false);}
