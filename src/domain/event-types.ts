@@ -41,6 +41,7 @@ export const EventTypes = {
   ActionResolved: "ActionResolved",
   StudentLearningGoalReviewed: "StudentLearningGoalReviewed",
   EnrollmentActivated: "EnrollmentActivated",
+  EnrollmentExited: "EnrollmentExited",
   EnrollmentDocumentSubmitted: "EnrollmentDocumentSubmitted",
   EnrollmentDocumentReviewed: "EnrollmentDocumentReviewed",
   EnrollmentFormSigned: "EnrollmentFormSigned",
