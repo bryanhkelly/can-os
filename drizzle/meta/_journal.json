@@ -386,6 +386,13 @@
       "when": 1793418000000,
       "tag": "0054_academic_credential_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1793421600000,
+      "tag": "0055_academic_credential_release_authorizations",
+      "breakpoints": true
     }
   ]
 }
