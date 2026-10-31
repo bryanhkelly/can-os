@@ -22,7 +22,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
- .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(desc(s.notifications.createdAt)).limit(50);
+ .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(sql`CASE WHEN ${s.notifications.type} = 'school_family_alert' AND ${s.notifications.status} = 'unread' THEN 0 ELSE 1 END`,desc(s.notifications.createdAt)).limit(50);
  const tripNoticeTypes=new Set([
   "field_trip_permission_requested","field_trip_permission_signed","field_trip_permission_declined",
  ]);
