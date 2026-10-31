@@ -202,9 +202,13 @@ export const getGradebook = createServerFn({ method: "GET" })
     .orderBy(desc(s.submissions.attemptNumber))
    : [];
 
-  // Latest attempt per (student, assessment); rows arrive newest-attempt first.
+  // The gradebook grid must not return submissions for withdrawn pupils
+  // even when their old Section enrollment and assessment history remain.
+  // Apply the same live Program + Section membership as the student roster.
+  const activeStudentIds = new Set(studentRows.map(row => row.studentProfileId));
   const latest = new Map<string, (typeof submissionRows)[number]>();
   for (const row of submissionRows) {
+   if (!activeStudentIds.has(row.studentProfileId)) continue;
    const key = `${row.studentProfileId}:${row.assessmentId}`;
    if (!latest.has(key)) latest.set(key, row);
   }
