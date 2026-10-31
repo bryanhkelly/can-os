@@ -12,10 +12,6 @@ concurrency:
   group: admissions-neon-acceptance
   cancel-in-progress: false
 
-concurrency:
-  group: academic-intervention-neon-acceptance
-  cancel-in-progress: false
-
 jobs:
   academic-intervention:
     name: Disposable Neon GF1 acceptance
