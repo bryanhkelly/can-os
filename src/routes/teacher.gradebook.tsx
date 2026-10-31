@@ -13,6 +13,7 @@ import {
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
+import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEditor";
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -301,7 +302,9 @@ function TeacherGradebookPage() {
 
  async function changeAssessment(id:string,action:"publish"|"close"|"reopen"|"reschedule"){
   const date=assessmentDueDates[id];
-  if((action==="publish"||action==="reschedule")&&!date){
+  const savedDueAt=gradebook?.assessments.find(item=>item.id===id)?.dueAt;
+  if((action==="reschedule"&&!date)||(action==="publish"&&!date&&
+    (!savedDueAt||new Date(savedDueAt)<=new Date()))){
    setNotice("Select a future due date first.");return;
   }
   setBusy(true);setNotice("");
@@ -534,6 +537,8 @@ function TeacherGradebookPage() {
           {assessment.availableAt&&" · Releases "+new Date(assessment.availableAt).toLocaleString()}
           {assessment.closesAt?" · Closes "+new Date(assessment.closesAt).toLocaleString():" · No submission close time"}
          </span>
+         {assessment.status==="draft"&&<AssessmentDraftEditor key={assessment.id+assessment.title+assessment.instructions}
+          assessment={assessment} onSaved={async()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");await loadGradebook(selected);}}/>}
          {assessment.status!=="closed"&&<AssessmentScheduleEditor
           key={assessment.id+assessment.availableAt+assessment.closesAt} assessment={assessment}
           onSaved={()=>loadGradebook(selected)}/>}

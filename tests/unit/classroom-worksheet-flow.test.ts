@@ -29,7 +29,7 @@ vi.mock("@/db/client",async()=>{
   return {db:drizzle(state.client)};
 });
 import {db} from "@/db/client";
-import {createAssessment,getGradebook,getSubmissionReview,gradeSubmission} from "@/modules/learning/gradebook.functions";
+import {createAssessment,getGradebook,getSubmissionReview,gradeSubmission,manageAssessment} from "@/modules/learning/gradebook.functions";
 import {getGuardianAssignments} from "@/modules/learning/guardian-academic-queries.functions";
 import {listGuardianGradeFollowUps} from "@/modules/learning/guardian-grade-response.functions";
 import {getScopedPrograms} from "@/modules/operations/program-preview.functions";
@@ -77,11 +77,17 @@ beforeAll(async()=>{
 afterAll(async()=>{await state.client.close();vi.unstubAllEnvs();});
 it("publishes lesson-linked work, submits a worksheet, preserves it for review and releases the grade",async()=>{
   expect(await getScopedPrograms()).toEqual([expect.objectContaining({id:id(4),name:"School",siteName:"School campus",counts:expect.objectContaining({sections:1,enrollments:1,teachers:1})})]);
-  const assessment=await createAssessment({data:{sectionId:id(6),title:"Equation worksheet",instructions:"Upload the completed worksheet.",
-    pointsPossible:10,curriculumLessonId:"lesson-1",dueAt:new Date(Date.now()+86400000).toISOString(),publishNow:true}});
+  const assessment=await createAssessment({data:{sectionId:id(6),title:"Worksheet draft",instructions:"Directions in progress.",
+    pointsPossible:10,curriculumLessonId:"lesson-1",dueAt:new Date(Date.now()+86400000).toISOString(),publishNow:false}});
+  state.role="student";
+  expect((await getAssignments()).assignments).toEqual([]);
+  state.role="teacher";
+  expect((await getGradebook({data:{sectionId:id(6)}})).assessments[0]).toMatchObject({status:"draft",instructions:"Directions in progress."});
+  await manageAssessment({data:{assessmentId:assessment.assessmentId,action:"edit_draft",title:"Equation worksheet",instructions:"Upload the completed worksheet."}});
+  await manageAssessment({data:{assessmentId:assessment.assessmentId,action:"publish"}});
   state.role="student";
   const assigned=(await getAssignments()).assignments[0];
-  expect(assigned).toMatchObject({assessmentId:assessment.assessmentId,status:"assigned",canEdit:true,metadata:{curriculumLessonId:"lesson-1"}});
+  expect(assigned).toMatchObject({assessmentId:assessment.assessmentId,title:"Equation worksheet",instructions:"Upload the completed worksheet.",status:"assigned",canEdit:true,metadata:{curriculumLessonId:"lesson-1"}});
   await saveAssignmentDraft({data:{assessmentId:assessment.assessmentId,text:""}});
   const upload=await createSubmissionAttachmentUpload({data:{assessmentId:assessment.assessmentId,fileName:"worksheet.pdf",contentType:"application/pdf",sizeBytes:100}});
   await attachDocumentToSubmission({data:{assessmentId:assessment.assessmentId,documentId:upload.documentId}});
