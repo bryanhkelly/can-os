@@ -153,12 +153,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
         </label>
         <button type="button" disabled={busy||!accepted[pack.id]} className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
          onClick={()=>perform(()=>installCurriculumPack({data:{programId:market.program.id,packId:pack.id,termsAccepted:true}}),"Pack added to your organization's library.")}>Add to library</button>
-       </>:pack.adoption?.status==="active" && pack.adoption.versionId===pack.versionId?
-        <p className="text-sm font-medium">Release v{pack.version} adopted for {market.program.name}</p>:
-        pack.adoption?.status==="active"?
-        <p className="text-sm text-muted-foreground">Installed; a different release of this pack is already adopted. Upgrades must be reviewed to preserve class progress.</p>:
-        pack.adoption?
-        <p role="status" className="text-sm text-muted-foreground">Program adoption status: {pack.adoption.status}. An explicit adoption revision is required before this pack can be used again. Existing class version pins and local supplements are preserved.</p>:
+       </>:
         <section className="space-y-3 rounded border p-3" aria-label={"Review adoption for "+pack.name}>
          {adoptionReview!==pack.versionId?<button type="button" disabled={busy}
            className="rounded border px-3 py-2 text-sm" onClick={()=>setAdoptionReview(pack.versionId)}>Review adoption</button>:<>
