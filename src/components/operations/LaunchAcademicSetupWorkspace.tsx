@@ -34,6 +34,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [courseCredits,setCourseCredits]=useState("");
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [confirmedSectionId,setConfirmedSectionId]=useState<string|null>(null);
  const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
  const busy=mutation.isSubmitting;
  async function run(operation:()=>Promise<unknown>,message:string){
@@ -41,7 +42,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   try{
    const submission=await mutation.submit(operation);
    if(submission.status === "ignored") return;
-   if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
+   if(submission.refreshError){setError("The server accepted the command, but fresh records could not be loaded. Reopen this workspace to verify before retrying.");return;}
    setNotice(message);
   }catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
  }
@@ -115,7 +116,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
      code:code.trim()||(selectedCourse?selectedCourse.code+"-A":""),title:title.trim()||selectedCourse?.title||"",teacherPersonId:effectiveTeacherId,scheduleTemplateId:effectiveScheduleId,
-     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class saved. Review its schedule and first-week readiness below.");
+     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);setConfirmedSectionId(null);},"Class command accepted. Verify the saved Section and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
@@ -155,12 +156,12 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
-   <strong>Classroom saved.</strong> The schedule, instructor and learner-facing first lesson were checked.
+   <strong>Section command accepted.</strong> The server validated the requested Section and assignment. Confirm the latest persisted readiness after refreshing; this is not an opening approval.
    {data.sections.find(section=>section.id===createdSectionId)?<div className="mt-3">
     <p className="font-medium">Remaining first-day requirements</p>
     {data.sections.find(section=>section.id===createdSectionId)!.classroom.blockers.length?
      <ul className="mt-2 list-inside list-disc space-y-1">{data.sections.find(section=>section.id===createdSectionId)!.classroom.blockers.map(blocker=><li key={blocker.key}>{blocker.message}</li>)}</ul>:
-     <p className="mt-2">First-week classroom checks are satisfied.</p>}
+     <p className="mt-2">First-week classroom checks are satisfied in the currently loaded snapshot. Refresh for the latest state.</p>}
    </div>:<p className="mt-2">Refresh the classroom checklist to see live readiness.</p>}
    <div className="mt-3 flex flex-wrap gap-3">
     <a href={"#classroom-"+createdSectionId} className="rounded border px-3 py-2 font-semibold">Review classroom readiness</a>
