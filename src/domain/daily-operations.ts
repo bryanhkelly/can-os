@@ -268,7 +268,8 @@ export function buildGuardianAttention(items: readonly {
       title: item.title,
       detail: item.detail ?? "",
       href: item.href,
-      nextStep: item.kind === "excuse" ? "Submit excuse" : item.kind === "schoolwork" ? "Review assignment" : item.kind === "action" ? "Review action" : "View update",
+      nextStep: item.kind === "excuse" ? "Submit excuse" : item.kind === "schoolwork" ? "Review assignment" :
+        item.kind === "course_approval" ? "Review class request" : item.kind === "action" ? "Review action" : "View update",
       ownerName: "You",
       dueAt: item.dueAt ?? null,
       priority: item.priority === "urgent" ? "critical" : item.priority === "high" ? "high" : "normal",
