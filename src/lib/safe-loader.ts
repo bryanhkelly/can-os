@@ -22,7 +22,13 @@ export function classifyLoaderError(error: unknown): { kind: LoaderFailureKind; 
   const name = error instanceof Error ? error.name : "";
   if (error instanceof AuthenticationRequiredError || name === "AuthenticationRequiredError")
     return { kind: "authentication", retryable: false };
-  // The existing verified-session provider uses this exact capability marker\n  // for a missing session. Do not treat other capability denials as sign-in.\n  if (name === "AuthorizationError" &&\n      error instanceof Error &&\n      error.message === "Missing required capability or scope: authenticated session")\n    return { kind: "authentication", retryable: false };\n  if (error instanceof AuthorizationError || name === "AuthorizationError")
+  // The existing verified-session provider uses this exact capability marker
+  // for a missing session. Do not treat other capability denials as sign-in.
+  if (name === "AuthorizationError" &&
+      error instanceof Error &&
+      error.message === "Missing required capability or scope: authenticated session")
+    return { kind: "authentication", retryable: false };
+  if (error instanceof AuthorizationError || name === "AuthorizationError")
     return { kind: "authorization", retryable: false };
   if (error instanceof DataUnavailableError || name === "DataUnavailableError")
     return { kind: "unavailable", retryable: true };
