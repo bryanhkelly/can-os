@@ -128,6 +128,30 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
     {action&&!needsWarning&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
    </div>
 
+   <section aria-label="School responses to your grade questions" className="mt-10">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your school grade questions</h2>
+     <Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="text-sm font-semibold underline">Academic progress</Link>
+    </div>
+    <p className="mt-2 text-sm text-muted-foreground">Questions you sent about released grades, and your school's responses. Pending questions are awaiting school action, not another family task.</p>
+    {gradeFollowUpsWarning&&<p className="mt-3 rounded-lg border p-3 text-sm" role="status">{gradeFollowUpsWarning}</p>}
+    {!gradeFollowUpsWarning&&visibleQuestions.length===0&&<p className="mt-3 text-sm text-muted-foreground">No school grade questions to review in the current academic view.</p>}
+    <div className="mt-4 space-y-3">
+     {visibleQuestions.slice(0,6).map(question=><article key={question.id} className="rounded-xl border bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+       <p className="font-semibold">{question.studentName} · {question.assessmentTitle}</p>
+       <StatusBadge tone={question.status==="resolved"?"success":"info"}>{question.status==="resolved"?"School responded":"Awaiting school response"}</StatusBadge>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">Your question: {question.question}</p>
+      {question.status==="resolved"&&question.resolutionNote&&<p className="mt-3 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">School response: {question.resolutionNote}</p>}
+      <Link to="/guardian/academics"
+       search={{student:question.studentPersonId,section:question.sectionId,assessment:question.assessmentId,submission:question.submissionId}}
+       className="mt-3 inline-block text-sm font-semibold underline">View grade and school follow-up</Link>
+     </article>)}
+    </div>
+    {visibleQuestions.length>6&&<p className="mt-3 text-sm text-muted-foreground">Showing 6 of {visibleQuestions.length} recent questions. Open academic progress for your child's full assignment history.</p>}
+   </section>
+
    <section aria-label="Your children" className="mt-12">
     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your children</h2>
     {children.length === 0 && <div className="mt-4 rounded-xl border bg-card p-5">
