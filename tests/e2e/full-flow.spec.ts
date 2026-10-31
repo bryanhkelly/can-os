@@ -792,6 +792,9 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         unrelatedGuardian.page,
         `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
+      await expect(unrelatedGuardian.page.getByText(
+        "No students with academic-viewing permission were found at your school.",
+      )).toBeVisible();
       await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
       await expect(
         unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
@@ -823,6 +826,9 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       );
       await unrelatedGuardian.page.reload();
       await waitForAppHydration(unrelatedGuardian.page);
+      await expect(unrelatedGuardian.page.getByText(
+        "No students with academic-viewing permission were found at your school.",
+      )).toBeVisible();
       await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
       await expect(
         unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
