@@ -9,13 +9,21 @@ declare const Netlify: { env: { get(name: string): string | undefined } };
  * The main CAN OS app on Netlify/application hosts is untouched.
  *
  * IMPORTANT: Wildcard DNS/TLS is not provisioned by this source change.
- * Tenant-origin requests cannot reach CAN OS private routes or RPCs.\n * POST /apply is only a verification-link request, never a child write.
+ * Tenant-origin requests cannot reach CAN OS private routes or RPCs.
+ * POST /apply is only a verification-link request, never a child write.
  */
 export default function siteHostGate(request: Request): Response | URL | undefined {
   const enabled = typeof Netlify !== "undefined" &&
     Netlify.env.get("CAN_PUBLIC_SITE_HOSTING_ENABLED") === "true";
   let decision;
   try {
+    const requestHost = new URL(request.url).host.toLowerCase();
+    const hostHeader = request.headers.get("host");
+    // Reject conflicting Host metadata before a tenant rewrite. Forwarded
+    // headers never select a Site and cannot override the actual request URL.
+    if (hostHeader && hostHeader.toLowerCase() !== requestHost) {
+      return new Response("Not found", {status: 404, headers: {"Cache-Control": "no-store"}});
+    }
     decision = classifyPublicSiteRequest(request.url, request.method, enabled);
   } catch {
     return new Response("Not found", {
