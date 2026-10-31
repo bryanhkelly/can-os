@@ -3,7 +3,7 @@ import {
   approveChurchOnboardingRequest, declineChurchOnboardingRequest,
   listChurchOnboardingRequests, verifyChurchOnboardingRequest, resendApprovedChurchInvitation,
 } from "@/modules/networks/network-steward.functions";
-import { cancelChurchOnboardingRequest, requestChurchOnboardingEvidence } from "@/modules/networks/church-applications.functions";
+import { cancelChurchOnboardingRequest, requestChurchOnboardingEvidence, resendChurchEvidenceNotice } from "@/modules/networks/church-applications.functions";
 
 type Applications = Awaited<ReturnType<typeof listChurchOnboardingRequests>>;
 const field = "mt-1 w-full rounded-lg border bg-background p-2 text-sm";
@@ -88,7 +88,14 @@ export function ChurchApplicationsDesk() {
           {request.churchWebsite&&<a href={request.churchWebsite} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm underline">Church website</a>}
           <p className="mt-1 text-xs text-muted-foreground">Received {new Date(request.createdAt).toLocaleDateString()} · Request {request.id}</p>
           {request.status!=="verified" ? <div className="mt-4 space-y-3">
-            {request.status==="needs_evidence" && <p role="status" className="rounded border p-3 text-sm">Additional evidence requested. Fresh independent verification is required before approval. Do not rely on an applicant-submitted claim alone.</p>}
+            {request.status==="needs_evidence" && <p role="status" className="rounded border p-3 text-sm">Additional evidence requested. Fresh independent verification is required before approval. Do not rely on an applicant-submitted claim alone.</p>
+            {request.status==="needs_evidence" && <button type="button" disabled={!!working} className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={async ()=>{
+              setWorking(request.id); setError(""); setNotice("");
+              try { const result = await resendChurchEvidenceNotice({ data: request.id });
+                setNotice(result.providerAccepted ? "Evidence reminder accepted by the provider; delivery not confirmed." : "Evidence reminder not accepted by the provider. Follow up through an established channel.");
+              } catch(cause) { setError(cause instanceof Error ? cause.message : "Unable to resend evidence reminder."); }
+              finally { setWorking(null); }
+            }}>Retry evidence follow-up notice</button>}}
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
             <label className="block text-sm font-semibold">How authority was verified
               <select className={field} value={verificationMethod[request.id] ?? "signed_authority"} onChange={e=>setVerificationMethod(previous=>({...previous,[request.id]:e.target.value as "signed_authority" | "denominational_confirmation" | "independent_church_confirmation"}))}>
