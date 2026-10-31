@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,gt,inArray,isNotNull,isNull } from "drizzle-orm";
+import { and,desc,eq,gt,inArray,isNotNull,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -127,6 +127,22 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   });
   if(!approved)throw new AuthorizationError("Verified transfer, guardian consent and recipient identity required");
   return db.transaction(async tx=>{
+   // Serialize competing requests for the same exact credential, recipient
+   // and signed transfer. Repeated requests reuse the existing live grant.
+   const lockKey=[data.credentialId,data.recipientPersonId,consent!.id].join(":");
+   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+   const [existing]=await tx.select({
+    id:s.academicCredentialReleaseAuthorizations.id,
+   }).from(s.academicCredentialReleaseAuthorizations).where(and(
+    eq(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,doc.issuerId),
+    eq(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,data.credentialId),
+    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,data.recipientPersonId),
+    eq(s.academicCredentialReleaseAuthorizations.instructionReference,action!.id),
+    eq(s.academicCredentialReleaseAuthorizations.consentEvidenceReference,consent!.id),
+    isNull(s.academicCredentialReleaseAuthorizations.revokedAt),
+    gt(s.academicCredentialReleaseAuthorizations.expiresAt,new Date()),
+   )).limit(1);
+   if(existing)return {authorizationId:existing.id};
    // A signed consent is bound to this transfer action and recipient.
    const [created]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
     issuingOrganizationId:doc.issuerId,transcriptIssuanceId:data.credentialId,
