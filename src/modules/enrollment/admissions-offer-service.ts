@@ -212,6 +212,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   // A receiving school may decide an application and the family may accept
   // the offer while the originating school coordinates its exit. Only actual
   // enrollment activation waits for the verified institutional transfer.
+  let transferOrigin: {id:string;metadata:Record<string,unknown>}|null=null;
   if(typeof app.metadata.originTransferActionId==="string"){
     const [origin]=await tx.select({
       id:actions.id,type:actions.type,status:actions.status,
@@ -234,7 +235,20 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
         eq(enrollments.programId,origin.programId),
         eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
     if(activeOrigin)throw new Error("The originating school still has an active Program enrollment. Reconcile the transfer before activating the destination.");
+    transferOrigin={id:origin.id,metadata:origin.metadata};
   }
+  const recordDestinationActivation=async(enrollmentId:string)=>{
+    if(!transferOrigin)return;
+    await tx.update(actions).set({
+      metadata:{...transferOrigin.metadata,
+        destinationApplicationId:app.id,
+        destinationProgramId:app.programId,
+        destinationEnrollmentId:enrollmentId,
+        destinationActivatedAt:new Date().toISOString(),
+      },
+      updatedAt:new Date(),
+    }).where(eq(actions.id,transferOrigin.id));
+  };
   const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
   if(!programSite||programSite.organizationId!==organizationId)
@@ -247,6 +261,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
       studentProfileId:app.studentProfileId,sectionId,actor:context,
       source:"accepted_offer_activation",applicationId:app.id,
     });
+    await recordDestinationActivation(existing.id);
     return existing.id;
   }
   const journey=await ready(tx,app.id);
@@ -260,6 +275,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
     source:"accepted_offer_activation",applicationId:app.id,
   });
   await tx.update(journeys).set({status:"active",completedAt:new Date(),updatedAt:new Date()}).where(eq(journeys.id,journey.id));
+  await recordDestinationActivation(enrollment.id);
   const [student]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!student)throw new Error("Student profile missing during activation");
   const recipients=[...new Set([student.personId,offer!.respondedByPersonId].filter((id):id is string=>Boolean(id)))];
