@@ -1,3 +1,7 @@
+import { LaunchOrientationTask } from "@/components/operations/LaunchOrientationTask";
+import { LaunchOpeningTask } from "@/components/operations/LaunchOpeningTask";
+import { SchoolOwnedCompletion, LaunchEvidenceStatement, InstitutionalEvidenceReview } from "@/components/operations/LaunchRequirementActions";
+import { LaunchTaskDestination } from "@/components/operations/LaunchTaskDestination";
 import { useState } from "react";
 import { resolveLaunchResume } from "@/domain/launch-resume";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -27,230 +31,7 @@ function taskTone(task: LaunchGuidanceTask): "success" | "attention" | "neutral"
   return "neutral";
 }
 
-function TaskDestination({ launch, task }: { launch: Launch; task: LaunchGuidanceTask }) {
-  if (task.requiresRegistrarReview) {
-    return <Link to="/operations/launch/$programId" params={{programId:launch.id}}
-      search={{siteId:launch.siteId??undefined,programId:undefined}}
-      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold">
-      Review requirement details
-    </Link>;
-  }
-  if (task.action === "academics" || task.action === "review") {
-    return <Link to="/operations/launch/$programId" params={{ programId: launch.id }}
-      search={{ siteId: launch.siteId ?? undefined, programId: undefined }}
-      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
-      Open guided setup
-    </Link>;
-  }
-  if (task.action === "admissions") {
-    return <Link to="/admissions/intake" search={{ siteId: launch.siteId ?? undefined, programId: launch.id }}
-      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
-      Open family intake
-    </Link>;
-  }
-  return null;
-}
 
-function SchoolOwnedCompletion({ task, busy, complete }: {
-  task: LaunchGuidanceTask;
-  busy: boolean;
-  complete: (requirementId: string) => Promise<void>;
-}) {
-  const [confirmed, setConfirmed] = useState(false);
-  if (!task.requirementId || task.state !== "needs_you" || task.requiresRegistrarReview) return null;
-  return <details className="mt-4 rounded-xl border bg-background p-4">
-    <summary className="cursor-pointer text-sm font-semibold">Record this school-owned requirement</summary>
-    <p className="mt-3 text-sm text-muted-foreground">
-      Use this only after the actual work is complete. This cannot complete CAN or third-party work,
-      approve evidence, or authorize opening.
-    </p>
-    <label className="mt-3 flex items-start gap-2 text-sm">
-      <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
-      I confirm the school-owned work is complete and accurately represented.
-    </label>
-    <button type="button" disabled={busy || !confirmed} onClick={() => void complete(task.requirementId!)}
-      className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-      Save school completion
-    </button>
-  </details>;
-}
-
-function LaunchEvidenceStatement({ task, busy, submit }: {
-  task: LaunchGuidanceTask;
-  busy: boolean;
-  submit: (requirementId: string, statement: string) => Promise<boolean>;
-}) {
-  const [statement, setStatement] = useState("");
-  if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state) || task.pendingEvidenceReview || task.action === "admissions" || (task.state === "needs_you" && !task.evidenceReviewRequired)) return null;
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
-    event.preventDefault();
-    if (statement.trim().length < 10) return;
-    void submit(task.requirementId!, statement.trim()).then(saved => { if (saved) setStatement(""); });
-  }}>
-    <p className="text-sm font-semibold">Submit evidence statement</p>
-    <p className="mt-2 text-xs text-muted-foreground">Describe the completed work or supporting evidence. This records a statement for review; it does not approve the requirement or authorize opening.</p>
-    <label className="mt-3 block text-sm">Evidence details
-      <textarea value={statement} onChange={event => setStatement(event.target.value)} maxLength={4000}
-        rows={3} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-    </label>
-    <button type="submit" disabled={busy || statement.trim().length < 10}
-      className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">Record evidence statement</button>
-  </form>;
-}
-
-function InstitutionalEvidenceReview({ task, busy, review }: {
-  task: LaunchGuidanceTask;
-  busy: boolean;
-  review: (id: string, decision: "accepted" | "rejected", reason: string) => Promise<boolean>;
-}) {
-  const [reason, setReason] = useState("");
-  const [decision, setDecision] = useState<"accepted" | "rejected">("rejected");
-  if (!task.requirementId || !task.pendingEvidenceReview || task.state === "complete") return null;
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
-    event.preventDefault();
-    void review(task.requirementId!, decision, reason).then(saved => { if (saved) setReason(""); });
-  }}>
-    <p className="text-sm font-semibold">CAN institutional evidence review</p>
-    <p className="mt-2 text-xs text-muted-foreground">Approval completes this requirement, but does not independently authorize opening.</p>
-    {task.latestEvidenceStatement && <blockquote className="mt-3 whitespace-pre-wrap rounded-lg border p-3 text-sm">{task.latestEvidenceStatement}</blockquote>}
-    {task.latestEvidenceStatementAt && <p className="mt-2 text-xs text-muted-foreground">Submitted: {task.latestEvidenceStatementAt}</p>}
-    <label className="mt-3 block text-sm">Decision
-      <select value={decision} onChange={event => setDecision(event.target.value as "accepted" | "rejected")}
-        className="mt-1 block w-full rounded-lg border bg-card p-2">
-        <option value="rejected">Request correction</option>
-        <option value="accepted">Accept evidence</option>
-      </select>
-    </label>
-    <label className="mt-3 block text-sm">Decision reason
-      <textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={1000}
-        rows={3} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-    </label>
-    <button type="submit" disabled={busy || (decision === "rejected" ? reason.trim().length < 5 : reason.trim().length < 1)}
-      className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-      Record institutional decision
-    </button>
-  </form>;
-}
-
-function siteDateTime(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(date);
-  const value = (part: string) => parts.find(item => item.type === part)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
-}
-
-function siteLocalToIso(value: string, timezone: string) {
-  const naive = Date.parse(value + ":00Z");
-  if (!Number.isFinite(naive)) throw new Error("Invalid orientation time");
-  let instant = naive;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const formatted = siteDateTime(new Date(instant), timezone);
-    const difference = naive - Date.parse(formatted + ":00Z");
-    if (difference === 0) break;
-    instant += difference;
-  }
-  if (siteDateTime(new Date(instant), timezone) !== value)
-    throw new Error("This local time does not exist in the Site timezone");
-  if (siteDateTime(new Date(instant - 60 * 60_000), timezone) === value ||
-      siteDateTime(new Date(instant + 60 * 60_000), timezone) === value)
-    throw new Error("This local time occurs twice in the Site timezone; choose an unambiguous time");
-  return new Date(instant).toISOString();
-}
-
-function OrientationTask({ launch, busy, save }: {
-  launch: Launch;
-  busy: boolean;
-  save: (input: { title: string; startsAt: string; endsAt: string; timezone: string }) => Promise<void>;
-}) {
-  const [title, setTitle] = useState("Student and family orientation");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
-  const timezone = launch.siteTimezone ?? "America/Los_Angeles";
-  function useRecommendation() {
-    const start = new Date();
-    start.setDate(start.getDate() + 7);
-    const siteDay = siteDateTime(start, timezone).slice(0, 10);
-    const suggestedStart = siteLocalToIso(`${siteDay}T18:00`, timezone);
-    const end = new Date(Date.parse(suggestedStart) + 45 * 60_000);
-    setStartsAt(`${siteDay}T18:00`);
-    setEndsAt(siteDateTime(end, timezone));
-  }
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
-    event.preventDefault();
-    if (!startsAt || !endsAt) return;
-    void save({
-      title,
-      startsAt: siteLocalToIso(startsAt, timezone),
-      endsAt: siteLocalToIso(endsAt, timezone),
-      timezone,
-    });
-  }}>
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm font-semibold">Schedule the canonical orientation event</p>
-      <button type="button" onClick={useRecommendation} className="text-sm font-semibold underline">
-        Use a suggested 45-minute time
-      </button>
-    </div>
-    <p className="mt-2 text-xs text-muted-foreground">
-      The suggestion only fills this form. Saving uses the existing orientation command and the Site timezone ({timezone}).
-    </p>
-    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm sm:col-span-2">Title
-        <input required value={title} onChange={event => setTitle(event.target.value)}
-          className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-      <label className="text-sm">Start
-        <input aria-label="Orientation start" required type="datetime-local" value={startsAt}
-          onChange={event => setStartsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-      <label className="text-sm">End
-        <input aria-label="Orientation end" required type="datetime-local" value={endsAt}
-          onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-    </div>
-    <button type="submit" disabled={busy || !startsAt || !endsAt}
-      className="mt-4 min-h-11 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-      Save orientation
-    </button>
-  </form>;
-}
-
-function OpeningTask({ launch, busy, open }: {
-  launch: Launch;
-  busy: boolean;
-  open: (recipientPersonId?: string) => Promise<void>;
-}) {
-  const [recipient, setRecipient] = useState("");
-  return <div className="mt-4 rounded-xl border border-warning/40 bg-background p-4">
-    {launch.siteId && <label className="block text-sm">Receiving site operator (required)
-      <select aria-label={`Receiving site operator for ${launch.name}`} value={recipient}
-        onChange={event => setRecipient(event.target.value)}
-        className="mt-1 block w-full rounded-lg border bg-card p-2 text-sm">
-        <option value="">Select the named receiving operator</option>
-        {launch.openingOperators.map(operator => <option key={operator.personId} value={operator.personId}>
-          {operator.firstName} {operator.lastName}
-        </option>)}
-      </select>
-      <span className="mt-2 block text-xs text-muted-foreground">
-        Only the selected active site registrar/operator can acknowledge receipt after opening.
-        This does not waive readiness checks.
-      </span>
-      {!launch.openingOperators.length && <span role="alert" className="mt-2 block text-xs">
-        No active site registrar/operator is available. An existing authorized site grant is required.
-      </span>}
-    </label>}
-    <button type="button" disabled={busy || Boolean(launch.siteId && !recipient)}
-      onClick={() => void open(recipient || undefined)}
-      className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-      Activate
-    </button>
-    <p className="mt-2 text-xs text-muted-foreground">
-      Activation is not self-certified: the server rechecks the ready Journey and all current opening authority.
-    </p>
-  </div>;
-}
 
 export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId }: {
   launches: Launch[];
@@ -441,14 +222,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       {next.state === "waiting_third_party" && <p className="mt-3 text-sm">
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
-      <div className="mt-4"><TaskDestination launch={launch} task={next} /></div>
+      <div className="mt-4"><LaunchTaskDestination launch={launch} task={next} /></div>
       {canReviewSelectedLaunch && next.pendingEvidenceReview && <InstitutionalEvidenceReview key={next.id} task={next} busy={busy} review={reviewEvidence} />}
       <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
       {next.action === "orientation" && next.state === "needs_you" &&
-        <OrientationTask launch={launch} busy={busy} save={saveOrientation} />}
+        <LaunchOrientationTask launch={launch} busy={busy} save={saveOrientation} />}
       {next.action === "opening" && next.state === "needs_you" &&
-        <OpeningTask key={launch.id} launch={launch} busy={busy} open={open} />}
+        <LaunchOpeningTask key={launch.id} launch={launch} busy={busy} open={open} />}
     </article> : <p role="status" className="mt-6 rounded-xl border p-4 text-sm">
       No further task is derived from the saved Launch Journey. Review the canonical record rather than assuming opening is approved.
     </p>}
@@ -480,7 +261,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.state === "needs_you" && <span className="max-w-48 text-right text-xs text-muted-foreground">School-owned work; confirm completion only after the underlying requirement is met.</span>}
             {task.state === "blocked" && <span className="max-w-48 text-right text-xs text-muted-foreground">Review the canonical requirement record to resolve the blocker.</span>}
             {task.state !== "complete" && task.action !== "opening" &&
-              <TaskDestination launch={launch} task={task} />}
+              <LaunchTaskDestination launch={launch} task={task} />}
             {canReviewSelectedLaunch && task.id !== next?.id && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
             {task.id !== next?.id && (task.evidenceReviewCorrectionPending || (task.state === "needs_can" && !task.pendingEvidenceReview && !task.evidenceStatementCount)) && <LaunchEvidenceStatement key={task.id} task={task} busy={busy} submit={submitEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&

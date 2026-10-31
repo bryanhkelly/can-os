@@ -9,7 +9,8 @@ import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploa
 import { validateCommonCartridgeImport, importCommonCartridgeSectionLinks, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
 import { validateOneRosterCsvBundle, applyOneRosterClassMappings } from "@/modules/learning/oneroster-import.functions";
-import { previewOneRosterCsv } from "@/domain/oneroster-csv";
+import { CurriculumProgramNavigation } from "@/components/learning/CurriculumProgramNavigation";
+import { previewRosterClasses } from "@/components/learning/oneroster-class-preview";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
@@ -53,16 +54,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [rosterValidated,setRosterValidated]=useState(false);
  const [rosterMap,setRosterMap]=useState<Record<string,string>>({});
  const cartridgeWebLinks=cartridgeReport?.preview.resources.filter(r=>/weblink|imswl/i.test(r.type))??[];
- type RosterClassRow=ReturnType<typeof previewOneRosterCsv>["rows"][number]&{sourcedId:string};
- let rosterClasses:RosterClassRow[]=[];
- try{if(rosterCsv.trim()){
-   const preview=previewOneRosterCsv("classes",rosterCsv);
-   if(!preview.errors.length)rosterClasses=preview.rows.map(row=>{
-     const sourcedId=row.sourcedId;
-     if(!sourcedId)throw new Error("A OneRoster class is missing its sourcedId.");
-     return {...row,sourcedId};
-   });
- }}catch{/* Keep the editor available for incomplete CSV input. */}
+ const rosterClasses=previewRosterClasses(rosterCsv);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
@@ -84,11 +76,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Academic operations</p>
   <h1 className="font-serif text-4xl">Curriculum Marketplace</h1>
   <p className="max-w-3xl text-sm text-muted-foreground">Install published curriculum packs into your organization's library, adopt releases for a school program and supplement classes without changing the publisher's immutable material.</p>
-  <nav className="flex flex-wrap gap-3" aria-label="Curriculum program scope">
-   {data.programs.map(program=><Link key={program.id} to="/operations/curriculum-marketplace" search={{programId:program.id}}
-    aria-current={market?.program.id===program.id?"page":undefined} className="rounded-lg border px-3 py-2 text-sm">{program.name}</Link>)}
-   {market?.canPublish&&<Link to="/operations/curriculum" search={{programId:market.program.id}} className="rounded-lg border px-3 py-2 text-sm underline">Curriculum Studio</Link>}
-  </nav>
+  <CurriculumProgramNavigation programs={data.programs} selectedProgramId={market?.program.id} canPublish={Boolean(market?.canPublish)} />
   {error&&<p role="alert" className="rounded-lg border border-red-500 p-4 text-sm">{error}</p>}
   {notice&&<p role="status" className="rounded-lg border p-4 text-sm">{notice}</p>}
   {!market&&<p className="rounded-lg border p-4">Select a program to browse packs under its verified school membership.</p>}

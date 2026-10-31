@@ -1,3 +1,5 @@
+import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
+import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -17,6 +19,9 @@ import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEdit
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
+import { liveRubricTotal } from "@/components/learning/live-rubric-total";
+import { prioritizeSubmittedReviews, adjacentReviews } from "@/components/learning/gradebook-review-queue";
+import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
 
 export const Route = createFileRoute("/teacher/gradebook")({
@@ -70,12 +75,10 @@ function TeacherGradebookPage() {
  const reviewAssessment=gradebook?.assessments.find(item=>item.id===reviewCell?.assessmentId);
  const reviewStudent=gradebook?.students.find(item=>item.studentProfileId===reviewCell?.studentProfileId);
  // Prioritize work awaiting a grade; reviewed history remains in the grid.
- const reviewQueue=[...(gradebook?.cells.filter(cell=>cell.status==="submitted")??[])]
-  .sort((a,b)=>Number(Boolean(b.gradingDraft))-Number(Boolean(a.gradingDraft)));
+ const reviewQueue=prioritizeSubmittedReviews(gradebook?.cells??[]);
  const pendingReviewCount=reviewQueue.length;
  const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
- const previousReview=reviewIndex>0?reviewQueue[reviewIndex-1]:undefined;
- const nextReview=reviewIndex>=0?reviewQueue[reviewIndex+1]:undefined;
+ const {previous:previousReview,next:nextReview}=adjacentReviews(reviewQueue,reviewCell?.submissionId);
 
  useEffect(()=>{
   const draft=reviewCell?.gradingDraft;
@@ -219,17 +222,7 @@ function TeacherGradebookPage() {
   }
  };
 
- /** Live rubric total for the grading panel; null until every criterion is valid. */
- const liveRubricTotal = (assessment: Assessment): number | null => {
-  if (!assessment.rubric.length) return null;
-  if(assessment.rubric.some(criterion=>!rubricInputs[criterion.id]?.trim()))return null;
-  try {
-   const grades = assessment.rubric.map(criterion => ({ id: criterion.id, points: Number(rubricInputs[criterion.id]) }));
-   return scoreRubric(assessment.rubric, grades).earned;
-  } catch {
-   return null;
-  }
- };
+ const liveRubricScore = (assessment: Assessment) => liveRubricTotal(assessment.rubric, rubricInputs);
 
  /** Arrow-key movement across the grade grid. */
  const onCellKeyDown = (event: React.KeyboardEvent, row: number, col: number) => {
@@ -350,12 +343,9 @@ function TeacherGradebookPage() {
   breadcrumbs={<><Link to="/teacher" search={{gradeAction:undefined}} className="underline">Teacher Today</Link><span>/</span><span>Gradebook</span></>}>
    <WorkflowIntro eyebrow="Teaching · Assessment" title="Feedback that moves learning forward." description="Review submitted evidence, assess with the published rubric, and give each learner a clear next step. Grade changes stay in the authorized gradebook workflow." />
    {(search.assessment||search.student)&&<Link to="/teacher/gradebook" search={{section:selected||search.section}} className="mt-4 inline-block text-sm underline">View full section gradebook</Link>}
-   {sections.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
-    Section
-    <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{section:event.target.value}})}>
-     {sections.map(section => <option key={section.id} value={section.id}>{section.title} ({section.code})</option>)}
-    </select>
-   </label>}
+   {sections.length > 0 && <div className="mt-8 max-w-sm">
+    <GradebookSectionSelector sections={sections} selectedId={selected} onSelect={section => void navigate({search:{section}})} />
+   </div>}
    {loading && <p className="mt-8 text-sm" role="status">Loading gradebook…</p>}
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
    {notice && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
@@ -371,24 +361,11 @@ function TeacherGradebookPage() {
      <p className="text-sm text-muted-foreground">There are no submitted assignments awaiting grading in this section. New student submissions will appear here.</p>
     </WorkspacePanel>}
     {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Choose a student submission to review and grade.">
-     <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">
-      {reviewQueue.map(cell=><Link key={cell.submissionId} to="/teacher/gradebook"
-       search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
-       className="rounded-lg border p-3 text-sm hover:bg-muted">
-       <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName??"Student"}</span>
-       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title??"Assessment"} · {cell.gradingDraft?"Draft saved · not released":cell.status}</span>
-      </Link>)}
-     </nav>
+     <GradebookReviewQueue cells={reviewQueue} students={gradebook.students} assessments={gradebook.assessments} sectionId={selected} />
     </WorkspacePanel>}
     {reviewCell&&reviewAssessment&&reviewStudent&&<div className="mt-6 grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
      <WorkspacePanel title="Submission queue" description="Select submitted or reviewed work.">
-      <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">{reviewQueue.map(cell=><Link key={cell.submissionId}
-       to="/teacher/gradebook" search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
-       aria-current={cell.submissionId===reviewCell.submissionId?"page":undefined}
-       className={"rounded-lg border p-3 text-sm "+(cell.submissionId===reviewCell.submissionId?"bg-muted":"")}>
-       <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName}</span>
-       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title} · {cell.gradingDraft?"Draft saved · not released":cell.status}</span>
-      </Link>)}</nav>
+      <GradebookReviewQueue cells={reviewQueue} students={gradebook.students} assessments={gradebook.assessments} sectionId={selected} activeSubmissionId={reviewCell.submissionId} />
      </WorkspacePanel>
      <WorkspacePanel title={`${reviewStudent.displayName} · ${reviewAssessment.title}`} actions={<div className="flex gap-3 text-sm">
       {previousReview&&<Link to="/teacher/gradebook" search={{section:selected,assessment:previousReview.assessmentId,student:previousReview.studentProfileId}} className="underline">Previous</Link>}
@@ -398,14 +375,13 @@ function TeacherGradebookPage() {
       <AssignmentConversation key={`conversation-${reviewCell.submissionId}`} assessmentId={reviewAssessment.id} studentPersonId={reviewStudent.personId}/>
       {reviewCell.status==="submitted"?<div className="grid gap-4">
        <StatusBadge>Ready for grading</StatusBadge>
-       {reviewAssessment.rubric.length>0?<fieldset className="space-y-3"><legend className="font-semibold">Rubric</legend>
-        {reviewAssessment.rubric.map(criterion=><label key={criterion.id} className="block text-sm font-semibold">{criterion.label} <span className="font-normal text-muted-foreground">(0–{criterion.maxPoints})</span>
-         {criterion.description&&<span className="mt-1 block text-sm font-normal text-muted-foreground">{criterion.description}</span>}
-         <input className="mt-2 w-28 rounded-lg border bg-background p-2" type="number" min={0} max={criterion.maxPoints}
-          value={rubricInputs[criterion.id]??""} onChange={event=>setRubricInputs(current=>({...current,[criterion.id]:event.target.value}))}/>
-        </label>)}
-        <p role="status" className="text-sm font-semibold">Total: {liveRubricTotal(reviewAssessment)??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
-       </fieldset>:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
+       {reviewAssessment.rubric.length>0?<RubricScoreFields
+        criteria={reviewAssessment.rubric}
+        values={rubricInputs}
+        onChange={(id,value)=>setRubricInputs(current=>({...current,[id]:value}))}
+        total={liveRubricScore(reviewAssessment)}
+        pointsPossible={reviewAssessment.pointsPossible}
+       />:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
         <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
        </label>}
        <label className="text-sm font-semibold">Feedback comment<textarea rows={4} maxLength={4000} value={comment} onChange={event=>setComment(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>

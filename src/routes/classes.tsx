@@ -1,8 +1,11 @@
+import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
+import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
+import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { classResources, type ClassContent } from "@/domain/class-content";
-import { FIRST_PUBLISHED_LESSON_ROUTE, isLearnerFacingInstruction } from "@/domain/first-class-lesson";
+import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
@@ -36,12 +39,7 @@ function ClassesPage() {
   if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson}/>;
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
     subtitle="Published learning, class updates and the teaching team, backed by your current relationships and enrollment.">
-    <div className="mt-7 grid gap-4 md:grid-cols-2">{directory.classes.map(section => <WorkspacePanel
-      key={`${section.id}:${section.studentPersonId}`} title={section.title} description={directory.role === "guardian" ? section.studentName ?? section.code : section.code}>
-      <Link to="/classes" search={{ section: section.id, student: directory.role === "guardian" ? section.studentPersonId ?? undefined : undefined }}
-        className="inline-block rounded-lg bg-foreground px-4 py-2 text-sm text-background">Open class</Link>
-    </WorkspacePanel>)}</div>
-    {!directory.classes.length && <p role="status" className="mt-7 rounded-xl border p-5 text-sm">No active classes are available in this membership.</p>}
+    <ClassDirectoryCards classes={directory.classes} role={directory.role} />
   </WorkspaceShell>;
 }
 
@@ -72,12 +70,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   // The student home can link directly to a real published lesson without
   // predicting the publisher's IDs. Empty shell lessons are not first-day
   // instruction, even if they precede the first authored lesson.
-  const lesson = lessonId===FIRST_PUBLISHED_LESSON_ROUTE
-    ? lessons.find(isLearnerFacingInstruction)
-    : lessons.find(item=>item.id===lessonId);
-  const lessonIndex=lesson?lessons.findIndex(item=>item.id===lesson.id):-1;
-  const previousLesson=lessonIndex>0?lessons[lessonIndex-1]:null;
-  const nextLesson=lessonIndex>=0&&lessonIndex<lessons.length-1?lessons[lessonIndex+1]:null;
+  const { lesson, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
   const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
@@ -161,15 +154,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     {error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{notice}</p>}
     {tab === "overview" && <div className="grid gap-5">
-      {data.role !== "teacher" && <WorkspacePanel title="Your next learning steps"
-        description="Recommendations come from published lessons and actual assessment status; they do not assign a grade or claim mastery.">
-        {nextSteps.nextLessonId ? <Link to="/classes" search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId }} className="text-sm underline">Continue the next uncompleted lesson →</Link>
-          : <p className="text-sm">{nextSteps.message}</p>}
-        <p className="mt-2 text-sm text-muted-foreground">{nextSteps.selfReportedCompleted} of {nextSteps.totalPublishedLessons} published lessons marked complete
-          · {nextSteps.awaitingFeedback} assessment(s) awaiting feedback
-          · {nextSteps.revisionRequested} returned for revision</p>
-        <p className="mt-2 text-xs">If you need help, use your school's academic-support or teacher communication workflow.</p>
-      </WorkspacePanel>}
+      {data.role !== "teacher" && <StudentNextStepsPanel nextSteps={nextSteps} search={search} />}
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
       <WorkspacePanel title="Learning progress" description="Student-reported lesson completion is not a grade, mastery score or attendance record.">
         <p className="text-sm">{data.role === "teacher" ? `${lessons.length} published lessons · ${data.roster.length} enrolled students` : `${completed.size} / ${lessons.length} published lessons marked complete`}</p>
