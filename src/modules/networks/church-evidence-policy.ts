@@ -14,6 +14,7 @@ export function validateChurchEvidenceReference(reference: string, method: strin
     throw new Error("A valid independent authority evidence reference and method are required");
   }
   // A URL is a pointer, not proof of authority. Never allow untrusted schemes.
+  if (/^vault:[a-z0-9][a-z0-9/_-]{6,}$/i.test(trimmed)) return trimmed;
   if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) {
     let parsed: URL;
     try { parsed = new URL(trimmed); }
