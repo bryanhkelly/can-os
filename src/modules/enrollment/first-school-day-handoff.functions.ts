@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gte, asc } from "drizzle-orm";
+import { and, eq, gte, asc, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { applications, programs, sites, academicCalendarDays, academicCalendars, schoolYears } from "@/db/schema";
@@ -70,7 +70,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         eq(schoolYears.programId,app.programId),eq(schoolYears.status,"active"),
         gte(academicCalendarDays.calendarDate,today),
         gte(schoolYears.endsOn,today)))
-      .orderBy(asc(academicCalendarDays.calendarDate)).limit(1464);
+      .orderBy(desc(academicCalendars.version),asc(academicCalendarDays.calendarDate)).limit(1464);
     // Use the latest active calendar version for each academic year; a stale
     // earlier version cannot re-open a canceled holiday or weekend.
     const versionByYear=new Map<string,number>();
