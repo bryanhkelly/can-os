@@ -56,7 +56,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  // Recheck both at read time before revealing even the notification title.
  const medicalIds=rows.filter(row=>row.resourceType==="health_office_visit"&&row.resourceId)
    .map(row=>row.resourceId!);
- const permittedMedical=medicalIds.length&&context.role==="guardian"?await db.select({id:s.healthOfficeVisits.id})
+ const permittedMedical=medicalIds.length&&context.role==="guardian"?await db.select({id:s.healthOfficeVisits.id,studentPersonId:s.studentProfiles.personId})
   .from(s.healthOfficeVisits)
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.healthOfficeVisits.studentProfileId))
   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
@@ -74,7 +74,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     inArray(s.healthOfficeVisits.siteId,context.scope.siteIds??[]),
     inArray(s.enrollments.programId,context.scope.programIds??[])
   )):[];
- const permittedMedicalIds=new Set(permittedMedical.map(row=>row.id));
+ const medicalChildByVisit=new Map(permittedMedical.map(row=>[row.id,row.studentPersonId]));
+ const permittedMedicalIds=new Set(medicalChildByVisit.keys());
  const pickupRows=rows.filter(row=>pickupNotificationTypes.has(row.type)&&row.resourceId);
  const pickupReleaseIds=pickupRows.filter(row=>row.resourceType==="pickup_release_event").map(row=>row.resourceId!);
  const pickupHoldIds=pickupRows.filter(row=>row.resourceType==="pickup_custody_hold").map(row=>row.resourceId!);
@@ -359,7 +360,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
-   n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?"/messages":
+   n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
