@@ -6,6 +6,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { guardianWorkNeedsAction } from "@/domain/guardian-academics";
+import { assessmentAvailability } from "@/domain/assessment-availability";
 import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-section-readiness.server";
 
 /**
@@ -113,6 +114,9 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     assessmentId: s.assessments.id,
     sectionId: s.assessments.sectionId,
     title: s.assessments.title,
+    assessmentStatus: s.assessments.status,
+    availableAt: s.assessments.availableAt,
+    closesAt: s.assessments.closesAt,
     dueAt: s.assessments.dueAt,
     submissionId: s.submissions.id,
     submissionStatus: s.submissions.status,
@@ -138,8 +142,15 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    }
    for (const row of newest.values()) {
     const status = row.submissionStatus ?? "assigned";
-    const unsubmitted = !row.submissionId || status === "assigned";
-    if (guardianWorkNeedsAction(status)) {
+    // Parents must not be told to complete work the student cannot open.
+    // Use the same availability policy as the authenticated student workspace.
+    const actionable = assessmentAvailability({
+     status: row.assessmentStatus,
+     availableAt: row.availableAt,
+     closesAt: row.closesAt,
+    }, now).actionable;
+    const unsubmitted = !row.submissionId || status === "assigned" || status === "draft";
+    if (actionable && guardianWorkNeedsAction(status)) {
      workToReview.push({
       assessmentId: row.assessmentId,
       sectionId: row.sectionId,
@@ -148,7 +159,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
       dueAt: row.dueAt?.toISOString() ?? null,
      });
     }
-    if (!row.dueAt) continue;
+    if (!actionable || !row.dueAt) continue;
     if (row.dueAt.getTime() < now.getTime() && unsubmitted) missingCount += 1;
     if (row.dueAt.getTime() >= now.getTime() && unsubmitted) {
      if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) nextDueAt = row.dueAt.toISOString();
