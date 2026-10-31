@@ -545,15 +545,17 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // identity and place that exact student in this Program's Section.
       const activated = await singleRow(
         sql,
-        `select distinct sp.person_id, e.program_id
+        `select sp.person_id, e.program_id, e.section_id
          from enrollments e
          join student_profiles sp on sp.id = e.student_profile_id
          where e.student_profile_id = $1 and e.program_id = $2
+           and e.section_id = $3 and e.kind = 'section'
            and e.status = 'active'`,
-        [fixture.studentProfileId!, fixture.programId!],
+        [fixture.studentProfileId!, fixture.programId!, fixture.sectionId!],
       );
       expect(activated.person_id).toBe(fixture.studentPersonId);
       expect(activated.program_id).toBe(fixture.programId);
+      expect(activated.section_id).toBe(fixture.sectionId);
 
     });
 
