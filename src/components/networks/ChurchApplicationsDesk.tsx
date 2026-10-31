@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   approveChurchOnboardingRequest, declineChurchOnboardingRequest,
-  listChurchOnboardingRequests, verifyChurchOnboardingRequest,
+  listChurchOnboardingRequests, verifyChurchOnboardingRequest, resendApprovedChurchInvitation,
 } from "@/modules/networks/network-steward.functions";
 
 type Applications = Awaited<ReturnType<typeof listChurchOnboardingRequests>>;
@@ -112,7 +112,14 @@ export function ChurchApplicationsDesk() {
       <summary className="cursor-pointer text-sm font-semibold">Recently approved churches</summary>
       <ul className="mt-3 space-y-2 text-sm">
         {applications.filter(x=>x.status==="approved").map(x=><li key={x.id}>
-          {x.churchName} · {x.siteName} · {x.contactEmail} — invitation issued
+          {x.churchName} · {x.siteName} · {x.contactEmail}
+          <button type="button" disabled={!!working} className="ml-3 rounded border px-2 py-1 text-xs disabled:opacity-50"
+            onClick={async ()=>{
+              setWorking(x.id);setError("");setNotice("");
+              try { await resendApprovedChurchInvitation({data:x.id});setNotice("Access email request accepted. Delivery is subject to mail configuration and cooldown."); }
+              catch(cause){setError(cause instanceof Error?cause.message:"Unable to request access email.");}
+              finally{setWorking(null);}
+            }}>Resend access link</button>
         </li>)}
       </ul>
     </details>}
