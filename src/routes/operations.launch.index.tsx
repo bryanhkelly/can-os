@@ -3,7 +3,7 @@ import { LaunchWizardPage } from "@/components/operations/LaunchWizardPage";
 import { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
 import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
 import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
-import { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
+import { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admissions-counts.functions";
 import { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listExtendedSeasonPlanning } from "@/modules/activities/extended-learning.functions";
 import { safeLoader } from "@/lib/safe-loader";
@@ -16,14 +16,14 @@ export const Route = createFileRoute("/operations/launch/")({
     // dashboards and outreach data must not block school setup.
     const options = await listLaunchOptions();
     const launches = await listLaunches();
-    const [preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning] = await Promise.all([
+    const [preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning] = await Promise.all([
       listAdmissionsPrograms().catch(() => null),
       listFamilyInvitations().catch(() => null),
-      listAdmissionsIntake().catch(() => null),
+      getLaunchAdmissionsCounts({ data: deps }).catch(() => null),
       getActiveEnrollmentCounts({ data: deps }).catch(() => null),
       listExtendedSeasonPlanning().catch(() => null),
     ]);
-    return { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError: "" };
+    return { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, authError: "" };
   })(),
   component: LaunchPage,
 });
