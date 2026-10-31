@@ -1,3 +1,4 @@
+import { ClassAnnouncementComposer } from "@/components/learning/ClassAnnouncementComposer";
 import { ClassCourseRoadmap } from "@/components/learning/ClassCourseRoadmap";
 import { ClassRosterPanel } from "@/components/learning/ClassRosterPanel";
 import { ClassAssessmentEvidence } from "@/components/learning/ClassAssessmentEvidence";
@@ -400,18 +401,15 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       </div>
     ) : <p role="alert" className="rounded-lg border p-4 text-sm">Teacher-only materials are unavailable to this account.</p>)}
     {tab === "announcements" && <div className="grid gap-5">
-      {data.role === "teacher" && <WorkspacePanel title="Post a class announcement" description="Visible to enrolled students and academically authorized guardians.">
-        <form className="grid gap-3" onSubmit={event => { event.preventDefault(); announcementId.current ??= crypto.randomUUID();
-          void run(async () => {
-            await publishClassAnnouncement({ data: { id: announcementId.current!, sectionId: data.section.id, title, body } });
-            setTitle(""); setBody(""); announcementId.current = null;
-          }, "Class announcement published.");
-        }}>
-          <label className="text-sm">Title<input maxLength={160} disabled={busy} value={title} onChange={event => { setTitle(event.target.value); announcementId.current = null; }} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-          <label className="text-sm">Announcement<textarea maxLength={5000} rows={4} disabled={busy} value={body} onChange={event => { setBody(event.target.value); announcementId.current = null; }} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-          <button disabled={busy || title.trim().length < 3 || !body.trim()} className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">{busy ? "Publishing..." : "Publish announcement"}</button>
-        </form>
-      </WorkspacePanel>}
+      {data.role === "teacher" && <ClassAnnouncementComposer title={title} body={body} busy={busy}
+        onTitleChange={value=>{setTitle(value);announcementId.current=null;}}
+        onBodyChange={value=>{setBody(value);announcementId.current=null;}}
+        onSubmit={()=>{announcementId.current??=crypto.randomUUID();
+          void run(async()=>{
+            await publishClassAnnouncement({data:{id:announcementId.current!,sectionId:data.section.id,title,body}});
+            setTitle("");setBody("");announcementId.current=null;
+          },"Class announcement published.");
+        }} />}
       {data.announcements.slice().reverse().map(item => <WorkspacePanel key={item.id} title={item.title} description={new Date(item.createdAt).toLocaleString()}>
         <p className="whitespace-pre-wrap text-sm leading-7">{item.body}</p>
       </WorkspacePanel>)}
