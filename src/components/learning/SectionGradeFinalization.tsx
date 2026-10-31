@@ -175,7 +175,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                 :<span className="font-semibold">{item.studentName} · {item.assessmentTitle}</span>}
               {" · "+(item.status==="submitted"?"Awaiting grading":item.status==="returned"?"Awaiting revision":item.status==="graded"?"Score needs review":"Not submitted")}
             </li>)}</ul>}
-          {preview.blockers.some(item=>item.status!=="submitted")&&<p className="mt-3"><Link to="/teacher/missing-work" className="underline">Open missing-work follow-up</Link></p>}
+          {preview.blockers.some(item=>item.status!=="submitted")&&<p className="mt-3">For unsubmitted or returned work, follow up with the student before finalizing. <Link to="/teacher/missing-work" className="underline">Review overdue missing work and create follow-ups</Link></p>}
         </section>}
         <h3 className="mt-6 text-sm font-semibold">Finalized grades for this section</h3>
         {grades.length === 0 && <p className="mt-2 text-sm text-muted-foreground">
