@@ -10,6 +10,8 @@ import { getCourseRegistration } from "@/modules/learning/course-registration.fu
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 
 const state = vi.hoisted(() => ({ search: {} as Record<string, unknown>, data: null as unknown }));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useSearch: () => state.search, useLoaderData: () => state.data }),
   useRouter: () => ({ invalidate: vi.fn() }),
