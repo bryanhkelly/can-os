@@ -32,6 +32,7 @@ function Setup({data}:{data:Snapshot}){
  const selectedYear=data.years.find(y=>y.id===selectedTerm?.schoolYearId);
  const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
+ const [createdSectionId,setCreatedSectionId]=useState<string|null>(null);
  const [teacherId,setTeacherId]=useState("");
  const [courseCredits,setCourseCredits]=useState("");
  const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
@@ -122,12 +123,13 @@ function Setup({data}:{data:Snapshot}){
     changed={async()=>{await router.invalidate();}}/>
   </section>
   <section className="mt-7 rounded-xl border bg-card p-5">
-   <h2 className="font-serif text-2xl">Provision a class</h2>
+   <h2 className="font-serif text-2xl">Set up your first classroom</h2>
+   <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
-    e.preventDefault();void run(()=>provisionLaunchSection({data:{
+    e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
      code,title,...(teacherId?{teacherPersonId:teacherId}:{}),
-     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}}),"Class provisioned.");
+     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class saved. Review its schedule and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
@@ -151,7 +153,7 @@ function Setup({data}:{data:Snapshot}){
     </div>}
     <label className="text-sm">Class code<input value={code} required onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Class title<input value={title} required onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1 block w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm sm:col-span-2">Instructor (optional)<select value={teacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
+    <label className="text-sm sm:col-span-2">Instructor (verified assignment)<select value={teacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
      <option value="">Assign later</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </select></label>
     <label className="text-sm sm:col-span-2">Course credit units
@@ -160,9 +162,10 @@ function Setup({data}:{data:Snapshot}){
       className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId||(Boolean(teacherId)&&!data.academicAuthority.teacherAssignment)||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create section</button>
+    <button type="submit" disabled={busy||!termId||!versionId||(Boolean(teacherId)&&!data.academicAuthority.teacherAssignment)||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
    </form>
   </section>
+  {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm"><strong>Classroom saved.</strong> Review the new class in Teaching assignments below for its pinned first lesson and any blockers. Complete the instructional schedule in the Section lifecycle workspace; a saved Section alone is not ready to teach.</div>}
   <div className="mt-6 rounded-lg border p-4 text-sm">
    After provisioning sections, <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="font-semibold underline">
     configure enrollment windows, prerequisites, seat capacity and credit limits →
