@@ -154,7 +154,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     existingStudents={existingStudents} existingStudent={existingStudent}
     createHouseholdConfirmed={createHouseholdConfirmed} setCreateHouseholdConfirmed={setCreateHouseholdConfirmed}
     existingApplicationId={existingApplicationId} setExistingApplicationId={setExistingApplicationId}
-    records={data.records.items} studentFirstName={studentFirstName} setStudentFirstName={setStudentFirstName}
+    studentFirstName={studentFirstName} setStudentFirstName={setStudentFirstName}
     studentLastName={studentLastName} setStudentLastName={setStudentLastName}
     guardianFirstName={guardianFirstName} setGuardianFirstName={setGuardianFirstName}
     guardianLastName={guardianLastName} setGuardianLastName={setGuardianLastName}
