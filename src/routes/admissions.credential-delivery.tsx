@@ -79,9 +79,9 @@ function CredentialDeliveryPage(){
       <button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
        const rows=await listAcademicCredentialReleaseAccessHistory({data:{authorizationId:row.id}});
        setAccessHistory(previous=>({...previous,[row.id]:rows}));
-      })}>Review actual downloads</button>
-      {accessHistory[row.id]?.length===0&&<p>No successful download audit entries.</p>}
-      {accessHistory[row.id]?.map(entry=><p key={entry.id}>Downloaded: {new Date(entry.occurredAt).toLocaleString()} · Recipient ID: {entry.actorPersonId}</p>)}
+      })}>Review PDF disclosures</button>
+      {accessHistory[row.id]?.length===0&&<p>No successfully prepared PDF disclosures recorded.</p>}
+      {accessHistory[row.id]?.map(entry=><p key={entry.id}>PDF prepared: {new Date(entry.occurredAt).toLocaleString()} · Recipient ID: {entry.actorPersonId}</p>)}
       {status==="Authorized"&&<button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
        await revokeAcademicCredentialRelease({data:{authorizationId:row.id}});
        setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}));
