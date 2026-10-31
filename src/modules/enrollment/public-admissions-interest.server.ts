@@ -14,42 +14,77 @@ import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
-const BUDGET = 30;
-const WINDOW_SECONDS = 60;
+const PER_SITE_BUDGET = 30;
+const GLOBAL_EMERGENCY_BUDGET = 600;
+const INVITATION_BUDGET = 120;
+type PublicInterestRoute = "public_site_inquiry" | "public_site_family_start" | "invited_family_interest";
 
-/**
- * Coarse global, atomic emergency limiter. No unauthenticated forwarding
- * headers/IP/email are trusted as identity. Edge-side bot defenses are still
- * necessary before a production tenant-host launch.
+/** Keys contain a verified published Site ID, never a client-supplied slug,
+ * email, IP or arbitrary user identifier. Number of rows is thus bounded
+ * by real published Sites and the known route types. */
+export function publicInterestRateLimitKeys(route: PublicInterestRoute, siteId?: string) {
+  return {
+    emergency: route + ":global",
+    site: siteId ? route + ":site:" + siteId : null,
+  };
+}
+
+/** Atomic shared emergency ceiling plus independently scoped school limits.
+ * An attack against one school must not exhaust all other schools' 30/minute
+ * capacity. The platform ceiling is retained for extreme traffic; trusted-edge
+ * bot protection remains required for a public deployment.
  */
 export async function admitPublicAdmissionsInterest(
- route:"public_site_inquiry"|"public_site_family_start"="public_site_inquiry",
-): Promise<{
-  allowed: boolean; retryAfterSeconds: number;
-}> {
-  const row = await db.execute(sql`
-    INSERT INTO auth_request_rate_limits AS bucket
-      (route, window_started_at, request_count)
-    VALUES (${route}, now(), 1)
-    ON CONFLICT (route) DO UPDATE SET
-      request_count = CASE
-        WHEN bucket.window_started_at <= now() - interval '60 seconds' THEN 1
-        ELSE LEAST(bucket.request_count + 1, ${BUDGET + 1})
-      END,
-      window_started_at = CASE
-        WHEN bucket.window_started_at <= now() - interval '60 seconds' THEN now()
-        ELSE bucket.window_started_at
-      END
-    RETURNING request_count <= ${BUDGET} AS allowed,
-      GREATEST(1, CEIL(EXTRACT(EPOCH FROM
-        (window_started_at + interval '60 seconds' - now())))::integer)
-        AS "retryAfterSeconds"
-  `);
-  const first = row.rows[0] as { allowed?: unknown; retryAfterSeconds?: unknown } | undefined;
-  if (typeof first?.allowed !== "boolean" ||
-      typeof first.retryAfterSeconds !== "number") throw new Error("Inquiry admission budget unavailable");
-  return { allowed: first.allowed, retryAfterSeconds:
-    first.allowed ? 0 : Math.max(1, Math.min(60, Math.ceil(first.retryAfterSeconds))) };
+  route: PublicInterestRoute = "invited_family_interest",
+  siteSlug?: string,
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  if (route !== "invited_family_interest" && !siteSlug)
+    throw new Error("Published Site identity is required for public admissions throttling");
+  let siteId: string | undefined;
+  if (siteSlug) {
+    if (!isPublicSiteSlug(siteSlug))
+      throw new Error("Unrecognized public school origin");
+    const [published] = await db.select({siteId:sitePublications.siteId})
+      .from(sitePublications).where(and(
+        eq(sitePublications.slug,siteSlug),
+        eq(sitePublications.status,"published"),
+        isNotNull(sitePublications.publishedAt),
+      )).limit(1);
+    if (!published) throw new Error("School page not available");
+    siteId = published.siteId;
+  }
+  const keys = publicInterestRateLimitKeys(route, siteId);
+  return db.transaction(async tx => {
+    async function charge(key: string, limit: number) {
+      const result = await tx.execute(sql`
+        INSERT INTO auth_request_rate_limits AS bucket
+          (route, window_started_at, request_count)
+        VALUES (${key}, now(), 1)
+        ON CONFLICT (route) DO UPDATE SET
+          request_count = CASE
+            WHEN bucket.window_started_at <= now() - interval '60 seconds' THEN 1
+            ELSE LEAST(bucket.request_count + 1, ${limit + 1})
+          END,
+          window_started_at = CASE
+            WHEN bucket.window_started_at <= now() - interval '60 seconds' THEN now()
+            ELSE bucket.window_started_at
+          END
+        RETURNING request_count <= ${limit} AS allowed,
+          GREATEST(1, CEIL(EXTRACT(EPOCH FROM
+            (window_started_at + interval '60 seconds' - now())))::integer)
+            AS "retryAfterSeconds"
+      `);
+      const row = result.rows[0] as {allowed?:unknown;retryAfterSeconds?:unknown}|undefined;
+      if (typeof row?.allowed !== "boolean" || typeof row.retryAfterSeconds !== "number")
+        throw new Error("Inquiry admission budget unavailable");
+      return {allowed:row.allowed,retryAfterSeconds:
+        row.allowed ? 0 : Math.max(1,Math.min(60,Math.ceil(row.retryAfterSeconds)))};
+    }
+    const emergency = await charge(keys.emergency,
+      route === "invited_family_interest" ? INVITATION_BUDGET : GLOBAL_EMERGENCY_BUDGET);
+    if (!emergency.allowed || !keys.site) return emergency;
+    return charge(keys.site,PER_SITE_BUDGET);
+  });
 }
 
 /** A public visitor may express interest but cannot create an Application,
