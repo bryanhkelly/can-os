@@ -90,3 +90,9 @@ GitHub connector commits are not proof of successful compilation or tests. No va
 - `LoaderFailure` from `@/lib/loader-failure` remains the page-level adapter that composes `WorkspaceShell` with `LoaderErrorState`. Existing page consumers retain their interface.
 - Retry is offered only when `outcome.retryable` is true; authentication failures retain the sign-in link and authorization denials do not imply missing login.
 - Agents C, D, E: use the shell-free component inside an existing workspace page; use `LoaderFailure` only when the route needs the complete page shell. Do not duplicate the classification or sign-in logic.
+
+## TanStack Start generic handler compatibility
+
+The four generic server-function factories use `createServerFn({ method, strict: false })` because TanStack Start's conditional `ValidateSerializable` return type cannot prove that an unresolved generic `TResult` is serializable. This is a **type-checking escape hatch**, not a change to runtime transport behavior. The factories continue to require `TResult extends SerializableResult` (JSON primitives, arrays and plain objects), parse inputs with Zod, and obtain identity and authorization on the server. Do not use the factories for Date, Map, Set, Error, Response, class instances or functions. Add concrete direct `createServerFn` wrappers where richer serialization is required. See the TanStack Start server-functions documentation on `strict`.
+
+Agent C: preserve the discriminated `submit` result. A completed mutation with `refreshError` must be treated as saved, not retried. Use `invalidateRouter` for route loader updates and show refresh errors separately from command errors.
