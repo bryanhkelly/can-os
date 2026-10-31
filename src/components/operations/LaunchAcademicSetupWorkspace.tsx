@@ -1,8 +1,10 @@
+import { LaunchTeacherQualificationPolicy } from "@/components/operations/LaunchTeacherQualificationPolicy";
+import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSectionRow } from "@/components/operations/LaunchSectionRow";
 import {useState} from "react";
 import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
 import {Link,useRouter} from "@tanstack/react-router";
-import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,publishLaunchTeacherPolicy,setLaunchSectionCredits} from "@/modules/programs/launch-academics.functions";
+import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,setLaunchSectionCredits} from "@/modules/programs/launch-academics.functions";
 import {WorkspaceShell} from "@/components/workspace";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
@@ -11,7 +13,6 @@ import { SectionFacilitatorPanel } from "@/components/operations/SectionFacilita
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
 import {Qualifications} from "@/components/profiles/Qualifications";
 import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
-import {TeacherPolicyRevisions} from "@/components/profiles/TeacherPolicyRevisions";
 
 export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
@@ -26,15 +27,18 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [teacherId,setTeacherId]=useState("");
  const [scheduleId,setScheduleId]=useState("");
  const [courseCredits,setCourseCredits]=useState("");
- const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
- const [policyConfirmed,setPolicyConfirmed]=useState(false);
  const [reviewTeacherId,setReviewTeacherId]=useState("");
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
+ const busy=mutation.isSubmitting;
  async function run(operation:()=>Promise<unknown>,message:string){
-  setBusy(true);setError("");setNotice("");
-  try{await operation();await router.invalidate();setNotice(message);}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
-  finally{setBusy(false);}
+  setError("");setNotice("");
+  try{
+   const submission=await mutation.submit(operation);
+   if(submission.status === "ignored") return;
+   if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
+   setNotice(message);
+  }catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
  }
  return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
   subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
@@ -86,33 +90,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   </p>}
   <QualificationCatalog programId={data.program.id} canAuthor={data.canAuthorCatalog}
    changed={async()=>{await router.invalidate();}}/>
-  <section className="mt-7 rounded-xl border bg-card p-5">
-   <h2 className="font-serif text-2xl">Teacher qualification policy</h2>
-   {data.policyPublished?<p className="mt-3 text-sm">Program requirements are published. Each instructor is checked against every applicable published policy for the full instructional window.</p>:
-    !data.canPublishTeacherPolicy?<p className="mt-3 text-sm">Only a verified, program-scoped institutional staffing-policy publisher can approve the initial teacher qualification requirements. Ask your school administrator to assign that authority.</p>:
-    <form className="mt-3 space-y-3" onSubmit={e=>{
-     e.preventDefault();void run(()=>publishLaunchTeacherPolicy({data:{
-      programId:data.program.id,qualificationKeys,confirmed:true}}),"Teacher qualification policy published.");
-    }}>
-     <p className="text-sm">Assignment and opening require applicable published policies. Publish this program's reviewed requirements here; jurisdiction, organization and site policies also apply. Select every required qualification; all must be independently verified. Publishing does not certify legal or regulatory compliance.</p>
-     <div className="space-y-2">{data.qualificationCatalog.map(qualification=>
-      <label key={qualification.key} className="flex items-center gap-2 text-sm">
-       <input type="checkbox" checked={qualificationKeys.includes(qualification.key)} onChange={e=>
-        setQualificationKeys(keys=>e.target.checked?[...keys,qualification.key]:keys.filter(key=>key!==qualification.key))}/>
-       {qualification.title} <span className="text-xs text-muted-foreground">({qualification.key})</span>
-      </label>)}</div>
-     {!data.qualificationCatalog.length&&<p role="alert" className="text-sm">No qualification catalog entries exist. Configure the shared qualification catalog before publishing requirements.</p>}
-     <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={policyConfirmed}
-      onChange={e=>setPolicyConfirmed(e.target.checked)}/>
-      I confirm these requirements are reviewed for this program and apply to its instructional dates. Published requirements cannot be edited here.
-     </label>
-     <button disabled={busy||!policyConfirmed||!qualificationKeys.length} type="submit"
-      className="rounded border px-3 py-2 text-sm disabled:opacity-50">Publish reviewed requirements</button>
-    </form>}
-   <TeacherPolicyRevisions programId={data.program.id} policies={data.teacherPolicies}
-    catalog={data.qualificationCatalog} canRevise={data.canReviseTeacherPolicy}
-    changed={async()=>{await router.invalidate();}}/>
-  </section>
+  <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
    <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
