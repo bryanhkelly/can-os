@@ -69,8 +69,9 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
   };
   const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
   return <WorkspaceShell eyebrow="CAN OS · Network partnerships" title="Church onboarding and partner contracts"
-    subtitle="Only verified CAN stewards can record externally signed agreements and designate denomination HQ officers. Neither action grants access to student records.">
-    <p className="mt-5 text-sm text-muted-foreground">Prerequisite: a separately reviewed, verified Document already exists with the correct organization subject and signed-agreement or HQ-authority category. Entering a document ID does not sign or verify a document.</p>
+    subtitle="Review new church requests, verify church authority, invite leaders, and manage partner contracts. School opening remains separately authorized.">
+    <ChurchApplicationsDesk/>
+    <p className="mt-5 text-sm text-muted-foreground">Denomination agreements and HQ officer appointments below require an already verified Document with the appropriate subject and category. Church applications above do not require anyone to assemble a document UUID manually.</p>
     {error && <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
     <section className="mt-6 rounded-xl border bg-card p-5">
@@ -137,7 +138,6 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
         {!data.agreements.length && <li className="text-sm text-muted-foreground">No agreements recorded.</li>}
       </ul>
     </section>
-    <ChurchApplicationsDesk/>
     <CANOperatingAuthorizationDesk/>
   </WorkspaceShell>;
 }
