@@ -149,7 +149,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
      availableAt: row.availableAt,
      closesAt: row.closesAt,
     }, now).actionable;
-    const unsubmitted = !row.submissionId || status === "assigned" || status === "draft";
+    const incomplete = !row.submissionId || guardianWorkNeedsAction(status);
     if (actionable && guardianWorkNeedsAction(status)) {
      workToReview.push({
       assessmentId: row.assessmentId,
@@ -159,9 +159,15 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
       dueAt: row.dueAt?.toISOString() ?? null,
      });
     }
+    // A closed assignment does not stop being missing. Teachers continue to
+    // see overdue missing/returned work after closure; families must not be
+    // marked "on track" just because the student can no longer submit it.
+    // Work not yet released cannot count as missing.
+    if (row.dueAt && row.dueAt < now &&
+        (!row.availableAt || row.availableAt <= now) && incomplete)
+     missingCount += 1;
     if (!actionable || !row.dueAt) continue;
-    if (row.dueAt.getTime() < now.getTime() && unsubmitted) missingCount += 1;
-    if (row.dueAt.getTime() >= now.getTime() && unsubmitted) {
+    if (row.dueAt.getTime() >= now.getTime() && incomplete) {
      if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) nextDueAt = row.dueAt.toISOString();
     }
    }
