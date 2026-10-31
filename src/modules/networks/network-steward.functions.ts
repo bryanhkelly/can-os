@@ -75,3 +75,51 @@ export const prepareChurchOnboarding = createServerFn({ method: "POST" })
     ]);
     return bootstrapVerifiedChurch(await getCommandContext(getRequest()), data);
   });
+
+const churchVerificationSchema = z.object({
+  requestId: uuid,
+  evidenceReference: z.string().trim().min(8).max(500),
+  verificationMethod: z.enum(["signed_authority", "denominational_confirmation", "independent_church_confirmation"]),
+}).strict();
+const churchDeclineSchema = z.object({
+  requestId: uuid,
+  note: z.string().trim().min(10).max(1000),
+}).strict();
+
+export const listChurchOnboardingRequests = createServerFn({ method: "GET" }).handler(async () => {
+  const [{ getCommandContext }, { listChurchApplications }] = await Promise.all([
+    import("@/modules/identity/command-context.server"),
+    import("./church-applications.server"),
+  ]);
+  return listChurchApplications(await getCommandContext(getRequest()));
+});
+
+export const verifyChurchOnboardingRequest = createServerFn({ method: "POST" })
+  .validator((value: unknown) => churchVerificationSchema.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { verifyChurchApplication }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-applications.server"),
+    ]);
+    return verifyChurchApplication(await getCommandContext(getRequest()), data);
+  });
+
+export const approveChurchOnboardingRequest = createServerFn({ method: "POST" })
+  .validator((value: unknown) => uuid.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { approveChurchApplication }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-applications.server"),
+    ]);
+    return approveChurchApplication(await getCommandContext(getRequest()), data);
+  });
+
+export const declineChurchOnboardingRequest = createServerFn({ method: "POST" })
+  .validator((value: unknown) => churchDeclineSchema.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { declineChurchApplication }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-applications.server"),
+    ]);
+    return declineChurchApplication(await getCommandContext(getRequest()), data.requestId, data.note);
+  });
