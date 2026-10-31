@@ -262,43 +262,27 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const students = await guardianStudents(s, actor, siteIds,context.scope.programIds??[]);
  const studentPersonByProfile = new Map(students.map(row => [row.studentProfileId, row.studentPersonId]));
  const authorizedStudentIds = new Set(students.map(row => row.studentPersonId));
- const excuseWindow = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
- const excuseItems: { id: string; title: string; childName: string; studentPersonId: string; expectedAt: string }[] = [];
- for (const student of students) {
-  const rows = await db.select({
-   id: s.attendanceEvents.id,
-   studentProfileId: s.attendanceEvents.studentProfileId,
-   programId: s.attendanceEvents.programId,
-   occurrenceKey: s.attendanceEvents.occurrenceKey,
-   recordedAt: s.attendanceEvents.recordedAt,
-   status: s.attendanceEvents.status,
-   expectedAt: s.attendanceEvents.expectedAt,
-   excuseId: s.attendanceExcuses.id,
-  }).from(s.attendanceEvents)
-   // Rejected or cancelled excuses are not resolved guardian follow-ups.
-   .leftJoin(s.attendanceExcuses, and(
-    eq(s.attendanceExcuses.attendanceEventId, s.attendanceEvents.id),
-    inArray(s.attendanceExcuses.status, ["submitted", "approved"]),
-   ))
-   .where(and(
-    eq(s.attendanceEvents.studentProfileId, student.studentProfileId),
-    inArray(s.attendanceEvents.siteId,siteIds),
-    inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
-    gte(s.attendanceEvents.expectedAt, excuseWindow),
-   ))
-   .orderBy(desc(s.attendanceEvents.expectedAt));
-  for (const row of effectiveAttendanceEvents(rows).filter(row=>row.status==="absent").slice(0,10)) {
-   if (!row.excuseId) {
-    excuseItems.push({
-     id: row.id,
-     title: "Absence needs an excuse",
-     childName: student.firstName ?? student.legalFirstName,
-     studentPersonId: student.studentPersonId,
-     expectedAt: row.expectedAt.toISOString(),
-    });
-   }
-  }
- }
+ // The guardian attendance workspace owns the current correction chain and
+ // school excuse status. Reuse its authorized projection instead of making a
+ // second decision from raw event/exception rows (which missed tardiness).
+ const canReviewAttendance = context.capabilities.has("attendance.excuse.submit");
+ const attendanceRead = canReviewAttendance ? await import("@/modules/attendance/onsite-attendance-workflow.functions")
+  .then(({listGuardianEffectiveAbsences})=>listGuardianEffectiveAbsences({data:{}}))
+  .then(result=>({absences:result.absences,unavailable:false}),
+    ()=>({absences:[] as Awaited<ReturnType<typeof import("@/modules/attendance/onsite-attendance-workflow.functions").listGuardianEffectiveAbsences>>["absences"],unavailable:true}))
+  : {absences:[],unavailable:false};
+ const excuseItems = attendanceRead.absences.filter(row=>
+  authorizedStudentIds.has(row.studentPersonId) &&
+  (row.status==="absent" || row.status==="tardy") &&
+  (!row.excuse || row.excuse.status==="rejected"))
+  .map(row=>({
+   id:row.attendanceEventId,
+   childName:row.studentName,
+   studentPersonId:row.studentPersonId,
+   expectedAt:row.expectedAt,
+   attendanceStatus:row.status,
+   rejected:row.excuse?.status==="rejected",
+  }));
 
  // Reuse the notification center's live verified-guardian checks. A
  // notification addressed to an adult is not authority to display a child's
@@ -361,11 +345,14 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  }));
  const absenceItems = excuseItems.map(row => ({
   id: row.id,
-  kind: "excuse" as const,
+  kind: row.rejected ? "attendance_review" as const : "excuse" as const,
   studentPersonId: row.studentPersonId,
   type: "attendance_excuse",
-  title: `${row.childName}: ${row.title}`,
-  detail: `Absence on ${new Date(row.expectedAt).toLocaleDateString()} has no excuse yet.`,
+  title: `${row.childName}: ${row.rejected ? "School rejected attendance excuse" :
+   row.attendanceStatus==="tardy" ? "Tardiness needs an excuse" : "Absence needs an excuse"}`,
+  detail: row.rejected
+   ? "The school's response needs review. Contact the school if this mark is incorrect."
+   : `${row.attendanceStatus==="tardy" ? "Tardiness" : "Absence"} on ${new Date(row.expectedAt).toLocaleDateString()} has no excuse yet.`,
   href: `/guardian/attendance?student=${encodeURIComponent(row.studentPersonId)}&attendance=${encodeURIComponent(row.id)}`,
   createdAt: row.expectedAt,
  }));
@@ -373,5 +360,6 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  return {
   items: [...actionItems, ...groupItems, ...absenceItems, ...notificationItems],
   groupConsentsUnavailable: consentRead.unavailable,
+  attendanceUnavailable: attendanceRead.unavailable,
  };
 });
