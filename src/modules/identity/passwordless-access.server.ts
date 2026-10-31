@@ -1,12 +1,12 @@
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people } from "@/db/schema";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
-import { and,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
+import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 
@@ -109,8 +109,32 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   )).limit(1) : [];
   const onboardingInvitation = accepted.find(invitation =>
     invitation.id === onboarding[0]?.invitationGrantId);
-  const activeGrant=onboardingInvitation??grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
+  // The same leader may sign in again before completing setup. Prefer the
+  // existing approved church grant over unrelated memberships, and resume that
+  // exact Site rather than dropping them into a generic admissions workspace.
+  const activeRegistrarIds = grants.filter(grant=>grant.role==="registrar").map(grant=>grant.id);
+  const returningOnboarding = !onboardingInvitation && activeRegistrarIds.length
+    ? await tx.select({
+        siteId: churchOnboardingRequests.siteId,
+        invitationGrantId: churchOnboardingRequests.invitationGrantId,
+      }).from(churchOnboardingRequests).where(and(
+        eq(churchOnboardingRequests.status, "approved"),
+        inArray(churchOnboardingRequests.invitationGrantId, activeRegistrarIds),
+      )).orderBy(desc(churchOnboardingRequests.approvedAt)).limit(1)
+    : [];
+  const returningGrant = grants.find(grant =>
+    grant.id === returningOnboarding[0]?.invitationGrantId);
+  const activeGrant=onboardingInvitation??returningGrant??
+    grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
   if(!activeGrant)throw new Error("No supported CAN OS membership");
+  const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
+  // After the school becomes active, ordinary sign-in need not keep redirecting
+  // the administrator through setup. Opening status is read, never inferred.
+  const existingOpenSchool = candidateLaunchSiteId
+    ? await tx.select({ id: programs.id }).from(programs)
+        .where(and(eq(programs.siteId,candidateLaunchSiteId),eq(programs.status,"active"))).limit(1)
+    : [];
+  const launchSiteId=existingOpenSchool.length?undefined:candidateLaunchSiteId;
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
@@ -126,7 +150,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    role:activeGrant.role,method:"email_link",
   });
   return {accountId:account.id,role:activeGrant.role,
-   ...(onboardingInvitation && onboarding[0]?.siteId ? {launchSiteId:onboarding[0].siteId} : {}),
+   ...(launchSiteId ? {launchSiteId} : {}),
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
