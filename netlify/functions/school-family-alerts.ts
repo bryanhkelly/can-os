@@ -12,7 +12,7 @@ export default async()=>{
    headers:{"x-can-job-secret":secret},
  });
  if(!response.ok)throw new Error("school-family-alerts: dispatch failed ("+response.status+")");
- console.log("school-family-alerts:",await response.text());
+ console.info("school-family-alerts: completed",new Date().toISOString(),await response.text());
 };
 
 export const config={schedule:"* * * * *"};
