@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { approveGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
+import { approveGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listTranscriptDiplomas, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
 
 export const Route=createFileRoute("/admissions/graduation")({component:GraduationCloseout});
 
@@ -25,6 +25,7 @@ function GraduationCloseout(){
  const [decisionRationale,setDecisionRationale]=useState("");
  const [issuedDiplomaId,setIssuedDiplomaId]=useState("");
  const [diplomaStatus,setDiplomaStatus]=useState("");
+ const [diplomas,setDiplomas]=useState<Awaited<ReturnType<typeof listTranscriptDiplomas>>>([]);
  const [revocationReason,setRevocationReason]=useState("");
  const [audit,setAudit]=useState<Awaited<ReturnType<typeof auditIssuedTranscript>>|null>(null);
  const [sets,setSets]=useState<Awaited<ReturnType<typeof listGraduationRequirements>>>([]);
@@ -62,7 +63,7 @@ function GraduationCloseout(){
     <p className="text-sm">First <Link to="/admissions/transcripts" search={{query:""}} className="underline">issue the student's official transcript</Link>, then select the student below.</p>
     <label className="block text-sm">Find student by first name<input className="mt-1 block w-full rounded border bg-background p-2" value={search} onChange={e=>setSearch(e.target.value)}/></label>
     <button disabled={busy||search.trim().length<2} className="rounded border px-3 py-2" onClick={()=>void perform(async()=>setCandidates(await listGraduationCandidates({data:{query:search}})))}>Find issued transcripts</button>
-    {candidates.map(candidate=><button key={candidate.transcriptId} className="block w-full rounded border p-2 text-left text-sm" onClick={()=>{setTranscriptId(candidate.transcriptId);setDecisionId("");setApplicablePolicy("");setIssuerId(candidate.issuerId);setRequirementSetId("");setSets([]);setAudit(null);void perform(async()=>{const policy=await getApplicableGraduationPolicy({data:{transcriptId:candidate.transcriptId}});setRequirementSetId(policy.id);setApplicablePolicy(`${policy.academicYear} · version ${policy.version} · entry cohorts ${policy.cohortStart}–${policy.cohortEnd}`)})}}>{candidate.firstName} {candidate.lastName} · Issued {new Date(candidate.issuedAt).toLocaleDateString()}</button>)}
+    {candidates.map(candidate=><button key={candidate.transcriptId} className="block w-full rounded border p-2 text-left text-sm" onClick={()=>{setTranscriptId(candidate.transcriptId);setDecisionId("");setApplicablePolicy("");setIssuerId(candidate.issuerId);setRequirementSetId("");setSets([]);setAudit(null);setDiplomas([]);setIssuedDiplomaId("");void perform(async()=>{setDiplomas(await listTranscriptDiplomas({data:{transcriptId:candidate.transcriptId}}));const policy=await getApplicableGraduationPolicy({data:{transcriptId:candidate.transcriptId}});setRequirementSetId(policy.id);setApplicablePolicy(`${policy.academicYear} · version ${policy.version} · entry cohorts ${policy.cohortStart}–${policy.cohortEnd}`)})}}>{candidate.firstName} {candidate.lastName} · Issued {new Date(candidate.issuedAt).toLocaleDateString()}</button>)}
     {transcriptId&&<p className="text-sm">Selected issued transcript. Choose its applicable approved policy below.</p>}
     {applicablePolicy&&<p className="rounded border p-3 text-sm">Applicable institution policy: <strong>{applicablePolicy}</strong></p>}
 
@@ -80,12 +81,17 @@ function GraduationCloseout(){
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">3. Diploma issuance</h2>
     <p className="text-sm">{decisionId?"Graduation decision recorded. Diploma issuance is available below.":"Record an eligible graduation approval above before issuing a diploma."}</p>
-    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setIssuedDiplomaId(result.diplomaId);setDiplomaStatus("current");setDecisionId("");setMessage("Diploma credential recorded.")})}>Issue diploma</button>
+    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setIssuedDiplomaId(result.diplomaId);setDiplomaStatus("current");setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}));setDecisionId("");setMessage("Diploma credential recorded.")})}>Issue diploma</button>
+    {transcriptId&&<div className="space-y-2 rounded-lg border p-3">
+      <p className="text-sm font-semibold">Recorded diplomas for selected transcript</p>
+      <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>setDiplomas(await listTranscriptDiplomas({data:{transcriptId}})))}>Refresh diploma history</button>
+      {diplomas.length===0?<p className="text-sm">No diploma issuance recorded for this transcript.</p>:diplomas.map(row=><button key={row.id} type="button" className="block w-full rounded border p-2 text-left text-sm" onClick={()=>void perform(async()=>{setIssuedDiplomaId(row.id);setRevocationReason("");const result=await getDiplomaFreshness({data:{diplomaId:row.id}});setDiplomaStatus(result.status)})}>Issued {new Date(row.issuedAt).toLocaleDateString()} · {row.revokedAt?"Revoked":"Recorded"} · Inspect</button>)}
+    </div>}
     {issuedDiplomaId&&<div className="space-y-2 rounded-lg border p-3">
       <p className="text-sm">Issued diploma status: <strong>{diplomaStatus||"Review required"}</strong></p>
       <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await getDiplomaFreshness({data:{diplomaId:issuedDiplomaId}});setDiplomaStatus(result.status)})}>Inspect diploma status</button>
       {field("Revocation reason (required)",revocationReason,setRevocationReason)}
-      <button type="button" disabled={busy||diplomaStatus==="revoked"||revocationReason.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await revokeDiploma({data:{diplomaId:issuedDiplomaId,reason:revocationReason}});setDiplomaStatus("revoked");setMessage("Diploma revoked and audited.")})}>Revoke diploma</button>
+      <button type="button" disabled={busy||diplomaStatus==="revoked"||revocationReason.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await revokeDiploma({data:{diplomaId:issuedDiplomaId,reason:revocationReason}});setDiplomaStatus("revoked");setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}));setMessage("Diploma revoked and audited.")})}>Revoke diploma</button>
     </div>}
    </section>
   </div>
