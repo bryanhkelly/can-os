@@ -1,3 +1,4 @@
+import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
 import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClassMappingFields";
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
 import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
@@ -271,13 +272,8 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        },"Cartridge manifest validated and audit-staged. Review the notices before publishing any content.")}>
        Validate cartridge
      </button>
-     {cartridgeReport&&<div className="space-y-2 rounded-lg border p-4 text-sm" role="status">
-       <p><strong>Validated source:</strong> {cartridgeReport.preview.profile.replaceAll("_"," ")} · {cartridgeReport.preview.resources.length} resources · {cartridgeReport.preview.outline.length} top-level units</p>
-       <p><strong>Publication:</strong> Source inspection is separate from publishing. Only explicitly selected external web links can be attached to an existing Section. Embedded lessons, QTI and LTI are not converted.</p>
-       <ul className="list-disc pl-5">{cartridgeReport.preview.notices.map((n,i)=><li key={i}>{n}</li>)}</ul>
-       {!cartridgeReport.preview.notices.length&&<p>No unresolved resource references were detected in the manifest.</p>}
-     </div>}
-     {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import supported Common Cartridge web links">
+     {cartridgeReport&&<CommonCartridgeValidationSummary report={cartridgeReport} />}
+      {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import supported Common Cartridge web links">
        <h3 className="font-semibold">Add supported web links to a class</h3>
        <p className="text-xs text-muted-foreground">Select the original external links you reviewed. Their URLs and source identifiers are preserved in canonical curriculum resources; this does not import a course or lesson package.</p>
        <label className="block text-sm">Destination class
