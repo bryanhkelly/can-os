@@ -31,6 +31,16 @@ export interface GuardianApplicationSubmission {
   schoolYearId?: string;
   studentProfileId?: string;
   familyStartRequestId?: string;
+  originTransferActionId?: string;
+}
+
+export interface GuardianApplicationTransferRequest {
+  id:string;
+  studentProfileId:string;
+  originProgramId:string|null;
+  originSchoolName:string;
+  destinationSchoolName:string;
+  originExited:boolean;
 }
 
 const setupSteps: readonly GuidedSetupStep[] = [
@@ -40,11 +50,12 @@ const setupSteps: readonly GuidedSetupStep[] = [
   { id: "decision", title: "Decision", description: "Authorized school review", status: "upcoming" },
 ];
 
-export function GuardianApplicationForm({ programs, households, students = [], requestedProgramId,
+export function GuardianApplicationForm({ programs, households, students = [], transferRequests = [], requestedProgramId,
   familyStartRequestId, onSubmit, onSubmitted }: {
   programs: readonly GuardianApplicationProgram[];
   households: readonly GuardianApplicationHousehold[];
   students?: readonly GuardianApplicationStudent[];
+  transferRequests?: readonly GuardianApplicationTransferRequest[];
   requestedProgramId?: string;
   familyStartRequestId?: string;
   onSubmit: (input: GuardianApplicationSubmission) => Promise<{ applicationId: string }>;
@@ -63,6 +74,8 @@ export function GuardianApplicationForm({ programs, households, students = [], r
   const selectedProgram = selection.program;
   const [studentOptionId, setStudentOptionId] = useState("");
   const [studentProfileId, setStudentProfileId] = useState("");
+  const [originTransferActionId,setOriginTransferActionId] = useState("");
+  const [confirmedDestination,setConfirmedDestination] = useState(false);
   const [householdId, setHouseholdId] = useState(households[0]?.id ?? "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -81,6 +94,7 @@ export function GuardianApplicationForm({ programs, households, students = [], r
     const student = students.find(item =>
       `${item.studentProfileId}:${item.householdId}` === optionId);
     setStudentProfileId(student?.studentProfileId ?? "");
+    setOriginTransferActionId("");setConfirmedDestination(false);
     if (!student) {
       setFirstName(""); setLastName(""); setGrade("");
       return;
@@ -91,11 +105,18 @@ export function GuardianApplicationForm({ programs, households, students = [], r
     setGrade(student.gradeLevel);
   }
 
+  const availableTransfers=transferRequests.filter(transfer=>
+    transfer.studentProfileId===studentProfileId&&transfer.originProgramId!==selectedProgram?.id);
+  const selectedTransfer=availableTransfers.find(transfer=>transfer.id===originTransferActionId);
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
     if (!selectedProgram || !selection.year || selection.unavailable) {
       setError("Choose an available school and its configured academic year before submitting.");
+      return;
+    }
+    if(selectedTransfer&&!confirmedDestination){
+      setError("Confirm that you selected the intended destination school before linking this transfer.");
       return;
     }
     setBusy(true);
@@ -108,11 +129,13 @@ export function GuardianApplicationForm({ programs, households, students = [], r
         ...(householdId ? { householdId } : {}),
         schoolYearId: selection.year.id,
         ...(studentProfileId ? { studentProfileId } : {}),
+        ...(selectedTransfer ? {originTransferActionId:selectedTransfer.id} : {}),
         ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
       setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
       setRequestId(crypto.randomUUID());
       setStudentProfileId(""); setStudentOptionId("");
+      setOriginTransferActionId("");setConfirmedDestination(false);
       setFirstName("");
       setLastName("");
       setGrade("");
@@ -148,7 +171,7 @@ export function GuardianApplicationForm({ programs, households, students = [], r
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-program`}>School and program</Label>
           <Select id={`${id}-program`} name="programId" required value={selectedProgram?.id ?? ""}
-            onChange={event => { setProgramId(event.target.value); setSchoolYearId(""); setStudentProfileId(""); setStudentOptionId(""); }}>
+            onChange={event => { setProgramId(event.target.value); setSchoolYearId(""); setStudentProfileId(""); setStudentOptionId(""); setOriginTransferActionId("");setConfirmedDestination(false); }}>
             <option value="">Choose a school and program</option>
             {selection.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
           </Select>
