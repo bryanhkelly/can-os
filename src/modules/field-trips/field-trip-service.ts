@@ -779,11 +779,23 @@ export async function getFieldTripSafetyPacket(
         eq(studentProfiles.id, fieldTripParticipants.studentProfileId),
       )
       .innerJoin(people, eq(people.id, studentProfiles.personId))
+      .innerJoin(consentRecords,and(
+        eq(consentRecords.id,fieldTripParticipants.consentRecordId),
+        eq(consentRecords.subjectType,"field_trip_participant"),
+        eq(consentRecords.subjectId,fieldTripParticipants.id),
+        eq(consentRecords.consentType,"field_trip_permission"),
+        isNull(consentRecords.revokedAt),
+      ))
+      .innerJoin(guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:consentRecords.signerPersonId,
+        studentPersonId:studentProfiles.personId,access:"enrollment",
+      }))
       .leftJoin(
         healthProfiles,
         eq(healthProfiles.studentProfileId, fieldTripParticipants.studentProfileId),
       )
-      .where(eq(fieldTripParticipants.fieldTripId, fieldTripId));
+      .where(and(eq(fieldTripParticipants.fieldTripId, fieldTripId),
+        eq(fieldTripParticipants.status,"permission_complete")));
 
     const students = [];
     for (const row of participantRows) {
