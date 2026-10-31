@@ -219,7 +219,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
       subjectType:actions.subjectType,subjectId:actions.subjectId,
       programId:actions.programId,siteId:actions.siteId,metadata:actions.metadata,
     }).from(actions).where(eq(actions.id,app.metadata.originTransferActionId))
-      .for("share").limit(1);
+      .for("update").limit(1);
     if(!origin||origin.type!=="guardian_enrollment_change_request"||
        origin.subjectType!=="student_profile"||
        origin.subjectId!==app.studentProfileId||
