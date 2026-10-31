@@ -12,7 +12,13 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
   const [savedResponse, setSavedResponse] = useState<string | null>(null);
   return <article id={"grade-action-"+item.id} className={"rounded-xl border p-4"+(selected?" ring-2 ring-primary":"")}>
     <p className="font-semibold">{item.studentName} · {item.assessmentTitle}</p>
-    <p className="mt-2 whitespace-pre-wrap text-sm">{item.message}</p>
+    <p className="mt-2 text-xs font-semibold text-muted-foreground">Released attempt {item.attemptNumber}</p>
+    <div className="mt-2 rounded-lg border bg-muted/40 p-3 text-sm">
+      <p className="font-semibold">Grade being discussed: {item.score ?? "Not scored"}{item.score === null ? "" : " / " + item.pointsPossible}</p>
+      <p className="mt-2 whitespace-pre-wrap">Released teacher feedback: {item.teacherFeedback || "No written comment recorded."}</p>
+    </div>
+    <p className="mt-3 text-sm font-semibold">Guardian's question</p>
+    <p className="mt-1 whitespace-pre-wrap text-sm">{item.message}</p>
     <p className="mt-2 text-xs capitalize">{item.status.replaceAll("_", " ")}</p>
     <Link to="/teacher/gradebook" search={{ section: item.sectionId, assessment: item.assessmentId, student: item.studentProfileId }}
       className="mt-2 inline-block text-sm underline">Review graded work</Link>
