@@ -45,8 +45,9 @@ export async function checkPublishedSiteReachability(input: {
         diagnostic: `HTTPS returned HTTP ${response.status} or an invalid HTML content type/size.` };
     }
     // Bound the actual body, not just the untrusted Content-Length header.
+    // UTF-8 byte length is the relevant network limit, not JS code units.
     const html = await response.text();
-    const verified = html.length <= 1_000_000 &&
+    const verified = new TextEncoder().encode(html).byteLength <= 1_000_000 &&
       html.toLowerCase().includes("<!doctype html>") &&
       html.includes("Powered by CAN OS") &&
       html.includes(`<footer>${input.host} · Powered by CAN OS</footer>`);
