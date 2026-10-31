@@ -825,6 +825,21 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
       ).toHaveCount(0);
 
+      // Revoking an otherwise authorized guardian's live session must
+      // immediately remove access to grades, even with the exact resource IDs.
+      await sql.query(
+        "update access_sessions set revoked_at = now() where account_id = $1",
+        [fixture.guardian.accountId],
+      );
+      await goto(
+        guardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
+      await expect(guardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(
+        guardian.page.getByRole("button", { name: "Request school follow-up" }),
+      ).toHaveCount(0);
+
       await sql.query(
         "update access_sessions set revoked_at = now() where account_id = $1",
         [fixture.studentAccountId!],
