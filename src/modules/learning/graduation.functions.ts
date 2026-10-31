@@ -331,6 +331,8 @@ export const getDiplomaFreshness=createServerFn({method:"GET"})
    if(latest?.id!==decision.id || decision.decision!=="approved")return {diplomaId:diploma.id,status:"review_required" as const};
    try {
      const current=await transcriptAndRules(db,s,decision.transcriptIssuanceId,decision.requirementSetId);
+     if(current.transcript.studentProfileId!==decision.studentProfileId || current.transcript.issuingOrganizationId!==decision.issuingOrganizationId)
+       return {diplomaId:diploma.id,status:"review_required" as const};
      const [newest]=await db.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
        .where(and(eq(s.transcriptIssuances.studentProfileId,decision.studentProfileId),eq(s.transcriptIssuances.issuingOrganizationId,decision.issuingOrganizationId)))
        .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
