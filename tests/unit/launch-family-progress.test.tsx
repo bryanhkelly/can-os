@@ -45,6 +45,11 @@ describe("launch family outreach progress",()=>{
     expect(html).toContain(">0</strong>Accepted by provider");
     expect(html).toContain("need delivery review");
   });
+  it("does not offer unauthorized outreach as a completed launch step",()=>{
+    const html=view({programs:[],batches:[batch("a","site")]});
+    expect(html).toContain("You cannot create new outreach for this selected school");
+    expect(html).toContain("Saved batch records are loaded from the server");
+  });
   it("does not treat unavailable invitation history as a successful send",()=>{
     const html=view(null);
     expect(html).toContain("Invitation history is unavailable");
