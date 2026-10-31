@@ -351,6 +351,13 @@
       "when": 1793400000000,
       "tag": "0049_field_trip_decline",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793403600000,
+      "tag": "0050_notification_outbound_deliveries",
+      "breakpoints": true
     }
   ]
 }
