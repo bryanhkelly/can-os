@@ -1,4 +1,4 @@
-import { AdmissionsTransferStatus } from "@/components/admissions/AdmissionsTransferStatus";
+import { AdmissionsApplicantCard } from "@/components/admissions/AdmissionsApplicantCard";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import {useEffect,useState} from "react";
@@ -9,8 +9,6 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
 import { AdmissionsInquiryForm } from "@/components/admissions/AdmissionsInquiryForm";
-import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGuardianActions";
-import { AdmissionsDecisionActions } from "@/components/admissions/AdmissionsDecisionActions";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
@@ -167,39 +165,21 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <AdmissionsPipelineSummary counts={countAdmissionsStages(scopedRecords)}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
    {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
-   {records.map(r=><article key={r.id} className="rounded-xl border bg-card p-5">
-    <div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-semibold">{r.studentFirst} {r.studentLast}</h3>
-     <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
-     <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
-    </div>
-    <AdmissionsTransferStatus applicationId={r.id} transferOriginStatus={r.transferOriginStatus}
-     transferNamedDestination={r.transferNamedDestination} transferRecordsStatus={r.transferRecordsStatus}
-     destinationTranscriptConsentRecorded={r.destinationTranscriptConsentRecorded}/>
-    <AdmissionsGuardianActions applicationId={r.id} verified={r.guardianVerified}
-     loginProvisioned={r.guardianLoginProvisioned} busy={busy}
-     onVerify={applicationId=>{
-      const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
-      if(!evidenceNote)return;
-      const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
-      if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
-      void perform(()=>verifyAdmissionsGuardianRelationship({data:{
-       applicationId,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
-      }}),"Guardian relationship verified and family permissions enabled.");
-     }}
-     onProvision={applicationId=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
-      "Verified guardian sign-in access provisioned.")}
-     onInvite={applicationId=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
-      "A secure email sign-in invitation was requested for this guardian.")}/>
-    {r.disposition==="ready_for_offer"&&<Link to="/admissions"
-      search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
-      className="mt-3 inline-block rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
-    <AdmissionsDecisionActions stage={r.stage} disposition={r.disposition} busy={busy}
-     onDecision={(decision,label)=>void perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision}}),label+" saved.")}/>
-    <Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
-      className="mt-3 inline-block text-xs underline">Review this application's offers and enrollment →</Link>
-    <p className="mt-2 text-xs text-muted-foreground">Withdraw unaccepted offers before waitlisting, declining or withdrawing an application.
-      Accepted offers and active enrollments require their enrollment workflow and cannot be cancelled here.</p>
-   </article>)}
+   {records.map(r=><AdmissionsApplicantCard key={r.id} r={r} busy={busy}
+    onVerify={applicationId=>{
+     const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
+     if(!evidenceNote)return;
+     const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
+     if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
+     void perform(()=>verifyAdmissionsGuardianRelationship({data:{
+      applicationId,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
+     }}),"Guardian relationship verified and family permissions enabled.");
+    }}
+    onProvision={applicationId=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
+     "Verified guardian sign-in access provisioned.")}
+    onInvite={applicationId=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
+     "A secure email sign-in invitation was requested for this guardian.")}
+    onDecision={(applicationId,decision,label)=>void perform(()=>transitionAdmissionsStage({data:{applicationId,decision}}),label+" saved.")}/>)}
    {pageNavigation}
    {!records.length&&<p role="status" className="rounded-lg border p-5 text-sm text-muted-foreground">{selected.application?
     "This application is unavailable in your authorized programs.":"No applications recorded in your authorized programs."}</p>}
