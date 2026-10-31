@@ -34,7 +34,7 @@ export const adoptCurriculumPack=createServerFn({method:"POST"})
  .validator((input:unknown)=>program.extend({packId:uuid,versionId:uuid,academicYearId:uuid}).strict().parse(input))
  .handler(async({data})=>rolloverCurriculumAdoption(await actor(),{
   programId:data.programId,packId:data.packId,versionId:data.versionId,
-  year:{id:data.academicYearId,startsAt:new Date(0),endsAt:new Date(0)}
+  academicYearId:data.academicYearId
  }));
 export const reviewAnnualCurriculumAdoption=createServerFn({method:"GET"})
  .validator((input:unknown)=>program.extend({packId:uuid,academicYearId:uuid}).strict().parse(input))
@@ -42,7 +42,7 @@ export const reviewAnnualCurriculumAdoption=createServerFn({method:"GET"})
   setResponseHeader("Cache-Control","private, no-store");
   return readAnnualAdoptionEligibility(await actor(),{
    programId:data.programId,packId:data.packId,
-   year:{id:data.academicYearId,startsAt:new Date(0),endsAt:new Date(0)}
+   academicYearId:data.academicYearId
   });
  });
 export const rollbackCurriculumPackAdoption=createServerFn({method:"POST"})
