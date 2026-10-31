@@ -188,7 +188,7 @@ export const listGuardianEnrollmentChanges=createServerFn({method:"GET"})
    )).orderBy(desc(s.actions.createdAt)).limit(50);
   return {items:rows.filter(row=>row.kind.requestedByGuardianPersonId===actor.actorPersonId)
     .map(row=>({
-      id:row.id,kind:row.kind.kind,
+      id:row.id,kind:changeKinds.safeParse(row.kind.kind).success ? changeKinds.parse(row.kind.kind) : "unknown",
       destinationSchoolName:typeof row.kind.destinationSchoolName==="string"?row.kind.destinationSchoolName:null,
       destinationSchoolContactEmail:typeof row.kind.destinationSchoolContactEmail==="string"?row.kind.destinationSchoolContactEmail:null,
       destinationFamilyStartProgramName:typeof row.kind.destinationFamilyStartProgramName==="string"?row.kind.destinationFamilyStartProgramName:null,
