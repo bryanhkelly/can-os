@@ -46,6 +46,7 @@ export function FamilyInviteImporter({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState("");
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
   const requestId = useRef(crypto.randomUUID());
   const parsed = useMemo(() => parseFamilyContacts(raw), [raw]);
   const tooMany = parsed.contacts.length > FAMILY_INVITATION_MAX_RECIPIENTS;
@@ -55,6 +56,7 @@ export function FamilyInviteImporter({
     setPreview(false);
     setConfirmed(false);
     setResult("");
+    setAwaitingVerification(false);
   }
   async function loadFile(file: File | undefined) {
     if (!file) return;
@@ -89,7 +91,9 @@ export function FamilyInviteImporter({
         setPreview(false);
         setConfirmed(false);
         requestId.current = crypto.randomUUID();
+        setAwaitingVerification(false);
       } catch {
+        setAwaitingVerification(true);
         setConfirmed(false);
         setError("Invitations were saved by the server, but updated outreach records could not be loaded. Reopen this launch to verify the saved batch; do not send another batch.");
       }
@@ -184,7 +188,7 @@ export function FamilyInviteImporter({
         </label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Email uses the approved CAN sender. Application links use the CAN access-mail service; pre-opening notices use the notification delivery service. A typed sender address cannot override either.</p>
-      <button type="button" disabled={!selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
+      <button type="button" disabled={awaitingVerification || !selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
         onClick={() => { setPreview(true); setConfirmed(false); }}
         className="mt-5 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Preview invitation</button>
       {preview && <div className="mt-6 rounded-xl border p-5" aria-label="Invitation preview">
@@ -195,12 +199,13 @@ export function FamilyInviteImporter({
           ? "Each message is a pre-opening notice, not an application. It includes an opening-authorization disclaimer and a link where the adult can explicitly request school updates."
           : `Each email includes a single-use, 10-minute link directly to ${selectedProgram?.name}\u0027s verified application.`}</p>
         <label className="mt-5 flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</label>
-        <button type="button" disabled={!selectedProgram || !confirmed || busy} onClick={() => void send()}
+        <button type="button" disabled={awaitingVerification || !selectedProgram || !confirmed || busy} onClick={() => void send()}
           className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving and queueing…" : "Save and queue invitations"}</button>
       </div>}
     </>}
 
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {awaitingVerification && <button type="button" disabled={busy} onClick={()=>void router.invalidate().then(()=>{setAwaitingVerification(false);setRaw("");setPreview(false);setConfirmed(false);requestId.current=crypto.randomUUID();setError("");}).catch(()=>setError("Saved invitation records are still unavailable. Do not resend; reopen this launch or contact the registrar."))} className="mt-3 rounded border px-3 py-2 text-sm font-semibold">Verify saved invitation batch</button>}
     {result && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{result}</p>}
 
     {batches.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-4" aria-label="Family invitation progress">
