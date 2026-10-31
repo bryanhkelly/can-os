@@ -6,6 +6,7 @@ import {db} from "@/db/client";
 import * as s from "@/db/schema";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {guardianRelationshipPredicate} from "@/domain/guardian-relationship";
+import {isAcademicMarketingType} from "@/domain/academic-program-publication";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {requestPublicFamilyStart,resolvePublishedFamilyStartDestination} from "./public-family-start.server";
 import {writeAudit} from "@/platform/mutation";
@@ -32,7 +33,7 @@ export const listPublicTransferDestinations=createServerFn({method:"GET"}).handl
  setResponseHeader("Cache-Control","private, no-store");
  await verifiedFamily();
  const rows=await db.selectDistinct({
-  id:s.programs.id,name:s.programs.name,
+  id:s.programs.id,name:s.programs.name,type:s.programs.type,
   siteName:s.sites.name,slug:s.sitePublications.slug,
  }).from(s.programs)
  .innerJoin(s.sites,eq(s.sites.id,s.programs.siteId))
@@ -58,8 +59,19 @@ export const listPublicTransferDestinations=createServerFn({method:"GET"}).handl
  ))
  .where(and(eq(s.programs.status,"active"),
   eq(s.programs.organizationId,s.sites.organizationId)))
- .orderBy(asc(s.sites.name),asc(s.programs.name)).limit(100);
- return rows;
+ .orderBy(asc(s.sites.name),asc(s.programs.name)).limit(80);
+ const candidates=rows.filter(row=>isAcademicMarketingType(row.type));
+ // Publication alone does not confer independent academic operating authority.
+ const available=await Promise.all(candidates.map(async row=>{
+   try{
+     await resolvePublishedFamilyStartDestination(db,row.id);
+     return {id:row.id,name:row.name,siteName:row.siteName,slug:row.slug};
+   }catch(error){
+     if(error instanceof AuthorizationError)return null;
+     throw error;
+   }
+ }));
+ return available.filter((row):row is NonNullable<typeof row>=>row!==null);
 });
 
 const request=z.object({
