@@ -100,6 +100,8 @@ export async function listChurchApplications(actor: AccessContext) {
       ? evidenceById.get(request.authorityDocumentId) : undefined;
     return {
       ...request,
+      // The decision note is reviewer-only. Never expose it in applicant-facing
+      // status APIs or outgoing notices.
       authorityEvidence: document ? {
         reference: document.storageKey,
         method: typeof document.metadata.verificationMethod === "string"
