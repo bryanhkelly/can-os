@@ -4,9 +4,9 @@
  * but never throws: email delivery must not break a domain transaction.
  * Call from server code only; never import this module into a client component.
  */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, accountPersonGrants } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 
 export type NotificationEmailMessage = {
   to: string;
@@ -81,7 +81,7 @@ export async function sendNotificationEmail(
 /**
  * Resolve notification recipient emails for a set of personIds through their
  * access accounts (people -> account_person_grants -> access_accounts).
- * Only active grants on non-disabled accounts are eligible. Returns at most
+ * Only real grants for active people on verified, non-disabled accounts are eligible. Returns at most
  * one email per person.
  */
 export async function emailNotificationRecipients(
@@ -97,15 +97,16 @@ export async function emailNotificationRecipients(
       email: accessAccounts.emailNormalized,
     })
     .from(accountPersonGrants)
-    .innerJoin(
-      accessAccounts,
-      eq(accessAccounts.id, accountPersonGrants.accountId),
-    )
+    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
+    .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .where(
       and(
         inArray(accountPersonGrants.personId, uniqueIds),
         eq(accountPersonGrants.active, true),
+        eq(accountPersonGrants.isSynthetic, false),
+        eq(people.active, true),
         eq(accessAccounts.disabled, false),
+        isNotNull(accessAccounts.emailVerifiedAt),
       ),
     );
 
