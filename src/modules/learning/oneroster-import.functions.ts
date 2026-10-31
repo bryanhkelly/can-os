@@ -20,8 +20,8 @@ const files=z.object({
 }).strict().refine(o=>Object.values(o).some(Boolean),"At least one OneRoster CSV file is required.");
 const input=z.object({programId:z.string().uuid(),files}).strict();
 /** Import identity includes the institutional Program, preventing cross-Program digest reuse. */
-const bundleDigest=(programId:string,files:z.infer<typeof files>)=>
- createHash("sha256").update(JSON.stringify({programId,files})).digest("hex");
+const bundleDigest=(programId:string,bundle:z.infer<typeof files>)=>
+ createHash("sha256").update(JSON.stringify({programId,files:bundle})).digest("hex");
 export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
  .validator((value:unknown)=>input.parse(value))
  .handler(async({data})=>{
@@ -155,11 +155,13 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
      .where(and(inArray(sections.id,sectionIds),eq(sections.programId,program.id),
        eq(sections.siteId,program.siteId),eq(schoolYears.organizationId,program.organizationId),
        eq(schoolYears.siteId,program.siteId)));
-   if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active||s.schoolYearStatus==="archived"))
+   if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active||s.schoolYearStatus==="closed"))
      throw new AuthorizationError("active Section owned by this Program and Site");
    const byCanonicalId=new Map(canonical.map(s=>[s.id,s]));
    for(const row of classes.rows){
-     const section=byCanonicalId.get(bySource.get(row.sourcedId)!);
+     const externalId=row.sourcedId;
+      if(!externalId)throw new Error("External class identifier is required.");
+      const section=byCanonicalId.get(bySource.get(externalId)!);
      if(!section||!row.schoolYear||row.schoolYear!==section.schoolYearKey)
        throw new Error("External class school year must match the canonical Section year.");
      if(!row.termSourcedIds||!row.termSourcedIds.split(",").map(s=>s.trim()).includes(section.termKey))
