@@ -199,7 +199,8 @@ function TeacherGradebookPage() {
     try {
      const refreshed=await getGradebook({data:{sectionId:selected}});
      setGradebook(refreshed);
-     const next=refreshed.cells.find(item=>item.status==="submitted"&&item.submissionId!==cell.submissionId);
+     const pending=refreshed.cells.filter(item=>item.status==="submitted"&&item.submissionId!==cell.submissionId);
+     const next=pending.find(item=>item.gradingDraft)??pending[0];
      void navigate({search:next
       ?{section:selected,assessment:next.assessmentId,student:next.studentProfileId}
       :{section:selected}});
