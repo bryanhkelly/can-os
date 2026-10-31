@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { File } from "node:buffer";
 import { submitEvidenceUpload, type PendingEvidenceUpload } from "./evidence-upload";
 type Input = { fileName: string; mimeType: "application/pdf"; size: number; expiresAt: string };
-const file = new File(["evidence"], "evidence.pdf", { type: "application/pdf" }) as unknown as globalThis.File;
+const file = new File(["evidence"], "evidence.pdf", { type: "application/pdf" });
 const makeInput = (selected: File, expiresAt: string): Input =>
   ({ fileName: selected.name, mimeType: "application/pdf", size: selected.size, expiresAt });
 afterEach(() => vi.unstubAllGlobals());
