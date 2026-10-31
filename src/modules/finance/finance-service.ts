@@ -70,15 +70,18 @@ export async function registerCanonicalInvoice(store: FinanceStore, identity: Fi
   await store.createInvoice(charge);
 }
 
-export async function recordProcessorEvidence(
-  store: FinanceStore, event: ProviderEvent,
-  verification: { verifiedByAdapter: true; provider: string },
+/**
+ * Server-only ingestion: only the configured processor can mint verified evidence.
+ * Do not expose this function through a client-supplied event JSON endpoint.
+ */
+export async function ingestSignedWebhook(
+  store: FinanceStore, processor: FinanceProcessor, rawPayload: string, signature: string,
 ): Promise<FinanceRecord> {
-  if (!verification || verification.verifiedByAdapter !== true || verification.provider !== event.provider || !event.verified) {
+  if (!processor.configured) throw new Error("Payment processor not configured");
+  const { event, verification } = await processor.verifyWebhook(rawPayload, signature);
+  if (!event.verified || verification.verifiedByAdapter !== true ||
+      verification.provider !== processor.name || event.provider !== processor.name)
     throw new Error("Processor verification required");
-  }
-  // The store MUST perform event insertion, state transition and receipt
-  // creation atomically; a browser/controller cannot mutate settlement state.
   return store.postVerifiedEvent(event);
 }
 
