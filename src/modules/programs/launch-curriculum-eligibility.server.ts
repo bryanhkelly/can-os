@@ -58,6 +58,7 @@ export async function listLaunchEligibleCourses(program: {
     packName:curriculumPacks.name,publisherName:organizations.name,
     licenseStatus:curriculumEntitlements.status,licenseMetadata:curriculumEntitlements.metadata,
     adoptionStatus:curriculumAnnualAdoptions.status,supersededAt:curriculumAnnualAdoptions.supersededAt,
+    adoptionSiteId:curriculumAnnualAdoptions.siteId,
   })
     .from(curriculumAnnualAdoptions)
     .innerJoin(curriculumEntitlements, and(
@@ -102,11 +103,11 @@ export async function listLaunchEligibleCourses(program: {
   for (const course of (validYear && startsAt && endsAt ? adopted : [])) {
     const metadata=course.licenseMetadata;
     const licenseStart=date(metadata.licenseStartsAt),licenseEnd=date(metadata.licenseEndsAt);
-    if(!licenseStart || !licenseEnd || course.supersededAt || course.adoptionStatus!=="active" ||
+    if(!licenseStart || !licenseEnd || course.adoptionSiteId!==actualProgram?.siteId || course.supersededAt || course.adoptionStatus!=="active" ||
        !licenseValidForYear({organizationId:program.organizationId,packId:"",publisherOrganizationId:"",
          status:course.licenseStatus,startsAt:licenseStart,endsAt:licenseEnd,
          withdrawnAt:date(metadata.withdrawnAt)}, {startsAt:startsAt!,endsAt:endsAt!},new Date()))continue;
-    const {licenseMetadata,licenseStatus,adoptionStatus,supersededAt,...choice}=course;
+    const {licenseMetadata,licenseStatus,adoptionStatus,supersededAt,adoptionSiteId,...choice}=course;
     deduplicated.set(choice.versionId,{...choice,origin:"adopted"});
   }
   return [...deduplicated.values()].sort((a, b) =>
