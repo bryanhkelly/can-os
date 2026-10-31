@@ -541,6 +541,20 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await guardian.page.reload();
       await waitForAppHydration(guardian.page);
       await expect(guardian.page.getByText(/Enrollment is active and classes are assigned/)).toBeVisible();
+      // The registrar's activation must preserve the same applicant student
+      // identity and place that exact student in this Program's Section.
+      const activated = await singleRow(
+        sql,
+        `select sp.person_id, e.program_id
+         from enrollments e
+         join student_profiles sp on sp.id = e.student_profile_id
+         where e.student_profile_id = $1 and e.program_id = $2
+           and e.status = 'active'`,
+        [fixture.studentProfileId!, fixture.programId!],
+      );
+      expect(activated.person_id).toBe(fixture.studentPersonId);
+      expect(activated.program_id).toBe(fixture.programId);
+
     });
 
     // ------------------------------------------------------------------
