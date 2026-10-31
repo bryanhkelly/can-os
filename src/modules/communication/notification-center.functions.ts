@@ -164,6 +164,19 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.actions.organizationId,context.scope.organizationIds??[]),
   )):[];
  const permittedOperatorChangeIds=new Set(operatorChangeActions.map(row=>row.id));
+ const recordsHandoffNoticeIds=rows.filter(n=>
+   n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId
+ ).map(n=>n.resourceId!);
+ const scopedHandoffNotices=recordsHandoffNoticeIds.length&&context.role==="registrar"?
+   await db.select({id:s.actions.id}).from(s.actions).where(and(
+     inArray(s.actions.id,recordsHandoffNoticeIds),
+     eq(s.actions.type,"transfer_academic_records_handoff"),
+     eq(s.actions.ownerPersonId,personId),
+     inArray(s.actions.siteId,context.scope.siteIds??[]),
+     inArray(s.actions.programId,context.scope.programIds??[]),
+     inArray(s.actions.organizationId,context.scope.organizationIds??[]),
+   )):[];
+ const permittedRecordsHandoffs=new Set(scopedHandoffNotices.map(row=>row.id));
  const healthNoticeIds=rows.filter(n=>["guardian_health_review_requested","guardian_health_review_completed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
  const healthReviewActions=healthNoticeIds.length?await db.select({
   id:s.actions.id,studentPersonId:s.studentProfiles.personId,
@@ -493,6 +506,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId&&permittedRecordsHandoffs.has(n.resourceId)?"/operations/transfer-records":
    n.type==="guardian_health_review_requested"&&n.resourceType==="action"&&n.resourceId&&healthStaffActionIds.has(n.resourceId)?`/operations/health-review?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="guardian_health_review_completed"&&n.resourceType==="action"&&n.resourceId&&healthGuardianChildByAction.has(n.resourceId)?`/guardian/health?student=${encodeURIComponent(healthGuardianChildByAction.get(n.resourceId)!)}`:
    n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
