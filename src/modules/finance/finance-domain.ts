@@ -36,7 +36,7 @@ export function applyVerifiedEvent(record: FinanceRecord, event: ProviderEvent):
     if (record.providerPaymentId && record.providerPaymentId !== event.providerPaymentId) throw new Error("Payment identity conflict");
     if (record.capturedCents + event.amount.cents > record.charge.amount.cents) throw new Error("Capture exceeds invoice");
     next.providerPaymentId = event.providerPaymentId;
-    next.capturedCents = event.amount.cents;
+    next.capturedCents = record.capturedCents + event.amount.cents;
   } else {
     if (!record.providerPaymentId || record.providerPaymentId !== event.providerPaymentId) throw new Error("Original payment mismatch");
     if (event.kind === "refund_succeeded") {
