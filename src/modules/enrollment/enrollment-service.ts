@@ -245,6 +245,22 @@ export async function startFamilyApplication(
         )).limit(1);
       if (!start) throw new AuthorizationError("verified family start for this account, Site and Program");
       familyStart = start;
+      // If this verified-email start was initiated from an existing family
+      // transfer, never silently create a second Student Person. The original
+      // verified student and original Action must be reused by this request.
+      const linkedTransfers=await tx.select({id:actions.id})
+        .from(actions).where(and(
+          eq(actions.type,"guardian_enrollment_change_request"),
+          eq(actions.subjectType,"student_profile"),
+          sql`${actions.metadata}->>'kind' = 'transfer'`,
+          sql`${actions.metadata}->>'requestedByGuardianPersonId' = ${actorPersonId}`,
+          sql`${actions.metadata}->>'destinationFamilyStartRequestId' = ${start.id}`,
+          sql`${actions.metadata}->>'destinationFamilyStartProgramId' = ${program.id}`,
+        )).limit(10);
+      if(linkedTransfers.length&&
+         (!input.existingStudentProfileId||!input.originTransferActionId||
+          !linkedTransfers.some(transfer=>transfer.id===input.originTransferActionId)))
+        throw new Error("This verified school invitation belongs to an existing student transfer. Reuse the verified student and linked transfer request; contact admissions if the student is not listed.");
     }
 
     let householdId = input.householdId;
