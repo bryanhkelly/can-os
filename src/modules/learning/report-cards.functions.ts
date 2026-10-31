@@ -610,10 +610,17 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
 
       const [gradeScale]=grade.gradeScaleId?await tx.select({configuration:s.gradeScales.configuration})
        .from(s.gradeScales).where(eq(s.gradeScales.id,grade.gradeScaleId)).limit(1):[];
+      // A finalized grade must never be corrected against an unavailable or
+      // unconfigured version of its institutional grading scale.
+      if (grade.gradeScaleId && !gradeScale?.configuration.entries.length)
+        throw new Error("Finalized grade scale is unavailable");
       const now = new Date();
       const newPercentage =
         data.percentage !== undefined ? String(data.percentage) : grade.percentage;
       const scaleEntries = gradeScale?.configuration.entries ?? [];
+      if (data.letterGrade && scaleEntries.length &&
+          !scaleEntries.some(entry => entry.label === data.letterGrade))
+        throw new Error("Corrected letter grade must belong to the finalized grade scale");
       const newLetterGrade =
         data.letterGrade ??
         (data.percentage !== undefined && scaleEntries.length
