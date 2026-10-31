@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, userEvent, within, fn } from "storybook/test";
+import { expect, userEvent, within, fn, fireEvent } from "storybook/test";
 import { EvidenceUploader } from "./EvidenceUploader";
 type Upload = { fileName: string; mimeType: "application/pdf" | "image/jpeg" | "image/png";
   size: number; expiresAt: string };
@@ -35,7 +35,7 @@ export const UploadAndFinalize: Story = {
       const fileInput = canvas.getByLabelText("PDF, JPEG or PNG") as HTMLInputElement;
       const dateInput = canvas.getByLabelText("Evidence expires on") as HTMLInputElement;
       await userEvent.upload(fileInput, new File(["document"], "approval.pdf", { type: "application/pdf" }));
-      await userEvent.type(dateInput, "2027-05-01");
+      fireEvent.change(dateInput, { target: { value: "2027-05-01" } });
       await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
       await expect(args.adapter.finish).toHaveBeenCalled();
       await expect(args.onUploaded).toHaveBeenCalled();
