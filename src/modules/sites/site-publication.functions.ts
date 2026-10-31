@@ -85,7 +85,7 @@ export const verifySitePublicationReachability = createServerFn({ method: "POST"
         return { status: "unreachable" as const, url, diagnostic: "The host did not return a valid public CAN site over HTTPS. Verify wildcard DNS, TLS certificate coverage, deployment, and host routing.", checkedAt };
       }
       const html = await response.text();
-      const verified = html.includes("Powered by CAN OS") && html.toLowerCase().includes("<!doctype html>");
+      const verified = html.includes("Powered by CAN OS") && html.toLowerCase().includes("<!doctype html>") && html.includes(draft.address.host);
       return { status: verified ? "live" as const : "unreachable" as const, url, checkedAt,
         diagnostic: verified ? "Public HTTPS returned CAN site HTML." : "HTTPS responded, but the response was not recognizable as a CAN public site." };
     } catch {
