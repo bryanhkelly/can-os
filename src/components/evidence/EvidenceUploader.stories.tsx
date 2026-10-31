@@ -69,3 +69,63 @@ export const RefreshFailureDoesNotRepeatFinalization: Story = {
     } finally { globalThis.fetch = originalFetch; }
   },
 };
+
+
+export const RetryFinalizationWithoutReupload: Story = {
+  args: {
+    adapter: {
+      begin: fn(async () => ({ key: "retry-key", uploadUrl: "/mock-private-upload", uploadHeaders: {} })),
+      finish: fn().mockRejectedValueOnce(new Error("Temporary finalization failure"))
+        .mockResolvedValue(undefined),
+    },
+    onUploaded: fn(async () => {}),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const originalFetch = globalThis.fetch;
+    let uploads = 0;
+    globalThis.fetch = async () => { uploads++; return new Response(null, { status: 200 }); };
+    try {
+      await userEvent.upload(canvas.getByLabelText("PDF, JPEG or PNG"),
+        new File(["document"], "approval.pdf", { type: "application/pdf" }));
+      fireEvent.change(canvas.getByLabelText("Evidence expires on"),
+        { target: { value: "2027-05-01" } });
+      await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
+      await expect(canvas.findByRole("alert")).resolves.toHaveTextContent("Temporary finalization failure");
+      await userEvent.click(canvas.getByRole("button", { name: "Retry recording uploaded evidence" }));
+      await expect(args.adapter.finish).toHaveBeenCalledTimes(2);
+      await expect(args.adapter.begin).toHaveBeenCalledTimes(1);
+      await expect(uploads).toBe(1);
+    } finally { globalThis.fetch = originalFetch; }
+  },
+};
+
+export const ChangeDocumentAfterFailedFinalization: Story = {
+  args: {
+    adapter: {
+      begin: fn(async () => ({ key: "new-key", uploadUrl: "/mock-private-upload", uploadHeaders: {} })),
+      finish: fn().mockRejectedValueOnce(new Error("First document rejected"))
+        .mockResolvedValue(undefined),
+    },
+    onUploaded: fn(async () => {}),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const originalFetch = globalThis.fetch;
+    let uploads = 0;
+    globalThis.fetch = async () => { uploads++; return new Response(null, { status: 200 }); };
+    try {
+      const input = canvas.getByLabelText("PDF, JPEG or PNG");
+      await userEvent.upload(input, new File(["first"], "first.pdf", { type: "application/pdf" }));
+      fireEvent.change(canvas.getByLabelText("Evidence expires on"),
+        { target: { value: "2027-05-01" } });
+      await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
+      await expect(canvas.findByRole("alert")).resolves.toHaveTextContent("First document rejected");
+      await userEvent.upload(input, new File(["second"], "second.pdf", { type: "application/pdf" }));
+      await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
+      await expect(args.adapter.begin).toHaveBeenCalledTimes(2);
+      await expect(args.adapter.finish).toHaveBeenCalledTimes(2);
+      await expect(uploads).toBe(2);
+    } finally { globalThis.fetch = originalFetch; }
+  },
+};
