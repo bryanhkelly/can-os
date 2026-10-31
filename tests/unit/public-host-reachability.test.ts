@@ -4,7 +4,7 @@ import { checkPublishedSiteReachability } from "@/modules/sites/public-host-reac
 const host = "vineyard.can-os.com";
 const goodHtml = `<!doctype html><html><body><footer>${host} · Powered by CAN OS</footer></body></html>`;
 const response = (body: string, status = 200, type = "text/html") =>
-  new Response(body, { status, headers: { "content-type": type } });
+  new Response(body, { status, headers: { "content-type": type, "cache-control": "private, no-store", vary: "Host" } });
 const fetcher = (result: Response) => vi.fn(async () => result) as unknown as typeof fetch;
 
 describe("published Site HTTPS verification", () => {
@@ -81,7 +81,7 @@ describe("published Site HTTPS verification", () => {
         if (pulled >= 5) controller.close();
       },
     });
-    const r = new Response(stream, { headers: { "content-type": "text/html" } });
+    const r = new Response(stream, { headers: { "content-type": "text/html", "cache-control": "private, no-store", vary: "Host" } });
     const result = await checkPublishedSiteReachability({
       host, published: true, hostingConfigured: true, fetcher: fetcher(r),
     });
@@ -95,6 +95,21 @@ describe("published Site HTTPS verification", () => {
     expect((await checkPublishedSiteReachability({
       host, published: true, hostingConfigured: true, fetcher: fetcher(r),
     })).status).toBe("unreachable");
+  });
+  it("rejects cacheable or cross-tenant-cacheable public responses", async () => {
+    for (const headers of [
+      { "cache-control": "public, max-age=300", vary: "Host" },
+      { "cache-control": "private, no-store", vary: "Accept-Encoding" },
+      { "cache-control": "private, no-store", vary: "Host", "netlify-cdn-cache-control": "s-maxage=60" },
+    ]) {
+      const result = await checkPublishedSiteReachability({
+        host, published: true, hostingConfigured: true,
+        fetcher: fetcher(new Response(goodHtml, {
+          headers: { "content-type": "text/html", ...headers },
+        })),
+      });
+      expect(result.status).toBe("unreachable");
+    }
   });
   it("does not report TLS, DNS or timeout failures as live", async () => {
     const f = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
