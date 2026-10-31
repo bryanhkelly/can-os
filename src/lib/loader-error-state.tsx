@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from "react";\nimport type { LoadOutcome } from "./safe-loader";
 import { Link } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
 import type { LoaderFailureKind } from "./safe-loader";
