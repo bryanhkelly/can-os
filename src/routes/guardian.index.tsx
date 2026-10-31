@@ -49,9 +49,22 @@ function FamilyHomePage() {
 export function FamilyHomeView({children,needs,loading,error,needsWarning,action,student}:{
  children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;action?:string;student?:string;
 }){
- const prioritized=prioritizeFamilyNeeds(needs,Date.now());
  const selectedChild=children.find(child=>child.studentPersonId===student);
  const visibleChildren=selectedChild?[selectedChild]:children;
+ const schoolworkItems=visibleChildren.flatMap(child=>child.workToReview.map(work=>({
+  id:child.studentPersonId+":"+work.assessmentId,
+  kind:"schoolwork",
+  type:"assignment_action",
+  title:child.displayName+": "+work.title,
+  detail:work.status==="returned"?"Teacher returned this work for revision.":
+   work.status==="draft"?"Student has work in progress to finish.":"Student has an assignment to complete.",
+  href:"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)+
+   "&section="+encodeURIComponent(work.sectionId)+"&assessment="+encodeURIComponent(work.assessmentId),
+  dueAt:work.dueAt,
+  priority:work.status==="returned"?"high":"normal",
+ })));
+ const prioritized=prioritizeFamilyNeeds([...needs,...schoolworkItems],Date.now());
+ const schoolworkCount=visibleChildren.reduce((total,child)=>total+child.workNeedsAttentionCount,0);
  return <WorkspaceShell
   width="wide"
   eyebrow="CAN OS · Family"
@@ -89,15 +102,15 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,action
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
-    <StatCard label="Needs your attention" value={needsWarning?"Unavailable":needs.length}/>
+    <StatCard label="Needs your attention" value={needsWarning?"Limited":needs.length+schoolworkCount}/>
     <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <div className="mt-6">
     {needsWarning && <p role="status" className="mb-3 rounded-xl border p-4 text-sm">{needsWarning}</p>}
-    {!needsWarning && <AttentionQueue
+    <AttentionQueue
      items={buildGuardianAttention(prioritized.filter(item=>!action||item.kind==="action"&&item.id===action))}
      empty={action?"The selected action is not available in your current family workspace.":"You are all caught up. Nothing needs your attention right now."}
-    />}
+    />
     {action&&<Link to="/guardian" className="mt-4 inline-block text-sm underline">View all family needs</Link>}
     {action&&!needsWarning&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
    </div>
@@ -135,7 +148,14 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,action
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline">Absences</Link></dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
       </dl>
-      <p className="mt-4 text-sm text-muted-foreground">{child.awaitingSections?"Your school is arranging class placement.":child.missingCount>0?`${child.missingCount} assignment(s) need follow-through.`:child.unexcusedAbsences>0?"An absence needs your review.":"No missing work or unexcused absences in this summary."}</p>
+      <p className="mt-4 text-sm text-muted-foreground">{child.awaitingSections?"Your school is arranging class placement.":child.missingCount>0?`${child.missingCount} assignment(s) need follow-through.`:child.workNeedsAttentionCount>0?`${child.workNeedsAttentionCount} assignment(s) to complete or revise.`:child.unexcusedAbsences>0?"An absence needs your review.":"No missing work or unexcused absences in this summary."}</p>
+      {child.workToReview.length>0&&<div className="mt-4 rounded-lg border p-3">
+       <p className="text-sm font-semibold">Schoolwork to review · {child.workNeedsAttentionCount}</p>
+       <ul className="mt-2 space-y-2">{child.workToReview.map(work=><li key={work.assessmentId} className="text-sm">
+        <Link to="/guardian/academics" search={{student:child.studentPersonId,section:work.sectionId,assessment:work.assessmentId}} className="font-semibold underline">{work.title}</Link>
+        <span className="ml-2 text-xs text-muted-foreground">{work.status==="returned"?"Revision requested":work.status==="draft"?"Draft in progress":"Not submitted"}</span>
+       </li>)}</ul>
+      </div>}
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
        <Link to="/guardian/academics" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
        <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
