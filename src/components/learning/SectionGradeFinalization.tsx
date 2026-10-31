@@ -72,6 +72,16 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
         "(already finalized or unfinished scoreable work in the period window). Finalized grades now appear on student and guardian report cards and transcripts.");
       // A refresh error is shown separately; it must not imply finalization failed.
       await refresh();
+      // Keep the remaining unfinished work visible after a partial closeout.
+      // The server preview excludes grades already finalized in this period.
+      if (result.skipped > 0) {
+        try {
+          const remaining = await finalizeSectionGrades({ data: { sectionId, gradingPeriodId: periodId, previewOnly: true } });
+          if ("preview" in remaining && remaining.preview) setPreview(remaining);
+        } catch {
+          // The successful finalization receipt remains authoritative.
+        }
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to finalize grades for this grading period.");
     } finally { setBusy(false); }
