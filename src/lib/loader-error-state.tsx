@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
-import type { LoaderFailureKind } from "./safe-loader";
+import type { LoadOutcome } from "./safe-loader";
 
 export interface LoaderErrorStateProps {
   outcome: {
