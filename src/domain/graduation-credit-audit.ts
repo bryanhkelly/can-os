@@ -36,14 +36,17 @@ export function auditGraduationCredits(
   const blockers: string[] = [];
   if (!requirements.length) blockers.push("No approved graduation requirements supplied");
   const required = new Map<string, number>();
+  const subjectNames = new Map<string,string>();
   for (const rule of requirements) {
     const subject = rule.subject.trim();
+    const key = subject.toLocaleLowerCase();
     if (!subject || !validUnits(rule.minimumUnits) || rule.minimumUnits <= 0 ||
-        required.has(subject)) {
+        required.has(key)) {
       blockers.push(`Invalid or duplicate graduation requirement: ${rule.subject}`);
       continue;
     }
-    required.set(subject, rule.minimumUnits);
+    required.set(key, rule.minimumUnits);
+    subjectNames.set(key,subject);
   }
   const earned = new Map<string, number>();
   const seen = new Set<string>();
@@ -58,10 +61,11 @@ export function auditGraduationCredits(
       blockers.push(`Unverified credit evidence: ${row.sectionId}`);
       continue;
     }
-    earned.set(row.subject.trim(), (earned.get(row.subject.trim()) ?? 0) + row.earnedUnits);
+    const key=row.subject.trim().toLocaleLowerCase();
+    earned.set(key, (earned.get(key) ?? 0) + row.earnedUnits);
   }
   const deficiencies = [...required].map(([subject, minimumUnits]) => ({
-    subject, required: minimumUnits, earned: earned.get(subject) ?? 0,
+    subject:subjectNames.get(subject)??subject, required: minimumUnits, earned: earned.get(subject) ?? 0,
     missing: Math.max(0, minimumUnits - (earned.get(subject) ?? 0)),
   })).filter(row => row.missing > 0);
   return {
