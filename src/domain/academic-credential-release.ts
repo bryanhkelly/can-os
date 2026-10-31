@@ -59,3 +59,9 @@ export const EXTERNAL_SCHOOL_TO_SCHOOL_RELEASE_SUPPORTED=false as const;
 export function isLatestTranscriptIssuance(requestedId:string,latestId:string|null):boolean {
  return !!latestId&&requestedId===latestId;
 }
+
+/** Revocation is terminal for a consent-bound release; expiry permits a
+ * separately reviewed replacement while preserving the original audit. */
+export function canReauthorizeCredentialRelease(previousRevoked:boolean):boolean {
+ return !previousRevoked;
+}
