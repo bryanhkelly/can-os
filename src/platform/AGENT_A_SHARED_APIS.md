@@ -33,3 +33,38 @@ Agent C can replace launch-specific time conversions after validating the desire
 ## Pending coordination
 
 Server function wrappers and loader error classification require further review of existing auth and loader contracts. Do not migrate feature endpoints until those contracts are published and tested. This branch does not change any feature routes.
+
+## Verified server functions
+
+Import from `@/platform/server-functions`:
+
+- `authenticatedQuery(schema, async (context, input) => result)`
+- `authenticatedCommand(schema, async (context, input) => result)`
+- `scopedQuery(schema, capability, resourceGuard, handler)`
+- `institutionalDecision(schema, capability, resourceGuard, decide)`
+
+These use the existing verified `getCommandContext(getRequest())` / `withAuth` infrastructure, parse input with Zod, and set `Cache-Control: private, no-store`. The context and resource authorization are never derived from browser roles or scope. A resource guard must perform the existing domain-specific checks, and institutional decisions must continue using existing decision/audit services.
+
+Example:
+
+```ts
+const input = z.object({ siteId: z.string().uuid() });
+export const getSiteSummary = scopedQuery(
+  input,
+  "site:read",
+  async (actor, data) => assertSiteScope(actor, data.siteId),
+  async (actor, data) => readAuthorizedSiteSummary(actor, data.siteId),
+);
+```
+
+Do not replace a specialized institutional authorization check with `assertSiteScope` alone. Coordinate migrations with the relevant feature owner.
+
+## Loader failures
+
+`safeLoader` preserves its legacy `ok`, `data`, `authError`, and `message` contract and adds optional `kind` and `retryable` metadata. `classifyLoaderError` recognizes `AuthenticationRequiredError`, `AuthorizationError`, `DataUnavailableError`, and `RetryableLoaderError` by explicit error identity/name. Arbitrary error message text is never treated as proof of authentication failure. `LoaderFailure` links to sign-in only for authentication errors; authorization denial remains distinct.
+
+Unexpected errors can be reported through `onUnexpectedError`; user-facing messages do not expose internal exception text. Optional secondary services should catch their own failures at the call site and preserve the primary result.
+
+## Validation and remaining adoption
+
+Unit tests added for timezone and loader classification. No feature routes were modified. Full repository TypeScript, Vitest, and lint commands require a checked-out workspace with dependencies; they have **not** been executed by the GitHub connector. Run `npm run typecheck`, `npx vitest run src/lib/safe-loader.test.ts src/modules/calendar/site-local-time.test.ts`, and focused ESLint before merging. Feature-agent adoption and further tests of the React mutation hook are outstanding.
