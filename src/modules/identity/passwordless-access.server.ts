@@ -24,19 +24,21 @@ function publicOrigin():string {
  if(!origin || new URL(origin).protocol!=="https:") throw new Error("HTTPS access origin must be configured");
  return new URL(origin).origin;
 }
-/** Deliberately never provisions arbitrary accounts from an unverified email. */
-export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
+/** Internal server-only dispatch outcome. Never expose eligibility/cooldown
+ * distinctions through the public passwordless request endpoint. */
+type AccessDispatchOutcome = "dispatched" | "cooldown" | "ineligible";
+async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender):Promise<AccessDispatchOutcome> {
  const email=normalizeAccessEmail(rawEmail);
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
- if(!account || email.endsWith(".invalid"))return genericResult;
+ if(!account || email.endsWith(".invalid"))return "ineligible";
  const memberships=await db.select({role:accountPersonGrants.role}).from(accountPersonGrants)
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
    eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
  const pendingInvitations=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))
   ?[]:await listPendingStaffInvitations(db,account.id);
- if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return genericResult;
+ if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return "ineligible";
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  // Serialize concurrent requests for the same account before enforcing cooldown.
@@ -53,7 +55,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   });
   return token;
  });
- if(!issued)return genericResult;
+ if(!issued)return "cooldown";
  try {
   await sender({to:email,accessUrl:accessOrigin+"/access/verify#token="+encodeURIComponent(issued)});
  }catch(error){
@@ -62,7 +64,18 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   // The link remains unusable unless the provider actually delivered it.
   throw error;
  }
+ return "dispatched";
+}
+/** Public API remains deliberately indistinguishable for unknown accounts,
+ * ineligible users, throttled retries and successfully dispatched mail. */
+export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
+ await issueOneTimeAccess(rawEmail,sender);
  return genericResult;
+}
+/** This privileged status is for already-authorized onboarding staff only.
+ * Dispatched means the configured sender accepted the message, not inbox delivery. */
+export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string):Promise<AccessDispatchOutcome> {
+ return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend);
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
 export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
