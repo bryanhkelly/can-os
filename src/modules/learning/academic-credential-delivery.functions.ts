@@ -270,12 +270,12 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    .for("update").limit(1);
   if(!release||release.revokedAt||release.expiresAt<=new Date())
    throw new AuthorizationError("active recipient authorization");
-  const [recipient]=await db.select({email:s.people.email,active:s.people.active})
+  const [recipient]=await tx.select({email:s.people.email,active:s.people.active})
    .from(s.people).where(eq(s.people.id,context.actorPersonId)).limit(1);
   if(!canDownloadAuthorizedCredential({actorPersonId:context.actorPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
   if(!context.accountId||!context.sessionId||!context.grantId)throw new AuthorizationError("verified active recipient session");
-  const [verifiedAccount]=await db.select({id:s.accessAccounts.id})
+  const [verifiedAccount]=await tx.select({id:s.accessAccounts.id})
    .from(s.accessAccounts)
    .innerJoin(s.accountPersonGrants,eq(s.accountPersonGrants.accountId,s.accessAccounts.id))
    .where(and(eq(s.accessAccounts.id,context.accountId),
@@ -290,7 +290,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   if(!verifiedAccount)throw new AuthorizationError("verified recipient account required");
   // Recheck the live authorization immediately before generating the PDF.
   // Revocation or expiry between initial lookup and rendering must deny access.
-  const [stillActive]=await db.select({id:s.academicCredentialReleaseAuthorizations.id})
+  const [stillActive]=await tx.select({id:s.academicCredentialReleaseAuthorizations.id})
    .from(s.academicCredentialReleaseAuthorizations)
    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,release.id),
     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId),
@@ -303,27 +303,27 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const kind=release.transcriptIssuanceId?"transcript":"diploma";
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
-  const doc=await documentData(db,s,kind,credentialId);
+  const doc=await documentData(tx as typeof db,s,kind,credentialId);
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
    throw new AuthorizationError("Only guardian transfer transcript access is supported");
-  const [student]=await db.select({personId:s.studentProfiles.personId})
+  const [student]=await tx.select({personId:s.studentProfiles.personId})
    .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).limit(1);
   if(!student)throw new AuthorizationError("student identity");
-  const [relationship]=await db.select({id:s.guardianRelationships.id})
+  const [relationship]=await tx.select({id:s.guardianRelationships.id})
    .from(s.guardianRelationships).where(and(
     eq(s.guardianRelationships.studentPersonId,student.personId),
     eq(s.guardianRelationships.guardianPersonId,context.actorPersonId),
     eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
-  const [action]=await db.select().from(s.actions).where(and(
+  const [action]=await tx.select().from(s.actions).where(and(
    eq(s.actions.id,release.instructionReference),
    eq(s.actions.type,"guardian_enrollment_change_request"),
    eq(s.actions.subjectType,"student_profile"))).limit(1);
-  const [consent]=await db.select().from(s.consentRecords).where(and(
+  const [consent]=await tx.select().from(s.consentRecords).where(and(
    eq(s.consentRecords.id,release.consentEvidenceReference),
    eq(s.consentRecords.subjectType,"student_profile"),
    eq(s.consentRecords.consentType,"academic_records_transfer_release"))).limit(1);
-  const [program]=action?.programId?await db.select({issuerId:s.programs.creditIssuingOrganizationId})
+  const [program]=action?.programId?await tx.select({issuerId:s.programs.creditIssuingOrganizationId})
    .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1):[];
   const evidence=consent?.signatureEvidence;
   if(!canRedeemTransferCredential({
