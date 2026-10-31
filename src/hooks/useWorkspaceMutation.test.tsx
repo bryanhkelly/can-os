@@ -40,7 +40,7 @@ describe("useWorkspaceMutation", () => {
 
   it("releases the guard when mutation rejects", async () => {
     mocks.mutateAsync.mockReset().mockRejectedValueOnce(new Error("failed")).mockResolvedValueOnce("recovered");
-    let submit!: (value: string) => Promise<string | undefined>;
+    let submit!: (value: string) => Promise<import("./useWorkspaceMutation").WorkspaceSubmission<string>>;
     function Harness() {
       submit = useWorkspaceMutation<string, string>({ mutationFn: async value => value }).submit;
       return null;
