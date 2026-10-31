@@ -1,3 +1,4 @@
+import { LaunchOrientationTask } from "@/components/operations/LaunchOrientationTask";
 import { LaunchOpeningTask } from "@/components/operations/LaunchOpeningTask";
 import { SchoolOwnedCompletion, LaunchEvidenceStatement, InstitutionalEvidenceReview } from "@/components/operations/LaunchRequirementActions";
 import { LaunchTaskDestination } from "@/components/operations/LaunchTaskDestination";
@@ -31,91 +32,6 @@ function taskTone(task: LaunchGuidanceTask): "success" | "attention" | "neutral"
 }
 
 
-
-function siteDateTime(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(date);
-  const value = (part: string) => parts.find(item => item.type === part)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
-}
-
-function siteLocalToIso(value: string, timezone: string) {
-  const naive = Date.parse(value + ":00Z");
-  if (!Number.isFinite(naive)) throw new Error("Invalid orientation time");
-  let instant = naive;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const formatted = siteDateTime(new Date(instant), timezone);
-    const difference = naive - Date.parse(formatted + ":00Z");
-    if (difference === 0) break;
-    instant += difference;
-  }
-  if (siteDateTime(new Date(instant), timezone) !== value)
-    throw new Error("This local time does not exist in the Site timezone");
-  if (siteDateTime(new Date(instant - 60 * 60_000), timezone) === value ||
-      siteDateTime(new Date(instant + 60 * 60_000), timezone) === value)
-    throw new Error("This local time occurs twice in the Site timezone; choose an unambiguous time");
-  return new Date(instant).toISOString();
-}
-
-function OrientationTask({ launch, busy, save }: {
-  launch: Launch;
-  busy: boolean;
-  save: (input: { title: string; startsAt: string; endsAt: string; timezone: string }) => Promise<void>;
-}) {
-  const [title, setTitle] = useState("Student and family orientation");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
-  const timezone = launch.siteTimezone ?? "America/Los_Angeles";
-  function useRecommendation() {
-    const start = new Date();
-    start.setDate(start.getDate() + 7);
-    const siteDay = siteDateTime(start, timezone).slice(0, 10);
-    const suggestedStart = siteLocalToIso(`${siteDay}T18:00`, timezone);
-    const end = new Date(Date.parse(suggestedStart) + 45 * 60_000);
-    setStartsAt(`${siteDay}T18:00`);
-    setEndsAt(siteDateTime(end, timezone));
-  }
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
-    event.preventDefault();
-    if (!startsAt || !endsAt) return;
-    void save({
-      title,
-      startsAt: siteLocalToIso(startsAt, timezone),
-      endsAt: siteLocalToIso(endsAt, timezone),
-      timezone,
-    });
-  }}>
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm font-semibold">Schedule the canonical orientation event</p>
-      <button type="button" onClick={useRecommendation} className="text-sm font-semibold underline">
-        Use a suggested 45-minute time
-      </button>
-    </div>
-    <p className="mt-2 text-xs text-muted-foreground">
-      The suggestion only fills this form. Saving uses the existing orientation command and the Site timezone ({timezone}).
-    </p>
-    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm sm:col-span-2">Title
-        <input required value={title} onChange={event => setTitle(event.target.value)}
-          className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-      <label className="text-sm">Start
-        <input aria-label="Orientation start" required type="datetime-local" value={startsAt}
-          onChange={event => setStartsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-      <label className="text-sm">End
-        <input aria-label="Orientation end" required type="datetime-local" value={endsAt}
-          onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-    </div>
-    <button type="submit" disabled={busy || !startsAt || !endsAt}
-      className="mt-4 min-h-11 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-      Save orientation
-    </button>
-  </form>;
-}
 
 export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId }: {
   launches: Launch[];
@@ -311,7 +227,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
       {next.action === "orientation" && next.state === "needs_you" &&
-        <OrientationTask launch={launch} busy={busy} save={saveOrientation} />}
+        <LaunchOrientationTask launch={launch} busy={busy} save={saveOrientation} />}
       {next.action === "opening" && next.state === "needs_you" &&
         <LaunchOpeningTask key={launch.id} launch={launch} busy={busy} open={open} />}
     </article> : <p role="status" className="mt-6 rounded-xl border p-4 text-sm">
