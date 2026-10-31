@@ -111,15 +111,20 @@ export function ChurchApplicationsDesk() {
     {applications.some(x=>x.status==="approved")&&<details className="mt-5 rounded-lg border p-3">
       <summary className="cursor-pointer text-sm font-semibold">Recently approved churches</summary>
       <ul className="mt-3 space-y-2 text-sm">
-        {applications.filter(x=>x.status==="approved").map(x=><li key={x.id}>
-          {x.churchName} · {x.siteName} · {x.contactEmail}
-          <button type="button" disabled={!!working} className="ml-3 rounded border px-2 py-1 text-xs disabled:opacity-50"
+        {applications.filter(x=>x.status==="approved").map(x=><li key={x.id} className="rounded-lg border p-3">
+          <strong>{x.churchName}</strong> · {x.siteName} · {x.contactEmail}
+          <p className="mt-1 text-xs text-muted-foreground">
+            {x.invitationAcceptedAt
+              ? `Leader accepted secure access on ${new Date(x.invitationAcceptedAt).toLocaleString()}. School setup is available under their Site.`
+              : "Leader has not accepted the invitation. School setup remains inaccessible until secure acceptance."}
+          </p>
+          {!x.invitationAcceptedAt&&<button type="button" disabled={!!working} className="mt-2 rounded border px-2 py-1 text-xs disabled:opacity-50"
             onClick={async ()=>{
               setWorking(x.id);setError("");setNotice("");
-              try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : "Access link not sent; review the account and pending invitation."); }
+              try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender; leader acceptance is still pending." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : "Access link not sent; review the account and pending invitation."); }
               catch(cause){setError(cause instanceof Error?cause.message:"Unable to request access email.");}
               finally{setWorking(null);}
-            }}>Resend access link</button>
+            }}>Resend access link</button>}
         </li>)}
       </ul>
     </details>}
