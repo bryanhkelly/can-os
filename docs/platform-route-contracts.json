@@ -103,9 +103,27 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/admissions.credential-delivery.tsx",
+      "route": "/admissions/credential-delivery",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/admissions.families.tsx",
       "route": "/admissions/families",
       "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.graduation.tsx",
+      "route": "/admissions/graduation",
+      "owner": "learning",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
