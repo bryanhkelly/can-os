@@ -360,8 +360,8 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    actionCompleted:action?.metadata.exitCompletedByRegistrar===true,
    issuerMatches:program?.issuerId===doc.issuerId,
   }))throw new AuthorizationError("Original transfer consent or guardian authority no longer valid");
-  await writeAudit(tx,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
   const pdf=academicDocumentPdf(doc);
+  await writeAudit(tx,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
   });
  });
