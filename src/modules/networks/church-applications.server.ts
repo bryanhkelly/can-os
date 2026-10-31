@@ -123,49 +123,59 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
 /** The approving steward must be distinct from the independent evidence verifier. */
 export async function approveChurchApplication(actor: AccessContext, requestId: string) {
   const canOrganizationId = await requireCANSteward(actor);
-  // Lock the application across provisioning and the final decision. A decline or
-  // second approver cannot race a separately committed organization/site creation.
-  const { result, email } = await db.transaction(async tx => {
-    const [request] = await tx.select().from(churchOnboardingRequests)
-      .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
-    if (!request || request.status !== "verified" || !request.authorityDocumentId ||
-        !request.verifiedByPersonId || request.verifiedByPersonId === actor.actorPersonId)
-      throw new AuthorizationError("separately verified church application and independent approver");
+  const [request] = await db.select().from(churchOnboardingRequests)
+    .where(eq(churchOnboardingRequests.id, requestId)).limit(1);
+  if (!request || request.status !== "verified" || !request.authorityDocumentId ||
+      !request.verifiedByPersonId || request.verifiedByPersonId === actor.actorPersonId)
+    throw new AuthorizationError("separately verified church application and independent approver");
 
-    // Canonical bootstrap is idempotent and performs its own validated steward
-    // checks. Defer the email until the approved request is durably committed.
-    const result = await bootstrapVerifiedChurch(actor, {
-      churchName: request.churchName, churchSlug: request.churchSlug,
-      siteName: request.siteName, siteSlug: request.siteSlug,
-      timezone: request.timezone, contactEmail: request.contactEmail,
-      firstName: request.firstName, lastName: request.lastName,
-      authorityDocumentId: request.authorityDocumentId,
-    }, { deferEmail: true });
-    const [saved] = await tx.update(churchOnboardingRequests).set({
-      status: "approved", approvedByPersonId: actor.actorPersonId,
-      approvedAt: new Date(), updatedAt: new Date(),
-      churchId: result.churchId, siteId: result.siteId, invitationGrantId: result.grantId,
-    }).where(and(eq(churchOnboardingRequests.id, requestId),
-      eq(churchOnboardingRequests.status, "verified"),
-      eq(churchOnboardingRequests.verifiedByPersonId, request.verifiedByPersonId),
-    )).returning({ id: churchOnboardingRequests.id });
-    if (!saved) throw new Error("Application was already decided; refresh the review desk");
-    await writeAudit(tx, actor, {
-      action: "church.onboarding.request.approved",
-      entityType: "church_onboarding_request", entityId: requestId,
-      scope: { organizationId: canOrganizationId, siteId: result.siteId },
-      after: { authorityDocumentId: request.authorityDocumentId,
-        churchId: result.churchId, siteId: result.siteId, grantId: result.grantId },
-    });
-    return { result, email: request.contactEmail };
+  // The callback updates the approved request INSIDE the canonical bootstrap
+  // transaction, so a failed/declined approval rolls back all new grants/Sites.
+  const result = await bootstrapVerifiedChurch(actor, {
+    churchName: request.churchName, churchSlug: request.churchSlug,
+    siteName: request.siteName, siteSlug: request.siteSlug,
+    timezone: request.timezone, contactEmail: request.contactEmail,
+    firstName: request.firstName, lastName: request.lastName,
+    authorityDocumentId: request.authorityDocumentId,
+  }, {
+    deferEmail: true,
+    onProvisioned: async (tx, provision) => {
+      const [locked] = await tx.select({
+        status: churchOnboardingRequests.status,
+        verifiedByPersonId: churchOnboardingRequests.verifiedByPersonId,
+        authorityDocumentId: churchOnboardingRequests.authorityDocumentId,
+      }).from(churchOnboardingRequests)
+        .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+      if (locked?.status !== "verified" ||
+          locked.verifiedByPersonId !== request.verifiedByPersonId ||
+          locked.authorityDocumentId !== request.authorityDocumentId)
+        throw new Error("Application changed during approval; no invitation was issued");
+      const [saved] = await tx.update(churchOnboardingRequests).set({
+        status: "approved", approvedByPersonId: actor.actorPersonId,
+        approvedAt: new Date(), updatedAt: new Date(),
+        churchId: provision.churchId, siteId: provision.siteId,
+        invitationGrantId: provision.grantId,
+      }).where(and(eq(churchOnboardingRequests.id, requestId),
+        eq(churchOnboardingRequests.status, "verified"),
+        eq(churchOnboardingRequests.verifiedByPersonId, request.verifiedByPersonId!),
+      )).returning({ id: churchOnboardingRequests.id });
+      if (!saved) throw new Error("Application was already decided; refresh the review desk");
+      await writeAudit(tx, actor, {
+        action: "church.onboarding.request.approved",
+        entityType: "church_onboarding_request", entityId: requestId,
+        scope: { organizationId: canOrganizationId, siteId: provision.siteId },
+        after: { authorityDocumentId: request.authorityDocumentId,
+          churchId: provision.churchId, siteId: provision.siteId, grantId: provision.grantId },
+      });
+    },
   });
+  // Delivery happens after the approved record, organization and invitation
+  // commit. A mail outage cannot change approval or activate the grant.
   if (!result.invitationPending) return { ...result, approved: true as const, emailSent: false };
   try {
-    await requestOneTimeAccess(email);
+    await requestOneTimeAccess(request.contactEmail);
     return { ...result, approved: true as const, emailSent: true };
   } catch {
-    // An approved invitation remains pending and can be sent again by the
-    // existing sign-in email flow; failure to send never activates its grant.
     return { ...result, approved: true as const, emailSent: false };
   }
 }
