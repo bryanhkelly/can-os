@@ -9,6 +9,7 @@ import {
   attendanceEvents,
   enrollments,
   guardianRelationships,
+  healthProfiles,
   householdMemberships,
   people,
   pickupAuthorizations,
@@ -726,6 +727,13 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
             sql`${actions.metadata}->>'date' = ${data.date}`,
           )).limit(200),
       ]) : [[], [], [], [], []];
+    const approvedContacts=studentIds.length?await db.select({
+      studentProfileId:healthProfiles.studentProfileId,metadata:healthProfiles.metadata,
+    }).from(healthProfiles).where(inArray(healthProfiles.studentProfileId,studentIds)):[];
+    const emergencyContacts=new Map(approvedContacts.map(row=>[
+      row.studentProfileId,row.metadata.approvedEmergencyContact as
+       {name:string;phone:string;relationship:string}|undefined,
+    ]));
     const personByProfile = new Map((await (studentIds.length ? db.select({
       id: studentProfiles.id, personId: studentProfiles.personId,
     }).from(studentProfiles).where(inArray(studentProfiles.id, studentIds)) : []))
@@ -741,6 +749,9 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
         const personId = personByProfile.get(student.studentProfileId);
         return {
           ...student,
+          // Expose only school-approved emergency contact, never the pending
+          // parent proposal or full restricted medical profile.
+          emergencyContact:emergencyContacts.get(student.studentProfileId)??null,
           householdIds: [...new Set(memberships.filter(row => row.personId === personId)
             .map(row => row.householdId))],
           authorizedAdults: authorizations.filter(same).filter(row =>
