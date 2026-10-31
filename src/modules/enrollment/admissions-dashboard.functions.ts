@@ -11,7 +11,7 @@ export const getAdmissionsDashboard=createServerFn({method:"GET"})
  .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("registrar admissions dashboard");
+ if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("registrar admissions dashboard");
  assertCapability(actor,"enrollment.decide");
  const scoped=await resolveOperationsSelection(actor,data);
  if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {studentName:string;programId:string;disposition:string|null;offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[]})[];
@@ -44,7 +44,7 @@ export const getActiveEnrollmentCounts=createServerFn({method:"GET"})
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
   setResponseHeader("Cache-Control","private, no-store");
-  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)
+  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)
    throw new AuthorizationError("registrar enrollment totals");
   assertCapability(actor,"enrollment.decide");
   const scoped=await resolveOperationsSelection(actor,data);
