@@ -163,15 +163,59 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
        sessionsRevoked=revoked.length;
      }
    }
+   const exitMetadata={...action.metadata,exitCompletedByRegistrar:true,
+     exitStatus:nextStatus,endedEnrollmentCount:ended.length,
+     studentGrantsRevoked:grantsRevoked,
+     completedByRegistrarPersonId:actor.actorPersonId};
    const [resolved]=await tx.update(s.actions).set({
      status:"resolved",resolutionNote:data.resolutionNote,
      resolvedAt:now,updatedAt:now,
-     metadata:{...action.metadata,exitCompletedByRegistrar:true,
-       exitStatus:nextStatus,endedEnrollmentCount:ended.length,
-       studentGrantsRevoked:grantsRevoked,
-       completedByRegistrarPersonId:actor.actorPersonId},
+     metadata:exitMetadata,
    }).where(eq(s.actions.id,action.id)).returning({id:s.actions.id});
    if(!resolved)throw new Error("Could not close the institutional exit request");
+   let recordsHandoffActionId:string|null=null;
+   if(kind==="transfer"){
+     const destination=typeof action.metadata.destinationSchoolName==="string"?
+       action.metadata.destinationSchoolName:"Destination school not yet verified";
+     const [handoff]=await tx.insert(s.actions).values({
+       type:"transfer_academic_records_handoff",status:"open",priority:"high",
+       title:"Transfer records handoff · "+destination,
+       description:"Verify the destination and the guardian's records authorization. Issue the official transcript with the authorized credit issuer. Record evidence of secure transfer; this Action does not send documents automatically.",
+       ownerPersonId:actor.actorPersonId,
+       organizationId:action.organizationId,siteId:action.siteId,programId:action.programId,
+       subjectType:"student_profile",subjectId:action.subjectId,
+       metadata:{
+         originChangeActionId:action.id,
+         requestedByGuardianPersonId:requestedBy,
+         recordsReleaseConsentId:typeof action.metadata.recordsReleaseConsentId==="string"?
+           action.metadata.recordsReleaseConsentId:null,
+         destinationSchoolName:destination,
+         destinationSchoolContactEmail:typeof action.metadata.destinationSchoolContactEmail==="string"?
+           action.metadata.destinationSchoolContactEmail:null,
+         intendedLastDay:action.metadata.intendedLastDay??null,
+         status:"pending_secure_records_release",
+       },
+     }).returning({id:s.actions.id});
+     if(!handoff)throw new Error("Could not create the destination records handoff");
+     recordsHandoffActionId=handoff.id;
+     await tx.update(s.actions).set({
+       metadata:{...exitMetadata,recordsHandoffStatus:"pending",
+         recordsHandoffActionId:handoff.id},
+     }).where(eq(s.actions.id,action.id));
+     await emitEvent(tx,{
+       eventType:EventTypes.ActionCreated,aggregateType:"action",
+       aggregateId:handoff.id,actorPersonId:actor.actorPersonId,
+       organizationId:action.organizationId,siteId:action.siteId,programId:action.programId,
+       payload:{type:"transfer_academic_records_handoff",originChangeActionId:action.id},
+     });
+     await notify(tx,{
+       recipientPersonId:actor.actorPersonId,
+       type:"transfer_academic_records_handoff_requested",
+       title:"Destination records handoff requires secure completion",
+       body:"The student's origin enrollment has ended. Verify the new school's authority, issue official records and record a secure release.",
+       resourceType:"action",resourceId:handoff.id,
+     });
+   }
    await writeAudit(tx,actor,{
      action:"enrollment."+nextStatus,entityType:"student_profile",entityId:action.subjectId,
      scope:{organizationId:action.organizationId,siteId:action.siteId,programId:action.programId},
@@ -197,6 +241,6 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
      resourceType:"action",resourceId:action.id,
    });
    return {completed:true as const,status:nextStatus,endedEnrollmentCount:ended.length,
-     grantsRevoked,sessionsRevoked};
+     grantsRevoked,sessionsRevoked,recordsHandoffActionId};
  });
 });
