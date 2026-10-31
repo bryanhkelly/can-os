@@ -51,7 +51,7 @@ jobs:
         run: npm ci
       - name: Audit route fixture coverage
         run: node scripts/check-route-fixture-coverage.mjs
-      - name: Verify static code and migration snapshot parity
+      - name: Verify static code and committed migration consistency
         run: |
           npm run lint
           npm run build
