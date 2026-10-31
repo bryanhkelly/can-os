@@ -67,13 +67,19 @@ export async function checkPublishedSiteReachability(input: {
       method: "GET", redirect: "manual",
       headers: { Accept: "text/html" }, signal: AbortSignal.timeout(5000),
     });
+    const cacheControl = response.headers.get("cache-control")?.toLowerCase() ?? "";
+    const vary = response.headers.get("vary")?.toLowerCase() ?? "";
+    const cdnCache = (response.headers.get("netlify-cdn-cache-control") ?? response.headers.get("cdn-cache-control") ?? "").toLowerCase();
+    const tenantUncacheable = cacheControl.includes("no-store") &&
+      vary.split(",").some(value => value.trim() === "host") &&
+      !/(?:s-maxage|max-age)\s*=\s*[1-9]/.test(cdnCache);
     const lengthHeader = response.headers.get("content-length");
     const length = lengthHeader === null ? null : Number(lengthHeader);
-    if (response.status !== 200 || !response.headers.get("content-type")?.toLowerCase().includes("text/html") ||
+    if (response.status !== 200 || !tenantUncacheable || !response.headers.get("content-type")?.toLowerCase().includes("text/html") ||
       (length !== null && (!Number.isFinite(length) || length > MAX_HTML_BYTES))) {
       await response.body?.cancel();
       return { status: "unreachable", url, checkedAt,
-        diagnostic: `HTTPS returned HTTP ${response.status} or an invalid HTML content type/size.` };
+        diagnostic: `HTTPS returned HTTP ${response.status}, unsafe tenant cache headers, or invalid HTML content type/size.` };
     }
     // Bound actual bytes while streaming; never buffer an unlimited response.
     const html = await readBoundedHtml(response);
