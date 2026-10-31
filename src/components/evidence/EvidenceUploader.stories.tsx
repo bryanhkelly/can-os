@@ -38,6 +38,7 @@ export const UploadAndFinalize: Story = {
       fireEvent.change(dateInput, { target: { value: "2027-05-01" } });
       await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
       await expect(args.adapter.finish).toHaveBeenCalled();
+      await expect(fileInput.value).toBe("");
       await expect(args.onUploaded).toHaveBeenCalled();
       await expect(byteUploads).toBe(1);
     } finally {
@@ -63,7 +64,7 @@ export const RefreshFailureDoesNotRepeatFinalization: Story = {
       fireEvent.change(canvas.getByLabelText("Evidence expires on"),
         { target: { value: "2027-05-01" } });
       await userEvent.click(canvas.getByRole("button", { name: "Submit for review" }));
-      await expect(canvas.findByRole("alert")).resolves.toHaveTextContent("Evidence recorded, but refresh failed");
+      await expect(await canvas.findByRole("alert")).toHaveTextContent("Evidence recorded, but refresh failed");
       await expect(args.adapter.finish).toHaveBeenCalledTimes(1);
       await expect(canvas.getByRole("button", { name: "Submit for review" })).toBeDisabled();
     } finally { globalThis.fetch = originalFetch; }
@@ -161,7 +162,7 @@ export const BlocksRepeatedSubmissionWhileUploading: Story = {
       releaseUpload();
       await expect(args.adapter.finish).toHaveBeenCalledTimes(1);
     } finally {
-      releaseUpload?.();
+      releaseUpload();
       globalThis.fetch = originalFetch;
     }
   },
