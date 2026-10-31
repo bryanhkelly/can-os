@@ -76,7 +76,7 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
  .handler(async({data})=>{
   const {actor,email}=await verifiedFamily();
   const [origin]=await db.select({
-   id:s.actions.id,status:s.actions.status,programId:s.actions.programId,
+   id:s.actions.id,status:s.actions.status,programId:s.actions.programId,siteId:s.actions.siteId,
    metadata:s.actions.metadata,studentProfileId:s.actions.subjectId,
    studentPersonId:s.studentProfiles.personId,
   }).from(s.actions)
@@ -102,8 +102,8 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
   const destination=await resolvePublishedFamilyStartDestination(db,data.destinationProgramId);
   if(typeof origin.metadata.destinationApplicationId==="string")
    throw new Error("This transfer already has a receiving-school application. Continue that application instead of requesting another invitation.");
-  if(origin.programId===destination.programId)
-   throw new Error("Choose a different school from the originating school.");
+  if(origin.programId===destination.programId||origin.siteId===destination.siteId)
+   throw new Error("A transfer destination must be a different school Site, not another Program at the same school.");
   const result=await requestPublicFamilyStart(destination.slug,{
    requestId:data.requestId,
    programId:destination.programId,
