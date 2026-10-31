@@ -211,6 +211,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/church.apply.tsx",
+      "route": "/church/apply",
+      "owner": "network",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/classes.tsx",
       "route": "/classes",
       "owner": "learning",
@@ -254,6 +263,15 @@
       "roleJourney": "pending",
       "readBoundary": "pending",
       "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/family.interest.ts",
+      "route": "/family/interest",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     },
     {
       "file": "src/routes/family.join.tsx",
