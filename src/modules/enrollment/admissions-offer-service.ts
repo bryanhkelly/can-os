@@ -23,9 +23,21 @@ const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
  if(context.role!==role||!context.actorPersonId)throw new AuthorizationError("authorized "+role+" admission session");
 };
 type Transaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
-function requireAdmissionsProgramScope(context:CommandContext,programId:string){
- if(!context.scope.programIds?.includes(programId))throw new AuthorizationError(`program scope: ${programId}`);
+async function requireAdmissionsProgramScope(context:AccessContext,programId:string,tx:Transaction){
+ // Guardians must retain an explicit Program grant and a verified relationship.
+ // Registrar organization-wide grants instead resolve the Program's current
+ // owning organization and Site from the database inside the command transaction.
+ if(context.role==="guardian"){
+  if(!context.scope.programIds?.includes(programId))throw new AuthorizationError(`program scope: ${programId}`);
+  assertProgramScope(context,programId);
+  return;
+ }
  assertProgramScope(context,programId);
+ const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
+  .from(programs).where(eq(programs.id,programId)).limit(1);
+ if(!program||!context.scope.organizationIds?.includes(program.organizationId)||
+   (context.scope.siteIds!==undefined&&(!program.siteId||!context.scope.siteIds.includes(program.siteId))))
+  throw new AuthorizationError(`program scope: ${programId}`);
 }
 async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
  const [pool]=await tx.select().from(admissionSeatPools).where(and(eq(admissionSeatPools.programId,programId),eq(admissionSeatPools.schoolYearId,schoolYearId))).for("update").limit(1);
@@ -75,9 +87,10 @@ async function expireElapsedOffers(tx:Transaction,context:CommandContext,program
  return count;
 }
 export async function expireSyntheticAdmissionOffers(context:AccessContext,input:{programId:string;schoolYearId:string}){
- guarded(context,"registrar");assertCapability(context,"enrollment.decide");requireAdmissionsProgramScope(context,input.programId);
+ guarded(context,"registrar");assertCapability(context,"enrollment.decide");
  if(!context.actorPersonId)throw new Error("Registrar identity required");
  return db.transaction(async tx=>{
+  await requireAdmissionsProgramScope(context,input.programId,tx);
   await lockPool(tx,input.programId,input.schoolYearId);
   return expireElapsedOffers(tx,context,input.programId,input.schoolYearId,new Date());
  });
@@ -90,7 +103,7 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   await lockAdmissionsApplication(tx,input.applicationId);
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
   if(!app)throw new Error("Application not found");
-  requireAdmissionsProgramScope(context,app.programId);
+  await requireAdmissionsProgramScope(context,app.programId,tx);
   await requireChurchHostedOperatingServices(tx,app.programId,[
     "admissions","school_of_record",
   ]);
@@ -138,7 +151,7 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
-  requireAdmissionsProgramScope(context,lookup.programId);
+  await requireAdmissionsProgramScope(context,lookup.programId,tx);
   await lockAdmissionsApplication(tx,lookup.applicationId);
   await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
@@ -172,7 +185,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
-  requireAdmissionsProgramScope(context,lookup.programId);
+  await requireAdmissionsProgramScope(context,lookup.programId,tx);
   const churchAuthorization=await requireChurchHostedOperatingServices(tx,lookup.programId,[
     "admissions","school_of_record","academic_instruction",
   ]);
@@ -238,7 +251,7 @@ export async function withdrawAdmissionOffer(context:AccessContext,input:{offerI
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,input.offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
-  requireAdmissionsProgramScope(context,lookup.programId);
+  await requireAdmissionsProgramScope(context,lookup.programId,tx);
   await lockAdmissionsApplication(tx,lookup.applicationId);
   await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,input.offerId)).limit(1);
