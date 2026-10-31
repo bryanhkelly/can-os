@@ -66,6 +66,7 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
         status: row.status,
         permissionText: policy?.text ?? null,
         permissionVersion: policy?.version ?? null,
+        canDecline: row.status==="invited" && row.tripStatus==="approved" && row.departsAt.getTime()>Date.now() && !row.consentRecordId,
         canSign: !row.consentRecordId && permissionCanBeSigned({
           tripStatus: row.tripStatus, participantStatus: row.status,
           departsAt: row.departsAt, permissionDueAt: row.permissionDueAt,
