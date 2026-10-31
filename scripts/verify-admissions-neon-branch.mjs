@@ -11,11 +11,15 @@ import { assertIsolatedTestDatabaseTarget } from "./isolated-test-db-guard.mjs";
 export const ADMISSIONS_NEON_PROJECT_ID = "sweet-hall-62441909";
 export const ADMISSIONS_PRODUCTION_BRANCH_ID = "br-restless-sea-ar9ooo55";
 
-export function assertAdmissionsNeonIdentity(identity, expectedBranchId) {
+export function assertExpectedAdmissionsBranchId(expectedBranchId) {
   if (!expectedBranchId || !/^br-[a-z0-9-]+$/.test(expectedBranchId) ||
       expectedBranchId === ADMISSIONS_PRODUCTION_BRANCH_ID) {
     throw new Error("Admissions acceptance requires an explicit nonproduction CAN_ADMISSIONS_TEST_BRANCH_ID.");
   }
+}
+
+export function assertAdmissionsNeonIdentity(identity, expectedBranchId) {
+  assertExpectedAdmissionsBranchId(expectedBranchId);
   if (!identity || identity.project_id !== ADMISSIONS_NEON_PROJECT_ID ||
       identity.branch_id !== expectedBranchId ||
       identity.branch_id === ADMISSIONS_PRODUCTION_BRANCH_ID) {
@@ -36,9 +40,7 @@ export async function verifyAdmissionsNeonBranch(env = process.env) {
   });
   // Fail closed on missing/misconfigured branch declarations BEFORE opening
   // any connection. Hostname inequality alone is not proof of branch identity.
-  assertAdmissionsNeonIdentity(null, env.CAN_ADMISSIONS_TEST_BRANCH_ID);
-  // The preliminary call above cannot pass without the server identity; only
-  // validate expected settings here before making the read-only SQL query.
+  assertExpectedAdmissionsBranchId(env.CAN_ADMISSIONS_TEST_BRANCH_ID);
   const sql = neon(testUrl);
   const [identity] = await sql`
     SELECT current_setting('neon.project_id', true) AS project_id,
