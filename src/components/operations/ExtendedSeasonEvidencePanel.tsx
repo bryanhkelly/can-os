@@ -73,7 +73,7 @@ function EvidenceCard({ model, item, changed }: {
         expectedVersion: item.version, reason, decision,
       } });
       await changed();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Review failed"); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Review failed"); throw cause; }
     finally { setBusy(false); }
   }
   async function download() {
