@@ -67,7 +67,7 @@ function TeacherGradebookPage() {
  const reviewStudent=gradebook?.students.find(item=>item.studentProfileId===reviewCell?.studentProfileId);
  // Prioritize work awaiting a grade; reviewed history remains in the grid.
  const reviewQueue=gradebook?.cells.filter(cell=>cell.status==="submitted")??[];
- const pendingReviewCount=reviewQueue.filter(cell=>cell.status==="submitted").length;
+ const pendingReviewCount=reviewQueue.length;
  const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
  const previousReview=reviewQueue[reviewIndex-1],nextReview=reviewQueue[reviewIndex+1];
 
