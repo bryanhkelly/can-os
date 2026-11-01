@@ -437,9 +437,53 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     });
 
     // ------------------------------------------------------------------
+    await test.step("stage 3: registrar invites a family and the same adult verifies the application link", async () => {
+      const email = `fullflow-guardian-${fixture.suffix}@example.test`;
+      await goto(operator.page, "/admissions/invite-families");
+      await operator.page.getByLabel("Authorized school Program").selectOption(fixture.programId!);
+      await operator.page.getByLabel("Family contacts · one per line")
+        .fill(`FullFlow Family Guardian,${email}`);
+      await operator.page.getByRole("button", { name: "Queue secure invitations" }).click();
+      await expect(operator.page.getByText(/secure application invitation\(s\) queued/)).toBeVisible();
+
+      const queued = await singleRow(sql,
+        `select id from communication_threads
+         where context_type = 'program' and context_id = $1
+           and metadata->>'kind' = 'family_invitation_batch'
+         order by created_at desc limit 1`,
+        [fixture.programId!],
+      );
+      const dispatch = await operator.context.request.post(`${baseURL}/api/jobs`, {
+        headers: { authorization: `Bearer ${TEST_JOB_SECRET}` },
+      });
+      expect(dispatch.ok()).toBe(true);
+      const invitedLink = await waitForLocalAccessLink(email);
+      await goto(guardian.page, invitedLink);
+      await guardian.page.getByRole("button", { name: "Verify email and continue" }).click();
+      await guardian.page.waitForURL(/\/guardian\/apply\?/);
+      await waitForAppHydration(guardian.page);
+      const destination = new URL(guardian.page.url());
+      expect(destination.searchParams.get("programId")).toBe(fixture.programId);
+      expect(destination.searchParams.get("familyStart")).toBeTruthy();
+
+      await expect.poll(async () => rowCount(sql,
+        `select id from public_family_start_requests
+         where program_id = $1 and email_normalized = $2 and consumed_at is not null`,
+        [fixture.programId!, email],
+      )).toBe(1);
+      await expect.poll(async () => rowCount(sql,
+        `select id from communication_threads where id = $1
+           and metadata->>'status' = 'complete'`,
+        [queued.id],
+      )).toBe(1);
+    });
+
+    // ------------------------------------------------------------------
     await test.step("stage 3: guardian applies through the guardian UI", async () => {
       const page = guardian.page;
-      await goto(page, `/guardian/apply?programId=${fixture.programId}`);
+      // Continue the same verified family-start session and provenance.
+      await page.reload();
+      await waitForAppHydration(page);
       await page.getByLabel("School and program").selectOption(fixture.programId!);
       await page.getByLabel("Application academic year").selectOption(fixture.schoolYearId!);
       await page.getByLabel("Student legal first name").fill(fixture.studentFirstName);
