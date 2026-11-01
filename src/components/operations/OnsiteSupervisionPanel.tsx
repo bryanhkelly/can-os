@@ -7,6 +7,7 @@ import {
 } from "@/modules/operations/onsite-duty-response.functions";
 import {
   getOnsitePhysicalPresence,reportOnsitePhysicalPresence,witnessOnsiteBlockPresence,
+  reportOnsiteStaffCoverageInterruption,
 } from "@/modules/operations/onsite-physical-presence.functions";
 
 type Plan = Awaited<ReturnType<typeof getOnsiteSupervisionPlan>>;
@@ -95,6 +96,17 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
     }catch(e){setError(e instanceof Error?e.message:"Unable to record physical presence");}
     finally{setPresenceBusy("");}
   }
+  async function interruptPresence(reportId:string,reason:"early_departure"|"temporary_absence"|"uncovered_handoff"){
+    if(presenceBusy)return;
+    setPresenceBusy(reportId);setDutyMessage("");setError("");
+    try{
+      await reportOnsiteStaffCoverageInterruption({data:{date,presenceReportId:reportId,reason}});
+      setPresence(await getOnsitePhysicalPresence({data:{date}}));
+      onChanged?.();
+      setDutyMessage("Coverage interruption recorded. Your earlier arrival cannot establish continuing supervision. Contact the Site director immediately.");
+    }catch(e){setError(e instanceof Error?e.message:"Could not record coverage interruption");}
+    finally{setPresenceBusy("");}
+  }
   return <section id="supervision" className="mt-10" aria-label="Planned onsite supervision">
     <h2 className="font-serif text-2xl">Instructional supervision plan</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -170,6 +182,7 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
             {" "}Required duties accepted: {onsite.dutiesAccepted?"Yes":"No"}.
             {" "}Your arrival: {onsite.ownPresenceReported?"Reported":"Not reported"}.
             {" "}Independent witness of both adults: {onsite.witnessedBothAdults?"Recorded":"Not recorded"}.
+            {" "}{onsite.coverageInterrupted?"Coverage interrupted: reassign supervision and verify the handoff.":""}
           </p>}
           {onsite&&block.periodId&&
             (onsite.canReport&&!onsite.ownPresenceReported ||
@@ -187,6 +200,24 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
                 className="rounded border px-3 py-2 text-xs disabled:opacity-50">
                 I personally witnessed both named adults here
               </button>}
+            </div>}
+          {onsite?.canReportInterruption&&onsite.ownPresenceReportId&&
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" disabled={!!presenceBusy}
+                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"temporary_absence")}
+                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                Report temporary absence from this room
+              </button>
+              <button type="button" disabled={!!presenceBusy}
+                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"early_departure")}
+                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                Report early departure
+              </button>
+              <button type="button" disabled={!!presenceBusy}
+                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"uncovered_handoff")}
+                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                Report an uncovered handoff
+              </button>
             </div>}
           {duty&&<p className="mt-2 text-xs font-semibold" role="status">
             Duty response: {duty.status==="accepted"?"All required named adults report availability":
