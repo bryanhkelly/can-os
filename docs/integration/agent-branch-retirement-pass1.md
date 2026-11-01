@@ -42,3 +42,37 @@ These 125 original PR changed-file entries are **not** a unique-file or code-lin
 - Agent B: `academic-credential-delivery.functions.ts`, platform route contract and fixture manifest differ; preserve post-#226 secure recipient and freshness checks.
 - Agent C: fixture manifest differs; do not overwrite unified seeded identity fixtures without checking connected acceptance.
 - Agent E: first-day handoff function differs; preserve newer FullFlow bounded query and canonical staffing checks unless missing behavior is demonstrated.
+
+## Pass 2 — exact Git blob inventory (2026-11-01)
+
+Compared each original PR's changed paths against the live FullFlow tree and its original head tree. A byte-identical path is present at the same Git blob SHA. **All 125 entries exist on FullFlow**; 103 are byte-identical and 22 differ. Counts include overlapping paths modified by multiple agents, not unique files or feature-completion percentages.
+
+| Agent | PR | Total | Identical | Different | Missing |
+|---|---:|---:|---:|---:|---:|
+| A | 214 | 8 | 3 | 5 | 0 |
+| B | 213 | 7 | 4 | 3 | 0 |
+| C | 203 | 5 | 4 | 1 | 0 |
+| D | 212 | 24 | 24 | 0 | 0 |
+| E | 211 | 7 | 6 | 1 | 0 |
+| F | 204 | 10 | 9 | 1 | 0 |
+| G | 210 | 14 | 8 | 6 | 0 |
+| H | 205 | 18 | 17 | 1 | 0 |
+| I | 206 | 13 | 12 | 1 | 0 |
+| J | 209 | 6 | 5 | 1 | 0 |
+| K | 208 | 7 | 5 | 2 | 0 |
+| L | 207 | 6 | 6 | 0 | 0 |
+| **Total** | | **125** | **103** | **22** | **0** |
+
+### Divergent files requiring semantic signoff
+
+- **A:** `docs/agent-a-b-diploma-release-contract.md`, `src/domain/graduation-policy.ts`, `src/modules/learning/graduation.functions.ts`, `src/routes/admissions.graduation.tsx`, `tests/unit/graduation-policy.test.ts`.
+- **B:** `docs/platform-route-contracts.json`, `scripts/seeds/fixture-manifest.json`, `src/modules/learning/academic-credential-delivery.functions.ts`.
+- **C:** `scripts/seeds/fixture-manifest.json`.
+- **E:** `src/modules/enrollment/first-school-day-handoff.functions.ts`.
+- **F and I:** `src/components/operations/LaunchWebsiteStep.tsx`.
+- **G:** `src/db/schema/index.ts`, `src/modules/learning/curriculum-marketplace.functions.ts`, `src/modules/learning/curriculum-marketplace.server.ts`, `src/modules/programs/launch-academics.functions.ts`, `src/modules/programs/launch-curriculum-eligibility.server.ts`, `src/routes/operations.curriculum-marketplace.tsx`.
+- **H:** `src/db/schema/index.ts`.
+- **J:** `src/modules/learning/oneroster-import.functions.ts`.
+- **K:** `src/modules/learning/common-cartridge-import.functions.ts`, `src/routes/operations.curriculum-marketplace.tsx`.
+
+**Decision:** Do not overwrite divergent FullFlow files from older source branches. Pass 2 establishes file inventory completeness, not behavioral equivalence. Retain source branches until the above semantic deltas are signed off; then close original PRs and delete branches in a separate cleanup. No production deployment or migrations authorized by this audit.
