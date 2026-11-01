@@ -37,6 +37,11 @@ describe("connected official credential disclosure", () => {
   order(authorize,transcriptGuard,"const [created]=await tx.insert(");
   expect(authorize).toContain("liveConsent.revokedAt");
   expect(authorize).toContain("liveRecipientAccount");
+  expect(authorize).toContain("const [liveRecipientPerson]=await tx.select(");
+  expect(authorize).toContain("!liveRecipientPerson?.active");
+  expect(authorize).toContain("liveRecipientPerson.email?.trim().toLowerCase()");
+  expect(authorize).toContain("const [liveProgram]=await tx.select(");
+  expect(authorize).toContain("liveProgram?.issuerId!==doc.issuerId");
  });
 
  it("holds verified recipient, grant and canonical source checks through PDF rendering",()=>{
@@ -45,6 +50,7 @@ describe("connected official credential disclosure", () => {
   expect(recipient).toContain("isNotNull(s.accessAccounts.emailVerifiedAt)");
   expect(recipient).toContain("eq(s.accountPersonGrants.isSynthetic,false)");
   expect(recipient).toContain('release.releasePurpose!=="transfer"');
+  expect(recipient).toContain('.from(s.programs).where(eq(s.programs.id,action.programId)).for("share").limit(1)');
   order(recipient,"return db.transaction(async tx=>",transcriptGuard);
   order(recipient,transcriptGuard,"const pdf=academicDocumentPdf(doc)");
   order(recipient,"const pdf=academicDocumentPdf(doc)","academic_credential.release.download");
