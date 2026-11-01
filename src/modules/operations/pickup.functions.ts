@@ -26,6 +26,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { projectGuardianPickupHolds } from "@/domain/guardian-pickup-hold-visibility";
 import { assertOnsitePickupScope } from "@/domain/onsite-pickup-access";
 import {
   evaluatePickupRelease,
@@ -360,11 +361,9 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
           ...row,
           pickupName: row.legalFirstName + " " + row.legalLastName,
         })),
-        holds: holds.filter(row => matches(row, student)).map(row => ({
-          id: row.id, kind: row.kind, reason: row.reason, status: row.status,
-          createdAt: row.createdAt.toISOString(), resolvedAt: row.resolvedAt?.toISOString() ?? null,
-          resolutionNote: row.resolutionNote,
-        })),
+        holds: projectGuardianPickupHolds(
+          holds.filter(row => matches(row, student)), actor.actorPersonId!,
+        ),
         releases: releases.filter(row => matches(row, student)).map(row => ({
           ...row, occurredAt: row.occurredAt.toISOString(),
         })),
