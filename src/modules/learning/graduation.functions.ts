@@ -7,7 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { resolveGraduationPolicy, validateLegacyGraduationCohortClassification } from "@/domain/graduation-policy";
 import { adjudicateGraduation } from "@/domain/graduation-adjudication";
 import { auditGraduationCredits, type CreditEvidence, type CreditRequirement } from "@/domain/graduation-credit-audit";
-import { issuedGradeIds, assertIssuedGradesStillCanonical, type IssuedGradeSnapshot } from "@/domain/graduation-grade-freshness";
+import { issuedGradeIds, issuedWithdrawalIds, assertIssuedGradesStillCanonical, assertIssuedWithdrawalsStillCanonical, type IssuedGradeSnapshot } from "@/domain/graduation-grade-freshness";
 import { verifiedSectionCreditUnits } from "@/domain/section-credit-policy";
 import { writeAudit } from "@/platform/mutation";
 
@@ -77,9 +77,33 @@ async function assertCurrentCanonicalTranscriptGrades(
 ){
  if(!Array.isArray(transcript.snapshot.rows))throw new AuthorizationError("Issued transcript grade evidence missing");
  const rows=transcript.snapshot.rows as IssuedGradeSnapshot[];
- let gradeIds:string[];
- try{gradeIds=issuedGradeIds(rows);}catch{throw new AuthorizationError("Issued transcript grade provenance requires institutional review");}
- if(!gradeIds.length)return; // withdrawal-only transcript has no earned credits
+ let gradeIds:string[],withdrawalIds:string[];
+ try{
+   gradeIds=issuedGradeIds(rows);
+   withdrawalIds=issuedWithdrawalIds(rows);
+ }catch{throw new AuthorizationError("Issued transcript grade provenance requires institutional review");}
+ if(withdrawalIds.length){
+   const current=await db.select({
+     id:s.enrollments.id,sectionId:s.enrollments.sectionId,
+     status:s.enrollments.status,kind:s.enrollments.kind,
+     metadata:s.enrollments.metadata,endedAt:s.enrollments.endedAt,
+     creditIssuerId:s.programs.creditIssuingOrganizationId,
+     sectionMetadata:s.sections.metadata,
+   }).from(s.enrollments)
+     .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+     .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
+       inArray(s.enrollments.id,withdrawalIds))).for("share");
+   try{
+     assertIssuedWithdrawalsStillCanonical(rows,current.map(row=>({
+       id:row.id,sectionId:row.sectionId!,status:row.status,kind:row.kind,
+       withdrawalNotation:row.metadata?.withdrawalNotation,
+       endedAt:row.endedAt,creditIssuerId:row.creditIssuerId,
+       configuredCredits:verifiedSectionCreditUnits(row.sectionMetadata),
+     })),transcript.issuingOrganizationId);
+   }catch{throw new AuthorizationError("Issued withdrawal notation has changed; reissue and review transcript");}
+ }
+ if(!gradeIds.length)return;
  const canonical=await db.select({
    id:s.sectionGrades.id,sectionId:s.sectionGrades.sectionId,
    letterGrade:s.sectionGrades.letterGrade,status:s.sectionGrades.status,
