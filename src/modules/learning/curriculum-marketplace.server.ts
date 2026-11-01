@@ -192,6 +192,12 @@ export async function addCurriculumSupplement(actor:Actor,input:{
  scope:"program"|"site"|"section";title:string;kind:"link"|"video"|"pdf"|"image"|"audio"|"document";
  url:string;
 }){
+ // A historical program-wide adoption must never grant new supplement rights
+ // after annual licensing is enabled. A year-scoped Section/entitlement
+ // resolver must be integrated before reopening this command.
+ if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
+    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+  throw new AuthorizationError("Curriculum supplements require verified annual adoption and Section licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
   if(input.scope==="site" && !program.siteId)throw new Error("Site supplement requires a site.");
