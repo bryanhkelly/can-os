@@ -135,8 +135,8 @@ export function OnsitePickupPanel({ date, onChanged }: {
             </div>}
 
             {student.activeHolds.map(hold => <div key={hold.id}
-              className="mt-4 rounded-lg border border-              {roster.canResolveHolds && !hold.pendingResolution && <>
-                <p className="mt-2 text-xs">Proposal only. A second Site director must independently approve the release.</p>
+              className="mt-4 rounded-lg border border-              {roster.canProposeHolds && !hold.pendingResolution && <>
+                <p className="mt-2 text-xs">Proposal only. The independently appointed Site director must approve the release.</p>
                 <label className="mt-3 block text-xs font-semibold">Resolution note
                   <textarea rows={2} maxLength={2000} value={resolutions[hold.id]??""}
                     onChange={event=>setResolutions(old=>({...old,[hold.id]:event.target.value}))}
@@ -160,11 +160,11 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     className="mt-1 block w-full rounded border bg-background p-2"/>
                 </label>
                 <button type="button" disabled={!!busy||(resolutions[hold.id]??"").trim().length<20||
-                  (resolutionReferences[hold.id]??"").trim().length<15}
+                  (resolutionReferences[hold.id]??"").trim().length<15 || !student.sectionId}
                   className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                   onClick={()=>void run(hold.id+":propose","Resolution proposed for independent review.",
                     mutationId=>proposePickupCustodyResolution({data:{
-                      holdId:hold.id,mutationId,
+                      holdId:hold.id,mutationId,sectionId:student.sectionId??undefined,
                       resolutionNote:resolutions[hold.id]??"",
                       authorityBasis:(resolutionBases[hold.id]??(hold.kind==="emergency"?"documented_emergency_cleared":"verified_court_order")) as "verified_court_order"|"verified_guardian_instructions"|"documented_emergency_cleared",
                       evidenceReference:resolutionReferences[hold.id]??"",
