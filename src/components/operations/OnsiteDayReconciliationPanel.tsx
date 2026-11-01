@@ -58,6 +58,14 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
       <p className="rounded border p-3">Issues
         <strong className="mt-1 block text-2xl">{summary.issues.length}</strong></p>
     </div>
+    {(review?.schoolDay?.staffing.interruptedBlocks??0)>0&&
+      <p role="alert" className="mt-4 rounded border p-3 text-sm">
+        <strong>Onsite supervision interruption:</strong> {review!.schoolDay.staffing.interruptedBlocks}
+        {" "}scheduled block(s) have a reported early departure, temporary absence or
+        uncovered handoff. The earlier witnessed arrival no longer establishes
+        continued coverage. Arrange current supervision and review the incident
+        before treating the campus as safely covered.
+      </p>}
     {review?.custody&&<div className="mt-4 rounded-lg border p-4" aria-label="Custody release evidence summary">
       <h3 className="text-sm font-semibold">Linked custody evidence</h3>
       <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
