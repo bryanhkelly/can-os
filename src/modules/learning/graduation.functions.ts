@@ -347,7 +347,7 @@ export const decideGraduation = createServerFn({method:"POST"})
  .handler(async ({data}) => {
    const context=await registrar();const {db,s}=await resources();
    return db.transaction(async tx => {
-     const [candidate]=await tx.select({issuerId:s.transcriptIssuances.issuingOrganizationId})
+     const [candidate]=await tx.select({issuerId:s.transcriptIssuances.issuingOrganizationId,studentId:s.transcriptIssuances.studentProfileId})
        .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
      if(!candidate)throw new AuthorizationError("Transcript not found");
      issuerAuthorized(context,candidate.issuerId);
@@ -356,6 +356,9 @@ export const decideGraduation = createServerFn({method:"POST"})
      // superseding policy racing with graduation adjudication.
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${candidate.issuerId + ":graduation-policy"}))`);
+     // Coordinate the latest official transcript identity with concurrent
+     // transcript issuance before reading eligibility or recording a decision.
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${candidate.studentId + ":" + candidate.issuerId + ":transcript-issuance"}))`);
      const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
      // Always acquire the issuer-policy lock before the student-decision lock.
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${transcript.studentProfileId + ":" + transcript.issuingOrganizationId + ":graduation"}))`);
@@ -537,6 +540,7 @@ export async function assertDiplomaFreshForAuthorizedRelease(
    throw new AuthorizationError("Verified diploma release identity required");
  const {sql}=await import("drizzle-orm");
  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.issuerId + ":graduation-policy"}))`);
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.studentProfileId + ":" + args.issuerId + ":transcript-issuance"}))`);
  // A concurrent registrar revocation must not commit between the live status
  // check and preparation of private PDF bytes in the same B transaction.
  const [locked]=await tx.select({id:s.diplomaIssuances.id}).from(s.diplomaIssuances)
@@ -575,6 +579,7 @@ export const issueDiploma = createServerFn({method:"POST"})
      // race with the final diploma freshness check and issuance.
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.issuingOrganizationId + ":graduation-policy"}))`);
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.studentProfileId + ":" + decision.issuingOrganizationId + ":transcript-issuance"}))`);
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.studentProfileId + ":" + decision.issuingOrganizationId + ":graduation"}))`);
      const [prior]=await tx.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
        .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))
