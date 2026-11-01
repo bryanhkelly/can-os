@@ -313,6 +313,9 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
         eq(programs.status, "active"),
         ...(data.studentPersonId ? [eq(studentProfiles.personId, data.studentPersonId)] : []),
       )).limit(100);
+    requireCompletePickupSafetyRows([
+      {name:"guardian pickup student directory",received:students.length,limit:100},
+    ]);
     const studentIds = [...new Set(students.map(row => row.studentProfileId))];
     const programIds = [...new Set(students.map(row => row.programId))];
     const [authorizations, holds, releases] = studentIds.length ? await Promise.all([
@@ -354,6 +357,11 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
         inArray(pickupReleaseEvents.programId, programIds),
       )).orderBy(desc(pickupReleaseEvents.occurredAt)).limit(200),
     ]) : [[], [], []];
+    requireCompletePickupSafetyRows([
+      {name:"guardian pickup authorizations",received:authorizations.length,limit:500},
+      {name:"guardian custody history",received:holds.length,limit:200},
+      {name:"guardian pickup release history",received:releases.length,limit:200},
+    ]);
     const matches = (row: { studentProfileId: string; programId: string; householdId: string },
       student: typeof students[number]) => row.studentProfileId === student.studentProfileId &&
       row.programId === student.programId && row.householdId === student.householdId;
@@ -694,6 +702,12 @@ export const proposePickupCustodyResolution=createServerFn({method:"POST"})
          evidenceReference:data.evidenceReference},
      }).returning({id:actions.id});
      if(!proposal)throw new Error("Could not persist custody proposal");
+     await emitEvent(tx,{
+       eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:proposal.id,
+       actorPersonId:actor.actorPersonId,organizationId:student.organizationId,
+       siteId:student.siteId,programId:student.programId,
+       payload:{type:"pickup_custody_resolution_proposal",holdId:hold.id},
+     });
      await writeAudit(tx,actor,{action:"pickup.custody_hold.resolution_proposed",
        entityType:"action",entityId:proposal.id,
        scope:{organizationId:student.organizationId,siteId:student.siteId,programId:student.programId},
