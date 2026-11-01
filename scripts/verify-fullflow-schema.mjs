@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
@@ -38,6 +39,17 @@ async function main() {
       "Migrate the isolated branch before running FullFlow.",
     );
   }
+
+  // Last-row parity alone is insufficient: 0053-0055 previously existed
+  // outside the ledger. Reuse the canonical read-only stage/catalog/hash
+  // reviewer before any browser or integration fixture is written.
+  const migrationReview = spawnSync(
+    process.execPath, ["scripts/review-fullflow-migrations.mjs"],
+    { stdio: "inherit", env: process.env },
+  );
+  if (migrationReview.error) throw migrationReview.error;
+  if (migrationReview.status !== 0)
+    throw new Error("FullFlow schema reviewer rejected staged migration/catalog/hash parity.");
 
   const required = {
     auth_request_rate_limits: ["route", "window_started_at", "request_count"],

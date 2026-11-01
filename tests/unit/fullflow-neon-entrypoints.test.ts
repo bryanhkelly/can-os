@@ -48,6 +48,16 @@ describe("FullFlow Neon branch isolation", () => {
       .toBeLessThan(wrapper.indexOf('["run", "db:migrate"]'));
   });
 
+  it("requires the full stage/catalog/hash reviewer before connected fixture writes", () => {
+    const source = readFileSync("scripts/verify-fullflow-schema.mjs", "utf8");
+    expect(source).toContain('["scripts/review-fullflow-migrations.mjs"]');
+    expect(source.indexOf("migrationReview.status !== 0"))
+      .toBeLessThan(source.indexOf("const required = {"));
+    const runner = readFileSync("scripts/run-integration-tests.mjs", "utf8");
+    expect(runner.indexOf('"scripts/verify-fullflow-schema.mjs"'))
+      .toBeLessThan(runner.indexOf("node_modules/vitest/vitest.mjs"));
+  });
+
   it("maps the Postgres migration ledger timestamp into the reviewer contract", () => {
     const reviewer = readFileSync("scripts/review-fullflow-migrations.mjs", "utf8");
     expect(reviewer).toContain("max(created_at) AS last_timestamp");
