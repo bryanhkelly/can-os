@@ -37,6 +37,9 @@ describe("durable OneRoster placement decisions",()=>{
   expect(fn).toContain('const placementIdentifier="enrollment:"');
   expect(fn).toContain("assessOneRosterPlacementReplay(priorPlacement??null,requested)");
   expect(fn).toContain('live.status!=="active"');
+  expect(fn).toContain("const checked=await activateSectionEnrollment(tx,{");
+  expect(fn).toContain("if(checked.enrollmentId!==live.id||checked.created)");
+  expect(fn).toContain("eq(sections.active,true)");
   expect(fn).toContain('entityType:"enrollment"');
   expect(fn).toContain("activateSectionEnrollment(tx,");
   expect(fn).toContain('action:"curriculum.interop.oneroster.placement.replay"');
