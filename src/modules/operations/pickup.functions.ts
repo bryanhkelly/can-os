@@ -1,3 +1,4 @@
+import { requireCompletePickupSafetyRows } from "@/domain/pickup-projection-completeness";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
@@ -743,6 +744,15 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
             sql`${actions.metadata}->>'date' = ${data.date}`,
           )).limit(200),
       ]) : [[], [], [], [], []];
+    // The staff roster is a safety decision aid. A capped source cannot
+    // silently omit a custody hold or a permitted pickup adult.
+    requireCompletePickupSafetyRows([
+      {name:"pickup authorizations",received:authorizations.length,limit:500},
+      {name:"active custody and emergency holds",received:holds.length,limit:200},
+      {name:"pickup history",received:releases.length,limit:500},
+      {name:"student household membership",received:memberships.length,limit:500},
+      {name:"uncollected child follow-ups",received:uncollected.length,limit:200},
+    ]);
     const approvedContacts=studentIds.length?await db.select({
       studentProfileId:healthProfiles.studentProfileId,metadata:healthProfiles.metadata,
     }).from(healthProfiles).where(inArray(healthProfiles.studentProfileId,studentIds)):[];
