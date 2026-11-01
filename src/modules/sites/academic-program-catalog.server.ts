@@ -34,7 +34,11 @@ export async function readAcademicProgramCatalog(
       eq(programPublications.status, "published"),
       isNotNull(programPublications.publishedAt),
       inArray(programs.status, ["draft", "launching", "ready", "active"]),
-    )).orderBy(asc(programPublications.title)).limit(100);
+    )).orderBy(asc(programPublications.title))
+      // Readers must hold the reviewed marketing snapshot and Program
+      // membership stable until the parent Site-publication transaction ends.
+      // Otherwise a concurrent unpublish could expose stale approved copy.
+      .for("share", { of: [programPublications, programs] }).limit(100);
   const eligible = rows.filter(row => publishableAcademicProgram({
     type: row.type, status: row.status,
     siteId: row.programSiteId,
