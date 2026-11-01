@@ -60,10 +60,14 @@ async function assertNoWithdrawnTranscriptCredits(db:Pick<Awaited<ReturnType<typ
  s:Awaited<ReturnType<typeof resources>>["s"],studentProfileId:string,evidence:readonly CreditEvidence[]){
  const sectionIds=evidence.filter(row=>row.earnedUnits!==null && row.earnedUnits>0).map(row=>row.sectionId);
  if(!sectionIds.length)return;
- const withdrawn=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+ // Lock all matching enrollment rows, including those currently active.
+ // Filtering for withdrawn in SQL would lock only already-withdrawn rows and
+ // allow a concurrent active→withdrawn update to race with diploma release.
+ const custody=await db.select({sectionId:s.enrollments.sectionId,status:s.enrollments.status}).from(s.enrollments)
    .where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.kind,"section"),
-     eq(s.enrollments.status,"withdrawn"),inArray(s.enrollments.sectionId,sectionIds)));
- if(withdrawn.length)throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
+     inArray(s.enrollments.sectionId,sectionIds))).for("share");
+ if(custody.some(row=>row.status==="withdrawn"))
+   throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
 }
 
 /** Lock and reconcile the live finalized gradebook against every issued
