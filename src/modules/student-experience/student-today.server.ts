@@ -4,13 +4,14 @@
  * from the demo UI until a real student session exists.
  */
 import { and, asc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { localDayBoundsInTimezone } from "@/modules/calendar/timezone";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { isCurrentCoursework } from "@/domain/student-today-coursework";
 import { isStudentAssessmentVisible } from "@/domain/assessment-availability";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
-  scheduledOccurrences, studentProfiles, submissions, terms,
+  scheduledOccurrences, sites, studentProfiles, submissions, terms,
 } from "@/db/schema";
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
@@ -64,15 +65,25 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   const sectionIds = activeSections.map((row) => row.sectionId);
   const siteIds = [...new Set(activeSections.map((row) => row.siteId).filter((id): id is string => Boolean(id)))];
 
-  const startOfDay = new Date(at);
-  startOfDay.setUTCHours(0, 0, 0, 0);
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+  // Each enrolled Site owns its own local school day. One UTC range cannot
+  // represent a student who has classes at Sites in different timezones.
+  const siteTimezones = siteIds.length ? await db
+    .select({ siteId: sites.id, timezone: sites.timezone })
+    .from(sites).where(inArray(sites.id, siteIds)) : [];
+  const siteDays = siteTimezones.map(row => ({
+    siteId: row.siteId,
+    ...localDayBoundsInTimezone(at, row.timezone),
+  }));
+  const utcDay = localDayBoundsInTimezone(at, "UTC");
+  // Legacy summary fields represent the first enrolled Site. Individual event
+  // and coursework filtering always uses the appropriate Site's actual day.
+  const { start: startOfDay, end: endOfDay } = siteDays[0] ?? utcDay;
+  const sectionDayStart = new Map(activeSections.map(section => [
+    section.sectionId,
+    siteDays.find(day => day.siteId === section.siteId)?.start ?? startOfDay,
+  ] as const));
 
-  // Site calendar is the source of truth for operations/formation;
-  // a separate timezone-aware day boundary resolver will be required for
-  // local-day fidelity before live release.
-  const events = siteIds.length ? await db
+  const events = siteDays.length ? await db
     .select({
       id: calendarEvents.id,
       title: calendarEvents.title,
@@ -91,11 +102,13 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       eq(calendarEvents.scheduledOccurrenceId, scheduledOccurrences.id),
     )
     .where(and(
-      inArray(scheduledOccurrences.siteId, siteIds),
+      or(...siteDays.map(day => and(
+        eq(scheduledOccurrences.siteId, day.siteId),
+        gte(scheduledOccurrences.startsAt, day.start),
+        lt(scheduledOccurrences.startsAt, day.end),
+      ))),
       ...(scope?[or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,scope.programIds))]:[]),
       ne(calendarEvents.type, "extended_learning_session"), // keep draft camp plans out of Student Today
-      gte(scheduledOccurrences.startsAt, startOfDay),
-      lt(scheduledOccurrences.startsAt, endOfDay),
       or(
         ...[
           ...sectionIds.map(id => eq(scheduledOccurrences.sectionId, id)),
@@ -149,7 +162,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   }
   const currentCoursework = [...latestCoursework.values()].filter(row =>
     isStudentAssessmentVisible({ status: "published", availableAt: row.availableAt }, at) &&
-    isCurrentCoursework(row, startOfDay));
+    isCurrentCoursework(row, sectionDayStart.get(row.sectionId) ?? startOfDay));
 
   const openActions = await db
     .select({
