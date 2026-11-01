@@ -24,6 +24,11 @@ describe("connected official credential disclosure", () => {
   order(render,"return db.transaction(async tx=>",transcriptGuard);
   order(render,transcriptGuard,"const pdf=academicDocumentPdf(doc)");
   order(render,diplomaGuard,"const pdf=academicDocumentPdf(doc)");
+  expect(render).toContain("const lockedDoc=await documentData(tx as unknown as typeof db,s,data.kind,data.credentialId)");
+  expect(render.indexOf("const lockedDoc=")).toBeGreaterThan(render.indexOf(diplomaGuard));
+  expect(render.indexOf("const lockedDoc=")).toBeGreaterThan(render.indexOf(transcriptGuard));
+  order(render,"doc=lockedDoc","const pdf=academicDocumentPdf(doc)");
+  expect(render).toContain("lockedDoc.issuerId!==doc.issuerId");
   order(render,"const pdf=academicDocumentPdf(doc)","return {filename:");
   // Match the closing boundary of the transaction rather than the FIRST
   // occurrence of '});', which also appears inside freshness calls.
@@ -42,6 +47,13 @@ describe("connected official credential disclosure", () => {
   expect(authorize).toContain("liveRecipientPerson.email?.trim().toLowerCase()");
   expect(authorize).toContain("const [liveProgram]=await tx.select(");
   expect(authorize).toContain("liveProgram?.issuerId!==doc.issuerId");
+  expect(authorize).toContain("const [liveStudent]=await tx.select(");
+  expect(authorize).toContain("liveStudent.personId!==student.personId");
+  expect(authorize).toContain('liveAction?.type!=="guardian_enrollment_change_request"');
+  expect(authorize).toContain('liveAction.subjectType!=="student_profile"');
+  expect(authorize).toContain('liveConsent.consentType!=="academic_records_transfer_release"');
+  expect(authorize).toContain('liveAction.metadata.kind!=="transfer"');
+  order(authorize,"const [liveStudent]=",transcriptGuard);
  });
 
  it("holds verified recipient, grant and canonical source checks through PDF rendering",()=>{
@@ -53,6 +65,11 @@ describe("connected official credential disclosure", () => {
   expect(recipient).toContain('.from(s.programs).where(eq(s.programs.id,action.programId)).for("share").limit(1)');
   order(recipient,"return db.transaction(async tx=>",transcriptGuard);
   order(recipient,transcriptGuard,"const pdf=academicDocumentPdf(doc)");
+  expect(recipient).toContain('.from(s.people).where(eq(s.people.id,recipientPersonId)).for("share").limit(1)');
+  expect(recipient).toContain("const lockedDoc=await documentData(tx as unknown as typeof db,s,kind,credentialId)");
+  expect(recipient.indexOf("const lockedDoc=")).toBeGreaterThan(recipient.indexOf(transcriptGuard));
+  order(recipient,"doc=lockedDoc","const pdf=academicDocumentPdf(doc)");
+  expect(recipient).toContain("lockedDoc.studentProfileId!==doc.studentProfileId");
   order(recipient,"const pdf=academicDocumentPdf(doc)","academic_credential.release.download");
   expect(recipient.lastIndexOf("});")).toBeGreaterThan(recipient.indexOf("return {filename:"));
  });
