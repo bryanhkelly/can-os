@@ -702,7 +702,14 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       fixture.assessmentId = assessment.id;
 
       const sp = studentPage!;
-      await goto(sp, `/student/assignments?section=${fixture.sectionId}&assessment=${fixture.assessmentId}`);
+      // Follow the learner's real first-week handoff instead of jumping
+      // directly to a known assessment URL from the test fixture.
+      await goto(sp, "/student");
+      await expect(sp.getByText("Your first week")).toBeVisible();
+      await sp.getByRole("link", { name: /Study.*Solving for x/ }).click();
+      await expect(sp.getByText("Students isolate the variable by applying inverse operations.")).toBeVisible();
+      await sp.getByRole("link", { name: "Open assignment" }).click();
+      await expect(sp.getByRole("heading", { name: "Your assignments" })).toBeVisible();
       const response = sp
         .getByLabel("Your response")
         .or(sp.getByPlaceholder(/Write your response/));
