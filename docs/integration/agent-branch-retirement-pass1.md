@@ -91,3 +91,9 @@ Compared each original PR's changed paths against the live FullFlow tree and its
 - **Original PR #212 (D): closed as superseded.** All 24 changed paths are byte-identical on FullFlow; the 40-lesson draft remains incomplete.
 - **Original PR #207 (L): closed as superseded.** All 6 changed paths are byte-identical on FullFlow; connected church evidence remains incomplete.
 - Source branches remain in GitHub until deletion is supported and the remaining semantic gates are resolved. Closing an original PR does not delete its branch.
+
+## Agent G compatibility resolution — FullFlow `c57f89c5`
+
+New legacy program-wide adoption writes are denied whenever `CAN_ANNUAL_ADOPTIONS_ENABLED=true` or `CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS=true`. Existing historical adoptions remain readable. Annual writes remain independently gated until 0057 and connected license/Section acceptance. This resolves the immediate double-write authorization risk without copying the source branch's abrupt unconditional legacy shutdown. It does **not** yet establish year-scoped Section/supplement authorization, so G remains a connected-workflow hold.
+
+**CI at time of change:** queued/in progress; do not mark verified until exact-commit checks pass.
