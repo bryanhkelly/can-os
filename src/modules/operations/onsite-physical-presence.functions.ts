@@ -134,7 +134,19 @@ export const reportOnsitePhysicalPresence=createServerFn({method:"POST"})
           sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
           sql`${actions.metadata}->>'planToken' = ${block.planToken}`))
         .orderBy(desc(actions.createdAt)).limit(1);
-      if(prior)return {reportId:prior.id,created:false as const};
+      if(prior){
+        // A retry is not another real-world arrival. Once this person has
+        // reported leaving the room, the old report cannot silently restore
+        // supervised coverage even if the original UUID/room token is reused.
+        const [departure]=await tx.select({id:actions.id}).from(actions)
+          .where(and(eq(actions.type,exitType),eq(actions.siteId,site.id),
+            eq(actions.ownerPersonId,actor.actorPersonId!),
+            sql`${actions.metadata}->>'presenceReportId' = ${prior.id}`,
+          )).limit(1);
+        if(departure)throw new AuthorizationError(
+          "prior staff arrival was interrupted; arrange newly approved room coverage before witnessing");
+        return {reportId:prior.id,created:false as const};
+      }
       const [record]=await tx.insert(actions).values({
         type:presenceType,status:"resolved",priority:"normal",
         title:"Staff member reports physical arrival at scheduled room",
