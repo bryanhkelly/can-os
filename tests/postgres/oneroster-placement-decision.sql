@@ -54,7 +54,9 @@ BEGIN
  BEGIN
   DELETE FROM curriculum_import_jobs WHERE id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
   RAISE EXCEPTION 'Referenced source import can be deleted';
- EXCEPTION WHEN foreign_key_violation THEN NULL;
+ -- ON DELETE RESTRICT raises restrict_violation (23001), whereas a
+ -- missing referenced job on INSERT raises foreign_key_violation (23503).
+ EXCEPTION WHEN restrict_violation OR foreign_key_violation THEN NULL;
  END;
 END $prove$;
 ROLLBACK;
