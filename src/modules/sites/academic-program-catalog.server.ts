@@ -45,20 +45,26 @@ export async function readAcademicProgramCatalog(
   const listings = [];
   // Deliberately sequential: a caller may already own the transaction.
   for (const row of eligible) {
+    // An old published snapshot does NOT outlive a withdrawn CAN–church
+    // institutional relationship. Even inquiry marketing must not advertise
+    // academic services after independent agreement expiry or revocation.
+    try {
+      await requireChurchHostedOperatingServices(executor, row.programId,
+        ["academic_instruction", "school_of_record"]);
+    } catch (error) {
+      if (error instanceof AuthorizationError) continue;
+      throw error;
+    }
+
     let applicationOpen = false;
     if (row.status === "active") {
       try {
-        // Marketing approval and an active Program are insufficient on their
-        // own to invite families into an academic school of record. The same
-        // CAN/church services check is enforced again at actual submission.
+        // Actual applications require additional current admissions service
+        // authority. Recheck again at submission/redemption.
         await requireChurchHostedOperatingServices(executor, row.programId,
           ["admissions", "school_of_record"]);
         applicationOpen = true;
       } catch (error) {
-        // Absence/expiry/revocation of the separately verified agreement is
-        // a routine not-open state, NOT an error to reflect to families.
-        // Unexpected database failures must still fail closed, not produce
-        // a misleading Apply call-to-action.
         if (!(error instanceof AuthorizationError)) throw error;
       }
     }
