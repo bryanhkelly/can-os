@@ -124,4 +124,36 @@ describe("standalone public site HTML", () => {
     expect(hosted).toContain('action="/inquiry"');
   });
 
+  it("does not invite applicants just because an academic Program is active", () => {
+    const page = {
+      host: "academy.can-os.com",
+      site: { name: "Academy", organizationName: "Church partner" },
+      offerings: [],
+      academicPrograms: [{
+        programId: "00000000-0000-4000-8000-000000000002",
+        title: "Hybrid Academy",
+        summary: "A program with independent operational readiness.",
+        typeLabel: "Hybrid learning program",
+        grades: { min: "9", max: "12" },
+        delivery: { onsite: true, liveOnline: true, asynchronous: true,
+          onsiteDaysPerWeek: 2 },
+        availability: "operating" as const,
+      }],
+    };
+    const opts = { makeRequestId: () => "00000000-0000-4000-8000-000000000001" };
+    const withoutInstitutionalApproval = renderPublicSiteHtml(page, opts);
+    expect(withoutInstitutionalApproval).toContain("Current program");
+    expect(withoutInstitutionalApproval).toContain("applications not currently available");
+    expect(withoutInstitutionalApproval).toContain('action="/inquiry"');
+    expect(withoutInstitutionalApproval).not.toContain('action="/apply"');
+    const authorized = renderPublicSiteHtml({
+      ...page,
+      academicPrograms: page.academicPrograms.map(program => ({
+        ...program, applicationOpen: true,
+      })),
+    }, opts);
+    expect(authorized).toContain('action="/apply" method="post"');
+    expect(authorized).toContain("Verify email to apply");
+  });
+
 });
