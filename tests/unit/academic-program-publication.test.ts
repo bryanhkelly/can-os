@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   academicMarketingSnapshot, isAcademicMarketingType,
-  publishableAcademicProgram, publicAcademicProgram,
+  isCurrentAcademicMarketingSnapshot, publishableAcademicProgram, publicAcademicProgram,
 } from "@/domain/academic-program-publication";
 
 describe("academic Program marketing approval", () => {
@@ -67,4 +67,32 @@ describe("academic Program marketing approval", () => {
     expect(publicAcademicProgram({ ...baseRow, status: "active",
       applicationOpen: true }).applicationOpen).toBe(true);
   });
+  it("withdraws stale published academic copy when official Program facts change", () => {
+    const snapshot = {
+      title: "Ninth Grade Academy",
+      summary: "Local mentors support our blended learning community.",
+      gradeRange: { min: "9", max: "9" },
+      deliveryModel: { onsite: true, asynchronous: true,
+        liveOnline: false, onsiteDaysPerWeek: 2 },
+      programName: "Ninth Grade Academy",
+      canonicalGrades: { min: "9", max: "9" },
+      canonicalDelivery: { onsite: true, asynchronous: true,
+        liveOnline: false, onsiteDaysPerWeek: 2 },
+    };
+    expect(isCurrentAcademicMarketingSnapshot(snapshot)).toBe(true);
+    expect(isCurrentAcademicMarketingSnapshot({
+      ...snapshot, canonicalGrades: { min: "9", max: "10" },
+    })).toBe(false);
+    expect(isCurrentAcademicMarketingSnapshot({
+      ...snapshot, canonicalDelivery: { ...snapshot.canonicalDelivery,
+        onsiteDaysPerWeek: 3 },
+    })).toBe(false);
+    expect(isCurrentAcademicMarketingSnapshot({
+      ...snapshot, programName: "Renamed Academy",
+    })).toBe(false);
+    expect(isCurrentAcademicMarketingSnapshot({
+      ...snapshot, summary: "Fully accredited school with guaranteed enrollment.",
+    })).toBe(false);
+  });
+
 });
