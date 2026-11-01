@@ -16,7 +16,7 @@ jobs:
   connected:
     name: One school, end-to-end isolated Neon acceptance
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     environment: integration-test
     env:
       APP_ENV: test
@@ -24,10 +24,21 @@ jobs:
       CAN_TEST_DB_WRITES_ENABLED: "true"
       CAN_DEMO_WRITES_ENABLED: "true"
       TEST_DATABASE_URL: ${{ secrets.CAN_FULLFLOW_TEST_DATABASE_URL }}
+      CAN_ADMISSIONS_TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+      CAN_ADMISSIONS_TEST_BRANCH_ID: ${{ vars.CAN_ADMISSIONS_TEST_BRANCH_ID }}
+      DATABASE_URL: ${{ secrets.CAN_FULLFLOW_TEST_DATABASE_URL }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
     steps:
-      - name: Checkout selected FullFlow ref
+      - name: Checkout exact workflow-dispatch commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Assert immutable checked-out SHA
+        shell: bash
+        run: |
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo '::error::BLOCKED: checkout differs from triggering SHA'; exit 1; }
+          echo "Acceptance commit: $GITHUB_SHA"
       - name: Require approved test branch and credentials
         shell: bash
         run: |
@@ -35,8 +46,8 @@ jobs:
             echo "::error::FullFlow release acceptance only runs on the reviewed FullFlow branch."
             exit 1
           fi
-          if [[ -z "${TEST_DATABASE_URL}" || -z "${CAN_APPLICATION_DB_HOST}" ]]; then
-            echo "::error::Configure the CAN_FULLFLOW_TEST_DATABASE_URL secret and CAN_APPLICATION_DB_HOST integration-test variable."
+          if [[ -z "${TEST_DATABASE_URL}" || -z "${CAN_APPLICATION_DB_HOST}" || -z "${CAN_ADMISSIONS_TEST_DATABASE_URL}" || -z "${CAN_ADMISSIONS_TEST_BRANCH_ID}" ]]; then
+            echo "::error::HOLD: configure approved FullFlow and admissions disposable Neon secrets, branch IDs, and application endpoint guard in integration-test."
             exit 1
           fi
       - name: Set up Node
@@ -46,39 +57,169 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit route ownership contracts
+        id: route_ownership
+        run: node scripts/check-platform-route-contracts.mjs --check
+      - name: Audit route fixture coverage
+        id: route_fixtures
+        run: node scripts/check-route-fixture-coverage.mjs
+      - name: Verify static code and committed migration consistency
+        id: static
+        run: |
+          npm run lint
+          npm run build
+          npm run typecheck
+          npm test
+          npx drizzle-kit check
+          if [[ -n "$(git status --porcelain -- drizzle/)" ]]; then
+            echo "::error::HOLD: schema verification unexpectedly modified committed migration artifacts."
+            exit 1
+          fi
       - name: Verify isolated endpoint and Postgres-attested FullFlow branch
+        id: fullflow_preflight
         run: |
           npm run test:integration:full-flow -- --preflight
           npm run db:migrate:fullflow -- --preflight
-      - name: Apply only reviewed migrations to isolated branch
+      - name: Attest dedicated FullFlow Neon project and branch before mutation
+        id: fullflow_identity
+        run: node scripts/verify-fullflow-neon-branch.mjs
+      - name: Ensure independent admissions target differs from FullFlow target
+        id: db_separation
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            const a = new URL(process.env.TEST_DATABASE_URL);
+            const b = new URL(process.env.CAN_ADMISSIONS_TEST_DATABASE_URL);
+            const stripPool = host => host.replace(/-pooler(?=\.)/, "").toLowerCase();
+            if (stripPool(a.hostname) === stripPool(b.hostname)) {
+              console.error("HOLD: admissions and FullFlow acceptance must not migrate the same isolated database twice.");
+              process.exit(1);
+            }
+          '
+      - name: Verify separate admissions database is an attested disposable branch
+        id: admissions_preflight
+        env:
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: |
+          npm run test:integration:admissions -- --preflight
+          node scripts/verify-admissions-neon-branch.mjs
+      - name: Require distinct Postgres-attested Neon branch IDs before any writes
+        id: branch_separation
+        shell: bash
+        run: |
+          if [[ "${CAN_ADMISSIONS_TEST_BRANCH_ID}" == "br-proud-pine-arfju8h2" ]]; then
+            echo "::error::HOLD: admissions branch is the pinned FullFlow branch; independent migration is unsafe."
+            exit 1
+          fi
+      - name: Record pre-migration evidence without secrets
+        shell: bash
+        run: |
+          {
+            echo "## Database preflight (read-only)"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- FullFlow project: \`sweet-hall-62441909\`, branch: \`br-proud-pine-arfju8h2\` (Postgres-attested in preceding step)"
+            echo "- Admissions branch: \`$CAN_ADMISSIONS_TEST_BRANCH_ID\` (Postgres-attested in preceding step)"
+            echo "- Database URLs, passwords, and hostnames are not disclosed."
+            echo "- Distinct identity checks completed before any schema mutation."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply only reviewed migrations to isolated FullFlow branch
+        id: fullflow_migration
         run: npm run db:migrate:fullflow
+      - name: Apply admissions migrations on separately guarded disposable branch
+        id: admissions_migration
+        env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: npm run db:migrate
+      - name: Run connected admissions integration
+        id: admissions_integration
+        env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: npm run test:integration:admissions
       - name: Verify complete cross-role school transaction
+        id: fullflow_integration
         run: npm run test:integration:full-flow
       - name: Verify independently supervised church school day
+        id: journey_c
         run: npm run test:integration:journey-c
       - name: Install browser for real authenticated sessions
+        id: browser_install
         run: npx playwright install --with-deps chromium
+      - name: Run authenticated admissions browser acceptance
+        id: admissions_browser
+        env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+          TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
+        run: npm run test:e2e:admissions
       - name: Verify connected launch, admission, instruction, guardian, and operations browser journey
+        id: fullflow_browser
         run: npm run test:e2e:full-flow
-      - name: Preserve browser failure evidence
-        if: failure()
+      - name: Preserve authenticated browser evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fullflow-connected-acceptance-failure
+          name: fullflow-connected-acceptance-${{ github.sha }}
           path: |
             test-results/
             playwright-report/
           if-no-files-found: ignore
-          retention-days: 7
-      - name: Record evidence limitations
+          retention-days: 30
+      - name: Record exact-SHA release evidence and decision
         if: always()
         shell: bash
+        env:
+          GATE_RESULT: ${{ job.status }}
+          STAGE_ROUTE_OWNERSHIP: ${{ steps.route_ownership.outcome }}
+          STAGE_ROUTE_FIXTURES: ${{ steps.route_fixtures.outcome }}
+          STAGE_STATIC: ${{ steps.static.outcome }}
+          STAGE_FULLFLOW_PREFLIGHT: ${{ steps.fullflow_preflight.outcome }}
+          STAGE_FULLFLOW_IDENTITY: ${{ steps.fullflow_identity.outcome }}
+          STAGE_DB_SEPARATION: ${{ steps.db_separation.outcome }}
+          STAGE_ADMISSIONS_PREFLIGHT: ${{ steps.admissions_preflight.outcome }}
+          STAGE_BRANCH_SEPARATION: ${{ steps.branch_separation.outcome }}
+          STAGE_FULLFLOW_MIGRATION: ${{ steps.fullflow_migration.outcome }}
+          STAGE_ADMISSIONS_MIGRATION: ${{ steps.admissions_migration.outcome }}
+          STAGE_ADMISSIONS_INTEGRATION: ${{ steps.admissions_integration.outcome }}
+          STAGE_FULLFLOW_INTEGRATION: ${{ steps.fullflow_integration.outcome }}
+          STAGE_JOURNEY_C: ${{ steps.journey_c.outcome }}
+          STAGE_BROWSER_INSTALL: ${{ steps.browser_install.outcome }}
+          STAGE_ADMISSIONS_BROWSER: ${{ steps.admissions_browser.outcome }}
+          STAGE_FULLFLOW_BROWSER: ${{ steps.fullflow_browser.outcome }}
         run: |
           {
             echo "## FullFlow connected release acceptance"
             echo ""
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- The steps above must ALL succeed on this exact commit to count as connected acceptance."
+            echo "- Job gate result: ${GATE_RESULT}"
+            echo ""
+            echo "| Required gate | Outcome |"
+            echo "| --- | --- |"
+            echo "| Audit route ownership contracts | ${STAGE_ROUTE_OWNERSHIP:-skipped} |"
+            echo "| Audit route fixture coverage | ${STAGE_ROUTE_FIXTURES:-skipped} |"
+            echo "| Verify static code and committed migration consistency | ${STAGE_STATIC:-skipped} |"
+            echo "| Verify isolated endpoint and Postgres-attested FullFlow branch | ${STAGE_FULLFLOW_PREFLIGHT:-skipped} |"
+            echo "| Attest dedicated FullFlow Neon project and branch before mutation | ${STAGE_FULLFLOW_IDENTITY:-skipped} |"
+            echo "| Ensure independent admissions target differs from FullFlow target | ${STAGE_DB_SEPARATION:-skipped} |"
+            echo "| Verify separate admissions database is an attested disposable branch | ${STAGE_ADMISSIONS_PREFLIGHT:-skipped} |"
+            echo "| Require distinct Postgres-attested Neon branch IDs before any writes | ${STAGE_BRANCH_SEPARATION:-skipped} |"
+            echo "| Apply only reviewed migrations to isolated FullFlow branch | ${STAGE_FULLFLOW_MIGRATION:-skipped} |"
+            echo "| Apply admissions migrations on separately guarded disposable branch | ${STAGE_ADMISSIONS_MIGRATION:-skipped} |"
+            echo "| Run connected admissions integration | ${STAGE_ADMISSIONS_INTEGRATION:-skipped} |"
+            echo "| Verify complete cross-role school transaction | ${STAGE_FULLFLOW_INTEGRATION:-skipped} |"
+            echo "| Verify independently supervised church school day | ${STAGE_JOURNEY_C:-skipped} |"
+            echo "| Install browser for real authenticated sessions | ${STAGE_BROWSER_INSTALL:-skipped} |"
+            echo "| Run authenticated admissions browser acceptance | ${STAGE_ADMISSIONS_BROWSER:-skipped} |"
+            echo "| Verify connected launch, admission, instruction, guardian, and operations browser journey | ${STAGE_FULLFLOW_BROWSER:-skipped} |"
+            echo "- Browser artifacts: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}#artifacts (if any were created)"
+            if [[ "${GATE_RESULT}" == "success" ]]; then
+              echo "- Decision: CONNECTED-GATES PASS for this exact SHA only; separate operational release approval required."
+            else
+              echo "- Decision: HOLD. Inspect the failed/skipped steps; no release acceptance may be inferred."
+            fi
+            echo "- Every step above (including separate-branch admissions and safeguarding) must succeed on this exact SHA. Any failure or skip means HOLD."
+            echo "- Status: CONNECTED-GATES PASS only when every check succeeds; operational deployment readiness and coordinator approval remain separate."
+            echo "- This run provides same-SHA admissions, static, schema and Journey C results only when all respective steps pass. Deployment readiness and coordinator approval are separate."
             echo "- This synthetic isolated-branch evidence does not authorize production deployment or certify legal/accreditation compliance."
           } >> "${GITHUB_STEP_SUMMARY}"

@@ -514,6 +514,12 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
           rowCount(sql, "select id from admission_offers where application_id = $1", [fixture.applicationId!]),
         )
         .toBe(1);
+      // Authorization must fail before the legitimate guardian accepts the
+      // offer, not only after enrollment has already completed.
+      await goto(unrelatedGuardian.page, offersUrl);
+      await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
+      await expect(unrelatedGuardian.page.getByRole("button", { name: "Sign and submit enrollment form" })).toHaveCount(0);
+
       await goto(guardian.page, offersUrl);
       await guardian.page.getByRole("button", { name: "Accept" }).click();
       await expect(guardian.page.getByText(/acceptance is recorded/i)).toBeVisible();
@@ -535,6 +541,22 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await guardian.page.reload();
       await waitForAppHydration(guardian.page);
       await expect(guardian.page.getByText(/Enrollment is active and classes are assigned/)).toBeVisible();
+      // The registrar's activation must preserve the same applicant student
+      // identity and place that exact student in this Program's Section.
+      const activated = await singleRow(
+        sql,
+        `select sp.person_id, e.program_id, e.section_id
+         from enrollments e
+         join student_profiles sp on sp.id = e.student_profile_id
+         where e.student_profile_id = $1 and e.program_id = $2
+           and e.section_id = $3 and e.kind = 'section'
+           and e.status = 'active'`,
+        [fixture.studentProfileId!, fixture.programId!, fixture.sectionId!],
+      );
+      expect(activated.person_id).toBe(fixture.studentPersonId);
+      expect(activated.program_id).toBe(fixture.programId);
+      expect(activated.section_id).toBe(fixture.sectionId);
+
     });
 
     // ------------------------------------------------------------------
@@ -764,6 +786,56 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         await fresh.context.close();
       }
 
+      // Onsite attendance and custody are separate from online learning.
+      // A family account must never be granted the staff-only school-day
+      // roster or physical release controls merely by knowing the Site IDs.
+      await goto(guardian.page, "/site/day");
+      await expect(guardian.page.getByText(
+        "Sign in with a room facilitator, site staff or site leader membership for this site.",
+      )).toBeVisible();
+      await expect(guardian.page.getByRole("button", { name: /record.*present|mark present/i })).toHaveCount(0);
+      await goto(unrelatedGuardian.page, "/site/day");
+      await expect(unrelatedGuardian.page.getByText(
+        "Sign in with a room facilitator, site staff or site leader membership for this site.",
+      )).toBeVisible();
+
+      // The guardian attendance endpoint must not disclose the enrolled
+      // child's cases to an unrelated guardian supplied the exact person ID.
+      await goto(unrelatedGuardian.page,
+        `/guardian/attendance?student=${fixture.studentPersonId}`);
+      // This canonical reader deliberately returns an empty authorized
+      // collection rather than an error for an unrelated student's ID.
+      // Wait for the settled empty state: absence of rows while loading
+      // would otherwise be a false positive.
+      await expect(unrelatedGuardian.page.getByText(
+        "No recent absence or tardy cases were found for your students.",
+      )).toBeVisible();
+      await expect(unrelatedGuardian.page.getByText(
+        `${fixture.studentFirstName} ${fixture.studentLastName}`,
+      )).toHaveCount(0);
+
+      // A separate, authenticated guardian must not access another family's
+      // graded work even when supplied the precise student/Section/assessment IDs.
+      await goto(
+        unrelatedGuardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
+      await expect(unrelatedGuardian.page.getByText(
+        "No students with academic-viewing permission were found at your school.",
+      )).toBeVisible();
+      await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(
+        unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
+      ).toHaveCount(0);
+
+      // Report cards are also protected student records; possession of the
+      // exact student person ID must not grant an unrelated family access.
+      await goto(unrelatedGuardian.page, `/guardian/report-cards?student=${fixture.studentPersonId}`);
+      await expect(
+        unrelatedGuardian.page.getByText("No students with academic-viewing permission were found at your school."),
+      ).toBeVisible();
+      await expect(unrelatedGuardian.page.getByText(fixture.courseTitle)).toHaveCount(0);
+
       await goto(unrelatedGuardian.page, `/guardian/admission-offers?application=${fixture.applicationId}`);
       await expect(unrelatedGuardian.page.getByRole("alert")).toBeVisible();
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
@@ -773,6 +845,37 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         await expect(denied.getByText(/authorized staff account|could not be loaded/i)).toBeVisible();
         await expect(denied.getByText(fixture.programName)).toHaveCount(0);
       }
+
+      // Revisit the protected academics URL after the unrelated guardian's
+      // other navigation, then reload that exact route to catch stale-cache leaks.
+      await goto(
+        unrelatedGuardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
+      await unrelatedGuardian.page.reload();
+      await waitForAppHydration(unrelatedGuardian.page);
+      await expect(unrelatedGuardian.page.getByText(
+        "No students with academic-viewing permission were found at your school.",
+      )).toBeVisible();
+      await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(
+        unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
+      ).toHaveCount(0);
+
+      // Revoking an otherwise authorized guardian's live session must
+      // immediately remove access to grades, even with the exact resource IDs.
+      await sql.query(
+        "update access_sessions set revoked_at = now() where account_id = $1",
+        [fixture.guardian.accountId],
+      );
+      await goto(
+        guardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
+      await expect(guardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(
+        guardian.page.getByRole("button", { name: "Request school follow-up" }),
+      ).toHaveCount(0);
 
       await sql.query(
         "update access_sessions set revoked_at = now() where account_id = $1",

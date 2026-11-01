@@ -180,3 +180,50 @@ rerun from the beginning.
 **Not in scope for this gate:** a live executed agreement with a denomination,
 opening HQ accounts or an HQ-created Site. Those are valid alternate onboarding
 paths but not prerequisites for a school-operated high-school extension.
+
+## Agent C acceptance evidence ledger (frozen baseline)
+
+This ledger is a **test plan**, not a claim that any gate passed. All IDs below must originate from one continuous run; never substitute separately seeded school, Program, Section, enrollment, submission or grade records.
+
+| Gate | Required positive evidence | Required negative evidence | Decision without verified run |
+| --- | --- | --- | --- |
+| School launch | Site, Program, Journey and authorization persist across a new session | Different organization cannot read or mutate Program | HOLD |
+| Curriculum and instruction | Published version, adoption, Section, qualified teacher assignment and lesson share Program identity | Unassigned teacher cannot grade; wrong tenant cannot adopt or access | HOLD |
+| Admissions and identity | Inquiry/application, offer, required consents, enrollment and activated student use stable identifiers | Unrelated guardian cannot view student or accept offer; revoked guardian denied | HOLD |
+| Student and grading | Student loads published lesson, submits work, teacher grades and persisted grade survives reload | Wrong student or teacher denied submission/grade mutation | HOLD |
+| Guardian and operations | Related guardian sees result; school sees canonical joins, audit and notification state | Other guardian/tenant denied; revoked access denied after fresh session | HOLD |
+| Supervised onsite day | Authorized staff, roster, check-in/out, safeguarding and custody evidence linked to same student and Site | Unsafe attendance, unauthorized pickup, absent supervision and revoked staff denied | HOLD |
+| Database parity | Exact integrated commit migrates cleanly on verified disposable Neon branch | Production/shared FullFlow endpoint rejected before writes | HOLD |
+| Release provenance | Integration, Journey C, admissions and authenticated browser acceptance pass on same integrated SHA, with run IDs | Missing secret, skipped step, mismatched SHA or partial test coverage blocks approval | HOLD |
+
+### Coordinator handoff and execution boundaries
+
+1. Integration owner merges independently reviewed PRs to `FullFlow`; Agent C does not merge them or run acceptance against a moving branch.
+2. Capture the final integrated commit SHA and the exact disposable Neon project/branch identifiers. Read-only preflight must attest the endpoint and migration journal **before any migration or fixture writes**.
+3. Run the connected integration, Journey C, admissions acceptance and multi-role browser checks against that commit; record command, CI run URL/ID, migration parity, pass/fail and any skipped step separately.
+4. Repeat the authenticated checks with a fresh session after revocation, and reload each role's persisted views. A server-function mock or a rollback transaction does not replace browser evidence.
+5. Any missing `CAN_FULLFLOW_TEST_DATABASE_URL`, unsafe endpoint, incomplete migrations, failed child-safety denial, skipped browser step, or unavailable admissions acceptance is **HOLD**, not a product regression by inference and not a PASS.
+
+**Frozen-baseline audit (2026-10-31):** Source inspection confirms the integration test, browser spec and serialized workflow exist. No connected test, migration, CI job or browser session was executed during this audit. No database was accessed or modified. The missing admissions test secret described above remains an unverified environment blocker pending coordinator configuration. CI run IDs for a definitive integrated release: **none**.
+
+### Agent C implementation coverage versus unverified release gates
+
+The browser spec now checks a separately authenticated unrelated guardian at three
+different points: **before** offer acceptance (no acceptance or enrollment-form
+signature), **after** grading (no grade, follow-up action or report-card
+disclosure), and **after reload** (no reappearance of graded academic data).
+The registrar's active enrollment must retain the application student
+`personId` and the same `programId` even when the student has multiple
+placement/enrollment rows. These are source-level assertions, **not recorded
+passing test results**.
+
+The browser spec does **not** yet exercise the church-hosted onsite attendance
+and pickup experience. That remains a separately required Journey C acceptance
+suite, whose negative custody and supervision cases must be verified on the
+same final integrated SHA. Never substitute a passing academic browser journey
+for those safeguarding results.
+
+A workflow that passes only its connected job does **not** prove admissions
+Neon acceptance, deployment operational readiness, or static/schema integrity.
+The coordinator must record independent run IDs and verify every required
+gate; an unavailable secret, skipped job or absent run is a release **HOLD**.
