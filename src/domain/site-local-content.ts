@@ -72,6 +72,11 @@ const protectedClaims = [
   /\b(?:only|never|do not|won't)\s+(?:admit|accept|enroll)\b/i,
   /\b(?:school admissions policy|academic admission requirement|CAN(?: Academy| OS)?(?:'s)? official (?:faith|theology|doctrine))\b/i,
 ];
+/** Institutional and admissions claims must use authoritative approved facts. */
+export function containsProtectedInstitutionalClaim(text: string): boolean {
+  return protectedClaims.some(rule => rule.test(text));
+}
+
 const unsafeText = [
   /<\s*\/?\s*(?:script|iframe|style|img|a|svg|object|embed|form)\b/i,
   /\b(?:javascript|data):\s*[^\s]+/i,
@@ -180,7 +185,7 @@ export function classifySiteLocalContent(content: SiteLocalContent): SiteLocalCo
     if (unsafeText.some(rule => rule.test(text))) {
       throw new Error("This text cannot be published. Remove unsafe markup or sensitive information.");
     }
-    if (protectedClaims.some(rule => rule.test(text))) flaggedFields.push(field);
+    if (containsProtectedInstitutionalClaim(text)) flaggedFields.push(field);
   }
   return flaggedFields.length ? { status: "review_required", flaggedFields }
     : { status: "published", flaggedFields: [] };
