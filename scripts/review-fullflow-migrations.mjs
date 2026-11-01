@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
-import { assessPost0051MigrationArtifacts } from "./fullflow-post0051-artifacts.mjs";
+import { assessPost0051MigrationArtifacts, assessPost0056MigrationArtifacts } from "./fullflow-post0051-artifacts.mjs";
 
 /**
  * READ-ONLY migration preflight for the one dedicated FullFlow Neon branch.
@@ -43,6 +43,9 @@ const stagedTags = [
   "0054_academic_credential_delivery",
   "0055_academic_credential_release_authorizations",
   "0056_steep_lenny_balinger",
+  "0057_curriculum_annual_adoptions",
+  "0058_finance_invoices",
+  "0059_church_evidence_statuses",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -53,7 +56,9 @@ export function assessFullFlowMigrationReadiness(input) {
     consentColumns = [], consentIndexes = [], safetyQualificationKeys = [],
     conferenceBookingIndexes = [], p0SafetyColumns = [], p0SafetyIndexes = [],
     onboardingColumns = [], onboardingIndexes = [], outboundIndexes = [],
-    relationshipColumns = [], futureIndexes = [], cohortColumns = [], cohortConstraints = [] } = input;
+    relationshipColumns = [], futureIndexes = [], cohortColumns = [], cohortConstraints = [],
+    lateColumns = [], lateIndexes = [], lateForeignKeys = [], latePrimaryKeys = [],
+    churchStatusConstraints = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying each staged migration, verify that exact
@@ -127,14 +132,18 @@ export function assessFullFlowMigrationReadiness(input) {
     const post0054=laterLedgerMatch(55,54);
     const post0055=laterLedgerMatch(56,55);
     const post0056=laterLedgerMatch(57,56);
+    const post0057=laterLedgerMatch(58,57);
+    const post0058=laterLedgerMatch(59,58);
+    const post0059=laterLedgerMatch(60,59);
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
       post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
       post0046 ? 47 : post0047 ? 48 : post0048 ? 49 :
       post0049 ? 50 : post0050 ? 51 : post0051 ? 52 :
       post0052 ? 53 : post0053 ? 54 : post0054 ? 55 :
-      post0055 ? 56 : post0056 ? 57 : 0;
+      post0055 ? 56 : post0056 ? 57 : post0057 ? 58 :
+      post0058 ? 59 : post0059 ? 60 : 0;
     if (!stage)
-      issues.push("0039-0056 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0059 migration ledger/table state is inconsistent or unexpected");
     if (stage) {
       if ((stage >= 50) !== declinedEnum)
         issues.push("0049 declined participant status disagrees with migration ledger");
@@ -354,9 +363,14 @@ export function assessFullFlowMigrationReadiness(input) {
       if (actualAuthConstraints.has("program_site_authorization_suspended_ck"))
         issues.push("0048 suspension constraint present before migration: program_site_authorization_suspended_ck");
     }
-    if(stage)issues.push(...assessPost0051MigrationArtifacts({
-      stage,tables,relationshipColumns,futureIndexes,cohortColumns,cohortConstraints,
-    }));
+    if(stage) {
+      issues.push(...assessPost0051MigrationArtifacts({
+        stage,tables,relationshipColumns,futureIndexes,cohortColumns,cohortConstraints,
+      }));
+      issues.push(...assessPost0056MigrationArtifacts({
+        stage,tables,lateColumns,lateIndexes,lateForeignKeys,latePrimaryKeys,churchStatusConstraints,
+      }));
+    }
     const stagedPending = stagedEntries.map(entry => entry.tag);
     const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];
     return {
@@ -408,7 +422,8 @@ async function main() {
     consentColumns,consentIndexes,safetyQualificationKeys,conferenceBookingIndexes,
     p0SafetyColumns,p0SafetyIndexes,
     onboardingColumns,onboardingIndexes,outboundIndexes,
-    relationshipColumns,futureIndexes,cohortColumns,cohortConstraints] = await Promise.all([
+    relationshipColumns,futureIndexes,cohortColumns,cohortConstraints,
+    lateColumns,lateIndexes,lateForeignKeys,latePrimaryKeys,churchStatusConstraints] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -424,7 +439,9 @@ async function main() {
           table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents','pickup_authorizations','pickup_custody_holds','pickup_release_events','safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports','safeguarding_site_policies','safeguarding_site_responders',
             'notification_outbound_deliveries','church_onboarding_requests',
              'graduation_requirement_sets','graduation_decisions','diploma_issuances',
-             'academic_credential_deliveries','academic_credential_release_authorizations')`,
+             'academic_credential_deliveries','academic_credential_release_authorizations',
+              'curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
+              'finance_provider_events','finance_receipts')`,
     query`SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='program_site_authorizations'`,
     query`SELECT indexname FROM pg_indexes
@@ -488,6 +505,38 @@ async function main() {
       WHERE conrelid=to_regclass('public.graduation_requirement_sets') AND
       conname IN ('graduation_cohort_bounds_ck','graduation_supersession_not_self_ck',
        'graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk')`,
+,
+    query`SELECT table_name,column_name,data_type,is_nullable FROM information_schema.columns
+      WHERE table_schema='public' AND table_name IN
+       ('curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
+        'finance_provider_events','finance_receipts')`,
+    query`SELECT tablename,indexname,indexdef FROM pg_indexes
+      WHERE schemaname='public' AND tablename IN
+       ('curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
+        'finance_provider_events','finance_receipts')`,
+    query`SELECT source.relname AS table_name, att.attname AS column_name,
+       target.relname AS referenced_table, c.confdeltype AS on_delete
+      FROM pg_constraint c
+      JOIN pg_class source ON source.oid=c.conrelid
+      JOIN pg_class target ON target.oid=c.confrelid
+      JOIN pg_attribute att ON att.attrelid=source.oid AND att.attnum=c.conkey[1]
+      WHERE c.contype='f' AND array_length(c.conkey,1)=1
+       AND source.relnamespace='public'::regnamespace
+       AND source.relname IN
+       ('curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
+        'finance_provider_events','finance_receipts')`,
+    query`SELECT source.relname AS table_name, att.attname AS column_name
+      FROM pg_constraint c
+      JOIN pg_class source ON source.oid=c.conrelid
+      JOIN pg_attribute att ON att.attrelid=source.oid AND att.attnum=c.conkey[1]
+      WHERE c.contype='p' AND array_length(c.conkey,1)=1
+       AND source.relnamespace='public'::regnamespace
+       AND source.relname IN
+       ('curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
+        'finance_provider_events','finance_receipts')`,
+    query`SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint
+      WHERE conrelid=to_regclass('public.church_onboarding_requests')
+       AND conname='church_onboarding_request_status_ck'`
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal, types, columns, tables,
@@ -498,6 +547,7 @@ async function main() {
     p0SafetyColumns, p0SafetyIndexes,
     onboardingColumns, onboardingIndexes, outboundIndexes,
     relationshipColumns, futureIndexes, cohortColumns, cohortConstraints,
+    lateColumns, lateIndexes, lateForeignKeys, latePrimaryKeys, churchStatusConstraints,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;

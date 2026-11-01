@@ -53,6 +53,14 @@ if (process.argv.includes("--preflight")) {
 if (process.argv.slice(2).length) {
   throw new Error("Unrecognized migration argument. Use --preflight or no additional arguments.");
 }
+// Historical drift on the retained E2E branch remains unapproved for writes.
+// A generic test-write flag never authorizes applying SQL. Require explicit
+// reviewed migration approval tied to the checked-out commit.
+const gitHead = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+if (gitHead.status !== 0 || !/^[a-f0-9]{40}$/.test(gitHead.stdout.trim()) ||
+    process.env.CAN_FULLFLOW_MIGRATION_APPROVED_SHA !== gitHead.stdout.trim()) {
+  throw new Error("HOLD: reviewed exact-SHA migration authorization missing; no SQL applied.");
+}
 // The repo's existing Drizzle migration command is reused, not bypassed.
 const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "db:migrate"], {
   stdio: "inherit",
