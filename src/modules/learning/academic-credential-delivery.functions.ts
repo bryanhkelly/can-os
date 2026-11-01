@@ -543,6 +543,9 @@ export const listMyAcademicCredentialReleases=createServerFn({method:"GET"})
    .innerJoin(s.accountPersonGrants,and(eq(s.accountPersonGrants.id,context.grantId),eq(s.accountPersonGrants.accountId,s.accessAccounts.id)))
    .innerJoin(s.people,eq(s.people.id,s.academicCredentialReleaseAuthorizations.recipientPersonId))
    .where(and(eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId),
+    eq(s.academicCredentialReleaseAuthorizations.releasePurpose,"transfer"),
+    isNotNull(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId),
+    isNull(s.academicCredentialReleaseAuthorizations.diplomaIssuanceId),
     isNull(s.academicCredentialReleaseAuthorizations.revokedAt),
     gt(s.academicCredentialReleaseAuthorizations.expiresAt,now),
     eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt),
