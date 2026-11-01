@@ -7,6 +7,7 @@ import {
 } from "@/domain/academic-program-publication";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "./site-publication.server";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 import { EventTypes } from "@/domain/event-types";
 export type AcademicMarketingAction = "publish" | "unpublish";
@@ -81,6 +82,14 @@ export async function changeAcademicProgramPublication(
     const snapshot = target === "published"
       ? academicMarketingSnapshot(program, input.summary)
       : null;
+    // A host registrar's Site-publisher grant cannot itself authorize CAN's
+    // academic/school-of-record relationship. Verify independent agreement
+    // before associating CAN instructional claims with a public listing.
+    // This remains distinct from operational activation or admissions.
+    const institutionalAuthorizationId = target === "published"
+      ? await requireChurchHostedOperatingServices(tx, program.id,
+          ["academic_instruction", "school_of_record"])
+      : null;
     if (target === "published") {
       if (current) {
         await tx.update(programPublications).set({
@@ -110,6 +119,7 @@ export async function changeAcademicProgramPublication(
         publishedAt: current.publishedAt?.toISOString() ?? null } : null,
       after: { status: target, title: snapshot?.title ?? current?.title,
         summary: snapshot?.summary ?? current?.summary, reason,
+        institutionalAuthorizationId,
         reviewed: target === "published" ? input.contentReviewed : null },
     });
     await emitEvent(tx, {
