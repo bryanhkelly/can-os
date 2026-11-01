@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { programPublications, programs, sites } from "@/db/schema";
-import { publishableAcademicProgram, publicAcademicProgram } from "@/domain/academic-program-publication";
+import { isCurrentAcademicMarketingSnapshot, publishableAcademicProgram, publicAcademicProgram } from "@/domain/academic-program-publication";
 import { AuthorizationError } from "@/domain/command-context";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
@@ -23,6 +23,9 @@ export async function readAcademicProgramCatalog(
     deliveryModel: programPublications.deliveryModel,
     type: programs.type,
     status: programs.status,
+    canonicalName: programs.name,
+    canonicalGrades: programs.gradeRange,
+    canonicalDelivery: programs.deliveryModel,
     programSiteId: programs.siteId,
     organizationId: programs.organizationId,
     siteOrganizationId: sites.organizationId,
@@ -45,6 +48,14 @@ export async function readAcademicProgramCatalog(
     organizationId: row.organizationId,
     siteOrganizationId: row.siteOrganizationId,
     publicationSiteId: row.publicationSiteId,
+  }) && isCurrentAcademicMarketingSnapshot({
+    title: row.title,
+    summary: row.summary,
+    gradeRange: row.gradeRange,
+    deliveryModel: row.deliveryModel,
+    programName: row.canonicalName,
+    canonicalGrades: row.canonicalGrades,
+    canonicalDelivery: row.canonicalDelivery,
   }));
   const listings = [];
   // Deliberately sequential: a caller may already own the transaction.
