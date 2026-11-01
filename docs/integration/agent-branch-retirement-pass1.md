@@ -97,3 +97,9 @@ Compared each original PR's changed paths against the live FullFlow tree and its
 New legacy program-wide adoption writes are denied whenever `CAN_ANNUAL_ADOPTIONS_ENABLED=true` or `CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS=true`. Existing historical adoptions remain readable. Annual writes remain independently gated until 0057 and connected license/Section acceptance. This resolves the immediate double-write authorization risk without copying the source branch's abrupt unconditional legacy shutdown. It does **not** yet establish year-scoped Section/supplement authorization, so G remains a connected-workflow hold.
 
 **CI at time of change:** queued/in progress; do not mark verified until exact-commit checks pass.
+
+## Agent G service-layer enforcement (2026-11-01)
+
+The same annual rollout compatibility gate is now enforced inside `adoptPack`, not only its HTTP handler, preventing internal callers from creating new legacy adoption grants. `addCurriculumSupplement` also fails closed during annual rollout, rather than using legacy unscoped adoption as authority for new publisher-content overlays. These are deliberate temporary restrictions until year-scoped Section/supplement entitlement checks are implemented. **Do not enable annual adoption without the serial migration and connected rights tests.**
+
+This is a safety/compatibility patch, **not** an implementation of annual Section supplement eligibility. No original source branches deleted.
