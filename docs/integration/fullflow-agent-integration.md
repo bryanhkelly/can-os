@@ -2,7 +2,7 @@
 
 Last reconciled: 2026-10-31. **Canonical branch: `FullFlow`.**
 
-This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. All twelve original parallel agent PRs remain draft; the ten integration PRs below are deliberately partial, separately reviewed integrations.
+This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. All twelve original parallel agent PRs remain draft; the eleven merged integration PRs below are deliberately partial, separately reviewed integrations.
 
 ## Canonical verified baseline
 
@@ -25,6 +25,7 @@ This ledger distinguishes **source integrated**, **product capability completed*
 | [#222](https://github.com/bryanhkelly/can-os/pull/222) | `76aff4147c75` | L | Independent church evidence review policies | Secure upload, independent review, decisions, applicant notification |
 | [#223](https://github.com/bryanhkelly/can-os/pull/223) | `16c3ed2d16a0` | H | Money/ledger invariants and tests | Processor payments, refunds, receipts, CAN–church settlement |
 | [#224](https://github.com/bryanhkelly/can-os/pull/224) | `254d54d1bfc9` | A | Transcript credit/withdrawal evidence guards | Whole-cohort adjudication, connected credential release and acceptance |
+| [#227](https://github.com/bryanhkelly/can-os/pull/227) | `7e17246e312b` | E | Bounded first-day effective-window prefilter, 24-date fail-closed verification | Isolated realistic query/latency measurements and connected school-day acceptance |
 
 **No agent A–L is marked product-complete by these merges.** Integration PR merge status and original agent delivery status are different facts.
 
@@ -50,9 +51,9 @@ This ledger distinguishes **source integrated**, **product capability completed*
 1. [#225](https://github.com/bryanhkelly/can-os/pull/225), `integration/a-graduation-connected-20261031`, targets `FullFlow`: registered 0056 cohort migration, audited registrar classification, source-grade and diploma freshness. Focused [PostgreSQL 18 acceptance](https://github.com/bryanhkelly/can-os/actions/runs/41261793970) runs the **actual original-FK SQL** against ephemeral service, checks malformed bounds/supersession and verifies rollback. This is not equivalent to a migration through an approved full-schema Neon clone with representative historical records.
 2. [#226](https://github.com/bryanhkelly/can-os/pull/226), `integration/ab-secure-credential-delivery-20261031`, **stacked on #225**: issuer-authorized, consent-bound recipient download and ledger. Candidate branch must use A-owned canonical transcript freshness at creation/reuse, registrar PDF and recipient PDF, and retain independent consent and revocation checks. Connected acceptance is still missing. Neither A nor B is production-approved.
 
-## Newly proposed P1 hardening (not yet merged)
+## P1 integration hardening and remaining candidates
 
-- [#227](https://github.com/bryanhkelly/can-os/pull/227), `integration/firstday-bounded-projection-20261031` at `c5d9b94c9aef`: prefilters active Section effective windows and caps canonical first-day candidate projection checks at 24. Beyond the bound returns fail-closed `verification_incomplete`; existing registrar, roster and staffing authorization is unchanged. [CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263079648) and [platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263079848). Needs representative isolated-DB query/latency evidence, so release remains held.
+- **Merged into FullFlow**: [#227](https://github.com/bryanhkelly/can-os/pull/227) at `7e17246e312b18d5ede5551ddbccbf7a54bfbaa9` (source `c5d9b94c9aef`): prefilters active Section effective windows and caps canonical first-day candidate projection checks at 24. Beyond the bound returns fail-closed `verification_incomplete`; existing registrar, roster and staffing authorization is unchanged. [CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263079648) and [platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263079848). Needs representative isolated-DB query/latency evidence; selective merge is not a first-day release certification.
 - [#228](https://github.com/bryanhkelly/can-os/pull/228), `integration/oneroster-placement-provenance-20261031` at `1a8b17efbff5`: persists per-external-enrollment approval in existing interop mapping, retains source package, registrar, student, Section and canonical enrollment IDs, audits identical retries and same-binding reimports, denies silent remapping or withdrawn-placement reactivation. [CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263234542) and [platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263234523). Still needs authenticated DB concurrency, negative tests, and explicit revocation/reconciliation UI; not OneRoster completion.
 - [Agent C PR #203 handoff](https://github.com/bryanhkelly/can-os/pull/203#issuecomment-6552072803) defines the multi-role, single-SHA end-to-end journey and negative tests. No connected PASS is claimed.
 
