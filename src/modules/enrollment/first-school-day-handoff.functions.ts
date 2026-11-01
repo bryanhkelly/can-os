@@ -3,9 +3,10 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gte, asc, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { applications, programs, sites, academicCalendarDays, academicCalendars, schoolYears } from "@/db/schema";
+import { applications, programs, sites, academicCalendarDays, academicCalendars, schoolYears, enrollments } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { deriveFirstSchoolDayHandoff } from "@/domain/first-school-day-handoff";
+import { planBoundedFirstDayCandidates } from "@/domain/first-school-day-candidates";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedOnsiteRosterForActor, loadExpectedFirstDayPreparationForActor } from "@/modules/attendance/onsite-attendance-workflow.functions";
@@ -83,9 +84,20 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       (day.type==="instructional"||day.type==="makeup"||
         (day.type==="special"&&(day.minutes??0)>0)) &&
       day.minutes!==0).map(day=>day.date))].sort();
-    // Scan canonical, active, published instructional days for THIS student.
-    // The canonical preparation resolver also checks enrollment effective dates,
-    // timetable periods, site-local dates and the active Section placement.
+    // One bounded query prefilters the next 180 published days by the student's
+    // active Section-enrollment effective windows. This is ONLY a cost filter:
+    // the canonical date-specific resolver remains the sole authority for
+    // student/teacher/Section/schedule/onsite eligibility and identity.
+    const placementWindows=await db.select({
+      startedAt:enrollments.startedAt,endedAt:enrollments.endedAt,
+    }).from(enrollments).where(and(
+      eq(enrollments.studentProfileId,app.studentProfileId),
+      eq(enrollments.programId,app.programId),
+      eq(enrollments.kind,"section"),
+      eq(enrollments.status,"active")));
+    const scan=planBoundedFirstDayCandidates(dates,placementWindows,app.timezone);
+    // Scan only bounded canonical days, never infer attendance from placement.
+    // Dates beyond the budget are explicitly UNVERIFIED, not declared absent.
     let selected: Awaited<ReturnType<typeof loadExpectedFirstDayPreparationForActor>>|null=null;
     let selectedDate:string|null=null;
     let placementMissing=false;
@@ -95,7 +107,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     let teacherMissing=false;
     let selectedSupervision: Awaited<ReturnType<typeof loadFirstDaySupervisionPreparationForActor>>|null=null;
     let sectionScheduleMissing=false;
-    for(const candidate of dates.slice(0,180)){
+    for(const candidate of scan.candidates){
       const projected=await loadExpectedFirstDayPreparationForActor(actor,{
         date:candidate,programId:app.programId,siteId:app.siteId,
         studentProfileId:app.studentProfileId,
@@ -133,15 +145,16 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     }
     if(!selected || !selectedDate){
       const date=dates[0]??today;
-      const blocker=missingCalendar?"calendar_not_ready":(placementMissing||ambiguousPlacement)?"placement_missing":
+      const blocker=scan.truncated?"verification_incomplete":missingCalendar?"calendar_not_ready":(placementMissing||ambiguousPlacement)?"placement_missing":
         (noSchedule||sectionScheduleMissing)?"not_scheduled":"not_on_roster";
       return {date,preview:date>today,state:blocker,studentExpected:false,
         supervisionPlanned:false,attendanceRecorded:false,
-        outstandingGaps:[missingCalendar?"calendar_unverified":ambiguousPlacement?
+        outstandingGaps:[scan.truncated?"first_day_verification_limit_reached":missingCalendar?"calendar_unverified":ambiguousPlacement?
           "multiple_section_placements":placementMissing?
           "section_placement_missing":(noSchedule||sectionScheduleMissing)?"section_schedule_missing":"student_not_expected"],
         sectionTitle:null as string|null,programName:null as string|null,
-        message:!dates.length?"No published instructional day is available. Publish the school-year calendar.":
+        message:scan.truncated?"The preview reached its bounded 24-date verification limit without a provable first supervised day. This student is NOT cleared for attendance. Ask the registrar to review later enrollment dates, timetable and staffing; do not assume an absent roster or a ready school day.":
+          !dates.length?"No published instructional day is available. Publish the school-year calendar.":
           ambiguousPlacement?"This student has multiple active Section placements on a scheduled day. Resolve the conflicting placements before opening.":
           placementMissing?"This student has no active instructional Section on a scheduled school day. Complete Section placement.":
           missingCalendar?"The published instructional calendar is incomplete. Correct the calendar and schedule.":
