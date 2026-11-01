@@ -138,8 +138,8 @@ export function OnsitePickupPanel({ date, onChanged }: {
               className="mt-4 rounded-lg border border-danger/40 bg-danger/5 p-3 text-sm">
               <p className="font-semibold">{hold.kind === "emergency" ? "Emergency hold" : "Disputed custody hold"}</p>
               <p className="mt-1">{hold.reason}</p>
-              {roster.canResolveHolds && !hold.pendingResolution && <>
-                <p className="mt-2 text-xs">Proposal only. A different authorized Site director must independently approve clearing this hold.</p>
+              {roster.canProposeHoldResolution && !hold.pendingResolution && <>
+                <p className="mt-2 text-xs">Only an authorized Site director may independently approve a proposal from a separately verified onsite staff member. This form does not clear the hold.</p>
                 <label className="mt-3 block text-xs font-semibold">Resolution note
                   <textarea rows={2} maxLength={2000} value={resolutions[hold.id] ?? ""}
                     onChange={event => setResolutions(current => ({...current, [hold.id]: event.target.value}))}
@@ -170,6 +170,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     mutationId => proposePickupCustodyResolution({ data: {
                       holdId: hold.id,
                       mutationId,
+                      sectionId: student.sectionId ?? undefined,
                       resolutionNote: resolutions[hold.id] ?? "",
                       authorityBasis: (resolutionBases[hold.id] ??
                         (hold.kind === "emergency" ? "documented_emergency_cleared" : "verified_court_order")) as
@@ -192,7 +193,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                           resolutionNote: hold.pendingResolution!.resolutionNote,
                           mutationId,
                         } }))}>Independently approve and clear hold</button>
-                  : <p className="mt-2 text-xs">You cannot approve your own proposal. A different authorized Site director must review.</p>}
+                  : <p className="mt-2 text-xs">You cannot approve your own proposal. A separately authorized Site director must review.</p>}
               </>}
             </div>)}
 

@@ -8,6 +8,8 @@ describe("independent onsite custody resolution panel", () => {
     const end=text.indexOf("{!student.release &&",start);
     const panel=text.slice(start,end);
     expect(panel).toContain("proposePickupCustodyResolution");
+    expect(panel).toContain("roster.canProposeHoldResolution && !hold.pendingResolution");
+    expect(panel).toContain("sectionId: student.sectionId ?? undefined");
     expect(panel).toContain("resolvePickupCustodyHold");
     expect(panel).toContain("hold.pendingResolution.proposerPersonId !== roster.reviewerPersonId");
     expect(panel).toContain("proposalId: hold.pendingResolution!.id");

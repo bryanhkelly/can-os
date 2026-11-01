@@ -879,6 +879,7 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
     return {
       date: data.date,
       canResolveHolds: actor.role === "site_leader",
+      canProposeHoldResolution: ["room_facilitator", "site_staff"].includes(actor.role),
       canProposeHolds:actor.role==="room_facilitator"||actor.role==="site_staff",
       reviewerPersonId:actor.role==="site_leader"?actor.actorPersonId:null,
       students: roster.students.map(student => {
