@@ -1143,6 +1143,10 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
         studentProfileId: data.studentProfileId, programId: data.programId,
         sectionId: student!.sectionId,
       });
+      // Custody holds and verified release acquire pickup-safety first. Keep
+      // the same ordering while determining whether a family notification is
+      // safe: a concurrent new hold must not slip between the check and send.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + data.studentProfileId + ":" + data.programId}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-release:" + data.studentProfileId + ":" + data.programId + ":" + data.date}))`);
       const sourceKey = source("uncollected-child", data.mutationId);
       const [replay] = await tx.select({
@@ -1154,7 +1158,10 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
           sql`${actions.metadata}->>'sourceKey' = ${sourceKey}`,
         )).limit(1);
       if (replay) {
-        if (replay.ownerPersonId !== actor.actorPersonId ||
+        // Action ownership can legitimately transfer to the named site director
+        // when a custody hold is active. Replay identity belongs to the
+        // original reporting witness, NOT the follow-up owner.
+        if ((replay.metadata.reportedByPersonId ?? replay.ownerPersonId) !== actor.actorPersonId ||
             replay.subjectId !== data.studentProfileId ||
             replay.programId !== data.programId ||
             replay.siteId !== school.siteId ||
@@ -1202,6 +1209,7 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
         subjectType: "student_profile",
         subjectId: data.studentProfileId,
         metadata: { date: data.date, attendanceEventId: attendance.id,
+          reportedByPersonId: actor.actorPersonId,
           dismissalConfirmed: true, followUpPlan: data.followUpPlan, sourceKey },
       }).returning({ id: actions.id });
       if (!record) throw new Error("Unable to create uncollected-child follow-up");
