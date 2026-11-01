@@ -24,6 +24,11 @@ describe("institutional graduation policy applicability",()=>{
   expect(()=>resolveGraduationPolicy([policy("a","2024","2024","b"),policy("b","2024","2024","a")],"2024")).toThrow(/cycle/);
   expect(()=>resolveGraduationPolicy([policy("a","2024","2024"),policy("b","2024","2024","a"),policy("c","2024","2024","a")],"2024")).toThrow(/Competing/);
  });
+ it("does not silently ignore an unresolved active legacy policy",()=>{
+  const legacy={...policy("legacy","2022","2022"),cohortStart:null,cohortEnd:null};
+  expect(()=>resolveGraduationPolicy([legacy,policy("classified","2024","2026")],"2025")).toThrow(/Unclassified active/);
+  expect(()=>resolveGraduationPolicy([legacy],"2022")).toThrow(/Unclassified active/);
+ });
  it("rejects partial and malformed policy classifications",()=>{
   expect(()=>resolveGraduationPolicy([{...policy("a","2024","2025"),cohortEnd:null}],"2024")).toThrow(/Partially classified/);
   expect(()=>resolveGraduationPolicy([policy("a","2024","not-a-year")],"2024")).toThrow(/Invalid/);

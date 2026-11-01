@@ -25,7 +25,12 @@ export function resolveGraduationPolicy<T extends ApplicablePolicy>(policies: re
    node=policies.find(other=>other.id===node!.supersedesRequirementSetId);
   }
  }
- const candidates=policies.filter(p=>!replaced.has(p.id) && p.cohortStart!==null && p.cohortEnd!==null && p.cohortStart<=entryCohort && p.cohortEnd>=entryCohort);
+ // A legacy active policy without an attested cohort window may overlap any
+ // classified policy. Never treat it as out-of-scope merely because bounds are NULL.
+ const active=policies.filter(p=>!replaced.has(p.id));
+ if(active.some(p=>p.cohortStart===null || p.cohortEnd===null))
+   throw new Error("Unclassified active graduation policy requires registrar review");
+ const candidates=active.filter(p=>p.cohortStart!==null && p.cohortEnd!==null && p.cohortStart<=entryCohort && p.cohortEnd>=entryCohort);
  if(candidates.length!==1) throw new Error("No unambiguous institution-approved graduation policy applies to this student's entry cohort");
  return candidates[0]!;
 }
