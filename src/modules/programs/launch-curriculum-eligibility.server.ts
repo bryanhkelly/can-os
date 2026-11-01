@@ -36,7 +36,14 @@ export async function listLaunchEligibleCourses(program: {
       inArray(courseTemplates.owningOrganizationId, owners),
     ));
 
-  const adopted = await query.select({
+  // Annual rollout must not reuse legacy, program-wide adoption as a grant
+  // for a new Section. Institution-owned courses remain available. The
+  // year-scoped resolver will replace this temporary fail-closed restriction.
+  const legacyPublisherAdoptionsEnabled =
+    process.env.CAN_ANNUAL_ADOPTIONS_ENABLED !== "true" &&
+    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS !== "true";
+
+  const adopted = !legacyPublisherAdoptionsEnabled ? [] : await query.select({
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
     subject: courseTemplates.subject, curriculum: courseTemplateVersions.curriculum,
