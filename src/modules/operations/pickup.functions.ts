@@ -20,6 +20,7 @@ import {
   programs,
   roleAssignments,
   schoolConfigurationVersions,
+  sites,
   studentProfiles,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -27,6 +28,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { siteDate } from "@/domain/expected-attendance";
 import { projectGuardianPickupHolds } from "@/domain/guardian-pickup-hold-visibility";
 import { projectGuardianPickupReleaseEvents } from "@/domain/guardian-pickup-release-visibility";
 import { maySendAutomatedPickupFamilyNotice } from "@/domain/pickup-notification-privacy";
@@ -283,6 +285,7 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
       programName: programs.name,
       siteId: programs.siteId,
       organizationId: programs.organizationId,
+      siteTimezone: sites.timezone,
     }).from(guardianRelationships)
       .innerJoin(studentProfiles, eq(studentProfiles.personId, guardianRelationships.studentPersonId))
       .innerJoin(people, eq(people.id, studentProfiles.personId))
@@ -296,6 +299,7 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
         eq(enrollments.kind, "program"),
         eq(enrollments.status, "active")))
       .innerJoin(programs, eq(programs.id, enrollments.programId))
+      .innerJoin(sites, eq(sites.id, programs.siteId))
       .where(and(
         guardianRelationshipPredicate({
           guardianPersonId: actor.actorPersonId!,
@@ -360,6 +364,7 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
         householdId: student.householdId,
         programId: student.programId,
         programName: student.programName,
+        schoolLocalToday: siteDate(new Date(), student.siteTimezone),
         authorizations: authorizations.filter(row => matches(row, student)).map(row => ({
           ...row,
           pickupName: row.legalFirstName + " " + row.legalLastName,

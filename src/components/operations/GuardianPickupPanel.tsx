@@ -10,13 +10,6 @@ import {
 type Workspace = Awaited<ReturnType<typeof getGuardianPickupWorkspace>>;
 type Student = Workspace["students"][number];
 const keyFor = (student: Student) => student.programId + ":" + student.studentProfileId + ":" + student.householdId;
-// HTML date inputs use local calendar days, not UTC. UTC defaults can silently
-// start tomorrow's authorization on the US West Coast in the afternoon.
-const todayForPickupInput = () => {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-};
-
 /** Family release-authority management and authorized handoff history. */
 export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: string }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -153,7 +146,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   </select>
                 </label>
                 <label className="text-xs font-semibold">Valid from
-                  <input type="date" value={startDates[key] ?? todayForPickupInput()}
+                  <input type="date" value={startDates[key] ?? student.schoolLocalToday}
                     onChange={event => setStartDates(current => ({ ...current, [key]: event.target.value }))}
                     className="mt-1 w-full rounded border bg-background p-2 text-sm" />
                 </label>
@@ -163,7 +156,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                     className="mt-1 w-full rounded border bg-background p-2 text-sm" />
                 </label>
               </div>
-              <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS.</p>
+              <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS. The default start date uses the school's local calendar day, not your device's time zone.</p>
               <button type="button" disabled={!!busy}
                 className="mt-3 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 onClick={() => void run(key, `Pickup authorization added for ${student.studentName}.`, (mutationId) => createPickupAuthorization({ data: {
@@ -174,7 +167,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   legalLastName: lastNames[key] ?? "",
                   relationshipLabel: relationships[key] ?? "",
                   identityVerificationMethod: (methods[key] ?? "government_photo_id") as "government_photo_id" | "school_issued_id",
-                  startsOn: startDates[key] ?? todayForPickupInput(),
+                  startsOn: startDates[key] ?? student.schoolLocalToday,
                   expiresOn: expiryDates[key] || null,
                   mutationId,
                 } }))}>Save pickup authorization</button>
