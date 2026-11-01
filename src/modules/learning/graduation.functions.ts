@@ -245,8 +245,13 @@ export const decideGraduation = createServerFn({method:"POST"})
        .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
      if(!candidate)throw new AuthorizationError("Transcript not found");
      issuerAuthorized(context,candidate.issuerId);
-     const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
+     // Policy approval/revision takes the same issuer-wide lock. Resolve policy
+     // only after acquiring it; hold through decision commit to prevent a
+     // superseding policy racing with graduation adjudication.
      const {sql}=await import("drizzle-orm");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${candidate.issuerId + ":graduation-policy"}))`);
+     const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
+     // Always acquire the issuer-policy lock before the student-decision lock.
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${transcript.studentProfileId + ":" + transcript.issuingOrganizationId + ":graduation"}))`);
      if(data.decision==="approved") {
        const [latestTranscript]=await tx.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
@@ -359,9 +364,11 @@ export const issueDiploma = createServerFn({method:"POST"})
      const [decision]=await tx.select().from(s.graduationDecisions).where(eq(s.graduationDecisions.id,data.decisionId)).limit(1);
      if (!decision || decision.decision!=="approved") throw new AuthorizationError("approved graduation decision required");
      issuerAuthorized(context,decision.issuingOrganizationId);
-     // Lock the student/issuer decision stream: a later adjudication cannot
-     // race with diploma issuance. A subsequent decision supersedes this one.
+     // Acquire issuer-policy lock first (same ordering as graduation decisions),
+     // then the student decision lock. An approved policy revision must never
+     // race with the final diploma freshness check and issuance.
      const {sql}=await import("drizzle-orm");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.issuingOrganizationId + ":graduation-policy"}))`);
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.studentProfileId + ":" + decision.issuingOrganizationId + ":graduation"}))`);
      const [prior]=await tx.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
        .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))
