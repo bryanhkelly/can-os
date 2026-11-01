@@ -388,6 +388,10 @@ export const createPickupAuthorization = createServerFn({ method: "POST" })
     if (data.expiresOn && data.expiresOn < data.startsOn)
       throw new Error("Pickup authorization expiry must be on or after its start date");
     return db.transaction(async tx => {
+      // Even an identical retry must prove current, live guardian/Household
+      // and enrolled Program authority. A revoked guardian cannot retrieve
+      // an authorization or its pickup Person ID from an old request ID.
+      const student = await guardianStudent(tx, actor, data);
       const sourceKey = source("guardian-pickup-authorization", data.mutationId);
       const [replay] = await tx.select().from(pickupAuthorizations)
         .where(eq(pickupAuthorizations.sourceKey, sourceKey)).limit(1);
@@ -408,7 +412,6 @@ export const createPickupAuthorization = createServerFn({ method: "POST" })
           throw new Error("Pickup mutation ID was already used for different input");
         return { authorizationId: replay.id, pickupPersonId: replay.pickupPersonId, created: false as const };
       }
-      const student = await guardianStudent(tx, actor, data);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-authorization:" + data.studentProfileId + ":" + data.programId + ":" + data.householdId}))`);
       const duplicates = await tx.select({ id: pickupAuthorizations.id })
         .from(pickupAuthorizations).innerJoin(people, eq(people.id, pickupAuthorizations.pickupPersonId))
@@ -533,6 +536,11 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
     }
     if (!actor.actorPersonId) throw new AuthorizationError("verified custody hold actor");
     return db.transaction(async tx => {
+      // Recheck the live enrollment and grant for both new and replayed
+      // holds. Reusing a prior idempotency key is not a role entitlement.
+      const student = guardian ? await guardianStudent(tx, actor, data) :
+        await staffStudent(tx, actor, data);
+      await assertStudentHousehold(tx, data.studentProfileId, data.householdId);
       const sourceKey = source("pickup-custody-hold", data.mutationId);
       const [replay] = await tx.select().from(pickupCustodyHolds)
         .where(eq(pickupCustodyHolds.sourceKey, sourceKey)).limit(1);
@@ -545,9 +553,6 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
           throw new Error("Custody hold mutation ID was already used for different input");
         return { holdId: replay.id, created: false as const };
       }
-      const student = guardian ? await guardianStudent(tx, actor, data) :
-        await staffStudent(tx, actor, data);
-      await assertStudentHousehold(tx, data.studentProfileId, data.householdId);
       // Serialize new custody restrictions against a staff pickup release.
       // A hold cannot appear after the release's safety check but before its write.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + data.studentProfileId + ":" + data.programId}))`);
