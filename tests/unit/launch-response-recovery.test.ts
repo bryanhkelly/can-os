@@ -22,7 +22,7 @@ describe("one-hour launch lost-response recovery",()=>{
     const source=readFileSync("src/components/operations/FamilyInviteImporter.tsx","utf8");
     const block=source.slice(source.indexOf("async function retryFailed("),source.indexOf("if (!workspace)",source.indexOf("async function retryFailed(")));
     expect(block.match(/setAwaitingVerification\(true\)/g)).toHaveLength(2);
-    expect(source).toContain("disabled={awaitingVerification || !selectedProgram");
+    expect(source).toContain("disabled={busy || awaitingVerification} onClick={() => void retryFailed(batch.id)}");
     expect(source).toContain("Verify saved invitation batch");
   });
 });

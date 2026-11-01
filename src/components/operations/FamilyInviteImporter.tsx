@@ -229,7 +229,7 @@ export function FamilyInviteImporter({
         return <details key={batch.id} className="rounded-xl border p-4">
         <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.purpose === "interest" ? "Pre-opening information" : "Applications"} · {batch.recipients.length} recipients</summary>
         <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {progress.label}</p>
-        {progress.canRetry && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
+        {progress.canRetry && <button type="button" disabled={busy || awaitingVerification} onClick={() => void retryFailed(batch.id)}
           className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           {busy ? "Queueing retry…" : `Retry ${progress.failedRecipients} failed recipient${progress.failedRecipients === 1 ? "" : "s"}`}
         </button>}
