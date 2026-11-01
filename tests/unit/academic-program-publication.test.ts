@@ -36,6 +36,15 @@ describe("academic Program marketing approval", () => {
     });
     expect(() => academicMarketingSnapshot(program, "<script>Claims</script>")).toThrow();
     expect(() => academicMarketingSnapshot(program, "Short")).toThrow();
+    // Neither the church host nor a marketing publisher can invent CAN
+    // authority, accreditation, tuition terms or admissions status.
+    expect(() => academicMarketingSnapshot(program,
+      "Our school is fully accredited and guarantees admission.")).toThrow(/regulated academic/);
+    expect(() => academicMarketingSnapshot(program,
+      "Tuition is guaranteed at $5,000 for all students.")).toThrow(/regulated academic/);
+    expect(() => academicMarketingSnapshot({
+      ...program, name: "CAN-approved High School Diploma",
+    }, "Local mentors support students in a hybrid schedule.")).toThrow(/regulated academic/);
   });
   it("public projection never asserts readiness or accreditor authority", () => {
     const baseRow = {
