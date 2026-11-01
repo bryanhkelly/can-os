@@ -412,6 +412,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    } else if(!data.existingStudent){
     if(data.existingApplicationId){
      const [prior]=await tx.select({householdId:applications.householdId,
+      studentProfileId:applications.studentProfileId,
       metadata:applications.metadata,programId:applications.programId,
       organizationId:programs.organizationId,siteId:programs.siteId})
       .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
@@ -426,6 +427,25 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       .from(people).where(eq(people.id,contactId)).limit(1);
      if(!contact?.email||normalizeAccessEmail(contact.email)!==normalizeAccessEmail(data.guardianEmail))
       throw new Error("Guardian email must match the verified household contact");
+     // Email equality is NEVER proof of a lawful guardian relationship.
+     // Sibling intake may reuse an existing household only when an existing
+     // Student already has a separately verified managing relationship
+     // to this exact adult and the adult is a member of that household.
+     const [verifiedRelationship]=await tx.select({id:guardianRelationships.id})
+      .from(guardianRelationships)
+      .innerJoin(studentProfiles,
+       eq(studentProfiles.personId,guardianRelationships.studentPersonId))
+      .innerJoin(householdMemberships,and(
+       eq(householdMemberships.householdId,prior.householdId),
+       eq(householdMemberships.personId,guardianRelationships.guardianPersonId)))
+      .where(and(
+       eq(studentProfiles.id,prior.studentProfileId),
+       eq(guardianRelationships.guardianPersonId,contact.id),
+       eq(guardianRelationships.canManageEnrollment,true),
+       sql`${guardianRelationships.metadata}->>'verification' = 'verified'`,
+      )).limit(1);
+     if(!verifiedRelationship)
+      throw new AuthorizationError("verified household guardian relationship required for sibling intake");
      householdId=prior.householdId;
      guardianPersonId=contact.id;
     } else {
