@@ -9,6 +9,7 @@ import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
 import { verifiedSectionCreditUnits,countTranscriptRowsWithUnrecordedCredits } from "@/domain/section-credit-policy";
+import { assertUnchangedTranscriptProjection } from "@/domain/transcript-issue-freshness";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 import { listDelegatedCANTranscriptPrograms } from "@/modules/learning/can-transcript-scope.server";
@@ -1189,8 +1190,8 @@ export const issueTranscript = createServerFn({ method: "POST" })
       // gradeUpdatedAt is captured in the original and locked projections.
       // It catches same-letter in-place corrections as well as new grades,
       // credit metadata changes and revoked withdrawal notation.
-      if(JSON.stringify(freshRows)!==JSON.stringify(rows))
-        throw new AuthorizationError("Academic evidence changed during transcript issuance; refresh and retry");
+      try {assertUnchangedTranscriptProjection(rows,freshRows);}
+      catch {throw new AuthorizationError("Academic evidence changed during transcript issuance; refresh and retry");}
       // Resolve every source Section and current issuer under the same
       // transaction as issuance; past transcripts remain immutable after
       // revocation, but a new CAN-issued record requires a live agreement.
