@@ -6,6 +6,8 @@ on:
       - "drizzle/**"
       - "tests/postgres/graduation-full-schema-acceptance.sql"
       - ".github/workflows/graduation-full-schema-postgres.yml"
+      - "scripts/review-fullflow-migrations.mjs"
+      - "scripts/fullflow-post0051-artifacts*"
   workflow_dispatch:
 
 permissions:
@@ -47,6 +49,8 @@ jobs:
       # and cannot open the local PostgreSQL service. Execute the exact committed
       # SQL files here instead. This tests SQL compatibility but deliberately
       # does NOT claim that the Drizzle journal or Neon-specific runner passed.
+      - name: Check migration preflight rejects future DDL ahead of journal
+        run: node --test scripts/fullflow-post0051-artifacts.test.mjs
       - name: Apply every committed SQL migration (0000 through 0056) to disposable PostgreSQL
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
