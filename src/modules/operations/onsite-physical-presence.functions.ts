@@ -217,13 +217,13 @@ export const reportOnsiteStaffCoverageInterruption=createServerFn({method:"POST"
           gt(programResponsibilityAssignments.effectiveThrough,now),
         )).limit(1):[];
       const [record]=await tx.insert(actions).values({
-        type:exitType,status:"resolved",priority:"urgent",
+        type:exitType,status:"open",priority:"urgent",
         title:"Named adult reported interruption to physical classroom supervision",
         description:"Recheck remaining supervision, continuity and student custody; previous arrival cannot establish ongoing coverage.",
         subjectType:"section",subjectId:presence.sectionId,
         organizationId:site.organizationId,siteId:site.id,
         programId:presence.programId,sectionId:presence.sectionId,
-        ownerPersonId:director?.personId??actor.actorPersonId,resolvedAt:now,
+        ownerPersonId:director?.personId??actor.actorPersonId,
         metadata:{date:data.date,periodId:presence.metadata.periodId,
           planToken:presence.metadata.planToken,
           presenceReportId:presence.id,reason:data.reason,reportedAt:now.toISOString()},
