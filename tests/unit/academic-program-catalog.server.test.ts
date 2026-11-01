@@ -42,6 +42,7 @@ function fakeReader() {
     innerJoin() { return this; },
     where() { return this; },
     orderBy() { return this; },
+    for() { return this; },
     limit() { return Promise.resolve(state.rows); },
   };
   return { select: () => ({ from: () => builder }) };
