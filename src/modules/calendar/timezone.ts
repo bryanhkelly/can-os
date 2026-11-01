@@ -72,6 +72,24 @@ export function dateKeyInTimezone(instant: string, timezone: string): string {
   return dateTimeInputValue(instant, timezone).slice(0, 10);
 }
 
+/** Absolute boundaries of the calendar date at a Site, not the server's UTC
+ * date or the browser's timezone. Resolving both midnights separately handles
+ * 23- and 25-hour days across daylight-saving transitions.
+ */
+export function localDayBoundsInTimezone(at: Date, timezone: string): {
+  start: Date;
+  end: Date;
+} {
+  const dateKey = dateKeyInTimezone(at.toISOString(), timezone);
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const nextDateKey = new Date(Date.UTC(year!, month! - 1, day! + 1))
+    .toISOString().slice(0, 10);
+  return {
+    start: new Date(dateTimeInputInTimezone(`${dateKey}T00:00`, timezone)),
+    end: new Date(dateTimeInputInTimezone(`${nextDateKey}T00:00`, timezone)),
+  };
+}
+
 export function isValidTimeZone(timezone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone });
