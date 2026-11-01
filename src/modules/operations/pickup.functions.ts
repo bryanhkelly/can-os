@@ -31,7 +31,8 @@ import {
   evaluatePickupRelease,
   pickupDenialReasons,
 } from "@/domain/pickup-policy";
-import { listExpectedOnsiteRoster } from "@/modules/attendance/onsite-attendance-workflow.functions";
+import { getOnsiteStaffDayContext, listExpectedOnsiteRoster } from "@/modules/attendance/onsite-attendance-workflow.functions";
+import { assertCurrentPickupObservationDate } from "@/domain/onsite-pickup-day";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 import {
@@ -683,6 +684,7 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actor = await staffActor();
     const { roster } = await scopedRoster(data.date);
+    const schoolDay = await getOnsiteStaffDayContext();
     const studentIds = [...new Set(roster.students.map(row => row.studentProfileId))];
     const programIds = [...new Set(roster.students.map(row => row.programId))];
     const [authorizations, holds, releases, memberships, uncollected] = studentIds.length ?
@@ -775,6 +777,7 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
           }))?.id ?? null,
         };
       }),
+      canRecordPickupObservations: data.date === schoolDay.date,
       note: "Release requires current attendance, family authority, no active hold, matching identity and a staff-witnessed handoff. Attendance alone never authorizes release.",
     };
   });
@@ -815,6 +818,10 @@ export const recordVerifiedPickupRelease = createServerFn({ method: "POST" })
           throw new Error("Pickup release mutation ID was already used for different input");
         return { releaseId: replay.id, created: false as const };
       }
+      // A witnessed handoff, denial or dismissal follow-up must not be newly
+      // fabricated from a historical attendance screen. Identical mutation-ID
+      // replays return above without creating another event.
+      assertCurrentPickupObservationDate(data.date, (await getOnsiteStaffDayContext()).date);
       const attendance = await currentAttendance(tx, data);
       const [priorRelease] = await tx.select({ id: pickupReleaseEvents.id })
         .from(pickupReleaseEvents).where(and(
@@ -985,6 +992,10 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
         )).limit(1);
         return { denialId: replay.id, followUpActionId: existingFollowUpOrNull(existingFollowUp), created: false as const };
       }
+      // A witnessed handoff, denial or dismissal follow-up must not be newly
+      // fabricated from a historical attendance screen. Identical mutation-ID
+      // replays return above without creating another event.
+      assertCurrentPickupObservationDate(data.date, (await getOnsiteStaffDayContext()).date);
       const attendance = await currentAttendance(tx, data);
       const [released] = await tx.select({ id: pickupReleaseEvents.id }).from(pickupReleaseEvents)
         .where(and(
@@ -1122,6 +1133,10 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
           throw new Error("Uncollected-child mutation ID was already used for different input");
         return { actionId: replay.id, created: false as const };
       }
+      // A witnessed handoff, denial or dismissal follow-up must not be newly
+      // fabricated from a historical attendance screen. Identical mutation-ID
+      // replays return above without creating another event.
+      assertCurrentPickupObservationDate(data.date, (await getOnsiteStaffDayContext()).date);
       const attendance = await currentAttendance(tx, data);
       const [released] = await tx.select({ id: pickupReleaseEvents.id }).from(pickupReleaseEvents)
         .where(and(

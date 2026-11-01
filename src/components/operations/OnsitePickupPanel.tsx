@@ -81,13 +81,18 @@ export function OnsitePickupPanel({ date, onChanged }: {
     {loading && <p role="status" className="text-sm">Loading family release authority…</p>}
     {!loading && roster && <>
       <p className="mb-5 text-xs text-muted-foreground">{roster.note}</p>
+      {!roster.canRecordPickupObservations && <p role="status" className="mb-5 rounded border p-3 text-sm">
+        Historical school-day record: no new pickup release, denial or dismissal observation can be recorded for this date.
+        Return to Operate today to witness a current handoff. Existing custody holds and urgent safety reporting remain separate.
+      </p>}
       {!roster.students.length && <p className="text-sm">No students in the current scoped onsite roster.</p>}
       <div className="grid gap-5">
         {roster.students.map(student => {
           const key = keyFor(student);
           const selectedAuth = student.authorizedAdults.find(row => row.id === selected[key]);
           const activeHold = student.activeHolds.length > 0;
-          const canAttempt = ["present", "tardy"].includes(student.status) && !student.release;
+          const canAttempt = roster.canRecordPickupObservations &&
+            ["present", "tardy"].includes(student.status) && !student.release;
           return <section key={key} aria-label={`Pickup for ${student.studentName}`}
             className="rounded-xl border p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
