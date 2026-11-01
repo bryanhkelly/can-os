@@ -213,13 +213,13 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
 
             <div className="mt-4 text-sm">
               <h4 className="font-semibold">Release and denial history</h4>
+              <p className="mt-1 text-xs text-muted-foreground">Internal witness evidence, disputed custody reports and denied-person identity details remain restricted to authorized school staff.</p>
               {!student.releases.length && <p className="mt-2 text-xs text-muted-foreground">No pickup attempts have been recorded.</p>}
               <ul className="mt-2 space-y-2">
                 {student.releases.map(event => <li key={event.id} className="rounded border p-3">
                   <StatusBadge tone={event.status === "released" ? "success" : "attention"}>{event.status}</StatusBadge>
                   <p className="mt-2">{event.presentedName} · {new Date(event.occurredAt).toLocaleString()}</p>
-                  {event.denialReason && <p className="mt-1 text-xs">Reason: {event.denialReason.replaceAll("_", " ")}</p>}
-                  {event.handoffEvidence && <p className="mt-1 text-xs">Staff handoff evidence: {event.handoffEvidence}</p>}
+
                 </li>)}
               </ul>
             </div>
