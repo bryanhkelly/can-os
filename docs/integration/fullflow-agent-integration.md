@@ -2,7 +2,7 @@
 
 Last reconciled: 2026-10-31. **Canonical branch: `FullFlow`.**
 
-This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. All twelve original parallel agent PRs remain draft; the eleven merged integration PRs below are deliberately partial, separately reviewed integrations.
+This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. All twelve original parallel agent PRs remain draft; the twelve merged integration PRs below are deliberately partial, separately reviewed integrations.
 
 ## Canonical verified baseline
 
@@ -26,6 +26,7 @@ This ledger distinguishes **source integrated**, **product capability completed*
 | [#223](https://github.com/bryanhkelly/can-os/pull/223) | `16c3ed2d16a0` | H | Money/ledger invariants and tests | Processor payments, refunds, receipts, CAN–church settlement |
 | [#224](https://github.com/bryanhkelly/can-os/pull/224) | `254d54d1bfc9` | A | Transcript credit/withdrawal evidence guards | Whole-cohort adjudication, connected credential release and acceptance |
 | [#227](https://github.com/bryanhkelly/can-os/pull/227) | `7e17246e312b` | E | Bounded first-day effective-window prefilter, 24-date fail-closed verification | Isolated realistic query/latency measurements and connected school-day acceptance |
+| [#228](https://github.com/bryanhkelly/can-os/pull/228) | `a04bc5ea2284` | J | Durable external-enrollment approval, immutable import/registrar provenance, current Section authority on retries | Authenticated registrar concurrency, corrective/revocation workflow and G/K rights acceptance |
 
 **No agent A–L is marked product-complete by these merges.** Integration PR merge status and original agent delivery status are different facts.
 
@@ -42,7 +43,7 @@ This ledger distinguishes **source integrated**, **product capability completed*
 | G Licensing | [#210](https://github.com/bryanhkelly/can-os/pull/210) | Pure policy integrated | Persistent rights provenance, annual adoption, Section eligibility |
 | H Finance | [#205](https://github.com/bryanhkelly/can-os/pull/205) | Pure money/ledger rules integrated | Real idempotent processor events, refunds, receipts, finance settlement |
 | I Tenant hosting | [#206](https://github.com/bryanhkelly/can-os/pull/206) | Hosted-site guards/UI integrated, flag-gated | Wildcard DNS/TLS, two-tenant live HTTPS and isolation |
-| J OneRoster | [#209](https://github.com/bryanhkelly/can-os/pull/209) | Matching and canonical Section placement integrated | Decision ledger with external version, retries/reversals and authorization acceptance |
+| J OneRoster | [#209](https://github.com/bryanhkelly/can-os/pull/209) | Matching, canonical Section placement and durable per-enrollment decision history integrated | Authenticated concurrent reimports, explicit corrective/revocation workflow, G/K rights and browser acceptance |
 | K Cartridge | [#208](https://github.com/bryanhkelly/can-os/pull/208) | Secure parser integrated | Private authorized import, license provenance, teacher/student rendering |
 | L Church evidence | [#207](https://github.com/bryanhkelly/can-os/pull/207) | Policy tests integrated | Private applicant upload, screening, independent reviewer, applicant response |
 
@@ -54,7 +55,7 @@ This ledger distinguishes **source integrated**, **product capability completed*
 ## P1 integration hardening and remaining candidates
 
 - **Merged into FullFlow**: [#227](https://github.com/bryanhkelly/can-os/pull/227) at `7e17246e312b18d5ede5551ddbccbf7a54bfbaa9` (source `c5d9b94c9aef`): prefilters active Section effective windows and caps canonical first-day candidate projection checks at 24. Beyond the bound returns fail-closed `verification_incomplete`; existing registrar, roster and staffing authorization is unchanged. [CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263079648) and [platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263079848). Needs representative isolated-DB query/latency evidence; selective merge is not a first-day release certification.
-- [#228](https://github.com/bryanhkelly/can-os/pull/228), `integration/oneroster-placement-provenance-20261031` at `344991eb87d0`: persists per-external-enrollment approval in existing interop mapping, retains source package, registrar, student, Section and canonical enrollment IDs, audits identical retries and same-binding reimports, denies silent remapping or withdrawn-placement reactivation. [earlier CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263493874), [earlier platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263494041), and [latest full-schema PostgreSQL import-mapping integrity/rollback PASS](https://github.com/bryanhkelly/can-os/actions/runs/41264422167). Latest-head CI/platform checks were still running at this documentation update. Still needs authenticated DB concurrency, negative tests, and explicit revocation/reconciliation UI; not OneRoster completion.
+- **Merged into FullFlow**: [#228](https://github.com/bryanhkelly/can-os/pull/228) as `a04bc5ea22847739b2fa498e0fad68f6d8fc533c` (source `344991eb87d0`): persists per-external-enrollment approval in existing interop mapping, retains source package, registrar, student, Section and canonical enrollment IDs, audits identical retries and same-binding reimports, denies silent remapping or withdrawn-placement reactivation. [earlier CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263493874), [earlier platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41263494041), and [latest full-schema PostgreSQL import-mapping integrity/rollback PASS](https://github.com/bryanhkelly/can-os/actions/runs/41264422167). [exact-head CI PASS 41264422190](https://github.com/bryanhkelly/can-os/actions/runs/41264422190) and [platform PASS 41264422155](https://github.com/bryanhkelly/can-os/actions/runs/41264422155). The selective merge does not replace authenticated DB concurrency, negative tests or an explicit revocation/reconciliation UI; OneRoster remains product-incomplete.
 - [Agent C PR #203 handoff](https://github.com/bryanhkelly/can-os/pull/203#issuecomment-6552072803) defines the multi-role, single-SHA end-to-end journey and negative tests. No connected PASS is claimed.
 
 ## Release sequence and cross-agent contracts
