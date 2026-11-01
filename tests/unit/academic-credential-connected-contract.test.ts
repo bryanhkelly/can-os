@@ -38,6 +38,9 @@ describe("connected official credential disclosure", () => {
  it("fails closed on corrected/withdrawn/superseded transcripts before grant reuse or creation",()=>{
   expect(authorize).toContain("return db.transaction(async tx=>");
   order(authorize,"return db.transaction(async tx=>",transcriptGuard);
+  order(authorize,transcriptGuard,"const [previousRevoked]=await tx.select(");
+  order(authorize,"const [previousRevoked]=await tx.select(","const [existing]=await tx.select(");
+  order(authorize,"if(!canReauthorizeCredentialRelease(!!previousRevoked))","if(existing)return {authorizationId:existing.id}");
   order(authorize,transcriptGuard,"const [existing]=await tx.select(");
   order(authorize,transcriptGuard,"const [created]=await tx.insert(");
   expect(authorize).toContain("liveConsent.revokedAt");
