@@ -8,6 +8,10 @@ const state = vi.hoisted(() => ({
     deliveryModel: { onsite: boolean; asynchronous: boolean; liveOnline: boolean;
       onsiteDaysPerWeek: number | null };
     type: "church_hosted_academy"; status: string;
+    canonicalName: string;
+    canonicalGrades: { min: string; max: string };
+    canonicalDelivery: { onsite: boolean; asynchronous: boolean;
+      liveOnline: boolean; onsiteDaysPerWeek: number };
     programSiteId: string; organizationId: string; siteOrganizationId: string;
   }>,
   academicAuthority: true,
@@ -51,6 +55,10 @@ beforeEach(() => {
     deliveryModel: { onsite: true, asynchronous: true,
       liveOnline: false, onsiteDaysPerWeek: 2 },
     type: "church_hosted_academy", status: "active",
+    canonicalName: "Church-Hosted Academy",
+    canonicalGrades: { min: "9", max: "12" },
+    canonicalDelivery: { onsite: true, asynchronous: true,
+      liveOnline: false, onsiteDaysPerWeek: 2 },
     programSiteId: "site-1", organizationId: "church-1",
     siteOrganizationId: "church-1",
   }];
