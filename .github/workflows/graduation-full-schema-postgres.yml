@@ -1,10 +1,19 @@
 name: Full-schema graduation migration (ephemeral PostgreSQL)
 
 on:
+  push:
+    branches: [FullFlow]
+    paths:
+      - "drizzle/**"
+      - "tests/postgres/**"
+      - "scripts/fullflow-post0051-artifacts*"
+      - "scripts/fullflow-ledger-hashes.mjs"
+      - ".github/workflows/graduation-full-schema-postgres.yml"
   pull_request:
     paths:
       - "drizzle/**"
       - "tests/postgres/graduation-full-schema-acceptance.sql"
+      - "tests/postgres/fullflow-post0056-acceptance.sql"
       - ".github/workflows/graduation-full-schema-postgres.yml"
       - "scripts/review-fullflow-migrations.mjs"
       - "scripts/fullflow-post0051-artifacts*"
@@ -70,3 +79,9 @@ jobs:
         run: |
           docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
             < tests/postgres/graduation-full-schema-acceptance.sql
+      - name: Assert 0057-0059 curriculum, finance and evidence SQL on disposable PostgreSQL
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/fullflow-post0056-acceptance.sql
