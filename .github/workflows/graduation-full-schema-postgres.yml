@@ -43,15 +43,25 @@ jobs:
           test "$DATABASE_URL" = "postgresql://can_disposable:can_disposable@127.0.0.1:5432/can_disposable"
           test "${GITHUB_REPOSITORY}" = "bryanhkelly/can-os"
           echo "Only local disposable service is authorized"
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Apply entire committed Drizzle migration chain (0000 through 0056)
-        run: npm run db:migrate
+      # drizzle-kit selects the remote Neon websocket driver in this repository
+      # and cannot open the local PostgreSQL service. Execute the exact committed
+      # SQL files here instead. This tests SQL compatibility but deliberately
+      # does NOT claim that the Drizzle journal or Neon-specific runner passed.
+      - name: Apply every committed SQL migration (0000 through 0056) to disposable PostgreSQL
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          mapfile -t migrations < <(find drizzle -maxdepth 1 -type f -regextype posix-extended -regex 'drizzle/[0-9]{4}_.*\.sql' | sort)
+          if [[ "${#migrations[@]}" -ne 57 ]]; then
+            echo "::error::Expected exactly 57 committed 0000..0056 migrations, got ${#migrations[@]}"
+            exit 1
+          fi
+          for migration in "${migrations[@]}"; do
+            echo "::group::Apply ${migration}"
+            docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 < "$migration"
+            echo "::endgroup::"
+          done
       - name: Assert real complete schema, graduation FK and policy constraints
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
