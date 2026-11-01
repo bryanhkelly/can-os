@@ -124,10 +124,16 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       const result = submission.value;
       setCreated({...result,programType:type});
       if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
-      await router.navigate({
-        to: "/operations/launch",
-        search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId },
-      });
+      try {
+        await router.navigate({
+          to: "/operations/launch",
+          search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId },
+        });
+      } catch {
+        // startLaunch already committed. Keep the handoff with canonical IDs.
+        // A navigation failure must never be presented as failed creation.
+        setError("The school launch was saved, but automatic navigation failed. Use its saved launch handoff below, or reopen launch setup; do not start a duplicate Program.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start launch");
     }

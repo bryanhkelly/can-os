@@ -113,9 +113,15 @@ export function FamilyInviteImporter({
         ? `Retry queued for ${response.retried} recipient${response.retried === 1 ? "" : "s"}. Provider acceptance is not inbox delivery.`
         : "No failed recipients are waiting for a retry.");
       try { await router.invalidate(); }
-      catch { setError("The retry command was accepted, but updated delivery records could not be loaded. Reopen this launch before retrying again."); }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to retry failed invitations");
+      catch {
+        setAwaitingVerification(true);
+        setError("The retry command was accepted, but updated delivery records could not be loaded. Verify the saved batch before retrying again.");
+      }
+    } catch {
+      // A lost response cannot establish whether a retry was queued. Unlike
+      // sending a batch, this endpoint has no client-request idempotency key.
+      setAwaitingVerification(true);
+      setError("Could not confirm whether the retry was queued. Verify the existing delivery record before another retry.");
     } finally {
       setBusy(false);
     }

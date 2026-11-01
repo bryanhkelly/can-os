@@ -128,18 +128,34 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     await run(() => scheduleLaunchOrientation({ data: { programId: launch!.id, ...input } }));
   }
   async function open(recipientPersonId?: string) {
-    await run(async () => {
-      const activeLaunch = launch!;
+    if (busy) return;
+    const activeLaunch = launch!;
+    setBusy(true);
+    setError("");
+    try {
+      // Only the canonical server command can establish opening authority.
       await activateLaunch({ data: { programId: activeLaunch.id, recipientPersonId } });
-      // Navigation happens only after the canonical activation command returns.
-      // The command alone decides readiness and opening authority.
-      const href = postLaunchOperationsDestination({ programId: activeLaunch.id, siteId: activeLaunch.siteId });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "School opening was not confirmed. Refresh its readiness before retrying.");
+      setBusy(false);
+      return;
+    }
+    // A router error after server success must not encourage a second activation.
+    // Preserve a visible recovery link to the same Program/Site.
+    setOpened({ name: activeLaunch.name, siteId: activeLaunch.siteId });
+    try {
       if (activeLaunch.siteId) {
-        await router.navigate({ href });
-        return;
+        await router.navigate({ href: postLaunchOperationsDestination({
+          programId: activeLaunch.id, siteId: activeLaunch.siteId,
+        }) });
+      } else {
+        await router.invalidate();
       }
-      setOpened({ name: activeLaunch.name, siteId: null });
-    });
+    } catch {
+      setError("Opening was recorded, but navigation could not refresh. Use the saved Site Today link below; do not activate again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return <section className="mt-8 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Guided school launch">
