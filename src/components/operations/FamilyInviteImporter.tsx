@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { familyInvitationProgress, familyInvitationRetryLabel } from "@/domain/family-invitation-progress";
 import { Link, useRouter } from "@tanstack/react-router";
-import { familyInvitationLaunchScope } from "@/domain/family-invitation-launch-scope";
+import { familyInvitationLaunchScope, selectedFamilyInvitationProgram } from "@/domain/family-invitation-launch-scope";
 import { parseFamilyContacts } from "@/domain/family-contact-import";
 import {
   FAMILY_INVITATION_MAX_RECIPIENTS,
@@ -35,7 +35,7 @@ export function FamilyInviteImporter({
     siteId: selectedSiteId, programId: selectedProgramId,
   });
   const [programId, setProgramId] = useState(initialProgram?.id ?? "");
-  const selectedProgram = programs.find(program => program.id === programId) ?? (programs.length === 1 ? programs[0] : undefined);
+  const selectedProgram = selectedFamilyInvitationProgram(programs, programId);
   const [raw, setRaw] = useState("");
   const [subject, setSubject] = useState(initialProgram?.purpose === "interest"
     ? `${initialProgram.name} · school launch information`
@@ -144,6 +144,11 @@ export function FamilyInviteImporter({
         <select disabled={awaitingVerification} value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
           setProgramId(event.target.value);
+          // Never transfer a pasted family contact list or a confirmed preview
+          // between schools, even when the same registrar can operate both.
+          setRaw("");
+          setError("");
+          setIntroduction("We're excited to invite your family to learn about our school.");
           if (program) setSubject(program.purpose === "interest"
             ? `${program.name} · school launch information`
             : `${program.name} is welcoming families`);
@@ -153,6 +158,7 @@ export function FamilyInviteImporter({
           {programs.map(program => <option key={program.id} value={program.id}>{program.name} · {program.purpose === "interest" ? "Pre-opening information" : "Application"}</option>)}
         </select>
       </label>
+      {programId && !selectedProgram && <p role="alert" className="mt-2 text-sm">The previously selected school is no longer eligible for this outreach. Choose another destination and review a new recipient list.</p>}
       {selectedProgram && (selectedProgram.purpose === "interest"
         ? <p className="mt-2 text-xs text-muted-foreground">The school is still preparing to open. The email states that opening has not been authorized and includes an optional request-updates link. Imported contacts are not considered opted in until they submit that form.</p>
         : <p className="mt-2 text-xs text-muted-foreground">After email verification: <a href={selectedProgram.privateApplicationUrl ?? selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">{selectedProgram.name} family application</a>. Each recipient receives a single-use verification link.</p>)}

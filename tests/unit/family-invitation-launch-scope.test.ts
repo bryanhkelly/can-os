@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { familyInvitationLaunchScope } from "../../src/domain/family-invitation-launch-scope";
+import { familyInvitationLaunchScope, selectedFamilyInvitationProgram } from "../../src/domain/family-invitation-launch-scope";
 const school = { id: "school", name: "School", siteId: "site", publishedSiteUrl: "https://school.example.test", purpose: "application" as const };
 const other = { ...school, id: "other", siteId: "other-site" };
 function batch(programId: string, siteId: string) {
@@ -30,6 +30,12 @@ describe("family invitations remain in the active launch", () => {
   });
   it("requires a choice when the unfiltered workspace has multiple Programs", () => {
     expect(familyInvitationLaunchScope(workspace, {}).initialProgram).toBeUndefined();
+  });
+  it("never silently substitutes another school after a selected Program loses invitation eligibility", () => {
+    expect(selectedFamilyInvitationProgram([other], school.id)).toBeUndefined();
+    expect(selectedFamilyInvitationProgram([other], "")).toEqual(other);
+    expect(selectedFamilyInvitationProgram([school, other], "")).toBeUndefined();
+    expect(selectedFamilyInvitationProgram([school, other], school.id)).toEqual(school);
   });
   it("does not assign site-less historical evidence to a selected school", () => {
     const legacy = { ...batch(school.id, school.siteId), siteId: undefined };

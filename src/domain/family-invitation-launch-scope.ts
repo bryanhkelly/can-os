@@ -17,3 +17,13 @@ export function familyInvitationLaunchScope(
   };
 }
 
+
+/** A formerly selected Program must never silently fall back to a different
+ * school's authorized outreach destination when permissions or status change.
+ * Only a genuinely unselected form may default to its sole eligible Program. */
+export function selectedFamilyInvitationProgram<T extends { id: string }>(
+  programs: readonly T[], selectedId: string,
+): T | undefined {
+  return programs.find(program => program.id === selectedId) ??
+    (!selectedId && programs.length === 1 ? programs[0] : undefined);
+}

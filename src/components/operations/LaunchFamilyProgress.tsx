@@ -19,6 +19,11 @@ export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, famil
   const providerAccepted=scopedBatches.reduce((count,batch)=>count+batch.recipients.filter(recipient=>recipient.status==="provider_accepted").length,0);
   const responded=scopedBatches.reduce((count,batch)=>count+batch.recipients.filter(recipient=>recipient.status==="responded").length,0);
   const failedBatches=scopedBatches.filter(batch=>batch.outboxStatus==="failed").length;
+  // A Program can transition from pre-opening interest to formal applications
+  // without changing its ID. Never carry a confirmed interest preview across
+  // that authorization boundary: remount the outreach form at that transition.
+  const currentInvitationPurpose=familyInvitations?.programs.find(program=>
+    (!programId||program.id===programId)&&(!siteId||program.siteId===siteId))?.purpose ?? "unavailable";
   return <>
         {admissionsCounts&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Admissions progress</h2>
@@ -57,7 +62,7 @@ export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, famil
         </section>
         <details open className="mt-5 rounded-xl border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold">Family invitations and outreach progress</summary>
-          <FamilyInviteImporter key={`${siteId ?? ""}:${programId ?? ""}`} workspace={familyInvitations} selectedProgramId={programId} selectedSiteId={siteId}/>
+          <FamilyInviteImporter key={`${siteId ?? ""}:${programId ?? ""}:${currentInvitationPurpose}`} workspace={familyInvitations} selectedProgramId={programId} selectedSiteId={siteId}/>
         </details>
 
 
