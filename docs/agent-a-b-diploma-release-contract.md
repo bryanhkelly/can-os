@@ -14,5 +14,7 @@ Agent A now exports `assertDiplomaFreshForAuthorizedRelease(tx, schema, {diploma
 
 Agent B must call it from within the **same transaction** that authorizes a recipient release and again from within the **same transaction** that checks the live recipient and prepares private download bytes. The function takes the issuer/student from B's independently verified ledger, acquires the issuer-policy advisory lock and a share lock on the diploma row to coordinate against registrar revocation. Do not call the registrar-facing `getDiplomaFreshness` as a recipient, and do not make the function accessible through an unguarded RPC.
 
+Agent A also reconciles every issued finalized grade row against the current issuer-owned SectionGrade and credit configuration. In-place grade corrections after transcript issuance (including corrections that restore the same letter grade) require transcript reissuance and graduation review. The gradebook query takes a SHARE lock in the calling transaction, coordinated with the grade-correction UPDATE lock.
+
 Agent B's current explicit transcript-only eligibility remains intact. **Do not enable diploma or external school delivery** until B adopts this contract and connected authenticated DB/browser concurrency checks pass.
 
