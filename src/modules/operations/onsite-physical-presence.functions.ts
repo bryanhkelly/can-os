@@ -1,10 +1,10 @@
 import { summarizeNamedDutyResponses } from "@/domain/onsite-duty-policy";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { actions, sites } from "@/db/schema";
+import { actions,sites,programResponsibilityAssignments,roleAssignments,schoolConfigurationVersions } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
@@ -12,7 +12,7 @@ import { siteDate } from "@/domain/expected-attendance";
 import { inPhysicalCheckInWindow } from "@/domain/onsite-physical-presence-policy";
 import { hasOnsiteCoverageInterruption } from "@/domain/onsite-coverage-interruption";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { emitEvent,writeAudit } from "@/platform/mutation";
+import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import {
   getOnsiteSupervisionPlan, loadOnsiteSupervisionPlanForActor,
@@ -200,6 +200,22 @@ export const reportOnsiteStaffCoverageInterruption=createServerFn({method:"POST"
         return {interruptionId:existing.id,created:false as const};
       }
       const now=new Date();
+      // Route urgent supervision interruptions to the current, explicitly
+      // appointed local Site director, not just the reporter's private queue.
+      const [configuration]=await tx.select({id:schoolConfigurationVersions.id})
+        .from(schoolConfigurationVersions)
+        .where(eq(schoolConfigurationVersions.programId,presence.programId))
+        .orderBy(desc(schoolConfigurationVersions.version)).limit(1);
+      const [director]=configuration?await tx.select({personId:roleAssignments.personId})
+        .from(programResponsibilityAssignments)
+        .innerJoin(roleAssignments,eq(roleAssignments.id,
+          programResponsibilityAssignments.responsibleRoleAssignmentId))
+        .where(and(
+          eq(programResponsibilityAssignments.configurationVersionId,configuration.id),
+          eq(programResponsibilityAssignments.responsibilityKey,"site_director"),
+          lte(programResponsibilityAssignments.effectiveFrom,now),
+          gt(programResponsibilityAssignments.effectiveThrough,now),
+        )).limit(1):[];
       const [record]=await tx.insert(actions).values({
         type:exitType,status:"resolved",priority:"urgent",
         title:"Named adult reported interruption to physical classroom supervision",
@@ -207,18 +223,26 @@ export const reportOnsiteStaffCoverageInterruption=createServerFn({method:"POST"
         subjectType:"section",subjectId:presence.sectionId,
         organizationId:site.organizationId,siteId:site.id,
         programId:presence.programId,sectionId:presence.sectionId,
-        ownerPersonId:actor.actorPersonId,resolvedAt:now,
+        ownerPersonId:director?.personId??actor.actorPersonId,resolvedAt:now,
         metadata:{date:data.date,periodId:presence.metadata.periodId,
           planToken:presence.metadata.planToken,
           presenceReportId:presence.id,reason:data.reason,reportedAt:now.toISOString()},
       }).returning({id:actions.id});
       if(!record)throw new Error("Could not record coverage interruption");
-      await emitEvent(tx,{
+      const eventId=await emitEvent(tx,{
         eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:record.id,
         actorPersonId:actor.actorPersonId,organizationId:site.organizationId,
         siteId:site.id,programId:presence.programId,sectionId:presence.sectionId,
         payload:{type:exitType,reason:data.reason},
       });
+      if(director?.personId && director.personId!==actor.actorPersonId)
+        await notifyMany(tx,[{
+          recipientPersonId:director.personId,
+          type:"onsite_urgent_supervision_interruption",
+          title:"Urgent: classroom supervision may be interrupted",
+          body:"A named adult has reported an absence or uncovered handoff. Review live room coverage and student custody immediately.",
+          resourceType:"action",resourceId:record.id,eventId,
+        }]);
       await writeAudit(tx,actor,{
         action:"onsite.staff.coverage_interrupted",entityType:"action",entityId:record.id,
         scope:{organizationId:site.organizationId,siteId:site.id,
