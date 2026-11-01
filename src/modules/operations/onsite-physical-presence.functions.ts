@@ -1,7 +1,7 @@
 import { summarizeNamedDutyResponses } from "@/domain/onsite-duty-policy";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { actions,sites,programResponsibilityAssignments,roleAssignments,schoolConfigurationVersions } from "@/db/schema";
@@ -189,6 +189,10 @@ export const reportOnsiteStaffCoverageInterruption=createServerFn({method:"POST"
          typeof presence.metadata.planToken!=="string" ||
          !presence.programId || !presence.sectionId)
         throw new AuthorizationError("original own physical-arrival record");
+      // Serialize departures with physical arrivals and director witnesses of
+      // this same school-local Section/period. A witness must not race a leave
+      // report into an apparently valid, but already interrupted, snapshot.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-presence:"+site.id+":"+data.date+":"+presence.sectionId+":"+presence.metadata.periodId}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-staff-exit:"+presence.id}))`);
       const [existing]=await tx.select({id:actions.id,metadata:actions.metadata})
         .from(actions).where(and(eq(actions.type,exitType),
@@ -319,6 +323,19 @@ export const witnessOnsiteBlockPresence=createServerFn({method:"POST"})
       const backup=reports.find(r=>r.personId===room.backupPersonId);
       if(!primary || !backup)
         throw new AuthorizationError("both named adults must individually report physical arrival");
+      // An arrival made before a reported early departure is historical
+      // evidence, not renewed adult presence. The presence lock is shared
+      // with exit recording, so this check cannot miss a committed departure.
+      const [departure]=await tx.select({id:actions.id}).from(actions)
+        .where(and(eq(actions.type,exitType),eq(actions.siteId,site.id),
+          eq(actions.sectionId,block.sectionId),
+          inArray(actions.ownerPersonId,adults),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+          sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
+          sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
+        )).limit(1);
+      if(departure)throw new AuthorizationError(
+        "named classroom adult reported leaving; a prior arrival cannot be witnessed again for this plan");
       const now=new Date();
       if([primary,backup].some(r=>r.createdAt>now ||
         now.getTime()-r.createdAt.getTime()>90*60*1000))
