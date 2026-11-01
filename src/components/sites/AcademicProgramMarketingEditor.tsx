@@ -63,6 +63,14 @@ export function AcademicProgramMarketingEditor({
       withheld from the public catalog. Withdraw the outdated listing,
       then review and approve a new snapshot before advertising it.
     </p>}
+    {published && program.marketing?.current === true &&
+      program.marketing?.catalogEligible === false && <p role="alert"
+      className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
+      This Program is not eligible for the public catalog. Its underlying
+      institutional operating authorization may be absent, expired, suspended
+      or revoked, or the Program may no longer be eligible. Review and restore
+      the canonical authorization before publishing school information again.
+    </p>}
     <form className="mt-4 space-y-3" onSubmit={submit}>
       {!published && <label className="block text-sm">
         Public description (30–2,000 characters; plain text)
