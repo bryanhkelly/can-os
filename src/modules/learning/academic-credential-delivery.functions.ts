@@ -8,6 +8,7 @@ import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
 import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, canReauthorizeCredentialRelease } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
 import { assertDiplomaFreshForAuthorizedRelease, assertOfficialTranscriptFreshForAuthorizedRelease } from "@/modules/learning/academic-credential-freshness.server";
+import { sessionIdleCutoff } from "@/domain/access-tokens";
 
 const uuid=z.string().uuid();
 const target=z.object({kind:z.enum(["transcript","diploma"]),credentialId:uuid});
@@ -392,6 +393,20 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   if(!canDownloadAuthorizedCredential({actorPersonId:recipientPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
   if(!context.accountId||!context.sessionId||!context.grantId)throw new AuthorizationError("verified active recipient session");
+  // The request context was resolved before this transaction. A simultaneous
+  // session revocation, persona switch or idle expiry must not leave an
+  // authorized PDF download in flight. Lock the exact live access session.
+  const sessionNow=new Date();
+  const [liveSession]=await tx.select({id:s.accessSessions.id})
+   .from(s.accessSessions)
+   .where(and(eq(s.accessSessions.id,context.sessionId),
+    eq(s.accessSessions.accountId,context.accountId),
+    eq(s.accessSessions.activeGrantId,context.grantId),
+    isNull(s.accessSessions.revokedAt),
+    gt(s.accessSessions.expiresAt,sessionNow),
+    gt(s.accessSessions.updatedAt,sessionIdleCutoff(sessionNow))))
+   .for("share").limit(1);
+  if(!liveSession)throw new AuthorizationError("recipient session expired, revoked or switched");
   const [verifiedAccount]=await tx.select({id:s.accessAccounts.id})
    .from(s.accessAccounts)
    .innerJoin(s.accountPersonGrants,eq(s.accountPersonGrants.accountId,s.accessAccounts.id))
