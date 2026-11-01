@@ -7,6 +7,7 @@ import { and, asc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { isCurrentCoursework } from "@/domain/student-today-coursework";
+import { isStudentAssessmentVisible } from "@/domain/assessment-availability";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
   scheduledOccurrences, studentProfiles, submissions, terms,
@@ -112,6 +113,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       assessmentTitle: assessments.title,
       instructions: assessments.instructions,
       dueAt: assessments.dueAt,
+      availableAt: assessments.availableAt,
       status: submissions.status,
       timeliness: submissions.timeliness,
       score: submissions.score,
@@ -145,7 +147,9 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       latestCoursework.set(row.assessmentId, row);
     }
   }
-  const currentCoursework = [...latestCoursework.values()].filter(row => isCurrentCoursework(row, startOfDay));
+  const currentCoursework = [...latestCoursework.values()].filter(row =>
+    isStudentAssessmentVisible({ status: "published", availableAt: row.availableAt }, at) &&
+    isCurrentCoursework(row, startOfDay));
 
   const openActions = await db
     .select({
