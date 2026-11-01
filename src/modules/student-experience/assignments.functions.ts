@@ -6,11 +6,11 @@ import { createAssessment,gradeSubmission,manageAssessment,returnSubmissionForRe
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,sql } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,lte,or,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { assessmentAttemptLimit, assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
-import { assessmentAvailability, assertAssessmentActionable } from "@/domain/assessment-availability";
+import { assessmentAvailability, assertAssessmentActionable, isStudentAssessmentVisible } from "@/domain/assessment-availability";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 
@@ -54,6 +54,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  // Section enrollments. Withdrawn learners must not see submitted feedback.
  const ids=[...new Set((await accessibleClasses(context as Actor)).map(row=>row.id))];
  if(!ids.length)return {connected:true,assignments:[]};
+ const now = new Date();
  const rows=await db.select({
   assessmentId:s.assessments.id,sectionId:s.assessments.sectionId,
   title:s.assessments.title,instructions:s.assessments.instructions,
@@ -67,12 +68,14 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  }).from(s.assessments)
  .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
  .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,studentId)))
- .where(and(inArray(s.assessments.sectionId,ids),inArray(s.assessments.status,["published","closed"])))
+ .where(and(inArray(s.assessments.sectionId,ids),inArray(s.assessments.status,["published","closed"]),
+  or(isNull(s.assessments.availableAt),lte(s.assessments.availableAt,now))))
  .orderBy(desc(s.assessments.dueAt));
+ const visibleRows=rows.filter(row=>isStudentAssessmentVisible({status:row.assessmentStatus,availableAt:row.availableAt},now));
  const newest=new Map<string,(typeof rows)[number]>();
- for(const row of rows){const existing=newest.get(row.assessmentId);if(!existing||(row.attemptNumber??0)>(existing.attemptNumber??0))newest.set(row.assessmentId,row);}
+ for(const row of visibleRows){const existing=newest.get(row.assessmentId);if(!existing||(row.attemptNumber??0)>(existing.attemptNumber??0))newest.set(row.assessmentId,row);}
  return {connected:true,assignments:[...newest.values()].map(row=>{
-  const history=rows.filter(item=>item.assessmentId===row.assessmentId);
+  const history=visibleRows.filter(item=>item.assessmentId===row.assessmentId);
   // When a revision draft becomes attempt N+1, the grade/feedback on
   // returned attempt N must stay available while the student rewrites.
   // Never copy the old score into a new ungraded attempt.
