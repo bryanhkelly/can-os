@@ -81,6 +81,44 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
   test.setTimeout(600_000);
   let studentPage: Page | undefined;
 
+  // Portable, non-secret acceptance manifest captured with Playwright artifacts.
+  // The verified source SHA, Neon identity and synthetic actor IDs are tied
+  // to the same browser run, without disclosing session cookies or credentials.
+  const sourceSha = process.env.CAN_FULLFLOW_ACCEPTANCE_SOURCE_SHA;
+  expect(sourceSha).toMatch(/^[0-9a-f]{40}$/);
+  const identityRows = await sql.query(
+    "SELECT current_setting('neon.project_id',true) AS project_id, current_setting('neon.branch_id',true) AS branch_id",
+    [],
+  ) as Array<{project_id:string;branch_id:string}>;
+  expect(identityRows[0]).toMatchObject({
+    project_id:"sweet-hall-62441909",
+    branch_id:"br-proud-pine-arfju8h2",
+  });
+  await test.info().attach("fullflow-provenance.json", {
+    body: Buffer.from(JSON.stringify({
+      sourceSha,
+      githubRunId: process.env.GITHUB_RUN_ID ?? null,
+      browserBaseUrl: baseURL,
+      neon: identityRows[0],
+      syntheticFixtureId: fixture.suffix,
+      organizations: {
+        school: fixture.schoolOrgId,
+        unrelatedSchool: fixture.otherSchoolOrgId,
+        publisher: fixture.publisherOrgId,
+      },
+      personas: {
+        operator:fixture.operator.personId,
+        publisher:fixture.publisher.personId,
+        teacher:fixture.teacher.personId,
+        guardian:fixture.guardian.personId,
+        unrelatedGuardian:fixture.unrelatedGuardian.personId,
+        otherOperator:fixture.otherOperator.personId,
+      },
+      credentialsIncluded:false,
+    },null,2)),
+    contentType:"application/json",
+  });
+
   await withAuthenticatedPages(browser, {
     operator: fixture.operator.secret,
     publisher: fixture.publisher.secret,

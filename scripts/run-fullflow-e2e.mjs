@@ -9,13 +9,14 @@
  *   2. scripts/verify-fullflow-neon-branch.mjs
  *      (pinned FullFlow branch id/name against the Neon API)
  *   3. scripts/verify-fullflow-schema.mjs
- *      (48 applied migrations plus required FullFlow tables/columns)
+ *      (all committed migrations plus required FullFlow tables/columns)
  *
  * The journey boots its own app server on the dedicated localhost:3189 port,
  * uses synthetic fullflow-* identities, a disposable local access-mail outbox,
  * and revokes every session it created during teardown.
  */
 import { spawnSync } from "node:child_process";
+import { verifyFullFlowCheckout } from "./fullflow-source-identity.mjs";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -45,6 +46,11 @@ if (process.argv.includes("--preflight")) {
   process.exit(0);
 }
 
+// Confirm the browser runner executes the exact FullFlow source that CI reviewed.
+// This runs before any fixture rows are written.
+const sourceSha = verifyFullFlowCheckout();
+console.log(`FullFlow browser source attested: ${sourceSha}`);
+
 // 2 + 3. Pinned FullFlow Neon branch identity and schema guards (read-only;
 // they require CAN_TEST_DB_WRITES_ENABLED=true enforced by the preflight).
 run("pinned FullFlow Neon branch guard", process.execPath, [
@@ -67,6 +73,7 @@ try {
     env: {
       ...process.env,
       DATABASE_URL: process.env.TEST_DATABASE_URL,
+      CAN_FULLFLOW_ACCEPTANCE_SOURCE_SHA: sourceSha,
       CAN_APPLICATION_DB_HOST: process.env.CAN_APPLICATION_DB_HOST
         ?? new URL(process.env.DATABASE_URL).hostname,
       APP_ENV: "test",
