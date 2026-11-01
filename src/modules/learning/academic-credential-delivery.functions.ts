@@ -212,6 +212,23 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
    // withdrawal custody and supersession, before either creating OR reusing a
    // release grant. Locks remain held until the grant transaction commits.
    await assertOfficialTranscriptFreshForAuthorizedRelease(tx,s,{transcriptIssuanceId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
+   // Check revocation BEFORE accepting an idempotent active release. A
+   // previously revoked grant cannot be bypassed by another stale active
+   // authorization under the same signed transfer consent.
+   // A revoked authorization cannot be replayed with the same signed consent.
+   // A fresh, independently signed and reviewed consent is required.
+   const [previousRevoked]=await tx.select({id:s.academicCredentialReleaseAuthorizations.id})
+    .from(s.academicCredentialReleaseAuthorizations)
+    .where(and(
+     eq(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,doc.issuerId),
+     eq(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,data.credentialId),
+     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,data.recipientPersonId),
+     eq(s.academicCredentialReleaseAuthorizations.consentEvidenceReference,consent!.id),
+     isNotNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
+    .limit(1);
+   if(!canReauthorizeCredentialRelease(!!previousRevoked))
+    throw new AuthorizationError("Revoked release requires new signed transfer consent");
+   // A previously checked and still-live grant can be reused safely.
    const [existing]=await tx.select({
     id:s.academicCredentialReleaseAuthorizations.id,
    }).from(s.academicCredentialReleaseAuthorizations).where(and(
@@ -226,19 +243,6 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     gt(s.academicCredentialReleaseAuthorizations.expiresAt,new Date()),
    )).limit(1);
    if(existing)return {authorizationId:existing.id};
-   // A revoked authorization cannot be replayed with the same signed consent.
-   // A fresh, independently signed and reviewed consent is required.
-   const [previousRevoked]=await tx.select({id:s.academicCredentialReleaseAuthorizations.id})
-    .from(s.academicCredentialReleaseAuthorizations)
-    .where(and(
-     eq(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,doc.issuerId),
-     eq(s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,data.credentialId),
-     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,data.recipientPersonId),
-     eq(s.academicCredentialReleaseAuthorizations.consentEvidenceReference,consent!.id),
-     isNotNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
-    .limit(1);
-   if(!canReauthorizeCredentialRelease(!!previousRevoked))
-    throw new AuthorizationError("Revoked release requires new signed transfer consent");
    // A signed consent is bound to this transfer action and recipient.
    const [created]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
     issuingOrganizationId:doc.issuerId,transcriptIssuanceId:data.credentialId,
