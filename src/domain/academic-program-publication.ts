@@ -8,6 +8,8 @@ export type PublicAcademicProgram = {
   grades: { min: string; max: string };
   delivery: { onsite: boolean; asynchronous: boolean; liveOnline: boolean; onsiteDaysPerWeek: number | null };
   availability: "planned" | "operating";
+  /** Server-computed canonical admissions/operating authorization, not a marketing flag. */
+  applicationOpen?: boolean;
 };
 
 export function isAcademicMarketingType(type: ProgramType): boolean {
@@ -35,6 +37,7 @@ export function publicAcademicProgram(row: {
   summary: string;
   type: ProgramType;
   status: string;
+  applicationOpen?: boolean;
   gradeRange: { min: string; max: string };
   deliveryModel: {
     onsite: boolean;
@@ -63,6 +66,8 @@ export function publicAcademicProgram(row: {
     delivery: { ...row.deliveryModel },
     // Marketing approval does NOT assert admissions readiness.
     availability: row.status === "active" ? "operating" : "planned",
+    // Only authoritative operating-admissions checks may make this true.
+    applicationOpen: row.status === "active" && row.applicationOpen === true,
   };
 }
 
