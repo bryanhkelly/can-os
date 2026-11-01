@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { resolveGraduationPolicy } from "@/domain/graduation-policy";
+import { resolveGraduationPolicy, validateLegacyGraduationCohortClassification } from "@/domain/graduation-policy";
 import { adjudicateGraduation } from "@/domain/graduation-adjudication";
 import { auditGraduationCredits, type CreditEvidence, type CreditRequirement } from "@/domain/graduation-credit-audit";
 import { writeAudit } from "@/platform/mutation";
@@ -150,6 +150,49 @@ export const approveGraduationRequirements = createServerFn({method:"POST"})
      }).returning({id:s.graduationRequirementSets.id});
      await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"graduation.requirements.approve",resourceType:"graduation_requirement_set",resourceId:row!.id,scope:{organizationId:data.issuerId},after:data,context:{requestId:context.requestId??null}});
      return {requirementSetId:row!.id};
+   });
+ });
+
+/** One-time audited, explicit registrar attestation for legacy NULL-cohort policies.
+ * Requirements and original approval remain immutable. Unknown policies remain
+ * blocking until all active issuer policies have been individually classified.
+ */
+export const classifyLegacyGraduationRequirements = createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({
+   issuerId:uuid,requirementSetId:uuid,
+   cohortStart:z.string().regex(/^[0-9]{4}$/),cohortEnd:z.string().regex(/^[0-9]{4}$/),
+   evidenceReference:z.string().trim().min(12).max(250),
+   applicabilityReason:z.string().trim().min(20).max(1000),
+ }).parse(input))
+ .handler(async({data})=>{
+   const context=await registrar();issuerAuthorized(context,data.issuerId);
+   const {db,s}=await resources();
+   return db.transaction(async tx=>{
+     const {sql}=await import("drizzle-orm");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.issuerId + ":graduation-policy"}))`);
+     const policies=await tx.select().from(s.graduationRequirementSets)
+       .where(eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId));
+     try {
+       validateLegacyGraduationCohortClassification(policies,data.requirementSetId,data.cohortStart,data.cohortEnd);
+     } catch(error) {
+       throw new AuthorizationError(error instanceof Error?error.message:"Invalid cohort classification");
+     }
+     const justification=`Registrar attestation: ${data.applicabilityReason}\nEvidence reference: ${data.evidenceReference}`;
+     const [classified]=await tx.update(s.graduationRequirementSets)
+       .set({cohortStart:data.cohortStart,cohortEnd:data.cohortEnd,applicabilityReason:justification})
+       .where(and(eq(s.graduationRequirementSets.id,data.requirementSetId),
+         eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId),
+         isNull(s.graduationRequirementSets.cohortStart),isNull(s.graduationRequirementSets.cohortEnd)))
+       .returning({id:s.graduationRequirementSets.id});
+     if(!classified)throw new AuthorizationError("Legacy policy classification changed; refresh and review");
+     await writeAudit(tx,{actorPersonId:context.actorPersonId!,
+       action:"graduation.requirements.classify_legacy",resourceType:"graduation_requirement_set",
+       resourceId:classified.id,scope:{organizationId:data.issuerId},
+       after:{cohortStart:data.cohortStart,cohortEnd:data.cohortEnd,
+         evidenceReference:data.evidenceReference,applicabilityReason:data.applicabilityReason,
+         registrarPersonId:context.actorPersonId},
+       context:{requestId:context.requestId??null}});
+     return {requirementSetId:classified.id,status:"classified" as const};
    });
  });
 
