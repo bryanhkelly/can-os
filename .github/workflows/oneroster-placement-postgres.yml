@@ -1,0 +1,54 @@
+name: OneRoster placement decision PostgreSQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - "src/modules/learning/oneroster-import.functions.ts"
+      - "src/domain/oneroster-placement-decision.ts"
+      - "tests/postgres/oneroster-placement-decision.sql"
+      - ".github/workflows/oneroster-placement-postgres.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  decision-persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: can_disposable
+          POSTGRES_USER: can_disposable
+          POSTGRES_PASSWORD: can_disposable
+        options: >-
+          --health-cmd "pg_isready -U can_disposable -d can_disposable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+      - name: Apply committed 0000 through 0055 SQL migrations to disposable PostgreSQL only
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          mapfile -t migrations < <(find drizzle -maxdepth 1 -type f -regextype posix-extended -regex 'drizzle/[0-9]{4}_.*\.sql' | sort)
+          if [[ "${#migrations[@]}" -ne 56 ]]; then
+            echo "::error::Unexpected committed migration count; refuse partial acceptance"
+            exit 1
+          fi
+          for migration in "${migrations[@]}"; do
+            echo "::group::${migration}"
+            docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 < "$migration"
+            echo "::endgroup::"
+          done
+      - name: Exercise real import FK, unique enrollment binding and rollback
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/oneroster-placement-decision.sql
