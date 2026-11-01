@@ -394,7 +394,17 @@ export const createPickupAuthorization = createServerFn({ method: "POST" })
       if (replay) {
         if (replay.authorizedByPersonId !== actor.actorPersonId ||
             replay.studentProfileId !== data.studentProfileId ||
-            replay.programId !== data.programId || replay.householdId !== data.householdId)
+            replay.programId !== data.programId || replay.householdId !== data.householdId ||
+            replay.relationshipLabel !== data.relationshipLabel ||
+            replay.identityVerificationMethod !== data.identityVerificationMethod ||
+            replay.startsOn !== data.startsOn ||
+            (replay.expiresOn ?? null) !== (data.expiresOn ?? null))
+          throw new Error("Pickup mutation ID was already used for different input");
+        const [existingPerson] = await tx.select({
+          legalFirstName: people.legalFirstName, legalLastName: people.legalLastName,
+        }).from(people).where(eq(people.id, replay.pickupPersonId)).limit(1);
+        if (!existingPerson || existingPerson.legalFirstName !== data.legalFirstName ||
+            existingPerson.legalLastName !== data.legalLastName)
           throw new Error("Pickup mutation ID was already used for different input");
         return { authorizationId: replay.id, pickupPersonId: replay.pickupPersonId, created: false as const };
       }
@@ -528,7 +538,10 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
         .where(eq(pickupCustodyHolds.sourceKey, sourceKey)).limit(1);
       if (replay) {
         if (replay.createdByPersonId !== actor.actorPersonId ||
-            replay.studentProfileId !== data.studentProfileId || replay.kind !== data.kind)
+            replay.studentProfileId !== data.studentProfileId ||
+            replay.programId !== data.programId ||
+            replay.householdId !== data.householdId ||
+            replay.kind !== data.kind || replay.reason !== data.reason)
           throw new Error("Custody hold mutation ID was already used for different input");
         return { holdId: replay.id, created: false as const };
       }
@@ -814,7 +827,11 @@ export const recordVerifiedPickupRelease = createServerFn({ method: "POST" })
         if (replay.staffWitnessPersonId !== actor.actorPersonId ||
             replay.studentProfileId !== data.studentProfileId ||
             replay.programId !== data.programId || replay.status !== "released" ||
-            replay.pickupAuthorizationId !== data.authorizationId)
+            replay.releaseDate !== data.date ||
+            replay.pickupAuthorizationId !== data.authorizationId ||
+            replay.identityVerified !== true ||
+            replay.identityVerificationMethod !== data.identityVerificationMethod ||
+            replay.handoffEvidence !== data.handoffEvidence)
           throw new Error("Pickup release mutation ID was already used for different input");
         return { releaseId: replay.id, created: false as const };
       }
@@ -983,7 +1000,16 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
         .where(eq(pickupReleaseEvents.sourceKey, sourceKey)).limit(1);
       if (replay) {
         if (replay.staffWitnessPersonId !== actor.actorPersonId ||
-            replay.studentProfileId !== data.studentProfileId || replay.status !== "denied" ||
+            replay.studentProfileId !== data.studentProfileId ||
+            replay.programId !== data.programId ||
+            replay.householdId !== data.householdId ||
+            replay.releaseDate !== data.date ||
+            replay.status !== "denied" ||
+            replay.pickupPersonId !== (data.pickupPersonId ?? null) ||
+            replay.presentedName !== data.presentedName ||
+            replay.identityVerified !== data.identityVerified ||
+            (replay.identityVerificationMethod ?? null) !== (data.identityVerificationMethod ?? null) ||
+            (replay.detail ?? null) !== (data.detail ?? null) ||
             replay.denialReason !== data.reason)
           throw new Error("Denied pickup mutation ID was already used for different input");
         const [existingFollowUp] = await tx.select({ id: actions.id }).from(actions).where(and(
@@ -1123,13 +1149,22 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
       });
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-release:" + data.studentProfileId + ":" + data.programId + ":" + data.date}))`);
       const sourceKey = source("uncollected-child", data.mutationId);
-      const [replay] = await tx.select({ id: actions.id, metadata: actions.metadata })
-        .from(actions).where(and(
+      const [replay] = await tx.select({
+        id: actions.id, metadata: actions.metadata,
+        subjectId: actions.subjectId, programId: actions.programId,
+        siteId: actions.siteId, ownerPersonId: actions.ownerPersonId,
+      }).from(actions).where(and(
           eq(actions.type, uncollectedActionType),
           sql`${actions.metadata}->>'sourceKey' = ${sourceKey}`,
         )).limit(1);
       if (replay) {
-        if (replay.metadata.followUpPlan !== data.followUpPlan)
+        if (replay.ownerPersonId !== actor.actorPersonId ||
+            replay.subjectId !== data.studentProfileId ||
+            replay.programId !== data.programId ||
+            replay.siteId !== school.siteId ||
+            replay.metadata.date !== data.date ||
+            replay.metadata.dismissalConfirmed !== true ||
+            replay.metadata.followUpPlan !== data.followUpPlan)
           throw new Error("Uncollected-child mutation ID was already used for different input");
         return { actionId: replay.id, created: false as const };
       }
