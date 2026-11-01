@@ -55,9 +55,15 @@ export function isCurrentAcademicMarketingSnapshot(input: {
       gradeRange: input.canonicalGrades,
       deliveryModel: input.canonicalDelivery,
     }, input.summary);
+    // PostgreSQL jsonb does not preserve object key order. Compare the
+    // canonical typed fields, not JSON.stringify equality.
     return input.title === canonical.title &&
-      JSON.stringify(input.gradeRange) === JSON.stringify(canonical.gradeRange) &&
-      JSON.stringify(input.deliveryModel) === JSON.stringify(canonical.deliveryModel);
+      input.gradeRange.min === canonical.gradeRange.min &&
+      input.gradeRange.max === canonical.gradeRange.max &&
+      input.deliveryModel.onsite === canonical.deliveryModel.onsite &&
+      input.deliveryModel.asynchronous === canonical.deliveryModel.asynchronous &&
+      input.deliveryModel.liveOnline === canonical.deliveryModel.liveOnline &&
+      input.deliveryModel.onsiteDaysPerWeek === canonical.deliveryModel.onsiteDaysPerWeek;
   } catch {
     // Legacy data containing prohibited claims or malformed fields must not
     // remain publicly readable until explicitly re-reviewed.
