@@ -27,6 +27,7 @@ import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { projectGuardianPickupHolds } from "@/domain/guardian-pickup-hold-visibility";
+import { projectGuardianPickupReleaseEvents } from "@/domain/guardian-pickup-release-visibility";
 import { maySendAutomatedPickupFamilyNotice } from "@/domain/pickup-notification-privacy";
 import { assertOnsitePickupScope } from "@/domain/onsite-pickup-access";
 import {
@@ -365,9 +366,9 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
         holds: projectGuardianPickupHolds(
           holds.filter(row => matches(row, student)), actor.actorPersonId!,
         ),
-        releases: releases.filter(row => matches(row, student)).map(row => ({
-          ...row, occurredAt: row.occurredAt.toISOString(),
-        })),
+        releases: projectGuardianPickupReleaseEvents(
+          releases.filter(row => matches(row, student)),
+        ),
       })),
       note: "Only independently verified guardians with pickup authority can change release authority. Active custody or emergency holds block every release.",
     };
