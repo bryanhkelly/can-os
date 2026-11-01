@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StatusBadge, WorkspacePanel } from "@/components/workspace";
 import {
   createPickupCustodyHold,
@@ -19,6 +19,9 @@ export function OnsitePickupPanel({ date, onChanged }: {
   onChanged?: () => void;
 }) {
   const [roster, setRoster] = useState<Roster | null>(null);
+  // Preserve the server idempotency identity if a witnessed custody command
+  // succeeds but its response is lost. A second click must not invent a new event.
+  const pendingMutationIds = useRef(new Map<string, string>());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -53,21 +56,30 @@ export function OnsitePickupPanel({ date, onChanged }: {
     setEvidence({});
     setVerifiedNames({});
     setNotice("");
+    pendingMutationIds.current.clear(); // Never carry observation IDs across dates.
     void load();
   }, [load]);
 
-  async function run(key: string, message: string, command: () => Promise<unknown>) {
+  async function run(key: string, message: string, command: (mutationId: string) => Promise<unknown>) {
     if (busy) return;
+    const mutationId = pendingMutationIds.current.get(key) ?? crypto.randomUUID();
+    pendingMutationIds.current.set(key, mutationId);
     setBusy(key);
     setError("");
     setNotice("");
     try {
-      await command();
+      await command(mutationId);
+      // Only a confirmed response retires an idempotency identity. A subsequent
+      // independent observed event may then receive its own new request ID.
+      pendingMutationIds.current.delete(key);
       setNotice(message);
       await load();
       onChanged?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Pickup command could not be recorded");
+      // Server writes may have committed before a network error. Keep this ID
+      // for a same-payload retry rather than creating a second child event.
+      setError((cause instanceof Error ? cause.message : "Pickup command could not be confirmed") +
+        " The result may be saved. Refresh the roster and retry with identical details; the retry will reuse the original request ID.");
     } finally {
       setBusy("");
     }
@@ -130,10 +142,10 @@ export function OnsitePickupPanel({ date, onChanged }: {
               </label>}
               {roster.canResolveHolds && <button type="button" disabled={!!busy}
                 className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => void run(hold.id, "Custody hold resolved.", () => resolvePickupCustodyHold({ data: {
+                onClick={() => void run(hold.id, "Custody hold resolved.", (mutationId) => resolvePickupCustodyHold({ data: {
                   holdId: hold.id,
                   resolutionNote: resolutions[hold.id] ?? "",
-                  mutationId: crypto.randomUUID(),
+                  mutationId,
                 } }))}>Resolve hold</button>}
             </div>)}
 
@@ -171,7 +183,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
               <p className="mt-2 text-xs text-muted-foreground">By recording this command you attest that you checked the required credential, matched the adult, and personally witnessed the handoff.</p>
               <button type="button" disabled={!!busy}
                 className="mt-3 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                onClick={() => void run(key, `Verified release recorded for ${student.studentName}.`, () => recordVerifiedPickupRelease({ data: {
+                onClick={() => void run(key, `Verified release recorded for ${student.studentName}.`, (mutationId) => recordVerifiedPickupRelease({ data: {
                   date,
                   studentProfileId: student.studentProfileId,
                   programId: student.programId,
@@ -181,7 +193,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                   verifiedLegalName: verifiedNames[key] ?? "",
                   handoffEvidence: evidence[key] ?? "",
                   confirmedHandoff: true as const,
-                  mutationId: crypto.randomUUID(),
+                  mutationId,
                 } }))}>Record verified release</button>
             </div>}
 
@@ -213,7 +225,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 </label>
                 <button type="button" disabled={!!busy || !student.householdIds.length}
                   className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                  onClick={() => void run(key + ":deny", `Denied pickup recorded for ${student.studentName}; school supervision continues.`, () => recordDeniedPickup({ data: {
+                  onClick={() => void run(key + ":deny", `Denied pickup recorded for ${student.studentName}; school supervision continues.`, (mutationId) => recordDeniedPickup({ data: {
                     date,
                     studentProfileId: student.studentProfileId,
                     programId: student.programId,
@@ -221,7 +233,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
                     presentedName: denialNames[key] ?? "",
                     reason: (denialReasons[key] ?? "not_authorized") as "not_authorized" | "identity_not_verified" | "custody_dispute" | "emergency_hold" | "expired_authorization",
                     identityVerified: false,
-                    mutationId: crypto.randomUUID(),
+                    mutationId,
                   } }))}>Record denial — no release</button>
               </details>
 
@@ -249,14 +261,14 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 </label>
                 <button type="button" disabled={!!busy || !student.householdIds.length}
                   className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                  onClick={() => void run(key + ":hold", `All pickup release held for ${student.studentName}.`, () => createPickupCustodyHold({ data: {
+                  onClick={() => void run(key + ":hold", `All pickup release held for ${student.studentName}.`, (mutationId) => createPickupCustodyHold({ data: {
                     studentProfileId: student.studentProfileId,
                     programId: student.programId,
                     householdId: holdHouseholds[key] ?? student.householdIds[0] ?? "",
                     sectionId: student.sectionId ?? undefined,
                     kind: (holdKinds[key] ?? "disputed_custody") as "disputed_custody" | "emergency",
                     reason: holdReasons[key] ?? "",
-                    mutationId: crypto.randomUUID(),
+                    mutationId,
                   } }))}>Block all release</button>
               </details>
 
@@ -269,13 +281,13 @@ export function OnsitePickupPanel({ date, onChanged }: {
                 </label>
                 <button type="button" disabled={!!busy || !!student.uncollectedActionId}
                   className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                  onClick={() => void run(key + ":uncollected", `Uncollected-child follow-up opened for ${student.studentName}.`, () => recordUncollectedChild({ data: {
+                  onClick={() => void run(key + ":uncollected", `Uncollected-child follow-up opened for ${student.studentName}.`, (mutationId) => recordUncollectedChild({ data: {
                     date,
                     studentProfileId: student.studentProfileId,
                     programId: student.programId,
                     dismissalConfirmed: true as const,
                     followUpPlan: followUpPlans[key] ?? "",
-                    mutationId: crypto.randomUUID(),
+                    mutationId,
                   } }))}>Confirm dismissal & open follow-up</button>
               </details>
             </div>}
