@@ -106,6 +106,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       marketing: program.marketingStatus ? {
         status: program.marketingStatus, title: program.marketingTitle,
         summary: program.marketingSummary,
+        catalogEligible: approvedAcademicListings.some(listing => listing.programId === program.id),
         current: Boolean(program.marketingTitle && program.marketingSummary &&
           program.marketingGradeRange && program.marketingDeliveryModel &&
           isCurrentAcademicMarketingSnapshot({
