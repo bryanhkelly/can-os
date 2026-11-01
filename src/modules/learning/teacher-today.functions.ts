@@ -9,6 +9,7 @@ import { accessibleClasses } from "./class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
 import { readFirstClassrooms } from "./first-classroom.server";
 import type { FirstClassroom } from "@/domain/first-classroom";
+import { projectTeacherSections } from "@/domain/teacher-classroom-projection";
 
 async function assertTeacher() {
  const context = await getCommandContext(getRequest());
@@ -22,7 +23,7 @@ async function assertTeacher() {
 const EMPTY_TODAY = {
  connected: false,
  teacher: { firstName: "" },
- sections: [] as { id: string; title: string; studentCount: number; classroom: FirstClassroom }[],
+ sections: [] as { id: string; title: string; studentCount: number | null; classroom: FirstClassroom | null }[],
  ungraded: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; submittedAt: string | null }[],
  missingWork: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string }[],
  notices: [] as { id: string; title: string; body: string | null; status: string; createdAt: string }[],
@@ -61,15 +62,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
    inArray(s.enrollments.sectionId,sectionIds),
  );
  const classrooms = await readFirstClassrooms(sectionIds);
- const sections = assigned.map(row => {
-  const classroom = classrooms.find(item => item.sectionId === row.sectionId)!;
-  return {
-   id: row.sectionId,
-   title: row.title,
-   studentCount: classroom.activeStudentCount,
-   classroom,
-  };
- });
+ const sections = projectTeacherSections(assigned, classrooms);
 
  // submission_status has no "late" value; late work arrives as status "submitted"
  // with timeliness "late", so the queue keys on ungraded submitted attempts.
