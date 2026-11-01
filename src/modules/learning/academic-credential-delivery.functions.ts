@@ -6,7 +6,7 @@ import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
 import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, canReauthorizeCredentialRelease } from "@/domain/academic-credential-release";
-import { writeAudit } from "@/platform/mutation";
+import { notifyMany, writeAudit } from "@/platform/mutation";
 import { assertDiplomaFreshForAuthorizedRelease, assertOfficialTranscriptFreshForAuthorizedRelease } from "@/modules/learning/academic-credential-freshness.server";
 import { sessionIdleCutoff } from "@/domain/access-tokens";
 
@@ -260,6 +260,17 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     after:{recipientPersonId:data.recipientPersonId,credentialId:data.credentialId,
      consentId:consent!.id,transferActionId:action!.id,expiresAt:data.expiresAt},
    });
+   // Never mail credential bytes or an anonymous bearer link. Notify only
+   // the account-backed verified recipient about authenticated access.
+   // Download independently rechecks the live session, release, transfer
+   // consent, issuer and transcript freshness.
+   await notifyMany(tx,[{
+     recipientPersonId:data.recipientPersonId,
+     type:"academic_credential_secure_access_available",
+     title:"Protected academic record available",
+     body:"Sign in to My Academic Credentials to access any currently authorized record. No document is included in this message.",
+     resourceType:"academic_credential_release_authorization",resourceId:created.id,
+   }]);
    return {authorizationId:created.id};
   });
  });
