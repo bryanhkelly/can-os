@@ -1197,8 +1197,8 @@ export const issueTranscript = createServerFn({ method: "POST" })
       if(livePrograms.length!==programIds.length)
         throw new AuthorizationError("Transcript issuing Program source changed; retry issuance");
       const freshRows=[
-        ...await finalizedGradeRows(tx as DbClient,s,viewer),
-        ...await withdrawalTranscriptRows(tx as DbClient,s,viewer),
+        ...await finalizedGradeRows(tx as unknown as DbClient,s,viewer),
+        ...await withdrawalTranscriptRows(tx as unknown as DbClient,s,viewer),
       ];
       // gradeUpdatedAt is captured in the original and locked projections.
       // It catches same-letter in-place corrections as well as new grades,
