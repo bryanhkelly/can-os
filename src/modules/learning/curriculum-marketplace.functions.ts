@@ -32,7 +32,22 @@ export const installCurriculumPack=createServerFn({method:"POST"})
  .handler(async({data})=>installPack(await actor(),data));
 export const adoptCurriculumPack=createServerFn({method:"POST"})
  .validator((input:unknown)=>program.extend({packId:uuid,versionId:uuid}).strict().parse(input))
- .handler(async({data})=>adoptPack(await actor(),data));
+ .handler(async({data})=>{
+  // Never create a new unscoped adoption after annual licensing is activated.
+  // Historical adoptions remain readable; new grants must use the explicit
+  // school-year command and its verified publisher entitlement.
+  requireLegacyAdoptionWriteEnabled();
+  return adoptPack(await actor(),data);
+ });
+/** Explicit compatibility gate: historical records remain readable, but
+ * enabling annual adoption disables creation of new unscoped grants.
+ * This also permits an operator to close legacy writes before migration.
+ */
+function requireLegacyAdoptionWriteEnabled() {
+ if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
+    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+  throw new AuthorizationError("New curriculum adoption requires a verified school-year license and annual adoption workflow");
+}
 /**
  * Year-scoped adoption is staged on FullFlow but its SQL migration has NOT
  * been approved/applied. Leave the working legacy adoption path unchanged.
