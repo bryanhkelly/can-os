@@ -632,10 +632,72 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
     });
   });
 
+/** A current Site leader proposes a release, but may never approve their own
+ * proposal. All custody release authority is independently rechecked.
+ */
+export const proposePickupCustodyResolution=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({
+   holdId:uuid, mutationId,
+   resolutionNote:z.string().trim().min(20).max(2000),
+   authorityBasis:z.enum(["verified_court_order","verified_guardian_instructions","documented_emergency_cleared"]),
+   evidenceReference:z.string().trim().min(15).max(500),
+ }).strict().parse(v))
+ .handler(async({data})=>{
+   const actor=await staffActor();
+   if(actor.role!=="site_leader")throw new AuthorizationError("Site leader resolution proposal");
+   return db.transaction(async tx=>{
+     const [hold]=await tx.select().from(pickupCustodyHolds)
+       .where(eq(pickupCustodyHolds.id,data.holdId)).for("update").limit(1);
+     if(!hold)throw new AuthorizationError("existing pickup hold");
+     const student=await staffStudent(tx,actor,hold);
+     if(hold.status!=="active")throw new AuthorizationError("active pickup hold");
+     if((hold.kind==="emergency")!==(data.authorityBasis==="documented_emergency_cleared"))
+       throw new AuthorizationError("evidence basis does not fit the held safety concern");
+     const key="custody-resolution:"+data.mutationId;
+     const [replay]=await tx.select().from(actions).where(and(
+       eq(actions.type,"pickup_custody_resolution_proposal"),
+       sql`${actions.metadata}->>'requestKey' = ${key}`,
+     )).limit(1);
+     if(replay){
+       if(replay.subjectId!==hold.id||replay.ownerPersonId!==actor.actorPersonId||
+         replay.metadata.resolutionNote!==data.resolutionNote||
+         replay.metadata.authorityBasis!==data.authorityBasis||
+         replay.metadata.evidenceReference!==data.evidenceReference)
+         throw new Error("Resolution request ID reused with different input");
+       return {proposalId:replay.id,created:false as const};
+     }
+     const [pending]=await tx.select({id:actions.id}).from(actions).where(and(
+       eq(actions.type,"pickup_custody_resolution_proposal"),
+       eq(actions.subjectType,"pickup_custody_hold"),eq(actions.subjectId,hold.id),
+       eq(actions.status,"open"))).limit(1);
+     if(pending)throw new Error("Existing proposal still awaits independent review");
+     const [proposal]=await tx.insert(actions).values({
+       type:"pickup_custody_resolution_proposal",status:"open",priority:"urgent",
+       title:"Independent child custody hold resolution review",
+       description:"Review external authority independently; proposal is not permission to release.",
+       organizationId:student.organizationId,siteId:student.siteId,
+       programId:student.programId,subjectType:"pickup_custody_hold",
+       subjectId:hold.id,ownerPersonId:actor.actorPersonId,
+       metadata:{requestKey:key,holdId:hold.id,proposerPersonId:actor.actorPersonId,
+         resolutionNote:data.resolutionNote,authorityBasis:data.authorityBasis,
+         evidenceReference:data.evidenceReference},
+     }).returning({id:actions.id});
+     if(!proposal)throw new Error("Could not persist custody proposal");
+     await writeAudit(tx,actor,{action:"pickup.custody_hold.resolution_proposed",
+       entityType:"action",entityId:proposal.id,
+       scope:{organizationId:student.organizationId,siteId:student.siteId,programId:student.programId},
+       after:{holdId:hold.id,authorityBasis:data.authorityBasis},
+       contextExtras:{classification:"family_custody",mutationId:data.mutationId,
+         evidenceReference:data.evidenceReference}});
+     return {proposalId:proposal.id,created:true as const};
+   });
+ });
+
 export const resolvePickupCustodyHold = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     holdId: uuid,
-    resolutionNote: z.string().trim().min(10).max(2000),
+    proposalId: uuid,
+    resolutionNote: z.string().trim().min(20).max(2000),
     mutationId,
   }).strict().parse(value))
   .handler(async ({ data }) => {
@@ -653,7 +715,30 @@ export const resolvePickupCustodyHold = createServerFn({ method: "POST" })
         return { holdId: existing.id, resolved: false as const };
       }
       if (existing.status !== "active") throw new Error("Custody hold is not active");
+      const [proposal]=await tx.select().from(actions).where(and(
+        eq(actions.id,data.proposalId),
+        eq(actions.type,"pickup_custody_resolution_proposal"),
+        eq(actions.subjectType,"pickup_custody_hold"),
+        eq(actions.subjectId,existing.id),
+        eq(actions.programId,existing.programId),
+        eq(actions.siteId,existing.siteId),
+        eq(actions.status,"open"))).for("update").limit(1);
+      if(!proposal || proposal.ownerPersonId===actor.actorPersonId ||
+        proposal.metadata.proposerPersonId!==proposal.ownerPersonId ||
+        proposal.metadata.resolutionNote!==data.resolutionNote ||
+        typeof proposal.metadata.evidenceReference!=="string" ||
+        proposal.metadata.evidenceReference.trim().length<15 ||
+        (existing.kind==="emergency")!==
+          (proposal.metadata.authorityBasis==="documented_emergency_cleared") ||
+        !["verified_court_order","verified_guardian_instructions","documented_emergency_cleared"]
+          .includes(String(proposal.metadata.authorityBasis)))
+        throw new AuthorizationError("independently reviewed custody release authority required");
       const now = new Date();
+      await tx.update(actions).set({status:"resolved",resolvedAt:now,updatedAt:now,
+        resolutionNote:"Independently reviewed by a second Site leader",
+        metadata:{...proposal.metadata,reviewedByPersonId:actor.actorPersonId,
+          reviewedAt:now.toISOString()},
+      }).where(eq(actions.id,proposal.id));
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + existing.studentProfileId + ":" + existing.programId}))`);
       await tx.update(pickupCustodyHolds).set({
         status: "resolved", resolvedAt: now, resolvedByPersonId: actor.actorPersonId!,
