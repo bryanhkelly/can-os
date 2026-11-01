@@ -1183,6 +1183,19 @@ export const issueTranscript = createServerFn({ method: "POST" })
             inArray(s.enrollments.id,withdrawalIds))).for("share");
         if(locked.length!==withdrawalIds.length)throw new AuthorizationError("Transcript withdrawal source changed; retry issuance");
       }
+      // Credit units and issuer come from Section/Program metadata, not just
+      // the grade row. Lock those source records before the fresh projection so
+      // concurrent edits cannot change Section credit or issuer mid-issuance.
+      const lockedSectionIds=[...new Set(rows.map(row=>row.sectionId))];
+      const sectionSources=await tx.select({id:s.sections.id,programId:s.sections.programId})
+        .from(s.sections).where(inArray(s.sections.id,lockedSectionIds)).for("share");
+      if(sectionSources.length!==lockedSectionIds.length)
+        throw new AuthorizationError("Transcript Section source changed; retry issuance");
+      const programIds=[...new Set(sectionSources.map(section=>section.programId))];
+      const livePrograms=await tx.select({id:s.programs.id})
+        .from(s.programs).where(inArray(s.programs.id,programIds)).for("share");
+      if(livePrograms.length!==programIds.length)
+        throw new AuthorizationError("Transcript issuing Program source changed; retry issuance");
       const freshRows=[
         ...await finalizedGradeRows(tx as DbClient,s,viewer),
         ...await withdrawalTranscriptRows(tx as DbClient,s,viewer),
