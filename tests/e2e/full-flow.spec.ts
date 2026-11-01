@@ -783,7 +783,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       )).toBe(2);
 
       await goto(teacher.page, gradebook);
-      await teacher.page.getByLabel(/^Score \\(0/).fill("10");
+      await teacher.page.getByLabel(/^Score \(0/).fill("10");
       await teacher.page.getByLabel("Feedback comment").fill("Revision complete; the solution checks.");
       await teacher.page.getByRole("button", { name: "Post grade" }).click();
       await expect(teacher.page.getByText(/Grade posted/)).toBeVisible();
