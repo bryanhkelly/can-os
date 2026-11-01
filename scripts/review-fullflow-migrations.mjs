@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
+import { assessStagedLedgerHashes } from "./fullflow-ledger-hashes.mjs";
 import { assessPost0051MigrationArtifacts, assessPost0056MigrationArtifacts } from "./fullflow-post0051-artifacts.mjs";
 
 /**
@@ -423,7 +424,8 @@ async function main() {
     p0SafetyColumns,p0SafetyIndexes,
     onboardingColumns,onboardingIndexes,outboundIndexes,
     relationshipColumns,futureIndexes,cohortColumns,cohortConstraints,
-    lateColumns,lateIndexes,lateForeignKeys,latePrimaryKeys,churchStatusConstraints] = await Promise.all([
+    lateColumns,lateIndexes,lateForeignKeys,latePrimaryKeys,churchStatusConstraints,
+    migrationLedgerRows] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -535,7 +537,10 @@ async function main() {
         'finance_provider_events','finance_receipts')`,
     query`SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint
       WHERE conrelid=to_regclass('public.church_onboarding_requests')
-       AND conname='church_onboarding_request_status_ck'`
+       AND conname='church_onboarding_request_status_ck'`,
+    query`SELECT hash,created_at FROM drizzle.__drizzle_migrations
+      WHERE created_at >= ${journal.entries[52].when}
+      ORDER BY created_at`
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal, types, columns, tables,
@@ -548,7 +553,13 @@ async function main() {
     relationshipColumns, futureIndexes, cohortColumns, cohortConstraints,
     lateColumns, lateIndexes, lateForeignKeys, latePrimaryKeys, churchStatusConstraints,
   });
-  process.stdout.write(JSON.stringify(review,null,2)+"\n");
+  const hashIssues=assessStagedLedgerHashes({journal,applied:ledger.applied,rows:migrationLedgerRows});
+  if(hashIssues.length) {
+    review.issues.push(...hashIssues);
+    review.ready=false;
+    review.status="HOLD_REVIEW_DRIFT";
+  }
+  process.stdout.write(JSON.stringify(review,null,2)+"\\n");
   if (!review.ready) process.exitCode = 1;
 }
 
