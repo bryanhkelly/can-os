@@ -7,6 +7,7 @@ import {
   recordUncollectedChild,
   recordVerifiedPickupRelease,
   resolvePickupCustodyHold,
+  proposePickupCustodyResolution,
 } from "@/modules/operations/pickup.functions";
 
 type Roster = Awaited<ReturnType<typeof getOnsitePickupRoster>>;
@@ -37,6 +38,8 @@ export function OnsitePickupPanel({ date, onChanged }: {
   const [holdKinds, setHoldKinds] = useState<Record<string, string>>({});
   const [holdHouseholds, setHoldHouseholds] = useState<Record<string, string>>({});
   const [resolutions, setResolutions] = useState<Record<string, string>>({});
+  const [resolutionReferences,setResolutionReferences]=useState<Record<string,string>>({});
+  const [resolutionBases,setResolutionBases]=useState<Record<string,string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,17 +135,56 @@ export function OnsitePickupPanel({ date, onChanged }: {
             </div>}
 
             {student.activeHolds.map(hold => <div key={hold.id}
-              className="mt-4 rounded-lg border border-danger/40 bg-danger/5 p-3 text-sm">
-              <p className="font-semibold">{hold.kind === "emergency" ? "Emergency hold" : "Disputed custody hold"}</p>
-              <p className="mt-1">{hold.reason}</p>
-              {roster.canResolveHolds && <label className="mt-3 block text-xs font-semibold">Resolution note
-                <textarea rows={2} maxLength={2000} value={resolutions[hold.id] ?? ""}
-                  onChange={event => setResolutions(current => ({ ...current, [hold.id]: event.target.value }))}
-                  className="mt-1 w-full rounded border bg-background p-2" />
-              </label>}
-              {roster.canResolveHolds && <button type="button" disabled={!!busy}
-                className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => void run(hold.id, "Custody hold resolved.", (mutationId) => resolvePickupCustodyHold({ data: {
+              className="mt-4 rounded-lg border border-              {roster.canResolveHolds && !hold.pendingResolution && <>
+                <p className="mt-2 text-xs">Proposal only. A second Site director must independently approve the release.</p>
+                <label className="mt-3 block text-xs font-semibold">Resolution note
+                  <textarea rows={2} maxLength={2000} value={resolutions[hold.id]??""}
+                    onChange={event=>setResolutions(old=>({...old,[hold.id]:event.target.value}))}
+                    className="mt-1 w-full rounded border bg-background p-2"/>
+                </label>
+                <label className="mt-2 block text-xs">Documented authority basis
+                  <select className="mt-1 block w-full rounded border bg-background p-2"
+                    value={resolutionBases[hold.id]??(hold.kind==="emergency"?"documented_emergency_cleared":"verified_court_order")}
+                    onChange={event=>setResolutionBases(old=>({...old,[hold.id]:event.target.value}))}>
+                    {hold.kind==="emergency"
+                      ? <option value="documented_emergency_cleared">Verified emergency clearance</option>
+                      : <>
+                        <option value="verified_court_order">Verified court order</option>
+                        <option value="verified_guardian_instructions">Verified guardian instructions</option>
+                      </>}
+                  </select>
+                </label>
+                <label className="mt-2 block text-xs">Verified case or document reference
+                  <input maxLength={500} value={resolutionReferences[hold.id]??""}
+                    onChange={event=>setResolutionReferences(old=>({...old,[hold.id]:event.target.value}))}
+                    className="mt-1 block w-full rounded border bg-background p-2"/>
+                </label>
+                <button type="button" disabled={!!busy||(resolutions[hold.id]??"").trim().length<20||
+                  (resolutionReferences[hold.id]??"").trim().length<15}
+                  className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  onClick={()=>void run(hold.id+":propose","Resolution proposed for independent review.",
+                    mutationId=>proposePickupCustodyResolution({data:{
+                      holdId:hold.id,mutationId,
+                      resolutionNote:resolutions[hold.id]??"",
+                      authorityBasis:(resolutionBases[hold.id]??(hold.kind==="emergency"?"documented_emergency_cleared":"verified_court_order")) as "verified_court_order"|"verified_guardian_instructions"|"documented_emergency_cleared",
+                      evidenceReference:resolutionReferences[hold.id]??"",
+                    }}))}>Propose release for independent review</button>
+              </>}
+              {roster.canResolveHolds && hold.pendingResolution && <>
+                <p className="mt-2 text-xs font-semibold">Pending independent review</p>
+                <p className="mt-1 text-xs">Basis: {hold.pendingResolution.authorityBasis.replaceAll("_"," ")}</p>
+                <p className="mt-1 text-xs">Reference: {hold.pendingResolution.evidenceReference}</p>
+                <p className="mt-1 text-xs">Proposal: {hold.pendingResolution.resolutionNote}</p>
+                {hold.pendingResolution.proposerPersonId!==roster.reviewerPersonId
+                  ? <button type="button" disabled={!!busy}
+                      className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      onClick={()=>void run(hold.id+":resolve","Independent release approved; hold cleared.",
+                        mutationId=>resolvePickupCustodyHold({data:{
+                          holdId:hold.id,proposalId:hold.pendingResolution!.id,
+                          resolutionNote:hold.pendingResolution!.resolutionNote,mutationId,
+                        }}))}>Independently approve and clear hold</button>
+                  : <p className="mt-2 text-xs">You cannot approve your own proposal. A different authorized Site director must review.</p>}
+              </>} resolvePickupCustodyHold({ data: {
                   holdId: hold.id,
                   resolutionNote: resolutions[hold.id] ?? "",
                   mutationId,
