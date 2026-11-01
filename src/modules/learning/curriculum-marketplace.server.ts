@@ -151,6 +151,11 @@ export async function installPack(actor: Actor, input:{programId:string;packId:s
 }
 
 export async function adoptPack(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
+ // Enforce the same compatibility policy at the domain entry point, not just
+ // the HTTP handler: internal callers must never bypass the annual rollout.
+ if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
+    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+  throw new AuthorizationError("New curriculum adoption requires verified school-year licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
   const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
