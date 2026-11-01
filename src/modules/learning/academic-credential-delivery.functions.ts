@@ -154,6 +154,16 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      eq(s.guardianRelationships.studentPersonId,student.personId),
      eq(s.guardianRelationships.guardianPersonId,data.recipientPersonId),
      eq(s.guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
+   // Directory identity and issuer affiliation may change after screening.
+   // Lock both before recording or reusing an official records release.
+   const [liveRecipientPerson]=await tx.select({
+     email:s.people.email,active:s.people.active,
+   }).from(s.people).where(eq(s.people.id,data.recipientPersonId))
+     .for("share").limit(1);
+   const [liveProgram]=await tx.select({
+     issuerId:s.programs.creditIssuingOrganizationId,
+   }).from(s.programs).where(eq(s.programs.id,action!.programId))
+     .for("share").limit(1);
    const [liveRecipientAccount]=await tx.select({id:s.accessAccounts.id})
     .from(s.accessAccounts)
     .innerJoin(s.accountPersonGrants,and(
@@ -166,6 +176,9 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      eq(s.accessAccounts.emailNormalized,data.recipientEmail.trim().toLowerCase())))
     .for("share").limit(1);
    if(!liveConsent||liveConsent.revokedAt||!liveGuardian||!liveRecipientAccount||
+      !liveRecipientPerson?.active||
+      liveRecipientPerson.email?.trim().toLowerCase()!==data.recipientEmail.trim().toLowerCase()||
+      liveProgram?.issuerId!==doc.issuerId||
       liveConsent.signerPersonId!==data.recipientPersonId||
       liveConsent.subjectId!==doc.studentProfileId||
       liveAction?.subjectId!==doc.studentProfileId||
@@ -431,7 +444,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    eq(s.consentRecords.subjectType,"student_profile"),
    eq(s.consentRecords.consentType,"academic_records_transfer_release"))).for("share").limit(1);
   const [program]=action?.programId?await tx.select({issuerId:s.programs.creditIssuingOrganizationId})
-   .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1):[];
+   .from(s.programs).where(eq(s.programs.id,action.programId)).for("share").limit(1):[];
   const evidence=consent?.signatureEvidence;
   if(!canRedeemTransferCredential({
    consentActive:!!consent&&!consent.revokedAt&&evidence?.acknowledged===true,
