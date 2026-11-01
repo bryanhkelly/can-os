@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { approveGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listTranscriptDiplomas, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
+import { approveGraduationRequirements, classifyLegacyGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listTranscriptDiplomas, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
 
 export const Route=createFileRoute("/admissions/graduation")({component:GraduationCloseout});
 
@@ -17,6 +17,11 @@ function GraduationCloseout(){
  const [cohortEnd,setCohortEnd]=useState("");
  const [applicabilityReason,setApplicabilityReason]=useState("");
  const [supersedesRequirementSetId,setSupersedesRequirementSetId]=useState("");
+ const [legacyPolicyId,setLegacyPolicyId]=useState("");
+ const [legacyCohortStart,setLegacyCohortStart]=useState("");
+ const [legacyCohortEnd,setLegacyCohortEnd]=useState("");
+ const [legacyEvidenceReference,setLegacyEvidenceReference]=useState("");
+ const [legacyJustification,setLegacyJustification]=useState("");
  const [applicablePolicy,setApplicablePolicy]=useState("");
  const [requirements,setRequirements]=useState([{subject:"",minimumUnits:""}]);
  const [transcriptId,setTranscriptId]=useState("");
@@ -56,6 +61,21 @@ function GraduationCloseout(){
      <button disabled={busy||!issuerId||!academicYear.trim()||!cohortStart||!cohortEnd||applicabilityReason.trim().length<12||requirements.some(rule=>!rule.subject.trim()||!(Number(rule.minimumUnits)>0))} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await approveGraduationRequirements({data:{issuerId,academicYear,version,cohortStart,cohortEnd,applicabilityReason,supersedesRequirementSetId:supersedesRequirementSetId||undefined,requirements:requirements.map(rule=>({subject:rule.subject.trim(),minimumUnits:Number(rule.minimumUnits)}))}});setRequirementSetId(result.requirementSetId);setSets(await listGraduationRequirements({data:{issuerId}}));setAudit(null);setDecisionId("");setMessage("Requirements version approved.")})}>Approve requirements</button>
      <button disabled={busy||!issuerId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setSets(await listGraduationRequirements({data:{issuerId}}))})}>Load approved versions</button>
     </div>
+
+    {sets.some(set=>!set.cohortStart||!set.cohortEnd)&&
+     <div className="space-y-3 rounded-lg border p-3">
+      <h3 className="font-semibold">Classify a legacy graduation policy</h3>
+      <p className="text-sm">Legacy policies without attested entry-cohort bounds block graduation. Classify each policy from its institutional evidence. Never infer a cohort from its academic year. This one-time action is audited; approved credit requirements do not change.</p>
+      <label className="block text-sm">Unclassified policy<select className="mt-1 block w-full rounded border bg-background p-2" value={legacyPolicyId} onChange={e=>setLegacyPolicyId(e.target.value)}><option value="">Select unclassified policy</option>{sets.filter(set=>!set.cohortStart||!set.cohortEnd).map(set=><option key={set.id} value={set.id}>{set.academicYear} · {set.version}</option>)}</select></label>
+      {field("Attested entry cohort start (YYYY)",legacyCohortStart,setLegacyCohortStart)}
+      {field("Attested entry cohort end (YYYY)",legacyCohortEnd,setLegacyCohortEnd)}
+      {field("Registrar evidence reference",legacyEvidenceReference,setLegacyEvidenceReference)}
+      {field("Institutional classification justification",legacyJustification,setLegacyJustification)}
+      <button type="button" className="rounded-lg border px-3 py-2 disabled:opacity-50" disabled={busy||!issuerId||!legacyPolicyId||!/^[0-9]{4}$/.test(legacyCohortStart)||!/^[0-9]{4}$/.test(legacyCohortEnd)||legacyCohortStart>legacyCohortEnd||legacyEvidenceReference.trim().length<12||legacyJustification.trim().length<20} onClick={()=>void perform(async()=>{
+       await classifyLegacyGraduationRequirements({data:{issuerId,requirementSetId:legacyPolicyId,cohortStart:legacyCohortStart,cohortEnd:legacyCohortEnd,evidenceReference:legacyEvidenceReference,applicabilityReason:legacyJustification}});
+       setSets(await listGraduationRequirements({data:{issuerId}}));setLegacyPolicyId("");setLegacyCohortStart("");setLegacyCohortEnd("");setLegacyEvidenceReference("");setLegacyJustification("");setMessage("Legacy policy cohort classified and audited. Review any remaining unclassified active policies.");
+      })}>Attest and classify legacy policy</button>
+     </div>}
 
    </section>
    <section className="space-y-3 rounded-xl border p-4">
