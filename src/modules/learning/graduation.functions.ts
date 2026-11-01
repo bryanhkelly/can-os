@@ -7,6 +7,8 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { resolveGraduationPolicy, validateLegacyGraduationCohortClassification } from "@/domain/graduation-policy";
 import { adjudicateGraduation } from "@/domain/graduation-adjudication";
 import { auditGraduationCredits, type CreditEvidence, type CreditRequirement } from "@/domain/graduation-credit-audit";
+import { issuedGradeIds, assertIssuedGradesStillCanonical, type IssuedGradeSnapshot } from "@/domain/graduation-grade-freshness";
+import { verifiedSectionCreditUnits } from "@/domain/section-credit-policy";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid = z.string().uuid();
@@ -64,6 +66,42 @@ async function assertNoWithdrawnTranscriptCredits(db:Pick<Awaited<ReturnType<typ
  if(withdrawn.length)throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
 }
 
+/** Lock and reconcile the live finalized gradebook against every issued
+ * transcript grade row. A corrected final grade cannot silently leave a
+ * previously issued diploma current. Historical missing provenance fails closed.
+ */
+async function assertCurrentCanonicalTranscriptGrades(
+ db:Pick<Awaited<ReturnType<typeof resources>>["db"],"select">,
+ s:Awaited<ReturnType<typeof resources>>["s"],
+ transcript:{studentProfileId:string;issuingOrganizationId:string;issuedAt:Date;snapshot:Record<string,unknown>},
+){
+ if(!Array.isArray(transcript.snapshot.rows))throw new AuthorizationError("Issued transcript grade evidence missing");
+ const rows=transcript.snapshot.rows as IssuedGradeSnapshot[];
+ let gradeIds:string[];
+ try{gradeIds=issuedGradeIds(rows);}catch{throw new AuthorizationError("Issued transcript grade provenance requires institutional review");}
+ if(!gradeIds.length)return; // withdrawal-only transcript has no earned credits
+ const canonical=await db.select({
+   id:s.sectionGrades.id,sectionId:s.sectionGrades.sectionId,
+   letterGrade:s.sectionGrades.letterGrade,status:s.sectionGrades.status,
+   updatedAt:s.sectionGrades.updatedAt,
+   creditIssuerId:s.programs.creditIssuingOrganizationId,
+   sectionMetadata:s.sections.metadata,
+ }).from(s.sectionGrades)
+   .innerJoin(s.sections,eq(s.sections.id,s.sectionGrades.sectionId))
+   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+   .where(and(eq(s.sectionGrades.studentProfileId,transcript.studentProfileId),
+     inArray(s.sectionGrades.id,gradeIds)))
+   .for("share");
+ try{
+   assertIssuedGradesStillCanonical(rows,canonical.map(row=>({
+     id:row.id,sectionId:row.sectionId,letterGrade:row.letterGrade,
+     status:row.status,updatedAt:row.updatedAt,
+     creditIssuerId:row.creditIssuerId,
+     configuredCredits:verifiedSectionCreditUnits(row.sectionMetadata),
+   })),transcript.issuedAt,transcript.issuingOrganizationId);
+ }catch{throw new AuthorizationError("Issued transcript no longer matches canonical finalized gradebook; reissue and review");}
+}
+
 async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>["db"], "select">, s: Awaited<ReturnType<typeof resources>>["s"], transcriptId: string, requirementSetId: string) {
   const [transcript] = await db.select().from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,transcriptId)).limit(1);
   const [requirementSet] = await db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.id,requirementSetId)).limit(1);
@@ -114,6 +152,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     throw new AuthorizationError("Transcript predates institutional enrollment");
   const evidence=evidenceFromSnapshot(transcript.snapshot,transcript.issuingOrganizationId);
   await assertNoWithdrawnTranscriptCredits(db,s,transcript.studentProfileId,evidence);
+  await assertCurrentCanonicalTranscriptGrades(db,s,transcript);
   return { transcript, requirementSet, evidence };
 }
 
