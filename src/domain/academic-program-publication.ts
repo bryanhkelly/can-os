@@ -31,6 +31,40 @@ export function publishableAcademicProgram(input: {
     input.organizationId === input.siteOrganizationId;
 }
 
+/** Invalidate a previously reviewed listing when the source Program's
+ * identity, grade coverage or delivery model is subsequently edited. Do not
+ * silently advertise stale institutional facts to prospective families. */
+export function isCurrentAcademicMarketingSnapshot(input: {
+  title: string;
+  summary: string;
+  gradeRange: { min: string; max: string };
+  deliveryModel: {
+    onsite: boolean; asynchronous: boolean;
+    liveOnline: boolean; onsiteDaysPerWeek: number | null;
+  };
+  programName: string;
+  canonicalGrades: { min: string; max: string };
+  canonicalDelivery: {
+    onsite?: boolean; asynchronous?: boolean;
+    liveOnline?: boolean; onsiteDaysPerWeek?: number;
+  };
+}): boolean {
+  try {
+    const canonical = academicMarketingSnapshot({
+      name: input.programName,
+      gradeRange: input.canonicalGrades,
+      deliveryModel: input.canonicalDelivery,
+    }, input.summary);
+    return input.title === canonical.title &&
+      JSON.stringify(input.gradeRange) === JSON.stringify(canonical.gradeRange) &&
+      JSON.stringify(input.deliveryModel) === JSON.stringify(canonical.deliveryModel);
+  } catch {
+    // Legacy data containing prohibited claims or malformed fields must not
+    // remain publicly readable until explicitly re-reviewed.
+    return false;
+  }
+}
+
 /** Public copy is approved separately from the mutable internal Program. */
 export function publicAcademicProgram(row: {
   programId: string;
