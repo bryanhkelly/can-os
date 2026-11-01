@@ -637,19 +637,29 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
  */
 export const proposePickupCustodyResolution=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({
-   holdId:uuid, mutationId,
+   holdId:uuid, mutationId, sectionId:uuid.optional(),
    resolutionNote:z.string().trim().min(20).max(2000),
    authorityBasis:z.enum(["verified_court_order","verified_guardian_instructions","documented_emergency_cleared"]),
    evidenceReference:z.string().trim().min(15).max(500),
  }).strict().parse(v))
  .handler(async({data})=>{
    const actor=await staffActor();
-   if(actor.role!=="site_leader")throw new AuthorizationError("Site leader resolution proposal");
+   if(!["room_facilitator","site_staff"].includes(actor.role))
+     throw new AuthorizationError("separate verified local school staff must propose custody resolution");
    return db.transaction(async tx=>{
      const [hold]=await tx.select().from(pickupCustodyHolds)
        .where(eq(pickupCustodyHolds.id,data.holdId)).for("update").limit(1);
      if(!hold)throw new AuthorizationError("existing pickup hold");
-     const student=await staffStudent(tx,actor,hold);
+     const student=await staffStudent(tx,actor,{...hold,sectionId:data.sectionId});
+     if(actor.role==="room_facilitator"){
+       if(!data.sectionId)throw new AuthorizationError("named student Section for custody proposal");
+       const [seat]=await tx.select({id:enrollments.id}).from(enrollments)
+         .where(and(eq(enrollments.studentProfileId,hold.studentProfileId),
+           eq(enrollments.programId,hold.programId),
+           eq(enrollments.sectionId,data.sectionId),eq(enrollments.kind,"section"),
+           eq(enrollments.status,"active"))).limit(1);
+       if(!seat)throw new AuthorizationError("student and delegated facilitator must share the exact Section");
+     }
      if(hold.status!=="active")throw new AuthorizationError("active pickup hold");
      if((hold.kind==="emergency")!==(data.authorityBasis==="documented_emergency_cleared"))
        throw new AuthorizationError("evidence basis does not fit the held safety concern");
@@ -869,6 +879,7 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
     return {
       date: data.date,
       canResolveHolds: actor.role === "site_leader",
+      canProposeHolds:actor.role==="room_facilitator"||actor.role==="site_staff",
       reviewerPersonId:actor.role==="site_leader"?actor.actorPersonId:null,
       students: roster.students.map(student => {
         const same = (row: { studentProfileId: string; programId: string }) =>
