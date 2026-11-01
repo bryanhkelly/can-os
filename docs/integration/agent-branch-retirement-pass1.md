@@ -76,3 +76,18 @@ Compared each original PR's changed paths against the live FullFlow tree and its
 - **K:** `src/modules/learning/common-cartridge-import.functions.ts`, `src/routes/operations.curriculum-marketplace.tsx`.
 
 **Decision:** Do not overwrite divergent FullFlow files from older source branches. Pass 2 establishes file inventory completeness, not behavioral equivalence. Retain source branches until the above semantic deltas are signed off; then close original PRs and delete branches in a separate cleanup. No production deployment or migrations authorized by this audit.
+
+## Semantic reconciliation — safety-critical findings
+
+- **A graduation:** FullFlow adds fail-closed handling for unclassified active graduation policies and registrar classification validation. The older A branch lacks these guards. Preserve FullFlow.
+- **B credential delivery:** FullFlow replaces the branch's local latest-transcript-only guard with authoritative transcript **and diploma** freshness, row locks and recipient rechecks. Preserve FullFlow; do not restore branch's local fallback.
+- **E first-day:** FullFlow replaces the branch's 180-day per-date scan with bounded candidate prefiltering and explicit `verification_incomplete` fail-closed status. Preserve FullFlow.
+- **J OneRoster:** FullFlow adds durable external enrollment placement decisions, active Section checks, replay protection and nonreactivation of withdrawn enrollment. Preserve FullFlow.
+- **K Cartridge:** FullFlow adds a non-null Site guard for authorized published Section lesson reads. Preserve FullFlow.
+- **G curriculum:** **Real semantic divergence**: the source branch forbids legacy program-wide adoption and adds annual-year-scoped read/write checks, while FullFlow retains a legacy adoption route plus separate flag-closed annual commands. Do not copy source branch blindly or enable annual rights before migration and Section/entitlement acceptance. This requires an explicit migration/compatibility decision on FullFlow.
+
+## Retirement actions
+
+- **Original PR #212 (D): closed as superseded.** All 24 changed paths are byte-identical on FullFlow; the 40-lesson draft remains incomplete.
+- **Original PR #207 (L): closed as superseded.** All 6 changed paths are byte-identical on FullFlow; connected church evidence remains incomplete.
+- Source branches remain in GitHub until deletion is supported and the remaining semantic gates are resolved. Closing an original PR does not delete its branch.
