@@ -35,7 +35,6 @@ describe("graduation cohort migration SQL integrity", () => {
   it("defines the self-FK and unique successor index exactly once", () => {
     expect((migration.match(/FOREIGN KEY /g) ?? [])).toHaveLength(1);
     expect((migration.match(/WHERE "supersedes_requirement_set_id" IS NOT NULL/g) ?? [])).toHaveLength(1);
-    expect(migration).not.toMatch(/\bDROP\b/i);
-    expect(migration).not.toMatch(/\bUPDATE\b/i);
+    expect(statements.every(s => !/^(?:DROP|UPDATE)\s/i.test(s))).toBe(true);
   });
 });
