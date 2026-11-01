@@ -182,7 +182,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
 
             <details className="mt-3 rounded border border-danger/40 p-3">
               <summary className="cursor-pointer text-sm font-semibold">Report disputed custody — pause all release</summary>
-              <p className="mt-2 text-xs text-muted-foreground">This immediately blocks every pickup authorization until an authorized site leader resolves the hold. It does not decide legal custody.</p>
+              <p className="mt-2 text-xs text-muted-foreground">This immediately blocks every pickup authorization until an authorized site leader resolves the hold. It does not decide legal custody. The school receives an urgent review task; staff independently determine safe recipients for any family notification.</p>
               <label className="mt-3 block text-xs font-semibold">What requires school review
                 <textarea rows={3} maxLength={2000} value={holdReasons[key] ?? ""}
                   onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}

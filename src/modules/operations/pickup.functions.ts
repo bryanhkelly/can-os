@@ -27,6 +27,7 @@ import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { projectGuardianPickupHolds } from "@/domain/guardian-pickup-hold-visibility";
+import { maySendAutomatedPickupFamilyNotice } from "@/domain/pickup-notification-privacy";
 import { assertOnsitePickupScope } from "@/domain/onsite-pickup-access";
 import {
   evaluatePickupRelease,
@@ -602,7 +603,7 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
         body:"A custody or emergency hold is active at your school. All release is blocked until the site leader reviews and resolves the hold.",
         resourceType:"action",resourceId:followUp.id,eventId:actionEventId,
       }]);
-      const eventId = await emitEvent(tx, {
+      await emitEvent(tx, {
         eventType: EventTypes.PickupCustodyHoldCreated,
         aggregateType: "pickup_custody_hold", aggregateId: record.id,
         actorPersonId: actor.actorPersonId,
@@ -616,13 +617,10 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
         contextExtras: { classification: "family_custody", mutationId: data.mutationId,
           reason: data.reason },
       });
-      await notifyPickupGuardians(tx, {
-        studentProfileId: data.studentProfileId,
-        type: "pickup_custody_hold_created",
-        title: data.kind === "emergency" ? "School pickup emergency hold" : "Pickup custody review",
-        body: "All student release is paused while authorized staff review this pickup restriction. Contact the school for next steps.",
-        resourceType: "pickup_custody_hold", resourceId: record.id, eventId,
-      });
+      // Confidential custody restrictions require an approved human recipient
+      // decision. Never broadcast the existence of a dispute or emergency hold
+      // to every guardian with general pickup access. The urgent site-leader
+      // Action and staff notification above remain mandatory.
       return { holdId: record.id, created: true as const };
     });
   });
@@ -672,7 +670,7 @@ export const resolvePickupCustodyHold = createServerFn({ method: "POST" })
           payload:{type:"onsite_pickup_custody_hold",holdId:existing.id},
         });
       }
-      const eventId = await emitEvent(tx, {
+      await emitEvent(tx, {
         eventType: EventTypes.PickupCustodyHoldResolved,
         aggregateType: "pickup_custody_hold", aggregateId: existing.id,
         actorPersonId: actor.actorPersonId,
@@ -686,12 +684,8 @@ export const resolvePickupCustodyHold = createServerFn({ method: "POST" })
         contextExtras: { classification: "family_custody", mutationId: data.mutationId,
           resolutionNote: data.resolutionNote },
       });
-      await notifyPickupGuardians(tx, {
-        studentProfileId: student.studentProfileId,
-        type: "pickup_custody_hold_resolved", title: "Pickup restriction resolved",
-        body: "Authorized staff resolved a pickup restriction. Current family authorizations and identity checks still apply.",
-        resourceType: "pickup_custody_hold", resourceId: existing.id, eventId,
-      });
+      // A resolution may itself be sensitive. Staff must follow verified,
+      // case-specific family contact instructions; no blanket broadcast.
       return { holdId: existing.id, resolved: true as const };
     });
   });
@@ -1094,7 +1088,7 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
         payload: { type: deniedPickupActionType, denialId: record.id,
           studentProfileId: data.studentProfileId, ownerPersonId },
       });
-      const eventId = await emitEvent(tx, {
+      await emitEvent(tx, {
         eventType: EventTypes.ChildPickupDenied,
         aggregateType: "pickup_release_event", aggregateId: record.id,
         actorPersonId: actor.actorPersonId,
@@ -1111,12 +1105,9 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
         contextExtras: { classification: "family_custody", mutationId: data.mutationId,
           detail: data.detail ?? null },
       });
-      await notifyPickupGuardians(tx, {
-        studentProfileId: data.studentProfileId,
-        type: "child_pickup_denied", title: "Student pickup was not released",
-        body: "The school denied a pickup attempt and kept the student under school supervision. Contact the school for next steps.",
-        resourceType: "pickup_release_event", resourceId: record.id, eventId,
-      });
+      // A denied adult may be part of a contested custody situation. Do not
+      // notify all pickup guardians automatically; route the urgent incident
+      // to its designated site-leader Action owner below.
       if (ownerPersonId !== actor.actorPersonId) {
         await notifyMany(tx, [{
           recipientPersonId: ownerPersonId,
@@ -1185,13 +1176,25 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
           eq(pickupReleaseEvents.status, "released"),
         )).limit(1);
       if (released) throw new Error("This student already has verified release evidence");
+      // An active protective hold changes who may safely receive urgent family
+      // contact. Preserve the child's urgent follow-up without broadcasting to
+      // potentially disputed guardians before an independent staff review.
+      const [activeHold] = await tx.select({ id: pickupCustodyHolds.id })
+        .from(pickupCustodyHolds).where(and(
+          eq(pickupCustodyHolds.studentProfileId, data.studentProfileId),
+          eq(pickupCustodyHolds.programId, data.programId),
+          eq(pickupCustodyHolds.status, "active"),
+        )).limit(1);
+      const followUpOwnerPersonId = activeHold
+        ? (await currentSiteDirectorPersonId(tx, data.programId, new Date())) ?? actor.actorPersonId!
+        : actor.actorPersonId!;
       const [record] = await tx.insert(actions).values({
         type: uncollectedActionType,
         status: "open",
         priority: "high",
         title: "Uncollected child requires supervised family follow-up",
         description: "Dismissal was confirmed without verified release. Keep the child supervised and follow the documented plan.",
-        ownerPersonId: actor.actorPersonId,
+        ownerPersonId: followUpOwnerPersonId,
         organizationId: school.organizationId,
         siteId: school.siteId,
         programId: data.programId,
@@ -1216,12 +1219,26 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
           date: data.date, status: "open" },
         contextExtras: { classification: "family_custody", mutationId: data.mutationId },
       });
-      await notifyPickupGuardians(tx, {
-        studentProfileId: data.studentProfileId,
-        type: "child_uncollected_follow_up", title: "School needs pickup follow-up",
-        body: "The school has no verified release record after dismissal and is keeping your student supervised. Contact the school now.",
-        resourceType: "action", resourceId: record.id, eventId,
-      });
+      if (maySendAutomatedPickupFamilyNotice({
+        event: "uncollected_child", activeCustodyHold: Boolean(activeHold),
+      })) {
+        await notifyPickupGuardians(tx, {
+          studentProfileId: data.studentProfileId,
+          type: "child_uncollected_follow_up", title: "School needs pickup follow-up",
+          body: "The school has no verified release record after dismissal and is keeping your student supervised. Contact the school now.",
+          resourceType: "action", resourceId: record.id, eventId,
+        });
+      } else if (followUpOwnerPersonId !== actor.actorPersonId) {
+        // Alert the named local authority directly; ordinary broadcast is not
+        // a lawful substitute for individual custody-recipient verification.
+        await notifyMany(tx, [{
+          recipientPersonId: followUpOwnerPersonId,
+          type: "child_uncollected_restricted_follow_up",
+          title: "Urgent supervised pickup follow-up",
+          body: "A student remains onsite under an active pickup restriction. Review the school safety plan and contact authorized recipients through verified channels.",
+          resourceType: "action", resourceId: record.id, eventId,
+        }]);
+      }
       return { actionId: record.id, created: true as const };
     });
   });
