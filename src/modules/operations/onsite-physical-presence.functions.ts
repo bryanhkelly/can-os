@@ -25,6 +25,7 @@ import { fetchRoomPlanEvidence, parseVerifiedRoomPlan } from "./onsite-block-roo
 import { requireCurrentChurchSchoolOpening } from "./school-opening.server";
 
 const presenceType="onsite_staff_presence_reported";
+const exitType="onsite_staff_coverage_interrupted";
 const dutyType="onsite_instruction_duty_response";
 const witnessType="onsite_block_presence_witnessed";
 const todaySchema=z.object({
@@ -164,6 +165,69 @@ export const reportOnsitePhysicalPresence=createServerFn({method:"POST"})
     });
   });
 
+/** An adult must be able to report leaving a room even if the opening
+ * approval or room plan was revoked. This is an exception, not a new presence
+ * authorization and never reports attendance or student custody.
+ */
+export const reportOnsiteStaffCoverageInterruption=createServerFn({method:"POST"})
+  .validator((v:unknown)=>z.object({
+    date:todaySchema.shape.date,presenceReportId:z.string().uuid(),
+    reason:z.enum(["temporary_absence","early_departure","uncovered_handoff"]),
+  }).strict().parse(v))
+  .handler(async({data})=>{
+    const {actor,site}=await schoolSite();
+    if(actor.role!=="room_facilitator" || siteDate(new Date(),site.timezone)!==data.date)
+      throw new AuthorizationError("own current-day onsite coverage exception");
+    return db.transaction(async tx=>{
+      const [presence]=await tx.select().from(actions)
+        .where(and(eq(actions.id,data.presenceReportId),
+          eq(actions.type,presenceType),eq(actions.siteId,site.id),
+          eq(actions.ownerPersonId,actor.actorPersonId!))).for("share").limit(1);
+      if(!presence || presence.metadata.date!==data.date ||
+         typeof presence.metadata.periodId!=="string" ||
+         typeof presence.metadata.planToken!=="string" ||
+         !presence.programId || !presence.sectionId)
+        throw new AuthorizationError("original own physical-arrival record");
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-staff-exit:"+presence.id}))`);
+      const [existing]=await tx.select({id:actions.id,metadata:actions.metadata})
+        .from(actions).where(and(eq(actions.type,exitType),
+          eq(actions.siteId,site.id),eq(actions.ownerPersonId,actor.actorPersonId!),
+          sql`${actions.metadata}->>'presenceReportId' = ${presence.id}`)).limit(1);
+      if(existing){
+        if(existing.metadata.reason!==data.reason)
+          throw new Error("This physical departure is already recorded with a different reason");
+        return {interruptionId:existing.id,created:false as const};
+      }
+      const now=new Date();
+      const [record]=await tx.insert(actions).values({
+        type:exitType,status:"resolved",priority:"urgent",
+        title:"Named adult reported interruption to physical classroom supervision",
+        description:"Recheck remaining supervision, continuity and student custody; previous arrival cannot establish ongoing coverage.",
+        subjectType:"section",subjectId:presence.sectionId,
+        organizationId:site.organizationId,siteId:site.id,
+        programId:presence.programId,sectionId:presence.sectionId,
+        ownerPersonId:actor.actorPersonId,resolvedAt:now,
+        metadata:{date:data.date,periodId:presence.metadata.periodId,
+          planToken:presence.metadata.planToken,
+          presenceReportId:presence.id,reason:data.reason,reportedAt:now.toISOString()},
+      }).returning({id:actions.id});
+      if(!record)throw new Error("Could not record coverage interruption");
+      await emitEvent(tx,{
+        eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:record.id,
+        actorPersonId:actor.actorPersonId,organizationId:site.organizationId,
+        siteId:site.id,programId:presence.programId,sectionId:presence.sectionId,
+        payload:{type:exitType,reason:data.reason},
+      });
+      await writeAudit(tx,actor,{
+        action:"onsite.staff.coverage_interrupted",entityType:"action",entityId:record.id,
+        scope:{organizationId:site.organizationId,siteId:site.id,
+          programId:presence.programId,sectionId:presence.sectionId},
+        after:{presenceReportId:presence.id,date:data.date,reason:data.reason},
+      });
+      return {interruptionId:record.id,created:true as const};
+    });
+  });
+
 /** Only an independently appointed Site director can verify seeing both
  * named adults, with fresh original individual reports and a current opening
  * authorization. Records human witnessing, NOT automated location proof.
@@ -285,7 +349,7 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
     });
     if(plan.siteId!==site.id || plan.projectionTruncated)
       return {blocks:[],truncated:true,hasWitnessedAllBlocks:false};
-    const [reports,witnesses,duties]=await Promise.all([
+    const [reports,witnesses,duties,interruptions]=await Promise.all([
       db.select({
         sectionId:actions.sectionId,personId:actions.ownerPersonId,
         metadata:actions.metadata,
@@ -302,8 +366,12 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
           eq(actions.type,dutyType),
           sql`${actions.metadata}->>'date' = ${data.date}`,
         )).orderBy(desc(actions.createdAt),desc(actions.id)).limit(501),
+      db.select({sectionId:actions.sectionId,personId:actions.ownerPersonId,
+        metadata:actions.metadata}).from(actions)
+        .where(and(eq(actions.siteId,site.id),eq(actions.type,exitType),
+          sql`${actions.metadata}->>'date' = ${data.date}`)).limit(501),
     ]);
-    const truncated=reports.length>500||witnesses.length>500||duties.length>500;
+    const truncated=reports.length>500||witnesses.length>500||duties.length>500||interruptions.length>500;
     const blocks=[];
     for(const block of plan.blocks){
       let opening=false;
@@ -318,7 +386,12 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         backupPersonId:block.backupPersonId,requiresBackup:block.requiresSectionDelegation===true,
         actorPersonId:actor.actorPersonId},exactDuties);
       const dutiesAccepted=duty.status==="accepted";
-      const matched=current && dutiesAccepted && witnesses.some(row=>
+      const interrupted=interruptions.some(row=>
+        row.sectionId===block.sectionId &&
+        row.metadata.periodId===block.periodId &&
+        row.metadata.planToken===block.planToken &&
+        [block.facilitatorPersonId,block.backupPersonId].includes(row.personId));
+      const matched=current && dutiesAccepted && !interrupted && witnesses.some(row=>
         row.sectionId===block.sectionId &&
         row.metadata.periodId===block.periodId &&
         row.metadata.planToken===block.planToken);
@@ -339,6 +412,7 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         canWitness:current && dutiesAccepted && actor.role==="site_leader",
         dutiesAccepted,
         ownPresenceReported:ownPresence,witnessedBothAdults:matched,
+        coverageInterrupted:interrupted,
         reportedAdultCount,requiredAdultReports,
         missingAdultReports:Math.max(0,requiredAdultReports-reportedAdultCount),
         openingAuthorized:opening,
