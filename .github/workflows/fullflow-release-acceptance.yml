@@ -28,6 +28,8 @@ jobs:
       CAN_ADMISSIONS_TEST_BRANCH_ID: ${{ vars.CAN_ADMISSIONS_TEST_BRANCH_ID }}
       DATABASE_URL: ${{ secrets.CAN_FULLFLOW_TEST_DATABASE_URL }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
+      # Set only after explicit DBA/owner sign-off on the exact release SHA.
+      CAN_FULLFLOW_MIGRATION_APPROVED_SHA: ${{ vars.CAN_FULLFLOW_MIGRATION_APPROVED_SHA }}
     steps:
       - name: Checkout exact workflow-dispatch commit
         uses: actions/checkout@v4
@@ -122,6 +124,13 @@ jobs:
             echo "- Database URLs, passwords, and hostnames are not disclosed."
             echo "- Distinct identity checks completed before any schema mutation."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Require explicit exact-head migration approval before schema writes
+        shell: bash
+        run: |
+          if [[ "${CAN_FULLFLOW_MIGRATION_APPROVED_SHA}" != "${GITHUB_SHA}" ]]; then
+            echo "::error::HOLD: approval for this exact FullFlow SHA is required before database migration."
+            exit 1
+          fi
       - name: Apply only reviewed migrations to isolated FullFlow branch
         id: fullflow_migration
         run: npm run db:migrate:fullflow
