@@ -38,6 +38,7 @@ export function SiteDayPage() {
   const [preparing,setPreparing]=useState(false);
   const [preparation,setPreparation]=useState<Awaited<ReturnType<typeof getOnsiteSchoolDayPreparation>>|null>(null);
   const [openings, setOpenings] = useState<OpeningStatuses>([]);
+  const [schoolDayRevision, setSchoolDayRevision] = useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -229,7 +230,7 @@ export function SiteDayPage() {
         className="mt-6 text-sm underline">Refresh school roster</button>
     </>}
     {roster && !preparing && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
-    {roster && !preparing && <div id="day-review"><OnsiteDayReconciliationPanel date={date} roster={roster} /></div>}
-    {context && date && !preparing && <OnsiteSupervisionPanel date={date} />}
+    {roster && !preparing && <div id="day-review"><OnsiteDayReconciliationPanel date={date} roster={roster} refreshRevision={schoolDayRevision} /></div>}
+    {context && date && !preparing && <OnsiteSupervisionPanel date={date} onChanged={() => setSchoolDayRevision(revision => revision + 1)} />}
   </WorkspaceShell>;
 }

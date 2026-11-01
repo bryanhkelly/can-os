@@ -30,7 +30,7 @@ const labels: Record<string,string> = {
 };
 
 /** Read-only staffing plan. This is NOT a live duty check-in or room sign-off. */
-export function OnsiteSupervisionPanel({ date }: { date:string }) {
+export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onChanged?: () => void }) {
   const [plan,setPlan]=useState<Plan|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -67,6 +67,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
         ...(response==="cannot_cover"?{reason:"unavailable" as const}:{}),
         confirmed:true as const,
       }});
+      onChanged?.(); // Persisted staff duty changes invalidate the site review snapshot.
       setDutyMessage(response==="accepted"
         ?"Your availability response was saved. This is not a supervision or student handoff certification."
         :"Coverage exception recorded. Contact the site leader directly to arrange supervision.");
@@ -86,6 +87,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       else await witnessOnsiteBlockPresence({data:{
         date,sectionId,periodId,witnessedBothAdults:true,
       }});
+      onChanged?.(); // The independent witness or arrival can stale a prior day review.
       setPresence(await getOnsitePhysicalPresence({data:{date}}));
       setDutyMessage(action==="report"
         ?"Your physical arrival was recorded. The Site director must independently witness both adults."
@@ -217,7 +219,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       </p>}
       {plan.canPlanRooms&&[...new Map(plan.blocks.filter(block=>block.requiresSectionDelegation).map(block=>[block.programId,block])).values()]
         .map(block=><OnsiteRoomPlanningPanel key={block.programId} programId={block.programId} initialDate={date}
-          onChanged={()=>setNonce(value=>value+1)}/>)}
+          onChanged={()=>{setNonce(value=>value+1);onChanged?.();}}/>)}
       <p className="mt-3 text-xs text-muted-foreground">{plan.note}</p>
       <details className="mt-5 rounded border p-3">
         <summary className="cursor-pointer font-semibold text-sm">My required safety-screening and safeguarding-training evidence</summary>

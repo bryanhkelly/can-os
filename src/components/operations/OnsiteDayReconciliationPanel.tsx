@@ -14,8 +14,8 @@ type Review = Awaited<ReturnType<typeof getOnsiteDayReview>>;
  * No automatic absences, student release, supervision certification or
  * undocumented "end of day" closure.
  */
-export function OnsiteDayReconciliationPanel({date,roster}:{
-  date:string;roster:Roster;
+export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
+  date:string;roster:Roster;refreshRevision?:number;
 }) {
   const summary=deriveOnsiteDayReconciliation(roster.programs,roster.students);
   const [review,setReview]=useState<Review|null>(null);
@@ -37,7 +37,7 @@ export function OnsiteDayReconciliationPanel({date,roster}:{
       setError("Unable to check the latest attendance review. No closure status is assumed.");
     });
     return ()=>{live=false};
-  },[date,roster,refresh]);
+  },[date,roster,refresh,refreshRevision]);
 
   const ready=summary.readyForAttendanceReview &&
     review?.readyForAttendanceReview===true && review.unresolvedIssues===0;
