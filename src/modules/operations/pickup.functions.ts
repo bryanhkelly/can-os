@@ -934,10 +934,15 @@ export const recordVerifiedPickupRelease = createServerFn({ method: "POST" })
         sourceKey,
       }).returning({ id: pickupReleaseEvents.id });
       if (!record) throw new Error("Unable to record verified pickup release");
+      // A supervised child can already have an assigned follow-up marked
+      // in_progress or waiting. Verified physical release closes every
+      // unresolved same-day custody follow-up, not only fresh "open" items.
       const openFollowUps = await tx.select({ id: actions.id }).from(actions).where(and(
-        eq(actions.type, uncollectedActionType), eq(actions.status, "open"),
+        eq(actions.type, uncollectedActionType),
+        inArray(actions.status, ["open", "in_progress", "waiting"]),
         eq(actions.subjectType, "student_profile"), eq(actions.subjectId, data.studentProfileId),
-        eq(actions.programId, data.programId), sql`${actions.metadata}->>'date' = ${data.date}`,
+        eq(actions.siteId, school.siteId), eq(actions.programId, data.programId),
+        sql`${actions.metadata}->>'date' = ${data.date}`,
       ));
       if (openFollowUps.length) await tx.update(actions).set({
         status: "resolved", resolvedAt: occurredAt, updatedAt: occurredAt,
