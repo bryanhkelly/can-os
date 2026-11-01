@@ -77,7 +77,9 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
           <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
       </select>
       <span className="mt-1 block text-xs text-muted-foreground">
-        Search authorized admissions independently of the visible page. Reuse requires the same guardian email.
+        Only households with an independently verified managing guardian
+        are offered for reuse. The receiving command rechecks the relationship
+        and the guardian email before linking a sibling.
       </span>
     </label>
     <label className="text-sm">Student first name<input required value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
