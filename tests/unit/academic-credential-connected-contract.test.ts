@@ -60,6 +60,14 @@ describe("connected official credential disclosure", () => {
   expect(recipient).toContain("return db.transaction(async tx=>");
   expect(recipient).toContain('.for("update").limit(1)');
   expect(recipient).toContain("isNotNull(s.accessAccounts.emailVerifiedAt)");
+  expect(recipient).toContain("const [liveSession]=await tx.select(");
+  expect(recipient).toContain("eq(s.accessSessions.id,context.sessionId)");
+  expect(recipient).toContain("eq(s.accessSessions.accountId,context.accountId)");
+  expect(recipient).toContain("eq(s.accessSessions.activeGrantId,context.grantId)");
+  expect(recipient).toContain("isNull(s.accessSessions.revokedAt)");
+  expect(recipient).toContain("gt(s.accessSessions.updatedAt,sessionIdleCutoff(sessionNow))");
+  expect(recipient).toContain('recipient session expired, revoked or switched');
+  order(recipient,"const [liveSession]=",transcriptGuard);
   expect(recipient).toContain("eq(s.accountPersonGrants.isSynthetic,false)");
   expect(recipient).toContain('release.releasePurpose!=="transfer"');
   expect(recipient).toContain('.from(s.programs).where(eq(s.programs.id,action.programId)).for("share").limit(1)');
