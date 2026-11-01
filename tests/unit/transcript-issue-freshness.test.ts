@@ -1,8 +1,9 @@
 import { describe,expect,it } from "vitest";
 import {assertUnchangedTranscriptProjection} from "@/domain/transcript-issue-freshness";
-const first={sectionGradeId:"grade-1",sectionId:"math",letterGrade:"A",gradeUpdatedAt:"2026-10-01",creditsEarned:3};
-const second={sectionGradeId:"withdrawal:enrollment-2",sectionId:"english",letterGrade:"W",gradeUpdatedAt:null,creditsEarned:0};
-const check=(before:typeof first[],after:typeof first[])=>
+type Row={sectionGradeId:string;sectionId:string;letterGrade:string;gradeUpdatedAt:string|null;creditsEarned:number};
+const first:Row={sectionGradeId:"grade-1",sectionId:"math",letterGrade:"A",gradeUpdatedAt:"2026-10-01",creditsEarned:3};
+const second:Row={sectionGradeId:"withdrawal:enrollment-2",sectionId:"english",letterGrade:"W",gradeUpdatedAt:null,creditsEarned:0};
+const check=(before:Row[],after:Row[])=>
  assertUnchangedTranscriptProjection(before,after);
 describe("locked official transcript issuance source projection",()=>{
  it("permits stable evidence with different database row order",()=>{
