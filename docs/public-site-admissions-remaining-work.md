@@ -59,6 +59,60 @@ at an existing Site is now source-committed, not validated or publicly live.
 Partner local website editing is also source-committed but not fully accepted.
 Follow-up assignments and advanced designs/domains remain separate work.
 
+## November 1 code-review fixes on `FullFlow` (source-committed; unverified)
+
+The following changes were made **in product services and their callers**, not
+only this backlog:
+
+- **P0 academic institutional authorization:** Academic marketing approval for
+  an independently church-hosted CAN Program now requires the current,
+  independently verified `academic_instruction` and `school_of_record`
+  operating services in the publication transaction. A host's explicit
+  website-publisher grant alone is no longer equivalent to CAN authorization.
+  Unpublishing remains possible after a contract lapses.
+- **P0 withdrawal/revocation:** The public academic catalog rechecks the
+  live institutional agreement on every read. A revoked/expired or otherwise
+  unauthorized CAN-church relationship causes the previously approved listing
+  to be withheld; the published Site and its unrelated local/enrichment copy
+  are not automatically deleted. Approved snapshot and canonical Program
+  records are share-locked against concurrent withdrawal/update during the
+  catalog transaction.
+- **P0 Apply versus active:** The catalog returns a separate server-derived
+  `applicationOpen` flag only when an active Program ALSO has current
+  `admissions` and `school_of_record` services. Public HTML never renders
+  an Apply form just because `Program.status=active`. The family-start
+  submission still rechecks the actual destination.
+- **P0 reviewed marketing parity:** Public copy is withheld when canonical
+  Program name, grades or delivery model drift from its independently
+  reviewed snapshot. Comparisons use exact typed fields rather than JSON
+  serialization order, which cannot be trusted for PostgreSQL `jsonb`.
+  Existing publisher UI distinguishes stale content and missing operating
+  authorization and points to the withdrawal/reapproval path.
+- **P0 protected claims:** Academic marketing title and free-text summary
+  reject known regulated accreditation, diploma, credit, tuition,
+  admissions-opening and institutional-endorsement claims, reusing the
+  existing church-content protected-claim policy. These must be sourced
+  from authoritative institutional records; keyword screening is NOT
+  independent legal approval.
+- **P0 sibling identity reuse:** The canonical `createAdmissionsInquiry`
+  existing-household path now requires a verified, enrollment-managing
+  guardian relationship linked to the prior Student and household, in
+  addition to an exact contact-email match. Household search offers only
+  eligible verified relationships; unverified web inquiries cannot borrow
+  household identity merely by matching an email.
+
+Added source-level policy, public rendering and catalog fixtures. **No
+typecheck, test runner, Neon migration, browser/edge acceptance or production
+deployment has been executed in this review.** Do not label the continuous
+six-stage FullFlow as accepted based on these patches.
+
+**Still blocking the complete journey:** independently approved church–CAN
+operating relationship; verified/published institutional copy and publisher
+access; connected guardian application/offer/consent/active Enrollment;
+authenticated Student/Section/teacher work and onsite school day on the
+SAME Program; end-to-end negative authorization and persistence acceptance.
+Release gates GATE-01–09 remain open.
+
 ## Current priority: one connected school journey
 
 **Critical-path override (23 October 2026):** Complete the actual
