@@ -477,6 +477,49 @@ async function inspectDiplomaFreshness(
 }
 
 /**
+ * INTERNAL SERVER-ONLY transcript freshness gate. Agent B owns the actual
+ * recipient, purpose, consent, institution scope and live grant checks.
+ *
+ * Calls MUST execute inside the B grant-creation or private-download DB
+ * transaction. The advisory lock coordinates latest-issuance selection with
+ * official transcript issuance; row SHARE locks hold canonical grade and W
+ * evidence stable until the authorized response is prepared.
+ */
+export async function assertOfficialTranscriptFreshForAuthorizedRelease(
+ tx:Pick<Awaited<ReturnType<typeof resources>>["db"],"select"|"execute">,
+ s:Awaited<ReturnType<typeof resources>>["s"],
+ args:{transcriptIssuanceId:string;issuerId:string;studentProfileId:string},
+):Promise<void>{
+ if(!uuid.safeParse(args.transcriptIssuanceId).success||
+    !uuid.safeParse(args.issuerId).success||
+    !uuid.safeParse(args.studentProfileId).success)
+   throw new AuthorizationError("Verified transcript release identity required");
+ const {sql}=await import("drizzle-orm");
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.studentProfileId + ":" + args.issuerId + ":transcript-issuance"}))`);
+ const [transcript]=await tx.select().from(s.transcriptIssuances)
+   .where(eq(s.transcriptIssuances.id,args.transcriptIssuanceId)).for("share").limit(1);
+ if(!transcript||transcript.studentProfileId!==args.studentProfileId||
+    transcript.issuingOrganizationId!==args.issuerId)
+   throw new AuthorizationError("Transcript issuer/student scope mismatch");
+ const [latest]=await tx.select({id:s.transcriptIssuances.id})
+   .from(s.transcriptIssuances)
+   .where(and(eq(s.transcriptIssuances.studentProfileId,args.studentProfileId),
+     eq(s.transcriptIssuances.issuingOrganizationId,args.issuerId)))
+   .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
+ if(latest?.id!==transcript.id)
+   throw new AuthorizationError("Newer official transcript issuance requires release review");
+ await assertCurrentCanonicalTranscriptGrades(tx,s,transcript);
+ const rows=transcript.snapshot.rows as IssuedGradeSnapshot[];
+ // Snapshot W notation cannot confer earned credit; the canonical W source
+ // check above separately ensures it is still a true withdrawn enrollment.
+ const earned=rows.filter(row=>row.terminalPeriod && typeof row.creditsEarned==="number" && row.creditsEarned>0);
+ await assertNoWithdrawnTranscriptCredits(tx,s,args.studentProfileId,earned.map(row=>({
+   sectionId:row.sectionId,subject:"",earnedUnits:row.creditsEarned,
+   finalized:true,acceptedByIssuer:true,
+ })));
+}
+
+/**
  * INTERNAL SERVER-ONLY RELEASE GATE, called by Agent B after it has validated
  * the live signed recipient grant and exact issuer/student/credential binding.
  *
