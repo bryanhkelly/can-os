@@ -166,6 +166,18 @@ export const searchAdmissionsHouseholds=createServerFn({method:"GET"})
    .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
    .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
    .innerJoin(people,eq(people.id,studentProfiles.personId))
+   // Sibling reuse suggestions must require the same relationship proof as
+   // the final transactional create command. Email/name alone is not enough.
+   .innerJoin(guardianRelationships,and(
+     eq(guardianRelationships.studentPersonId,studentProfiles.personId),
+     eq(guardianRelationships.canManageEnrollment,true),
+     sql`${guardianRelationships.metadata}->>'verification' = 'verified'`,
+     sql`${guardianRelationships.guardianPersonId}::text = ${applications.metadata}->>'contactPersonId'`,
+   ))
+   .innerJoin(householdMemberships,and(
+     eq(householdMemberships.personId,guardianRelationships.guardianPersonId),
+     eq(householdMemberships.householdId,applications.householdId),
+   ))
    .where(and(eq(programs.organizationId,target.organizationId),
      ...(actor.scope.programIds?[inArray(programs.id,actor.scope.programIds)]:[]),
      ...(actor.scope.siteIds?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
