@@ -7,6 +7,7 @@ on:
       - "src/domain/oneroster-placement-decision.ts"
       - "tests/postgres/oneroster-placement-decision.sql"
       - ".github/workflows/oneroster-placement-postgres.yml"
+      - "scripts/verify-committed-migration-chain.mjs"
   workflow_dispatch:
 
 permissions:
@@ -31,16 +32,13 @@ jobs:
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4
-      - name: Apply committed 0000 through 0055 SQL migrations to disposable PostgreSQL only
+      - name: Apply exact journaled SQL chain to disposable PostgreSQL only
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
-          mapfile -t migrations < <(find drizzle -maxdepth 1 -type f -regextype posix-extended -regex 'drizzle/[0-9]{4}_.*\.sql' | sort)
-          if [[ "${#migrations[@]}" -ne 56 ]]; then
-            echo "::error::Unexpected committed migration count; refuse partial acceptance"
-            exit 1
-          fi
+          node scripts/verify-committed-migration-chain.mjs > "$RUNNER_TEMP/committed-migrations.txt"
+          mapfile -t migrations < "$RUNNER_TEMP/committed-migrations.txt"
           for migration in "${migrations[@]}"; do
             echo "::group::${migration}"
             docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 < "$migration"

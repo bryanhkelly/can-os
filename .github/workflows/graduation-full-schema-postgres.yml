@@ -8,6 +8,7 @@ on:
       - ".github/workflows/graduation-full-schema-postgres.yml"
       - "scripts/review-fullflow-migrations.mjs"
       - "scripts/fullflow-post0051-artifacts*"
+      - "scripts/verify-committed-migration-chain.mjs"
   workflow_dispatch:
 
 permissions:
@@ -51,16 +52,13 @@ jobs:
       # does NOT claim that the Drizzle journal or Neon-specific runner passed.
       - name: Check migration preflight rejects future DDL ahead of journal
         run: node --test scripts/fullflow-post0051-artifacts.check.mjs
-      - name: Apply every committed SQL migration (0000 through 0056) to disposable PostgreSQL
+      - name: Apply exact journaled SQL migration chain to disposable PostgreSQL
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
-          mapfile -t migrations < <(find drizzle -maxdepth 1 -type f -regextype posix-extended -regex 'drizzle/[0-9]{4}_.*\.sql' | sort)
-          if [[ "${#migrations[@]}" -ne 57 ]]; then
-            echo "::error::Expected exactly 57 committed 0000..0056 migrations, got ${#migrations[@]}"
-            exit 1
-          fi
+          node scripts/verify-committed-migration-chain.mjs > "$RUNNER_TEMP/committed-migrations.txt"
+          mapfile -t migrations < "$RUNNER_TEMP/committed-migrations.txt"
           for migration in "${migrations[@]}"; do
             echo "::group::Apply ${migration}"
             docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 < "$migration"
