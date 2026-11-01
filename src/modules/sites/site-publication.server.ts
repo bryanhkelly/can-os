@@ -7,7 +7,7 @@ import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { isAcademicMarketingType } from "@/domain/academic-program-publication";
+import { isAcademicMarketingType, isCurrentAcademicMarketingSnapshot } from "@/domain/academic-program-publication";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
@@ -68,6 +68,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       marketingStatus: programPublications.status,
       marketingTitle: programPublications.title,
       marketingSummary: programPublications.summary,
+      marketingGradeRange: programPublications.gradeRange,
+      marketingDeliveryModel: programPublications.deliveryModel,
       marketingUpdatedAt: programPublications.updatedAt,
     }).from(programs)
       .leftJoin(programPublications, and(
@@ -104,6 +106,17 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       marketing: program.marketingStatus ? {
         status: program.marketingStatus, title: program.marketingTitle,
         summary: program.marketingSummary,
+        current: Boolean(program.marketingTitle && program.marketingSummary &&
+          program.marketingGradeRange && program.marketingDeliveryModel &&
+          isCurrentAcademicMarketingSnapshot({
+            title: program.marketingTitle,
+            summary: program.marketingSummary,
+            gradeRange: program.marketingGradeRange,
+            deliveryModel: program.marketingDeliveryModel,
+            programName: program.name,
+            canonicalGrades: program.gradeRange,
+            canonicalDelivery: program.deliveryModel,
+          })),
         updatedAt: program.marketingUpdatedAt?.toISOString() ?? null,
       } : null,
     })),
