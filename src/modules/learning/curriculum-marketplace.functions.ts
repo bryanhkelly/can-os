@@ -55,8 +55,12 @@ function requireLegacyAdoptionWriteEnabled() {
  * institutional licensing tests have been accepted.
  */
 function requireAnnualAdoptionEnabled() {
- if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED!=="true")
-  throw new AuthorizationError("Annual curriculum adoption awaits approved schema and release gate");
+ // A single flag is insufficient: prevent accidental activation of
+ // unregistered schema and unverified publisher/Section rights in production.
+ if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED!=="true" ||
+    process.env.CAN_ANNUAL_ADOPTIONS_SCHEMA_READY!=="true" ||
+    process.env.CAN_ANNUAL_ADOPTIONS_CONNECTED_ACCEPTANCE!=="true")
+  throw new AuthorizationError("Annual curriculum adoption awaits schema and connected release acceptance");
 }
 export const reviewAnnualCurriculumAdoption=createServerFn({method:"GET"})
  .validator((input:unknown)=>program.extend({packId:uuid,academicYearId:uuid}).strict().parse(input))
