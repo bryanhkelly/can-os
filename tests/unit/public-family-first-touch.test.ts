@@ -9,7 +9,7 @@ const program={
  summary:"Local learning led by CAN Academic Services in church classrooms.",
  typeLabel:"Church-hosted academy",grades:{min:"9",max:"12"},
  delivery:{onsite:true,asynchronous:true,liveOnline:false,onsiteDaysPerWeek:2},
- availability:"operating" as const,
+ availability:"operating" as const, applicationOpen:true,
 };
 
 describe("published Site to verified first-family application boundary",()=>{
@@ -23,10 +23,18 @@ describe("published Site to verified first-family application boundary",()=>{
    expect(html).toContain(`name="programId" value="${program.programId}"`);
    expect(html).not.toContain('name="studentFirstName"');
  });
+ it("does not expose application form for an active program without separate admissions authority",()=>{
+   const html=renderPublicSiteHtml({
+     host:"sample-school.can-os.com",site:{name:"School of Hope",organizationName:"Host Church"},
+     academicPrograms:[{...program,applicationOpen:false}],offerings:[],
+   },{makeRequestId:()=>"cb3edba8-28c8-4fda-ac27-23e680c55a7d"});
+   expect(html).not.toContain('action="/apply"');
+   expect(html).toContain("applications not currently available");
+ });
  it("never represents a planned program as open for new family applications",()=>{
    const html=renderPublicSiteHtml({
      host:"sample-school.can-os.com",site:{name:"School of Hope",organizationName:"Host Church"},
-     academicPrograms:[{...program,availability:"planned"}],offerings:[],
+     academicPrograms:[{...program,availability:"planned",applicationOpen:false}],offerings:[],
    },{makeRequestId:()=>"cb3edba8-28c8-4fda-ac27-23e680c55a7d"});
    expect(html).not.toContain('action="/apply"');
  });
