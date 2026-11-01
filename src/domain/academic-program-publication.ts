@@ -1,4 +1,5 @@
 import { isExtendedLearningType, type ProgramType } from "./program-offerings";
+import { containsProtectedInstitutionalClaim } from "./site-local-content";
 
 export type PublicAcademicProgram = {
   programId: string;
@@ -86,6 +87,13 @@ export function academicMarketingSnapshot(input: {
   if (title.length < 3 || title.length > 150) throw new Error("Program title must be 3–150 characters");
   if (text.length < 30 || text.length > 2000) throw new Error("Public program summary must be 30–2000 characters");
   if (/[<>]/.test(text)) throw new Error("Use plain text; HTML is not allowed");
+  // Reviewed marketing text is not CAN institutional approval. Protected
+  // enrollment, tuition, credit, accreditation and recognition claims must
+  // come from separately verified, institution-owned public read models.
+  if (containsProtectedInstitutionalClaim(title) ||
+      containsProtectedInstitutionalClaim(text)) {
+    throw new Error("Remove regulated academic, admissions or institutional claims from free-text marketing; use approved school records");
+  }
   const days = input.deliveryModel.onsiteDaysPerWeek;
   return {
     title,
