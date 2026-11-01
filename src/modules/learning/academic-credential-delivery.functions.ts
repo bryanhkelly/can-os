@@ -43,7 +43,7 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   const doc=await documentData(db,s,data.kind,data.credentialId);
   if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
   if(data.kind==="transcript")await assertLatestTranscriptIssuance(db,s,doc.studentProfileId,doc.issuerId,data.credentialId);
-  else await assertDiplomaFreshForAuthorizedRelease({diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
+  else await db.transaction(async tx => assertDiplomaFreshForAuthorizedRelease(tx,s,{diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId}));
   // Generating an official record is a privileged disclosure, even without email.
   // Do not cache or share the resulting response outside the authorized registrar session.
   const pdf=academicDocumentPdf(doc);
