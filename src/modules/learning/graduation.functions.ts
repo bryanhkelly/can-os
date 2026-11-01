@@ -370,33 +370,90 @@ export const revokeDiploma=createServerFn({method:"POST"})
    });
  });
 
+/**
+ * Shared server-owned diploma eligibility check. No recipient authorization is
+ * implied. Caller must validate issuer authority before exposing its result.
+ */
+async function inspectDiplomaFreshness(
+ db:Pick<Awaited<ReturnType<typeof resources>>["db"],"select">,
+ s:Awaited<ReturnType<typeof resources>>["s"],
+ diplomaId:string,
+ expectedIssuerId:string,
+ expectedStudentProfileId?:string,
+):Promise<"current"|"revoked"|"review_required">{
+ const [diploma]=await db.select().from(s.diplomaIssuances)
+   .where(eq(s.diplomaIssuances.id,diplomaId)).limit(1);
+ if(!diploma)throw new AuthorizationError("Diploma not found");
+ const [decision]=await db.select().from(s.graduationDecisions)
+   .where(eq(s.graduationDecisions.id,diploma.graduationDecisionId)).limit(1);
+ if(!decision||decision.issuingOrganizationId!==expectedIssuerId||
+   (expectedStudentProfileId && decision.studentProfileId!==expectedStudentProfileId))
+   throw new AuthorizationError("Diploma issuer/student scope mismatch");
+ if(diploma.revokedAt)return "revoked";
+ const [latest]=await db.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
+   .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),
+     eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))
+   .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.createdAt),
+     desc(s.graduationDecisions.id)).limit(1);
+ if(latest?.id!==decision.id||decision.decision!=="approved")return "review_required";
+ try{
+   const current=await transcriptAndRules(db,s,decision.transcriptIssuanceId,decision.requirementSetId);
+   if(current.transcript.studentProfileId!==decision.studentProfileId||
+      current.transcript.issuingOrganizationId!==decision.issuingOrganizationId)
+     return "review_required";
+   const [newest]=await db.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
+     .where(and(eq(s.transcriptIssuances.studentProfileId,decision.studentProfileId),
+       eq(s.transcriptIssuances.issuingOrganizationId,decision.issuingOrganizationId)))
+     .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
+   const audit=auditGraduationCredits(current.requirementSet.requirements as CreditRequirement[],current.evidence);
+   if(newest?.id!==decision.transcriptIssuanceId||audit.status!=="requirements_met"||
+      JSON.stringify(audit)!==JSON.stringify(decision.audit))
+     return "review_required";
+ }catch{return "review_required";}
+ return "current";
+}
+
+/**
+ * INTERNAL SERVER-ONLY RELEASE GATE, called by Agent B after it has validated
+ * the live signed recipient grant and exact issuer/student/credential binding.
+ *
+ * Must run inside B's authorization or private-download DB transaction, never
+ * as an independent request, so the advisory/row locks cover disclosure.
+ * B must re-run on every download; this does NOT authorize a recipient.
+ */
+export async function assertDiplomaFreshForAuthorizedRelease(
+ tx:Pick<Awaited<ReturnType<typeof resources>>["db"],"select"|"execute">,
+ s:Awaited<ReturnType<typeof resources>>["s"],
+ args:{diplomaId:string;issuerId:string;studentProfileId:string},
+):Promise<void>{
+ if(!uuid.safeParse(args.diplomaId).success||!uuid.safeParse(args.issuerId).success||
+    !uuid.safeParse(args.studentProfileId).success)
+   throw new AuthorizationError("Verified diploma release identity required");
+ const {sql}=await import("drizzle-orm");
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.issuerId + ":graduation-policy"}))`);
+ // A concurrent registrar revocation must not commit between the live status
+ // check and preparation of private PDF bytes in the same B transaction.
+ const [locked]=await tx.select({id:s.diplomaIssuances.id}).from(s.diplomaIssuances)
+   .where(eq(s.diplomaIssuances.id,args.diplomaId)).for("share").limit(1);
+ if(!locked)throw new AuthorizationError("No issued diploma for authorized release");
+ const state=await inspectDiplomaFreshness(tx,s,args.diplomaId,args.issuerId,args.studentProfileId);
+ if(state!=="current")throw new AuthorizationError("Diploma is revoked, superseded or requires institutional review");
+}
+
 export const getDiplomaFreshness=createServerFn({method:"GET"})
  .validator((input:unknown)=>z.object({diplomaId:uuid}).parse(input))
- .handler(async ({data})=>{
+ .handler(async({data})=>{
    setResponseHeader("Cache-Control","private, no-store");
    const context=await registrar();const {db,s}=await resources();
-   const [diploma]=await db.select().from(s.diplomaIssuances).where(eq(s.diplomaIssuances.id,data.diplomaId)).limit(1);
+   const [diploma]=await db.select().from(s.diplomaIssuances)
+     .where(eq(s.diplomaIssuances.id,data.diplomaId)).limit(1);
    if(!diploma)throw new AuthorizationError("Diploma not found");
-   const [decision]=await db.select().from(s.graduationDecisions).where(eq(s.graduationDecisions.id,diploma.graduationDecisionId)).limit(1);
+   const [decision]=await db.select().from(s.graduationDecisions)
+     .where(eq(s.graduationDecisions.id,diploma.graduationDecisionId)).limit(1);
    if(!decision)throw new AuthorizationError("Graduation decision unavailable");
    issuerAuthorized(context,decision.issuingOrganizationId);
-   if(diploma.revokedAt) return {diplomaId:diploma.id,status:"revoked" as const};
-   const [latest]=await db.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
-     .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))
-     .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.id)).limit(1);
-   if(latest?.id!==decision.id || decision.decision!=="approved")return {diplomaId:diploma.id,status:"review_required" as const};
-   try {
-     const current=await transcriptAndRules(db,s,decision.transcriptIssuanceId,decision.requirementSetId);
-     if(current.transcript.studentProfileId!==decision.studentProfileId || current.transcript.issuingOrganizationId!==decision.issuingOrganizationId)
-       return {diplomaId:diploma.id,status:"review_required" as const};
-     const [newest]=await db.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
-       .where(and(eq(s.transcriptIssuances.studentProfileId,decision.studentProfileId),eq(s.transcriptIssuances.issuingOrganizationId,decision.issuingOrganizationId)))
-       .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
-     const audit=auditGraduationCredits(current.requirementSet.requirements as CreditRequirement[],current.evidence);
-     if(newest?.id!==decision.transcriptIssuanceId || audit.status!=="requirements_met" || JSON.stringify(audit)!==JSON.stringify(decision.audit))
-       return {diplomaId:diploma.id,status:"review_required" as const};
-   }catch{return {diplomaId:diploma.id,status:"review_required" as const};}
-   return {diplomaId:diploma.id,status:"current" as const};
+   const status=await inspectDiplomaFreshness(db,s,data.diplomaId,decision.issuingOrganizationId,decision.studentProfileId);
+   return {diplomaId:data.diplomaId,status};
  });
 
 export const issueDiploma = createServerFn({method:"POST"})
