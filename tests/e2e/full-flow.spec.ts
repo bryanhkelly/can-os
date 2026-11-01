@@ -646,7 +646,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await tp
         .getByLabel("Student assignment instructions")
         .fill("Show your work for solving the equation.");
-      await tp.getByLabel("Due date").fill("2026-11-06");
+      await tp.getByLabel("Due date").fill(new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10));
       await tp.getByRole("checkbox", { name: /I reviewed this assignment/ }).check();
       await tp.getByRole("button", { name: "Publish & assign" }).click();
       await expect(tp.getByText(/Assessment published and assigned/)).toBeVisible();
@@ -762,6 +762,48 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     });
 
     // ------------------------------------------------------------------
+    await test.step("stage 5a: teacher returns work, student revises, teacher regrades, guardian sees current grade", async () => {
+      const gradebook = `/teacher/gradebook?section=${fixture.sectionId}&assessment=${fixture.assessmentId}&student=${fixture.studentProfileId}`;
+      const assignment = `/student/assignments?section=${fixture.sectionId}&assessment=${fixture.assessmentId}`;
+      await goto(teacher.page, gradebook);
+      await teacher.page.getByRole("button", { name: "Return for revision" }).click();
+      await expect(teacher.page.getByText(/returned to student for revision/)).toBeVisible();
+
+      await goto(studentPage!, assignment);
+      await expect(studentPage!.getByText(/Teacher feedback/).first()).toBeVisible();
+      await studentPage!.getByLabel("Your response").fill(
+        "Revised solution: x = 7. I verified the sign in each step and checked the result.",
+      );
+      await studentPage!.getByRole("button", { name: "Submit assignment" }).click();
+      await expect(studentPage!.getByText(/has been submitted/)).toBeVisible();
+
+      await expect.poll(async () => rowCount(sql,
+        `select id from submissions where assessment_id = $1 and student_profile_id = $2`,
+        [fixture.assessmentId!, fixture.studentProfileId!],
+      )).toBe(2);
+
+      await goto(teacher.page, gradebook);
+      await teacher.page.getByLabel(/^Score \\(0/).fill("10");
+      await teacher.page.getByLabel("Feedback comment").fill("Revision complete; the solution checks.");
+      await teacher.page.getByRole("button", { name: "Post grade" }).click();
+      await expect(teacher.page.getByText(/Grade posted/)).toBeVisible();
+      const latest = await singleRow(sql,
+        `select status, attempt_number, score from submissions
+          where assessment_id = $1 and student_profile_id = $2
+          order by attempt_number desc limit 1`,
+        [fixture.assessmentId!, fixture.studentProfileId!],
+      );
+      expect(latest.status).toBe("graded");
+      expect(Number(latest.attempt_number)).toBe(2);
+      expect(Number(latest.score)).toBe(10);
+
+      await goto(guardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
+      await expect(guardian.page.getByText("Grade: 10 / 10")).toBeVisible();
+    });
+
+    // ------------------------------------------------------------------
     await test.step("stage 5b: finalize grade, guardian/student report cards, and issue official transcript", async () => {
       const tp = teacher.page;
       await goto(tp, `/teacher/gradebook?section=${fixture.sectionId}`);
@@ -773,7 +815,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
          where section_id = $1 and student_profile_id = $2 and status = 'finalized'`,
         [fixture.sectionId!, fixture.studentProfileId!],
       );
-      expect(Number(finalGrade.percentage)).toBe(90);
+      expect(Number(finalGrade.percentage)).toBe(100);
 
       await goto(guardian.page, `/guardian/report-cards?student=${fixture.studentPersonId}`);
       await expect(guardian.page.getByText(fixture.courseTitle).first()).toBeVisible();
@@ -861,7 +903,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await expect(unrelatedGuardian.page.getByText(
         "No students with academic-viewing permission were found at your school.",
       )).toBeVisible();
-      await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(unrelatedGuardian.page.getByText("Grade: 10 / 10")).toHaveCount(0);
       await expect(
         unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
       ).toHaveCount(0);
@@ -895,7 +937,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await expect(unrelatedGuardian.page.getByText(
         "No students with academic-viewing permission were found at your school.",
       )).toBeVisible();
-      await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(unrelatedGuardian.page.getByText("Grade: 10 / 10")).toHaveCount(0);
       await expect(
         unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
       ).toHaveCount(0);
@@ -910,7 +952,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         guardian.page,
         `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
-      await expect(guardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(guardian.page.getByText("Grade: 10 / 10")).toHaveCount(0);
       await expect(
         guardian.page.getByRole("button", { name: "Request school follow-up" }),
       ).toHaveCount(0);
