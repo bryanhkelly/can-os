@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StatusBadge, WorkspacePanel } from "@/components/workspace";
 import {
   createPickupAuthorization,
@@ -20,6 +20,7 @@ const todayForPickupInput = () => {
 /** Family release-authority management and authorized handoff history. */
 export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: string }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const pendingMutationIds = useRef(new Map<string, string>());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -48,20 +49,29 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
 
   useEffect(() => {
     setNotice("");
+    // Different guardian / child selection must not inherit a pending request.
+    pendingMutationIds.current.clear();
     void load();
   }, [load]);
 
-  async function run(key: string, message: string, command: () => Promise<unknown>) {
+  async function run(key: string, message: string, command: (mutationId: string) => Promise<unknown>) {
     if (busy) return;
+    const mutationId = pendingMutationIds.current.get(key) ?? crypto.randomUUID();
+    pendingMutationIds.current.set(key, mutationId);
     setBusy(key);
     setError("");
     setNotice("");
     try {
-      await command();
+      await command(mutationId);
+      pendingMutationIds.current.delete(key);
       setNotice(message);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Pickup change could not be saved");
+      // The server may have committed a guardian authorization, revocation or
+      // custody hold before the response was lost. Do not create a new event
+      // identity until an unchanged retry has been acknowledged.
+      setError((cause instanceof Error ? cause.message : "Pickup change could not be confirmed") +
+        " The result may already be saved. Refresh pickup history and retry with the same details; the original request ID will be reused.");
     } finally {
       setBusy("");
     }
@@ -106,10 +116,10 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                     </label>
                     <button type="button" disabled={!!busy}
                       className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                      onClick={() => void run(adult.id, `Pickup authorization revoked for ${adult.pickupName}.`, () => revokePickupAuthorization({ data: {
+                      onClick={() => void run(adult.id, `Pickup authorization revoked for ${adult.pickupName}.`, (mutationId) => revokePickupAuthorization({ data: {
                         authorizationId: adult.id,
                         reason: revocationReasons[adult.id] ?? "",
-                        mutationId: crypto.randomUUID(),
+                        mutationId,
                       } }))}>Revoke future pickup</button>
                   </details>}
                 </div>)}
@@ -156,7 +166,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
               <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS.</p>
               <button type="button" disabled={!!busy}
                 className="mt-3 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                onClick={() => void run(key, `Pickup authorization added for ${student.studentName}.`, () => createPickupAuthorization({ data: {
+                onClick={() => void run(key, `Pickup authorization added for ${student.studentName}.`, (mutationId) => createPickupAuthorization({ data: {
                   studentProfileId: student.studentProfileId,
                   programId: student.programId,
                   householdId: student.householdId,
@@ -166,7 +176,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   identityVerificationMethod: (methods[key] ?? "government_photo_id") as "government_photo_id" | "school_issued_id",
                   startsOn: startDates[key] ?? todayForPickupInput(),
                   expiresOn: expiryDates[key] || null,
-                  mutationId: crypto.randomUUID(),
+                  mutationId,
                 } }))}>Save pickup authorization</button>
             </details>
 
@@ -180,13 +190,13 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
               </label>
               <button type="button" disabled={!!busy || activeHold}
                 className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => window.confirm("Pause every pickup release for this child until an authorized site leader resolves the custody hold?") && void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, () => createPickupCustodyHold({ data: {
+                onClick={() => window.confirm("Pause every pickup release for this child until an authorized site leader resolves the custody hold?") && void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, (mutationId) => createPickupCustodyHold({ data: {
                   studentProfileId: student.studentProfileId,
                   programId: student.programId,
                   householdId: student.householdId,
                   kind: "disputed_custody" as const,
                   reason: holdReasons[key] ?? "",
-                  mutationId: crypto.randomUUID(),
+                  mutationId,
                 } }))}>Pause all pickup release</button>
             </details>
 
