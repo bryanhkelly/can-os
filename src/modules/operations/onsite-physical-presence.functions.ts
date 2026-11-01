@@ -351,7 +351,7 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
       return {blocks:[],truncated:true,hasWitnessedAllBlocks:false};
     const [reports,witnesses,duties,interruptions]=await Promise.all([
       db.select({
-        sectionId:actions.sectionId,personId:actions.ownerPersonId,
+        id:actions.id,sectionId:actions.sectionId,personId:actions.ownerPersonId,
         metadata:actions.metadata,
       }).from(actions).where(and(eq(actions.siteId,site.id),
         eq(actions.type,presenceType),
@@ -395,11 +395,12 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         row.sectionId===block.sectionId &&
         row.metadata.periodId===block.periodId &&
         row.metadata.planToken===block.planToken);
-      const ownPresence=current && reports.some(row=>
+      const ownReport=reports.find(row=>
         row.sectionId===block.sectionId &&
         row.personId===actor.actorPersonId &&
         row.metadata.periodId===block.periodId &&
         row.metadata.planToken===block.planToken);
+      const ownPresence=current && !!ownReport;
       const reportedAdultCount=current?new Set(reports.filter(row=>
         row.sectionId===block.sectionId&&row.metadata.periodId===block.periodId&&
         row.metadata.planToken===block.planToken&&!!row.personId)
@@ -409,6 +410,9 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         sectionId:block.sectionId,periodId:block.periodId,
         programId:block.programId,
         canReport:current && !!block.canCheckIn,
+        canReportInterruption:!!ownReport && actor.role==="room_facilitator" &&
+          !interruptions.some(row=>row.metadata.presenceReportId===ownReport.id),
+        ownPresenceReportId:ownReport?.id??null,
         canWitness:current && dutiesAccepted && actor.role==="site_leader",
         dutiesAccepted,
         ownPresenceReported:ownPresence,witnessedBothAdults:matched,
