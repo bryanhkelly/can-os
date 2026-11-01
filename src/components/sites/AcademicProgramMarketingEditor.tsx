@@ -56,6 +56,13 @@ export function AcademicProgramMarketingEditor({
     <p className="mt-2 text-sm text-muted-foreground">
       Academic operations: {program.status}. Public marketing: {program.marketing?.status ?? "not approved"}.
     </p>
+    {published && program.marketing?.current === false && <p role="alert"
+      className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
+      This approved listing no longer matches the canonical Program title,
+      grades, delivery schedule or current protected-claim rules. It is
+      withheld from the public catalog. Withdraw the outdated listing,
+      then review and approve a new snapshot before advertising it.
+    </p>}
     <form className="mt-4 space-y-3" onSubmit={submit}>
       {!published && <label className="block text-sm">
         Public description (30–2,000 characters; plain text)
