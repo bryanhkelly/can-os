@@ -850,6 +850,18 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
       row.studentProfileId,row.metadata.approvedEmergencyContact as
        {name:string;phone:string;relationship:string}|undefined,
     ]));
+    const holdIds=holds.map(hold=>hold.id);
+    const pendingResolutions=holdIds.length?await db.select({
+      id:actions.id,holdId:actions.subjectId,
+      proposerPersonId:actions.ownerPersonId,metadata:actions.metadata,
+    }).from(actions).where(and(
+      eq(actions.type,"pickup_custody_resolution_proposal"),
+      eq(actions.subjectType,"pickup_custody_hold"),eq(actions.status,"open"),
+      eq(actions.siteId,actor.grantSiteId!),inArray(actions.subjectId,holdIds),
+    )).orderBy(desc(actions.createdAt)).limit(201):[];
+    requireCompletePickupSafetyRows([
+      {name:"pending independent custody reviews",received:pendingResolutions.length,limit:201},
+    ]);
     const personByProfile = new Map((await (studentIds.length ? db.select({
       id: studentProfiles.id, personId: studentProfiles.personId,
     }).from(studentProfiles).where(inArray(studentProfiles.id, studentIds)) : []))
@@ -857,6 +869,7 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
     return {
       date: data.date,
       canResolveHolds: actor.role === "site_leader",
+      reviewerPersonId:actor.role==="site_leader"?actor.actorPersonId:null,
       students: roster.students.map(student => {
         const same = (row: { studentProfileId: string; programId: string }) =>
           row.studentProfileId === student.studentProfileId && row.programId === student.programId;
@@ -873,9 +886,18 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
           authorizedAdults: authorizations.filter(same).filter(row =>
             row.startsOn <= data.date && (!row.expiresOn || row.expiresOn >= data.date))
             .map(row => ({ ...row, pickupName: row.legalFirstName + " " + row.legalLastName })),
-          activeHolds: holds.filter(same).map(row => ({
-            id: row.id, householdId: row.householdId, kind: row.kind, reason: row.reason,
-          })),
+          activeHolds: holds.filter(same).map(row => {
+            const pending=pendingResolutions.find(proposal=>proposal.holdId===row.id);
+            return {
+              id:row.id,householdId:row.householdId,kind:row.kind,reason:row.reason,
+              pendingResolution:pending?{
+                id:pending.id,proposerPersonId:pending.proposerPersonId,
+                resolutionNote:String(pending.metadata.resolutionNote??""),
+                authorityBasis:String(pending.metadata.authorityBasis??""),
+                evidenceReference:String(pending.metadata.evidenceReference??""),
+              }:null,
+            };
+          }),
           release: release ? {
             id: release.id, pickupName: release.presentedName,
             occurredAt: release.occurredAt.toISOString(),
