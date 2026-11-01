@@ -2,7 +2,7 @@
 
 Last reconciled: 2026-10-31. **Canonical branch: `FullFlow`.**
 
-This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. All twelve original parallel agent PRs remain draft; the twelve merged integration PRs below are deliberately partial, separately reviewed integrations.
+This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. Original parallel agent PRs can remain open for provenance even when their code is imported. Fourteen integration PRs (#215–224, #225–228) have been merged, plus focused direct commits for remaining agent source. **Code present is not capability completed.**
 
 ## Canonical verified baseline
 
@@ -27,6 +27,8 @@ This ledger distinguishes **source integrated**, **product capability completed*
 | [#224](https://github.com/bryanhkelly/can-os/pull/224) | `254d54d1bfc9` | A | Transcript credit/withdrawal evidence guards | Whole-cohort adjudication, connected credential release and acceptance |
 | [#227](https://github.com/bryanhkelly/can-os/pull/227) | `7e17246e312b` | E | Bounded first-day effective-window prefilter, 24-date fail-closed verification | Isolated realistic query/latency measurements and connected school-day acceptance |
 | [#228](https://github.com/bryanhkelly/can-os/pull/228) | `a04bc5ea2284` | J | Durable external-enrollment approval, immutable import/registrar provenance, current Section authority on retries | Authenticated registrar concurrency, corrective/revocation workflow and G/K rights acceptance |
+| [#225](https://github.com/bryanhkelly/can-os/pull/225) | `ecba5f33af56` | A | Graduation cohort classification, 0056 migration, transcript/diploma source freshness | Reconcile isolated Neon ledger, authenticated registrar acceptance |
+| [#226](https://github.com/bryanhkelly/can-os/pull/226) | `7bd4136bf425` | B | Consent-bound official credential guardian release, canonical freshness checks and private PDF | Authenticated revocation/concurrency, recipient browser and cross-tenant acceptance |
 
 **No agent A–L is marked product-complete by these merges.** Integration PR merge status and original agent delivery status are different facts.
 
@@ -34,23 +36,31 @@ This ledger distinguishes **source integrated**, **product capability completed*
 
 | Agent | Original PR | FullFlow integration status | Remaining completion/acceptance gate |
 |---|---|---|---|
-| A Graduation | [#214](https://github.com/bryanhkelly/can-os/pull/214) | Resolver and credit guards only; candidate [#225](https://github.com/bryanhkelly/can-os/pull/225) | Attested cohort classification, 0056 full-schema DB acceptance, diploma freshness and authenticated registrar review |
-| B Academic release | [#213](https://github.com/bryanhkelly/can-os/pull/213) | Pure policy only; stacked candidate [#226](https://github.com/bryanhkelly/can-os/pull/226) | Canonical transcript check at all disclosure boundaries, lock/concurrency, verified recipient/consent, connected PDF tests |
-| C Acceptance | [#203](https://github.com/bryanhkelly/can-os/pull/203) | Not integrated | Same-SHA role/tenant browser+DB journey, negative checks, evidence artifacts |
-| D Algebra I | [#212](https://github.com/bryanhkelly/can-os/pull/212) | Not integrated | 36 weeks / 180 academically reviewed lessons; earlier review counted 8 weeks / 40 lessons |
+| A Graduation | [#214](https://github.com/bryanhkelly/can-os/pull/214) | **Merged** cohort classification, migration 0056, graduation approval and official credential freshness (#225) | Approved isolated Neon migration reconciliation; authenticated registrar decisions and stale-evidence denials |
+| B Academic release | [#213](https://github.com/bryanhkelly/can-os/pull/213) | **Merged** secure guardian transfer disclosure at grant, registrar rendering and recipient download (#226) | Authenticated concurrent revocation, issuer/recipient isolation and actual browser PDF; no external-school delivery |
+| C Acceptance | [#203](https://github.com/bryanhkelly/can-os/pull/203) | Static PR workflow, manual connected workflow, acceptance contract and cross-role browser spec imported (`a92e2942`) | Approved isolated Neon identities/secrets, fixture reconciliation and same-SHA passing DB/browser traces |
+| D Algebra I | [#212](https://github.com/bryanhkelly/can-os/pull/212) | 40 drafted lessons across 8 weeks, teacher-only guides and packaging protections imported (`1290d846`) | Remaining 140 lessons, academic review, formal CAN approval; NOT CREDIT READY |
 | E First day | [#211](https://github.com/bryanhkelly/can-os/pull/211) | Future roster/handoff integrated | Bounded candidate/query cost, authenticated staffing/supervision/first-day acceptance |
 | F One-hour launch | [#204](https://github.com/bryanhkelly/can-os/pull/204) | Launch and website coordination integrated | Real persisted timed 1-hour end-to-end launch, admissions continuity and invite recovery |
-| G Licensing | [#210](https://github.com/bryanhkelly/can-os/pull/210) | Pure policy integrated | Persistent rights provenance, annual adoption, Section eligibility |
-| H Finance | [#205](https://github.com/bryanhkelly/can-os/pull/205) | Pure money/ledger rules integrated | Real idempotent processor events, refunds, receipts, finance settlement |
+| G Licensing | [#210](https://github.com/bryanhkelly/can-os/pull/210) | Pure policy plus annual adoption schema/model/server and new flag-closed commands imported (`5e51d690`, `8c2619f3`) | Assign serial migration, license/version/Section integration; `CAN_ANNUAL_ADOPTIONS_ENABLED` must remain off |
+| H Finance | [#205](https://github.com/bryanhkelly/can-os/pull/205) | Finance invoice schema, payment initiation, signed processor adapters, read models, receipts and tests imported (`5e51d690`) | Serial migration, processor configuration, real idempotent payments/refunds/settlement and connected acceptance; not activated |
 | I Tenant hosting | [#206](https://github.com/bryanhkelly/can-os/pull/206) | Hosted-site guards/UI integrated, flag-gated | Wildcard DNS/TLS, two-tenant live HTTPS and isolation |
 | J OneRoster | [#209](https://github.com/bryanhkelly/can-os/pull/209) | Matching, canonical Section placement and durable per-enrollment decision history integrated | Authenticated concurrent reimports, explicit corrective/revocation workflow, G/K rights and browser acceptance |
-| K Cartridge | [#208](https://github.com/bryanhkelly/can-os/pull/208) | Secure parser integrated | Private authorized import, license provenance, teacher/student rendering |
-| L Church evidence | [#207](https://github.com/bryanhkelly/can-os/pull/207) | Policy tests integrated | Private applicant upload, screening, independent reviewer, applicant response |
+| K Cartridge | [#208](https://github.com/bryanhkelly/can-os/pull/208) | Parser plus private static lesson upload/read, sandboxed iframe, class authorization imported (`5e51d690`, `e3205b3a`) | Authenticated storage/licensing/Section tests and teacher/student browser verification |
+| L Church evidence | [#207](https://github.com/bryanhkelly/can-os/pull/207) | Policy plus steward evidence follow-up/review UI and endpoints imported (`5e51d690`) | Church evidence status migration, independent reviewer/safe upload and verified notices |
 
-## Active integration candidates: strictly not merged
+## Code-first integration: new shared baseline
 
-1. [#225](https://github.com/bryanhkelly/can-os/pull/225), `integration/a-graduation-connected-20261031`, targets `FullFlow`: registered 0056 cohort migration, audited registrar classification, source-grade and diploma freshness. [CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41264214131), [platform PASS](https://github.com/bryanhkelly/can-os/actions/runs/41264214145), and [full 57-file SQL migration chain with real legacy cohort fixtures / FK / bounds / supersession / rollback PASS](https://github.com/bryanhkelly/can-os/actions/runs/41264214134) at `09f90041010b`. This runs committed SQL through `psql` on a disposable PostgreSQL container; it does not test Drizzle's remote-only Neon journal runner, authenticated registrar, or historic policies on an approved isolated Neon clone.
-2. [#226](https://github.com/bryanhkelly/can-os/pull/226), `integration/ab-secure-credential-delivery-20261031`, **stacked on #225**: issuer-authorized, consent-bound recipient download and ledger. Exact stacked HEAD `5844fc775a39` [CI PASS](https://github.com/bryanhkelly/can-os/actions/runs/41264291261) uses the A-owned canonical transcript check at grant creation/reuse, registrar rendering and recipient PDF download, with locked live recipient/issuer revalidation and existing consent/revocation safeguards. Connected role/tenant/concurrency acceptance is still missing. Neither A nor B is production-approved.
+The coordinator is merging verified code into **FullFlow first**, then using that branch as the unified implementation and repair target. Original A–L feature branches remain useful as source references but **should not overwrite** changed FullFlow files. Original A/B integration PRs #225/#226 are merged. Remaining functionality is not certified merely because its files are present.
+
+- `7bf6536a`: PostgreSQL acceptance jobs read the **exact committed Drizzle journal** instead of expecting 56 or 57 migrations.
+- `1290d846`: Algebra I draft Weeks 2–8 (40/180 lessons), teacher-only answer material segregated from student package.
+- `5e51d690`: Staged H finance, L church evidence, K private Common Cartridge and G year-scoped adoption source files. Existing updated shared contracts are preserved.
+- `a92e2942`: C's cross-role browser test, same-SHA manual workflow and static acceptance PR gate.
+- `e3205b3a`: Private Cartridge read requires an actual Site-scoped authorized Section; fixes nullable query and fails closed.
+- `8c2619f3`: New G adoption commands are explicitly blocked unless `CAN_ANNUAL_ADOPTIONS_ENABLED=true`; the existing working adoption path remains unchanged.
+
+**Migrations:** 0056 is already committed in FullFlow. G/H/L include proposed or unregistered changes, not accepted 0057+ migrations. Never enable those database-dependent features until migration identifiers, durable tables, rights and rollback are reconciled.
 
 ## P1 integration hardening and remaining candidates
 
@@ -60,7 +70,7 @@ This ledger distinguishes **source integrated**, **product capability completed*
 
 ## Release sequence and cross-agent contracts
 
-1. **P0 A+B:** #225 first, #226 second; no credential-release enablement before exact-head CI, real-schema migration acceptance, verified enrollment/cohort and recipient tests. The guardian transfer inbox is **not school-to-school delivery**. No raw emailed academic PDFs.
+1. **P0 A+B unified:** The code is now merged, but credential disclosure deployment remains gated pending actual Neon migrations, authenticated cohort/recipient tests, concurrency/revocation and issuer isolation. The guardian transfer inbox is **not school-to-school delivery**; no emailed academic PDFs.
 2. **P0 C + integration:** produce a single immutable **FullFlow SHA** with authenticated campus/onboarding → launch → admissions → enrollment → Section → lesson/gradebook → staffed supervised first day → official transcript; assert one student identity and issuer from start to finish. Deny wrong tenant, site, role, guardian, revoked consent, stale grade and revoked diploma. Save DB/browser traces and exact tested SHA.
 3. **P1 J+G+K:** canonical roster-to-Section authorization must check adopted/licensed content and private Cartridge rights without bypassing institutional entitlement checks. Retain external enrollment identity and review history.
 4. **P1 H/L:** finish processor-backed finance lifecycle and secure church evidence upload/review as separate agent workstreams; coordinator owns migrations and cross-role coherence.
@@ -68,7 +78,7 @@ This ledger distinguishes **source integrated**, **product capability completed*
 
 ## Migration ownership and connected environment (HOLD)
 
-- 0055 is committed in FullFlow; **0056 is reserved by graduation PR #225 only**. G/H/L must not independently select their next Drizzle integer; coordinator assigns subsequent identifiers serially against current canonical journal/snapshot.
+- **0056 graduation is committed in FullFlow**. G/H/L have no registered post-0056 migrations; coordinator assigns 0057 onward serially against the current canonical journal/snapshot. Their proposed tables/status updates must not be assumed to exist.
 - Disposable Neon acceptance is blocked by missing approved `CAN_ADMISSIONS_TEST_DATABASE_URL` / environment configuration and exhausted branch quota. Do **not** silently swap in production, shared E2E or another agent's database. Ephemeral PostgreSQL migration smoke tests are useful but are not fully seeded integration acceptance.
 - Before any merge of schema-bearing PRs: review current FullFlow HEAD, register generated SQL and snapshot, run original-FK migration/rollback on an **approved isolated** environment, and re-run checks against the exact integrated SHA.
 - Operational release gate remains **CLOSED** until one connected cross-role acceptance suite passes on a single FullFlow SHA. CI passing alone is not release approval.
