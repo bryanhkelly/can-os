@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { spawnSync } from "node:child_process";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
@@ -27,6 +27,13 @@ if (host === process.env.CAN_APPLICATION_DB_HOST.trim().replace(/-pooler(?=\.)/,
 if (process.env.DATABASE_URL && process.env.DATABASE_URL !== testUrl) {
   const appHost = new URL(process.env.DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").toLowerCase();
   if (host === appHost) throw new Error("Refusing migrations against the application DATABASE_URL endpoint.");
+}
+// Never apply a journal tip that lacks its Drizzle snapshot: drizzle-kit
+// generate would otherwise infer a synthetic catch-up migration.
+const migrationJournal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
+const migrationTip = migrationJournal.entries.at(-1);
+if (!migrationTip || !existsSync(`drizzle/meta/${String(migrationTip.idx).padStart(4, "0")}_snapshot.json`)) {
+  throw new Error(`Refusing FullFlow migration: journal tip ${migrationTip?.tag ?? "(empty)"} lacks its reviewed Drizzle snapshot.`);
 }
 await verifyFullFlowNeonBranch(testUrl);
 // Even on the correct branch, Drizzle must not silently continue from a
