@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {resolveGraduationPolicy} from "@/domain/graduation-policy";
+import {resolveGraduationPolicy,validateLegacyGraduationCohortClassification} from "@/domain/graduation-policy";
 const policy=(id:string,start:string,end:string,supersedesRequirementSetId:string|null=null)=>({id,academicYear:"2026",cohortStart:start,cohortEnd:end,supersedesRequirementSetId});
 describe("institutional graduation policy applicability",()=>{
  it("resolves old and new entry cohorts regardless of current academic year",()=>{
@@ -37,5 +37,29 @@ describe("institutional graduation policy applicability",()=>{
  it("rejects malformed cohort evidence and duplicate identities",()=>{
   expect(()=>resolveGraduationPolicy([policy("a","2024","2024")],"unknown")).toThrow(/cohort/);
   expect(()=>resolveGraduationPolicy([policy("a","2024","2024"),policy("a","2024","2024")],"2024")).toThrow(/Duplicate/);
+ });
+});
+
+describe("attested legacy cohort classification",()=>{
+ const legacy=()=>({...policy("old","2024","2026"),cohortStart:null,cohortEnd:null});
+ it("allows explicit classification while other unknowns still block adjudication",()=>{
+  const policies=[legacy(),{...legacy(),id:"other"}];
+  expect(()=>validateLegacyGraduationCohortClassification(policies,"old","2024","2025")).not.toThrow();
+  expect(()=>resolveGraduationPolicy(policies,"2024")).toThrow(/Unclassified active/);
+ });
+ it("rejects overlapping active cohort policies",()=>{
+  const policies=[legacy(),policy("current","2025","2027")];
+  expect(()=>validateLegacyGraduationCohortClassification(policies,"old","2024","2026")).toThrow(/overlaps/);
+ });
+ it("rejects reclassification, nonexistent policies and invalid bounds",()=>{
+  expect(()=>validateLegacyGraduationCohortClassification([policy("p","2024","2025")],"p","2024","2025")).toThrow(/already/);
+  expect(()=>validateLegacyGraduationCohortClassification([legacy()],"missing","2024","2025")).toThrow(/not found/);
+  expect(()=>validateLegacyGraduationCohortClassification([legacy()],"old","2028","2024")).toThrow(/Invalid/);
+  expect(()=>validateLegacyGraduationCohortClassification([legacy()],"old","20xx","2024")).toThrow(/Invalid/);
+ });
+ it("keeps revision eligibility bounds identical",()=>{
+  const policies=[legacy(),policy("revision","2024","2026","old")];
+  expect(()=>validateLegacyGraduationCohortClassification(policies,"old","2024","2025")).toThrow(/conflict/);
+  expect(()=>validateLegacyGraduationCohortClassification(policies,"old","2024","2026")).not.toThrow();
  });
 });
