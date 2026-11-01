@@ -69,8 +69,8 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
  .validator((value:unknown)=>target.extend({
   recipientPersonId:uuid,recipientEmail:z.string().email().max(254),
   releasePurpose:z.string().trim().min(5).max(300),
-  instructionReference:z.string().trim().min(5).max(500),
-  consentEvidenceReference:z.string().trim().min(5).max(500),
+  instructionReference:uuid,
+  consentEvidenceReference:uuid,
   expiresAt:z.string().datetime(),
  }).strict().parse(value))
  .handler(async ({data})=>{
