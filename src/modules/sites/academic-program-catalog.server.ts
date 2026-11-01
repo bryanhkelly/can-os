@@ -2,6 +2,8 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { programPublications, programs, sites } from "@/db/schema";
 import { publishableAcademicProgram, publicAcademicProgram } from "@/domain/academic-program-publication";
+import { AuthorizationError } from "@/domain/command-context";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 /**
  * Canonical Program-to-public-listing projection; approved snapshots ONLY.
@@ -33,19 +35,43 @@ export async function readAcademicProgramCatalog(
       isNotNull(programPublications.publishedAt),
       inArray(programs.status, ["draft", "launching", "ready", "active"]),
     )).orderBy(asc(programPublications.title)).limit(100);
-  return rows.filter(row => publishableAcademicProgram({
+  const eligible = rows.filter(row => publishableAcademicProgram({
     type: row.type, status: row.status,
     siteId: row.programSiteId,
     organizationId: row.organizationId,
     siteOrganizationId: row.siteOrganizationId,
     publicationSiteId: row.publicationSiteId,
-  })).map(row => publicAcademicProgram({
-    programId: row.programId,
-    title: row.title,
-    summary: row.summary,
-    type: row.type,
-    status: row.status,
-    gradeRange: row.gradeRange,
-    deliveryModel: row.deliveryModel,
   }));
+  const listings = [];
+  // Deliberately sequential: a caller may already own the transaction.
+  for (const row of eligible) {
+    let applicationOpen = false;
+    if (row.status === "active") {
+      try {
+        // Marketing approval and an active Program are insufficient on their
+        // own to invite families into an academic school of record. The same
+        // CAN/church services check is enforced again at actual submission.
+        await requireChurchHostedOperatingServices(executor, row.programId,
+          ["admissions", "school_of_record"]);
+        applicationOpen = true;
+      } catch (error) {
+        // Absence/expiry/revocation of the separately verified agreement is
+        // a routine not-open state, NOT an error to reflect to families.
+        // Unexpected database failures must still fail closed, not produce
+        // a misleading Apply call-to-action.
+        if (!(error instanceof AuthorizationError)) throw error;
+      }
+    }
+    listings.push(publicAcademicProgram({
+      programId: row.programId,
+      title: row.title,
+      summary: row.summary,
+      type: row.type,
+      status: row.status,
+      gradeRange: row.gradeRange,
+      deliveryModel: row.deliveryModel,
+      applicationOpen,
+    }));
+  }
+  return listings;
 }
