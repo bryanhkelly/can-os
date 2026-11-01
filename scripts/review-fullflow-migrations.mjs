@@ -559,7 +559,7 @@ async function main() {
     review.ready=false;
     review.status="HOLD_REVIEW_DRIFT";
   }
-  process.stdout.write(JSON.stringify(review,null,2)+"\\n");
+  process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
 }
 
