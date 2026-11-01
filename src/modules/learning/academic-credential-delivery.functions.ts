@@ -162,7 +162,7 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      .for("share").limit(1);
    const [liveProgram]=await tx.select({
      issuerId:s.programs.creditIssuingOrganizationId,
-   }).from(s.programs).where(eq(s.programs.id,action!.programId))
+   }).from(s.programs).where(eq(s.programs.id,action!.programId!))
      .for("share").limit(1);
    const [liveRecipientAccount]=await tx.select({id:s.accessAccounts.id})
     .from(s.accessAccounts)
