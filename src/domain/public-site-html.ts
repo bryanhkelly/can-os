@@ -66,11 +66,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ].filter(Boolean).join(" · ");
     const onsiteDays = program.delivery.onsiteDaysPerWeek;
     const requestId = options?.makeRequestId?.();
-    const applyRequestId = program.availability === "operating" ? options?.makeRequestId?.() : undefined;
-    // A published active academic Program can invite first-time families to
-    // verify their email. The receiving server checks the live operating
-    // authorization; this is not a claim of admission or school readiness.
-    const applicationForm = program.availability === "operating" && applyRequestId ?
+    const applyRequestId = program.applicationOpen === true ? options?.makeRequestId?.() : undefined;
+    // Only the separately authorized school-of-record/admissions projection
+    // can expose Apply. A live Program is NOT automatically an open school.
+    // The receiving command rechecks operating authority at submission.
+    const applicationForm = program.applicationOpen === true && applyRequestId ?
       `<form action="/apply" method="post" class="inquiry-form">
         <h4>Start your school application</h4>
         <p class="availability">Verify your email first. No child information is
@@ -111,9 +111,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">${escapePublicHtml(modes || "Delivery details available by inquiry")}
         ${onsiteDays !== null && program.delivery.onsite ? ` · ${onsiteDays} onsite days per week` : ""}
       </p>
-      <p class="availability">${program.availability === "planned"
-        ? "Program planned · admissions not open on this page"
-        : "Current program · contact the Site about admissions"}</p>
+      <p class="availability">${program.applicationOpen === true
+        ? "Applications available · identity verification required"
+        : program.availability === "planned"
+          ? "Program planned · admissions not open on this page"
+          : "Current program · applications not currently available"}</p>
       ${applicationForm}
       ${inquiryForm}
     </article>`;
