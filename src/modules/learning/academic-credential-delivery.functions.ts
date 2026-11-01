@@ -40,14 +40,20 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
  .handler(async ({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const context=await registrar();const {db,s}=await resources();
-  const doc=await documentData(db,s,data.kind,data.credentialId);
-  if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
-  if(data.kind==="transcript")await assertLatestTranscriptIssuance(db,s,doc.studentProfileId,doc.issuerId,data.credentialId);
-  else await db.transaction(async tx => assertDiplomaFreshForAuthorizedRelease(tx,s,{diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId}));
-  // Generating an official record is a privileged disclosure, even without email.
-  // Do not cache or share the resulting response outside the authorized registrar session.
-  const pdf=academicDocumentPdf(doc);
-  return {filename:`${data.kind}-${data.credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
+  // Keep the authoritative diploma freshness locks until the private PDF
+  // bytes have been produced, so a concurrent revocation cannot slip between
+  // eligibility verification and disclosure.
+  return db.transaction(async tx=>{
+   const doc=await documentData(tx as unknown as typeof db,s,data.kind,data.credentialId);
+   if(!context.scope.organizationIds?.includes(doc.issuerId))
+    throw new AuthorizationError("credential issuer");
+   if(data.kind==="transcript")
+    await assertLatestTranscriptIssuance(tx as unknown as typeof db,s,doc.studentProfileId,doc.issuerId,data.credentialId);
+   else
+    await assertDiplomaFreshForAuthorizedRelease(tx,s,{diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
+   const pdf=academicDocumentPdf(doc);
+   return {filename:`${data.kind}-${data.credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
+  });
  });
 
 /** A registrar can authorize a release only to an existing verified person with
