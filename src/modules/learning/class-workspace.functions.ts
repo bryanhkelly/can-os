@@ -121,6 +121,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       item.siteId ? item.siteId===section.siteId : true,
     ).map(item=>({id:item.id,title:item.title,kind:item.kind,
       url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
+      resourceId:item.resourceId,
       lessonId:item.lessonId,
       source:item.metadata?.source==="teacher_supplement"?"teacher" as const:"organization" as const,
       canManage:actor.role==="teacher"&&item.metadata?.source==="teacher_supplement"&&
@@ -130,6 +131,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const publisherRows=curriculumAccess.available?await db.select({
       id:s.curriculumResources.id,title:s.curriculumResources.title,
       kind:s.curriculumResources.kind,url:s.curriculumResources.url,
+      resourceId:s.curriculumResources.id,
       lessonId:s.curriculumResourceBindings.lessonId,
     }).from(s.curriculumAdoptions)
       .innerJoin(s.curriculumEntitlements,and(
@@ -159,7 +161,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       ?[...completionGroups].map(([lessonId,students])=>({lessonId,studentCount:students.size})):[];
     return {
       lessonCompletionCounts,
-      role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
+      role: actor.role, section: { id: section.id, programId: section.programId, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
       studentPersonId, content, teacherGuides, curriculumAccess, supplements:allSupplements,
       assessmentEvidence, assessmentEvidenceSummary:summarizeClassAssessmentEvidence(assessmentEvidence),

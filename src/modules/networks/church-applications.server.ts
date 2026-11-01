@@ -9,6 +9,8 @@ import { bootstrapVerifiedChurch } from "./church-onboarding.server";
 import { EventTypes } from "@/domain/event-types";
 import { STAFF_INVITATION_AGGREGATE } from "@/modules/identity/staff-invitations.server";
 import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
+import { currentChurchAuthorityEvidence, evidenceExpiresAt, validateChurchEvidenceReference } from "./church-evidence-policy";
+import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 
 export type ChurchApplication = {
   churchName: string;
@@ -43,7 +45,7 @@ export async function submitChurchApplication(data: ChurchApplication) {
       .from(churchOnboardingRequests).where(and(
         eq(churchOnboardingRequests.contactEmail, email),
         eq(churchOnboardingRequests.churchName, data.churchName),
-        inArray(churchOnboardingRequests.status, ["submitted", "verified", "approved"]),
+        inArray(churchOnboardingRequests.status, ["submitted", "needs_evidence", "verified", "approved"]),
       )).limit(1);
     if (duplicate.length) return;
     const recent = await tx.select({ id: churchOnboardingRequests.id })
@@ -87,7 +89,10 @@ export async function listChurchApplications(actor: AccessContext) {
     request.authorityDocumentId ? [request.authorityDocumentId] : []);
   const evidence = evidenceIds.length ? await db.select({
     id: documents.id, storageKey: documents.storageKey, metadata: documents.metadata,
+    category: documents.category, subjectType: documents.subjectType,
+    subjectId: documents.subjectId,
     verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+    expiresAt: documents.expiresAt,
   }).from(documents).where(inArray(documents.id, evidenceIds)) : [];
   const evidenceById = new Map(evidence.map(document => [document.id, document]));
   const withEvidence = requests.map(request => {
@@ -95,12 +100,17 @@ export async function listChurchApplications(actor: AccessContext) {
       ? evidenceById.get(request.authorityDocumentId) : undefined;
     return {
       ...request,
+      // The decision note is reviewer-only. Never expose it in applicant-facing
+      // status APIs or outgoing notices.
       authorityEvidence: document ? {
         reference: document.storageKey,
         method: typeof document.metadata.verificationMethod === "string"
           ? document.metadata.verificationMethod : "unspecified",
         verifiedAt: document.verifiedAt,
         verifiedByPersonId: document.verifiedByPersonId,
+        expiresAt: document.expiresAt,
+        usable: document.subjectType === "organization" && document.subjectId === (actor.scope.organizationIds ?? [])[0] &&
+          currentChurchAuthorityEvidence(document, request, actor.actorPersonId),
       } : null,
     };
   });
@@ -135,27 +145,43 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
   requestId: string; evidenceReference: string; verificationMethod: string;
 }) {
   const canOrganizationId = await requireCANSteward(actor);
+  const reference = validateChurchEvidenceReference(input.evidenceReference, input.verificationMethod);
+  // Never promote a staff-typed reference into authority. The only accepted
+  // evidence must be applicant-bound, uploaded to private storage, verified
+  // against its actual bytes, screened, and independently reviewed.
+  // This legacy shortcut intentionally stays disabled even when the intake
+  // feature flag is enabled, so deployments cannot bypass those controls.
+  void reference;
+  throw new AuthorizationError("verified, inspected church evidence required");
   return db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, input.requestId)).for("update").limit(1);
-    if (!request || request.status !== "submitted") throw new Error("Application is no longer awaiting verification");
+    if (!request || !["submitted", "needs_evidence"].includes(request.status)) throw new Error("Application is no longer awaiting verification");
+    // Serialize registrations for the same external reference to prevent concurrent reuse.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"church-evidence:" + reference}))`);
+    const reused = await tx.select({ id: documents.id }).from(documents).where(and(
+      eq(documents.category, "church_onboarding_authority"), eq(documents.storageKey, reference),
+    )).limit(1);
+    if (reused.length) throw new Error("Evidence reference is already registered; obtain an application-specific independent record");
+    const verifiedAt = new Date();
     const [document] = await tx.insert(documents).values({
       subjectType: "organization", subjectId: canOrganizationId,
       category: "church_onboarding_authority",
       fileName: "Independently reviewed church authority (" + input.verificationMethod + ")",
-      storageProvider: "external_verified_reference", storageKey: input.evidenceReference,
+      storageProvider: "external_verified_reference", storageKey: reference,
       sensitivityTier: "restricted",
       uploadedByPersonId: actor.actorPersonId!, verifiedByPersonId: actor.actorPersonId!,
-      verifiedAt: new Date(),
+      verifiedAt, expiresAt: evidenceExpiresAt(verifiedAt),
       metadata: {
         churchSlug: request.churchSlug, authorizedEmailNormalized: request.contactEmail,
         churchRequestId: request.id, verificationMethod: input.verificationMethod,
+        provenance: "can_steward_independently_reviewed",
       },
     }).returning({ id: documents.id });
     if (!document) throw new Error("Unable to record verified authority evidence");
     await tx.update(churchOnboardingRequests).set({
       status: "verified", authorityDocumentId: document.id,
-      verifiedByPersonId: actor.actorPersonId, verifiedAt: new Date(), updatedAt: new Date(),
+      verifiedByPersonId: actor.actorPersonId, verifiedAt, updatedAt: verifiedAt,
     }).where(eq(churchOnboardingRequests.id, request.id));
     await writeAudit(tx, actor, {
       action: "church.onboarding.authority.verified",
@@ -176,6 +202,15 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
       !request.verifiedByPersonId || request.verifiedByPersonId === actor.actorPersonId)
     throw new AuthorizationError("separately verified church application and independent approver");
 
+  const [evidence] = await db.select({ id: documents.id, expiresAt: documents.expiresAt,
+    verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+    metadata: documents.metadata, category: documents.category,
+    subjectType: documents.subjectType, subjectId: documents.subjectId,
+  }).from(documents).where(eq(documents.id, request.authorityDocumentId)).limit(1);
+  if (evidence?.subjectType !== "organization" || evidence.subjectId !== canOrganizationId ||
+      !currentChurchAuthorityEvidence(evidence, request, actor.actorPersonId))
+    throw new AuthorizationError("current, application-bound independent authority evidence");
+
   // The callback updates the approved request INSIDE the canonical bootstrap
   // transaction, so a failed/declined approval rolls back all new grants/Sites.
   const result = await bootstrapVerifiedChurch(actor, {
@@ -193,6 +228,19 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
         authorityDocumentId: churchOnboardingRequests.authorityDocumentId,
       }).from(churchOnboardingRequests)
         .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+      // Recheck authority inside the provisioning transaction. A concurrent
+      // decline, expiry, or evidence replacement cannot authorize bootstrap.
+      const [currentEvidence] = await tx.select({
+        id: documents.id, category: documents.category,
+        subjectType: documents.subjectType, subjectId: documents.subjectId,
+        verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+        expiresAt: documents.expiresAt, metadata: documents.metadata,
+      }).from(documents).where(eq(documents.id, request.authorityDocumentId!))
+        .for("update").limit(1);
+      if (currentEvidence?.subjectType !== "organization" ||
+          currentEvidence.subjectId !== canOrganizationId ||
+          !currentChurchAuthorityEvidence(currentEvidence, request, actor.actorPersonId))
+        throw new AuthorizationError("current independent evidence required at provisioning");
       if (locked?.status !== "verified" ||
           locked.verifiedByPersonId !== request.verifiedByPersonId ||
           locked.authorityDocumentId !== request.authorityDocumentId)
@@ -230,12 +278,93 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
   }
 }
 
-export async function declineChurchApplication(actor: AccessContext, requestId: string, note: string) {
+/** Request further evidence without allowing applicant self-verification or automatic approval. */
+export async function requestAdditionalChurchEvidence(actor: AccessContext, requestId: string, note: string) {
   const canOrganizationId = await requireCANSteward(actor);
-  await db.transaction(async tx => {
+  const message = note.trim();
+  if (message.length < 15 || message.length > 1000 || /[\u0000-\u0008\u000e-\u001f\u007f]/.test(message))
+    throw new Error("Provide a specific applicant-facing evidence request (15–1000 characters)");
+  const recipient = await db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
     if (!request || !["submitted", "verified"].includes(request.status))
+      throw new Error("Application is not awaiting initial evidence review");
+    if (request.authorityDocumentId) {
+      await tx.update(documents).set({ expiresAt: new Date(), updatedAt: new Date() })
+        .where(eq(documents.id, request.authorityDocumentId));
+    }
+    const requestedAt = new Date();
+    await tx.update(churchOnboardingRequests).set({
+      status: "needs_evidence", decisionNote: message, updatedAt: requestedAt,
+    }).where(eq(churchOnboardingRequests.id, requestId));
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.evidence.followup.requested",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { priorEvidenceInvalidated: !!request.authorityDocumentId, noticePrepared: true },
+    });
+    return { recipient: request.contactEmail, requestedAt };
+  });
+  // Transport happens after transaction commit; an acceptance is NOT final delivery.
+  const acceptedByProvider = await sendNotificationEmail({
+    to: recipient.recipient, subject: "CAN Academy church partnership: additional evidence needed",
+    text: "Thank you for your interest in partnering with CAN Academy. To continue our independent authority review, please provide the following information through your established CAN contact. Do not email student records or sensitive identification documents.\n\n" +
+      message + "\n\nThis request is not an approval or invitation to open a school.",
+  }, "church-evidence-followup:" + requestId + ":" + recipient.requestedAt.toISOString());
+  await db.transaction(async tx => {
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.evidence.followup.transport",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { providerAccepted: acceptedByProvider, delivered: false },
+    });
+  });
+  return { requested: true as const, providerAccepted: acceptedByProvider, delivered: false as const };
+}
+
+/** Explicit retry for a recorded evidence request when the provider rejected the first notice. */
+export async function resendChurchEvidenceFollowup(actor: AccessContext, requestId: string) {
+  const canOrganizationId = await requireCANSteward(actor);
+  const [request] = await db.select({
+    status: churchOnboardingRequests.status,
+    contactEmail: churchOnboardingRequests.contactEmail,
+    decisionNote: churchOnboardingRequests.decisionNote,
+    updatedAt: churchOnboardingRequests.updatedAt,
+  }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
+  if (request?.status !== "needs_evidence" || !request.decisionNote)
+    throw new Error("No pending evidence follow-up can be resent");
+  // Recheck state immediately before transport. A canceled or approved request
+  // must not receive a stale evidence demand after a reviewer changes its state.
+  const [current] = await db.select({ status: churchOnboardingRequests.status,
+    decisionNote: churchOnboardingRequests.decisionNote,
+    updatedAt: churchOnboardingRequests.updatedAt,
+  }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
+  if (current?.status !== "needs_evidence" || current.decisionNote !== request.decisionNote ||
+      current.updatedAt.getTime() !== request.updatedAt.getTime())
+    throw new Error("Evidence request changed; refresh before retrying");
+  const providerAccepted = await sendNotificationEmail({
+    to: request.contactEmail,
+    subject: "CAN Academy church partnership: additional evidence needed",
+    text: "CAN Academy still needs additional authority evidence before your application can be reviewed. Please provide the following through your established CAN contact. Do not email student records or sensitive identification documents.\n\n" +
+      request.decisionNote + "\n\nThis is not approval to open a school.",
+  }, "church-evidence-followup:" + requestId + ":" + request.updatedAt.toISOString());
+  await db.transaction(async tx => {
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.evidence.followup.retry.transport",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { providerAccepted, delivered: false },
+    });
+  });
+  return { providerAccepted, delivered: false as const };
+}
+
+export async function declineChurchApplication(actor: AccessContext, requestId: string, note: string) {
+  const canOrganizationId = await requireCANSteward(actor);
+  const recipient = await db.transaction(async tx => {
+    const [request] = await tx.select().from(churchOnboardingRequests)
+      .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+    if (!request || !["submitted", "needs_evidence", "verified"].includes(request.status))
       throw new Error("Application is already decided");
     if (request.authorityDocumentId) {
       // Evidence tied to a declined application cannot later authorize a manual bootstrap.
@@ -251,8 +380,47 @@ export async function declineChurchApplication(actor: AccessContext, requestId: 
       scope: { organizationId: canOrganizationId },
       after: { note, authorityDocumentId: request.authorityDocumentId },
     });
+    return request.contactEmail;
   });
-  return { declined: true as const };
+  const providerAccepted = await sendNotificationEmail({
+    to: recipient,
+    subject: "CAN Academy church partnership application update",
+    text: "Thank you for your interest in partnering with CAN Academy. After review, we are unable to approve your church partnership application at this time. Please contact your established CAN representative if you have questions. Do not send sensitive personal or student records by email.",
+  }, "church-application-declined:" + requestId);
+  await db.transaction(async tx => {
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.decision.notice.transport",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { decision: "declined", providerAccepted, delivered: false },
+    });
+  });
+  return { declined: true as const, providerAccepted, delivered: false as const };
+}
+
+/** Cancel an undecided request. No applicant authority or grant is created. */
+export async function cancelChurchApplication(actor: AccessContext, requestId: string) {
+  const canOrganizationId = await requireCANSteward(actor);
+  await db.transaction(async tx => {
+    const [request] = await tx.select().from(churchOnboardingRequests)
+      .where(eq(churchOnboardingRequests.id, requestId)).for("update").limit(1);
+    if (!request || !["submitted", "needs_evidence", "verified"].includes(request.status))
+      throw new Error("Application cannot be canceled after a final decision");
+    if (request.authorityDocumentId) {
+      await tx.update(documents).set({ expiresAt: new Date(), updatedAt: new Date() })
+        .where(eq(documents.id, request.authorityDocumentId));
+    }
+    await tx.update(churchOnboardingRequests).set({
+      status: "canceled", updatedAt: new Date(),
+    }).where(eq(churchOnboardingRequests.id, requestId));
+    await writeAudit(tx, actor, {
+      action: "church.onboarding.request.canceled",
+      entityType: "church_onboarding_request", entityId: requestId,
+      scope: { organizationId: canOrganizationId },
+      after: { priorEvidenceInvalidated: !!request.authorityDocumentId },
+    });
+  });
+  return { canceled: true as const };
 }
 
 /** Recovery path when the original approved invitation email was not delivered. */
