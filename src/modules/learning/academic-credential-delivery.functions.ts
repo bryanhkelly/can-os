@@ -44,13 +44,19 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   // bytes have been produced, so a concurrent revocation cannot slip between
   // eligibility verification and disclosure.
   return db.transaction(async tx=>{
-   const doc=await documentData(tx as unknown as typeof db,s,data.kind,data.credentialId);
+   let doc=await documentData(tx as unknown as typeof db,s,data.kind,data.credentialId);
    if(!context.scope.organizationIds?.includes(doc.issuerId))
     throw new AuthorizationError("credential issuer");
    if(data.kind==="transcript")
     await assertOfficialTranscriptFreshForAuthorizedRelease(tx,s,{transcriptIssuanceId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
    else
     await assertDiplomaFreshForAuthorizedRelease(tx,s,{diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
+   // Re-read after the authoritative locks, not only from an earlier preview.
+   // This prevents an intervening issuance revision from leaking stale bytes.
+   const lockedDoc=await documentData(tx as unknown as typeof db,s,data.kind,data.credentialId);
+   if(lockedDoc.issuerId!==doc.issuerId||lockedDoc.studentProfileId!==doc.studentProfileId)
+    throw new AuthorizationError("Credential subject or issuer changed during PDF review");
+   doc=lockedDoc;
    const pdf=academicDocumentPdf(doc);
    return {filename:`${data.kind}-${data.credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
   });
@@ -145,6 +151,9 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
    // Re-read and lock consent and action after obtaining the idempotency lock.
    // Authorization cannot race a revocation made before this transaction.
+   const [liveStudent]=await tx.select({personId:s.studentProfiles.personId})
+    .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId))
+    .for("share").limit(1);
    const [liveConsent]=await tx.select().from(s.consentRecords)
     .where(eq(s.consentRecords.id,consent!.id)).for("share").limit(1);
    const [liveAction]=await tx.select().from(s.actions)
@@ -176,6 +185,11 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      eq(s.accessAccounts.emailNormalized,data.recipientEmail.trim().toLowerCase())))
     .for("share").limit(1);
    if(!liveConsent||liveConsent.revokedAt||!liveGuardian||!liveRecipientAccount||
+      !liveStudent||liveStudent.personId!==student.personId||
+      liveConsent.subjectType!=="student_profile"||
+      liveConsent.consentType!=="academic_records_transfer_release"||
+      liveAction?.type!=="guardian_enrollment_change_request"||
+      liveAction.subjectType!=="student_profile"||
       !liveRecipientPerson?.active||
       liveRecipientPerson.email?.trim().toLowerCase()!==data.recipientEmail.trim().toLowerCase()||
       liveProgram?.issuerId!==doc.issuerId||
@@ -190,6 +204,7 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
       liveConsent.signatureEvidence.guardianPersonId!==data.recipientPersonId||
       liveConsent.signatureEvidence.studentPersonId!==student.personId||
       liveConsent.signatureEvidence.programId!==liveAction.programId||
+      liveAction.metadata.kind!=="transfer"||
       liveConsent.signatureEvidence.destinationSchoolName!==liveAction.metadata.destinationSchoolName)
     throw new AuthorizationError("Transfer release authority changed during review");
    // Validate authoritative transcript source, including grade corrections,
@@ -373,7 +388,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   if(!release||release.revokedAt||release.expiresAt<=new Date())
    throw new AuthorizationError("active recipient authorization");
   const [recipient]=await tx.select({email:s.people.email,active:s.people.active})
-   .from(s.people).where(eq(s.people.id,recipientPersonId)).limit(1);
+   .from(s.people).where(eq(s.people.id,recipientPersonId)).for("share").limit(1);
   if(!canDownloadAuthorizedCredential({actorPersonId:recipientPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
   if(!context.accountId||!context.sessionId||!context.grantId)throw new AuthorizationError("verified active recipient session");
@@ -405,8 +420,9 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   const kind=release.transcriptIssuanceId?"transcript":"diploma";
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
-  const doc=await documentData(tx as unknown as typeof db,s,kind,credentialId);
-  // Agent A must supply a canonical supersession policy before broader release.
+  let doc=await documentData(tx as unknown as typeof db,s,kind,credentialId);
+  // Canonical grade and withdrawal freshness, not just latest issuance,
+  // governs official transcript eligibility.
   // Transcript issuer/student identity is bound to the original signed transfer.
   const [currentIssuance]=await tx.select({
    id:s.transcriptIssuances.id,studentProfileId:s.transcriptIssuances.studentProfileId,
@@ -420,15 +436,14 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
 
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
   await assertOfficialTranscriptFreshForAuthorizedRelease(tx,s,{transcriptIssuanceId:credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
-  // Diploma delivery is blocked until Agent A defines active/superseded issuance semantics.
-  // Historical transcript release remains bound to its exact immutable issuance snapshot.
+  // Diploma delivery is separately unsupported. This path only returns a
+  // verified guardian's institutional transfer transcript, not school receipt.
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
    throw new AuthorizationError("Only guardian transfer transcript access is supported");
-  // The transfer action is not itself proof that a newer official transcript
-  // is valid. Until Agent A supplies a supersession contract, this exact
-  // issuance is the only credential eligible for this authorization.
+  // A completed guardian transfer action never overrides live transcript
+  // freshness, recipient scope or revocation controls.
   const [student]=await tx.select({personId:s.studentProfiles.personId})
-   .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).limit(1);
+   .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).for("share").limit(1);
   if(!student)throw new AuthorizationError("student identity");
   const [relationship]=await tx.select({id:s.guardianRelationships.id})
    .from(s.guardianRelationships).where(and(
@@ -464,6 +479,12 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    actionCompleted:action?.metadata.exitCompletedByRegistrar===true,
    issuerMatches:program?.issuerId===doc.issuerId,
   }))throw new AuthorizationError("Original transfer consent or guardian authority no longer valid");
+  // The first preview may predate A's lock on the immutable issuance row.
+  // Render only the source projected AFTER canonical freshness verification.
+  const lockedDoc=await documentData(tx as unknown as typeof db,s,kind,credentialId);
+  if(lockedDoc.issuerId!==doc.issuerId||lockedDoc.studentProfileId!==doc.studentProfileId)
+   throw new AuthorizationError("Credential subject or issuer changed during release");
+  doc=lockedDoc;
   const pdf=academicDocumentPdf(doc);
   // Rendering may cross the expiry boundary; the row remains locked against
   // concurrent registrar revocation until the audited disclosure commits.
