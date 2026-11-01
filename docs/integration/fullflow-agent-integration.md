@@ -4,6 +4,18 @@ Last reconciled: 2026-10-31. **Canonical branch: `FullFlow`.**
 
 This ledger distinguishes **source integrated**, **product capability completed**, and **connected release acceptance**. A green unit/build/typecheck does not certify operational or production readiness. Original parallel agent PRs can remain open for provenance even when their code is imported. Fourteen integration PRs (#215–224, #225–228) have been merged, plus focused direct commits for remaining agent source. **Code present is not capability completed.**
 
+## 2026-11-01 canonical FullFlow implementation update
+
+Current repository branch is **FullFlow only**, never main or feature worktrees. 0057–0059 committed SQL, journal entries and exact matching Drizzle snapshots have been restored and verified on disposable PostgreSQL. The dedicated Neon branch has 60 recorded migrations and read-only catalog/hash parity through 0059; this is **not** historical proof that the 0053–0055 DDL was applied in ledger order. Independent reconciliation sign-off and protected connected acceptance are still blocked. **Release: HOLD.** Feature flags for annual adoptions, payments, credentials and tenant hosting must retain their existing disabled state until their own verification and approvals.
+
+Small commits at 2026-11-01 baseline, all directly to FullFlow:
+
+- `8ccfa8bd`: staff-witnessed pickup releases, denied attempts and uncollected-child dismissals reject newly entered historical/future dates by the school-local date; identical idempotency replays are still resolved before this check. Historical custody records remain readable, and emergency reporting and current holds are separate workflows.
+- `547f9294` and `6a9d5cb4`: after the server has already created a launch or activated a school, navigation failure retains the canonical same-school handoff instead of inviting a duplicate; invitation retry uncertainty disables further retries until persisted delivery records are reloaded.
+- `acd4e5eb`: new duty, physical-arrival, witness and room-plan evidence invalidates the on-screen school-day review projection immediately. The server continues to decide whether a previous review is stale.
+
+These are source fixes, **not** proof of a complete authenticated church day or one-hour launch. The full existing Journey C, R2 storage, enrollment, child custody, cross-tenant and deployment acceptance gates remain required. The school-opening legal and safeguarding checks are not waived.
+
 ## Canonical verified baseline
 
 - Initial repaired baseline: PR [#215](https://github.com/bryanhkelly/can-os/pull/215) → `c6ded48d4ca7a3b7dc5c55f9de94a99a3bef4ead`. Restored Drizzle 0055 snapshot/constraints, recipient fixture and Storybook imports.
@@ -60,7 +72,7 @@ The coordinator is merging verified code into **FullFlow first**, then using tha
 - `e3205b3a`: Private Cartridge read requires an actual Site-scoped authorized Section; fixes nullable query and fails closed.
 - `8c2619f3`: New G adoption commands are explicitly blocked unless `CAN_ANNUAL_ADOPTIONS_ENABLED=true`; the existing working adoption path remains unchanged.
 
-**Migrations:** 0056 is already committed in FullFlow. G/H/L include proposed or unregistered changes, not accepted 0057+ migrations. Never enable those database-dependent features until migration identifiers, durable tables, rights and rollback are reconciled.
+**Migrations:** 0056–0059 are now registered in the FullFlow migration journal with committed SQL and snapshots: 0057 annual curriculum adoptions, 0058 finance, 0059 church evidence status. The read-only Neon ledger and catalog match their expected hashes and objects, but historical 0053–0055 DDL provenance remains unapproved. Do not enable the database-dependent features until the existing rights, rollback, processor/storage and connected acceptance gates pass.
 
 ## P1 integration hardening and remaining candidates
 
@@ -78,7 +90,7 @@ The coordinator is merging verified code into **FullFlow first**, then using tha
 
 ## Migration ownership and connected environment (HOLD)
 
-- **0056 graduation is committed in FullFlow**. G/H/L have no registered post-0056 migrations; coordinator assigns 0057 onward serially against the current canonical journal/snapshot. Their proposed tables/status updates must not be assumed to exist.
+- **0056–0059 are committed on FullFlow**. Verified clean replay is not authorization to write the retained Neon branch: historical 0053–0055 provenance, exact-SHA migration approval and connected acceptance remain HOLD. Future schema additions must be serially generated from the latest journal/snapshot.
 - Disposable Neon acceptance is blocked by missing approved `CAN_ADMISSIONS_TEST_DATABASE_URL` / environment configuration and exhausted branch quota. Do **not** silently swap in production, shared E2E or another agent's database. Ephemeral PostgreSQL migration smoke tests are useful but are not fully seeded integration acceptance.
 - Before any merge of schema-bearing PRs: review current FullFlow HEAD, register generated SQL and snapshot, run original-FK migration/rollback on an **approved isolated** environment, and re-run checks against the exact integrated SHA.
 - Operational release gate remains **CLOSED** until one connected cross-role acceptance suite passes on a single FullFlow SHA. CI passing alone is not release approval.

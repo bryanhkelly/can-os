@@ -6,6 +6,12 @@ This is an additional operating model, not a substitute for the canonical six-st
 **Status check (2026-10-28, FullFlow HEAD `94a194c`):** Golden Flow B remains **HOLD**.
 The GF-B onsite/church-hosted typecheck diagnostics are now closed (workspace typecheck reports 0 diagnostics) without runtime authorization changes; this is a static-check improvement only. Safeguarding intake and custody/pickup workflows are still missing product surface, not just tests, and site-director real-session browser proof remains missing. No live acceptance was executed in this review.
 
+## 2026-11-01 FullFlow follow-up — current operating-day protections
+
+Small FullFlow commits added a **school-local contemporaneous date rule** for newly recorded staff-witnessed pickup release, denied attempt and uncollected-child dismissal; historical rosters remain readable and previously accepted idempotency retries are preserved. The corresponding historical-date interface is read-only for physical pickup observations. The Site Today staffing and witness panels now request a fresh authoritative attendance-review snapshot when a duty, staff-arrival, independent witness or room-plan change could invalidate the earlier review.
+
+The current school-day source is **not** a certified continuous two-adult school day; additional authentic role sessions, legal opening approval, safeguarding response and actual arrival/departure/incident acceptance still require separate evidence. Nothing in this update authorizes a school to open or bypasses CAN approval.
+
 ## Product boundary
 
 A legally independent church owns its Organization and physical Site. CAN supplies authorized academic

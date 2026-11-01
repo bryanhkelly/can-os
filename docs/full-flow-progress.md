@@ -1,5 +1,19 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## 2026-11-01 — current FullFlow school-day and launch source fixes
+
+**Only FullFlow has been modified. Production, default main, protected Neon E2E, and feature-flag rollout are unchanged.** Drizzle 0057–0059 SQL and snapshots are committed; clean 0000–0059 SQL replay passes on disposable PostgreSQL. Standard CI has passed earlier integrated exact-head candidates. Final-day CI and authenticated acceptance need separate exact-head evidence; passing static tests is not proof of physical supervision, lawful campus opening or a one-hour timed launch.
+
+Source work committed:
+
+1. Guard three new pickup observations by server-derived school-local day while retaining historical reading and idempotent replay. Do not silently backdate physical release, denial or dismissal.
+2. Keep canonical Program/Site recovery links after server-side launch creation or activation if navigation fails; freeze ambiguous invitation delivery retries until persisted batch records are verified.
+3. Refresh the site-leader attendance reconciliation when duty, human witness or room coverage changes; canonical server fingerprint remains the source of truth.
+
+**Outstanding P0:** a real uninterrupted two-adult supervised day with current local delegation, child safeguarding, program authorization, attendance, physical presence, denied/approved custody, separate site-leader witness, and distinct-person browser sessions; a timed real school launch with persisted site publication, invited families and same-student admissions handoff. Both require approved connected acceptance, legal/safeguarding authority, and realistic operational integrations. Historical 0053–0055 migration provenance and GitHub protected test credentials remain BLOCKED.
+
+---
+
 ## Status reconciliation (28 October 2026)
 
 At FullFlow HEAD `94a194c`: `npm test -- --reporter=dot` passed **219 files / 1284 tests**, `npm run typecheck` reports **0 diagnostics** (the 47 baseline diagnostics referenced in earlier entries are closed), production build, mutation hygiene, 86/86 route contracts and 75/75 static fixture declarations pass. The FullFlow A continuous six-stage Neon + issued-session browser journey remains **unexecuted** in this environment, so the current result remains **HOLD**. See `docs/CURRENT-STATE.md` (2026-10-28 addendum) for the full evidence list and remaining acceptance gaps. No live integration, production migration or authenticated browser run is claimed.
