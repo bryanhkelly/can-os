@@ -50,7 +50,12 @@ describe("academic Program marketing approval", () => {
     expect(planned.availability).toBe("planned");
     expect(planned).not.toHaveProperty("creditIssuingOrganizationId");
     expect(planned).not.toHaveProperty("accreditationAuthorityOrganizationId");
-    expect(publicAcademicProgram({ ...baseRow, status: "active" }).availability)
-      .toBe("operating");
+    const merelyActive = publicAcademicProgram({ ...baseRow, status: "active" });
+    expect(merelyActive.availability).toBe("operating");
+    expect(merelyActive.applicationOpen).toBe(false);
+    expect(publicAcademicProgram({ ...baseRow, status: "launching",
+      applicationOpen: true }).applicationOpen).toBe(false);
+    expect(publicAcademicProgram({ ...baseRow, status: "active",
+      applicationOpen: true }).applicationOpen).toBe(true);
   });
 });
