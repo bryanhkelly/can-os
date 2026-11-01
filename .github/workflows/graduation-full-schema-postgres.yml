@@ -1,0 +1,74 @@
+name: Full-schema graduation migration (ephemeral PostgreSQL)
+
+on:
+  pull_request:
+    paths:
+      - "drizzle/**"
+      - "tests/postgres/graduation-full-schema-acceptance.sql"
+      - ".github/workflows/graduation-full-schema-postgres.yml"
+      - "scripts/review-fullflow-migrations.mjs"
+      - "scripts/fullflow-post0051-artifacts*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: can_disposable
+          POSTGRES_USER: can_disposable
+          POSTGRES_PASSWORD: can_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U can_disposable -d can_disposable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      APP_ENV: test
+      NODE_ENV: test
+      # Literal localhost GitHub Actions service only; never accepts a secret,
+      # production URL, Neon branch, or externally supplied connection string.
+      DATABASE_URL: postgresql://can_disposable:can_disposable@127.0.0.1:5432/can_disposable
+    steps:
+      - name: Checkout exact integrated candidate
+        uses: actions/checkout@v4
+      - name: Verify target is local ephemeral Postgres
+        run: |
+          test "$DATABASE_URL" = "postgresql://can_disposable:can_disposable@127.0.0.1:5432/can_disposable"
+          test "${GITHUB_REPOSITORY}" = "bryanhkelly/can-os"
+          echo "Only local disposable service is authorized"
+      # drizzle-kit selects the remote Neon websocket driver in this repository
+      # and cannot open the local PostgreSQL service. Execute the exact committed
+      # SQL files here instead. This tests SQL compatibility but deliberately
+      # does NOT claim that the Drizzle journal or Neon-specific runner passed.
+      - name: Check migration preflight rejects future DDL ahead of journal
+        run: node --test scripts/fullflow-post0051-artifacts.check.mjs
+      - name: Apply every committed SQL migration (0000 through 0056) to disposable PostgreSQL
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          mapfile -t migrations < <(find drizzle -maxdepth 1 -type f -regextype posix-extended -regex 'drizzle/[0-9]{4}_.*\.sql' | sort)
+          if [[ "${#migrations[@]}" -ne 57 ]]; then
+            echo "::error::Expected exactly 57 committed 0000..0056 migrations, got ${#migrations[@]}"
+            exit 1
+          fi
+          for migration in "${migrations[@]}"; do
+            echo "::group::Apply ${migration}"
+            docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 < "$migration"
+            echo "::endgroup::"
+          done
+      - name: Assert real complete schema, graduation FK and policy constraints
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/graduation-full-schema-acceptance.sql

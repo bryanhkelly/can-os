@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
+import { assessPost0051MigrationArtifacts } from "./fullflow-post0051-artifacts.mjs";
 
 /**
  * READ-ONLY migration preflight for the one dedicated FullFlow Neon branch.
@@ -37,6 +38,11 @@ const stagedTags = [
   "0049_field_trip_decline",
   "0050_notification_outbound_deliveries",
   "0051_church_onboarding_requests",
+  "0052_family_recruitment_relationship",
+  "0053_institutional_graduation_closeout",
+  "0054_academic_credential_delivery",
+  "0055_academic_credential_release_authorizations",
+  "0056_steep_lenny_balinger",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -46,7 +52,8 @@ export function assessFullFlowMigrationReadiness(input) {
     guardianDefaults = [], familyStartColumns = [], familyStartIndexes = [],
     consentColumns = [], consentIndexes = [], safetyQualificationKeys = [],
     conferenceBookingIndexes = [], p0SafetyColumns = [], p0SafetyIndexes = [],
-    onboardingColumns = [], onboardingIndexes = [], outboundIndexes = [] } = input;
+    onboardingColumns = [], onboardingIndexes = [], outboundIndexes = [],
+    relationshipColumns = [], futureIndexes = [], cohortColumns = [], cohortConstraints = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying each staged migration, verify that exact
@@ -113,12 +120,21 @@ export function assessFullFlowMigrationReadiness(input) {
       declinedEnum && outboundTable && !onboardingTable;
     const post0051 = applied === 52 && String(lastTimestamp) === when(51) &&
       declinedEnum && outboundTable && onboardingTable;
+    const laterLedgerMatch=(count,idx)=>applied===count &&
+      String(lastTimestamp)===when(idx) && declinedEnum && outboundTable && onboardingTable;
+    const post0052=laterLedgerMatch(53,52);
+    const post0053=laterLedgerMatch(54,53);
+    const post0054=laterLedgerMatch(55,54);
+    const post0055=laterLedgerMatch(56,55);
+    const post0056=laterLedgerMatch(57,56);
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
       post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
       post0046 ? 47 : post0047 ? 48 : post0048 ? 49 :
-      post0049 ? 50 : post0050 ? 51 : post0051 ? 52 : 0;
+      post0049 ? 50 : post0050 ? 51 : post0051 ? 52 :
+      post0052 ? 53 : post0053 ? 54 : post0054 ? 55 :
+      post0055 ? 56 : post0056 ? 57 : 0;
     if (!stage)
-      issues.push("0039-0051 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0056 migration ledger/table state is inconsistent or unexpected");
     if (stage) {
       if ((stage >= 50) !== declinedEnum)
         issues.push("0049 declined participant status disagrees with migration ledger");
@@ -338,6 +354,9 @@ export function assessFullFlowMigrationReadiness(input) {
       if (actualAuthConstraints.has("program_site_authorization_suspended_ck"))
         issues.push("0048 suspension constraint present before migration: program_site_authorization_suspended_ck");
     }
+    if(stage)issues.push(...assessPost0051MigrationArtifacts({
+      stage,tables,relationshipColumns,futureIndexes,cohortColumns,cohortConstraints,
+    }));
     const stagedPending = stagedEntries.map(entry => entry.tag);
     const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];
     return {
@@ -388,7 +407,8 @@ async function main() {
     guardianDefaults,familyStartColumns,familyStartIndexes,
     consentColumns,consentIndexes,safetyQualificationKeys,conferenceBookingIndexes,
     p0SafetyColumns,p0SafetyIndexes,
-    onboardingColumns,onboardingIndexes,outboundIndexes] = await Promise.all([
+    onboardingColumns,onboardingIndexes,outboundIndexes,
+    relationshipColumns,futureIndexes,cohortColumns,cohortConstraints] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -402,7 +422,9 @@ async function main() {
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
           table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents','pickup_authorizations','pickup_custody_holds','pickup_release_events','safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports','safeguarding_site_policies','safeguarding_site_responders',
-            'notification_outbound_deliveries','church_onboarding_requests')`,
+            'notification_outbound_deliveries','church_onboarding_requests',
+             'graduation_requirement_sets','graduation_decisions','diploma_issuances',
+             'academic_credential_deliveries','academic_credential_release_authorizations')`,
     query`SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='program_site_authorizations'`,
     query`SELECT indexname FROM pg_indexes
@@ -449,6 +471,23 @@ async function main() {
       WHERE schemaname='public' AND tablename='church_onboarding_requests'`,
     query`SELECT indexname FROM pg_indexes
       WHERE schemaname='public' AND tablename='notification_outbound_deliveries'`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='public_admissions_interests' AND
+      column_name IN ('contact_consent_at','source','invitation_batch_id','invitation_recipient_key','family_start_request_id')`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND
+      indexname IN ('public_admissions_interests_invited_recipient_uq',
+        'public_admissions_interests_family_start_idx','graduation_decision_student_idx',
+        'academic_delivery_issuer_idx','academic_delivery_status_idx',
+        'academic_release_issuer_idx','academic_release_recipient_idx',
+        'graduation_requirement_superseded_once_uq','graduation_requirement_cohort_lookup_idx')`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='graduation_requirement_sets' AND
+      column_name IN ('cohort_start','cohort_end','supersedes_requirement_set_id','applicability_reason')`,
+    query`SELECT conname FROM pg_constraint
+      WHERE conrelid=to_regclass('public.graduation_requirement_sets') AND
+      conname IN ('graduation_cohort_bounds_ck','graduation_supersession_not_self_ck',
+       'graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk')`,
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal, types, columns, tables,
@@ -458,6 +497,7 @@ async function main() {
     consentColumns, consentIndexes, safetyQualificationKeys, conferenceBookingIndexes,
     p0SafetyColumns, p0SafetyIndexes,
     onboardingColumns, onboardingIndexes, outboundIndexes,
+    relationshipColumns, futureIndexes, cohortColumns, cohortConstraints,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
