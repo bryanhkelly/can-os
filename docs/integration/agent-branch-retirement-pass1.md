@@ -107,3 +107,11 @@ This is a safety/compatibility patch, **not** an implementation of annual Sectio
 ## Annual activation gate hardening
 
 Annual commands now require all three explicit environment conditions: `CAN_ANNUAL_ADOPTIONS_ENABLED=true`, `CAN_ANNUAL_ADOPTIONS_SCHEMA_READY=true`, and `CAN_ANNUAL_ADOPTIONS_CONNECTED_ACCEPTANCE=true`. The last two must be set **only after** registered migration and exact-commit connected rights tests, respectively. Legacy writes are blocked as soon as `CAN_ANNUAL_ADOPTIONS_ENABLED=true`, even when annual commands remain closed, to avoid granting new unscoped rights during partial activation. Do not set these variables based on this documentation alone.
+
+## Agent G Section-creation guard (2026-11-01)
+
+The shared `listLaunchEligibleCourses` resolver (also used by `assertLaunchEligibleCourse` inside Section creation) now excludes legacy publisher adoption grants whenever annual adoption is activated **or** legacy curriculum adoption is explicitly disabled. Institution-owned published course versions remain eligible. This intentionally defers *new* externally published Sections until the year-specific, license-attested eligibility resolver is integrated; it does not rewrite existing Section records.
+
+## Connected acceptance CI blocker
+
+At FullFlow SHA `1fb7f4c1`, `full-schema`, `postgres-migration-acceptance`, and `decision-persistence` passed. The `Disposable Neon admissions acceptance` job failed at step **Require isolated test database secret**, before dependency installation, migration or browser tests. This is missing CI secret/environment configuration, **not a demonstrated failing admissions assertion**. Do not use the shared FullFlow E2E database as a substitute for the isolated CI database. Other verification jobs were still in progress when checked.
