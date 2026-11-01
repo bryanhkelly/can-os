@@ -375,7 +375,7 @@ export const readCommonCartridgeStaticLesson=createServerFn({method:"GET"})
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await classActor();
   const {section:authorizedSection}=await authorizeClass(actor,data.sectionId);
-  if(authorizedSection.programId!==data.programId||authorizedSection.contentStatus!=="published")
+  if(!authorizedSection.siteId||authorizedSection.programId!==data.programId||authorizedSection.contentStatus!=="published")
    throw new AuthorizationError("Published class in the same Program");
   const [program]=await db.select({id:programs.id,organizationId:programs.organizationId})
    .from(programs).where(eq(programs.id,data.programId)).limit(1);
