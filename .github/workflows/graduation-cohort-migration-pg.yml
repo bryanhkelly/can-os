@@ -1,0 +1,49 @@
+name: Graduation cohort SQL acceptance
+
+on:
+  pull_request:
+    paths:
+      - drizzle/0056_steep_lenny_balinger.sql
+      - tests/postgres/graduation-cohort-*.sql
+      - .github/workflows/graduation-cohort-migration-pg.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-migration-acceptance:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: acceptance
+          POSTGRES_USER: acceptance
+          POSTGRES_PASSWORD: acceptance
+        options: >-
+          --health-cmd "pg_isready -U acceptance -d acceptance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+    steps:
+      - name: Checkout exact PR code
+        uses: actions/checkout@v4
+
+      - name: Apply disposable pre-0056 fixture
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -U acceptance -d acceptance -v ON_ERROR_STOP=1 \
+            < tests/postgres/graduation-cohort-baseline.sql
+
+      - name: Apply ORIGINAL migration FK, assert cohorts and supersession, roll back
+        run: |
+          {
+            printf 'BEGIN;\n'
+            cat drizzle/0056_steep_lenny_balinger.sql
+            printf '\n'
+            cat tests/postgres/graduation-cohort-acceptance.sql
+            printf '\nROLLBACK;\n'
+            cat tests/postgres/graduation-cohort-rollback.sql
+          } | docker exec -i "$POSTGRES_CONTAINER" psql -U acceptance -d acceptance -v ON_ERROR_STOP=1
