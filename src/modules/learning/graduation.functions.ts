@@ -7,7 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { resolveGraduationPolicy, validateLegacyGraduationCohortClassification } from "@/domain/graduation-policy";
 import { adjudicateGraduation } from "@/domain/graduation-adjudication";
 import { auditGraduationCredits, type CreditEvidence, type CreditRequirement } from "@/domain/graduation-credit-audit";
-import { issuedGradeIds, assertIssuedGradesStillCanonical, type IssuedGradeSnapshot } from "@/domain/graduation-grade-freshness";
+import { issuedGradeIds, issuedWithdrawalIds, assertIssuedGradesStillCanonical, assertIssuedWithdrawalsStillCanonical, type IssuedGradeSnapshot } from "@/domain/graduation-grade-freshness";
 import { verifiedSectionCreditUnits } from "@/domain/section-credit-policy";
 import { writeAudit } from "@/platform/mutation";
 
@@ -60,10 +60,14 @@ async function assertNoWithdrawnTranscriptCredits(db:Pick<Awaited<ReturnType<typ
  s:Awaited<ReturnType<typeof resources>>["s"],studentProfileId:string,evidence:readonly CreditEvidence[]){
  const sectionIds=evidence.filter(row=>row.earnedUnits!==null && row.earnedUnits>0).map(row=>row.sectionId);
  if(!sectionIds.length)return;
- const withdrawn=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+ // Lock all matching enrollment rows, including those currently active.
+ // Filtering for withdrawn in SQL would lock only already-withdrawn rows and
+ // allow a concurrent active→withdrawn update to race with diploma release.
+ const custody=await db.select({sectionId:s.enrollments.sectionId,status:s.enrollments.status}).from(s.enrollments)
    .where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.kind,"section"),
-     eq(s.enrollments.status,"withdrawn"),inArray(s.enrollments.sectionId,sectionIds)));
- if(withdrawn.length)throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
+     inArray(s.enrollments.sectionId,sectionIds))).for("share");
+ if(custody.some(row=>row.status==="withdrawn"))
+   throw new AuthorizationError("Previously earned transcript credit has a current withdrawn enrollment; reissue and review the transcript");
 }
 
 /** Lock and reconcile the live finalized gradebook against every issued
@@ -77,9 +81,33 @@ async function assertCurrentCanonicalTranscriptGrades(
 ){
  if(!Array.isArray(transcript.snapshot.rows))throw new AuthorizationError("Issued transcript grade evidence missing");
  const rows=transcript.snapshot.rows as IssuedGradeSnapshot[];
- let gradeIds:string[];
- try{gradeIds=issuedGradeIds(rows);}catch{throw new AuthorizationError("Issued transcript grade provenance requires institutional review");}
- if(!gradeIds.length)return; // withdrawal-only transcript has no earned credits
+ let gradeIds:string[],withdrawalIds:string[];
+ try{
+   gradeIds=issuedGradeIds(rows);
+   withdrawalIds=issuedWithdrawalIds(rows);
+ }catch{throw new AuthorizationError("Issued transcript grade provenance requires institutional review");}
+ if(withdrawalIds.length){
+   const current=await db.select({
+     id:s.enrollments.id,sectionId:s.enrollments.sectionId,
+     status:s.enrollments.status,kind:s.enrollments.kind,
+     metadata:s.enrollments.metadata,endedAt:s.enrollments.endedAt,
+     creditIssuerId:s.programs.creditIssuingOrganizationId,
+     sectionMetadata:s.sections.metadata,
+   }).from(s.enrollments)
+     .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+     .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
+       inArray(s.enrollments.id,withdrawalIds))).for("share");
+   try{
+     assertIssuedWithdrawalsStillCanonical(rows,current.map(row=>({
+       id:row.id,sectionId:row.sectionId!,status:row.status,kind:row.kind,
+       withdrawalNotation:row.metadata?.withdrawalNotation,
+       endedAt:row.endedAt,creditIssuerId:row.creditIssuerId,
+       configuredCredits:verifiedSectionCreditUnits(row.sectionMetadata),
+     })),transcript.issuingOrganizationId);
+   }catch{throw new AuthorizationError("Issued withdrawal notation has changed; reissue and review transcript");}
+ }
+ if(!gradeIds.length)return;
  const canonical=await db.select({
    id:s.sectionGrades.id,sectionId:s.sectionGrades.sectionId,
    letterGrade:s.sectionGrades.letterGrade,status:s.sectionGrades.status,
@@ -323,7 +351,7 @@ export const decideGraduation = createServerFn({method:"POST"})
  .handler(async ({data}) => {
    const context=await registrar();const {db,s}=await resources();
    return db.transaction(async tx => {
-     const [candidate]=await tx.select({issuerId:s.transcriptIssuances.issuingOrganizationId})
+     const [candidate]=await tx.select({issuerId:s.transcriptIssuances.issuingOrganizationId,studentId:s.transcriptIssuances.studentProfileId})
        .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
      if(!candidate)throw new AuthorizationError("Transcript not found");
      issuerAuthorized(context,candidate.issuerId);
@@ -332,6 +360,9 @@ export const decideGraduation = createServerFn({method:"POST"})
      // superseding policy racing with graduation adjudication.
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${candidate.issuerId + ":graduation-policy"}))`);
+     // Coordinate the latest official transcript identity with concurrent
+     // transcript issuance before reading eligibility or recording a decision.
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${candidate.studentId + ":" + candidate.issuerId + ":transcript-issuance"}))`);
      const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
      // Always acquire the issuer-policy lock before the student-decision lock.
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${transcript.studentProfileId + ":" + transcript.issuingOrganizationId + ":graduation"}))`);
@@ -453,6 +484,49 @@ async function inspectDiplomaFreshness(
 }
 
 /**
+ * INTERNAL SERVER-ONLY transcript freshness gate. Agent B owns the actual
+ * recipient, purpose, consent, institution scope and live grant checks.
+ *
+ * Calls MUST execute inside the B grant-creation or private-download DB
+ * transaction. The advisory lock coordinates latest-issuance selection with
+ * official transcript issuance; row SHARE locks hold canonical grade and W
+ * evidence stable until the authorized response is prepared.
+ */
+export async function assertOfficialTranscriptFreshForAuthorizedRelease(
+ tx:Pick<Awaited<ReturnType<typeof resources>>["db"],"select"|"execute">,
+ s:Awaited<ReturnType<typeof resources>>["s"],
+ args:{transcriptIssuanceId:string;issuerId:string;studentProfileId:string},
+):Promise<void>{
+ if(!uuid.safeParse(args.transcriptIssuanceId).success||
+    !uuid.safeParse(args.issuerId).success||
+    !uuid.safeParse(args.studentProfileId).success)
+   throw new AuthorizationError("Verified transcript release identity required");
+ const {sql}=await import("drizzle-orm");
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.studentProfileId + ":" + args.issuerId + ":transcript-issuance"}))`);
+ const [transcript]=await tx.select().from(s.transcriptIssuances)
+   .where(eq(s.transcriptIssuances.id,args.transcriptIssuanceId)).for("share").limit(1);
+ if(!transcript||transcript.studentProfileId!==args.studentProfileId||
+    transcript.issuingOrganizationId!==args.issuerId)
+   throw new AuthorizationError("Transcript issuer/student scope mismatch");
+ const [latest]=await tx.select({id:s.transcriptIssuances.id})
+   .from(s.transcriptIssuances)
+   .where(and(eq(s.transcriptIssuances.studentProfileId,args.studentProfileId),
+     eq(s.transcriptIssuances.issuingOrganizationId,args.issuerId)))
+   .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
+ if(latest?.id!==transcript.id)
+   throw new AuthorizationError("Newer official transcript issuance requires release review");
+ await assertCurrentCanonicalTranscriptGrades(tx,s,transcript);
+ const rows=transcript.snapshot.rows as IssuedGradeSnapshot[];
+ // Snapshot W notation cannot confer earned credit; the canonical W source
+ // check above separately ensures it is still a true withdrawn enrollment.
+ const earned=rows.filter(row=>row.terminalPeriod && typeof row.creditsEarned==="number" && row.creditsEarned>0);
+ await assertNoWithdrawnTranscriptCredits(tx,s,args.studentProfileId,earned.map(row=>({
+   sectionId:row.sectionId,subject:"",earnedUnits:row.creditsEarned,
+   finalized:true,acceptedByIssuer:true,
+ })));
+}
+
+/**
  * INTERNAL SERVER-ONLY RELEASE GATE, called by Agent B after it has validated
  * the live signed recipient grant and exact issuer/student/credential binding.
  *
@@ -470,6 +544,7 @@ export async function assertDiplomaFreshForAuthorizedRelease(
    throw new AuthorizationError("Verified diploma release identity required");
  const {sql}=await import("drizzle-orm");
  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.issuerId + ":graduation-policy"}))`);
+ await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${args.studentProfileId + ":" + args.issuerId + ":transcript-issuance"}))`);
  // A concurrent registrar revocation must not commit between the live status
  // check and preparation of private PDF bytes in the same B transaction.
  const [locked]=await tx.select({id:s.diplomaIssuances.id}).from(s.diplomaIssuances)
@@ -508,6 +583,7 @@ export const issueDiploma = createServerFn({method:"POST"})
      // race with the final diploma freshness check and issuance.
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.issuingOrganizationId + ":graduation-policy"}))`);
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.studentProfileId + ":" + decision.issuingOrganizationId + ":transcript-issuance"}))`);
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.studentProfileId + ":" + decision.issuingOrganizationId + ":graduation"}))`);
      const [prior]=await tx.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
        .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))

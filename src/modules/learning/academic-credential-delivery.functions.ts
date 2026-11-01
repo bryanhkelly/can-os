@@ -5,9 +5,9 @@ import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
-import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, isLatestTranscriptIssuance, canReauthorizeCredentialRelease } from "@/domain/academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, canReauthorizeCredentialRelease } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
-import { assertDiplomaFreshForAuthorizedRelease } from "@/modules/learning/graduation.functions";
+import { assertDiplomaFreshForAuthorizedRelease, assertOfficialTranscriptFreshForAuthorizedRelease } from "@/modules/learning/academic-credential-freshness.server";
 
 const uuid=z.string().uuid();
 const target=z.object({kind:z.enum(["transcript","diploma"]),credentialId:uuid});
@@ -48,7 +48,7 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
    if(!context.scope.organizationIds?.includes(doc.issuerId))
     throw new AuthorizationError("credential issuer");
    if(data.kind==="transcript")
-    await assertLatestTranscriptIssuance(tx as unknown as typeof db,s,doc.studentProfileId,doc.issuerId,data.credentialId);
+    await assertOfficialTranscriptFreshForAuthorizedRelease(tx,s,{transcriptIssuanceId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
    else
     await assertDiplomaFreshForAuthorizedRelease(tx,s,{diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
    const pdf=academicDocumentPdf(doc);
@@ -179,6 +179,10 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
       liveConsent.signatureEvidence.programId!==liveAction.programId||
       liveConsent.signatureEvidence.destinationSchoolName!==liveAction.metadata.destinationSchoolName)
     throw new AuthorizationError("Transfer release authority changed during review");
+   // Validate authoritative transcript source, including grade corrections,
+   // withdrawal custody and supersession, before either creating OR reusing a
+   // release grant. Locks remain held until the grant transaction commits.
+   await assertOfficialTranscriptFreshForAuthorizedRelease(tx,s,{transcriptIssuanceId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
    const [existing]=await tx.select({
     id:s.academicCredentialReleaseAuthorizations.id,
    }).from(s.academicCredentialReleaseAuthorizations).where(and(
@@ -227,24 +231,6 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   });
  });
 
-
-/** Conservative local freshness guard. The A-owned authoritative invalidation
- * adapter must replace this before release approval. A newer issuance makes
- * an older snapshot ineligible for transfer disclosure. */
-async function assertLatestTranscriptIssuance(
- db:Awaited<ReturnType<typeof resources>>["db"],
- s:Awaited<ReturnType<typeof resources>>["s"],
- studentProfileId:string,issuerId:string,issuanceId:string,
-){
- const [latest]=await db.select({id:s.transcriptIssuances.id})
-  .from(s.transcriptIssuances)
-  .where(and(eq(s.transcriptIssuances.studentProfileId,studentProfileId),
-   eq(s.transcriptIssuances.issuingOrganizationId,issuerId)))
-  .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id))
-  .limit(1);
- if(!isLatestTranscriptIssuance(issuanceId,latest?.id??null))
-  throw new AuthorizationError("Superseded or missing official transcript issuance");
-}
 
 /** Verified account candidates are limited to the credential subject and
  * guardians with an existing academic-view relationship. This is NOT consent
@@ -420,7 +406,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    throw new AuthorizationError("Official transcript issuer or student invalid");
 
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
-  await assertLatestTranscriptIssuance(tx as unknown as typeof db,s,doc.studentProfileId,doc.issuerId,credentialId);
+  await assertOfficialTranscriptFreshForAuthorizedRelease(tx,s,{transcriptIssuanceId:credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
   // Diploma delivery is blocked until Agent A defines active/superseded issuance semantics.
   // Historical transcript release remains bound to its exact immutable issuance snapshot.
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
