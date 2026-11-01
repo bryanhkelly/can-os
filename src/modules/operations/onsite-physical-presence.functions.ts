@@ -10,6 +10,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
 import { inPhysicalCheckInWindow } from "@/domain/onsite-physical-presence-policy";
+import { hasOnsiteCoverageInterruption } from "@/domain/onsite-coverage-interruption";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
@@ -386,11 +387,11 @@ export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:
         backupPersonId:block.backupPersonId,requiresBackup:block.requiresSectionDelegation===true,
         actorPersonId:actor.actorPersonId},exactDuties);
       const dutiesAccepted=duty.status==="accepted";
-      const interrupted=interruptions.some(row=>
-        row.sectionId===block.sectionId &&
-        row.metadata.periodId===block.periodId &&
-        row.metadata.planToken===block.planToken &&
-        [block.facilitatorPersonId,block.backupPersonId].includes(row.personId));
+      const interrupted=hasOnsiteCoverageInterruption({
+        sectionId:block.sectionId,periodId:block.periodId,
+        planToken:block.planToken,primaryPersonId:block.facilitatorPersonId,
+        backupPersonId:block.backupPersonId,
+      },interruptions);
       const matched=current && dutiesAccepted && !interrupted && witnesses.some(row=>
         row.sectionId===block.sectionId &&
         row.metadata.periodId===block.periodId &&
