@@ -1,12 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, calendarEvents, calendarEventParticipants, enrollments, organizations, people, programs, scheduledOccurrences, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadOnsiteDayOperationalSnapshot } from "@/modules/operations/onsite-day-review.functions";
 import { AuthorizationError } from "@/domain/command-context";
+import { mayShowPrivatePickupAction, privatePickupActionTypes } from "@/domain/private-pickup-action";
+import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { buildDailyOperationsAttention } from "@/domain/daily-operations";
 import { readFullFlowOperations } from "./full-flow-dashboard.server";
 import { getSchoolOperationsCommandCenter } from "./command-center-service";
@@ -84,6 +86,11 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const hasParticipants = db.select({id:calendarEventParticipants.id})
       .from(calendarEventParticipants)
       .where(eq(calendarEventParticipants.calendarEventId,calendarEvents.id));
+    // Restrict another family's custody Action before the capped shared queue.
+    const caseQuery=actor.role==="site_leader"
+      ? or(notInArray(actions.type,[...privatePickupActionTypes]),
+          eq(actions.ownerPersonId,actor.actorPersonId))!
+      : notInArray(actions.type,[...privatePickupActionTypes]);
     const [actionRows, eventRows, enrolledRows, snapshot] = await Promise.all([
       db.select({
         id: actions.id, title: actions.title, description: actions.description,
@@ -93,6 +100,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
         programId: actions.programId, siteId: actions.siteId, type: actions.type,
       }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId))
         .where(and(eq(actions.siteId, site.id), inArray(actions.status, [...openStatuses]),
+          caseQuery,
           or(isNull(actions.programId),inArray(actions.programId,programIds))))
         .orderBy(asc(actions.dueAt)).limit(100),
       db.select({
@@ -113,7 +121,27 @@ export const getSiteToday = createServerFn({ method: "GET" })
       loadOnsiteDayOperationalSnapshot(actor,site,dayText),
     ]);
 
-    const filteredActions = actionRows.filter(row => !row.programId || permitted.has(row.programId));
+    // Original Action assignment alone does not survive delegation revocation.
+    const delegatedCases=new Set<string>();
+    if(actor.role==="site_leader"){
+      const candidates=[...new Set(actionRows.filter(row=>
+        privatePickupActionTypes.some(type=>type===row.type) &&
+        row.ownerPersonId===actor.actorPersonId && !!row.programId)
+        .map(row=>row.programId!))];
+      for(const programId of candidates){
+        try{
+          await requireCurrentSiteLocalDelegate(db,actor,programId,"site_director");
+          delegatedCases.add(programId);
+        }catch(error){if(!(error instanceof AuthorizationError))throw error;}
+      }
+    }
+    const filteredActions=actionRows.filter(row=>
+      (!row.programId || permitted.has(row.programId)) &&
+      mayShowPrivatePickupAction(
+        {type:row.type,ownerPersonId:row.ownerPersonId,programId:row.programId},
+        {role:actor.role,personId:actor.actorPersonId,
+          authorizedPrograms:delegatedCases})
+    );
     const serializedActions = filteredActions.map(row => ({
       ...row,
       ownerName: row.ownerFirstName && row.ownerLastName ? `${row.ownerFirstName} ${row.ownerLastName}` : null,
