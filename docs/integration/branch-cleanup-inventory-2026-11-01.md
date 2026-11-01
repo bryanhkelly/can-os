@@ -147,3 +147,7 @@ Deletion of Neon branches is destructive and requires separate explicit confirma
 ## First administrative retirement result
 
 Closed superseded agent draft PRs #203, #204, #205, #206, #208, #209, #210, #211, #213 and #214; #207 and #212 had already been closed. Preserved all head branches and commit SHAs. Remaining open PRs #172, #173, #174 and #175 retained pending separate disposition. GitHub connector currently offers PR closure but no remote branch-delete action, so branch deletion has not been executed.
+
+## Neon cleanup marking completed
+
+Renamed seven historical Neon branches with a `delete-` prefix; branch IDs and contents were preserved. The renamed branches are `delete-gf26-integrity-20261016`, `delete-gf2-end-to-end-verify-20261016`, `delete-fullflow-pre-0043-0045-20261024`, `delete-fullflow-pre-0039-0040-20261023`, `delete-fullflow-pre-0032-0038-20261023`, `delete-production-pre-0026-2026-10-20T16-46-37-985Z`, and `delete-production-pre-reconcile-20261019`. Kept `production`, `fullflow-e2e-20261022`, and `test01` unchanged. No Neon branches deleted. This prefix is an administrative marker only; deletion remains a separate decision.
