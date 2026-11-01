@@ -479,6 +479,16 @@ integration("Journey C: a safe school day including verified pickup", () => {
         aggregateId: uncollected.actionId,
         eventType: "ChildUncollectedFollowUpCreated",
       });
+      // A second staff device or page retry with a NEW request ID cannot
+      // manufacture another open dismissal action for the same child and day.
+      await expectJourneyDenied(pickup.recordUncollectedChild({ data: {
+        date: day,
+        studentProfileId: familyA.studentProfileId,
+        programId: school.program.id,
+        dismissalConfirmed: true,
+        followUpPlan: "Keep the child supervised and contact the authorized family guardian.",
+        mutationId: crypto.randomUUID(),
+      } }), "already exists");
 
       // A matching authorization is not enough when the credential name and
       // required verification method do not match the person at pickup.

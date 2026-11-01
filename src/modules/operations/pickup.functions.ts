@@ -736,7 +736,9 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
           .where(inArray(studentProfiles.id, studentIds)).limit(500),
         db.select({ id: actions.id, subjectId: actions.subjectId, programId: actions.programId,
           metadata: actions.metadata }).from(actions).where(and(
-            eq(actions.type, uncollectedActionType), eq(actions.status, "open"),
+            eq(actions.type, uncollectedActionType),
+            inArray(actions.status, ["open", "in_progress", "waiting"]),
+            eq(actions.siteId, actor.grantSiteId!),
             inArray(actions.subjectId, studentIds), inArray(actions.programId, programIds),
             sql`${actions.metadata}->>'date' = ${data.date}`,
           )).limit(200),
@@ -1184,6 +1186,20 @@ export const recordUncollectedChild = createServerFn({ method: "POST" })
           eq(pickupReleaseEvents.status, "released"),
         )).limit(1);
       if (released) throw new Error("This student already has verified release evidence");
+      // Same-child/same-school-day dismissal is one canonical exception, not
+      // one Action per button click or browser request UUID. The pickup-release
+      // advisory lock above serializes competing attempts across staff devices.
+      const [existingUncollected] = await tx.select({ id: actions.id })
+        .from(actions).where(and(
+          eq(actions.type, uncollectedActionType),
+          eq(actions.subjectType, "student_profile"),
+          eq(actions.subjectId, data.studentProfileId),
+          eq(actions.siteId, school.siteId),
+          eq(actions.programId, data.programId),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+        )).limit(1);
+      if (existingUncollected)
+        throw new Error("An uncollected-child record already exists for this student and school day. Review the existing follow-up rather than starting another.");
       // An active protective hold changes who may safely receive urgent family
       // contact. Preserve the child's urgent follow-up without broadcasting to
       // potentially disputed guardians before an independent staff review.

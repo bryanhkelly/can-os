@@ -174,7 +174,8 @@ export const loadOnsiteDayOperationalSnapshot=createServerOnlyFn(async (actor:Ac
     .map(row=>row.programId+":"+row.studentProfileId));
   const presentKeys=roster.students.filter(row=>["present","tardy"].includes(row.status))
     .map(row=>row.programId+":"+row.studentProfileId);
-  const openFollowUps=followUps.filter(row=>row.status==="open");
+  const openFollowUps=followUps.filter(row=>
+    ["open","in_progress","waiting"].includes(row.status));
   const custody={
     presentEntries:presentKeys.length,
     releasedEntries:presentKeys.filter(key=>releasedKeys.has(key)).length,
