@@ -499,6 +499,9 @@ integration("Journey C: a safe school day including verified pickup", () => {
       } }), "identity not verified");
       const released = await pickup.recordVerifiedPickupRelease({ data: releaseInput });
       expect(released.created).toBe(true);
+      await expectJourneyDomainEvent(journey.tx, {
+        aggregateId: uncollected.actionId, eventType: "ActionResolved",
+      });
       expect(await pickup.recordVerifiedPickupRelease({ data: releaseInput }))
         .toEqual({ releaseId: released.releaseId, created: false });
       const releaseRow = first(await journey.tx.select().from(s.pickupReleaseEvents)

@@ -15,5 +15,7 @@ describe("verified pickup closes every outstanding same-day follow-up", () => {
     const resolving=release.slice(release.indexOf("if (openFollowUps.length)"));
     expect(resolving).toContain('status: "resolved"');
     expect(resolving).toContain("Verified pickup release recorded:");
+    expect(resolving).toContain("eventType: EventTypes.ActionResolved");
+    expect(resolving).toContain('aggregateType: "action", aggregateId: followUp.id');
   });
 });

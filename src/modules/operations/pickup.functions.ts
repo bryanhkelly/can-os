@@ -954,10 +954,25 @@ export const recordVerifiedPickupRelease = createServerFn({ method: "POST" })
         eq(actions.siteId, school.siteId), eq(actions.programId, data.programId),
         sql`${actions.metadata}->>'date' = ${data.date}`,
       ));
-      if (openFollowUps.length) await tx.update(actions).set({
-        status: "resolved", resolvedAt: occurredAt, updatedAt: occurredAt,
-        resolutionNote: "Verified pickup release recorded: " + record.id,
-      }).where(inArray(actions.id, openFollowUps.map(row => row.id)));
+      if (openFollowUps.length) {
+        await tx.update(actions).set({
+          status: "resolved", resolvedAt: occurredAt, updatedAt: occurredAt,
+          resolutionNote: "Verified pickup release recorded: " + record.id,
+        }).where(inArray(actions.id, openFollowUps.map(row => row.id)));
+        // Action consumers require the canonical transition, not a silent row
+        // update. Commit the transition and verified release atomically.
+        for (const followUp of openFollowUps) {
+          await emitEvent(tx, {
+            eventType: EventTypes.ActionResolved,
+            aggregateType: "action", aggregateId: followUp.id,
+            actorPersonId: actor.actorPersonId,
+            organizationId: school.organizationId, siteId: school.siteId,
+            programId: data.programId,
+            payload: { type: uncollectedActionType, releaseId: record.id,
+              studentProfileId: data.studentProfileId },
+          });
+        }
+      }
       const eventId = await emitEvent(tx, {
         eventType: EventTypes.ChildReleaseVerified,
         aggregateType: "pickup_release_event", aggregateId: record.id,
