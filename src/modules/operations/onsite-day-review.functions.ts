@@ -156,7 +156,7 @@ export const loadOnsiteDayOperationalSnapshot=createServerOnlyFn(async (actor:Ac
       updatedAt:actions.updatedAt,
     }).from(actions).where(and(eq(actions.siteId,site.id),inArray(actions.type,[
       "onsite_instruction_duty_response","onsite_staff_presence_reported",
-      "onsite_block_presence_witnessed",
+      "onsite_block_presence_witnessed","onsite_staff_coverage_interrupted",
     ]),sql`${actions.metadata}->>'date' = ${date}`))
       .orderBy(desc(actions.createdAt)).limit(1501),
   ]);
@@ -199,6 +199,7 @@ export const loadOnsiteDayOperationalSnapshot=createServerOnlyFn(async (actor:Ac
       requiredAdultReports:arrival?.requiredAdultReports??0,
       missingAdultReports:arrival?.missingAdultReports??0,
       witnessedBothAdults:arrival?.witnessedBothAdults??false,
+      coverageInterrupted:arrival?.coverageInterrupted??false,
       openingAuthorized:arrival?.openingAuthorized??false,
     };
   });
@@ -243,6 +244,7 @@ export const loadOnsiteDayOperationalSnapshot=createServerOnlyFn(async (actor:Ac
       substitutions:duty.statuses.filter(row=>row.substitution).length,
       missingAdultReports:presence.blocks.reduce((sum,row)=>sum+row.missingAdultReports,0),
       witnessedBlocks:presence.blocks.filter(row=>row.witnessedBothAdults).length,
+      interruptedBlocks:presence.blocks.filter(row=>row.coverageInterrupted).length,
     },
     exceptions:{
       pendingGuardianExplanations:excuseRows.filter(row=>row.status==="submitted").length,
