@@ -13,6 +13,18 @@ export function assessmentAvailability(input: {
   return { actionable: true, reason: null } as const;
 }
 
+/** Visibility is not the same as actionability: previously released, closed
+ * work stays in assignment history, but future releases are never student-facing.
+ * Both Student Today and the full assignments view use this policy.
+ */
+export function isStudentAssessmentVisible(input: {
+  status: string;
+  availableAt: Date | null;
+}, now = new Date()): boolean {
+  return (input.status === "published" || input.status === "closed") &&
+    (!input.availableAt || input.availableAt <= now);
+}
+
 export function assertAssessmentActionable(input: Parameters<typeof assessmentAvailability>[0], now = new Date()) {
   const result = assessmentAvailability(input, now);
   if (!result.actionable) throw new Error(result.reason === "unreleased"
