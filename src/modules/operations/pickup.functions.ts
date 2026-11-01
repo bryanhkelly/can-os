@@ -1,4 +1,5 @@
 import { requireCompletePickupSafetyRows } from "@/domain/pickup-projection-completeness";
+import { mayIndependentlyResolveCustodyHold } from "@/domain/pickup-custody-review-policy";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
@@ -733,16 +734,16 @@ export const resolvePickupCustodyHold = createServerFn({ method: "POST" })
         eq(actions.programId,existing.programId),
         eq(actions.siteId,existing.siteId),
         eq(actions.status,"open"))).for("update").limit(1);
-      if(!proposal || proposal.ownerPersonId===actor.actorPersonId ||
-        proposal.metadata.proposerPersonId!==proposal.ownerPersonId ||
-        proposal.metadata.resolutionNote!==data.resolutionNote ||
-        typeof proposal.metadata.evidenceReference!=="string" ||
-        proposal.metadata.evidenceReference.trim().length<15 ||
-        (existing.kind==="emergency")!==
-          (proposal.metadata.authorityBasis==="documented_emergency_cleared") ||
-        !["verified_court_order","verified_guardian_instructions","documented_emergency_cleared"]
-          .includes(String(proposal.metadata.authorityBasis)))
-        throw new AuthorizationError("independently reviewed custody release authority required");
+      if(!proposal||!mayIndependentlyResolveCustodyHold({
+        kind:existing.kind,
+        proposerPersonId:proposal.ownerPersonId,
+        requesterPersonId:proposal.metadata.proposerPersonId,
+        reviewerPersonId:actor.actorPersonId,
+        submittedNote:data.resolutionNote,
+        resolutionNote:proposal.metadata.resolutionNote,
+        authorityBasis:proposal.metadata.authorityBasis,
+        evidenceReference:proposal.metadata.evidenceReference,
+      }))throw new AuthorizationError("independently verified custody-resolution proposal required");
       const now = new Date();
       await tx.update(actions).set({status:"resolved",resolvedAt:now,updatedAt:now,
         resolutionNote:"Independently reviewed by a second Site leader",
