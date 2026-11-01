@@ -407,6 +407,20 @@
       "when": 1793520000000,
       "tag": "0057_curriculum_annual_adoptions",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793523600000,
+      "tag": "0058_finance_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793527200000,
+      "tag": "0059_church_evidence_statuses",
+      "breakpoints": true
     }
   ]
 }
