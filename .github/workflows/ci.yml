@@ -18,7 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact CI commit
+        shell: bash
+        run: |
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo '::error::Checkout SHA differs from CI SHA'; exit 1; }
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -47,8 +53,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint and design-system checks
+        run: npm run lint
+
       - name: Test
         run: npm test
+
+      - name: FullFlow migration artifact-stage checks
+        run: node --test scripts/fullflow-post0051-artifacts.check.mjs
+
+      - name: Validate migration integrity
+        run: npx drizzle-kit check
 
       - name: Validate incremental migration generation
         run: |
