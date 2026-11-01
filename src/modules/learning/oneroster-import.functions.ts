@@ -402,7 +402,7 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
     .from(sections).innerJoin(terms,eq(terms.id,sections.termId))
     .innerJoin(schoolYears,eq(schoolYears.id,terms.schoolYearId))
     .where(and(eq(sections.id,data.sectionId),eq(sections.programId,program.id),
-      eq(sections.siteId,canonicalSiteId),eq(schoolYears.programId,program.id),
+      eq(sections.siteId,canonicalSiteId),eq(sections.active,true),eq(schoolYears.programId,program.id),
       eq(schoolYears.status,"active"))).limit(1);
    if(!canonical||klass.schoolYear!==canonical.year||
       !klass.termSourcedIds?.split(",").map(v=>v.trim()).includes(canonical.term))
@@ -445,6 +445,15 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
        live.studentProfileId!==data.studentProfileId||live.programId!==program.id||
        live.sectionId!==data.sectionId)
        throw new AuthorizationError("OneRoster placement was withdrawn or changed; registrar reconciliation required");
+     // Re-use CAN's full Section-activation authority checks on every replay:
+     // teacher access, lesson, operating agreement, term and institutional
+     // scope may have changed after the original imported placement.
+     const checked=await activateSectionEnrollment(tx,{
+       actor,studentProfileId:data.studentProfileId,sectionId:data.sectionId,
+       source:"oneroster_registrar_approved",
+     });
+     if(checked.enrollmentId!==live.id||checked.created)
+       throw new AuthorizationError("OneRoster re-import would change historical canonical placement");
      await writeAudit(tx,actor,{action:"curriculum.interop.oneroster.placement.replay",
        entityType:"curriculum_interop_mapping",entityId:priorPlacement!.id,
        scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
