@@ -368,6 +368,15 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
       }
       // Prevent two concurrent review requests from recording duplicate Actions.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"site-review:"+site.id+":"+data.date}))`);
+      // Validate that the reviewer is signing the same source-derived
+      // snapshot after current delegation and single-review locks.
+      // Other domain writers do not all share this lock; a later change
+      // still invalidates the stored fingerprint on the next read.
+      const refreshed=await loadOnsiteDayOperationalSnapshot(actor,site,data.date);
+      if(refreshed.projectionTruncated ||
+         !refreshed.summary.readyForAttendanceReview ||
+         refreshed.fingerprint!==fingerprint)
+        throw new Error("School-day records changed while reviewing. Reload and attest the latest evidence.");
       const [prior] = await tx.select({
         id:actions.id,metadata:actions.metadata,
       }).from(actions).where(and(eq(actions.siteId,site.id),eq(actions.type,reviewType),
