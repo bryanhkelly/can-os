@@ -34,3 +34,37 @@ export function resolveGraduationPolicy<T extends ApplicablePolicy>(policies: re
  if(candidates.length!==1) throw new Error("No unambiguous institution-approved graduation policy applies to this student's entry cohort");
  return candidates[0]!;
 }
+
+
+/**
+ * One-time registrar-attested classification of a pre-cohort policy.
+ * Other unknown policies may be classified separately, but the resolver
+ * continues to fail closed until every active unknown policy is resolved.
+ */
+export function validateLegacyGraduationCohortClassification(
+ policies: readonly ApplicablePolicy[],
+ targetId: string,
+ cohortStart: string,
+ cohortEnd: string,
+): void {
+ if (!/^[0-9]{4}$/.test(cohortStart) || !/^[0-9]{4}$/.test(cohortEnd) || cohortStart > cohortEnd)
+  throw new Error("Invalid legacy graduation cohort range");
+ const target = policies.find(p => p.id === targetId);
+ if (!target) throw new Error("Legacy graduation policy not found");
+ if (target.cohortStart !== null || target.cohortEnd !== null)
+  throw new Error("Graduation policy is already cohort classified");
+ const replaced = new Set(policies.map(p => p.supersedesRequirementSetId).filter((id): id is string => Boolean(id)));
+ // Revisions must keep cohort bounds exactly, not widen eligibility.
+ for (const related of policies.filter(p => p.id === target.supersedesRequirementSetId || p.supersedesRequirementSetId === target.id)) {
+  if (!related.cohortStart || !related.cohortEnd) continue; // still unresolved and fail-closed
+  if (related.cohortStart !== cohortStart || related.cohortEnd !== cohortEnd)
+   throw new Error("Legacy policy supersession cohort bounds conflict");
+ }
+ if (!replaced.has(targetId)) {
+  for (const other of policies.filter(p => p.id !== targetId && !replaced.has(p.id))) {
+   if (other.cohortStart === null || other.cohortEnd === null) continue;
+   if (other.cohortStart <= cohortEnd && other.cohortEnd >= cohortStart)
+    throw new Error("Legacy policy classification overlaps another active policy");
+  }
+ }
+}
