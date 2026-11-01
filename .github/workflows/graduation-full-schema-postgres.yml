@@ -1,0 +1,60 @@
+name: Full-schema graduation migration (ephemeral PostgreSQL)
+
+on:
+  pull_request:
+    paths:
+      - "drizzle/**"
+      - "tests/postgres/graduation-full-schema-acceptance.sql"
+      - ".github/workflows/graduation-full-schema-postgres.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: can_disposable
+          POSTGRES_USER: can_disposable
+          POSTGRES_PASSWORD: can_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U can_disposable -d can_disposable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      APP_ENV: test
+      NODE_ENV: test
+      # Literal localhost GitHub Actions service only; never accepts a secret,
+      # production URL, Neon branch, or externally supplied connection string.
+      DATABASE_URL: postgresql://can_disposable:can_disposable@127.0.0.1:5432/can_disposable
+    steps:
+      - name: Checkout exact integrated candidate
+        uses: actions/checkout@v4
+      - name: Verify target is local ephemeral Postgres
+        run: |
+          test "$DATABASE_URL" = "postgresql://can_disposable:can_disposable@127.0.0.1:5432/can_disposable"
+          test "${GITHUB_REPOSITORY}" = "bryanhkelly/can-os"
+          echo "Only local disposable service is authorized"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Apply entire committed Drizzle migration chain (0000 through 0056)
+        run: npm run db:migrate
+      - name: Assert real complete schema, graduation FK and policy constraints
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -X -U can_disposable -d can_disposable -v ON_ERROR_STOP=1 \
+            < tests/postgres/graduation-full-schema-acceptance.sql
