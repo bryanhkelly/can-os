@@ -103,3 +103,7 @@ New legacy program-wide adoption writes are denied whenever `CAN_ANNUAL_ADOPTION
 The same annual rollout compatibility gate is now enforced inside `adoptPack`, not only its HTTP handler, preventing internal callers from creating new legacy adoption grants. `addCurriculumSupplement` also fails closed during annual rollout, rather than using legacy unscoped adoption as authority for new publisher-content overlays. These are deliberate temporary restrictions until year-scoped Section/supplement entitlement checks are implemented. **Do not enable annual adoption without the serial migration and connected rights tests.**
 
 This is a safety/compatibility patch, **not** an implementation of annual Section supplement eligibility. No original source branches deleted.
+
+## Annual activation gate hardening
+
+Annual commands now require all three explicit environment conditions: `CAN_ANNUAL_ADOPTIONS_ENABLED=true`, `CAN_ANNUAL_ADOPTIONS_SCHEMA_READY=true`, and `CAN_ANNUAL_ADOPTIONS_CONNECTED_ACCEPTANCE=true`. The last two must be set **only after** registered migration and exact-commit connected rights tests, respectively. Legacy writes are blocked as soon as `CAN_ANNUAL_ADOPTIONS_ENABLED=true`, even when annual commands remain closed, to avoid granting new unscoped rights during partial activation. Do not set these variables based on this documentation alone.
