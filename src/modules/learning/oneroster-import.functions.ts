@@ -7,6 +7,7 @@ import { curriculumImportJobs,curriculumInteropMappings,programs,sections,terms,
 import { AuthorizationError } from "@/domain/command-context";
 import { previewOneRosterBundle } from "@/domain/oneroster-csv";
 import { planOneRosterReconciliation } from "@/domain/oneroster-reconciliation";
+import { assessOneRosterPlacementReplay } from "@/domain/oneroster-placement-decision";
 import { requireActor } from "@/modules/identity/actors.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit,emitEvent } from "@/platform/mutation";
@@ -412,15 +413,73 @@ export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
    if(identity.metadata.externalSchoolSourcedId!==data.externalSchoolSourcedId||
       !identity.metadata.sourceHash||!section.metadata.sourceHash)
     throw new Error("Missing or inconsistent registrar mapping provenance.");
+   // Durable external-enrollment decision, not just a transient audit line.
+   // Namespace it separately from external user and class sourcedIds.
+   const placementIdentifier="enrollment:"+data.externalSchoolSourcedId+":"+data.externalEnrollmentSourcedId;
+   const [priorPlacement]=await tx.select({
+     id:curriculumInteropMappings.id,entityType:curriculumInteropMappings.entityType,
+     entityId:curriculumInteropMappings.entityId,metadata:curriculumInteropMappings.metadata,
+   }).from(curriculumInteropMappings).where(and(
+     eq(curriculumInteropMappings.organizationId,program.organizationId),
+     eq(curriculumInteropMappings.format,"oneroster"),
+     eq(curriculumInteropMappings.sourceSystem,data.sourceSystem),
+     eq(curriculumInteropMappings.externalIdentifier,placementIdentifier),
+   )).for("update").limit(1);
+   const requested={
+     programId:program.id,siteId:canonicalSiteId,
+     studentProfileId:data.studentProfileId,sectionId:data.sectionId,
+     externalSchoolSourcedId:data.externalSchoolSourcedId,
+     externalUserSourcedId:data.externalUserSourcedId,
+     externalClassSourcedId:data.externalClassSourcedId,sourceHash:digest,
+   };
+   const replay=assessOneRosterPlacementReplay(priorPlacement??null,requested);
+   if(replay.enrollmentId){
+     // Re-import must NOT reactivate revoked/withdrawn CAN enrollment.
+     const [live]=await tx.select({
+       id:enrollments.id,kind:enrollments.kind,status:enrollments.status,
+       studentProfileId:enrollments.studentProfileId,
+       programId:enrollments.programId,sectionId:enrollments.sectionId,
+     }).from(enrollments).where(eq(enrollments.id,replay.enrollmentId))
+       .for("share").limit(1);
+     if(!live||live.kind!=="section"||live.status!=="active"||
+       live.studentProfileId!==data.studentProfileId||live.programId!==program.id||
+       live.sectionId!==data.sectionId)
+       throw new AuthorizationError("OneRoster placement was withdrawn or changed; registrar reconciliation required");
+     await writeAudit(tx,actor,{action:"curriculum.interop.oneroster.placement.replay",
+       entityType:"curriculum_interop_mapping",entityId:priorPlacement!.id,
+       scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+       after:{sourceSystem:data.sourceSystem,importJobId:job.id,
+         externalEnrollmentSourcedId:data.externalEnrollmentSourcedId,
+         studentProfileId:data.studentProfileId,sectionId:data.sectionId,
+         currentImportHash:digest,firstApprovedImportHash:priorPlacement!.metadata.sourceHash,
+         disposition:replay.disposition,canonicalEnrollmentId:live.id}});
+     return {enrollmentId:live.id,created:false,
+       policy:"canonical_section_allocation" as const,disposition:replay.disposition};
+   }
    const placement=await activateSectionEnrollment(tx,{
      actor,studentProfileId:data.studentProfileId,sectionId:data.sectionId,
      source:"oneroster_registrar_approved",
    });
+   // An immutable source-to-CAN decision is created atomically with canonical
+   // placement and an audit event. A changed destination must be reviewed.
+   const [decision]=await tx.insert(curriculumInteropMappings).values({
+     organizationId:program.organizationId,importJobId:job.id,
+     format:"oneroster",sourceSystem:data.sourceSystem,
+     externalIdentifier:placementIdentifier,entityType:"enrollment",
+     entityId:placement.enrollmentId,
+     metadata:{...requested,externalEnrollmentSourcedId:data.externalEnrollmentSourcedId,
+       approvedByPersonId:actor.actorPersonId,approvedAt:new Date().toISOString(),
+       outcome:placement.created?"activated":"already_active"},
+   }).returning({id:curriculumInteropMappings.id});
+   if(!decision)throw new Error("OneRoster placement decision was not persisted");
    await writeAudit(tx,actor,{action:"curriculum.interop.oneroster.placement.approve",
-    entityType:"enrollment",entityId:placement.enrollmentId,
-    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
-    after:{sourceSystem:data.sourceSystem,importJobId:job.id,
-      externalEnrollmentSourcedId:data.externalEnrollmentSourcedId,created:placement.created}});
-   return {...placement,policy:"canonical_section_allocation" as const};
+     entityType:"curriculum_interop_mapping",entityId:decision.id,
+     scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+     after:{sourceSystem:data.sourceSystem,importJobId:job.id,sourceHash:digest,
+       externalEnrollmentSourcedId:data.externalEnrollmentSourcedId,
+       studentProfileId:data.studentProfileId,sectionId:data.sectionId,
+       canonicalEnrollmentId:placement.enrollmentId,created:placement.created}});
+   return {...placement,policy:"canonical_section_allocation" as const,
+     decisionId:decision.id,disposition:"approved" as const};
   });
  });
