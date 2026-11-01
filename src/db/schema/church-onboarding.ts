@@ -1,4 +1,5 @@
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import { documents } from "./documents";
 import { people } from "./identity";
@@ -32,4 +33,5 @@ export const churchOnboardingRequests = pgTable("church_onboarding_requests", {
 }, t => [
   index("church_onboarding_requests_status_idx").on(t.status, t.createdAt),
   index("church_onboarding_requests_contact_idx").on(t.contactEmail, t.createdAt),
+  check("church_onboarding_request_status_ck", sql`${t.status} IN ('submitted', 'needs_evidence', 'verified', 'approved', 'declined', 'canceled')`),
 ]);
