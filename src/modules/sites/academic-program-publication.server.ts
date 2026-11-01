@@ -46,7 +46,7 @@ export async function changeAcademicProgramPublication(
       eq(programs.id, input.programId),
       eq(programs.siteId, site.id),
       eq(programs.organizationId, site.organizationId),
-    )).limit(1);
+    )).for("share").limit(1);
     if (!program || (input.action === "publish" && !publishableAcademicProgram({
       type: program.type, status: program.status,
       siteId: program.siteId, organizationId: program.organizationId,
