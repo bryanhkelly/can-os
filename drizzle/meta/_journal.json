@@ -400,6 +400,13 @@
       "when": 1793490658029,
       "tag": "0056_steep_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793520000000,
+      "tag": "0057_curriculum_annual_adoptions",
+      "breakpoints": true
     }
   ]
 }
