@@ -124,3 +124,26 @@ Canonical development: `FullFlow`; preserve `main`. Cleanup is administrative, n
 ## Cleanup policy
 
 Original agent PRs #203–214 represent prior agent-specific integration work. Their 125 changed-file entries were audited against FullFlow: 103 identical, 22 divergent, no missing paths. Semantic review determined FullFlow supersedes many divergent paths, but this does **not** prove byte-for-byte branch ancestry or complete product acceptance. Close original draft PRs as superseded, preserve their branch refs pending final review/deletion tooling. Keep PR #172 (FullFlow → main), #173 and #174 (stacked public inquiry work), and #175 (teaching eligibility) open until independently reconciled. No branch deletion without verified disposition. Do not delete Neon production, FullFlow E2E, or `test01` (ancestor of E2E) during initial cleanup. Other Neon branches are candidates only, subject to explicit destructive-action confirmation and restore/retention review.
+
+## Neon branch inventory and proposed retention
+
+Project `sweet-hall-62441909` (inventory only; **no Neon branches deleted**):
+
+| Branch | Branch ID | State | Disposition |
+|---|---|---|---|
+| `fullflow-e2e-20261022` | `br-proud-pine-arfju8h2` | ready | KEEP: canonical nonproduction migration/acceptance |
+| `production` | `br-restless-sea-ar9ooo55` | ready | KEEP: production |
+| `test01` | `br-bitter-feather-ar0u63x7` | ready | KEEP pending ancestry and environment dependency review |
+| `gf26-integrity-20261016` | `br-royal-mouse-arc11hc2` | archived | CANDIDATE: archived test checkpoint |
+| `gf2-end-to-end-verify-20261016` | `br-spring-waterfall-ardxs4wa` | archived | CANDIDATE: archived test checkpoint |
+| `fullflow-pre-0043-0045-20261024` | `br-patient-surf-ar8kreuo` | ready | CANDIDATE: historic FullFlow checkpoint |
+| `fullflow-pre-0039-0040-20261023` | `br-long-tooth-arg8xm19` | ready | CANDIDATE: historic FullFlow checkpoint |
+| `fullflow-pre-0032-0038-20261023` | `br-spring-heart-arjhajgf` | ready | CANDIDATE: historic FullFlow checkpoint |
+| `production-pre-0026-2026-10-20T16-46-37-985Z` | `br-delicate-mode-art59p1b` | ready | CANDIDATE: historic production checkpoint; confirm restore requirements |
+| `production-pre-reconcile-20261019` | `br-noisy-wind-ar1wkf98` | ready | CANDIDATE: historic production checkpoint; confirm restore requirements |
+
+Deletion of Neon branches is destructive and requires separate explicit confirmation. Check whether CI, deployment env, backup policy or any restoration procedure refers to each candidate before deleting. The FullFlow E2E branch has migrations 0057–0059 and must remain available.
+
+## First administrative retirement result
+
+Closed superseded agent draft PRs #203, #204, #205, #206, #208, #209, #210, #211, #213 and #214; #207 and #212 had already been closed. Preserved all head branches and commit SHAs. Remaining open PRs #172, #173, #174 and #175 retained pending separate disposition. GitHub connector currently offers PR closure but no remote branch-delete action, so branch deletion has not been executed.
