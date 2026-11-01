@@ -505,7 +505,6 @@ async function main() {
       WHERE conrelid=to_regclass('public.graduation_requirement_sets') AND
       conname IN ('graduation_cohort_bounds_ck','graduation_supersession_not_self_ck',
        'graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk')`,
-,
     query`SELECT table_name,column_name,data_type,is_nullable FROM information_schema.columns
       WHERE table_schema='public' AND table_name IN
        ('curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
