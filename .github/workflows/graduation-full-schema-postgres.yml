@@ -50,7 +50,7 @@ jobs:
       # SQL files here instead. This tests SQL compatibility but deliberately
       # does NOT claim that the Drizzle journal or Neon-specific runner passed.
       - name: Check migration preflight rejects future DDL ahead of journal
-        run: node --test scripts/fullflow-post0051-artifacts.test.mjs
+        run: node --test scripts/fullflow-post0051-artifacts.check.mjs
       - name: Apply every committed SQL migration (0000 through 0056) to disposable PostgreSQL
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
