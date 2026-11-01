@@ -1,0 +1,229 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u02",
+      "reviewStatus": "draft",
+      "teacherOverview": "Use accessible grids and verbal equivalents for all plotted information. Check discrete versus continuous contexts, axis units, table consistency and function uniqueness. Teacher answers must remain outside student content.",
+      "lessons": [
+        {
+          "lessonId": "u02-w06-d01",
+          "preparation": "Prepare labeled grids, an accessible ordered-pair table and example checks for plot ordered pairs and read coordinates.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Identify the quadrant containing (4,−2).",
+              "answer": "Quadrant IV: positive x and negative y."
+            },
+            {
+              "prompt": "Guided 2: Does (−5,0) lie in a quadrant?",
+              "answer": "No; it lies on the horizontal x-axis."
+            },
+            {
+              "prompt": "Independent 1: Locate (−2,−6) and identify its quadrant.",
+              "answer": "Quadrant III."
+            },
+            {
+              "prompt": "Independent 2: A graph uses x for hours and y for dollars earned. Interpret (5,60).",
+              "answer": "At 5 hours, earnings are $60."
+            },
+            {
+              "prompt": "Independent 3: Which point is on the y-axis: (0,7) or (7,0)?",
+              "answer": "(0,7), because x=0."
+            },
+            {
+              "prompt": "Exit: Interpret (−1,4) and identify its quadrant.",
+              "answer": "One unit left and four up, Quadrant II."
+            }
+          ],
+          "misconceptions": [
+            "Swapping x and y coordinates changes a plotted point and its contextual interpretation.",
+            "Connecting discrete data with a continuous line can imply nonexistent fractional inputs.",
+            "A repeated output does not violate the function definition, but a single input with conflicting outputs does."
+          ],
+          "interventions": [
+            "Practice moving horizontally first and vertically second on a tactile or large-print grid.",
+            "Construct the input/output table before graphing and check each row by substitution."
+          ],
+          "extensions": [
+            "Describe a function whose domain is restricted in context and compare its discrete plot with the unrestricted algebraic graph."
+          ]
+        },
+        {
+          "lessonId": "u02-w06-d02",
+          "preparation": "Prepare labeled grids, an accessible ordered-pair table and example checks for build a function table from a rule.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: For g(x)=3x−1, evaluate at x=0 and x=2.",
+              "answer": "g(0)=−1 and g(2)=5."
+            },
+            {
+              "prompt": "Guided 2: For h(x)=10−2x, evaluate at x=−1 and x=3.",
+              "answer": "h(−1)=12 and h(3)=4."
+            },
+            {
+              "prompt": "Independent 1: For f(x)=4x+1, give outputs at x=−1,0,2.",
+              "answer": "−3,1,9."
+            },
+            {
+              "prompt": "Independent 2: For p(t)=t², give outputs at t=−2,0,3.",
+              "answer": "4,0,9."
+            },
+            {
+              "prompt": "Independent 3: Explain why x=−2 and x=2 can share the output 4 in p(x)=x².",
+              "answer": "Distinct inputs can share one output; each input still has a unique output."
+            },
+            {
+              "prompt": "Exit: For q(x)=5−3x, give q(−1) and q(2).",
+              "answer": "8 and −1."
+            }
+          ],
+          "misconceptions": [
+            "Swapping x and y coordinates changes a plotted point and its contextual interpretation.",
+            "Connecting discrete data with a continuous line can imply nonexistent fractional inputs.",
+            "A repeated output does not violate the function definition, but a single input with conflicting outputs does."
+          ],
+          "interventions": [
+            "Practice moving horizontally first and vertically second on a tactile or large-print grid.",
+            "Construct the input/output table before graphing and check each row by substitution."
+          ],
+          "extensions": [
+            "Describe a function whose domain is restricted in context and compare its discrete plot with the unrestricted algebraic graph."
+          ]
+        },
+        {
+          "lessonId": "u02-w06-d03",
+          "preparation": "Prepare labeled grids, an accessible ordered-pair table and example checks for connect a table to a coordinate graph.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: For y=3x−2, list points at x=0 and x=2.",
+              "answer": "(0,−2) and (2,4)."
+            },
+            {
+              "prompt": "Guided 2: What is the y-intercept of y=−x+6?",
+              "answer": "(0,6), since x=0 gives y=6."
+            },
+            {
+              "prompt": "Independent 1: Find three points on y=x+4 for x=−2,0,2.",
+              "answer": "(−2,2),(0,4),(2,6)."
+            },
+            {
+              "prompt": "Independent 2: For y=−2x+3, find the y-intercept and one other point.",
+              "answer": "(0,3) and e.g. (1,1)."
+            },
+            {
+              "prompt": "Independent 3: Why should a graph of discrete tickets sold use isolated points rather than a continuous line?",
+              "answer": "Fractions of tickets are not valid inputs in that context."
+            },
+            {
+              "prompt": "Exit: Give two points on y=4x−1 at x=0 and x=1.",
+              "answer": "(0,−1) and (1,3)."
+            }
+          ],
+          "misconceptions": [
+            "Swapping x and y coordinates changes a plotted point and its contextual interpretation.",
+            "Connecting discrete data with a continuous line can imply nonexistent fractional inputs.",
+            "A repeated output does not violate the function definition, but a single input with conflicting outputs does."
+          ],
+          "interventions": [
+            "Practice moving horizontally first and vertically second on a tactile or large-print grid.",
+            "Construct the input/output table before graphing and check each row by substitution."
+          ],
+          "extensions": [
+            "Describe a function whose domain is restricted in context and compare its discrete plot with the unrestricted algebraic graph."
+          ]
+        },
+        {
+          "lessonId": "u02-w06-d04",
+          "preparation": "Prepare labeled grids, an accessible ordered-pair table and example checks for interpret domain and range across representations.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: For {(−2,4),(0,4),(2,9)}, state domain and range.",
+              "answer": "Domain {−2,0,2}; range {4,9}."
+            },
+            {
+              "prompt": "Guided 2: For f(x)=x+2 with x∈{0,1,3}, give the range.",
+              "answer": "{2,3,5}."
+            },
+            {
+              "prompt": "Independent 1: For {(1,8),(2,6),(4,8)}, find domain and range.",
+              "answer": "Domain {1,2,4}; range {6,8}."
+            },
+            {
+              "prompt": "Independent 2: For g(t)=3t with t∈{0,2,5}, find range.",
+              "answer": "{0,6,15}."
+            },
+            {
+              "prompt": "Independent 3: Explain why the range of y=x² over real x cannot contain −1.",
+              "answer": "Squares of real numbers are nonnegative, so y≥0."
+            },
+            {
+              "prompt": "Exit: For f(x)=x²−1 and x∈{−2,0,2}, give domain and range.",
+              "answer": "Domain {−2,0,2}; range {−1,3}."
+            }
+          ],
+          "misconceptions": [
+            "Swapping x and y coordinates changes a plotted point and its contextual interpretation.",
+            "Connecting discrete data with a continuous line can imply nonexistent fractional inputs.",
+            "A repeated output does not violate the function definition, but a single input with conflicting outputs does."
+          ],
+          "interventions": [
+            "Practice moving horizontally first and vertically second on a tactile or large-print grid.",
+            "Construct the input/output table before graphing and check each row by substitution."
+          ],
+          "extensions": [
+            "Describe a function whose domain is restricted in context and compare its discrete plot with the unrestricted algebraic graph."
+          ]
+        },
+        {
+          "lessonId": "u02-w06-d05",
+          "preparation": "Prepare labeled grids, an accessible ordered-pair table and example checks for compare verbal, table and graph evidence.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: A rule y=3x+2 gives (0,2),(1,5). Does table {(0,2),(1,6)} match?",
+              "answer": "No; at x=1 the rule gives 5, not 6."
+            },
+            {
+              "prompt": "Guided 2: A savings account starts at $20 and adds $4 weekly. Write the rule.",
+              "answer": "S(w)=20+4w, with whole nonnegative weeks if recorded weekly."
+            },
+            {
+              "prompt": "Independent 1: For y=2x−3, does (4,5) lie on its graph?",
+              "answer": "Yes; 2(4)−3=5."
+            },
+            {
+              "prompt": "Independent 2: For y=−x+7, does (3,5) lie on its graph?",
+              "answer": "No; −3+7=4."
+            },
+            {
+              "prompt": "Independent 3: A club charges $8 fixed and $6 per shirt. Give two correct table rows.",
+              "answer": "For n=0, C=8; for n=2, C=20."
+            },
+            {
+              "prompt": "Independent 4: Describe a graph error if a fixed $8 fee is plotted as the point (0,0).",
+              "answer": "It omits the fixed charge; the y-intercept should be (0,8)."
+            },
+            {
+              "prompt": "Exit: A rule f(x)=3x+1 and a table row (2,8) disagree. Identify the correction.",
+              "answer": "f(2)=7; row must be (2,7)."
+            }
+          ],
+          "misconceptions": [
+            "Swapping x and y coordinates changes a plotted point and its contextual interpretation.",
+            "Connecting discrete data with a continuous line can imply nonexistent fractional inputs.",
+            "A repeated output does not violate the function definition, but a single input with conflicting outputs does."
+          ],
+          "interventions": [
+            "Practice moving horizontally first and vertically second on a tactile or large-print grid.",
+            "Construct the input/output table before graphing and check each row by substitution."
+          ],
+          "extensions": [
+            "Describe a function whose domain is restricted in context and compare its discrete plot with the unrestricted algebraic graph."
+          ]
+        }
+      ],
+      "assessments": []
+    }
+  ]
+}

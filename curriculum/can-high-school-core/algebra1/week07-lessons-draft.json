@@ -1,0 +1,335 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u02",
+  "week": 7,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "title": "Average rate of change",
+  "lessons": [
+    {
+      "id": "u02-w07-d01",
+      "title": "Week 7 · Day 1 · Rates from two observations",
+      "body": "CAN Algebra I · Unit 2 · Average Rate of Change · Day 1\nPrerequisites: Week 6 function tables and graphs, signed arithmetic, quotient interpretation.\nLearning objectives: Compute and interpret average rate of change from two function values; distinguish constant from variable rates; assess predictions critically.\n\nEstimate and label units (5 min)\nPredict the direction and units before computing: Distance rises from 12 km at 1 hour to 36 km at 4 hours. Rate?\n\nWorked interpretation (12 min)\nRate of change compares output change to input change. A tank contains 18 liters at minute 2 and 42 liters at minute 8. Change in volume is 42−18=24 liters over 8−2=6 minutes, so average rate is 4 liters per minute. Its units are liters/minute, not liters.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.\n\nGuided interval calculations (12 min)\n1. Distance rises from 12 km at 1 hour to 36 km at 4 hours. Rate? Label each input and output difference.\n2. A balance changes from $50 at day 0 to $74 at day 6. Rate? Label each input and output difference.\n\nIndependent rate analysis (16 min)\n1. Temperature changes from 10°C at noon to 22°C at 3 p.m. Rate? Show the numerator, denominator, units, and contextual meaning.\n2. A container drains from 60 liters at 2 minutes to 36 liters at 8 minutes. Rate? Show the numerator, denominator, units, and contextual meaning.\n3. Why should a distance rate include hours in its unit? Show the numerator, denominator, units, and contextual meaning.\n\nIndividual evidence (5 min)\nA plant is 7 cm on day 1 and 19 cm on day 5. Average growth rate? Include a sentence explaining the sign and units.\n\nHome application (5 min)\nCreate an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.\n\nAccessibility: display an accessible input/output table in text, offer a two-color difference organizer and spoken explanation, preserve numerator/denominator labels, and support large print or screen readers. Intervention: compare the same two points using a subtraction diagram. Extension: test whether different subintervals share a rate.",
+      "resources": [],
+      "learningTargets": [
+        "I can calculate an average rate of change from two input-output values.",
+        "I can interpret rate sign, units and limitations in a real context."
+      ],
+      "standards": [
+        "F-IF.6",
+        "F-LE.1"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w07-d01-a1",
+          "kind": "launch",
+          "title": "Estimate and label units",
+          "instructions": "Predict the direction and units before computing: Distance rises from 12 km at 1 hour to 36 km at 4 hours. Rate?",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d01-a2",
+          "kind": "instruction",
+          "title": "Worked interpretation",
+          "instructions": "Rate of change compares output change to input change. A tank contains 18 liters at minute 2 and 42 liters at minute 8. Change in volume is 42−18=24 liters over 8−2=6 minutes, so average rate is 4 liters per minute. Its units are liters/minute, not liters.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d01-a3",
+          "kind": "guided_practice",
+          "title": "Guided interval calculations",
+          "instructions": "1. Distance rises from 12 km at 1 hour to 36 km at 4 hours. Rate? Label each input and output difference.\n2. A balance changes from $50 at day 0 to $74 at day 6. Rate? Label each input and output difference.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d01-a4",
+          "kind": "independent_practice",
+          "title": "Independent rate analysis",
+          "instructions": "1. Temperature changes from 10°C at noon to 22°C at 3 p.m. Rate? Show the numerator, denominator, units, and contextual meaning.\n2. A container drains from 60 liters at 2 minutes to 36 liters at 8 minutes. Rate? Show the numerator, denominator, units, and contextual meaning.\n3. Why should a distance rate include hours in its unit? Show the numerator, denominator, units, and contextual meaning.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d01-a5",
+          "kind": "exit_ticket",
+          "title": "Individual evidence",
+          "instructions": "A plant is 7 cm on day 1 and 19 cm on day 5. Average growth rate? Include a sentence explaining the sign and units.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w07-d01-a6",
+          "kind": "reflection",
+          "title": "Home application",
+          "instructions": "Create an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w07-d02",
+      "title": "Week 7 · Day 2 · Average rate from tables",
+      "body": "CAN Algebra I · Unit 2 · Average Rate of Change · Day 2\nPrerequisites: Week 6 function tables and graphs, signed arithmetic, quotient interpretation.\nLearning objectives: Compute and interpret average rate of change from two function values; distinguish constant from variable rates; assess predictions critically.\n\nEstimate and label units (5 min)\nPredict the direction and units before computing: For (0,4),(2,14),(5,20), calculate rate from 0 to 2.\n\nWorked interpretation (12 min)\nA table records (time, elevation): (0,100),(2,112),(5,121). From t=0 to t=2, rate=(112−100)/2=6 meters/minute; from t=2 to t=5, rate=(121−112)/3=3 meters/minute. The average rate over the entire interval is (121−100)/5=4.2 meters/minute, not the unweighted mean of 6 and 3.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.\n\nGuided interval calculations (12 min)\n1. For (0,4),(2,14),(5,20), calculate rate from 0 to 2. Label each input and output difference.\n2. Use the same table: rate from 2 to 5. Label each input and output difference.\n\nIndependent rate analysis (16 min)\n1. For (1,10),(3,18),(7,22), rate from x=1 to x=3? Show the numerator, denominator, units, and contextual meaning.\n2. For the same table, rate from x=3 to x=7? Show the numerator, denominator, units, and contextual meaning.\n3. For the same table, average rate from x=1 to x=7? Show the numerator, denominator, units, and contextual meaning.\n\nIndividual evidence (5 min)\nTable (0,30),(4,22),(10,10): average rate from 0 to 10? Include a sentence explaining the sign and units.\n\nHome application (5 min)\nCreate an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.\n\nAccessibility: display an accessible input/output table in text, offer a two-color difference organizer and spoken explanation, preserve numerator/denominator labels, and support large print or screen readers. Intervention: compare the same two points using a subtraction diagram. Extension: test whether different subintervals share a rate.",
+      "resources": [],
+      "learningTargets": [
+        "I can calculate an average rate of change from two input-output values.",
+        "I can interpret rate sign, units and limitations in a real context."
+      ],
+      "standards": [
+        "F-IF.6",
+        "F-LE.1"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w07-d02-a1",
+          "kind": "launch",
+          "title": "Estimate and label units",
+          "instructions": "Predict the direction and units before computing: For (0,4),(2,14),(5,20), calculate rate from 0 to 2.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d02-a2",
+          "kind": "instruction",
+          "title": "Worked interpretation",
+          "instructions": "A table records (time, elevation): (0,100),(2,112),(5,121). From t=0 to t=2, rate=(112−100)/2=6 meters/minute; from t=2 to t=5, rate=(121−112)/3=3 meters/minute. The average rate over the entire interval is (121−100)/5=4.2 meters/minute, not the unweighted mean of 6 and 3.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d02-a3",
+          "kind": "guided_practice",
+          "title": "Guided interval calculations",
+          "instructions": "1. For (0,4),(2,14),(5,20), calculate rate from 0 to 2. Label each input and output difference.\n2. Use the same table: rate from 2 to 5. Label each input and output difference.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d02-a4",
+          "kind": "independent_practice",
+          "title": "Independent rate analysis",
+          "instructions": "1. For (1,10),(3,18),(7,22), rate from x=1 to x=3? Show the numerator, denominator, units, and contextual meaning.\n2. For the same table, rate from x=3 to x=7? Show the numerator, denominator, units, and contextual meaning.\n3. For the same table, average rate from x=1 to x=7? Show the numerator, denominator, units, and contextual meaning.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d02-a5",
+          "kind": "exit_ticket",
+          "title": "Individual evidence",
+          "instructions": "Table (0,30),(4,22),(10,10): average rate from 0 to 10? Include a sentence explaining the sign and units.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w07-d02-a6",
+          "kind": "reflection",
+          "title": "Home application",
+          "instructions": "Create an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w07-d03",
+      "title": "Week 7 · Day 3 · Positive, negative and zero rates",
+      "body": "CAN Algebra I · Unit 2 · Average Rate of Change · Day 3\nPrerequisites: Week 6 function tables and graphs, signed arithmetic, quotient interpretation.\nLearning objectives: Compute and interpret average rate of change from two function values; distinguish constant from variable rates; assess predictions critically.\n\nEstimate and label units (5 min)\nPredict the direction and units before computing: A stock level falls from 80 units at hour 1 to 50 at hour 6. Rate?\n\nWorked interpretation (12 min)\nInterpret the sign of change. A savings balance changes from $110 on day 2 to $86 on day 8: rate=(86−110)/(8−2)=−$4/day, meaning the balance decreases on average $4 each day. A flat water level has rate zero, not an undefined rate, when elapsed time is nonzero.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.\n\nGuided interval calculations (12 min)\n1. A stock level falls from 80 units at hour 1 to 50 at hour 6. Rate? Label each input and output difference.\n2. Height is 15 cm at day 1 and 15 cm at day 4. Rate? Label each input and output difference.\n\nIndependent rate analysis (16 min)\n1. A trail rises from 200 m at km 1 to 260 m at km 3. Rate? Show the numerator, denominator, units, and contextual meaning.\n2. A store's inventory decreases from 90 to 54 over 3 days. Rate? Show the numerator, denominator, units, and contextual meaning.\n3. Can a negative rate represent increasing altitude? Explain. Show the numerator, denominator, units, and contextual meaning.\n\nIndividual evidence (5 min)\nA phone battery falls from 72% to 48% over 4 hours. Rate? Include a sentence explaining the sign and units.\n\nHome application (5 min)\nCreate an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.\n\nAccessibility: display an accessible input/output table in text, offer a two-color difference organizer and spoken explanation, preserve numerator/denominator labels, and support large print or screen readers. Intervention: compare the same two points using a subtraction diagram. Extension: test whether different subintervals share a rate.",
+      "resources": [],
+      "learningTargets": [
+        "I can calculate an average rate of change from two input-output values.",
+        "I can interpret rate sign, units and limitations in a real context."
+      ],
+      "standards": [
+        "F-IF.6",
+        "F-LE.1"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w07-d03-a1",
+          "kind": "launch",
+          "title": "Estimate and label units",
+          "instructions": "Predict the direction and units before computing: A stock level falls from 80 units at hour 1 to 50 at hour 6. Rate?",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d03-a2",
+          "kind": "instruction",
+          "title": "Worked interpretation",
+          "instructions": "Interpret the sign of change. A savings balance changes from $110 on day 2 to $86 on day 8: rate=(86−110)/(8−2)=−$4/day, meaning the balance decreases on average $4 each day. A flat water level has rate zero, not an undefined rate, when elapsed time is nonzero.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d03-a3",
+          "kind": "guided_practice",
+          "title": "Guided interval calculations",
+          "instructions": "1. A stock level falls from 80 units at hour 1 to 50 at hour 6. Rate? Label each input and output difference.\n2. Height is 15 cm at day 1 and 15 cm at day 4. Rate? Label each input and output difference.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d03-a4",
+          "kind": "independent_practice",
+          "title": "Independent rate analysis",
+          "instructions": "1. A trail rises from 200 m at km 1 to 260 m at km 3. Rate? Show the numerator, denominator, units, and contextual meaning.\n2. A store's inventory decreases from 90 to 54 over 3 days. Rate? Show the numerator, denominator, units, and contextual meaning.\n3. Can a negative rate represent increasing altitude? Explain. Show the numerator, denominator, units, and contextual meaning.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d03-a5",
+          "kind": "exit_ticket",
+          "title": "Individual evidence",
+          "instructions": "A phone battery falls from 72% to 48% over 4 hours. Rate? Include a sentence explaining the sign and units.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w07-d03-a6",
+          "kind": "reflection",
+          "title": "Home application",
+          "instructions": "Create an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w07-d04",
+      "title": "Week 7 · Day 4 · Constant versus changing rates",
+      "body": "CAN Algebra I · Unit 2 · Average Rate of Change · Day 4\nPrerequisites: Week 6 function tables and graphs, signed arithmetic, quotient interpretation.\nLearning objectives: Compute and interpret average rate of change from two function values; distinguish constant from variable rates; assess predictions critically.\n\nEstimate and label units (5 min)\nPredict the direction and units before computing: For f(x)=4x+7, average rate from x=1 to x=6?\n\nWorked interpretation (12 min)\nFor time and total cost, a linear rule C(t)=15+6t increases by $6 each hour: compare C(1)=21 and C(3)=33, giving (33−21)/(3−1)=6. A nonlinear rule S(t)=t² has average rate (4−1)/(2−1)=3 between t=1 and 2 but (9−4)/(3−2)=5 between t=2 and 3; rate changes.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.\n\nGuided interval calculations (12 min)\n1. For f(x)=4x+7, average rate from x=1 to x=6? Label each input and output difference.\n2. For g(x)=x², rate from 0 to 2? Label each input and output difference.\n\nIndependent rate analysis (16 min)\n1. For h(t)=3t+2, compare rate on [0,2] and [2,5]. Show the numerator, denominator, units, and contextual meaning.\n2. For q(t)=t², rate on [2,4]? Show the numerator, denominator, units, and contextual meaning.\n3. Why does an average rate not prove a nonlinear function changes steadily? Show the numerator, denominator, units, and contextual meaning.\n\nIndividual evidence (5 min)\nFor p(x)=x²+1, compare average rates on [0,1] and [1,2]. Include a sentence explaining the sign and units.\n\nHome application (5 min)\nCreate an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.\n\nAccessibility: display an accessible input/output table in text, offer a two-color difference organizer and spoken explanation, preserve numerator/denominator labels, and support large print or screen readers. Intervention: compare the same two points using a subtraction diagram. Extension: test whether different subintervals share a rate.",
+      "resources": [],
+      "learningTargets": [
+        "I can calculate an average rate of change from two input-output values.",
+        "I can interpret rate sign, units and limitations in a real context."
+      ],
+      "standards": [
+        "F-IF.6",
+        "F-LE.1"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w07-d04-a1",
+          "kind": "launch",
+          "title": "Estimate and label units",
+          "instructions": "Predict the direction and units before computing: For f(x)=4x+7, average rate from x=1 to x=6?",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d04-a2",
+          "kind": "instruction",
+          "title": "Worked interpretation",
+          "instructions": "For time and total cost, a linear rule C(t)=15+6t increases by $6 each hour: compare C(1)=21 and C(3)=33, giving (33−21)/(3−1)=6. A nonlinear rule S(t)=t² has average rate (4−1)/(2−1)=3 between t=1 and 2 but (9−4)/(3−2)=5 between t=2 and 3; rate changes.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d04-a3",
+          "kind": "guided_practice",
+          "title": "Guided interval calculations",
+          "instructions": "1. For f(x)=4x+7, average rate from x=1 to x=6? Label each input and output difference.\n2. For g(x)=x², rate from 0 to 2? Label each input and output difference.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d04-a4",
+          "kind": "independent_practice",
+          "title": "Independent rate analysis",
+          "instructions": "1. For h(t)=3t+2, compare rate on [0,2] and [2,5]. Show the numerator, denominator, units, and contextual meaning.\n2. For q(t)=t², rate on [2,4]? Show the numerator, denominator, units, and contextual meaning.\n3. Why does an average rate not prove a nonlinear function changes steadily? Show the numerator, denominator, units, and contextual meaning.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d04-a5",
+          "kind": "exit_ticket",
+          "title": "Individual evidence",
+          "instructions": "For p(x)=x²+1, compare average rates on [0,1] and [1,2]. Include a sentence explaining the sign and units.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w07-d04-a6",
+          "kind": "reflection",
+          "title": "Home application",
+          "instructions": "Create an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w07-d05",
+      "title": "Week 7 · Day 5 · Interpret an interval rate in context",
+      "body": "CAN Algebra I · Unit 2 · Average Rate of Change · Day 5\nPrerequisites: Week 6 function tables and graphs, signed arithmetic, quotient interpretation.\nLearning objectives: Compute and interpret average rate of change from two function values; distinguish constant from variable rates; assess predictions critically.\n\nEstimate and label units (5 min)\nPredict the direction and units before computing: A vehicle travels 40 miles at 1 hour and 160 at 4 hours. Average rate?\n\nWorked interpretation (12 min)\nA community garden's harvest totals 12 kg after 2 weeks and 42 kg after 7 weeks. Average rate=(42−12)/(7−2)=6 kg/week. This gives a useful interval summary, but does not establish the same harvest every week. Extrapolating beyond the observed weeks requires assumptions and a cautious explanation.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.\n\nGuided interval calculations (12 min)\n1. A vehicle travels 40 miles at 1 hour and 160 at 4 hours. Average rate? Label each input and output difference.\n2. A tank holds 90 liters at minute 0 and 30 at minute 10. Average rate? Label each input and output difference.\n\nIndependent rate analysis (16 min)\n1. At day 3 a project has 16 completed tasks; at day 8 it has 36. Rate? Show the numerator, denominator, units, and contextual meaning.\n2. A runner's distance rises from 2 to 8 miles between minutes 10 and 70. Average rate? Show the numerator, denominator, units, and contextual meaning.\n3. Explain one limitation of predicting day 15 from an average rate measured only on days 3–8. Show the numerator, denominator, units, and contextual meaning.\n\nIndividual evidence (5 min)\nA student reads 25 pages at hour 1 and 61 pages at hour 4. Average rate? Include a sentence explaining the sign and units.\n\nHome application (5 min)\nCreate an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.\n\nAccessibility: display an accessible input/output table in text, offer a two-color difference organizer and spoken explanation, preserve numerator/denominator labels, and support large print or screen readers. Intervention: compare the same two points using a subtraction diagram. Extension: test whether different subintervals share a rate.",
+      "resources": [],
+      "learningTargets": [
+        "I can calculate an average rate of change from two input-output values.",
+        "I can interpret rate sign, units and limitations in a real context."
+      ],
+      "standards": [
+        "F-IF.6",
+        "F-LE.1"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w07-d05-a1",
+          "kind": "launch",
+          "title": "Estimate and label units",
+          "instructions": "Predict the direction and units before computing: A vehicle travels 40 miles at 1 hour and 160 at 4 hours. Average rate?",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d05-a2",
+          "kind": "instruction",
+          "title": "Worked interpretation",
+          "instructions": "A community garden's harvest totals 12 kg after 2 weeks and 42 kg after 7 weeks. Average rate=(42−12)/(7−2)=6 kg/week. This gives a useful interval summary, but does not establish the same harvest every week. Extrapolating beyond the observed weeks requires assumptions and a cautious explanation.\n\nAverage rate formula: (output at second input − output at first input)/(second input − first input), for distinct input values.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d05-a3",
+          "kind": "guided_practice",
+          "title": "Guided interval calculations",
+          "instructions": "1. A vehicle travels 40 miles at 1 hour and 160 at 4 hours. Average rate? Label each input and output difference.\n2. A tank holds 90 liters at minute 0 and 30 at minute 10. Average rate? Label each input and output difference.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d05-a4",
+          "kind": "independent_practice",
+          "title": "Independent rate analysis",
+          "instructions": "1. At day 3 a project has 16 completed tasks; at day 8 it has 36. Rate? Show the numerator, denominator, units, and contextual meaning.\n2. A runner's distance rises from 2 to 8 miles between minutes 10 and 70. Average rate? Show the numerator, denominator, units, and contextual meaning.\n3. Explain one limitation of predicting day 15 from an average rate measured only on days 3–8. Show the numerator, denominator, units, and contextual meaning.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w07-d05-a5",
+          "kind": "exit_ticket",
+          "title": "Individual evidence",
+          "instructions": "A student reads 25 pages at hour 1 and 61 pages at hour 4. Average rate? Include a sentence explaining the sign and units.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w07-d05-a6",
+          "kind": "reflection",
+          "title": "Home application",
+          "instructions": "Create an original two-point table of a changing quantity and calculate its average rate with units. Describe a plausible reason its rate could change on a different interval.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u02",
+  "week": 5,
+  "readiness": "teacher_review_required",
+  "visibility": "publisher_draft",
+  "assessments": [
+    {
+      "key": "algebra1-u02-w05-formative",
+      "title": "Week 5 function reasoning check",
+      "pointsPossible": 20,
+      "status": "draft",
+      "formative": true,
+      "instructions": "Independently show reasoning for four items (5 points each). 1: Decide whether {(1,2),(2,2),(1,3)} is a function and explain. 2: For f(x)=3x−5, evaluate f(−2). 3: State the real domain of g(x)=7/(x+4). 4: A shuttle has 16 seats and charges $9 per rider. Define a feasible domain and compute R(7).",
+      "rubricCriteria": [
+        {
+          "id": "function",
+          "label": "Function definition and counterexample",
+          "maxPoints": 5,
+          "description": "Correct classification supported by unique-output reasoning."
+        },
+        {
+          "id": "evaluate",
+          "label": "Function substitution",
+          "maxPoints": 5,
+          "description": "Correct substitution and arithmetic shown."
+        },
+        {
+          "id": "domain",
+          "label": "Algebraic domain",
+          "maxPoints": 5,
+          "description": "Valid restriction justified by undefined arithmetic."
+        },
+        {
+          "id": "context",
+          "label": "Feasible domain and output",
+          "maxPoints": 5,
+          "description": "Whole-number input constraint, capacity and correct units."
+        }
+      ]
+    },
+    {
+      "key": "algebra1-u02-w05-mastery",
+      "title": "Week 5 independent mastery and transfer",
+      "pointsPossible": 20,
+      "status": "draft",
+      "formative": false,
+      "instructions": "Work independently (5 points each). 1: Classify {(−1,4),(0,4),(2,4)} as a function and justify. 2: For h(t)=t²−2t, evaluate h(−3). 3: Find the real domain of q(x)=√(x−6). 4: A tank contains 30 liters and drains 3 liters/minute. Give the feasible domain of V(t)=30−3t and evaluate V(4), including units.",
+      "rubricCriteria": [
+        {
+          "id": "mapping",
+          "label": "Input-output definition",
+          "maxPoints": 5,
+          "description": "Correct classification with explanation."
+        },
+        {
+          "id": "notation",
+          "label": "Function evaluation",
+          "maxPoints": 5,
+          "description": "Correct substitution and order of operations."
+        },
+        {
+          "id": "radical",
+          "label": "Real-valued radical domain",
+          "maxPoints": 5,
+          "description": "Correct radicand condition and boundary inclusion."
+        },
+        {
+          "id": "tank",
+          "label": "Contextual domain and evaluation",
+          "maxPoints": 5,
+          "description": "Correct continuous-time interval, endpoint and volume units."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "courseCode": "CAN-ALG1",
+  "sourceType": "original",
+  "license": "LicenseRef-CAN-Original",
+  "copyrightNotice": "Original CAN-authored Algebra I instructional materials. No third-party student content included in this package.",
+  "externalSources": [],
+  "standardsReferences": [
+    {
+      "title": "California Mathematics Standards",
+      "url": "https://www.cde.ca.gov/be/st/ss/mathstandard.asp",
+      "usage": "reference only; not copied instructional materials"
+    }
+  ],
+  "releaseStatus": "review_required",
+  "creditStatus": "not_credit_ready",
+  "schoolAdoptionStatus": "not_adopted",
+  "authoredWeeks": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "requiredReview": [
+    "Qualified mathematics educator checks all examples, answer keys and scoring criteria",
+    "CAN academic authority approves complete adopted course version and instruction calendar",
+    "Accessibility and differentiated support reviewed for each lesson",
+    "Complete 36-week daily content, weekly assessments, keys and teacher guides before claiming full-year completion"
+  ],
+  "notes": "Blueprint weeks 3–36 are planning only. Week 2 assessment has an in-lesson formative checkpoint, not a separate approved publisher assessment. Packaging does not publish, adopt, enroll or modify class records."
+}
