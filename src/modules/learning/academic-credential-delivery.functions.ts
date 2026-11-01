@@ -7,6 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
 import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, isLatestTranscriptIssuance, canReauthorizeCredentialRelease } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
+import { assertDiplomaFreshForAuthorizedRelease } from "@/modules/learning/graduation.functions";
 
 const uuid=z.string().uuid();
 const target=z.object({kind:z.enum(["transcript","diploma"]),credentialId:uuid});
@@ -42,6 +43,7 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   const doc=await documentData(db,s,data.kind,data.credentialId);
   if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
   if(data.kind==="transcript")await assertLatestTranscriptIssuance(db,s,doc.studentProfileId,doc.issuerId,data.credentialId);
+  else await assertDiplomaFreshForAuthorizedRelease({diplomaId:data.credentialId,issuerId:doc.issuerId,studentProfileId:doc.studentProfileId});
   // Generating an official record is a privileged disclosure, even without email.
   // Do not cache or share the resulting response outside the authorized registrar session.
   const pdf=academicDocumentPdf(doc);
