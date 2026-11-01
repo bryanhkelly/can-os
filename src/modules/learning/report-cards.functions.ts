@@ -142,6 +142,7 @@ async function finalizedGradeRows(
       score: s.sectionGrades.score,
       gradeScaleId: s.sectionGrades.gradeScaleId,
       finalizedAt: s.sectionGrades.finalizedAt,
+      gradeUpdatedAt: s.sectionGrades.updatedAt,
       programName: s.programs.name,
       creditIssuingOrganizationId: sql<string>`${s.programs.creditIssuingOrganizationId}`,
       creditIssuingOrganization: s.organizations.name,
@@ -1157,6 +1158,39 @@ export const issueTranscript = createServerFn({ method: "POST" })
     const issuingOrganization = rows[0]!.creditIssuingOrganization;
 
     return db.transaction(async (tx) => {
+      // Serialize official transcript issuance against the same student/issuer
+      // so the release-time latest-issuance check can share this lock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${profile.id + ":" + issuingOrganizationId + ":transcript-issuance"}))`);
+      // The search projection above is only an authorization/candidate preview.
+      // Lock its current source rows and re-run the complete academic projection
+      // inside the issuing transaction. This prevents a grade correction or
+      // reinstated withdrawal occurring during the handoff from producing an
+      // already-stale official transcript.
+      const gradeIds=rows.filter(row=>!row.sectionGradeId.startsWith("withdrawal:"))
+        .map(row=>row.sectionGradeId);
+      const withdrawalIds=rows.filter(row=>row.sectionGradeId.startsWith("withdrawal:"))
+        .map(row=>row.sectionGradeId.slice("withdrawal:".length));
+      if(gradeIds.length){
+        const locked=await tx.select({id:s.sectionGrades.id}).from(s.sectionGrades)
+          .where(and(eq(s.sectionGrades.studentProfileId,profile.id),
+            inArray(s.sectionGrades.id,gradeIds))).for("share");
+        if(locked.length!==gradeIds.length)throw new AuthorizationError("Transcript grade source changed; retry issuance");
+      }
+      if(withdrawalIds.length){
+        const locked=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+          .where(and(eq(s.enrollments.studentProfileId,profile.id),
+            inArray(s.enrollments.id,withdrawalIds))).for("share");
+        if(locked.length!==withdrawalIds.length)throw new AuthorizationError("Transcript withdrawal source changed; retry issuance");
+      }
+      const freshRows=[
+        ...await finalizedGradeRows(tx as DbClient,s,viewer),
+        ...await withdrawalTranscriptRows(tx as DbClient,s,viewer),
+      ];
+      // gradeUpdatedAt is captured in the original and locked projections.
+      // It catches same-letter in-place corrections as well as new grades,
+      // credit metadata changes and revoked withdrawal notation.
+      if(JSON.stringify(freshRows)!==JSON.stringify(rows))
+        throw new AuthorizationError("Academic evidence changed during transcript issuance; refresh and retry");
       // Resolve every source Section and current issuer under the same
       // transaction as issuance; past transcripts remain immutable after
       // revocation, but a new CAN-issued record requires a live agreement.
