@@ -12,6 +12,12 @@ Small FullFlow commits added a **school-local contemporaneous date rule** for ne
 
 The current school-day source is **not** a certified continuous two-adult school day; additional authentic role sessions, legal opening approval, safeguarding response and actual arrival/departure/incident acceptance still require separate evidence. Nothing in this update authorizes a school to open or bypasses CAN approval.
 
+## 2026-11-01 custody privacy and retry update
+
+The current FullFlow service and guardian/staff pickup UI now use stable per-command idempotency identities across uncertain network responses; a retry cannot silently become a different release or custody request. The family-facing custody read model separates a generic active safety restriction from confidential allegations, staff witness evidence, and other guardians' resolved hold history.
+
+Custody hold creation/resolution and pickup denials no longer send blanket notices to every guardian. An uncollected child with an active hold produces a restricted staff-owned urgent follow-up instead of indiscriminate family notification; independently witnessed releases and uncollected children without holds retain the ordinary verified-guardian notice. The original restricted custody, attendance and Action/Audit/Event records are preserved. **Required outstanding P0:** CAN-approved recipient-by-recipient emergency contact and mandated-reporting policy, escalation fallback if no current director, same-day live staff/browsers, and human review of custody authority. Do not claim school-day acceptance or send uncontrolled outreach.
+
 ## Product boundary
 
 A legally independent church owns its Organization and physical Site. CAN supplies authorized academic

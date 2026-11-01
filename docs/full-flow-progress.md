@@ -1,5 +1,18 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## 2026-11-01 — follow-up: family invitation and custody disclosure
+
+New commits on **FullFlow**:
+
+- Family invitation school/purpose selection now fails closed when a selected Program becomes ineligible, clears pasted contacts on a school change, and discards previously confirmed previews when pre-opening interest becomes authorized application outreach.
+- Staff and guardian pickup commands preserve their original client mutation IDs after an uncertain server response, preventing UI retries from inventing a second unrelated event. The server continues to re-check current relationships/authority even on idempotent replay.
+- The guardian-facing read model exposes only a generic active custody hold to someone other than its reporting guardian; restricted allegations, resolution notes and inactive hold history remain private. Denied adults' identities and raw witness notes are not returned to family-facing pickup history.
+- Creating or resolving a custody hold, and denying a pickup, no longer broadcasts safety-sensitive details to every pickup guardian. Site-leader Action/escalation remains. A child uncollected under an active hold is routed for restricted staff contact instead of a broad family notice. Ordinary verified release and non-held uncollected alerts retain their existing guardian notification path.
+
+**Important unmet operational requirement:** the school must implement verified, case-specific family contact routing and local jurisdiction/custody policy review before treating custody notifications as pilot-ready. Broad automated notices are not an acceptable shortcut; the release remains **HOLD**. These are code and unit/CI improvements, not authenticated child-safety acceptance.
+
+---
+
 ## 2026-11-01 — current FullFlow school-day and launch source fixes
 
 **Only FullFlow has been modified. Production, default main, protected Neon E2E, and feature-flag rollout are unchanged.** Drizzle 0057–0059 SQL and snapshots are committed; clean 0000–0059 SQL replay passes on disposable PostgreSQL. Standard CI has passed earlier integrated exact-head candidates. Final-day CI and authenticated acceptance need separate exact-head evidence; passing static tests is not proof of physical supervision, lawful campus opening or a one-hour timed launch.
