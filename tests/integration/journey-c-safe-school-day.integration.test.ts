@@ -444,11 +444,42 @@ integration("Journey C: a safe school day including verified pickup", () => {
         ...releaseInput,
         mutationId: crypto.randomUUID(),
       } }), "custody dispute");
-      await pickup.resolvePickupCustodyHold({ data: {
-        holdId: hold.holdId,
-        resolutionNote: "Site leader reviewed the dispute and documented permission to proceed.",
+      // The reporting guardian and the final site director cannot act as
+      // their own independent safety reviewer. A separately authenticated
+      // onsite staff member must propose with a documented authority source.
+      await expectJourneyDenied(pickup.resolvePickupCustodyHold({ data: {
+        holdId: hold.holdId, proposalId: crypto.randomUUID(),
+        resolutionNote: "Independently verified family instructions permit release after review.",
+        mutationId: crypto.randomUUID(),
+      } }), "independently reviewed custody release authority");
+      const onsiteProposer = await createPersona(journey.tx, {
+        key: "pickup-review-proposer",
+        role: "site_staff", organizationId: school.school.id, siteId: school.site.id,
+        programIds: [school.program.id], firstName: "Independent", lastName: "Onsite", suffix,
+        emailVerified: true,
+      });
+      journey.setActor(onsiteProposer.actor);
+      const resolutionNote = "Independent school review confirmed documented family pickup instructions.";
+      const proposal = await pickup.proposePickupCustodyResolution({ data: {
+        holdId: hold.holdId, resolutionNote,
+        authorityBasis: "verified_guardian_instructions",
+        evidenceReference: "synthetic-case-independent-review-" + suffix,
         mutationId: crypto.randomUUID(),
       } });
+      expect(proposal.created).toBe(true);
+      await expectJourneyDenied(pickup.resolvePickupCustodyHold({ data: {
+        holdId: hold.holdId, proposalId: proposal.proposalId, resolutionNote,
+        mutationId: crypto.randomUUID(),
+      } }), "site leader custody hold resolution");
+      journey.setActor(school.siteLeader.actor);
+      const reviewed = await pickup.resolvePickupCustodyHold({ data: {
+        holdId: hold.holdId, proposalId: proposal.proposalId, resolutionNote,
+        mutationId: crypto.randomUUID(),
+      } });
+      expect(reviewed.resolved).toBe(true);
+      await expectJourneyDomainEvent(journey.tx, {
+        aggregateId: hold.holdId, eventType: "PickupCustodyHoldResolved",
+      });
 
       // An unknown adult is explicitly denied; the child remains supervised.
       const denial = await pickup.recordDeniedPickup({ data: {
