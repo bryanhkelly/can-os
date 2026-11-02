@@ -27,6 +27,7 @@ if (!Number.isSafeInteger(deepCount) || deepCount < 0 || deepCount > 120) throw 
 const outputArg = process.argv.indexOf("--output");
 if (outputArg === -1 || !process.argv[outputArg+1] || process.argv[outputArg+1].startsWith("--")) throw Error("Provide --output <path>");
 const output = resolve(process.argv[outputArg+1]);
+const featuredTitles = new Set(["Algebra I","Geometry","Statistics","Biology","Chemistry","Anatomy and Physiology","English 9","American Literature","US History","Civics","New Testament Survey","Spanish I","Computer Science","Physical Education","Robotics"]);
 const courses = subjects.flatMap(([prefix, subject, titles]) => titles.map((title, i) => ({
   code: `CAN-DEMO-${prefix}-${String(i+1).padStart(2,"0")}`,
   title, subject, description: `Demonstration course for ${title}. Not approved for academic credit or use as instructional curriculum.`,
@@ -66,7 +67,7 @@ const payload = {
   licenseCode:"LicenseRef-CAN-Original-Demo",
   provenance:{sourceType:"ai-assisted-original-demo",isSynthetic:true,creditStatus:"not_credit_ready",reviewStatus:"unreviewed",adoptionAuthorized:false},
   pack:{slug:"can-os-demo-catalog",name:"CAN OS Demonstration Catalog",description:"Synthetic course catalog for exploring school software; not approved curriculum.",visibility:"private"},
-  courses:courses.map((course,i)=>({...course,deepDemo:i<deepCount,learning:buildContent(course,i<deepCount)})),
+  courses:courses.map((course,i)=>{const featured=featuredTitles.has(course.title);const featuredIndex=courses.filter(c=>featuredTitles.has(c.title)).findIndex(c=>c.code===course.code);const deep=featured ? featuredIndex<deepCount : i<Math.max(0,deepCount-featuredTitles.size);return {...course,deepDemo:deep,learning:buildContent(course,deep)};}),
 };
 mkdirSync(dirname(output),{recursive:true});
 writeFileSync(output,JSON.stringify(payload,null,2)+"\n");
