@@ -4,6 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
 import { db } from "@/db/client";
+import { writeAudit } from "@/platform/mutation";
 import { jurisdictionProfileVersions, jurisdictions } from "@/db/schema";
 import { and, eq, desc, inArray } from "drizzle-orm";
 
@@ -13,7 +14,7 @@ import { and, eq, desc, inArray } from "drizzle-orm";
  */
 export const listJurisdictionProfileReviews = createServerFn({method:"GET"}).handler(async()=>{
  const context=await getCommandContext(getRequest());
- assertCapability(context,"program.read");
+ assertCapability(context,"jurisdiction.profile.manage");
  const rows=await db.select({
   id:jurisdictionProfileVersions.id,
   jurisdictionId:jurisdictions.id,
@@ -79,11 +80,15 @@ export const saveJurisdictionProfileReview=createServerFn({method:"POST"})
   const [existing]=await db.select({status:jurisdictionProfileVersions.status})
    .from(jurisdictionProfileVersions).where(eq(jurisdictionProfileVersions.id,data.id)).limit(1);
   if(!existing || !["draft","in_review"].includes(existing.status))throw Error("Only unpublished reviews can be edited");
-  const [saved]=await db.update(jurisdictionProfileVersions).set({
+  const saved=await db.transaction(async tx=>{
+   const [updated]=await tx.update(jurisdictionProfileVersions).set({
    title:data.title,summary:data.summary,profile:data.profile,evidence:data.evidence,
    updatedAt:new Date(),
   }).where(and(eq(jurisdictionProfileVersions.id,data.id),inArray(jurisdictionProfileVersions.status,["draft","in_review"])))
    .returning({id:jurisdictionProfileVersions.id});
-  if(!saved)throw Error("Review was changed concurrently; reload and try again");
+   if(!updated)throw Error("Review was changed concurrently; reload and try again");
+   await writeAudit(tx,context,{action:"jurisdiction.profile.review.updated",entityType:"jurisdiction_profile_version",entityId:updated.id,after:{title:data.title,summary:data.summary,evidenceCount:data.evidence.length}});
+   return updated;
+  });
   return {id:saved.id};
  });
