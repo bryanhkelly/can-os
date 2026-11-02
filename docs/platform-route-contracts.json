@@ -580,6 +580,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.jurisdiction-profiles.tsx",
+      "route": "/operations/jurisdiction-profiles",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "network policy administrator reviews jurisdiction guidance",
+      "readBoundary": "listJurisdictionProfileReviews (jurisdiction.profile.manage)",
+      "writeBoundary": "saveJurisdictionProfileReview and publishJurisdictionProfile (jurisdiction.profile.manage)"
+    },
+    {
       "file": "src/routes/operations.launch.$programId.tsx",
       "route": "/operations/launch/$programId",
       "owner": "operations",
