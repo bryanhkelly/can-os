@@ -35,8 +35,8 @@ const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
   await client.query("BEGIN");
-  const org=await client.query("SELECT id FROM organizations WHERE id=$1", [publisher]);
-  if (org.rowCount !== 1) throw Error("Publisher organization not found");
+  const org=await client.query("SELECT id,slug,type,metadata FROM organizations WHERE id=$1", [publisher]);
+  if (org.rowCount !== 1 || org.rows[0].slug !== "can-demo-publisher" || org.rows[0].metadata?.demoPublisher !== true) throw Error("Only the dedicated CAN Demo Publisher organization can own demo curriculum");
   const existing=await client.query("SELECT id FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug=$2", [publisher,manifest.pack.slug]);
   if (existing.rowCount > 1) throw Error("Ambiguous demo pack");
   let packId=existing.rows[0]?.id;
