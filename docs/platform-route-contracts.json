@@ -517,6 +517,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.can-teacher-requests.tsx",
+      "route": "/operations/can-teacher-requests",
+      "owner": "staffing",
+      "verification": "pending",
+      "roleJourney": "CAN academic provider registrar reviews requests from its own church school programs",
+      "writeBoundary": "review transitions update existing staffing Action metadata or record a declined request with audit and event",
+      "readBoundary": "provider-scoped staffing inbox; verified registrar and capacity.manage"
+    },
+    {
       "file": "src/routes/operations.teacher-marketplace.tsx",
       "route": "/operations/teacher-marketplace",
       "owner": "staffing",
