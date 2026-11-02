@@ -14,7 +14,7 @@ export const Route=createFileRoute("/operations/jurisdiction-profiles")({
 function ReviewPage(){
  const result=Route.useLoaderData();
  if(!result.ok)return <LoaderFailure title="Jurisdiction profiles" eyebrow="CAN OS · Policy review" outcome={result}/>;
- return <WorkspaceShell>
+ return <WorkspaceShell title="Jurisdiction profiles">
   <div className="space-y-5">
    <WorkflowIntro eyebrow="CAN OS · Policy review" title="Jurisdiction profiles" description="Review state operating models, funding, requirements and official sources before publishing guidance. Publication does not authorize a school to open." />
    {result.data.length===0?<p>No jurisdiction profiles have been prepared.</p>:result.data.map(item=><ReviewEditor key={item.id} item={item}/>)}
