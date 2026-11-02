@@ -1162,14 +1162,18 @@
     "/operations/teacher-marketplace": {
       "persona": "registrar",
       "fixtureRequired": false,
-      "rationale": "Synthetic teacher selection is a read-only isolated-demo overlay gated by an environment flag and existing authorized curriculum adoption. General release seeds cannot grant synthetic instructor eligibility.",
+      "rationale": "The standard teacher marketplace reads authorized adopted curriculum, provider memberships, capabilities and offerings. Synthetic sample teachers are labeled through provider metadata. Synthetic offerings cannot confer verified eligibility or assign a Section.",
       "interactions": [
         "select the authorized school after curriculum adoption",
-        "find CAN Demo Teaching Provider candidates by selected course",
-        "inspect unverified demo availability without assigning teaching authority",
+        "find CAN Academy and labeled sample teacher candidates by adopted course",
+        "inspect availability and capacity offers without assigning teaching authority",
         "open canonical class staffing to complete independently authorized assignment"
       ],
-      "downstreamRecords": []
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/operations/curriculum-marketplace": {
       "persona": "registrar",
