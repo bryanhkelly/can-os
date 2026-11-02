@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
-import { workspaceHome } from "@/components/shell/WorkspaceNavigation";
+import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -8,7 +8,7 @@ export const Route = createFileRoute("/")({ component: HomePage });
 function HomePage() {
   const { session, error } = useWorkspaceSession();
   if (session && !session.authenticated) return <Navigate to="/access" replace />;
-  const destination = session?.authenticated ? workspaceHome[session.role] : undefined;
+  const destination = session?.authenticated ? getWorkspaceHome(session.role) : undefined;
   if (destination) return <Navigate to={destination} replace />;
 
   return (

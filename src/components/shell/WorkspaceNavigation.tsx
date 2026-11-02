@@ -1,47 +1,21 @@
 import {Link,useLocation} from "@tanstack/react-router";
 import {lazy,Suspense,useEffect,useState,type ReactNode} from "react";
-import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy,ShieldAlert} from "lucide-react";
+import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Users,Settings} from "lucide-react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {ContextTray,WorkspaceNotice} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
+import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks} from "./workspace-navigation.registry";
+import {SidebarLinks} from "./WorkspaceSidebarLinks";
 
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
 const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConversation").then(module=>({default:module.AskCanConversation})));
 const focusRingClass="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",safeguarding_responder:"/safeguarding",safeguarding_lead:"/safeguarding",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
-export const workspaceLinks:Record<string,{title:string;path:string}[]>={
- site_website_editor:[{title:"Website",path:"/site-website"}],
- room_facilitator:[{title:"Report a safety concern",path:"/safeguarding"},{title:"Today",path:"/site/day"},{title:"Attendance",path:"/staff/attendance"},{title:"Roster",path:"/site/day"}],
- site_staff:[{title:"Report a safety concern",path:"/safeguarding"},{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- site_leader:[{title:"Report a safety concern",path:"/safeguarding"},{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Staff",path:"/staff/teachers"},{title:"Schedule",path:"/calendar"},{title:"Attendance",path:"/staff/attendance"},{title:"Community",path:"/site-website"},{title:"Operations",path:"/operations"}],
- paraeducator:[{title:"Report a safety concern",path:"/safeguarding"},{title:"My profile",path:"/profiles"}],
- safeguarding_responder:[{title:"Assigned safeguarding",path:"/safeguarding"}],
- safeguarding_lead:[{title:"Assigned safeguarding",path:"/safeguarding"}],
- network_admin:[{title:"Network operations",path:"/network"},{title:"Operations",path:"/operations"}],
- can_network_steward:[{title:"Network contracts",path:"/network-steward"}],
- student:[{title:"Today",path:"/student"},{title:"Learn",path:"/student/courses"},{title:"My School",path:"/student/my-school"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"},{title:"Support",path:"/student/support"}],
- guardian:[{title:"Home",path:"/guardian"},{title:"Children",path:"/guardian/academics"},{title:"School",path:"/guardian/experiences"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Students",path:"/staff/students"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Students",path:"/staff/students"},{title:"Sites",path:"/sites"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
- specialist:[{title:"Caseload",path:"/coach"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- counselor:[{title:"Caseload",path:"/counselor"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}]
-};
-export function SidebarLinks({links,activePath}:{links:{title:string;path:string}[];activePath?:string}){
- return <nav aria-label="CAN OS primary navigation" className="flex-1 space-y-1 overflow-y-auto p-3">
-  {links.map(item=>{
-   const Icon=item.path.includes("safeguarding")?ShieldAlert:item.path.includes("calendar")?CalendarDays:item.path.includes("messages")?MessagesSquare:
-    item.path.includes("students")||item.path.includes("teachers")?Users:item.path.includes("class")||item.path.includes("courses")?BookOpen:
-    item.path.includes("support")||item.path.includes("coach")||item.path.includes("counselor")?LifeBuoy:
-    item.path.includes("assignments")||item.path.includes("gradebook")?ClipboardList:Home;
-   return <Link key={item.path} to={item.path} aria-current={activePath===item.path?"page":undefined}
-    className={"flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium "+focusRingClass+" "+(activePath===item.path?"bg-muted text-foreground":"text-muted-foreground hover:bg-muted hover:text-foreground")}>
-    <Icon className="size-4 shrink-0" aria-hidden="true"/>{item.title}</Link>;
-  })}
- </nav>;
-}
+export {SidebarLinks} from "./WorkspaceSidebarLinks";
+export {workspaceHome,workspaceLinks} from "./workspace-navigation.registry";
+
 export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const location=useLocation();
  const {session,error:sessionError}=useWorkspaceSession();
@@ -56,15 +30,14 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const authenticated=session?.authenticated?session:null;
  const grants=authenticated?.grants??[];
  const current=grants.find(g=>g.id===authenticated?.activeGrantId);
- const links=current?(workspaceLinks[current.role]??[]):[];
- const activePath=links.filter(item=>location.pathname===item.path||location.pathname.startsWith(item.path+"/"))
-  .sort((a,b)=>b.path.length-a.path.length)[0]?.path;
+ const links=current?(getWorkspaceLinks(current.role)??[]):[];
+ const activePath=getActiveWorkspacePath(links,location.pathname);
  const switchGrant=async(id:string)=>{
   const target=grants.find(g=>g.id===id);
   if(!target)throw new Error("This membership is unavailable.");
   const response=await fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:id})});
   if(!response.ok)throw new Error("Unable to change membership");
-  window.location.assign(workspaceHome[target.role]??"/");
+  window.location.assign(getWorkspaceHome(target.role)??"/");
  };
  const signOut=async()=>{
   const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
@@ -82,7 +55,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  }
  return <><div className={current?"min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]":"min-h-screen"}>
  {current&&<aside aria-label="Workspace sidebar" className="hidden border-r bg-card lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-  <div className="border-b p-5"><Link to={workspaceHome[current.role]??"/"} className={"rounded-sm font-serif text-xl font-semibold "+focusRingClass}>CAN OS</Link><p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Church Academy Network</p></div>
+  <div className="border-b p-5"><Link to={getWorkspaceHome(current.role)??"/"} className={"rounded-sm font-serif text-xl font-semibold "+focusRingClass}>CAN OS</Link><p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Church Academy Network</p></div>
   <div className="p-4"><p className="text-xs uppercase tracking-widest text-muted-foreground">{current.role} workspace</p><p className="mt-2 text-sm font-semibold">{current.firstName} {current.lastName}</p>
    <p className="mt-1 text-xs text-muted-foreground">{authenticated?.sites.map(site=>site.name).join(", ")}</p></div>
   <SidebarLinks links={links} activePath={activePath}/>

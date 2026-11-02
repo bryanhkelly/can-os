@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { searchWorkspace, type SearchHit } from "@/modules/search/global-search.functions";
-import { workspaceLinks } from "@/components/shell/WorkspaceNavigation";
+import { getWorkspaceLinks } from "./workspace-navigation.registry";
 import { useNavigate } from "@tanstack/react-router";
 import { useWorkspaceSession } from "./WorkspaceSession";
 import {
@@ -65,7 +65,7 @@ export function CommandPalette() {
   }, [open]);
 
   const destinations = useMemo(() => {
-    const authorized = activeRole ? (workspaceLinks[activeRole] ?? []) : [];
+    const authorized = activeRole ? (getWorkspaceLinks(activeRole) ?? []) : [];
     return filterDestinations(query, authorized.map(item=>({to:item.path,label:item.title}))).slice(0, 6);
   }, [query, activeRole]);
 

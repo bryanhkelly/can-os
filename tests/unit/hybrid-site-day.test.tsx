@@ -3,7 +3,7 @@ vi.mock("@/modules/operations/onsite-room-plan.functions",()=>({getOnsiteRoomPla
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { SiteDayPage } from "@/components/operations/SiteDayPage";
-import { workspaceHome, workspaceLinks } from "@/components/shell/WorkspaceNavigation";
+import { getWorkspaceHome, getWorkspaceLinks, workspaceLinks } from "@/components/shell/workspace-navigation.registry";
 
 vi.mock("@tanstack/react-router", async importOriginal => ({
   ...await importOriginal<typeof import("@tanstack/react-router")>(),
@@ -42,8 +42,8 @@ vi.mock("@/modules/operations/pickup.functions",()=>({
 describe("Hybrid Site daily facilitator workspace",()=>{
   it("links only site-day and no grades, counseling or generic case consoles",()=>{
     for(const role of ["room_facilitator","site_staff","site_leader"]){
-      expect(workspaceHome[role]).toBe("/site/day");
-      const destinations=workspaceLinks[role].map(item=>item.path);
+      expect(getWorkspaceHome(role)).toBe("/site/day");
+      const destinations=getWorkspaceLinks(role)?.map(item=>item.path)??[];
       expect(destinations).toContain("/site/day");
       for(const forbidden of ["/teacher/gradebook","/counselor","/support","/admissions","/admin"])
         expect(destinations).not.toContain(forbidden);
