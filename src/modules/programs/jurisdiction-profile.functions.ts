@@ -92,3 +92,30 @@ export const saveJurisdictionProfileReview=createServerFn({method:"POST"})
   });
   return {id:saved.id};
  });
+
+/** Publish a reviewed profile only when official sources have been recorded. */
+export const publishJurisdictionProfile=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({id:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  const context=await getCommandContext(getRequest());
+  assertCapability(context,"jurisdiction.profile.manage");
+  return db.transaction(async tx=>{
+   const [record]=await tx.select().from(jurisdictionProfileVersions)
+    .where(eq(jurisdictionProfileVersions.id,data.id)).limit(1);
+   if(!record || record.status!=="in_review")throw Error("Profile must be in review before publication");
+   const sources=record.evidence;
+   if(!Array.isArray(sources)||sources.length===0)throw Error("Add authoritative sources before publishing");
+   for(const source of sources){
+    if(!source || typeof source!=="object" || typeof source.url!=="string" || !source.url.startsWith("https://") || !source.authority || !source.checkedAt)
+     throw Error("Each source needs an HTTPS URL, authority, and checked date");
+   }
+   const [published]=await tx.update(jurisdictionProfileVersions).set({
+    status:"published",verificationStatus:"verified",reviewedAt:new Date(),
+    publishedAt:new Date(),updatedAt:new Date(),
+   }).where(and(eq(jurisdictionProfileVersions.id,data.id),eq(jurisdictionProfileVersions.status,"in_review")))
+    .returning({id:jurisdictionProfileVersions.id});
+   if(!published)throw Error("Profile was modified; reload and retry");
+   await writeAudit(tx,context,{action:"jurisdiction.profile.published",entityType:"jurisdiction_profile_version",entityId:published.id,after:{revision:record.revision,sourceCount:sources.length}});
+   return {id:published.id};
+  });
+ });
