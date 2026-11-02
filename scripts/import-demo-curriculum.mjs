@@ -39,6 +39,15 @@ for (const course of manifest.courses) {
 }
 const hash=createHash("sha256").update(source).digest("hex");
 const courseHash=c=>createHash("sha256").update(JSON.stringify({code:c.code,title:c.title,subject:c.subject,description:c.description,learning:c.learning})).digest("hex");
+// A database name alone is insufficient: production and isolated Neon branches
+// commonly share the same database name. Verify the actual branch identity.
+async function assertTargetBranch(client) {
+  const expected=process.env.DEMO_CURRICULUM_EXPECTED_BRANCH_ID;
+  if (!expected || !/^br-[a-z0-9-]+$/.test(expected)) throw Error("Writes require DEMO_CURRICULUM_EXPECTED_BRANCH_ID");
+  const result=await client.query("SELECT current_setting('neon.branch_id', true) AS branch_id");
+  const actual=result.rows[0]?.branch_id;
+  if (!actual || actual!==expected) throw Error("Neon branch identity mismatch; refusing demo curriculum writes");
+}
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
@@ -46,6 +55,7 @@ try {
   if(apply){
     const db=await client.query("SELECT current_database() AS name");
     if(db.rows[0].name!==process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)throw Error("Database identity mismatch");
+    await assertTargetBranch(client);
   }
   const org=await client.query("SELECT id,slug,type,metadata FROM organizations WHERE id=$1", [publisher]);
   if (org.rowCount !== 1 || org.rows[0].slug !== "can-demo-publisher" || org.rows[0].metadata?.demoPublisher !== true) throw Error("Only the dedicated CAN Demo Publisher organization can own demo curriculum");
