@@ -21,7 +21,7 @@ const evidence = {
 describe("CAN network stewardship policy", () => {
   it("never exposes school, network HQ or student privileges to a CAN steward", () => {
     const canSteward = actor();
-    expect([...canSteward.capabilities].sort()).toEqual(["network.admins.provision", "network.agreements.verify"]);
+    expect([...canSteward.capabilities].sort()).toEqual(["jurisdiction.profile.manage", "network.admins.provision", "network.agreements.verify"]);
     expect(() => assertCANSteward(canSteward, can, "network.agreements.verify")).not.toThrow();
     expect(() => assertCANSteward(canSteward, can, "network.admins.provision")).not.toThrow();
     expect(canSteward.capabilities.has("network.affiliations.review")).toBe(false);
