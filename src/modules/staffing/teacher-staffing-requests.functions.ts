@@ -201,6 +201,11 @@ export const listTeacherStaffingRequests = createServerFn({ method: "GET" })
         courseVersionId: String(row.metadata.courseVersionId ?? ""),
         teacherPersonId: String(row.metadata.teacherPersonId ?? ""),
         sectionId: typeof row.metadata.sectionId === "string" ? row.metadata.sectionId : null,
+        reviewState: row.status === "cancelled" ? "declined" as const :
+          row.metadata.canStaffingReviewState === "in_review" ? "in_review" as const :
+          row.status === "resolved" ? "resolved" as const : "requested" as const,
+        declineReason: row.status === "cancelled" && typeof row.metadata.canStaffingDeclineReason === "string"
+          ? row.metadata.canStaffingDeclineReason : null,
         createdAt: row.createdAt.toISOString(),
       })) };
   });
