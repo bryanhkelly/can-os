@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -55,3 +56,34 @@ export const listPublishedJurisdictionGuidance = createServerFn({method:"GET"}).
  }
  return byJurisdiction;
 });
+
+/** Only authorized operators can update an editorial draft. Published versions
+ * are immutable; publication requires a separate, independently reviewed gate. */
+const reviewInput=z.object({
+ id:z.string().uuid(),
+ title:z.string().trim().min(3).max(250),
+ summary:z.string().trim().min(10).max(4000),
+ profile:z.record(z.string(),z.unknown()),
+ evidence:z.array(z.object({
+  title:z.string().min(1),
+  url:z.string().url().refine(value=>value.startsWith("https://"),"HTTPS required"),
+  authority:z.string().min(1),
+  checkedAt:z.string().datetime(),
+ })),
+});
+export const saveJurisdictionProfileReview=createServerFn({method:"POST"})
+ .validator((value:unknown)=>reviewInput.parse(value))
+ .handler(async({data})=>{
+  const context=await getCommandContext(getRequest());
+  assertCapability(context,"jurisdiction.profile.manage");
+  const [existing]=await db.select({status:jurisdictionProfileVersions.status})
+   .from(jurisdictionProfileVersions).where(eq(jurisdictionProfileVersions.id,data.id)).limit(1);
+  if(!existing || !["draft","in_review"].includes(existing.status))throw Error("Only unpublished reviews can be edited");
+  const [saved]=await db.update(jurisdictionProfileVersions).set({
+   title:data.title,summary:data.summary,profile:data.profile,evidence:data.evidence,
+   updatedAt:new Date(),
+  }).where(and(eq(jurisdictionProfileVersions.id,data.id),inArray(jurisdictionProfileVersions.status,["draft","in_review"])))
+   .returning({id:jurisdictionProfileVersions.id});
+  if(!saved)throw Error("Review was changed concurrently; reload and try again");
+  return {id:saved.id};
+ });
