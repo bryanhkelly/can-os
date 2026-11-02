@@ -7,11 +7,12 @@
 import { Pool } from "@neondatabase/serverless";
 const apply=process.argv.includes("--apply");
 if(!process.env.DATABASE_URL) throw Error("DATABASE_URL required");
-if(apply && process.env.DEMO_CURRICULUM_ALLOW_WRITE!=="1") throw Error("Explicit write opt-in required");
+if(apply && (process.env.DEMO_CURRICULUM_ALLOW_WRITE!=="1" || !process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)) throw Error("Explicit write opt-in and confirmed database name required");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
   await client.query("BEGIN");
+  if(apply){const db=await client.query("SELECT current_database() AS name");if(db.rows[0].name!==process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)throw Error("Database identity mismatch");}
   const publisher=await client.query("SELECT id FROM organizations WHERE slug='can-demo-publisher' AND metadata->>'demoPublisher'='true'");
   if(publisher.rowCount!==1)throw Error("Dedicated demo publisher not found");
   const pack=await client.query("SELECT id FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug='can-os-demo-catalog'",[publisher.rows[0].id]);
@@ -21,6 +22,8 @@ try {
     JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
     WHERE pv.pack_id=$1 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$1)`,[pack.rows[0].id]);
   const jurisdictions=await client.query("SELECT id FROM jurisdictions");
+  if(courses.rowCount!==120)throw Error("Expected exactly 120 demo course versions before approval");
+  if(jurisdictions.rowCount===0)throw Error("No jurisdictions configured");
   const expected=courses.rowCount*jurisdictions.rowCount;
   const existing=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
     WHERE a.academic_purpose='general_instruction'
