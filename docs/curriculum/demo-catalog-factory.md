@@ -36,3 +36,103 @@ This is a dry run. To load drafts, set `DEMO_CURRICULUM_ALLOW_WRITE=1` and add `
 7. **Target protection:** dry-run and explicit write opt-in are provided, but a further production-target allowlist would be needed for unattended automation.
 
 The current scope intentionally favors safe, deterministic marketplace data over synthetic grades or live-school contamination.
+
+## CAN-managed demo teacher marketplace (PR #240 extension)
+
+The CAN Academy model is **centrally procured instructors**: CAN recruits,
+screens, onboards and governs teachers before churches can select them. Churches
+select curriculum while setting up a school, then choose from CAN-managed
+teacher candidates afterward. Teachers may serve multiple church schools
+through existing cross-school instructional capacity. Course-level selection
+should propagate to compatible sections, with an explicit section-level
+override. Real staffing supports both directly confirmed assignments and
+request/acceptance when needed; qualification, capacity, agreements and
+institutional authority remain mandatory.
+
+### Generate 30 teacher profiles connected to all 120 demo courses
+
+```bash
+node scripts/demo-curriculum-factory.mjs --output /tmp/can-demo-catalog.json --deep 15
+node scripts/demo-teacher-marketplace-factory.mjs \
+  --catalog /tmp/can-demo-catalog.json --output /tmp/can-demo-teachers.json
+```
+
+The teacher fixture is deterministic, with **30 invented identities, 240
+course-to-instructor capabilities (two per course), and 15 proposed class
+staffing examples** for featured courses. Subject matches are synthetic
+demonstration recommendations, **not** validated qualifications. Teacher
+contact addresses use the reserved `example.invalid` domain. Illustrative
+weekly schedules include weekend/Sunday options where applicable.
+
+### Inspect and optionally load on an isolated Neon branch
+
+Import the curriculum pack first, then generate the teacher fixture. The
+`scripts/import-demo-teachers.mjs` loader requires that the existing canonical
+CAN Demo Publisher own all 120 matching course templates. It creates the
+dedicated `CAN Demo Teaching Provider` organization as a synthetic
+`other_partner` only on an explicitly guarded write. This is the **single
+canonical marker** used to identify demo teachers: membership in the provider
+organization with metadata `demoProvider:true, isSynthetic:true`.
+The synthetic person fixture key is only for repeatable imports, not a
+separate teacher marketplace demo flag.
+
+```bash
+DATABASE_URL="<isolated-branch-url>" node scripts/import-demo-teachers.mjs \
+  --catalog /tmp/can-demo-catalog.json --teachers /tmp/can-demo-teachers.json
+```
+
+The default run is read-only. For an intentionally isolated Neon validation
+branch only, set each of these to *actual verified values* and append `--apply`:
+
+```bash
+DEMO_TEACHERS_ALLOW_WRITE=1
+DEMO_TEACHERS_DATABASE_CONFIRMED="<value returned by SELECT current_database()>"
+DEMO_TEACHERS_HOST_CONFIRMED="<isolated branch database hostname>"
+CAN_APPLICATION_DB_HOST="<production database hostname, different from branch>"
+```
+
+The loader checks the actual database name and connection hostname,
+and refuses writes to the declared production database host. Never deploy
+those write opt-ins to the application. Its transaction creates person
+records, provider memberships, course-specific `instructor_capabilities`,
+`instructor_availability_windows` and illustrative
+`instructional_capacity_offerings` using existing schema. Re-running an
+identical manifest reuses fixture records rather than creating duplicates.
+No access accounts, teacher role assignments, approved credential claims,
+reservations, delivery arrangements, canonical Sections or `section_teachers`
+are created. The 15 class matches remain planning examples until a separate
+authorized school staffing flow explicitly provisions and assigns them.
+
+### Discovery screen
+
+The isolated demonstration screen is
+`/operations/teacher-marketplace?programId=<school-program-uuid>`.
+It requires a signed-in school registrar authorized to view the selected
+program's curriculum and explicitly enabled isolated-demo environment flags:
+
+```
+CAN_DEMO_TEACHER_PREVIEW_ENABLED=true
+CAN_DEMO_ISOLATED_ENV=true
+```
+
+Only adopted, entitled, published course versions are considered. Matching
+synthetic teachers are discovered through the actual course-capability and
+provider-membership links, rather than unrelated fixture JSON. Teachers are
+labeled Demo and not credential verified; the screen is read-only and links to
+the existing school/class staffing workflow. Ordinary production deployments
+must not enable these flags. The original 120-course draft/private pack cannot
+be adopted until the separate authorized demo-publication path is provided.
+
+### Remaining product work (not claimed by this PR)
+
+- Implement CAN's real teacher onboarding, verified credential/contract status
+  and CAN-only marketplace publishing.
+- Complete one-course-to-many-section selection, matching and confirmation
+  with real teacher request/acceptance, cross-school scheduling conflict checks,
+  compliance eligibility, and auditable capacity reservations.
+- Provision 15 *actual* sample sections using existing school years, terms,
+  program authorizations and curriculum entitlements after the guarded demo
+  publication path exists; do not insert unattached `section_teachers` rows.
+- Run the teacher import on isolated Neon and exercise the authenticated
+  marketplace and school staffing journeys. Until then code is not database-
+  or browser-accepted.
