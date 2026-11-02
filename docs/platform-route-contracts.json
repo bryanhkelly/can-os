@@ -517,6 +517,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.teacher-marketplace.tsx",
+      "route": "/operations/teacher-marketplace",
+      "owner": "staffing",
+      "verification": "pending",
+      "roleJourney": "registrar reviews CAN-managed demo teacher candidates after adopting curriculum",
+      "writeBoundary": "none (read-only preview; existing launch staffing handles assignments)",
+      "readBoundary": "getDemoTeacherMarketplace (verified registrar and isolated-demo environment)"
+    },
+    {
       "file": "src/routes/operations.curriculum-marketplace.tsx",
       "route": "/operations/curriculum-marketplace",
       "owner": "learning",
