@@ -66,7 +66,8 @@ try {
       packId=randomUUID();
       await client.query("INSERT INTO curriculum_packs (id,publisher_organization_id,slug,name,description,visibility,license_code,metadata) VALUES ($1,$2,$3,$4,$5,'private',$6,$7::jsonb)",[packId,publisher,manifest.pack.slug,manifest.pack.name,manifest.pack.description,manifest.licenseCode,JSON.stringify({sourceHash:hash})]);
     }
-    // Create a new pack draft only when content actually changes.
+    // A pack's own content hash changes only when a new draft is created.
+    // Re-running an identical manifest is a no-op.
     if (plan.create || plan.update) {
       const pv=await client.query("SELECT COALESCE(MAX(version),0)+1 AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
       const packVersionId=randomUUID();
