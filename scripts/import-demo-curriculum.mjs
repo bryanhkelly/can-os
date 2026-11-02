@@ -84,7 +84,7 @@ try {
     }
     // A pack's own content hash changes only when a new draft is created.
     // Re-running an identical manifest is a no-op.
-    if (plan.create || plan.update) {
+    if (plan.create || plan.update || (packId && existing.rows[0]?.metadata?.sourceHash !== hash)) {
       const pv=await client.query("SELECT COALESCE(MAX(version),0)+1 AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
       const packVersionId=randomUUID();
       await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({sourceHash:hash})]);
@@ -109,6 +109,7 @@ try {
         await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,versionId,position++,JSON.stringify({deepDemo:c.deepDemo})]);
       }
     }
+    await client.query("UPDATE curriculum_packs SET metadata=jsonb_set(COALESCE(metadata,'{}'::jsonb),'{sourceHash}',to_jsonb($2::text)) WHERE id=$1",[packId,hash]);
     await client.query("COMMIT");
     console.log(JSON.stringify({...plan,packId,status:"draft",published:false},null,2));
   }
