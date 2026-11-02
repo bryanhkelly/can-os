@@ -52,7 +52,7 @@ function ReviewEditor({item}:{item:Item}){
  async function publish(){
   if(!window.confirm("Publish this state profile as verified guidance? Confirm all sources and requirements have been reviewed."))return;
   setSaving(true);setMessage("");
-  try{await publishJurisdictionProfile({data:{id:item.id}});setMessage("Published. The state guidance is now available during launch.");await router.invalidate();}
+  try{await saveJurisdictionProfileReview({data:{id:item.id,title,summary,profile:{...profile,summary},evidence:sources}});await publishJurisdictionProfile({data:{id:item.id}});setMessage("Saved and published. The state guidance is now available during launch.");await router.invalidate();}
   catch(error){setMessage(error instanceof Error?error.message:"Unable to publish");}
   finally{setSaving(false);}
  }
