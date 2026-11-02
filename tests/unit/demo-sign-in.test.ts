@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { redeemDemoAccess } from "@/modules/identity/passwordless-access.server";
+import { AccessInfrastructureError } from "@/domain/access-errors";
 
 const state = vi.hoisted(() => ({
   select: vi.fn(), insert: vi.fn(), grants: vi.fn(), audit: vi.fn(),
@@ -88,12 +89,29 @@ describe("shared demo sign-in", () => {
   it("fails explicitly without the configured session key", async () => {
     vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", undefined);
     await expect(redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000"))
-      .rejects.toThrow("Access secret pepper not configured");
+      .rejects.toMatchObject({ reason: "session_configuration" });
+    expect(state.select).not.toHaveBeenCalled();
     expect(state.audit).not.toHaveBeenCalled();
   });
 
   it("propagates a transactional audit failure rather than accepting the login", async () => {
     state.audit.mockRejectedValueOnce(new Error("audit offline"));
-    await expect(redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000")).rejects.toThrow("audit offline");
+    await expect(redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000"))
+      .rejects.toMatchObject({ reason: "session_audit" });
   });
+
+  it.each(["account_lookup", "grant_lookup", "session_creation"] as const)(
+    "reports %s without propagating driver secrets", async reason => {
+      const privateError = new Error("postgres://private-password@host/private");
+      if (reason === "account_lookup") state.select.mockImplementationOnce(() => { throw privateError; });
+      if (reason === "grant_lookup") state.grants.mockRejectedValueOnce(privateError);
+      if (reason === "session_creation") state.insert.mockImplementationOnce(() => { throw privateError; });
+      let failure: unknown;
+      try { await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000"); } catch (error) { failure = error; }
+      expect(failure).toBeInstanceOf(AccessInfrastructureError);
+      expect(failure).toMatchObject({ reason });
+      expect(String(failure)).not.toContain("private-password");
+      expect(state.audit).not.toHaveBeenCalled();
+    },
+  );
 });

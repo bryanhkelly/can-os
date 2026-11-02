@@ -14,6 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "demo:provision-registrar": "node --import tsx scripts/provision-demo-registrar.mjs",
+    "demo:check-access": "node --import tsx scripts/check-demo-access.mjs",
     "test": "vitest run --exclude 'tests/integration/**' --exclude 'tests/e2e/**'",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck": "tsc --noEmit",

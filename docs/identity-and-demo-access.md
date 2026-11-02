@@ -45,8 +45,29 @@ Operators must keep Valor's contents synthetic and keep real records elsewhere.
 Verification returns generic `401` responses for rejected credentials or
 unavailable memberships, and `503` with `Retry-After` for configuration,
 database or transactional audit failures. Infrastructure failures log a safe
-stage only, never raw errors, SQL, email addresses, tokens, codes or connection
+stage and an application-owned demo failure category, never raw errors, SQL, email addresses, tokens, codes or connection
 strings. Such failures are not recorded as incorrect-credential attempts.
+
+### Deployed demo access troubleshooting
+
+Run `npm run demo:check-access` with the server's environment to check the session
+key's presence/length, authentication schema and all six canonical demo grants.
+It executes only a read-only transaction, never provisions or repairs records,
+and prints no environment values or raw driver errors. An operator can load a
+local environment file explicitly with
+`node --env-file=.env.local --import tsx scripts/check-demo-access.mjs`.
+This check does not prove session inserts or audit writes; finish with real
+browser sign-in, reload, persona selection and sign-out on the deployed site.
+
+For HTTP 503 during demo verification, server logs distinguish
+`session_configuration`, `account_lookup`, `grant_lookup`, `session_creation`,
+`session_audit`, and `session_transaction`. The public response remains generic.
+A missing/short `CAN_ACCESS_TOKEN_PEPPER` fails before database work. Configure
+a stable server secret of at least 32 characters; never introduce a fallback key
+or disable transactional audit to make sign-in succeed. On Netlify, the database
+and session-key variables must be available to Functions in the active deploy
+context. A build passing does not establish runtime availability. Redeploy after
+correcting environment scope or values.
 
 ## Session-management hardening: initial inactivity limit (FullFlow)
 

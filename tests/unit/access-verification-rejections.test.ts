@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { InvalidAccessCredentialError } from "@/domain/access-errors";
+import { AccessInfrastructureError, InvalidAccessCredentialError } from "@/domain/access-errors";
 import { AuthorizationError } from "@/domain/command-context";
 
 type PostHandler=(input:{request:Request})=>Promise<Response>;
@@ -48,6 +48,16 @@ beforeEach(()=>{
 afterEach(()=>vi.restoreAllMocks());
 
 describe("unauthenticated verification failures",()=>{
+ it("logs only the safe infrastructure reason while preserving a generic public response",async()=>{
+  state.demo.mockRejectedValue(new AccessInfrastructureError("session_configuration"));
+  const response=await state.post!({request:request({email:"admin.demo@valorschool.demo",code:"000000"})});
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({error:"Authentication temporarily unavailable."});
+  expect(console.error).toHaveBeenCalledExactlyOnceWith("Authentication temporarily unavailable",{
+   stage:"verification",reason:"session_configuration",
+  });
+  expect(state.rejected).not.toHaveBeenCalled();
+ });
  it("returns the same generic response and only a coarse method for wrong links",async()=>{
   state.redeem.mockRejectedValue(new InvalidAccessCredentialError());
   const result=await state.post!({request:request({token:"very-secret-value"})});

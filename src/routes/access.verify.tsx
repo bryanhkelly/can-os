@@ -31,7 +31,7 @@ export const Route=createFileRoute("/access/verify")({
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch(error){
     if(!(error instanceof InvalidAccessCredentialError)&&!(error instanceof AuthorizationError)){
-     logAuthenticationUnavailable("verification");
+     logAuthenticationUnavailable("verification",error);
      return Response.json({error:"Authentication temporarily unavailable."},
       {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
     }

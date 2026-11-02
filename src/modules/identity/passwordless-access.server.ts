@@ -2,7 +2,7 @@ import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
-import { InvalidAccessCredentialError } from "@/domain/access-errors";
+import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import {
  isDemoAccountEmail,isApprovedDemoGrant,
@@ -20,7 +20,7 @@ const SESSION_LIFETIME_MS=12*60*60*1000;
 const genericResult={accepted:true} as const;
 function secretPepper():string {
  const value=process.env.CAN_ACCESS_TOKEN_PEPPER;
- if(!value || value.length<32) throw new Error("Access secret pepper not configured");
+ if(!value || value.length<32) throw new AccessInfrastructureError("session_configuration");
  return value;
 }
 function publicOrigin():string {
@@ -175,13 +175,19 @@ export async function redeemDemoAccess(
  if(!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email)) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
+ // Fail with a safe configuration category before doing database work.
+ const pepper=secretPepper();
  const now=new Date();
- return db.transaction(async tx=>{
+ let step: AccessFailureReason = "session_transaction";
+ try {
+ return await db.transaction(async tx=>{
+  step="account_lookup";
   const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized})
    .from(accessAccounts)
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
    .limit(1);
   if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  step="grant_lookup";
   const {grants}=await readSessionGrants(account.id,account.email,tx);
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
@@ -189,25 +195,33 @@ export async function redeemDemoAccess(
    :accountGrants.length===1?accountGrants[0]:undefined;
   if(!grant||!isApprovedDemoGrant(grant,email))throw new InvalidAccessCredentialError("Invalid demo credentials");
   const secret=issueOpaqueSecret();
+  step="session_creation";
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,
-   secretHash:hashAccessSecret(secret,secretPepper()),
+   secretHash:hashAccessSecret(secret,pepper),
    activeGrantId:grant.id,
    expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
+  step="session_audit";
   await recordSessionSecurityEvent(tx,{
    action:"identity.session.started",actorPersonId:grant.personId,
    accountId:grant.accountId,sessionAccountId:account.id,
    sessionId:session.id,grantId:grant.id,
    role:grant.role,method:"local_demo_code",
   });
+  step="session_transaction";
   return {
    accountId:account.id,
    role:grant.role,
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000),
   };
  });
+ } catch(error) {
+  if(error instanceof InvalidAccessCredentialError || error instanceof AuthorizationError ||
+     error instanceof AccessInfrastructureError) throw error;
+  throw new AccessInfrastructureError(step);
+ }
 }
 /** Compatibility entry point used by the existing access-verification route. */
 export const redeemLocalDemoAccess=redeemDemoAccess;
