@@ -8,7 +8,7 @@ import {getAssignments,saveAssignmentResponse,saveAssignmentDraft} from "@/modul
 import {createSubmissionAttachmentUpload,attachDocumentToSubmission,listSubmissionAttachments,getSubmissionAttachmentDownload} from "@/modules/learning/submission-attachments.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {WorkspaceShell,StatusBadge} from "@/components/workspace";
+import {WorkspaceShell,StatusBadge,WorkspaceNotice} from "@/components/workspace";
 
 const loadAssignments=()=>getAssignments();
 export const Route=createFileRoute("/student/assignments")({
@@ -45,12 +45,18 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const {filter="all",assessment,section}=Route.useSearch();
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
+ const [progress,setProgress]=useState("");
  const [submittedReceipt,setSubmittedReceipt]=useState<string|null>(null);
  const [error,setError]=useState("");
  const [draftStatus,setDraftStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const [pendingFiles,setPendingFiles]=useState<File[]>([]);
  const [attachments,setAttachments]=useState<{documentId:string;fileName:string}[]>([]);
  const saveGeneration=useRef(0);
+ const feedbackRef=useRef<HTMLParagraphElement>(null);
+ const saving=useRef(false);
+ useEffect(()=>{
+  if(error||notice)feedbackRef.current?.focus();
+ },[error,notice]);
  const items=assignments.filter(item=>(!section||item.sectionId===section)&&(
   filter==="all"||
   (filter==="todo"&&(!item.status||item.status==="assigned"||item.status==="returned"))||
@@ -59,7 +65,8 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   (filter==="feedback"&&(["graded","returned"].includes(item.status??"") ||
     Boolean(item.revisionFeedbackText)))));
  const [selection]=useState(()=>assessment??items[0]?.assessmentId);
- const chosen=items.find(item=>item.assessmentId===selection);
+ const chosen=items.find(item=>item.assessmentId===selection)??
+  (submittedReceipt?assignments.find(item=>item.assessmentId===selection):undefined);
  const selected=chosen?.assessmentId??null;
  const selectedIndex=items.findIndex(item=>item.assessmentId===selected);
  const previousAssignment=items[selectedIndex-1],nextAssignment=items[selectedIndex+1];
@@ -90,14 +97,24 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   return()=>{clearTimeout(task);saveGeneration.current++};
  },[chosen?.assessmentId,chosen?.status,chosen?.responseText,editable,busy,draft]);
  async function saveWork(submitFinal:boolean){
-  if(!chosen||!editable||(submitFinal&&!canSubmit))return;
+  if(saving.current)return;
+  if(!chosen||!editable){
+   setError("This assignment is no longer editable. Reload to review its current status.");
+   return;
+  }
+  if(submitFinal&&!canSubmit){
+   setError("Write at least three characters or choose a file before submitting.");
+   return;
+  }
+  saving.current=true;
   saveGeneration.current++;
-  setBusy(true);setError("");setNotice("");
+  setBusy(true);setError("");setNotice("");setProgress("Saving your draft...");
   try{
    const work={
     files:pendingFiles,
     saveDraft:()=>saveAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}}),
     attach:async(file:File)=>{
+     setProgress("Uploading "+file.name+"...");
      const contentType=attachmentMime(file.name);
      if(!contentType||file.size<16||file.size>10*1024*1024)
       throw new Error("Unsupported file type or size: "+file.name);
@@ -106,12 +123,16 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      }});
      const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":contentType},body:file});
      if(!response.ok)throw new Error("Upload failed for "+file.name+". Your draft is saved; retry before submitting.");
+     setProgress("Verifying "+file.name+"...");
      await attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
     },
     attached:(file:File)=>setPendingFiles(current=>current.filter(item=>item!==file)),
    };
    if(submitFinal){
-    const receipt=await submitAssignmentWork({...work,submit:()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}})});
+    const receipt=await submitAssignmentWork({...work,submit:()=>{
+     setProgress("Submitting your assignment...");
+     return saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}});
+    }});
     setSubmittedReceipt(receipt.submissionId);
     setNotice("Your assignment has been submitted. Receipt: "+receipt.submissionId);
    }else{
@@ -127,16 +148,16 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     setNotice(current=>current+" The latest view could not load. Reload to review your saved work.");
    }
   }catch(cause){
-   setError(cause instanceof Error?cause.message:submitFinal?"Unable to submit assignment":"Unable to save draft");
-  }finally{setBusy(false);}
+   const message=cause instanceof Error?cause.message:submitFinal?"Unable to submit assignment":"Unable to save draft";
+   setError(message+" Your assignment has not been confirmed as submitted. Your response and pending files are retained; correct the problem and retry.");
+  }finally{saving.current=false;setBusy(false);setProgress("");}
  }
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
   subtitle="Read instructions, save your response, submit work and follow through on feedback."
   breadcrumbs={<><Link to="/student" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{section}} className="underline">{section?"Class":"My classes"}</Link><span>/</span><span>Assignments</span></>}
   actions={<Link to="/calendar-export" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Export deadlines (.ics)</Link>}>
   {!connected&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">School records are currently unavailable.</p>}
-  {error&&<p role="alert" className="mt-5 rounded-xl border p-4 text-sm">{error}</p>}
-  {notice&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">{notice}</p>}
+  {!chosen&&error&&<WorkspaceNotice ref={feedbackRef} tone="danger" className="mt-5">{error}</WorkspaceNotice>}
   {assessment&&!chosen&&<p role="alert" className="mt-5 rounded-xl border p-4 text-sm">This assignment is unavailable in the current view. Choose another assignment or select All.</p>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Assignments</p><p className="mt-1 text-3xl font-semibold">{assignments.length}</p></div>
@@ -164,7 +185,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     {!chosen?<div className="rounded-xl border p-6"><h2 className="font-serif text-xl">Select an assignment</h2></div>:
     <article className="rounded-xl border bg-card p-6">
      <nav aria-label="Assignment navigation" className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b pb-4 text-sm">
-      <span>{selectedIndex+1} of {items.length}</span>
+      <span>{selectedIndex>=0?`${selectedIndex+1} of ${items.length}`:"Submitted assignment"}</span>
       <div className="flex gap-4">
        {previousAssignment&&<Link to="/student/assignments" search={{filter,section,assessment:previousAssignment.assessmentId}} className="underline">Previous</Link>}
        {nextAssignment&&selectedIndex>=0&&<Link to="/student/assignments" search={{filter,section,assessment:nextAssignment.assessmentId}} className="underline">Next</Link>}
@@ -217,7 +238,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
         window.location.assign(result.downloadUrl);
        }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open attachment")}
       }}>{file.fileName}</button>)}</div>}
-     {editable?<div className="mt-6">
+     {editable?<div className="mt-6" aria-busy={busy}>
       <label className="text-sm font-semibold">Your response (optional when submitting a file)
        <textarea disabled={busy} rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
@@ -234,8 +255,11 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
       <button type="button" disabled={busy} onClick={()=>saveWork(false)}
        className="mr-3 mt-4 rounded-lg border px-5 py-3 text-sm font-semibold disabled:opacity-40">Save draft</button>
       <button type="button" disabled={busy||!canSubmit} onClick={()=>saveWork(true)}
-       className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit assignment</button>
+       className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">{busy?"Saving assignment...":"Submit assignment"}</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
+     {busy&&<p role="status" className="mt-4 text-sm">{progress}</p>}
+     {error&&<WorkspaceNotice ref={feedbackRef} tone="danger" className="mt-4">{error}</WorkspaceNotice>}
+     {notice&&<WorkspaceNotice ref={feedbackRef} tone="success" className="mt-4">{notice}</WorkspaceNotice>}
     </article>}
    </section>
   </div>
