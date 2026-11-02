@@ -79,6 +79,21 @@ function ReviewEditor({item}:{item:Item}){
      </div>;
     })}
    </section>
+   <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+    <div className="flex items-center justify-between"><h3 className="font-semibold">Requirements & responsibilities</h3>{editable&&<button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>setProfile(v=>({...v,requirements:[...(Array.isArray(v.requirements)?v.requirements:[]),{id:crypto.randomUUID(),title:"",description:"",responsibleParty:"church",phase:"before_opening",evidenceIds:[]}]}))}>Add requirement</button>}</div>
+    {(Array.isArray(profile.requirements)?profile.requirements:[]).map((entry:unknown,i:number)=>{
+     const requirement=entry as {id:string;title:string;description:string;responsibleParty:string;phase:string;evidenceIds:string[]};
+     const update=(patch:Partial<typeof requirement>)=>setProfile(v=>({...v,requirements:(v.requirements as typeof requirement[]).map((r,j)=>i===j?{...r,...patch}:r)}));
+     return <div key={requirement.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+      <label className="text-sm sm:col-span-2">Requirement<input className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.title} onChange={e=>update({title:e.target.value})}/></label>
+      <label className="text-sm">Responsible party<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.responsibleParty} onChange={e=>update({responsibleParty:e.target.value})}>{["can","church","family"].map(s=><option key={s} value={s}>{s.toUpperCase()}</option>)}</select></label>
+      <label className="text-sm">When needed<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.phase} onChange={e=>update({phase:e.target.value})}>{["before_opening","before_enrollment","follow_up"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></label>
+      <label className="text-sm sm:col-span-2">Description<textarea className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.description} onChange={e=>update({description:e.target.value})}/></label>
+      <label className="text-sm sm:col-span-2">Supporting source<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.evidenceIds[0]??""} onChange={e=>update({evidenceIds:e.target.value?[e.target.value]:[]})}><option value="">Not linked yet</option>{sources.map(source=><option key={source.url} value={source.url}>{source.title||source.url}</option>)}</select></label>
+      {editable&&<button type="button" className="text-left text-sm underline" onClick={()=>setProfile(v=>({...v,requirements:(v.requirements as typeof requirement[]).filter((_,j)=>i!==j)}))}>Remove requirement</button>}
+     </div>;
+    })}
+   </section>
    <section className="space-y-3" aria-label="Evidence sources">
     <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Official source evidence</h3>
      {editable&&<button type="button" className="rounded border px-3 py-1 text-sm" onClick={()=>setSources(previous=>[...previous,{title:"",url:"",authority:"",checkedAt:new Date().toISOString()}])}>Add source</button>}</div>
