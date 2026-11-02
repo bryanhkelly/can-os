@@ -4,6 +4,17 @@
 Source-of-truth progression approved for `FullFlow`. Separate Golden Flow tests
 are prerequisite evidence, **not** proof of this journey.
 
+### Source branch versus test database
+
+Connected acceptance supports the reviewed `main` and `FullFlow` Git branches.
+Dispatch the workflow on the branch whose exact commit is being evaluated.
+The shared source guard rejects other branches, tags, detached local checkouts,
+missing CI commit identity and a checked-out SHA that differs from `GITHUB_SHA`.
+`main` source support does **not** authorize testing against the Neon `main`
+database: the pinned nonproduction FullFlow database, distinct admissions target,
+endpoint/branch attestation and exact-SHA migration approval remain mandatory.
+The same concurrency group serializes acceptance from both source branches.
+
 ## Exact sequence (no skipping or replacing steps with seed-only states)
 
 1. **School creates its high-school program.** A verified local school operator
