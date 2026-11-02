@@ -30,7 +30,7 @@ async function parent(){
  setResponseHeader("Cache-Control","private, no-store");
  const actor=await getCommandContext(getRequest());
  assertCapability(actor,"enrollment.apply");
- if(actor.role!=="guardian"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="guardian"||!actor.actorPersonId||actor.sessionAccountId)
   throw new AuthorizationError("verified family enrollment request");
  return actor;
 }
@@ -146,7 +146,6 @@ export const requestGuardianEnrollmentChange=createServerFn({method:"POST"})
     .where(and(
       eq(s.accountPersonGrants.role,"registrar"),
       eq(s.accountPersonGrants.active,true),
-      eq(s.accountPersonGrants.isSynthetic,false),
       eq(s.accountPersonGrants.organizationId,child.organizationId),
       or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,child.siteId)),
     )).limit(20);

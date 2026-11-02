@@ -50,7 +50,7 @@ export async function schoolIdentity(tx:Reader,programId:string){
 
 export function verifyCANSchoolApprover(actor:AccessContext,institutionId:string) {
   const originalOrganizations=actor.scope.organizationIds??[];
-  if(actor.demoFacilitator || originalOrganizations.length!==1 ||
+  if(actor.sessionAccountId || originalOrganizations.length!==1 ||
      !actor.actorPersonId || actor.grantSiteId!==null ||
      !originalOrganizations.includes(institutionId))
     throw new AuthorizationError("verified independent CAN school-opening officer");
@@ -58,7 +58,7 @@ export function verifyCANSchoolApprover(actor:AccessContext,institutionId:string
 }
 
 export function verifyChurchEvidenceSubmitter(actor:AccessContext,school:ChurchSchoolIdentity) {
-  if(actor.demoFacilitator || actor.role!=="registrar" || !actor.actorPersonId ||
+  if(actor.sessionAccountId || actor.role!=="registrar" || !actor.actorPersonId ||
     !actor.scope.organizationIds?.includes(school.organizationId) ||
     !actor.scope.siteIds?.includes(school.siteId) ||
     !actor.scope.programIds?.includes(school.programId))
@@ -121,7 +121,6 @@ async function requireSchoolOpeningEvidence(tx:Reader, school:Awaited<ReturnType
       eq(accountPersonGrants.role,"can_network_steward"),
       isNull(accountPersonGrants.siteId),
       eq(accountPersonGrants.active,true),
-      eq(accountPersonGrants.isSynthetic,false),
       eq(accessAccounts.disabled,false),eq(people.active,true),
       sql`${accessAccounts.emailVerifiedAt} is not null`,
     ));
@@ -166,7 +165,6 @@ async function requireVerifiedChurchSiteDirector(
           activeRoleAssignmentPredicate(),
           sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
           eq(accountPersonGrants.active,true),
-          eq(accountPersonGrants.isSynthetic,false),
           eq(accessAccounts.disabled,false),eq(people.active,true),
           sql`${accessAccounts.emailVerifiedAt} is not null`,
           sql`${programResponsibilityAssignments.effectiveFrom} <= ${now}`,
@@ -373,7 +371,7 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
  */
 export async function readLocalSchoolOpeningStatus(actor:AccessContext,programId:string) {
   const school=await schoolIdentity(db,programId);
-  if(actor.demoFacilitator || !actor.actorPersonId ||
+  if(actor.sessionAccountId || !actor.actorPersonId ||
     !["site_leader","room_facilitator","site_staff"].includes(actor.role) ||
     !actor.scope.organizationIds?.includes(school.organizationId) ||
     !actor.scope.siteIds?.includes(school.siteId) ||

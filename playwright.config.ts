@@ -57,8 +57,6 @@ export default defineConfig({
       CAN_ACCESS_TOKEN_PEPPER: TEST_ACCESS_TOKEN_PEPPER,
       // Guards POST /api/jobs (markOverdueSubmissionsMissing + event worker).
       CAN_JOB_SECRET: TEST_JOB_SECRET,
-      // Synthetic demo writes fail closed without this.
-      CAN_DEMO_WRITES_ENABLED: "true",
     },
   },
 });

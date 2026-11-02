@@ -110,11 +110,11 @@ test("GF2: verified family handoff through separate student learning, feedback a
     await expect(registrar.page.getByText("Student access approved.", { exact: false })).toBeVisible();
 
     const studentGrants = await sql.query(
-      `select id, person_id, role, active, is_synthetic from account_person_grants
+      `select id, person_id, role, active from account_person_grants
        where account_id = $1`, [fixture.studentAccountId]);
     expect(studentGrants).toEqual([{
       id: expect.any(String), person_id: fixture.studentPersonId, role: "student",
-      active: true, is_synthetic: false,
+      active: true,
     }]);
     fixture.studentGrantId = studentGrants[0]!.id as string;
     const consents = await sql.query(

@@ -14,7 +14,7 @@ import {writeAudit} from "@/platform/mutation";
 const uuid=z.string().uuid();
 async function verifiedFamily(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="guardian"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="guardian"||!actor.actorPersonId||actor.sessionAccountId)
   throw new AuthorizationError("verified family account");
  assertCapability(actor,"enrollment.apply");
  const [account]=await db.select({

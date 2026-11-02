@@ -1,3 +1,15 @@
+/** Read-only 0060 destructive-column precondition and ledger consistency guard. */
+export function assessTenantDemoColumnRemoval({stage,accountGrantColumns=[]}) {
+ const column=accountGrantColumns.find(row=>row.column_name==="is_synthetic");
+ if(stage>=61)
+  return column?["0060: is_synthetic exists after its column-drop migration; HOLD manual reconciliation"]:[];
+ if(!column)
+  return ["0060: is_synthetic missing ahead of migration ledger; HOLD manual reconciliation"];
+ if(column.data_type!=="boolean"||column.is_nullable!=="NO")
+  return ["0060: is_synthetic definition changed; HOLD review before destructive DDL"];
+ return [];
+}
+
 /** Read-only 0052–0056 schema/ledger consistency guard.
  * A pre-existing table does NOT establish a completed Drizzle migration. */
 const rules=[
@@ -29,7 +41,7 @@ export function assessPost0051MigrationArtifacts({
   column:new Set(relationshipColumns.map(x=>x.column_name)),
   index:new Set(futureIndexes.map(x=>x.indexname)),
   cohortColumn:new Set(cohortColumns.map(x=>x.column_name)),
-  constraint:new Set(cohortConstraints.map(x=>x.conname)),
+  constraint:new Set(cohortConstraints.map(x=>x.conname.slice(0,63))),
  };
  const issues=[];
  for(const rule of rules){
@@ -40,7 +52,8 @@ export function assessPost0051MigrationArtifacts({
    ["constraint",rule.constraints??[]],
   ]){
    for(const name of fields){
-    const exists=present[kind].has(name);
+    // PostgreSQL truncates these ASCII identifiers to NAMEDATALEN - 1 bytes.
+    const exists=present[kind].has(kind==="constraint"?name.slice(0,63):name);
     if(applied&&!exists)issues.push(`${rule.tag}: applied ${kind} missing: ${name}`);
     if(!applied&&exists)issues.push(`${rule.tag}: ${kind} exists ahead of migration ledger: ${name}; HOLD manual reconciliation`);
    }

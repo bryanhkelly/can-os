@@ -40,7 +40,6 @@ export async function listPendingStaffInvitations(
     .where(and(
       eq(accountPersonGrants.accountId, accountId),
       eq(accountPersonGrants.active, false),
-      eq(accountPersonGrants.isSynthetic, false),
       eq(people.active, true),
     ));
   if (!grants.length) return [];
@@ -80,8 +79,7 @@ export async function acceptStaffInvitations(
         eq(accountPersonGrants.organizationId, invitation.organizationId),
         eq(accountPersonGrants.siteId, invitation.siteId),
         eq(accountPersonGrants.active, false),
-        eq(accountPersonGrants.isSynthetic, false),
-      )).returning({ id: accountPersonGrants.id });
+        )).returning({ id: accountPersonGrants.id });
     if (!updated) continue;
     const [account] = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
       .where(and(eq(accessAccounts.id, accountId), eq(accessAccounts.disabled, false))).limit(1);

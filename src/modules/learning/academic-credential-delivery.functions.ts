@@ -16,7 +16,7 @@ async function resources(){const [{db},s]=await Promise.all([import("@/db/client
 async function registrar(){
  const context=await getCommandContext(getRequest());
  assertCapability(context,"enrollment:manage");
- if(context.role!=="registrar"||!context.actorPersonId||context.demoFacilitator)throw new AuthorizationError("verified issuer registrar");
+ if(context.role!=="registrar"||!context.actorPersonId||context.sessionAccountId)throw new AuthorizationError("verified issuer registrar");
  return context;
 }
 async function documentData(db:Awaited<ReturnType<typeof resources>>["db"],s:Awaited<ReturnType<typeof resources>>["s"],kind:"transcript"|"diploma",credentialId:string){
@@ -93,8 +93,7 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
    .innerJoin(s.accountPersonGrants,and(
     eq(s.accountPersonGrants.accountId,s.accessAccounts.id),
     eq(s.accountPersonGrants.personId,data.recipientPersonId),
-    eq(s.accountPersonGrants.active,true),
-    eq(s.accountPersonGrants.isSynthetic,false)))
+    eq(s.accountPersonGrants.active,true)))
    .where(and(eq(s.accessAccounts.disabled,false),
     isNotNull(s.accessAccounts.emailVerifiedAt),
     eq(s.accessAccounts.emailNormalized,data.recipientEmail.trim().toLowerCase())))
@@ -141,7 +140,7 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     recipient.email?.trim().toLowerCase()===data.recipientEmail.trim().toLowerCase()&&
     !!verified&&!!relationship,
    trustedInstructions,validAuthorityEvidence,
-   registrarApproved:true,demoActor:!!context.demoFacilitator,
+   registrarApproved:true,delegatedSession:!!context.sessionAccountId,
    purpose:"transfer",expiresAt:expiry,now:new Date(),
   });
   if(!approved)throw new AuthorizationError("Verified transfer, guardian consent and recipient identity required");
@@ -179,8 +178,7 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     .innerJoin(s.accountPersonGrants,and(
      eq(s.accountPersonGrants.accountId,s.accessAccounts.id),
      eq(s.accountPersonGrants.personId,data.recipientPersonId),
-     eq(s.accountPersonGrants.active,true),
-     eq(s.accountPersonGrants.isSynthetic,false)))
+     eq(s.accountPersonGrants.active,true)))
     .where(and(eq(s.accessAccounts.disabled,false),
      isNotNull(s.accessAccounts.emailVerifiedAt),
      eq(s.accessAccounts.emailNormalized,data.recipientEmail.trim().toLowerCase())))
@@ -301,8 +299,7 @@ export const listVerifiedCredentialRecipients=createServerFn({method:"GET"})
   }).from(s.people)
    .innerJoin(s.accountPersonGrants,and(
     eq(s.accountPersonGrants.personId,s.people.id),
-    eq(s.accountPersonGrants.active,true),
-    eq(s.accountPersonGrants.isSynthetic,false)))
+    eq(s.accountPersonGrants.active,true)))
    .innerJoin(s.accessAccounts,and(
     eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
     eq(s.accessAccounts.disabled,false),
@@ -391,7 +388,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
  .handler(async ({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const context=await getCommandContext(getRequest());
-  if(!context.actorPersonId||context.demoFacilitator)throw new AuthorizationError("authenticated recipient");
+  if(!context.actorPersonId||context.sessionAccountId)throw new AuthorizationError("authenticated recipient");
   const recipientPersonId=context.actorPersonId;
   const {db,s}=await resources();
   return db.transaction(async tx=>{
@@ -405,7 +402,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    throw new AuthorizationError("active recipient authorization");
   const [recipient]=await tx.select({email:s.people.email,active:s.people.active})
    .from(s.people).where(eq(s.people.id,recipientPersonId)).for("share").limit(1);
-  if(!canDownloadAuthorizedCredential({actorPersonId:recipientPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
+  if(!canDownloadAuthorizedCredential({actorPersonId:recipientPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),delegatedSession:!!context.sessionAccountId}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
   if(!context.accountId||!context.sessionId||!context.grantId)throw new AuthorizationError("verified active recipient session");
   // The request context was resolved before this transaction. A simultaneous
@@ -431,8 +428,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
     eq(s.accessAccounts.emailNormalized,release.recipientEmail.trim().toLowerCase()),
     eq(s.accountPersonGrants.id,context.grantId),
     eq(s.accountPersonGrants.personId,recipientPersonId),
-    eq(s.accountPersonGrants.active,true),
-    eq(s.accountPersonGrants.isSynthetic,false)))
+    eq(s.accountPersonGrants.active,true)))
    .for("share").limit(1);
   if(!verifiedAccount)throw new AuthorizationError("verified recipient account required");
   // Recheck the live authorization immediately before generating the PDF.
@@ -529,7 +525,7 @@ export const listMyAcademicCredentialReleases=createServerFn({method:"GET"})
  .handler(async()=>{
   setResponseHeader("Cache-Control","private, no-store");
   const context=await getCommandContext(getRequest());
-  if(!context.actorPersonId||!context.accountId||!context.grantId||context.demoFacilitator)
+  if(!context.actorPersonId||!context.accountId||!context.grantId||context.sessionAccountId)
    throw new AuthorizationError("authenticated recipient");
   const {db,s}=await resources();
   const now=new Date();
@@ -551,7 +547,7 @@ export const listMyAcademicCredentialReleases=createServerFn({method:"GET"})
     eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt),
     eq(s.accessAccounts.emailNormalized,s.academicCredentialReleaseAuthorizations.recipientEmail),
     eq(s.accountPersonGrants.personId,context.actorPersonId),eq(s.accountPersonGrants.active,true),
-    eq(s.accountPersonGrants.isSynthetic,false),eq(s.people.active,true)))
+    eq(s.people.active,true)))
    .orderBy(desc(s.academicCredentialReleaseAuthorizations.authorizedAt)).limit(100);
  });
 

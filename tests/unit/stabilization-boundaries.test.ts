@@ -1,11 +1,27 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { assertSyntheticMutation, isSyntheticAccessEnabled } from "@/modules/_demo/demo-write-gate";
-describe("synthetic mutation authorization boundary",()=>{
- const originalMode=process.env.NODE_ENV;
- const originalFlag=process.env.CAN_DEMO_WRITES_ENABLED;
- afterEach(()=>{process.env.NODE_ENV=originalMode; if(originalFlag===undefined)delete process.env.CAN_DEMO_WRITES_ENABLED; else process.env.CAN_DEMO_WRITES_ENABLED=originalFlag;});
- it("fails closed unless explicitly enabled",()=>{delete process.env.CAN_DEMO_WRITES_ENABLED;expect(()=>assertSyntheticMutation("teacher")).toThrow("disabled");process.env.CAN_DEMO_WRITES_ENABLED="true";expect(()=>assertSyntheticMutation("teacher")).not.toThrow();process.env.CAN_DEMO_WRITES_ENABLED="false";expect(()=>assertSyntheticMutation("teacher")).toThrow("disabled");});
- it("requires the explicit opt-in even in production",()=>{process.env.NODE_ENV="production";delete process.env.CAN_DEMO_WRITES_ENABLED;expect(()=>assertSyntheticMutation("registrar")).toThrow("disabled");process.env.CAN_DEMO_WRITES_ENABLED="true";expect(()=>assertSyntheticMutation("registrar")).not.toThrow();});
- it("reports collaboration availability independently of NODE_ENV",()=>{process.env.NODE_ENV="production";delete process.env.CAN_DEMO_WRITES_ENABLED;expect(isSyntheticAccessEnabled()).toBe(false);process.env.CAN_DEMO_WRITES_ENABLED="true";expect(isSyntheticAccessEnabled()).toBe(true);});
- it("accepts only declared demo roles",()=>{process.env.NODE_ENV="production";process.env.CAN_DEMO_WRITES_ENABLED="true";expect(()=>assertSyntheticMutation("student")).not.toThrow();expect(()=>assertSyntheticMutation("administrator" as never)).toThrow("Unknown");});
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@/db/client", () => ({ db: {} }));
+import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
+import { beginSmsVerification, confirmSmsVerification, sendOptedInSms } from "@/platform/subscriptions/preferences";
+const valor = "f1000000-0000-4000-8000-000000000002";
+
+describe("tenant external-delivery boundary", () => {
+  it("suppresses Valor and unscoped email before querying recipients", async () => {
+    expect(await emailNotificationRecipients(["person"], valor)).toEqual(new Map());
+    expect(await emailNotificationRecipients(["person"], null)).toEqual(new Map());
+  });
+  it("never sends notifications to demo email accounts", async () => {
+    await expect(sendNotificationEmail({
+      to: "student@valorschool.demo", subject: "Private", text: "Private",
+    })).resolves.toBe(false);
+  });
+  it("rejects demo and unscoped SMS verification before contacting Twilio", async () => {
+    for (const scope of [[], [valor], ["other", valor]]) {
+      await expect(beginSmsVerification("person", "+15555550100", scope)).rejects.toThrow("tenant scope");
+      await expect(confirmSmsVerification("person", "+15555550100", "123456", scope)).rejects.toThrow("tenant scope");
+    }
+  });
+  it("suppresses demo and unscoped SMS at the transport boundary too",async()=>{
+    await expect(sendOptedInSms("+15555550100","Private",valor)).resolves.toBe(false);
+    await expect(sendOptedInSms("+15555550100","Private",null)).resolves.toBe(false);
+  });
 });

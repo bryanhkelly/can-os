@@ -142,7 +142,6 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         eq(accountPersonGrants.siteId,studentAccessConsents.siteId),
         eq(accountPersonGrants.role,"student"),
         eq(accountPersonGrants.active,true),
-        eq(accountPersonGrants.isSynthetic,false),
         eq(accessAccounts.disabled,false),
       )) : [];
 

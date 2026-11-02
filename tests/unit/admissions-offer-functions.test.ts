@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activateOfferedEnrollment,
+  getAdmissionOfferOptions,
   issueAdmissionOffer,
   respondToAdmissionOffer,
 } from "@/modules/enrollment/admissions-offer.functions";
@@ -17,9 +18,9 @@ const { select, getCommandContext, issue, respond, activate } = vi.hoisted(() =>
 vi.mock("@/db/client", () => ({ db: { select } }));
 vi.mock("@/modules/identity/command-context.server", () => ({ getCommandContext }));
 vi.mock("@/modules/enrollment/admissions-offer-service", () => ({
-  issueSyntheticAdmissionOffer: issue,
-  respondToSyntheticAdmissionOffer: respond,
-  activateSyntheticOfferedEnrollment: activate,
+  issueAdmissionOfferCommand: issue,
+  respondToAdmissionOfferCommand: respond,
+  activateOfferedEnrollmentCommand: activate,
 }));
 vi.mock("@tanstack/react-start/server", () => ({
   getRequest: () => new Request("https://can.local"),
@@ -36,10 +37,20 @@ function rows(data: unknown[]) {
   const result = Promise.resolve(data);
   return {
     from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue(data),
     then: result.then.bind(result),
   };
+}
+
+function sqlParameterValues(value: unknown): unknown[] {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) return value.flatMap(sqlParameterValues);
+  const candidate = value as { queryChunks?: unknown[]; value?: unknown };
+  if (candidate.queryChunks) return candidate.queryChunks.flatMap(sqlParameterValues);
+  return "value" in candidate ? [candidate.value] : [];
 }
 
 const application = {
@@ -74,6 +85,32 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("canonical admission offer server functions", () => {
+  it("loads offer years for an exact in-scope application without truncating the options scope", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://test");
+    const selectedApplicationId = "00000000-0000-4000-8000-000000000201";
+    const applicationQuery = rows([{
+      id: selectedApplicationId, programId: "program", metadata: {},
+    }]);
+    const poolsQuery = rows([{
+      programId: "program", schoolYearId: "year", capacity: 18, name: "2027–2028",
+    }]);
+    select.mockReturnValueOnce(rows([{ id: "program", siteId: "site", organizationId: "organization" }]))
+      .mockReturnValueOnce(rows([{ id: "site" }]))
+      .mockReturnValueOnce(applicationQuery)
+      .mockReturnValueOnce(poolsQuery);
+
+    await expect(getAdmissionOfferOptions({
+      data: { applicationId: selectedApplicationId },
+    })).resolves.toEqual([{
+      applicationId: selectedApplicationId,
+      years: [{ id: "year", name: "2027–2028", capacity: 18 }],
+    }]);
+    expect(select).toHaveBeenCalledTimes(4);
+    expect(applicationQuery.limit).toHaveBeenCalledWith(1);
+    expect(sqlParameterValues(applicationQuery.where.mock.calls[0]?.[0])).toContain(selectedApplicationId);
+    expect(poolsQuery.orderBy).toHaveBeenCalled();
+  });
+
   it("preserves the existing idempotency key when retrying issuance", async () => {
     select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram])).mockReturnValueOnce(rows([{
       id: "offer", status: "issued", expiresAt: null, idempotencyKey: "existing-key",
@@ -105,10 +142,11 @@ describe("canonical admission offer server functions", () => {
     expect(issue).not.toHaveBeenCalled();
   });
 
-  it("continues to require the explicit write gate for synthetic records", async () => {
+  it("uses canonical scope authorization regardless of record provenance or obsolete flags", async () => {
     vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "false");
-    select.mockReturnValueOnce(rows([{ ...application, metadata: { synthetic: true } }]));
-    await expect(issueAdmissionOffer({ data: input })).rejects.toThrow();
+    select.mockReturnValueOnce(rows([{ ...application, metadata: { synthetic: true } }]))
+      .mockReturnValueOnce(rows([{ organizationId: "other-organization", siteId: "site" }]));
+    await expect(issueAdmissionOffer({ data: input })).rejects.toThrow(AuthorizationError);
     expect(issue).not.toHaveBeenCalled();
   });
 

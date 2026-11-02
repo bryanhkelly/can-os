@@ -23,7 +23,7 @@ export async function listAccountSessions(actor: AccessContext) {
   expiresAt: accessSessions.expiresAt,
  }).from(accessSessions)
   .where(and(
-   eq(accessSessions.accountId, actor.accountId),
+   eq(accessSessions.accountId, actor.sessionAccountId ?? actor.accountId),
    isNull(accessSessions.revokedAt),
    gt(accessSessions.expiresAt, now),
    gt(accessSessions.updatedAt, sessionIdleCutoff(now)),
@@ -53,7 +53,7 @@ export async function revokeOwnedAccountSessions(
  return db.transaction(async tx => {
   const now = new Date();
   const criteria = [
-   eq(accessSessions.accountId, actor.accountId),
+   eq(accessSessions.accountId, actor.sessionAccountId ?? actor.accountId),
    isNull(accessSessions.revokedAt),
   ];
   if (selection.kind === "one") {
@@ -68,6 +68,7 @@ export async function revokeOwnedAccountSessions(
     action: selection.kind === "all"
      ? "identity.sessions.revoked_all" : "identity.session.revoked_remote",
     accountId: actor.accountId,
+    sessionAccountId: actor.sessionAccountId ?? actor.accountId,
     actorPersonId: actor.actorPersonId!,
     sessionId: actor.sessionId,
     grantId: actor.grantId,

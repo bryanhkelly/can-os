@@ -94,7 +94,7 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     (g.siteId===null||g.siteId===school.siteId));
   const [createdGrant]=matchingGrant?[matchingGrant]:await tx.insert(accountPersonGrants).values({
     accountId:account.id,personId,role:"guardian",organizationId:school.organizationId,
-    siteId:school.siteId,active:true,isSynthetic:false,
+    siteId:school.siteId,active:true,
   }).returning({id:accountPersonGrants.id});
   if(!createdGrant)throw new Error("Unable to establish school-scoped family membership");
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now})

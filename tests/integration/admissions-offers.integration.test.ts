@@ -19,7 +19,6 @@ const integration=process.env.DATABASE_URL&&process.env.CAN_TEST_DB_WRITES_ENABL
 integration("synthetic admissions offer concurrency",()=>{
  it("only one offer takes the final seat and accepted offer activates once",async()=>{
   if(process.env.CAN_TEST_DB_WRITES_ENABLED!=="true"||process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test")throw new Error("Disposable Neon test guard required");
-  process.env.CAN_DEMO_WRITES_ENABLED="true";
   const [{db},s,{eq},svc,{startFamilyApplication}]=await Promise.all([
    import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
    import("@/modules/enrollment/admissions-offer-service"),import("@/modules/enrollment/enrollment-service")
@@ -77,31 +76,31 @@ integration("synthetic admissions offer concurrency",()=>{
   const expiry=new Date(Date.now()+7*24*60*60*1000);
   // First verify that a declined offer actually releases the sole seat for a sibling.
   const wrongProgramRegistrar={actorPersonId:registrarPerson.id,role:"registrar",capabilities:new Set(["enrollment.decide"]),scope:{programIds:[crypto.randomUUID()]}};
-  await expect(svc.issueSyntheticAdmissionOffer(wrongProgramRegistrar,{
+  await expect(svc.issueAdmissionOfferCommand(wrongProgramRegistrar,{
    applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`unauthorized-program-${suffix}`,expiresAt:expiry
   })).rejects.toThrow(/program scope|Missing required capability or scope/);
   const beforeIssuance=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.schoolYearId,calendar.schoolYear.id));
   expect(beforeIssuance).toHaveLength(0);
-  const temporaryOffer=await svc.issueSyntheticAdmissionOffer(registrar,{
+  const temporaryOffer=await svc.issueAdmissionOfferCommand(registrar,{
    applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`temporary-seat-${suffix}`,expiresAt:expiry
   });
-  await expect(svc.respondToSyntheticAdmissionOffer(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
+  await expect(svc.respondToAdmissionOfferCommand(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
   const [declined]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,temporaryOffer));
   expect(declined.status).toBe("declined");
   // Retrying the original idempotency key must never resurrect a declined offer.
-  await expect(svc.issueSyntheticAdmissionOffer(registrar,{
+  await expect(svc.issueAdmissionOfferCommand(registrar,{
    applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`temporary-seat-${suffix}`,expiresAt:expiry
   })).rejects.toThrow("Existing offer is no longer actionable");
-  await expect(svc.respondToSyntheticAdmissionOffer(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
+  await expect(svc.respondToAdmissionOfferCommand(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
   const declinedEvents=await db.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,temporaryOffer));
   expect(declinedEvents.filter(e=>e.eventType==="AdmissionOfferDeclined")).toHaveLength(1);
   const declinedNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
   expect(declinedNotices.filter(n=>n.type==="admission_offer_declined"&&n.resourceId===temporaryOffer)).toHaveLength(1);
   // Both children may now compete again; exactly one should obtain the freed seat.
-  const settled=await Promise.allSettled(records.map((row,i)=>svc.issueSyntheticAdmissionOffer(registrar,{applicationId:row.applicationId,schoolYearId:calendar.schoolYear.id,idempotencyKey:`synthetic-seat-${suffix}-${i}`,expiresAt:expiry})));
+  const settled=await Promise.allSettled(records.map((row,i)=>svc.issueAdmissionOfferCommand(registrar,{applicationId:row.applicationId,schoolYearId:calendar.schoolYear.id,idempotencyKey:`synthetic-seat-${suffix}-${i}`,expiresAt:expiry})));
   const successes=settled.filter(x=>x.status==="fulfilled");
   expect(successes).toHaveLength(1);
   const failures=settled.filter(x=>x.status==="rejected");
@@ -114,7 +113,7 @@ integration("synthetic admissions offer concurrency",()=>{
   // The losing sibling must not receive a held seat, including after a fresh database read.
   const competingOffers=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.schoolYearId,calendar.schoolYear.id));
   expect(competingOffers.filter(o=>o.status==="issued"||o.status==="accepted")).toHaveLength(1);
-  await expect(svc.issueSyntheticAdmissionOffer(registrar,{
+  await expect(svc.issueAdmissionOfferCommand(registrar,{
    applicationId:records[loserIndex]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`synthetic-seat-retry-${suffix}`,expiresAt:expiry
   })).rejects.toThrow("Seat pool is full");
@@ -123,20 +122,20 @@ integration("synthetic admissions offer concurrency",()=>{
 
   // A person with the guardian capability but without the student relationship must be denied.
   const unrelatedGuardian={actorPersonId:registrarPerson.id,role:"guardian",capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
-  await expect(svc.respondToSyntheticAdmissionOffer(unrelatedGuardian,offerId,"accept")).rejects.toThrow("Guardian is not authorized");
+  await expect(svc.respondToAdmissionOfferCommand(unrelatedGuardian,offerId,"accept")).rejects.toThrow("Guardian is not authorized");
   const [beforeDecision]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,offerId));
   expect(beforeDecision.status).toBe("issued");
   // Enrollment activation is forbidden before the actual guardian has accepted.
-  await expect(svc.activateSyntheticOfferedEnrollment(registrar,offerId)).rejects.toThrow("Guardian must accept offer first");
+  await expect(svc.activateOfferedEnrollmentCommand(registrar,offerId)).rejects.toThrow("Guardian must accept offer first");
 
-  await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
+  await expect(svc.respondToAdmissionOfferCommand(family,offerId,"accept")).resolves.toBe(offerId);
   const registrarNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
   expect(registrarNotices.filter(n=>n.type==="admission_offer_accepted"&&n.resourceId===offerId)).toHaveLength(1);
-  await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
+  await expect(svc.respondToAdmissionOfferCommand(family,offerId,"accept")).resolves.toBe(offerId);
   const decisionNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
   expect(decisionNotices.filter(n=>n.type==="admission_offer_accepted"&&n.resourceId===offerId)).toHaveLength(1);
-  const enrolled=await svc.activateSyntheticOfferedEnrollment(registrar,offerId);
-  expect(await svc.activateSyntheticOfferedEnrollment(registrar,offerId)).toBe(enrolled);
+  const enrolled=await svc.activateOfferedEnrollmentCommand(registrar,offerId);
+  expect(await svc.activateOfferedEnrollmentCommand(registrar,offerId)).toBe(enrolled);
   const actual=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
   expect(actual.filter(x=>x.kind==="program"&&x.status==="active")).toHaveLength(1);
   const offerEvents=await db.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,offerId));
@@ -152,7 +151,7 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(finalEnrollments.filter(x=>x.kind==="program"&&x.status==="active")).toHaveLength(1);
   // Converting a reserved offer into an active enrollment must not open a second seat.
   // A fresh retry against the losing sibling must still be rejected after activation.
-  await expect(svc.issueSyntheticAdmissionOffer(registrar,{
+  await expect(svc.issueAdmissionOfferCommand(registrar,{
    applicationId:records[loserIndex]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`synthetic-after-activation-${suffix}`,expiresAt:expiry
   })).rejects.toThrow("Seat pool is full");
@@ -171,7 +170,7 @@ integration("synthetic admissions offer concurrency",()=>{
     student:{legalFirstName:`Race${attempt}`,legalLastName:"Student",gradeLevel:"9"}});
    await db.update(s.applications).set({stage:"eligibility",metadata:{synthetic:true}}).where(eq(s.applications.id,racing.applicationId));
    await db.update(s.journeys).set({status:"ready"}).where(eq(s.journeys.id,racing.journeyId));
-   const issue=()=>svc.issueSyntheticAdmissionOffer(registrar,{applicationId:racing.applicationId,schoolYearId:calendar.schoolYear.id,
+   const issue=()=>svc.issueAdmissionOfferCommand(registrar,{applicationId:racing.applicationId,schoolYearId:calendar.schoolYear.id,
     idempotencyKey:`race-offer-${suffix}-${attempt}`,expiresAt:expiry});
    const waitlist=()=>transitionAdmissionsStage({data:{applicationId:racing.applicationId,decision:"waitlist"}});
    const results=await Promise.allSettled(attempt===0?[issue(),waitlist()]:[waitlist(),issue()]);

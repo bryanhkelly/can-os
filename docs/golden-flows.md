@@ -575,7 +575,7 @@ $env:CAN_APPLICATION_DB_HOST = "<distinct application database hostname>"
 npm run test:e2e -- tests/e2e/missing-assignment.spec.ts
 ```
 
-Playwright starts `npm run dev` itself (reusing an existing server on port 3000) with `CAN_ACCESS_TOKEN_PEPPER`, `CAN_JOB_SECRET`, and `CAN_DEMO_WRITES_ENABLED=true` set to test values; override any of them via the environment. The test signs in by inserting real session rows (secret hashed with the pepper) and injecting the session cookie — there is no app backdoor. Reports land in `playwright-report/` (git-ignored).
+Playwright starts `npm run dev` itself (reusing an existing server on port 3000) with `CAN_ACCESS_TOKEN_PEPPER` and `CAN_JOB_SECRET` set to test values; override them via the environment. The test signs in by inserting normal scoped session rows (secret hashed with the pepper) and injecting the session cookie; no synthetic write flag grants product authority. Reports land in `playwright-report/` (git-ignored).
 
 ## GF34 — Health Office
 
@@ -717,6 +717,18 @@ Prove a spoken standing instruction becomes a durable, inspectable, revocation-s
 
 ### Proves
 Subscription lifecycle, event-driven delivery over the outbox, delivery-time authorization re-check, reminder policy against current state, channel routing, idempotent delivery, user-visible management of agent behavior.
+
+Outbound subscription deliveries claim one item immediately before processing;
+school-family alerts claim only the next six concurrent items. Both workers
+renew an unexpired owned lease before transport and fence every completion,
+suppression, deferral and error update with its lease timestamp. Provider
+requests have a 20-second timeout within the two-minute lease. Email retains
+its stable provider idempotency key; a provider timeout after acceptance remains
+ambiguous, especially for SMS, and is not an exactly-once guarantee.
+School-authored email requires a verified, enabled account under the current
+guardian school grant. SMS instead requires verified phone consent. Quiet-hour
+deferral finds the first permitted real minute in the configured timezone,
+including skipped and repeated daylight-saving times.
 
 ### Running the GF-A2 test
 

@@ -207,7 +207,7 @@ export const requestMySmsVerification = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ phone: z.string().regex(/^\+[1-9]\d{7,14}$/) }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    await beginSmsVerification(context.actorPersonId, data.phone);
+    await beginSmsVerification(context.actorPersonId, data.phone, context.scope.organizationIds ?? []);
     return { ok: true };
   });
 
@@ -219,7 +219,7 @@ export const verifyMySmsConsent = createServerFn({ method: "POST" })
   }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    await confirmSmsVerification(context.actorPersonId, data.phone, data.code);
+    await confirmSmsVerification(context.actorPersonId, data.phone, data.code, context.scope.organizationIds ?? []);
     return { ok: true };
   });
 

@@ -328,7 +328,7 @@ export async function requireCurrentSiteLocalDelegate(
   tx: Reader, actor: AccessContext, programId: string, responsibility: LocalResponsibility,
 ): Promise<void> {
   const host = await loadHostProgram(tx, programId);
-  if (actor.demoFacilitator || !actor.actorPersonId ||
+  if (actor.sessionAccountId || !actor.actorPersonId ||
       actor.role !== localResponsibilityRoles[responsibility] ||
       actor.grantSiteId !== host.siteId ||
       !actor.scope.organizationIds?.includes(host.organizationId) ||

@@ -34,7 +34,6 @@ try {
       CAN_ACCESS_TOKEN_PEPPER: "admissions-e2e-pepper-0123456789abcdef",
       CAN_ACCESS_PUBLIC_ORIGIN: "https://app.can-os.test",
       CAN_ACCESS_MAIL_OUTBOX_DIR: accessMailOutboxDir,
-      CAN_DEMO_WRITES_ENABLED: "true",
       CAN_R2_LIVE_UPLOADS_ENABLED: "false", CAN_R2_DEMO_UPLOADS_ENABLED: "false",
     },
   });

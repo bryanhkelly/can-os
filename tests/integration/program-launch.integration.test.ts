@@ -331,8 +331,7 @@ integration("GF3 host / program launch", () => {
         }).returning();
         await db.insert(schema.accountPersonGrants).values({
           accountId:account.id,personId:person.id,organizationId:canOrg.id,
-          siteId:null,role:"teacher",active:true,isSynthetic:false,
-        });
+          siteId:null,role:"teacher",active:true,});
       }
       const teacherChoices=await launchAcademics.getLaunchAcademicSetup({data:{programId:launch.programId}});
       const visibleTeacherIds=teacherChoices.teachingStaff.map(teacher=>teacher.personId);

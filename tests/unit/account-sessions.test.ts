@@ -66,6 +66,21 @@ beforeEach(() => {
 });
 
 describe("owned security sessions", () => {
+ it("keeps delegated inventory and revocation scoped to the session owner",async()=>{
+  const delegated={...actor,accountId:"selected-account",sessionAccountId:"admin-owner"};
+  await listAccountSessions(delegated);
+  expect(sqlText(state.conditions[0]!).params).toContain("admin-owner");
+  expect(sqlText(state.conditions[0]!).params).not.toContain("selected-account");
+  state.changed=[{id:"session-2"}];
+  await revokeOwnedAccountSessions(delegated,{kind:"one",sessionId:"session-2"});
+  expect(sqlText(state.conditions[1]!).params).toContain("admin-owner");
+  expect(sqlText(state.conditions[1]!).params).not.toContain("selected-account");
+  expect(state.audit.mock.calls[0]?.[1]).toMatchObject({
+   resourceId:"admin-owner",actorPersonId:"actor-1",
+   context:{accountId:"selected-account",sessionAccountId:"admin-owner",
+    grantId:"grant-1",sessionId:"session-1"},
+  });
+ });
  it("lists only server-filtered live sessions and flags current without leaking token hashes", async () => {
   const time=new Date();
   state.reads=[

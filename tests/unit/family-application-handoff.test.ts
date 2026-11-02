@@ -4,6 +4,7 @@ import {
   assertFamilyApplicationRetry,
   assertVerifiedFamilyStudentReuse,
   familyApplicationSchoolYearId,
+  schoolYearServesProgram,
   schoolYearMatchesFamilyProgram,
 } from "@/domain/family-application-handoff";
 
@@ -22,6 +23,12 @@ describe("family application academic-year and source handoff", () => {
   });
 
   it("accepts only an active year belonging to the same Program and Site", () => {
+    expect(schoolYearServesProgram(year,program)).toBe(true);
+    expect(schoolYearServesProgram({...year,programId:"program-1"},program)).toBe(true);
+    expect(schoolYearServesProgram({...year,siteId:"site-2"},program)).toBe(false);
+    expect(schoolYearServesProgram({...year,organizationId:"org-2"},program)).toBe(false);
+    expect(schoolYearServesProgram({...year,programId:"program-2"},program)).toBe(false);
+    expect(schoolYearServesProgram(year,{...program,siteId:null})).toBe(false);
     expect(schoolYearMatchesFamilyProgram(year,program)).toBe(true);
     expect(schoolYearMatchesFamilyProgram({...year,programId:"program-1"},program)).toBe(true);
     expect(schoolYearMatchesFamilyProgram({...year,siteId:"site-2"},program)).toBe(false);

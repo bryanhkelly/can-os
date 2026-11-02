@@ -21,6 +21,7 @@ export async function handleAcademicInterventionEvent(
         studentPersonId: string;
         studentName: string;
         assessmentTitle: string;
+        organizationId: string | null;
       }
     | undefined;
 
@@ -120,6 +121,7 @@ export async function handleAcademicInterventionEvent(
       studentPersonId:context.studentPersonId,
       studentName: context.studentName,
       assessmentTitle: context.assessmentTitle,
+      organizationId: context.organizationId,
     };
   });
 
@@ -138,6 +140,7 @@ export async function handleAcademicInterventionEvent(
     const allowed=new Set(current.map(row=>row.id));
     const emails = await emailNotificationRecipients(
       guardianPersonIds.filter(id=>allowed.has(id)),
+      guardianEmailNotice.organizationId,
     );
     const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
     const actionUrl = origin ? `${new URL(origin).origin}/guardian` : undefined;

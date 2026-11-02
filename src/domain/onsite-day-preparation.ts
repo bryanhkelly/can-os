@@ -7,7 +7,7 @@ import { siteDate } from "./expected-attendance";
 export function assertSchoolDayPreparation(actor:AccessContext,
   site:{id:string;organizationId:string;timezone:string},date:string,now=new Date()){
   assertOnsiteAttendanceScope(actor,site.id);
-  if(actor.role!=="site_leader"||actor.demoFacilitator||!actor.scope.organizationIds?.includes(site.organizationId))
+  if(actor.role!=="site_leader"||actor.sessionAccountId||!actor.scope.organizationIds?.includes(site.organizationId))
     throw new AuthorizationError("current original-Site director for school-day preparation");
   const stamp=new Date(date+"T12:00:00Z");
   const today=siteDate(now,site.timezone);

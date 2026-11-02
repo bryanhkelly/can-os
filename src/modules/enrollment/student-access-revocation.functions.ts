@@ -21,7 +21,7 @@ const revocationInput = z.object({
 /** Same authorizer shape as student learning access provisioning. */
 async function studentAccessRegistrar() {
  const actor = await getCommandContext(getRequest());
- if (actor.role !== "registrar" || !actor.actorPersonId || actor.demoFacilitator)
+ if (actor.role !== "registrar" || !actor.actorPersonId || actor.sessionAccountId)
   throw new AuthorizationError("real school registrar");
  assertCapability(actor, "enrollment.activate");
  return actor;

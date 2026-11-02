@@ -7,7 +7,6 @@ import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configura
 import { assertCapability,assertProgramScope,AuthorizationError,type CommandContext } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { assertEnrollmentFormApproved } from "@/domain/enrollment-form";
-import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
@@ -86,7 +85,7 @@ async function expireElapsedOffers(tx:Transaction,context:CommandContext,program
  }
  return count;
 }
-export async function expireSyntheticAdmissionOffers(context:AccessContext,input:{programId:string;schoolYearId:string}){
+export async function expireAdmissionOffersCommand(context:AccessContext,input:{programId:string;schoolYearId:string}){
  guarded(context,"registrar");assertCapability(context,"enrollment.decide");
  if(!context.actorPersonId)throw new Error("Registrar identity required");
  return db.transaction(async tx=>{
@@ -95,7 +94,7 @@ export async function expireSyntheticAdmissionOffers(context:AccessContext,input
   return expireElapsedOffers(tx,context,input.programId,input.schoolYearId,new Date());
  });
 }
-export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{applicationId:string;schoolYearId:string;idempotencyKey:string;expiresAt:Date}){
+export async function issueAdmissionOfferCommand(context:AccessContext,input:{applicationId:string;schoolYearId:string;idempotencyKey:string;expiresAt:Date}){
  guarded(context,"registrar");assertCapability(context,"enrollment.decide");
  if(!context.actorPersonId)throw new Error("Staff identity required");
  if(!input.idempotencyKey.trim()||!Number.isFinite(input.expiresAt.getTime())||input.expiresAt.getTime()<=Date.now())throw new Error("Invalid offer issuance input");
@@ -107,7 +106,6 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   await requireChurchHostedOperatingServices(tx,app.programId,[
     "admissions","school_of_record",
   ]);
-  assertRecordWriteAllowed(app.metadata,"registrar");
   assertApplicationOffersAllowed(app);
   assertFamilyApplicationOfferYear(app.metadata,input.schoolYearId);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
@@ -146,7 +144,7 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   return offer.id;
  });
 }
-export async function respondToSyntheticAdmissionOffer(context:AccessContext,offerId:string,action:"accept"|"decline"){
+export async function respondToAdmissionOfferCommand(context:AccessContext,offerId:string,action:"accept"|"decline"){
  guarded(context,"guardian");assertCapability(context,"enrollment.apply");
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
@@ -158,7 +156,6 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.programId!==offer!.programId)throw new Error("Offer application mismatch");
   await assertGuardian(tx,context.actorPersonId,app.studentProfileId);
-  assertRecordWriteAllowed(app.metadata,"guardian");
   if(action==="accept")assertApplicationOffersAllowed(app);
   if(offer!.status==="accepted"&&action==="accept")return offerId;
   if(offer!.status==="declined"&&action==="decline")return offerId;
@@ -180,7 +177,7 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   return offerId;
  });
 }
-export async function activateSyntheticOfferedEnrollment(context:AccessContext,offerId:string,sectionId?:string){
+export async function activateOfferedEnrollmentCommand(context:AccessContext,offerId:string,sectionId?:string){
  guarded(context,"registrar");assertCapability(context,"enrollment.activate");
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
@@ -208,7 +205,6 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Application not accepted for this offer");
   assertApplicationOffersAllowed(app);
   await assertGuardian(tx,offer!.respondedByPersonId,app.studentProfileId);
-  assertRecordWriteAllowed(app.metadata,"registrar");
   // A receiving school may decide an application and the family may accept
   // the offer while the originating school coordinates its exit. Only actual
   // enrollment activation waits for the verified institutional transfer.
@@ -313,7 +309,6 @@ export async function withdrawAdmissionOffer(context:AccessContext,input:{offerI
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,input.offerId)).limit(1);
   const [app]=offer?await tx.select().from(applications).where(eq(applications.id,offer.applicationId)).limit(1):[];
   if(!offer||!app||app.programId!==offer.programId)throw new Error("Offer application mismatch");
-  assertRecordWriteAllowed(app.metadata,"registrar");
   if(offer.status==="revoked"){
    const [audit]=await tx.select({after:auditEvents.after}).from(auditEvents).where(and(
     eq(auditEvents.resourceId,offer.id),eq(auditEvents.action,"admissions.offer.withdraw"))).limit(1);

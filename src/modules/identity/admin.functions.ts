@@ -30,7 +30,7 @@ async function requireRegistrar(): Promise<Actor & { organizationIds: string[]; 
   const [grant]=await db.select({siteId:accountPersonGrants.siteId})
    .from(accountPersonGrants).where(and(
     eq(accountPersonGrants.id,actor.grantId),
-    eq(accountPersonGrants.accountId,actor.demoFacilitator?.sourceAccountId??actor.accountId),
+    eq(accountPersonGrants.accountId,actor.accountId),
     eq(accountPersonGrants.active,true))).limit(1);
   if(!grant)throw new AuthorizationError("active registrar grant");
   return { ...actor, organizationIds, grantSiteId:grant.siteId };

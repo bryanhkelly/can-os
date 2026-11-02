@@ -108,8 +108,7 @@ integration("real first-family publication to canonical application (rollback on
       .where(and(eq(s.accountPersonGrants.accountId,account!.id),
         eq(s.accountPersonGrants.role,"guardian"))).limit(1);
     expect(grant).toMatchObject({
-      organizationId:org!.id,siteId:site!.id,active:true,isSynthetic:false,
-    });
+      organizationId:org!.id,siteId:site!.id,active:true,});
     state.actor={
       accountId:account!.id,sessionId:crypto.randomUUID(),grantId:grant!.id,
       grantSiteId:site!.id,actorPersonId:grant!.personId,role:"guardian",

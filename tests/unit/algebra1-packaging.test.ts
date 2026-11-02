@@ -3,12 +3,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { classContentSchema } from "../../src/domain/class-content";
 import { curriculumDraftContent, assertPublishableCurriculum } from "../../src/domain/curriculum-authoring";
 
 
 const script = new URL("../../scripts/package-algebra1.mjs", import.meta.url);
-const run = (...args: string[]) => execFileSync(process.execPath, [script.pathname, ...args], { encoding: "utf8" });
+const scriptPath = fileURLToPath(script);
+const run = (...args: string[]) => execFileSync(process.execPath, [scriptPath, ...args], { encoding: "utf8" });
 describe("CAN Algebra I packaging controls", () => {
   it("reports actual authored coverage and refuses to mark full-year ready", () => {
     const coverage = JSON.parse(run("--report"));
@@ -52,7 +54,7 @@ describe("CAN Algebra I packaging controls", () => {
     } finally { rmSync(dir,{recursive:true,force:true}); }
   });
   it("keeps teacher keys out of the student-facing canonical content payload", () => {
-    const source = readFileSync(script.pathname, "utf8");
+    const source = readFileSync(scriptPath, "utf8");
     expect(source).toContain("version:1");
     expect(source).not.toContain("modules=[{id:week1.unitId,title:week1.title,lessons,teacherGuides");
     const license=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/release-metadata.json",import.meta.url),"utf8"));

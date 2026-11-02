@@ -16,7 +16,7 @@ export function assertFullFlowNeonIdentity(identity) {
       identity.branch_id !== FULLFLOW_NEON_BRANCH_ID) {
     throw new Error(
       "Database refused: FullFlow writes/tests require the dedicated " +
-      "fullflow-e2e-20261022 Neon branch; production, test01 and other branches are forbidden.",
+      "FullFlow Neon branch; production, test01 and other branches are forbidden.",
     );
   }
 }

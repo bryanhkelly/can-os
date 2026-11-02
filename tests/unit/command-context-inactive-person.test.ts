@@ -21,10 +21,6 @@ vi.mock("@/db/client",()=>({
     return query;
   }},
 }));
-vi.mock("@/modules/identity/demo-facilitator.server",()=>({
-  listDemoFacilitatorGrants:vi.fn(),
-}));
-
 describe("server session must enforce active-person memberships",()=>{
   const pepper="unit-tests-only-pepper-must-be-at-least-32-characters";
   beforeEach(()=>{
@@ -35,7 +31,7 @@ describe("server session must enforce active-person memberships",()=>{
   it("denies a valid, unrevoked session when its only person is deactivated",async()=>{
     const secret="a".repeat(43);
     state.rows=[
-      [{id:"session-1",accountId:"regular-account",activeGrantId:"grant-1"}],
+      [{id:"session-1",accountId:"regular-account",activeGrantId:"grant-1",email:"staff@example.org"}],
       // The database must reject this otherwise active grant because people.active=false.
       [],
     ];
@@ -53,7 +49,8 @@ describe("server session must enforce active-person memberships",()=>{
     expect(dates).toHaveLength(2); // absolute expiration and idle cutoff
     expect(dates[0]!.getTime()-dates[1]!.getTime()).toBe(30*60*1000);
     const query=sql.sqlToQuery(state.filters[1]!);
-    expect(query.params).toEqual(["regular-account",true,true]);
+    expect(query.params.slice(0,4)).toEqual(["regular-account",true,false,true]);
+    expect(query.params).toContain("registrar");
     expect(query.sql).toContain("people");
     expect(query.sql).toContain("active");
     expect(hashAccessSecret(secret,pepper)).toMatch(/^[a-f0-9]{64}$/);

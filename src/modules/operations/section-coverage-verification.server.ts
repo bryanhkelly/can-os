@@ -82,7 +82,6 @@ export async function verifiedScheduledSectionFacilitators(
       activeRoleAssignmentPredicate(),
       sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
       eq(accountPersonGrants.active, true),
-      eq(accountPersonGrants.isSynthetic, false),
       eq(accessAccounts.disabled, false),
       sql`${accessAccounts.emailVerifiedAt} is not null`,
       eq(people.active, true),

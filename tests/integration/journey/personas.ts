@@ -47,8 +47,7 @@ export async function createPersona(
     organizationId: input.organizationId,
     siteId: input.siteId ?? null,
     active: true,
-    isSynthetic: false,
-  }).returning());
+    }).returning());
   return {
     person, account, grant,
     actor: actorFor(person.id, account.id, grant.id, {

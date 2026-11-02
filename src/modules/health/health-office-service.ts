@@ -381,7 +381,6 @@ export async function recordHealthOfficeVisit(
           eq(accountPersonGrants.personId,guardianRelationships.guardianPersonId),
           eq(accountPersonGrants.role,"guardian"),
           eq(accountPersonGrants.active,true),
-          eq(accountPersonGrants.isSynthetic,false),
           eq(accountPersonGrants.organizationId,programs.organizationId),
           or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,input.siteId)),
         ))

@@ -48,7 +48,7 @@ async function schoolSite(){
     id:sites.id,timezone:sites.timezone,organizationId:sites.organizationId,
   }).from(sites).where(eq(sites.id,actor.grantSiteId!)).limit(1);
   if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
-    !actor.actorPersonId || actor.demoFacilitator)
+    !actor.actorPersonId || actor.sessionAccountId)
     throw new AuthorizationError("verified onsite school staff at original Site");
   return {actor,site};
 }

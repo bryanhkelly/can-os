@@ -122,6 +122,16 @@ integration("cross-persona admissions through active classes",()=>{
     const {createAcademicTimeFixture}=await import("./helpers/academic-time");
     const time=await createAcademicTimeFixture({organizationId:org.id,siteId:site.id,programId:program.id,suffix});
     await tx.insert(s.admissionSeatPools).values({programId:program.id,schoolYearId:time.schoolYear.id,capacity:1});
+    const candidateYear=first(await tx.insert(s.schoolYears).values({
+     organizationId:org.id,programId:null,siteId:site.id,key:`candidate-${suffix}`,
+     name:"Future School Year",status:"draft",startsOn:"2028-08-14",endsOn:"2029-06-01",
+     gradeScaleId:time.gradeScale.id,timezone:"America/Los_Angeles",
+    }).returning());
+    const closedYear=first(await tx.insert(s.schoolYears).values({
+     organizationId:org.id,programId:null,siteId:site.id,key:`closed-${suffix}`,
+     name:"Closed School Year",status:"closed",startsOn:"2026-08-14",endsOn:"2027-06-01",
+     gradeScaleId:time.gradeScale.id,timezone:"America/Los_Angeles",
+    }).returning());
     const guardian=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Guardian"}).returning());
     const registrar=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Registrar"}).returning());
     const outsider=first(await tx.insert(s.people).values({legalFirstName:"Unrelated",legalLastName:"Guardian"}).returning());
@@ -149,8 +159,7 @@ integration("cross-persona admissions through active classes",()=>{
     }).returning();
     const [guardianGrant]=await tx.insert(s.accountPersonGrants).values({
       accountId:guardianAccount!.id,personId:guardian.id,role:"guardian",
-      organizationId:org.id,siteId:site.id,active:true,isSynthetic:false,
-    }).returning();
+      organizationId:org.id,siteId:site.id,active:true,}).returning();
     const family=act("guardian",guardian.id);
     family.accountId=guardianAccount!.id;
     family.grantId=guardianGrant!.id;
@@ -174,6 +183,46 @@ integration("cross-persona admissions through active classes",()=>{
     formRequirementId=formRequirement.id;
     await tx.update(s.journeyDefinitions).set({configuration:{requirements:[]}}).where(eq(s.journeyDefinitions.key,key));
     const staff=act("registrar",registrar.id);
+    const exactApplication=await intake.listAdmissionsIntake({data:{applicationId}});
+    expect(exactApplication.items).toHaveLength(1);
+    expect(exactApplication.items[0]?.id).toBe(applicationId);
+    expect(exactApplication.items[0]).not.toHaveProperty("metadata");
+    const capacity=await import("@/modules/enrollment/capacity-preview.functions");
+    const candidates=await capacity.listSeatPoolCandidates({data:{programId:program.id}});
+    expect(candidates).toContainEqual({
+     programId:program.id,programName:program.name,schoolYearId:candidateYear.id,
+     yearName:candidateYear.name,
+    });
+    expect(candidates).not.toContainEqual(expect.objectContaining({schoolYearId:closedYear.id}));
+    await expect(capacity.createAdmissionsSeatPool({data:{
+     programId:program.id,schoolYearId:closedYear.id,capacity:30,
+    }})).rejects.toThrow("closed school year");
+    await expect(capacity.createAdmissionsSeatPool({data:{
+     programId:program.id,schoolYearId:candidateYear.id,capacity:0,
+    }})).rejects.toThrow();
+    const createdPool=await capacity.createAdmissionsSeatPool({data:{
+     programId:program.id,schoolYearId:candidateYear.id,capacity:30,
+    }});
+    const [persistedPool]=await tx.select().from(s.admissionSeatPools)
+     .where(eq(s.admissionSeatPools.id,createdPool.poolId));
+    expect(persistedPool).toMatchObject({programId:program.id,schoolYearId:candidateYear.id,capacity:30});
+    expect(await capacity.listSeatPoolCandidates({data:{programId:program.id}}))
+     .not.toContainEqual(expect.objectContaining({schoolYearId:candidateYear.id}));
+    await expect(capacity.createAdmissionsSeatPool({data:{
+     programId:program.id,schoolYearId:candidateYear.id,capacity:30,
+    }})).rejects.toThrow("A seat pool already exists");
+    const [poolAudit]=await tx.select().from(s.auditEvents).where(and(
+     eq(s.auditEvents.action,"admissions.capacity.create"),
+     eq(s.auditEvents.resourceId,createdPool.poolId),
+    ));
+    expect(poolAudit).toMatchObject({actorPersonId:registrar.id,scope:{
+     programId:program.id,schoolYearId:candidateYear.id,
+    }});
+    state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()],programIds:[]}};
+    await expect(capacity.createAdmissionsSeatPool({data:{
+     programId:program.id,schoolYearId:candidateYear.id,capacity:30,
+    }})).rejects.toThrow("program scope");
+    state.actor=staff;
     const issuance={applicationId,schoolYearId:time.schoolYear.id};
     // Real institution-wide registrar grants do not enumerate Program IDs.
     // Exercise the same commands as the actual admissions handoff, not a
@@ -684,21 +733,19 @@ integration("cross-persona admissions through active classes",()=>{
     await tx.insert(s.accountPersonGrants).values({
       accountId:sharedAccount!.id,personId:student.personId,
       role:"teacher",organizationId:org.id,siteId:site.id,
-      active:true,isSynthetic:false,
-    });
-    // Synthetic fixtures with otherwise supported roles must not get a
+      active:true,});
+    // Demo addresses with otherwise supported roles must not get a
     // genuine email challenge. The demo-code path remains separate.
     const [syntheticAccount]=await tx.insert(s.accessAccounts).values({
-      emailNormalized:`synthetic-student-${suffix}@example.org`,
+      emailNormalized:`synthetic-student-${suffix}@valorschool.demo`,
     }).returning();
     await tx.insert(s.accountPersonGrants).values({
       accountId:syntheticAccount!.id,personId:student.personId,
       role:"student",organizationId:org.id,siteId:site.id,
-      active:true,isSynthetic:true,
-    });
+      active:true,});
     const syntheticMail=vi.fn(async (_message:{to:string;accessUrl:string})=>{});
     await access.requestOneTimeAccess(
-      `synthetic-student-${suffix}@example.org`,syntheticMail);
+      `synthetic-student-${suffix}@valorschool.demo`,syntheticMail);
     expect(syntheticMail).not.toHaveBeenCalled();
     await consentToStudentLearningAccount({data:{
       applicationId,studentEmail:sharedEmail,acknowledged:true,
@@ -748,7 +795,7 @@ integration("cross-persona admissions through active classes",()=>{
         eq(s.accountPersonGrants.personId,student.personId),
         eq(s.accountPersonGrants.role,"student")));
     expect(studentGrant).toMatchObject({
-      active:true,isSynthetic:false,siteId:site.id,organizationId:org.id,
+      active:true,siteId:site.id,organizationId:org.id,
     });
     expect((await getStudentLearningHandoff({data:{applicationId}})).status)
       .toBe("approved");
@@ -1099,8 +1146,6 @@ integration("cross-persona admissions through active classes",()=>{
     await tx.update(s.householdMemberships).set({personId:guardian.id}).where(and(
      eq(s.householdMemberships.householdId,returningHousehold.id),eq(s.householdMemberships.personId,outsider.id)));
     vi.stubEnv("CAN_DEMO_WRITES_ENABLED","false");
-    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("Synthetic writes are disabled");
-    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","true");
     state.failInquiryEvent=true;
     await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("inquiry outbox failure");
     state.failInquiryEvent=false;

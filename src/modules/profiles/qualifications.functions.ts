@@ -39,7 +39,7 @@ type Reader = Pick<typeof db, "select">;
 const siteCredentialRoles=["room_facilitator","site_leader","site_staff"];
 async function ownSiteStaff(actor:Actor,executor:Reader=db){
   if(!actor.actorPersonId || !actor.grantSiteId || !actor.grantId ||
-     !siteCredentialRoles.includes(actor.role) || actor.demoFacilitator)
+     !siteCredentialRoles.includes(actor.role) || actor.sessionAccountId)
     throw new AuthorizationError("verified original onsite staff credential owner");
   assertCapability(actor,"profiles.credentials.submit");
   const [grant]=await executor.select({id:accountPersonGrants.id})
@@ -54,7 +54,6 @@ async function ownSiteStaff(actor:Actor,executor:Reader=db){
       eq(accountPersonGrants.siteId,actor.grantSiteId),
       inArray(accountPersonGrants.organizationId,actor.scope.organizationIds??[]),
       eq(accountPersonGrants.active,true),
-      eq(accountPersonGrants.isSynthetic,false),
       eq(accessAccounts.disabled,false),eq(people.active,true),
       sql`${accessAccounts.emailVerifiedAt} is not null`,
     )).limit(1);

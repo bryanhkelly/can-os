@@ -62,7 +62,10 @@ if (gitHead.status !== 0 || !/^[a-f0-9]{40}$/.test(gitHead.stdout.trim()) ||
   throw new Error("HOLD: reviewed exact-SHA migration authorization missing; no SQL applied.");
 }
 // The repo's existing Drizzle migration command is reused, not bypassed.
-const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "db:migrate"], {
+// Windows .cmd launchers require cmd.exe; no caller-supplied shell arguments.
+const windows = process.platform === "win32";
+const result = spawnSync(windows ? process.env.ComSpec ?? "cmd.exe" : "npm",
+  windows ? ["/d", "/s", "/c", "npm run db:migrate"] : ["run", "db:migrate"], {
   stdio: "inherit",
   env: {
     ...process.env, DATABASE_URL: testUrl, APP_ENV: "test", NODE_ENV: "test",

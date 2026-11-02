@@ -16,10 +16,10 @@ INSERT INTO access_accounts (id, email_normalized)
 VALUES ('fd000000-0000-4000-8000-000000000011','emery.website@can-os.invalid')
 ON CONFLICT (email_normalized) DO NOTHING;
 INSERT INTO account_person_grants
-(id, account_id, person_id, role, organization_id, site_id, is_synthetic)
+(id, account_id, person_id, role, organization_id, site_id)
 VALUES ('fd000000-0000-4000-8000-000000000012','fd000000-0000-4000-8000-000000000011',
  'fd000000-0000-4000-8000-000000000010','site_website_editor',
- 'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003',true)
+ 'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003')
 ON CONFLICT (id) DO NOTHING;
 
 -- requirePartnerWebsiteEditor needs BOTH an org membership and an explicit

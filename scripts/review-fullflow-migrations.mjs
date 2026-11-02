@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
 import { assessStagedLedgerHashes } from "./fullflow-ledger-hashes.mjs";
-import { assessPost0051MigrationArtifacts, assessPost0056MigrationArtifacts } from "./fullflow-post0051-artifacts.mjs";
+import { assessPost0051MigrationArtifacts, assessPost0056MigrationArtifacts, assessTenantDemoColumnRemoval } from "./fullflow-post0051-artifacts.mjs";
 
 /**
  * READ-ONLY migration preflight for the one dedicated FullFlow Neon branch.
@@ -47,6 +47,7 @@ const stagedTags = [
   "0057_curriculum_annual_adoptions",
   "0058_finance_invoices",
   "0059_church_evidence_statuses",
+  "0060_tenant_demo_access",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -59,7 +60,7 @@ export function assessFullFlowMigrationReadiness(input) {
     onboardingColumns = [], onboardingIndexes = [], outboundIndexes = [],
     relationshipColumns = [], futureIndexes = [], cohortColumns = [], cohortConstraints = [],
     lateColumns = [], lateIndexes = [], lateForeignKeys = [], latePrimaryKeys = [],
-    churchStatusConstraints = [] } = input;
+    churchStatusConstraints = [], accountGrantColumns = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying each staged migration, verify that exact
@@ -136,15 +137,16 @@ export function assessFullFlowMigrationReadiness(input) {
     const post0057=laterLedgerMatch(58,57);
     const post0058=laterLedgerMatch(59,58);
     const post0059=laterLedgerMatch(60,59);
+    const post0060=laterLedgerMatch(61,60);
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
       post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
       post0046 ? 47 : post0047 ? 48 : post0048 ? 49 :
       post0049 ? 50 : post0050 ? 51 : post0051 ? 52 :
       post0052 ? 53 : post0053 ? 54 : post0054 ? 55 :
       post0055 ? 56 : post0056 ? 57 : post0057 ? 58 :
-      post0058 ? 59 : post0059 ? 60 : 0;
+      post0058 ? 59 : post0059 ? 60 : post0060 ? 61 : 0;
     if (!stage)
-      issues.push("0039-0059 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0060 migration ledger/table state is inconsistent or unexpected");
     if (stage) {
       if ((stage >= 50) !== declinedEnum)
         issues.push("0049 declined participant status disagrees with migration ledger");
@@ -371,13 +373,15 @@ export function assessFullFlowMigrationReadiness(input) {
       issues.push(...assessPost0056MigrationArtifacts({
         stage,tables,lateColumns,lateIndexes,lateForeignKeys,latePrimaryKeys,churchStatusConstraints,
       }));
+      if(stagedEntries.some(entry=>entry.tag==="0060_tenant_demo_access"))
+        issues.push(...assessTenantDemoColumnRemoval({stage,accountGrantColumns}));
     }
     const stagedPending = stagedEntries.map(entry => entry.tag);
     const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];
     return {
       ready: issues.length === 0, issues, appliedMigrations: applied,
       pendingMigrations,
-      target: "fullflow-e2e-20261022",
+      target: "FullFlow",
       status: issues.length ? "HOLD_REVIEW_DRIFT" :
         pendingMigrations.length ? "PRECONDITIONS_MATCH_NOT_APPLIED" : "UP_TO_DATE",
     };
@@ -401,7 +405,7 @@ export function assessFullFlowMigrationReadiness(input) {
   for (const table of ["site_publications", "program_publications", "public_admissions_interests"])
     if (tableSet.has(table)) issues.push("Pending publication/intake table already exists: " + table);
   return { ready: issues.length === 0, issues,
-    appliedMigrations: applied, pendingMigrations: pendingTags, target: "fullflow-e2e-20261022",
+    appliedMigrations: applied, pendingMigrations: pendingTags, target: "FullFlow",
     // Being ready for migration is NOT approval to apply the migration.
     status: issues.length ? "HOLD_REVIEW_DRIFT" : "PRECONDITIONS_MATCH_NOT_APPLIED" };
 }
@@ -425,7 +429,7 @@ async function main() {
     onboardingColumns,onboardingIndexes,outboundIndexes,
     relationshipColumns,futureIndexes,cohortColumns,cohortConstraints,
     lateColumns,lateIndexes,lateForeignKeys,latePrimaryKeys,churchStatusConstraints,
-    migrationLedgerRows] = await Promise.all([
+    accountGrantColumns,migrationLedgerRows] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -506,7 +510,7 @@ async function main() {
     query`SELECT conname FROM pg_constraint
       WHERE conrelid=to_regclass('public.graduation_requirement_sets') AND
       conname IN ('graduation_cohort_bounds_ck','graduation_supersession_not_self_ck',
-       'graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk')`,
+       'graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk'::name)`,
     query`SELECT table_name,column_name,data_type,is_nullable FROM information_schema.columns
       WHERE table_schema='public' AND table_name IN
        ('curriculum_annual_adoptions','finance_invoices','finance_payment_attempts',
@@ -538,6 +542,8 @@ async function main() {
     query`SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint
       WHERE conrelid=to_regclass('public.church_onboarding_requests')
        AND conname='church_onboarding_request_status_ck'`,
+    query`SELECT column_name,data_type,is_nullable FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='account_person_grants'`,
     query`SELECT hash,created_at FROM drizzle.__drizzle_migrations
       WHERE created_at >= ${journal.entries[52].when}
       ORDER BY created_at`
@@ -551,7 +557,7 @@ async function main() {
     p0SafetyColumns, p0SafetyIndexes,
     onboardingColumns, onboardingIndexes, outboundIndexes,
     relationshipColumns, futureIndexes, cohortColumns, cohortConstraints,
-    lateColumns, lateIndexes, lateForeignKeys, latePrimaryKeys, churchStatusConstraints,
+    lateColumns, lateIndexes, lateForeignKeys, latePrimaryKeys, churchStatusConstraints, accountGrantColumns,
   });
   const hashIssues=assessStagedLedgerHashes({journal,applied:ledger.applied,rows:migrationLedgerRows});
   if(hashIssues.length) {

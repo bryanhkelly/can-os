@@ -106,4 +106,3 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
 });
 
 /** Existing callers migrate without changing the permission boundary. */
-export const getGuardianSyntheticAdmissionOffers=getGuardianAdmissionOffers;

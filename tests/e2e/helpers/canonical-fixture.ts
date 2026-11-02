@@ -121,8 +121,8 @@ export function createSyntheticPersonaGrant(
   return insertFixtureId(
     sql,
     `insert into account_person_grants (
-       account_id, person_id, role, organization_id, site_id, active, is_synthetic
-     ) values ($1, $2, $3, $4, $5, true, true) returning id`,
+       account_id, person_id, role, organization_id, site_id, active
+     ) values ($1, $2, $3, $4, $5, true) returning id`,
     [input.accountId, input.personId, input.role, input.organizationId, input.siteId],
   );
 }

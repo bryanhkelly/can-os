@@ -91,7 +91,6 @@ async function createPersona(
     role: string;
     organizationId: string;
     siteId?: string | null;
-    synthetic?: boolean;
   },
 ): Promise<FullFlowPersona> {
   const nameParts=input.name.split(" ");
@@ -105,15 +104,14 @@ async function createPersona(
   const grantId = await insertFixtureId(
     sql,
     `insert into account_person_grants (
-       account_id, person_id, role, organization_id, site_id, active, is_synthetic
-     ) values ($1, $2, $3, $4, $5, true, $6) returning id`,
+       account_id, person_id, role, organization_id, site_id, active
+     ) values ($1, $2, $3, $4, $5, true) returning id`,
     [
       accountId,
       personId,
       input.role,
       input.organizationId,
       input.siteId ?? null,
-      input.synthetic ?? true,
     ],
   );
   const secret = await createAccessSession(sql, {
@@ -232,15 +230,15 @@ export async function createFullFlowFixture(sql: Sql): Promise<FullFlowFixture> 
     [teacher.personId, schoolOrgId],
   );
 
-  // Teacher eligibility stack: verified non-synthetic provider-wide grant,
+  // Teacher eligibility stack: verified provider-wide grant,
   // qualification catalog entry, verified claim covering the instructional
   // window, and a published compliance policy with global teacher
   // applicability (mirrors the GF1 canonical fixture stack).
   const teacherEligibilityGrantId = await insertFixtureId(
     sql,
     `insert into account_person_grants (
-       account_id, person_id, role, organization_id, site_id, active, is_synthetic
-     ) values ($1, $2, 'teacher', $3, null, true, false) returning id`,
+       account_id, person_id, role, organization_id, site_id, active
+     ) values ($1, $2, 'teacher', $3, null, true) returning id`,
     [teacher.accountId, teacher.personId, schoolOrgId],
   );
   const qualificationKey = `fullflow-instructor-${suffix}`;
@@ -433,8 +431,8 @@ export async function grantSiteScopedOperatorRole(
 ): Promise<void> {
   await sql.query(
     `insert into account_person_grants (
-       account_id, person_id, role, organization_id, site_id, active, is_synthetic
-     ) values ($1, $2, 'registrar', $3, $4, true, false)`,
+       account_id, person_id, role, organization_id, site_id, active
+     ) values ($1, $2, 'registrar', $3, $4, true)`,
     [fixture.operator.accountId, fixture.operator.personId, fixture.schoolOrgId, siteId],
   );
 }

@@ -70,7 +70,6 @@ async function firstSpecialistAtSites(tx: any, s: any, sites: string[], area: st
       eq(s.accountPersonGrants.role, area === "counselor" ? "counselor" : "specialist"),
       inArray(s.accountPersonGrants.siteId, sites),
       eq(s.accountPersonGrants.active, true),
-      eq(s.accountPersonGrants.isSynthetic, false),
       eq(s.accessAccounts.disabled, false),
       eq(s.people.active, true),
     )).orderBy(s.accountPersonGrants.createdAt).limit(1);

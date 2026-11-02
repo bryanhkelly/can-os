@@ -26,7 +26,7 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
  .validator((value:unknown)=>input.parse(value))
  .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real institution registrar");
  assertCapability(actor,"enrollment.activate");
  return db.transaction(async tx=>{

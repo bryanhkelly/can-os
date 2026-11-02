@@ -251,8 +251,7 @@ integration("FullFlow: one school and Program across the six-stage academic jour
         }).returning());
         await tx.insert(s.accountPersonGrants).values({
           accountId:teacherAccount.id,personId:teacher.id,organizationId:school.id,
-          siteId:site.id,role:"teacher",active:true,isSynthetic:false,
-        });
+          siteId:site.id,role:"teacher",active:true,});
         await tx.insert(s.roleAssignments).values({
           personId: teacher.id, organizationId: school.id, siteId: site.id,
           programId, roleKey: "teacher",
@@ -344,8 +343,7 @@ integration("FullFlow: one school and Program across the six-stage academic jour
         }).returning());
         const guardianGrant=first(await tx.insert(s.accountPersonGrants).values({
           accountId:guardianAccount.id,personId:guardian.id,role:"guardian",
-          organizationId:school.id,siteId:site.id,active:true,isSynthetic:false,
-        }).returning());
+          organizationId:school.id,siteId:site.id,active:true,}).returning());
         const guardianActor: AccessContext = {
           ...context(guardian.id, school.id, [site.id], [programId]),
           role: "guardian", capabilities: new Set(roleCapabilities.guardian),

@@ -24,9 +24,9 @@ import {
   studentProfiles,
 } from "@/db/schema";
 import {
-  activateSyntheticOfferedEnrollment,
-  issueSyntheticAdmissionOffer,
-  respondToSyntheticAdmissionOffer,
+  activateOfferedEnrollmentCommand,
+  issueAdmissionOfferCommand,
+  respondToAdmissionOfferCommand,
 } from "@/modules/enrollment/admissions-offer-service";
 import type { CommandContext } from "@/domain/command-context";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
@@ -39,7 +39,6 @@ import { createAcademicTimeFixture } from "./helpers/academic-time";
  *
  * Run only via `npm run test:integration` against a disposable Neon branch.
  */
-process.env.CAN_DEMO_WRITES_ENABLED = "true";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
@@ -351,8 +350,8 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       expiresAt: expires(),
     };
 
-    const offerId = await issueSyntheticAdmissionOffer(registrarCtx(), input);
-    const reissued = await issueSyntheticAdmissionOffer(registrarCtx(), {
+    const offerId = await issueAdmissionOfferCommand(registrarCtx(), input);
+    const reissued = await issueAdmissionOfferCommand(registrarCtx(), {
       ...input,
       expiresAt: expires(),
     });
@@ -392,7 +391,7 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       .where(eq(admissionOffers.idempotencyKey, `gf2-offer-a-${suffix}`));
 
     await expect(
-      respondToSyntheticAdmissionOffer(
+      respondToAdmissionOfferCommand(
         guardianCtx(unrelatedGuardian.id),
         offerA!.id,
         "accept",
@@ -414,7 +413,7 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       .where(eq(admissionOffers.idempotencyKey, `gf2-offer-a-${suffix}`));
 
     await expect(
-      activateSyntheticOfferedEnrollment(activateCtx(), offerA!.id),
+      activateOfferedEnrollmentCommand(activateCtx(), offerA!.id),
     ).rejects.toThrow("Guardian must accept offer first");
 
     const rows = await db
@@ -430,8 +429,8 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       .from(admissionOffers)
       .where(eq(admissionOffers.idempotencyKey, `gf2-offer-a-${suffix}`));
 
-    await respondToSyntheticAdmissionOffer(guardianCtx(guardian1.id), offerA!.id, "accept");
-    await respondToSyntheticAdmissionOffer(guardianCtx(guardian1.id), offerA!.id, "accept");
+    await respondToAdmissionOfferCommand(guardianCtx(guardian1.id), offerA!.id, "accept");
+    await respondToAdmissionOfferCommand(guardianCtx(guardian1.id), offerA!.id, "accept");
 
     const [offer] = await db
       .select()
@@ -464,8 +463,8 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       .from(admissionOffers)
       .where(eq(admissionOffers.idempotencyKey, `gf2-offer-a-${suffix}`));
 
-    const enrollmentId = await activateSyntheticOfferedEnrollment(activateCtx(), offerA!.id);
-    const again = await activateSyntheticOfferedEnrollment(activateCtx(), offerA!.id);
+    const enrollmentId = await activateOfferedEnrollmentCommand(activateCtx(), offerA!.id);
+    const again = await activateOfferedEnrollmentCommand(activateCtx(), offerA!.id);
     expect(again).toBe(enrollmentId);
 
     const matches = await db
@@ -519,30 +518,27 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
     expect(journey!.status).toBe("active");
   }, 60000);
 
-  it("scenario 4: the demo kill switch rejects synthetic records while authentic applications proceed", async () => {
-    // The synthetic write gate protects fixture records whenever demo writes
-    // are disabled; authentic (non-synthetic) applications are canonical and
-    // unaffected by the demo flag.
+  it("scenario 4: capability authorization governs all provenance while the obsolete flag has no effect", async () => {
     process.env.CAN_DEMO_WRITES_ENABLED = "false";
     let authenticOfferId: string;
     try {
       await expect(
-        issueSyntheticAdmissionOffer(registrarCtx(), {
+        issueAdmissionOfferCommand({...registrarCtx(),capabilities:new Set()}, {
           applicationId: appA.id,
           schoolYearId: year1.id,
           idempotencyKey: `gf2-offer-killswitch-${suffix}`,
           expiresAt: expires(),
         }),
-      ).rejects.toThrow("Synthetic writes are disabled");
+      ).rejects.toThrow("enrollment.decide");
 
-      authenticOfferId = await issueSyntheticAdmissionOffer(registrarCtx(), {
+      authenticOfferId = await issueAdmissionOfferCommand(registrarCtx(), {
         applicationId: appNonSynthetic.id,
         schoolYearId: year1.id,
         idempotencyKey: `gf2-offer-ns-${suffix}`,
         expiresAt: expires(),
       });
     } finally {
-      process.env.CAN_DEMO_WRITES_ENABLED = "true";
+      delete process.env.CAN_DEMO_WRITES_ENABLED;
     }
 
     const blocked = await db
@@ -560,7 +556,7 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
     ).toHaveLength(0);
 
     // Leave no held seat behind for the later capacity scenarios.
-    await respondToSyntheticAdmissionOffer(
+    await respondToAdmissionOfferCommand(
       guardianCtx(guardian1.id),
       authenticOfferId!,
       "decline",
@@ -574,7 +570,7 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
 
   it("scenario 7b/8: incomplete blocking requirements block issuance; a declined offer cannot be resurrected by its key", async () => {
     await expect(
-      issueSyntheticAdmissionOffer(registrarCtx(), {
+      issueAdmissionOfferCommand(registrarCtx(), {
         applicationId: appB.id,
         schoolYearId: year1.id,
         idempotencyKey: `gf2-offer-b-${suffix}`,
@@ -591,15 +587,15 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       .set({ status: "ready", updatedAt: new Date() })
       .where(eq(journeys.id, journeyB.id));
 
-    const offerB = await issueSyntheticAdmissionOffer(registrarCtx(), {
+    const offerB = await issueAdmissionOfferCommand(registrarCtx(), {
       applicationId: appB.id,
       schoolYearId: year1.id,
       idempotencyKey: `gf2-offer-b-${suffix}`,
       expiresAt: expires(),
     });
 
-    await respondToSyntheticAdmissionOffer(guardianCtx(guardian1.id), offerB, "decline");
-    await respondToSyntheticAdmissionOffer(guardianCtx(guardian1.id), offerB, "decline");
+    await respondToAdmissionOfferCommand(guardianCtx(guardian1.id), offerB, "decline");
+    await respondToAdmissionOfferCommand(guardianCtx(guardian1.id), offerB, "decline");
 
     const [declined] = await db
       .select()
@@ -608,7 +604,7 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
     expect(declined!.status).toBe("declined");
 
     await expect(
-      issueSyntheticAdmissionOffer(registrarCtx(), {
+      issueAdmissionOfferCommand(registrarCtx(), {
         applicationId: appB.id,
         schoolYearId: year1.id,
         idempotencyKey: `gf2-offer-b-${suffix}`,
@@ -630,13 +626,13 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
 
   it("scenario 5: two applicants racing for one seat produce exactly one reservation", async () => {
     const results = await Promise.allSettled([
-      issueSyntheticAdmissionOffer(registrarCtx(), {
+      issueAdmissionOfferCommand(registrarCtx(), {
         applicationId: appC.id,
         schoolYearId: year2.id,
         idempotencyKey: `gf2-offer-c-${suffix}`,
         expiresAt: expires(),
       }),
-      issueSyntheticAdmissionOffer(registrarCtx(), {
+      issueAdmissionOfferCommand(registrarCtx(), {
         applicationId: appD.id,
         schoolYearId: year2.id,
         idempotencyKey: `gf2-offer-d-${suffix}`,
@@ -667,7 +663,7 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
     // A deterministic retry for the loser still fails while the seat is held.
     const loserApp = results[0]!.status === "rejected" ? appC : appD;
     await expect(
-      issueSyntheticAdmissionOffer(registrarCtx(), {
+      issueAdmissionOfferCommand(registrarCtx(), {
         applicationId: loserApp.id,
         schoolYearId: year2.id,
         idempotencyKey: `gf2-offer-loser-${suffix}`,

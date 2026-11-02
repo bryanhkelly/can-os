@@ -85,7 +85,7 @@ async function staffActor() {
   setResponseHeader("Cache-Control", "private, no-store");
   const actor = await getCommandContext(getRequest());
   assertOnsitePickupScope(actor);
-  if (actor.demoFacilitator)
+  if (actor.sessionAccountId)
     throw new AuthorizationError("non-synthetic verified pickup witness");
   return actor;
 }
@@ -548,7 +548,7 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
         throw new AuthorizationError("guardians may report disputed custody, not declare school emergencies");
     } else {
       assertOnsitePickupScope(actor);
-      if (actor.demoFacilitator) throw new AuthorizationError("verified onsite custody staff");
+      if (actor.sessionAccountId) throw new AuthorizationError("verified onsite custody staff");
     }
     if (!actor.actorPersonId) throw new AuthorizationError("verified custody hold actor");
     return db.transaction(async tx => {

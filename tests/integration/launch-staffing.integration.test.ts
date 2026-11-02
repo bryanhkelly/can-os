@@ -116,8 +116,7 @@ integration("registrar staffing to launch handoff", () => {
           await tx.insert(s.accountPersonGrants).values({
             accountId:account.id,personId:person.id,organizationId:org.id,
             siteId:person.id===outsider.id?otherSite.id:site.id,
-            role:"teacher",active:true,isSynthetic:false,
-          });
+            role:"teacher",active:true,});
         }
         teacherId = teacher.id;
         await tx.insert(s.memberships).values([teacher, registrar, coTeacher, outsider].map(person => ({

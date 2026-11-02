@@ -7,6 +7,7 @@
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
+import { isDemoAccountEmail, isDemoTenantOrganization } from "@/domain/local-demo-access";
 
 export type NotificationEmailMessage = {
   to: string;
@@ -34,6 +35,10 @@ export async function sendNotificationEmail(
   message: NotificationEmailMessage,
   idempotencyKey?: string,
 ): Promise<boolean> {
+  if(isDemoAccountEmail(message.to)){
+    console.log("[notification-email] Demo account delivery suppressed");
+    return false;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from =
     process.env.CAN_NOTIFICATIONS_FROM_EMAIL ??
@@ -51,6 +56,7 @@ export async function sendNotificationEmail(
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      signal: AbortSignal.timeout(20_000),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
@@ -82,22 +88,24 @@ export async function sendNotificationEmail(
  * filter and projection, including if a caller changes the query later. */
 export function eligibleNotificationEmailAccount(record: {
   accountDisabled:boolean;emailVerifiedAt:Date|null;
-  grantActive:boolean;synthetic:boolean;personActive:boolean;
+  grantActive:boolean;personActive:boolean;
 }): boolean {
   return !record.accountDisabled && !!record.emailVerifiedAt &&
-    record.grantActive && !record.synthetic && record.personActive;
+    record.grantActive && record.personActive;
 }
 
 /**
  * Resolve notification recipient emails for a set of personIds through their
  * access accounts (people -> account_person_grants -> access_accounts).
- * Only real grants for active people on verified, non-disabled accounts are eligible. Returns at most
+ * After callers authorize recipients, active grants on verified, non-disabled accounts are eligible. Returns at most
  * one email per person.
  */
 export async function emailNotificationRecipients(
   personIds: string[],
+  organizationId: string | null,
 ): Promise<Map<string, string>> {
   const recipients = new Map<string, string>();
+  if(!organizationId || isDemoTenantOrganization(organizationId))return recipients;
   const uniqueIds = [...new Set(personIds)];
   if (uniqueIds.length === 0) return recipients;
 
@@ -108,7 +116,6 @@ export async function emailNotificationRecipients(
       accountDisabled: accessAccounts.disabled,
       emailVerifiedAt: accessAccounts.emailVerifiedAt,
       grantActive: accountPersonGrants.active,
-      synthetic: accountPersonGrants.isSynthetic,
       personActive: people.active,
     })
     .from(accountPersonGrants)
@@ -118,7 +125,6 @@ export async function emailNotificationRecipients(
       and(
         inArray(accountPersonGrants.personId, uniqueIds),
         eq(accountPersonGrants.active, true),
-        eq(accountPersonGrants.isSynthetic, false),
         eq(people.active, true),
         eq(accessAccounts.disabled, false),
         isNotNull(accessAccounts.emailVerifiedAt),
@@ -126,7 +132,7 @@ export async function emailNotificationRecipients(
     );
 
   for (const row of rows) {
-    if (!eligibleNotificationEmailAccount(row)) continue;
+    if (!eligibleNotificationEmailAccount(row) || isDemoAccountEmail(row.email)) continue;
     if (!recipients.has(row.personId)) {
       recipients.set(row.personId, row.email);
     }

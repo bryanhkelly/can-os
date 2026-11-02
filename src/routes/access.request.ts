@@ -1,4 +1,5 @@
 import {createFileRoute} from "@tanstack/react-router";
+import {logAuthenticationUnavailable} from "@/domain/access-errors";
 export const Route=createFileRoute("/access/request")({
  server:{handlers:{
   POST:async({request})=>{
@@ -10,6 +11,7 @@ export const Route=createFileRoute("/access/request")({
     const denial=gate.anonymousAuthAdmissionResponse(await gate.admitAnonymousAuthRequest("request"));
     if(denial)return denial;
    }catch{
+    logAuthenticationUnavailable("admission");
     return Response.json({error:"Authentication temporarily unavailable."},
      {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
    }
@@ -23,6 +25,7 @@ export const Route=createFileRoute("/access/request")({
     return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     if(error instanceof Error && error.message==="Invalid email address")return Response.json({error:"Invalid email"},{status:400});
+    logAuthenticationUnavailable("email_request");
     // Do not reveal which addresses have a CAN OS account via delivery/config errors.
     return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }

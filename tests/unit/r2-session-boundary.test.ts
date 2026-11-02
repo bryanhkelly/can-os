@@ -25,7 +25,7 @@ vi.mock("@/db/client",()=>({
 import {getCommandContext} from "@/modules/identity/command-context.server";
 
 const account="11111111-1111-4111-8111-111111111111",person="22222222-2222-4222-8222-222222222222";
-const session={id:"33333333-3333-4333-8333-333333333333",accountId:account,activeGrantId:"44444444-4444-4444-8444-444444444444"};
+const session={id:"33333333-3333-4333-8333-333333333333",accountId:account,activeGrantId:"44444444-4444-4444-8444-444444444444",email:"staff@example.org"};
 const grant={id:session.activeGrantId,accountId:account,personId:person,role:"registrar",organizationId:"55555555-5555-4555-8555-555555555555",siteId:null,active:true};
 const request=(token="x".repeat(48))=>new Request("https://demo.example/access",{headers:{cookie:accessSessionCookie+"="+token}});
 beforeEach(()=>{state.sessions=[session];state.grants=[grant];state.selects=0;state.calls=0;process.env.CAN_ACCESS_TOKEN_PEPPER="integration-test-only-pepper-32-characters";});

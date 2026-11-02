@@ -26,7 +26,7 @@ export async function listDelegatedCANTranscriptPrograms(
 ): Promise<Array<{ programId: string; siteId: string }>> {
   const originalOrgs = actor.scope.organizationIds ?? [];
   if (actor.role !== "registrar" || !actor.actorPersonId ||
-      actor.demoFacilitator || actor.grantSiteId !== null ||
+      actor.sessionAccountId || actor.grantSiteId !== null ||
       !actor.capabilities.has("enrollment:manage") ||
       originalOrgs.length !== 1) return [];
 

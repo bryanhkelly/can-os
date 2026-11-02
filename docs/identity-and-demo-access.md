@@ -1,8 +1,8 @@
-# CAN OS identity, session, authorization and synthetic demo access
+# CAN OS identity, session, authorization and tenant demo access
 
-## Product decision (2026-10-16)
+## Tenant architecture (FullFlow local redesign)
 
-CAN OS is a real multi-user application with a shared Neon-backed synthetic demo dataset. Demo access is passwordless using one-time email codes or links delivered by Resend. Resend is a transactional email provider, **not** an identity provider or session authority. Future production authentication plugs into the identity adapter without replacing resource authorization or application workflows.
+Valor is an ordinary canonical Organization/Site tenant, not a separate workflow engine. Account/person grants no longer carry `is_synthetic`. Historical migrations and optional fixture provenance metadata remain historical evidence, not authorization. Ordinary accounts retain one-time email links via Resend, which is a transport provider, not session authority. Restricted Valor accounts use the explicit fixed-code access path described below.
 
 ## Required boundaries
 
@@ -11,12 +11,40 @@ CAN OS is a real multi-user application with a shared Neon-backed synthetic demo
 3. **Membership/grant**: verified account-to-person relationship, scoped site/organization/section access and capability grants. No grant is derived from a browser-selected persona.
 4. **Session**: server-created, opaque, random, expiring and revocable credential, stored only as a hash at rest. Send cookie as HttpOnly, Secure, SameSite=Lax, scoped to the application origin. Regenerate on login. Protect mutations from cross-site requests with same-origin and CSRF checks.
 5. **Active context**: choose only from the session's assigned roles/people/scopes; server resolves this from DB on every request (or short-lived cache with invalidation). Role switching never grants new capabilities.
-6. **Demo impersonation**: optional, explicit, environment-gated facilitator grant separate from regular role switching. Only allow approved synthetic account targets. Persist acting identity and impersonator in audit events. Disable in real-data environments.
+6. **Demo account switching**: the canonical Valor admin registrar membership may select only enabled, active, supported Valor account/person grants. Recheck admin and target authority on every request; no facilitator or mirrored grants.
 7. **Authorization**: one server-only `getCommandContext(request)` and `withAuth(capability, resourceResolver)` boundary for reads and writes. Validate relationship to each resource, not just capabilities.
 8. **Data protection**: prohibit real person, medical, legal, payment and student records until authentication, scoping, auditing and privacy review are complete. In shared public demo, explicitly label all synthetic data and expect visitors' changes to be visible to others.
-9. **Audit**: log acting person, authenticated account, effective role, impersonator (if any), resource, action, correlation ID, timestamp and outcome on consequential mutations; enforce append-only history at DB level. Avoid storing sensitive field contents in logs.
-10. **Demo kill switch**: `CAN_DEMO_WRITES_ENABLED` must be explicitly true for synthetic mutations; restrict writes to an allowlisted synthetic dataset/tenant and provide facilitator-only reset with an audit record.
+9. **Audit**: log effective account/person/grant/role, session owner when delegated, resource, action, correlation ID, timestamp and outcome on consequential mutations; enforce append-only history at DB level. A shared demo code does not identify the individual human visitor.
+10. **Demo identity access**: the approved `@valorschool.demo` accounts sign in with `000000` locally or on Netlify production, without demo-access flags. These shared accounts are intentionally public and must remain confined to Valor's synthetic tenant; they do not identify the human visitor. The database must already contain their active canonical grants, and `CAN_ACCESS_TOKEN_PEPPER` must be configured to issue sessions. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. `CAN_DEMO_WRITES_ENABLED` is retired; domain authorization, business invariants and transactional evidence apply to every tenant. External email/SMS is suppressed for Valor; R2 retains separate tenant-classified deployment switches.
 11. **Future authentication**: interface `verifyIdentityCredential(request): Promise<{ accountId: string } | null>` is replaceable by a future auth provider. Services depend on account/person/context, never on Resend or provider-specific claims.
+
+## Local startup and checkout authority
+
+FullFlow is the authoritative connected checkout. Its `npm run dev` command
+loads its own ignored `.env.local`, preserves explicit shell overrides, checks
+the database and stable session key, and verifies the dedicated nonproduction
+FullFlow Neon branch before starting. `npm run dev -- --check` performs those
+checks without starting a server. It never provisions accounts on login or
+automatically repairs data. Netlify production configuration remains separate.
+
+The older sibling checkout has a different applicant model; it is not an
+alternate source for FullFlow identity code. FullFlow's prospective-family
+email verification and guardian-application workflow remain unchanged.
+
+Approved demo grants must match the canonical account ID, person ID, expected
+role, Valor organization and Valor site, not merely an email ending in `.demo`.
+Login, context resolution and admin switching recheck these bindings. Changing
+an approved email onto another account/person does not grant shared-code access.
+Authentic accounts continue to use their normal email-verification flow.
+These boundaries prevent shared demo identities from selecting foreign grants;
+they cannot certify the authenticity of text entered into the demo tenant.
+Operators must keep Valor's contents synthetic and keep real records elsewhere.
+
+Verification returns generic `401` responses for rejected credentials or
+unavailable memberships, and `503` with `Retry-After` for configuration,
+database or transactional audit failures. Infrastructure failures log a safe
+stage only, never raw errors, SQL, email addresses, tokens, codes or connection
+strings. Such failures are not recorded as incorrect-credential attempts.
 
 ## Session-management hardening: initial inactivity limit (FullFlow)
 
@@ -215,16 +243,17 @@ measurements before real-student deployment.
 - Authenticate each request from session, not from query string, localStorage, or client-submitted actorId.
 - Where anonymous shared demo access is allowed, give it an explicit limited demo principal and never pretend that principal represents an authenticated student or staff member.
 
-## Local synthetic demo sign-in
+## Valor demo sign-in
 
-In the existing access form, the six seeded synthetic email addresses reveal a code field and use the fixed code `CANOS-LOCAL-TEST` without email delivery in local development or test runs. Other addresses keep the standard email-link flow. Enable demo-code redemption explicitly with `CAN_DEMO_FIXED_ACCESS_ENABLED=true`; the server also requires `NODE_ENV` to be `development` or `test`. Production environments reject this sign-in path even if the flag is accidentally set. It only accepts the six allowlisted `.invalid` demo emails with an active synthetic grant, creates a regular audited server session, and does not mark the email as verified. Never use this code for real accounts or shared production access.
+Valor demo accounts use `@valorschool.demo` and fixed code `000000` locally and on Netlify production, with no access flags, email delivery or implicit provisioning. Only the approved demo identities with active canonical Valor grants are eligible. Existing `.invalid` fixture aliases may be normalized by explicit provisioning, not promoted to arbitrary login identities. Demo redemption creates normal expiring, audited sessions but does not certify email ownership or a human person's identity.
 
 ### Demo school management
 
-Use `alex.registrar@can-os.invalid` for the registrar workspace. Jordan, Riley,
+Use `alex.registrar@valorschool.demo` for the registrar workspace. Jordan, Riley,
 Casey and Morgan retain their separate student, teacher, specialist and guardian
-roles. Registrar access is site-scoped to Synthetic Bay Campus in the existing
-CAN Synthetic Demonstration School, not an unrestricted network administrator.
+roles. Registrar access is scoped to the canonical demo Organization
+`f1000000-0000-4000-8000-000000000002` and Site
+`f1000000-0000-4000-8000-000000000003`, not an unrestricted network administrator.
 
 Explicitly provision the registrar's account, organization membership and
 institutional grants with:
@@ -234,13 +263,18 @@ $env:NODE_ENV = "development"
 npm run demo:provision-registrar -- --apply
 ```
 
-The command provisions both Alex and the separate Demo Admin. It loads `.env.local` and requires both
-`CAN_DEMO_FIXED_ACCESS_ENABLED=true` and `CAN_DEMO_WRITES_ENABLED=true`.
-It refuses production, missing/non-synthetic school scope, disabled accounts,
-inactive/conflicting grants and non-synthetic existing records. It does not
-reactivate revoked access. It is transactional and retry-safe, and appends
-operator-bootstrap audit/outbox evidence only when provisioning changes data.
-No account or grant is provisioned implicitly during login.
+The command provisions Alex and Demo Admin under explicit environment gates. It
+normalizes the four recognized legacy source-account addresses in the same
+transaction, after checking their fixed account/person/grant IDs, active status
+and canonical tenant scope. It never replaces identities, reactivates revoked
+grants or claims an address already owned by another account. Ordinary Programs
+created within Valor do not need fixture provenance metadata.
+It validates exact canonical tenant/person/account identities, refuses disabled
+accounts or conflicting/revoked ordinary grants, and retires recognized legacy
+facilitator/mirrored grants explicitly. It is transactional and retry-safe, with
+bootstrap audit/outbox evidence only for changes. No account or grant is
+provisioned implicitly during login. Do not run this against any live database
+without separate authorization and a reviewed rollout.
 
 The institutional site grant enables credential review, qualification-catalog
 creation, teacher-policy publication, curriculum publication and opening-handoff
@@ -252,32 +286,28 @@ acceptance still require an authorized guardian context, not registrar authority
 
 ### Demo Admin user switching
 
-Sign in as `admin.demo@can-os.invalid` with the same local demo code. Demo Admin
+Sign in as `admin.demo@valorschool.demo` with the same demo code. Demo Admin
 starts in a site-scoped registrar workspace. The top-bar **Demo user** selector
 can switch to Jordan, Riley, Casey, Morgan or Alex and back to Demo Admin without
 signing out. A persistent banner identifies the effective person and role.
 Each switch performs a document navigation to discard the previous user's
 mounted state and caches.
 
-This is explicit, development/test-only facilitator delegation, not arbitrary
-production impersonation. The admin account owns a separate synthetic
-`demo_facilitator` grant and selects the original allowlisted user grants without
-duplicating staff memberships. Each request
-and selection rechecks that facilitator grant, the source user's active
-synthetic grant, active person, enabled source account and exact school scope.
-Revoking the source or facilitator grant removes access; provisioning never
-reactivates it. Production or disabling either local demo flag denies existing
-admin sessions as well as new logins.
+This is restricted tenant account delegation, not arbitrary production
+impersonation. The canonical active admin registrar membership authorizes the
+selector; every request rechecks admin authority, enabled target account,
+active person and approved canonical exact-tenant membership. Revocation,
+disabling an account or changing its identity binding denies existing delegated
+sessions as well as new selections.
+The effective account, person, capabilities and relationships are the selected
+identity; `sessionAccountId` retains the admin session owner. Student selection
+does not retain registrar permissions. Institutional verification, sensitive
+custody/health operations and other independent-identity boundaries continue
+to reject delegated sessions. Self-service session inventory and revocation
+remain owned by the admin account, never by the selected account.
 
-The authenticated account remains Demo Admin while capabilities and relationships
-come from the selected person/role. Student mode does not retain registrar
-permissions. Guardian decisions can be demonstrated in Morgan's delegated
-context, not while acting as registrar. Login and switch audit records identify
-the facilitator; context-based domain audit helpers preserve both facilitator
-and acting identity. This does not claim to complete the broader legacy audit
-attribution migration documented below.
-
-After changing local environment flags, restart the development server.
+After changing the database connection or session configuration, restart the
+development server with `npm run dev`; demo login itself needs no flags.
 To validate provisioning, login, scope denials and transactional rollback on the
 guarded disposable database, run
 `node scripts/run-integration-tests.mjs demo-registrar`.
@@ -287,11 +317,11 @@ guarded disposable database, run
 1. Add auth/session/one-time-challenge schema, scoped grants and idempotent synthetic fixtures.
 2. Implement identity adapter + Resend magic code workflow with rate limits, challenge expiry, single use and cookie sessions.
 3. Establish server-side context from authenticated session and choose authorized active membership.
-4. Migrate every UI-facing server function from hard-coded fixture person IDs and `assertSyntheticMutation("role")` to scoped resource checks, including GET endpoints.
+4. Migrate every UI-facing server function from hard-coded fixture person IDs to scoped resource checks, including GET endpoints.
 5. Backfill mutation auditing and DB immutability safeguards on audit/domain event history.
-6. Implement clearly labeled facilitator-controlled demo impersonation and deterministic synthetic reset.
+6. Implement clearly labeled restricted demo account switching.
 7. Cover unauthorized reads/writes, role switches, multiple actors, guardian relationships, session replay, cross-user leakage and audit attribution with unit/integration/e2e tests.
 
 ## Current implementation boundary
 
-The application now derives workspace selection from server-issued session grants rather than trusting a browser-selected persona. See `src/modules/identity/command-context.server.ts` and `src/components/shell/WorkspaceNavigation.tsx`. Resource-level authorization, retention, safety, and deployment readiness still require explicit review and tests. Some legacy workflows still contain synthetic-write gates; do not generalize these into product architecture. Nothing in this document certifies the application for real student, medical, or legal data.
+The application derives workspace selection from server-issued session grants, never a browser-selected persona. Migration `0060_tenant_demo_access.sql` drops only `account_person_grants.is_synthetic`; it was applied on November 1, 2026 to the explicitly authorized nonproduction Neon `FullFlow` branch (`br-proud-pine-arfju8h2`). Postflight verified column absence and all 61 migration ledger/hash entries, with no pending migrations. The guarded preflight checks the known boolean column before 0060 and its absence afterward; exact-SHA migration authorization remains required. Application deployment and explicit legacy identity convergence remain separate, coordinated rollout steps. Identity provisioning and connected workflow/browser acceptance are unverified. Nothing here certifies production use or real student, medical or legal data.

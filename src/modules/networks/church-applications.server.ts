@@ -72,7 +72,7 @@ export async function submitChurchApplication(data: ChurchApplication) {
 
 async function requireCANSteward(actor: AccessContext) {
   const ids = actor.scope.organizationIds ?? [];
-  if (actor.demoFacilitator || ids.length !== 1 || actor.grantSiteId !== null || !actor.actorPersonId)
+  if (actor.sessionAccountId || ids.length !== 1 || actor.grantSiteId !== null || !actor.actorPersonId)
     throw new AuthorizationError("verified CAN organization-wide steward");
   const [can] = await db.select({ id: organizations.id, type: organizations.type })
     .from(organizations).where(eq(organizations.id, ids[0]!)).limit(1);

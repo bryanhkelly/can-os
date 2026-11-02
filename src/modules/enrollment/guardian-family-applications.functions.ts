@@ -18,7 +18,7 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
  */
 async function signedInFamilyApplicant() {
   const actor = await getCommandContext(getRequest());
-  if (actor.role !== "guardian" || !actor.actorPersonId || actor.demoFacilitator)
+  if (actor.role !== "guardian" || !actor.actorPersonId || actor.sessionAccountId)
     throw new AuthorizationError("real signed-in family guardian");
   assertCapability(actor, "enrollment.apply");
   const [account] = await db.select({emailVerifiedAt:accessAccounts.emailVerifiedAt})

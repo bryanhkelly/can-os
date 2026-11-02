@@ -29,7 +29,7 @@ vi.mock("@/db/client", () => {
   return { db: { transaction: async (fn: (tx: unknown) => unknown) => fn(tx) } };
 });
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
-const actor = () => ({ actorPersonId:"director", role:"site_leader", grantSiteId:"site", demoFacilitator:false,
+const actor = () => ({ actorPersonId:"director", role:"site_leader", grantSiteId:"site", sessionAccountId:undefined,
   scope:{ organizationIds:["church"], siteIds:["site"], programIds:["program"] } }) as AccessContext;
 const input = () => ({ programId:id(1), sectionId:id(2), periodId:id(3), documentId:id(4), expectedDocumentId:null,
   date:new Date(Date.now()+86400_000).toISOString().slice(0,10), primaryPersonId:id(5), backupPersonId:id(6),

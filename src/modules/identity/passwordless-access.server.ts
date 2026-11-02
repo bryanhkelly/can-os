@@ -2,9 +2,13 @@ import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
+import { InvalidAccessCredentialError } from "@/domain/access-errors";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
-import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
-import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
+import {
+ isDemoAccountEmail,isApprovedDemoGrant,
+ LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
+} from "@/domain/local-demo-access";
+import {readSessionGrants} from "./session-grants.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
 import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
@@ -29,13 +33,14 @@ function publicOrigin():string {
 type AccessDispatchOutcome = "dispatched" | "cooldown" | "ineligible";
 async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender):Promise<AccessDispatchOutcome> {
  const email=normalizeAccessEmail(rawEmail);
+ if(isDemoAccountEmail(email))return "ineligible";
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
  if(!account || email.endsWith(".invalid"))return "ineligible";
  const memberships=await db.select({role:accountPersonGrants.role}).from(accountPersonGrants)
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
-   eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
+   eq(people.active,true)));
  const pendingInvitations=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))
   ?[]:await listPendingStaffInvitations(db,account.id);
  if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return "ineligible";
@@ -79,23 +84,23 @@ export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string):Pr
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
 export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
- if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new Error("Invalid or expired access link");
+ if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new InvalidAccessCredentialError();
  const hash=hashAccessSecret(rawToken,secretPepper()),now=new Date();
  return db.transaction(async tx=>{
   const [claimed]=await tx.update(accessChallenges).set({consumedAt:now})
    .where(and(eq(accessChallenges.tokenHash,hash),isNull(accessChallenges.consumedAt),
      gt(accessChallenges.expiresAt,now),lt(accessChallenges.attempts,5)))
    .returning({accountId:accessChallenges.accountId});
-  if(!claimed)throw new Error("Invalid or expired access link");
+  if(!claimed)throw new InvalidAccessCredentialError();
   // A redeemed challenge is single-use even under simultaneous POSTs: the UPDATE
   // above atomically requires consumedAt IS NULL and returns at most one row.
-  const [account]=await tx.select({id:accessAccounts.id}).from(accessAccounts)
+  const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized}).from(accessAccounts)
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
-  if(!account)throw new Error("Account unavailable");
+  if(!account||isDemoAccountEmail(account.email))throw new InvalidAccessCredentialError("Account unavailable");
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
-    eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
+    eq(people.active,true)));
   const pending=await listPendingStaffInvitations(tx,account.id);
   const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
   // A newly accepted church-onboarding grant takes priority over an older
@@ -126,7 +131,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     grant.id === returningOnboarding[0]?.invitationGrantId);
   const activeGrant=onboardingInvitation??returningGrant??
     grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
-  if(!activeGrant)throw new Error("No supported CAN OS membership");
+  if(!activeGrant)throw new InvalidAccessCredentialError("No supported CAN OS membership");
   const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
   // After the school becomes active, ordinary sign-in need not keep redirecting
   // the administrator through setup. Opening status is read, never inferred.
@@ -146,7 +151,8 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   if(!member)throw new Error("Membership unavailable");
   await recordSessionSecurityEvent(tx,{
    action:"identity.session.started",actorPersonId:member.personId,
-   accountId:account.id,sessionId:session.id,grantId:activeGrant.id,
+   accountId:account.id,sessionAccountId:account.id,
+   sessionId:session.id,grantId:activeGrant.id,
    role:activeGrant.role,method:"email_link",
   });
   return {accountId:account.id,role:activeGrant.role,
@@ -154,37 +160,34 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
-/** Local/test-only sign-in for the seeded synthetic demo accounts. */
-export async function redeemLocalDemoAccess(
+/** Shared-code sign-in is limited to the fixed, tenant-scoped demo identities. */
+export async function redeemDemoAccess(
  rawEmail:string,
  code:string,
 ):Promise<{setCookie:string;accountId:string;role:string}> {
- if(!isLocalDemoAccessEnabled(process.env) || code!==LOCAL_DEMO_ACCESS_CODE) {
-  throw new Error("Invalid local demo credentials");
+ if(code!==LOCAL_DEMO_ACCESS_CODE) {
+  throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
- const email=normalizeAccessEmail(rawEmail);
+ let email:string;
+ try{email=normalizeAccessEmail(rawEmail);}catch{
+  throw new InvalidAccessCredentialError("Invalid demo credentials");
+ }
  if(!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email)) {
-  throw new Error("Invalid local demo credentials");
+  throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
  const now=new Date();
  return db.transaction(async tx=>{
-  const [account]=await tx.select({id:accessAccounts.id})
+  const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized})
    .from(accessAccounts)
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
    .limit(1);
-  if(!account)throw new Error("Invalid local demo credentials");
-  const grants=await tx.select({
-   id:accountPersonGrants.id,
-   personId:accountPersonGrants.personId,
-   role:accountPersonGrants.role,
-   isSynthetic:accountPersonGrants.isSynthetic,
-  }).from(accountPersonGrants)
-   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
+  if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
+  const {grants}=await readSessionGrants(account.id,account.email,tx);
+  const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
-   ?(await listDemoFacilitatorGrants(tx)).find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
-   :grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
-  if(!grant)throw new Error("Invalid local demo credentials");
+   ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
+   :accountGrants.length===1?accountGrants[0]:undefined;
+  if(!grant||!isApprovedDemoGrant(grant,email))throw new InvalidAccessCredentialError("Invalid demo credentials");
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,
@@ -195,7 +198,8 @@ export async function redeemLocalDemoAccess(
   if(!session)throw new Error("Unable to establish session");
   await recordSessionSecurityEvent(tx,{
    action:"identity.session.started",actorPersonId:grant.personId,
-   accountId:account.id,sessionId:session.id,grantId:grant.id,
+   accountId:grant.accountId,sessionAccountId:account.id,
+   sessionId:session.id,grantId:grant.id,
    role:grant.role,method:"local_demo_code",
   });
   return {
@@ -205,17 +209,21 @@ export async function redeemLocalDemoAccess(
   };
  });
 }
+/** Compatibility entry point used by the existing access-verification route. */
+export const redeemLocalDemoAccess=redeemDemoAccess;
 export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string> {
  await db.transaction(async tx=>{
   const [row]=await tx.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
    const [member]=await tx.select({
-    personId:accountPersonGrants.personId,role:accountPersonGrants.role,
+    accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
+    role:accountPersonGrants.role,
    }).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
    await recordSessionSecurityEvent(tx,{
     action:"identity.session.revoked",actorPersonId:member?.personId??null,
-    accountId,sessionId,grantId:row.activeGrantId,role:member?.role??null,
+    accountId:member?.accountId??accountId,sessionAccountId:accountId,
+    sessionId,grantId:row.activeGrantId,role:member?.role??null,
    });
   }
  });
@@ -224,20 +232,29 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
  await db.transaction(async tx=>{
-  const delegated=accountId===LOCAL_DEMO_ADMIN.accountId?(await listDemoFacilitatorGrants(tx)).find(grant=>grant.id===grantId):undefined;
-  if(accountId===LOCAL_DEMO_ADMIN.accountId&&!delegated)throw new Error("Demo user unavailable");
-  const [grant]=delegated?[delegated]:await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
-   .from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId))
-   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true),eq(people.active,true))).limit(1);
-  if(!grant || !Object.hasOwn(roleCapabilities,grant.role))throw new Error("Membership unavailable");
+  const now=new Date();
+  const [session]=await tx.select({
+   accountId:accessSessions.accountId,email:accessAccounts.emailNormalized,
+  }).from(accessSessions)
+   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
+   .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
+    eq(accessAccounts.disabled,false),isNull(accessSessions.revokedAt),
+    gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
+   .limit(1).for("update");
+  if(!session)throw new AuthorizationError("authenticated session");
+  const {grants}=await readSessionGrants(session.accountId,session.email,tx);
+  const grant=grants.find(candidate=>candidate.id===grantId);
+  if(!grant||!Object.hasOwn(roleCapabilities,grant.role))throw new AuthorizationError("active membership");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
-    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
+    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
+    gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
   await recordSessionSecurityEvent(tx,{
    action:"identity.membership.selected",actorPersonId:grant.personId,
-   accountId,sessionId,grantId,role:grant.role,
+   accountId:grant.accountId,sessionAccountId:accountId,
+   sessionId,grantId,role:grant.role,
   });
  });
 }

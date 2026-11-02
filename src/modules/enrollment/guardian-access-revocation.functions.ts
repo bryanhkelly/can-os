@@ -18,7 +18,7 @@ const revocationInput = z.object({
 /**
  * Lock and verify the exact guardian grant before any write. Only a real
  * admissions registrar of the grant's own Organization (and Site, when the
- * grant is site-bound) may touch it; demo facilitators and self-service are
+ * grant is site-bound) may touch it; delegated sessions and self-service are
  * refused. Never mutates guardianRelationships or people.active.
  */
 async function scopedGuardianGrant(
@@ -26,7 +26,7 @@ async function scopedGuardianGrant(
  actor: Awaited<ReturnType<typeof admissionsRegistrar>>,
  grantId: string,
 ) {
- if (actor.demoFacilitator) throw new AuthorizationError("real school registrar");
+ if (actor.sessionAccountId) throw new AuthorizationError("real school registrar");
  if (grantId === actor.grantId)
   throw new AuthorizationError("registrar cannot revoke their own active grant");
  const [grant] = await tx.select({

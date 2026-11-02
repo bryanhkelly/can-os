@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
  *    the declared base chain is standalone (gf41-support-referrals.sql inserts
  *    the same row idempotently but is not a base seed).
  * 3. valor-curriculum-marketplace.sql must not use the reserved word `grant`
- *    as a relation alias and must guard on the current @can-os.invalid
+ *    as a relation alias and must guard on the current @valorschool.demo
  *    synthetic identities while preserving its explicit seed authorization.
  */
 const seed = (name: string) => readFileSync("scripts/seeds/" + name, "utf8");
@@ -52,12 +52,12 @@ describe("seed chain SQL", () => {
     expect(sql).not.toMatch(/\bgrant\./);
   });
 
-  it("valor-curriculum-marketplace.sql guards on current @can-os.invalid identities", () => {
+  it("valor-curriculum-marketplace.sql guards on current @valorschool.demo identities", () => {
     const sql = seed("valor-curriculum-marketplace.sql");
-    expect(sql).not.toContain("@valorschool.demo");
-    expect(sql).toContain("alex.registrar@can-os.invalid");
-    expect(sql).toContain("jordan.student@can-os.invalid");
-    expect(sql).toContain("riley.teacher@can-os.invalid");
+    expect(sql).not.toContain("@can-os.invalid");
+    expect(sql).toContain("alex.registrar@valorschool.demo");
+    expect(sql).toContain("jordan.student@valorschool.demo");
+    expect(sql).toContain("riley.teacher@valorschool.demo");
     expect(sql).toContain("current_setting('can.seed_authorized',true) IS DISTINCT FROM 'valorschool'");
   });
 });

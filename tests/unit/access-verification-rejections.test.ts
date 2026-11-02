@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { InvalidAccessCredentialError } from "@/domain/access-errors";
+import { AuthorizationError } from "@/domain/command-context";
 
 type PostHandler=(input:{request:Request})=>Promise<Response>;
 const state=vi.hoisted(()=>({
@@ -35,6 +37,7 @@ const request=(data:unknown,origin="http://localhost")=>new Request(
 );
 
 beforeEach(()=>{
+ vi.spyOn(console,"error").mockImplementation(()=>{});
  state.redeem.mockReset();
  state.demo.mockReset();
  state.rejected.mockReset();
@@ -42,10 +45,11 @@ beforeEach(()=>{
  state.admit.mockReset();
  state.admit.mockResolvedValue({allowed:true,retryAfterSeconds:0});
 });
+afterEach(()=>vi.restoreAllMocks());
 
 describe("unauthenticated verification failures",()=>{
  it("returns the same generic response and only a coarse method for wrong links",async()=>{
-  state.redeem.mockRejectedValue(new Error("Sensitive DB issue for person@example.test"));
+  state.redeem.mockRejectedValue(new InvalidAccessCredentialError());
   const result=await state.post!({request:request({token:"very-secret-value"})});
   expect(result.status).toBe(401);
   expect(result.headers.get("Cache-Control")).toBe("no-store");
@@ -57,7 +61,7 @@ describe("unauthenticated verification failures",()=>{
   expect(state.rejected).toHaveBeenCalledWith("email_link");
  });
  it("does not store email/code on local-demo rejection",async()=>{
-  state.demo.mockRejectedValue(new Error("Invalid local demo credentials"));
+  state.demo.mockRejectedValue(new InvalidAccessCredentialError("Invalid demo credentials"));
   const response=await state.post!({request:request({
    email:"private@example.test",code:"very-secret-code",
   })});
@@ -66,11 +70,31 @@ describe("unauthenticated verification failures",()=>{
   expect(JSON.stringify(await response.json())).not.toContain("private@example.test");
  });
  it("does not affect authentication rejection if telemetry fails",async()=>{
-  state.redeem.mockRejectedValue(new Error("Invalid or expired access link"));
+  state.redeem.mockRejectedValue(new InvalidAccessCredentialError());
   state.rejected.mockRejectedValue(new Error("DB telemetry offline"));
   const response=await state.post!({request:request({token:"invalid"})});
   expect(response.status).toBe(401);
   expect(await response.json()).toEqual({error:"Invalid or expired access link"});
+  expect(console.error).toHaveBeenCalledWith("Authentication temporarily unavailable",{stage:"rejection_audit"});
+ });
+ it.each(["database","session_key","audit"])("returns 503 for %s failures without recording a credential rejection",async()=>{
+  state.demo.mockRejectedValue(new Error("private@example.test postgres://secret-token@database/private"));
+  const response=await state.post!({request:request({email:"admin.demo@valorschool.demo",code:"000000"})});
+  expect(response.status).toBe(503);
+  expect(response.headers.get("Retry-After")).toBe("30");
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(await response.json()).toEqual({error:"Authentication temporarily unavailable."});
+  expect(state.rejected).not.toHaveBeenCalled();
+  expect(console.error).toHaveBeenCalledExactlyOnceWith("Authentication temporarily unavailable",{stage:"verification"});
+  expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret-token");
+ });
+ it("returns generic denial for unavailable canonical membership",async()=>{
+  state.demo.mockRejectedValue(new AuthorizationError("active demo administrator membership"));
+  const response=await state.post!({request:request({email:"admin.demo@valorschool.demo",code:"000000"})});
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({error:"Invalid or expired access link"});
+  expect(state.rejected).toHaveBeenCalledWith("local_demo_code");
+  expect(console.error).not.toHaveBeenCalled();
  });
  it("does not audit successful logins as rejected attempts",async()=>{
   state.redeem.mockResolvedValue({

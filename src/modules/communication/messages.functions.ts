@@ -83,8 +83,7 @@ async function listAllowedThreadContacts(
         eq(s.accountPersonGrants.organizationId,s.programs.organizationId),
         or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,s.programs.siteId)),
         eq(s.accountPersonGrants.role,"registrar"),eq(s.accountPersonGrants.active,true),
-        eq(s.accountPersonGrants.isSynthetic,false),
-      ))
+        ))
       .innerJoin(s.accessAccounts,and(eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
         eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt)))
       .innerJoin(s.people,and(eq(s.people.id,s.accountPersonGrants.personId),eq(s.people.active,true)))
@@ -123,8 +122,7 @@ async function listAllowedThreadContacts(
           eq(s.accountPersonGrants.organizationId,s.programs.organizationId),
           or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,s.programs.siteId)),
           eq(s.accountPersonGrants.role,"registrar"),eq(s.accountPersonGrants.active,true),
-          eq(s.accountPersonGrants.isSynthetic,false),
-        ))
+          ))
         .innerJoin(s.accessAccounts,and(
           eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
           eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt),

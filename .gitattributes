@@ -1,3 +1,5 @@
+drizzle/*.sql text eol=lf
+
 # The FullFlow Neon migration ledger hashes this SQL with CRLF line endings.
 # Preserve its committed bytes across platforms; never normalize its history.
 drizzle/0046_conference_booking_cancellation.sql -text

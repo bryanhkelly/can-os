@@ -269,7 +269,7 @@ export async function reviewAttendanceExcuse(
   if (!context.actorPersonId || !["registrar", "teacher"].includes(reviewerRole ?? ""))
     throw new Error("Verified staff reviewer identity is required");
   const actorPersonId = context.actorPersonId;
-  let submitterEmailNotice: { submittedByPersonId: string } | undefined;
+  let submitterEmailNotice: { submittedByPersonId: string; organizationId: string } | undefined;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -432,6 +432,7 @@ export async function reviewAttendanceExcuse(
 
     submitterEmailNotice = {
       submittedByPersonId: record.submittedByPersonId,
+      organizationId: host.organizationId,
     };
 
     return correctionAttendanceEventId
@@ -441,7 +442,7 @@ export async function reviewAttendanceExcuse(
     if (submitterEmailNotice) {
       const emails = await emailNotificationRecipients([
         submitterEmailNotice.submittedByPersonId,
-      ]);
+      ], submitterEmailNotice.organizationId);
       const to = emails.get(submitterEmailNotice.submittedByPersonId);
       if (to) {
         await sendNotificationEmail({

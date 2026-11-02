@@ -32,14 +32,14 @@ type Proposal=z.infer<typeof change> & {guardianPersonId:string;requestedAt:stri
 
 async function parent(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="guardian"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="guardian"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("independently verified guardian");
  assertCapability(actor,"student:related-read");
  return actor;
 }
 async function medicalRegistrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real school medical-review registrar");
  assertCapability(actor,"health.manage");
  return actor;
@@ -113,8 +113,7 @@ export const requestGuardianHealthUpdate=createServerFn({method:"POST"})
    const operators=await tx.selectDistinct({personId:s.accountPersonGrants.personId})
      .from(s.accountPersonGrants).where(and(
        eq(s.accountPersonGrants.role,"registrar"),
-       eq(s.accountPersonGrants.active,true),eq(s.accountPersonGrants.isSynthetic,false),
-       eq(s.accountPersonGrants.organizationId,student.organizationId),
+       eq(s.accountPersonGrants.active,true),eq(s.accountPersonGrants.organizationId,student.organizationId),
        sql`(${s.accountPersonGrants.siteId} IS NULL OR ${s.accountPersonGrants.siteId} = ${student.siteId})`,
      )).limit(20);
    await notifyMany(tx,operators.map(row=>({

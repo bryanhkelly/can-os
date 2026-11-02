@@ -71,7 +71,9 @@ describe("connected official credential disclosure", () => {
   expect(recipient).toContain("gt(s.accessSessions.updatedAt,sessionIdleCutoff(sessionNow))");
   expect(recipient).toContain('recipient session expired, revoked or switched');
   order(recipient,"const [liveSession]=",transcriptGuard);
-  expect(recipient).toContain("eq(s.accountPersonGrants.isSynthetic,false)");
+  expect(recipient).toContain("eq(s.accountPersonGrants.active,true)");
+  expect(recipient).not.toContain("accountPersonGrants.isSynthetic");
+  expect(recipient).toContain("delegatedSession:!!context.sessionAccountId");
   expect(recipient).toContain('release.releasePurpose!=="transfer"');
   expect(recipient).toContain('.from(s.programs).where(eq(s.programs.id,action.programId)).for("share").limit(1)');
   order(recipient,"return db.transaction(async tx=>",transcriptGuard);

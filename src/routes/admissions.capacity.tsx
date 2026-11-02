@@ -2,12 +2,13 @@ import {useState} from "react";
 import {CapacityPoolCard} from "@/components/admissions/CapacityPoolCard";
 import {parseSeatCapacity} from "@/components/admissions/seat-capacity";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
-import {getAdmissionsCapacity,updateAdmissionsCapacity} from "@/modules/enrollment/capacity-preview.functions";
+import {createAdmissionsSeatPool,getAdmissionsCapacity,listSeatPoolCandidates,updateAdmissionsCapacity} from "@/modules/enrollment/capacity-preview.functions";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadCapacity=async(selection:{siteId?:string;programId?:string}={})=>({
  rows:await getAdmissionsCapacity({data:selection}),
+ candidates:await listSeatPoolCandidates({data:selection}),
  programs:await listAdmissionsPrograms()
 });
 export const Route=createFileRoute("/admissions/capacity")({
@@ -27,7 +28,7 @@ function Capacity(){
  return <CapacityView data={outcome.data}/>;
 }
 function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
- const {rows,programs}=data;
+ const {rows,programs,candidates}=data;
  const selection=Route.useSearch();
  const schools=[...new Map(programs.map(p=>[p.siteId,{id:p.siteId,name:p.siteName}])).values()];
  const choices=programs.filter(p=>!selection.siteId||p.siteId===selection.siteId);
@@ -40,6 +41,19 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  const router=useRouter();
  const [edits,setEdits]=useState<Record<string,string>>({});
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [newPool,setNewPool]=useState(""),[newCapacity,setNewCapacity]=useState("30");
+ async function create(){
+  const candidate=candidates.find(item=>`${item.programId}:${item.schoolYearId}`===newPool);
+  const capacity=parseSeatCapacity(newCapacity);
+  if(!candidate){setError("Choose an available program and school year.");return;}
+  if(capacity===null){setError("Enter a whole-number seat capacity between 1 and 100,000.");return;}
+  setBusy("create");setError("");setNotice("");
+  try{
+   await createAdmissionsSeatPool({data:{programId:candidate.programId,schoolYearId:candidate.schoolYearId,capacity}});
+   setNewPool("");await router.invalidate();setNotice("Seat pool created.");
+  }catch(cause){setError(cause instanceof Error?cause.message:"Unable to create seat pool");}
+  finally{setBusy(null);}
+ }
  async function save(id:string,current:number){
   const raw=edits[id]??String(current);
   const value=parseSeatCapacity(raw);
@@ -70,6 +84,31 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  </div>
  {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
  {notice&&<p role="status" className="mt-4 rounded-lg border p-3">{notice}</p>}
+ {candidates.length>0&&<section aria-label="Create seat pool" className="mt-6 rounded-xl border p-5">
+  <h2 className="font-serif text-xl">Create seat pool</h2>
+  <p className="mt-1 text-sm text-muted-foreground">Offers can only be issued for a program and school year with a configured seat pool.</p>
+  <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={event=>{event.preventDefault();void create();}}>
+   <label className="text-xs">Program and school year
+    <select aria-label="Seat pool program and school year" required value={newPool}
+     onChange={event=>setNewPool(event.target.value)} className="mt-1 block rounded-lg border bg-background p-2 text-sm">
+     <option value="">Choose…</option>
+     {candidates.map(candidate=><option key={`${candidate.programId}:${candidate.schoolYearId}`}
+      value={`${candidate.programId}:${candidate.schoolYearId}`}>
+      {candidate.programName} · {candidate.yearName}
+     </option>)}
+    </select>
+   </label>
+   <label className="text-xs">Seats
+    <input aria-label="New seat pool capacity" required type="number" min={1} max={100000} step={1}
+     value={newCapacity} onChange={event=>setNewCapacity(event.target.value)}
+     className="mt-1 block w-28 rounded-lg border bg-background p-2 text-sm"/>
+   </label>
+   <button type="submit" disabled={busy!==null||!newPool}
+    className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+    Create seat pool
+   </button>
+  </form>
+ </section>}
  <div className="mt-6 space-y-3">{rows.map(r=><CapacityPoolCard key={r.id} pool={r}
   value={edits[r.id]??String(r.capacity)} busy={busy!==null}
   onChange={value=>setEdits(previous=>({...previous,[r.id]:value}))}

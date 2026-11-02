@@ -68,7 +68,7 @@ export async function scheduledRoomBlock(tx: Reader, input: BlockInput) {
 export async function authorizeRoomPlanHost(tx: Reader, actor: AccessContext,
   school: Awaited<ReturnType<typeof schoolIdentity>>) {
   if (actor.role === "registrar") return verifyChurchEvidenceSubmitter(actor, school);
-  if (actor.role !== "site_leader" || actor.demoFacilitator || !actor.actorPersonId ||
+  if (actor.role !== "site_leader" || actor.sessionAccountId || !actor.actorPersonId ||
       actor.grantSiteId !== school.siteId || !actor.scope.organizationIds?.includes(school.organizationId) ||
       !actor.scope.siteIds?.includes(school.siteId) || !actor.scope.programIds?.includes(school.programId))
     throw new AuthorizationError("current local director for this exact school");

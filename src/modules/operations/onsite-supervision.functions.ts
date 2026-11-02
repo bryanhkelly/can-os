@@ -70,7 +70,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
     const oldest=siteDate(new Date(Date.now()-30*86400_000),site.timezone);
     if(data.registrarFirstDay){
       if(!data.preparation || !data.programId || !data.sectionId ||
-         actor.role!=="registrar" || !actor.actorPersonId || actor.demoFacilitator ||
+         actor.role!=="registrar" || !actor.actorPersonId || actor.sessionAccountId ||
          !actor.scope.siteIds?.includes(site.id) ||
          !actor.scope.programIds?.includes(data.programId))
         throw new AuthorizationError("registrar first-day Site Program and Section scope");
@@ -198,7 +198,6 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           eq(accountPersonGrants.role,"can_network_steward"),
           isNull(accountPersonGrants.siteId),
           eq(accountPersonGrants.active,true),
-          eq(accountPersonGrants.isSynthetic,false),
           eq(accessAccounts.disabled,false),eq(people.active,true),
           sql`${accessAccounts.emailVerifiedAt} is not null`,
         )) : [];
@@ -244,8 +243,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         role:accountPersonGrants.role})
         .from(accountPersonGrants)
         .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
-        .where(and(eq(accessAccounts.disabled,false),eq(accountPersonGrants.isSynthetic,false),
-          sql`${accessAccounts.emailVerifiedAt} is not null`,
+        .where(and(eq(accessAccounts.disabled,false),sql`${accessAccounts.emailVerifiedAt} is not null`,
           inArray(accountPersonGrants.personId,peopleIds),
           eq(accountPersonGrants.siteId,site.id),
           eq(accountPersonGrants.organizationId,site.organizationId),

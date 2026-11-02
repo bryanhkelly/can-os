@@ -70,7 +70,7 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(statusRead).toContain('eq(accountPersonGrants.active,true)');
     expect(statusRead).toContain('eq(accessAccounts.disabled,false)');
     expect(statusRead).toContain('eq(accountPersonGrants.role,"student")');
-    expect(statusRead).toContain('eq(accountPersonGrants.isSynthetic,false)');
+    expect(statusRead).not.toContain('accountPersonGrants.isSynthetic');
     expect(statusRead).toContain('status:"access_unavailable"');
     const ui=read("src/components/enrollment/StudentLearningAccessHandoff.tsx");
     expect(ui).toContain('status==="access_unavailable"');

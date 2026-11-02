@@ -7,6 +7,7 @@ import { Route as Operations } from "@/routes/operations.index";
 import { Route as Site } from "@/routes/sites.$siteId.index";
 import { Route as Admissions } from "@/routes/admissions.index";
 import { Route as Intake } from "@/routes/admissions.intake";
+import { Route as Capacity } from "@/routes/admissions.capacity";
 import { Route as Families } from "@/routes/admissions.families";
 import { Route as Support } from "@/routes/student.support";
 import { Route as CourseRequests } from "@/routes/operations.course-requests";
@@ -50,7 +51,13 @@ vi.mock("@/modules/operations/action-workspace.functions",()=>({
 vi.mock("@/modules/operations/site-today.functions",()=>({getSiteToday:vi.fn()}));
 vi.mock("@/modules/programs/opening-handoff.functions",()=>({acknowledgeLaunchHandoff:vi.fn(),transferLaunchHandoff:vi.fn()}));
 vi.mock("@/modules/enrollment/course-placement.functions",()=>({listEnrollmentPlacements:vi.fn(),placeEnrolledStudent:vi.fn()}));
-vi.mock("@/modules/enrollment/admissions-dashboard.functions",()=>({getAdmissionsDashboard:vi.fn()}));
+vi.mock("@/modules/enrollment/admissions-dashboard.functions",()=>({
+ getAdmissionsDashboard:vi.fn(),getActiveEnrollmentCounts:vi.fn(),
+}));
+vi.mock("@/modules/enrollment/capacity-preview.functions",()=>({
+ getAdmissionsCapacity:vi.fn(),listSeatPoolCandidates:vi.fn(),createAdmissionsSeatPool:vi.fn(),
+ updateAdmissionsCapacity:vi.fn(),
+}));
 vi.mock("@/modules/enrollment/admissions-intake.functions",()=>({
  listAdmissionsIntake:vi.fn(),listAdmissionsIntakePrograms:vi.fn(),listAdmissionsExistingStudents:vi.fn(),createAdmissionsInquiry:vi.fn(),
  provisionInquiryGuardianAccount:vi.fn(),sendAdmissionsGuardianInvitation:vi.fn(),
@@ -114,6 +121,15 @@ function render(route:{options:{component?:unknown}}){
   if (outcome?.ok && route===Intake && Array.isArray(outcome.data?.records)) {
     successful({...outcome.data,records:{items:outcome.data.records,hasMore:false,nextPage:null},
       stageCounts:[],existingStudentHasMore:false});
+  }
+  if (outcome?.ok && route===Admissions) {
+    const data=outcome.data??{};
+    const detail=data.detail??data.rows?.find((row:{id:string})=>row.id===state.search.application)??null;
+    successful({
+      rows:[],summary:{total:0,awaitingDecision:0,missingRequirements:0,byStage:[]},
+      page:1,pageSize:40,filteredTotal:0,hasMore:false,options:[],enrollmentCounts:[],sites:[],programs:[],
+      ...data,detail,
+    });
   }
   const Page=route.options.component;
   if(typeof Page!=="function")throw new Error("Missing page component");
@@ -227,6 +243,45 @@ describe("application contextual navigation",()=>{
     expect(html).not.toContain("Unrelated application");
   });
 
+    it("uses whole-scope aggregates and shows the final bounded stage page",()=>{
+      state.search={siteId:"school",programId:"program",stage:"application",page:3};
+      successful({
+        rows:[{id:"page-record",studentName:"Last Page Applicant",programId:"program",program:"Academy",
+          stage:"application",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]}],
+        summary:{total:201,awaitingDecision:174,missingRequirements:207,
+          byStage:[{stage:"application",count:81},{stage:"eligibility",count:93}]},
+        page:3,pageSize:40,filteredTotal:81,hasMore:false,
+        enrollmentCounts:[{programId:"program",activeStudents:9}],
+      });
+
+      const html=render(Admissions);
+      expect(html).toContain("201");
+      expect(html).toContain("207");
+      expect(html).toContain("Active students across programs");
+      expect(html).toContain("Page 3 of 3 · 81 applications");
+      expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=application&amp;page=2"');
+      expect(html).not.toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=application&amp;page=4"');
+      expect(html).toContain("Last Page Applicant");
+    });
+
+    it("renders a selected application that is outside the current paginated rows",()=>{
+      const selectedId="00000000-0000-4000-8000-000000000201";
+      state.search={siteId:"school",programId:"program",application:selectedId,stage:"eligibility",page:5};
+      successful({
+        rows:[{id:"page-record",studentName:"Different Page Applicant",programId:"program",program:"Academy",
+          stage:"eligibility",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]}],
+        detail:{id:selectedId,studentName:"Exact Selected Applicant",programId:"program",program:"Academy",
+          stage:"eligibility",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[],
+          activeSectionCount:0,studentAccessStatus:"not_requested"},
+        summary:{total:201,awaitingDecision:174,missingRequirements:207,byStage:[]},
+        page:5,pageSize:40,filteredTotal:81,hasMore:false,options:[],enrollmentCounts:[],
+      });
+
+      const html=render(Admissions);
+      expect(html).toContain("Exact Selected Applicant");
+      expect(html).not.toContain("Different Page Applicant");
+      expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=eligibility&amp;page=5"');
+    });
   it("returns from household readiness to the same admissions application",()=>{
     state.search={siteId:"school",programId:"program",application:"application"};
     successful([{id:"application",householdId:"household",program:"Test program",stage:"inquiry",isFixture:false,
@@ -262,6 +317,20 @@ describe("application contextual navigation",()=>{
     expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=application"');
   });
 
+  it("offers only authorized missing Program/SchoolYear pairs for seat-pool creation",()=>{
+    successful({
+      rows:[],candidates:[{
+        programId:"program",programName:"Academy",schoolYearId:"school-year",yearName:"2028–2029",
+      }],programs:[{id:"program",name:"Academy",siteId:"school",siteName:"School"}],
+    });
+    const html=render(Capacity);
+    expect(html).toContain("Create seat pool");
+    expect(html).toContain('aria-label="Seat pool program and school year"');
+    expect(html).toContain("Academy · 2028–2029");
+    expect(html).toContain('aria-label="New seat pool capacity"');
+    expect(html).toContain("Create seat pool</button>");
+  });
+
   it("offers existing students only from the selected intake program without replacing new-student intake",()=>{
     state.search={programId:"program"};
     successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],publicInterests:{items:[],nextCursor:null},linkedInterest:null,existingStudents:[
@@ -288,14 +357,14 @@ describe("application contextual navigation",()=>{
       sites:[],programs:[],options:[],
       rows:[
         {id:"jordan",studentName:"Jordan Sample",programId:"program",program:"Academy",stage:"inquiry",submittedAt:null,outstandingRequirements:2,offers:[],enrollments:[]},
-        {id:"casey",studentName:"Casey Sample",programId:"program",program:"Academy",stage:"accepted",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]},
       ],
+      summary:{total:1,awaitingDecision:1,missingRequirements:2,byStage:[{stage:"inquiry",count:1}]},
     });
     const html=render(Admissions);
     expect(html).toContain("Jordan Sample");
     expect(html).not.toContain("Casey Sample");
     expect(html).toContain("Review 2 blocking requirement(s)");
-    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=jordan"');
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry&amp;application=jordan"');
     expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry" aria-current="page"');
   });
 

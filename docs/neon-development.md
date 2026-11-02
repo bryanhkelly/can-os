@@ -44,8 +44,8 @@ another project or branch, and the known production branch. Offline
 Neon branch identity. Never bypass this online check to make a job green.
 
 
-**FullFlow branch-specific safety (2026-10-23):** For FullFlow use the single
-approved disposable branch `fullflow-e2e-20261022` (ID
+**FullFlow branch-specific safety:** For Git branch `FullFlow` use the single
+approved nonproduction Neon branch `FullFlow` (formerly `fullflow-e2e-20261022`; ID
 `br-proud-pine-arfju8h2`, project `sweet-hall-62441909`).
 Only the `full-flow` mode of `scripts/run-integration-tests.mjs` and
 `scripts/verify-fullflow-schema.mjs` require a real SQL identity check
@@ -62,6 +62,10 @@ migration wrapper passes the database-attested URL to the existing Drizzle
 suites retain their existing separate test branch configurations and must not
 be forced onto the FullFlow branch. Never run unrestricted `db:push` or
 `db:migrate` against the application database as a way of fixing drift.
+
+The November 1, 2026 rename changes only the Neon display name. The pinned
+branch ID and endpoint remain unchanged; historical records retain the prior
+name. Migration approval remains separate from connected release acceptance.
 
 
 Use separate Neon branches for:

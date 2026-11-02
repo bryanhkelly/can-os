@@ -10,7 +10,7 @@ BEGIN
       AND column_name IN ('cohort_start','cohort_end','supersedes_requirement_set_id','applicability_reason')) <> 4
   THEN RAISE EXCEPTION 'Graduation cohort schema fields missing'; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.graduation_requirement_sets'::regclass
-      AND conname='graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk'
+      AND conname='graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk'::name
       AND contype='f')
   THEN RAISE EXCEPTION 'Original public self-referencing FK not installed'; END IF;
   IF (SELECT count(*) FROM pg_constraint WHERE conrelid='public.graduation_requirement_sets'::regclass

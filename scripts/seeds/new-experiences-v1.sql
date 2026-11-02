@@ -14,10 +14,10 @@ INSERT INTO people(id,legal_first_name,legal_last_name,preferred_name,metadata) 
 ('f3000000-0000-4000-8000-000000000007','Morgan','Example','Morgan','{"synthetic":true,"role":"guardian"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO access_accounts (id,email_normalized) VALUES
-('f7000000-0000-4000-8000-000000000002','alex.registrar@can-os.invalid')
-ON CONFLICT (email_normalized) DO NOTHING;
-INSERT INTO account_person_grants(id,account_id,person_id,role,organization_id,site_id,is_synthetic) VALUES
-('f7000000-0000-4000-8000-000000000003','f7000000-0000-4000-8000-000000000002','f7000000-0000-4000-8000-000000000001','registrar','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003',true)
+('f7000000-0000-4000-8000-000000000002','alex.registrar@valorschool.demo')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO account_person_grants(id,account_id,person_id,role,organization_id,site_id) VALUES
+('f7000000-0000-4000-8000-000000000003','f7000000-0000-4000-8000-000000000002','f7000000-0000-4000-8000-000000000001','registrar','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003')
 ON CONFLICT (id) DO NOTHING;
 -- Report cards: one grading period on the synthetic Fall term.
 INSERT INTO grading_periods(id,term_id,key,name,sequence,starts_on,ends_on,grade_posting_opens_at,grade_posting_closes_at) VALUES

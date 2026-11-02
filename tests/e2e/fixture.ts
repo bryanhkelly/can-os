@@ -328,8 +328,8 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     );
     fixture.teacherProviderGrantId = await insertFixtureId(
       sql,
-      `insert into account_person_grants (account_id, person_id, role, organization_id, site_id, active, is_synthetic)
-       values ($1, $2, 'teacher', $3, null, true, false) returning id`,
+      `insert into account_person_grants (account_id, person_id, role, organization_id, site_id, active)
+       values ($1, $2, 'teacher', $3, null, true) returning id`,
       [fixture.teacherAccountId, fixture.teacherPersonId, fixture.canOrgId],
     );
 

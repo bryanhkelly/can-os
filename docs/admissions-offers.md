@@ -8,6 +8,32 @@ This document replaces historical offer implementation notes, preserved under [a
 - Domain service: `src/modules/enrollment/admissions-offer-service.ts`.
 - Core sequence: authorized registrar issuance → guardian accept/decline → authorized enrollment activation, under program and household relationships, with seat-pool/idempotency protections and audit/event behavior at the service boundary.
 
+## Registrar dashboard paging and detail
+
+The admissions dashboard resolves the selected Program/Site against the
+registrar's server-issued scope before reading applications. Its list is
+filtered by stage before applying a stable `updatedAt`/ID ordering and a
+40-application page limit. Page navigation is bounded, and stage totals,
+application totals, blocking-requirement totals and active-student totals
+come from the entire authorized scope rather than the visible page.
+
+An `application` search value loads that exact application separately from the
+list page, still constrained to the resolved authorized Programs. Offer-year
+options are likewise queried only for that selected in-scope application; they
+are not inferred from a truncated application list. This does not change the
+existing offer command boundary or idempotency key namespace.
+
+## Seat-pool configuration
+
+The registrar capacity page lists authorized Program/SchoolYear pairs that do
+not yet have a pool. A pool can be created only when the SchoolYear belongs to
+the Program's Organization and Site and is either shared at that Site or
+explicitly assigned to that Program. Closed years cannot receive pools.
+Creation is protected by the registrar's `enrollment.decide` capability and
+Program grant, rejects duplicate Program/SchoolYear pairs, and records the
+creation audit in the same transaction. Draft years may be configured ahead of
+activation; family application choices continue to expose only active years.
+
 ## Existing-student intake
 
 The registrar's `/admissions/intake` form can reuse an existing StudentProfile,
@@ -19,6 +45,13 @@ requires explicit registrar confirmation to create one and attach both existing
 people. It cannot merge separate households or silently replace a household.
 This is not a global person lookup or a student-transfer
 workflow. Registrars select the existing student/guardian/household combination;
+
+The registrar can open an exact application from `/admissions/intake` using
+its `application` search value. The read query applies that ID alongside the
+active registrar's Organization/Program/Site scope and returns at most one
+record; application metadata is not included in the intake DTO. This remains
+the current applicant-detail surface rather than a second route or alternate
+authorization path. Registrars select the existing student/guardian/household combination;
 names, grade and relationship permissions are not overwritten.
 
 The server rechecks those relationships and synthetic write restrictions,

@@ -22,13 +22,17 @@ beforeEach(() => {
     scope: { organizationIds: ["org"], siteIds: ["site"], programIds: ["program"] },
   });
   state.select.mockImplementation(() => {
+    const rows = state.rows.shift() ?? [];
     const query = {
       from: () => query,
       innerJoin: () => query,
       where: (filter: SQL) => {
         state.filters.push(filter);
-        return Promise.resolve(state.rows.shift() ?? []);
+        return query;
       },
+      limit: () => Promise.resolve(rows),
+      then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) =>
+        Promise.resolve(rows).then(resolve, reject),
     };
     return query;
   });
@@ -37,7 +41,9 @@ beforeEach(() => {
 describe("shared workspace session read", () => {
   it("resolves display choices only within the verified account and active scope", async () => {
     state.rows = [
-      [{ id: "student-grant", personId: "person", role: "student", firstName: "Test", lastName: "Learner" }],
+      [{ email: "staff@example.org" }],
+      [{ id: "student-grant", accountId: "account", personId: "person", role: "student",
+        firstName: "Test", lastName: "Learner", active: true }],
       [{ id: "site", name: "School", organizationId: "org" }],
       [{ id: "program", name: "Program", siteId: "site" }],
     ];
@@ -50,9 +56,13 @@ describe("shared workspace session read", () => {
     });
     const dialect = new PgDialect();
     const queries = state.filters.map(filter => dialect.sqlToQuery(filter));
-    expect(queries.map(query => query.params)).toEqual([["account", true, true], ["site"], ["program"]]);
-    expect(queries[0]?.sql).toContain("people");
-    expect(queries[0]?.sql).toContain("active");
+    expect(queries[0]?.params).toEqual(["account"]);
+    expect(queries[1]?.params.slice(0, 4)).toEqual(["account", true, false, true]);
+    expect(queries[1]?.params).toContain("student");
+    expect(queries[2]?.params).toEqual(["site"]);
+    expect(queries[3]?.params).toEqual(["program"]);
+    expect(queries[1]?.sql).toContain("people");
+    expect(queries[1]?.sql).toContain("active");
     expect(result).not.toHaveProperty("sessionId");
     expect(result).not.toHaveProperty("secretHash");
   });
@@ -61,9 +71,14 @@ describe("shared workspace session read", () => {
     state.context.mockResolvedValue({
       accountId: "account", grantId: "grant", role: "student", scope: {},
     });
+    state.rows = [
+      [{ email: "staff@example.org" }],
+      [{ id: "grant", accountId: "account", personId: "person", role: "student",
+        firstName: "Test", lastName: "Learner", active: true }],
+    ];
     const result = await readWorkspaceSession(new Request("http://localhost/access/session"));
     expect(result).toMatchObject({ authenticated: true, sites: [], programs: [] });
-    expect(state.select).toHaveBeenCalledTimes(1);
+    expect(state.select).toHaveBeenCalledTimes(2);
   });
 
   it("returns signed out for authorization failures without reading display data", async () => {

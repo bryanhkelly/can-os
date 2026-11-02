@@ -3,6 +3,7 @@ export { nextAllowedDelivery } from "@/domain/notification-quiet-hours";
 import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { notificationPreferences } from "@/db/schema";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 
 const phonePattern = /^\+[1-9]\d{7,14}$/;
 const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -21,13 +22,19 @@ function verifyUrl(suffix: string) {
 async function twilioPost(url: string, payload: Record<string, string>) {
   const response = await fetch(url, {
     method: "POST",
+    signal: AbortSignal.timeout(20_000),
     headers: { Authorization: auth(), "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(payload),
   });
   if (!response.ok) throw new Error("Twilio request was rejected (" + response.status + ")");
   return await response.json() as Record<string, unknown>;
 }
-export async function beginSmsVerification(personId: string, phone: string): Promise<void> {
+function assertSmsVerificationScope(organizationIds: readonly string[]) {
+  if(!organizationIds.length || organizationIds.some(isDemoTenantOrganization))
+    throw new Error("SMS verification is unavailable for this tenant scope");
+}
+export async function beginSmsVerification(personId: string, phone: string, organizationIds: readonly string[]): Promise<void> {
+  assertSmsVerificationScope(organizationIds);
   if (!phonePattern.test(phone)) throw new Error("Phone must use E.164 format");
   // Claim a per-person cooldown before contacting the paid SMS provider.
   const now = new Date();
@@ -45,7 +52,8 @@ export async function beginSmsVerification(personId: string, phone: string): Pro
   if (!rows.length) throw new Error("SMS verification rate limit");
   await twilioPost(verifyUrl("Verifications"), { To: phone, Channel: "sms" });
 }
-export async function confirmSmsVerification(personId: string, phone: string, code: string): Promise<void> {
+export async function confirmSmsVerification(personId: string, phone: string, code: string, organizationIds: readonly string[]): Promise<void> {
+  assertSmsVerificationScope(organizationIds);
   if (!phonePattern.test(phone) || !/^\d{4,10}$/.test(code)) throw new Error("Invalid phone or code");
   const result = await twilioPost(verifyUrl("VerificationCheck"), { To: phone, Code: code });
   if (result.status !== "approved") throw new Error("Verification failed");
@@ -72,7 +80,11 @@ export async function updateQuietHours(personId: string, timezone: string, start
       timezone, quietStart: start, quietEnd: end, updatedAt: new Date(),
     }});
 }
-export async function sendOptedInSms(phone: string, message: string): Promise<boolean> {
+export async function sendOptedInSms(phone: string, message: string, organizationId: string | null): Promise<boolean> {
+  if(!organizationId || isDemoTenantOrganization(organizationId)){
+    console.log("[sms] External delivery suppressed for tenant scope");
+    return false;
+  }
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const sender = process.env.TWILIO_MESSAGING_SERVICE_SID ?? process.env.TWILIO_FROM_NUMBER;
   if (!sid || !sender || !phonePattern.test(phone)) return false;

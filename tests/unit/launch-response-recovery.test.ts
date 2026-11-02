@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 describe("one-hour launch lost-response recovery",()=>{
   it("does not report a successful school creation as failed due to navigation",()=>{
-    const source=readFileSync("src/components/operations/LaunchWizardPage.tsx","utf8");
+    const source=readFileSync("src/components/operations/LaunchWizardPage.tsx","utf8").replace(/\r\n/g,"\n");
     const start=source.indexOf("async function submitLaunch(");
     const finish=source.indexOf("const {applySchoolModelPreset",start);
     const section=source.slice(start,finish);

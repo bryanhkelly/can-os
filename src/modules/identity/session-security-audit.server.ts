@@ -18,7 +18,10 @@ export type SessionSecurityAction =
 
 export type SessionSecurityEvidence = {
   action: SessionSecurityAction;
+  /** Effective account represented by the grant selected for this event. */
   accountId: string;
+  /** Account that owns the server-issued session, which can differ while switching. */
+  sessionAccountId?: string;
   actorPersonId: string | null;
   sessionId: string;
   grantId?: string | null;
@@ -32,17 +35,19 @@ export type SessionSecurityEvidence = {
 /** A single, typed account-scoped audit shape for successful session changes. */
 export async function recordSessionSecurityEvent(tx: MutationTx, evidence: SessionSecurityEvidence) {
   const {
-    action, accountId, actorPersonId, sessionId,
+    action, accountId, sessionAccountId, actorPersonId, sessionId,
     grantId, role, method, targetSessionId, revokedCount, requestId,
   } = evidence;
+  const sessionOwnerAccountId = sessionAccountId ?? accountId;
   await writeAudit(tx, {
     actorPersonId,
     action,
     resourceType: "account",
-    resourceId: accountId,
+    resourceId: sessionOwnerAccountId,
     scope: {},
     context: {
       accountId,
+      sessionAccountId: sessionOwnerAccountId,
       sessionId,
       grantId: grantId ?? null,
       role: role ?? null,

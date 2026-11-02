@@ -72,6 +72,7 @@ describe("persistent server-initialized workspace shell", () => {
     expect(html).toContain('aria-label="Workspace sidebar"');
     expect(html).toContain("Test Learner");
     expect(html).toContain("Test School");
+    expect(html.match(/<a\b[^>]*href="\/student"[^>]*>/)?.[0]).toContain("focus-visible:ring-2");
     expect(html).toContain('aria-label="Account menu"');
     expect(html).toContain("Ask CAN");
     expect(html.match(/<button[^>]*aria-label="Switch workspace"/g)).toHaveLength(1);
@@ -101,7 +102,7 @@ describe("persistent server-initialized workspace shell", () => {
   it("labels delegated demo switching without expanding the active student's navigation", async () => {
     if (!signedIn.session?.authenticated) throw new Error("Expected authenticated fixture");
     const view = await shell({
-      ...signedIn, session: { ...signedIn.session, demoFacilitator: true },
+      ...signedIn, session: { ...signedIn.session, demoAccountSwitching: true },
     });
     const html = view.markup();
     expect(html).toContain('aria-label="Account menu"');
@@ -114,6 +115,7 @@ describe("persistent server-initialized workspace shell", () => {
   it("renders signed-out state and session failures explicitly, without inventing a membership", async () => {
     const guest = await shell(signedOut);
     expect(guest.markup()).toContain("Sign in");
+    expect(guest.markup().match(/<a\b[^>]*href="\/"[^>]*>/)?.[0]).toContain("focus-visible:ring-2");
     expect(guest.markup()).not.toContain('aria-label="Workspace sidebar"');
     guest.queryClient.clear();
     const failure = await shell({ session: null, error: "Unable to load your workspace session." });

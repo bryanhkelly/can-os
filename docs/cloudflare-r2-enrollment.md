@@ -15,7 +15,9 @@ CAN OS stores document bytes in a private Cloudflare R2 bucket and metadata in t
 | `CAN_R2_QUALIFICATION_UPLOADS_ENABLED=true` | Separately enables authenticated teacher qualification evidence uploads after operational review |
 | `CAN_R2_SCHOOL_OPENING_UPLOADS_ENABLED=true` | Separately enables authenticated church school-opening evidence uploads after operational review |
 
-**All upload switches default to false.** Demo uploads also require the separate `CAN_DEMO_WRITES_ENABLED` gate. They must never be used as replacements for role and resource authorization. Use a token with access restricted to one private bucket, never put credentials in `VITE_` variables, and restrict CORS to approved application origins and the exact upload headers/methods. CORS does not confer authorization.
+**All upload switches default to false.** Enrollment uploads select the demo versus live switch from the canonical Application Program's Organization, not fixture metadata. The obsolete synthetic-write gate is retired; upload switches never replace verified role/resource authorization or storage verification. Use a token restricted to one private bucket, never put credentials in `VITE_` variables, and restrict CORS to approved origins and exact headers/methods. CORS does not confer authorization.
+
+Legacy fixture-only document evidence is accepted without a storage-verification marker only inside the canonical Valor tenant. A `synthetic` metadata bit alone never permits review or download in another tenant.
 
 ## Enrollment workflow
 

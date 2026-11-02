@@ -1,5 +1,61 @@
 # CAN OS — current implementation snapshot
 
+## FullFlow review fixes (November 1, 2026)
+
+Local source fixes preserve the existing tenant redesign and migration history:
+
+- Explicit bootstrap normalizes all four recognized legacy source-account
+  addresses transactionally, checks canonical identity and active grants, and
+  refuses collisions/revocations. Programs created through ordinary Valor
+  workflows no longer block bootstrap merely for lacking fixture metadata.
+- School-alert email requires verified account email; verified SMS consent
+  remains independent of email ownership.
+- Outbound workers claim only immediately processable work, renew owned leases
+  before transport and fence all result/error updates by the lease timestamp.
+  Email/SMS requests have a 20-second timeout. Provider acceptance followed by
+  timeout remains ambiguous; this does not certify exactly-once delivery.
+- Quiet-hour deferral uses actual timezone minute boundaries across DST and
+  does not carry seconds past the configured end.
+- Admissions uses scoped exact-ID detail/options, deterministic 40-row pages,
+  server-side stage filtering and whole-scope application/requirement totals.
+- Executed locally: **423 unit files / 2,504 tests passed**, typecheck and build
+  passed, and route inventory **107/107, 0 issues**. Connected database
+  concurrency/provisioning and authenticated browser
+  acceptance remain **unverified**. These fixes did not mutate a database.
+
+## FullFlow local tenant-identity redesign
+
+**Evidence scope:** FullFlow HEAD `8f3aca2e` plus the current uncommitted local
+changes. This addendum supersedes the synthetic-grant/write-gate architecture
+descriptions in older pinned sections below, not their outstanding acceptance
+requirements.
+
+- Valor uses canonical Organization/Site identity and normal server-authorized
+  product commands. The current grant schema has no `is_synthetic`; new
+  migration `0060_tenant_demo_access.sql` drops only that column and retains
+  historical SQL/snapshots.
+- Restricted demo-admin switching uses canonical accounts/grants, preserving
+  effective identity and session ownership. Delegated-session denials at
+  independent-identity boundaries, existing inactivity limits and transactional
+  audit/domain-event semantics remain in place.
+- External notification email/SMS is suppressed by canonical source tenant.
+  R2 demo/live upload deployment switches remain separate; legacy fixture
+  storage evidence is accepted only in the canonical demo tenant.
+- Executed locally: `npm test` **419 files / 2,460 tests passed**;
+  `npm run typecheck` passed; `npm run build` passed; changed-file ESLint
+  **0 errors / 38 warnings**; route contracts **107/107, 0 issues**;
+  mutation hygiene passed; fixture declarations **90/90, STATIC_ONLY**.
+- **Database follow-up (November 1, 2026, explicitly user-authorized):**
+  renamed only Neon branch `br-proud-pine-arfju8h2` to `FullFlow`, matching Git,
+  and applied migration 0060 through the guarded wrapper. Database identity,
+  column absence and 61-row migration/hash ledger were verified; postflight is
+  **UP_TO_DATE**, with no pending migrations. Production remains the unchanged
+  default branch. Migration guard fixes account for PostgreSQL's truncated
+  constraint names and Windows command launchers; **27 targeted tests passed**.
+- **Unverified:** identity provisioning, connected workflow integration and
+  authenticated browser acceptance. Historical DDL provenance remains unresolved.
+  No production data mutation, commit, push or main merge was performed.
+
 **Baseline reviewed:** `main` at `80f6c66` (2026-10-18), plus the academic Action and mutation-evidence follow-ups included with this snapshot. The prior academic/conference authorization follow-up was pushed in `75a83be`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
 
 **Repository cleanup review:** based on `main` at `6be1a57` (2026-10-18), plus the cleanup changes on `chore/repository-stabilization-20261018`. This refresh covers unused-source tracing, the route inventory, local checks and a read-only audit of the locally configured Neon connection, not a full product acceptance review. Earlier integration results remain historical evidence.

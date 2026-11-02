@@ -1,5 +1,7 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {useEffect,useState} from "react";
+import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
+import {AuthorizationError} from "@/domain/command-context";
 export const Route=createFileRoute("/access/verify")({
  server:{handlers:{
   POST:async({request})=>{
@@ -11,6 +13,7 @@ export const Route=createFileRoute("/access/verify")({
     const denial=gate.anonymousAuthAdmissionResponse(await gate.admitAnonymousAuthRequest("verify"));
     if(denial)return denial;
    }catch{
+    logAuthenticationUnavailable("admission");
     return Response.json({error:"Authentication temporarily unavailable."},
      {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
    }
@@ -26,7 +29,12 @@ export const Route=createFileRoute("/access/verify")({
       :null;
     if(!result)return Response.json({error:"Invalid request"},{status:400});
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
-   }catch{
+   }catch(error){
+    if(!(error instanceof InvalidAccessCredentialError)&&!(error instanceof AuthorizationError)){
+     logAuthenticationUnavailable("verification");
+     return Response.json({error:"Authentication temporarily unavailable."},
+      {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
+    }
     // The credential was not accepted; no account/person may be inferred from
     // an arbitrary token or demo-code attempt. Record only a bounded anonymous
     // rejection, never email, token, IP or request data.
@@ -36,7 +44,7 @@ export const Route=createFileRoute("/access/verify")({
      const {recordRejectedAuthentication}=await import("@/modules/identity/authentication-rejections.server");
      await recordRejectedAuthentication(method);
     }catch{
-     // A failure to emit audit evidence never changes the generic denial.
+     logAuthenticationUnavailable("rejection_audit");
     }
     return Response.json({error:"Invalid or expired access link"},
      {status:401,headers:{"Cache-Control":"no-store"}});

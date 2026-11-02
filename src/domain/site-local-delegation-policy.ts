@@ -10,7 +10,7 @@ export type LocalResponsibility = keyof typeof localResponsibilityRoles;
 export function assertLocalDelegationIssuer(actor: AccessContext, resource: {
   organizationId: string; siteId: string; programId: string;
 }) {
-  if (actor.demoFacilitator || !actor.actorPersonId ||
+  if (actor.sessionAccountId || !actor.actorPersonId ||
       actor.role !== "registrar" || !actor.capabilities.has("admin.manage") ||
       !actor.scope.organizationIds?.includes(resource.organizationId) ||
       !actor.scope.siteIds?.includes(resource.siteId) ||

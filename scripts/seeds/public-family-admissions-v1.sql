@@ -61,13 +61,13 @@ VALUES ('f3000000-0000-4000-8000-000000000007','Morgan','Example','Morgan',
  '{"synthetic":true,"fixture":"public-family-admissions-v1","role":"guardian"}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO access_accounts (id, email_normalized)
-VALUES ('fa000000-0000-4000-8000-000000000004','morgan.guardian@can-os.invalid')
-ON CONFLICT (email_normalized) DO NOTHING;
+VALUES ('fa000000-0000-4000-8000-000000000004','morgan.guardian@valorschool.demo')
+ON CONFLICT (id) DO NOTHING;
 INSERT INTO account_person_grants
-(id, account_id, person_id, role, organization_id, site_id, is_synthetic)
+(id, account_id, person_id, role, organization_id, site_id)
 VALUES ('fb000000-0000-4000-8000-000000000004','fa000000-0000-4000-8000-000000000004',
  'f3000000-0000-4000-8000-000000000007','guardian',
- 'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003',true)
+ 'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003')
 ON CONFLICT (id) DO NOTHING;
 -- /guardian/apply requires a verified email sign-in
 -- (signedInFamilyApplicant). Backfill only; never overwrite an existing

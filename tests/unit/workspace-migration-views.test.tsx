@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
 import { FamilyHomeView } from "@/routes/guardian.index";
+import { Route as GuardianAttendance } from "@/routes/guardian.attendance";
 import { Student360View } from "@/routes/staff.students.$personId";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import { WorkspaceShell } from "@/components/workspace";
@@ -29,6 +30,13 @@ vi.mock("@/modules/learning/course-registration.functions", () => ({
 vi.mock("@/modules/student-experience/assignments.functions", () => ({ getAssignments: vi.fn() }));
 vi.mock("@/modules/family/family-home.functions", () => ({ getFamilyHome: vi.fn(), getGuardianNeedsYou: vi.fn() }));
 vi.mock("@/modules/profiles/directory.functions", () => ({ getStudent360: vi.fn() }));
+vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
+  listGuardianEffectiveAbsences: vi.fn(), submitEffectiveAttendanceExcuse: vi.fn(),
+}));
+vi.mock("@/modules/learning/submission-attachments.functions", () => ({
+  createExcuseAttachmentUpload: vi.fn(), attachDocumentToExcuse: vi.fn(), listExcuseAttachmentCounts: vi.fn(),
+}));
+vi.mock("@/components/operations/GuardianPickupPanel", () => ({ GuardianPickupPanel: () => null }));
 
 const section = {
   id: "english", title: "English Literature", code: "ENG", subject: "English", description: "Read and discuss.",
@@ -133,11 +141,58 @@ describe("family and student profiles", () => {
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
     expect(html).not.toContain("student=child-profile");
   });
+  it("filters the family home by the selected child and retains action context", () => {
+    const children: ComponentProps<typeof FamilyHomeView>["children"] = [
+      { studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
+        sectionCount: 2, awaitingSections: false, missingCount: 3, unexcusedAbsences: 0, nextDueAt: null, status: "needs_attention",
+        workToReview: [], workNeedsAttentionCount: 0 },
+      { studentPersonId: "other-person", studentProfileId: "other-profile", displayName: "Casey", lastName: "Sample",
+        sectionCount: 1, awaitingSections: false, missingCount: 0, unexcusedAbsences: 0, nextDueAt: null, status: "on_track",
+        workToReview: [], workNeedsAttentionCount: 0 },
+    ];
+    const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""
+      student="child-person" action="consent-1"/>);
+    expect(html).toContain("Showing Jordan’s school information.");
+    expect(html).toContain('href="/guardian?action=consent-1"');
+    expect(html).toContain('href="/guardian/academics?student=child-person"');
+    expect(html).not.toContain("Casey Sample");
+    expect(html).toContain("focus-visible:outline-2");
+  });
+  it("preserves child and attendance search parameters in the guardian attendance contract", () => {
+    const validate = GuardianAttendance.options.validateSearch;
+    expect(typeof validate).toBe("function");
+    if (typeof validate !== "function") throw new Error("Missing attendance search validator");
+    expect(validate({ student: "child-person", attendance: "attendance-event" }))
+      .toEqual({ student: "child-person", attendance: "attendance-event" });
+    expect(validate({ student: 4, attendance: null })).toEqual({ student: undefined, attendance: undefined });
+  });
+  it("keeps the selected child context visible during attendance loading", () => {
+    state.search = { student: "child-person", attendance: "attendance-event" };
+    const Page = GuardianAttendance.options.component;
+    if (typeof Page !== "function") throw new Error("Missing guardian attendance component");
+    const html = renderToStaticMarkup(<Page />);
+    expect(html).toContain("Showing the selected child.");
+    expect(html).toContain('role="status"');
+    expect(html).toContain("Loading attendance…");
+  });
   const consentNeed: ComponentProps<typeof FamilyHomeView>["needs"][number] = {
     id: "consent-1", kind: "action", type: "study_group_consent", title: "Study group permission: Reading circle",
     detail: "Review a student's group request.", href: "/guardian?action=consent-1",
     priority: "normal", dueAt: null, createdAt: "2030-01-01T00:00:00.000Z",
   };
+  it("clears the selected action without losing the selected child", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView
+      children={[{
+        studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
+        sectionCount: 1, awaitingSections: false, missingCount: 0, unexcusedAbsences: 0, nextDueAt: null, status: "on_track",
+        workToReview: [], workNeedsAttentionCount: 0,
+      }]}
+      needs={[{ ...consentNeed, studentPersonId: "child-person" }]}
+      loading={false} error="" action="consent-1" student="child-person"
+    />);
+    expect(html).toContain("View all needs for this child");
+    expect(html).toContain('href="/guardian?student=child-person"');
+  });
   it("links a selected action to its owning workspace instead of dead-ending", () => {
     const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={[consentNeed]} loading={false} error="" action="consent-1"/>);
     expect(html).toContain('href="/guardian/group-permissions?action=consent-1"');
@@ -196,10 +251,13 @@ describe("launch portfolio", () => {
   };
   it("shows real blockers and exact program/site destinations", () => {
     const html = renderToStaticMarkup(<LaunchPortfolio launches={[launch]} sites={[]} siteId="school"/>);
-    expect(html).toContain("0 / 1 complete (0%)");
+    expect(html).toContain("0 of 1 recorded requirements complete");
     expect(html).toContain("Assign teachers");
     expect(html).toContain('href="/operations/launch/program?siteId=school"');
     expect(html).toContain('href="/operations/launch?siteId=school&amp;programId=program"');
+    expect(html).toContain("Requirement status does not authorize opening");
+    expect(html).not.toContain("0%)");
+    expect(html).toContain("Review academic setup");
   });
   it("reports unavailable scope without showing a different program", () => {
     const html = renderToStaticMarkup(<LaunchPortfolio launches={[launch]} sites={[]} programId="unavailable"/>);

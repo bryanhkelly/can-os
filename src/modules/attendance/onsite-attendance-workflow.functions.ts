@@ -295,7 +295,7 @@ export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
     return {
       siteId: site.id, siteName: site.name, timeZone: site.timezone,
       date: siteDate(new Date(), site.timezone),
-      canPrepareSchoolDays:actor.role==="site_leader"&&!actor.demoFacilitator,
+      canPrepareSchoolDays:actor.role==="site_leader"&&!actor.sessionAccountId,
       preparationThrough:siteDate(new Date(Date.now()+30*86400_000),site.timezone),
       note: "Staff-recorded onsite attendance. Online activity does not establish physical presence or departure.",
     };
@@ -347,7 +347,7 @@ export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:Ac
 export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(actor:AccessContext,data:{
   date:string;programId:string;siteId:string;studentProfileId:string;
 })=>{
-  if(actor.role!=="registrar" || !actor.actorPersonId || actor.demoFacilitator)
+  if(actor.role!=="registrar" || !actor.actorPersonId || actor.sessionAccountId)
     throw new AuthorizationError("verified registrar future first-day preparation");
   assertCapability(actor,"enrollment.activate");
   if(!actor.scope.organizationIds?.length ||
@@ -378,7 +378,7 @@ export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(ac
     .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.personId,sectionTeachers.personId),
       eq(accountPersonGrants.role,"teacher"),
       eq(accountPersonGrants.organizationId,program.academicProviderOrganizationId),
-      eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false)))
+      eq(accountPersonGrants.active,true)))
     .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
     .where(and(eq(sectionTeachers.sectionId,matched.sectionId),
       eq(sectionTeachers.role,"teacher"),eq(people.active,true),

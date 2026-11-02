@@ -23,7 +23,7 @@ describe("GF-B local Site responsibility boundaries", () => {
       registrar({ role: "site_leader" }),
       registrar({ role: "teacher" }),
       registrar({ capabilities: new Set(["program.launch.start"]) }),
-      registrar({ demoFacilitator: { accountId: "fake", personId: "person-a", sourceAccountId: "fake" } }),
+      registrar({ sessionAccountId: "demo-admin" }),
       registrar({ grantSiteId: "site-b" }),
       registrar({ scope: { organizationIds: ["church-b"], siteIds: ["site-a"], programIds: ["program-a"] } }),
       registrar({ scope: { organizationIds: ["church-a"], siteIds: ["site-b"], programIds: ["program-a"] } }),

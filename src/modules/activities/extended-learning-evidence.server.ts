@@ -60,7 +60,7 @@ async function seasonIdentity(reader: Reader, seasonId: string) {
 }
 
 function verifySubmitter(actor: AccessContext, season: Awaited<ReturnType<typeof seasonIdentity>>) {
-  if (actor.demoFacilitator || actor.role !== "registrar" || !actor.actorPersonId ||
+  if (actor.sessionAccountId || actor.role !== "registrar" || !actor.actorPersonId ||
       !actor.scope.organizationIds?.includes(season.organizationId) ||
       !actor.scope.siteIds?.includes(season.siteId) ||
       !actor.scope.programIds?.includes(season.programId))
@@ -70,7 +70,7 @@ function verifySubmitter(actor: AccessContext, season: Awaited<ReturnType<typeof
 
 async function verifyReviewer(actor: AccessContext, season: Awaited<ReturnType<typeof seasonIdentity>>,
   reader: Reader) {
-  if (actor.demoFacilitator || actor.scope.organizationIds?.length !== 1 ||
+  if (actor.sessionAccountId || actor.scope.organizationIds?.length !== 1 ||
       !actor.scope.organizationIds?.includes(season.academicProviderOrganizationId))
     throw new AuthorizationError("independent academic provider reviewer");
   const [institution] = await reader.select({ id: organizations.id, type: organizations.type })
@@ -317,7 +317,7 @@ export async function readExtendedEvidence(actor: AccessContext, seasonId: strin
 }
 
 export async function listExtendedEvidenceReviews(actor: AccessContext) {
-  if (actor.role !== "can_network_steward" || actor.demoFacilitator || !actor.actorPersonId ||
+  if (actor.role !== "can_network_steward" || actor.sessionAccountId || !actor.actorPersonId ||
       actor.grantSiteId !== null || actor.scope.organizationIds?.length !== 1)
     throw new AuthorizationError("verified CAN evidence reviewer");
   const providerId = actor.scope.organizationIds[0]!;

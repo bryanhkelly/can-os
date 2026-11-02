@@ -98,13 +98,16 @@ export async function writeAudit(
   // A generic CommandContext (e.g., system mutations) has no account/session
   // and must not fabricate an identity or let contextExtras override one.
   const session = context as CommandContext & Partial<Pick<AccessContext,
-    "accountId" | "sessionId" | "grantId" | "role">>;
+    "accountId" | "sessionAccountId" | "sessionId" | "grantId" | "role">>;
   const authenticatedAttribution = {
     ...(session.accountId ? { accountId: session.accountId } : {}),
+    ...(session.sessionAccountId ? { sessionAccountId: session.sessionAccountId } : {}),
     ...(session.sessionId ? { sessionId: session.sessionId } : {}),
     ...(session.grantId ? { grantId: session.grantId } : {}),
     ...(session.role ? { role: session.role } : {}),
   };
+  const contextExtras=Object.fromEntries(Object.entries(entry.contextExtras??{})
+    .filter(([key])=>!["accountId","sessionAccountId","sessionId","grantId","role"].includes(key)));
   await tx.insert(auditEvents).values({
     actorPersonId: context.actorPersonId,
     action: entry.action,
@@ -114,9 +117,8 @@ export async function writeAudit(
     before: entry.before ?? null,
     after: entry.after ?? null,
     context: {
-      ...(entry.contextExtras ?? {}),
+      ...contextExtras,
       requestId: context.requestId ?? null,
-      ...(context.demoFacilitator ? { demoFacilitator: context.demoFacilitator } : {}),
       ...authenticatedAttribution,
     },
   });

@@ -1,13 +1,8 @@
 import {createFileRoute} from "@tanstack/react-router";
-import {eq} from "drizzle-orm";
-import {db} from "@/db/client";
-import {accountPersonGrants} from "@/db/schema";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {selectAccessGrant,recordMeaningfulSessionActivity} from "@/modules/identity/passwordless-access.server";
 import {AuthorizationError} from "@/domain/command-context";
-import {assertGrantSelection} from "@/domain/access-context";
-import {listDemoFacilitatorGrants} from "@/modules/identity/demo-facilitator.server";
 
 /** The browser may ask to change memberships, but cannot declare a person or role. */
 export const Route=createFileRoute("/access/session")({
@@ -32,20 +27,14 @@ export const Route=createFileRoute("/access/session")({
     if(body && typeof body==="object" && "kind" in body &&
       (body as {kind:unknown}).kind==="activity" &&
       Object.keys(body).length===1){
-      await recordMeaningfulSessionActivity(context.sessionId,context.accountId);
+      await recordMeaningfulSessionActivity(
+       context.sessionId,context.sessionAccountId??context.accountId,
+      );
       return new Response(null,{status:204,headers:{"Cache-Control":"no-store"}});
     }
     const grantId=body&&typeof body==="object"&&"grantId" in body?(body as {grantId:unknown}).grantId:null;
     if(typeof grantId!=="string")return Response.json({error:"Invalid membership"},{status:400});
-    const grants=context.demoFacilitator
-     ?(await listDemoFacilitatorGrants(db)).map(grant=>({...grant,accountId:context.accountId}))
-     :await db.select({
-     id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
-     role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
-     siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
-    }).from(accountPersonGrants).where(eq(accountPersonGrants.accountId,context.accountId));
-    assertGrantSelection(context.accountId,grantId,grants);
-    await selectAccessGrant(context.sessionId,context.accountId,grantId);
+    await selectAccessGrant(context.sessionId,context.sessionAccountId??context.accountId,grantId);
     return Response.json({ok:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     return Response.json({error:error instanceof AuthorizationError?"Unauthorized":"Unable to switch membership"},

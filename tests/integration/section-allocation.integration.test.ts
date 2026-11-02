@@ -102,7 +102,7 @@ describe("section allocation prerequisites", () => {
     expect((await evaluateLaunchTeacher(advanced.id, instructor!.id)).eligible).toBe(true);
     expect((await evaluateLaunchStaffing(advanced.id)).ready).toBe(true);
     expect(await verifiedTeacherSectionIds([advanced.id])).toEqual(new Set([advanced.id]));
-        // A Section teacher link cannot turn disabled, unverified or synthetic
+        // A Section teacher link cannot turn disabled, unverified or inactive
     // accounts into a "staffed" class for a newly admitted student.
     await db.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,account!.id));
     expect((await evaluateLaunchTeacher(advanced.id, instructor!.id)).eligible).toBe(false);
@@ -116,11 +116,11 @@ describe("section allocation prerequisites", () => {
       .rejects.toThrow("Assign an active teacher");
     await db.update(s.accessAccounts).set({emailVerifiedAt:new Date()})
       .where(eq(s.accessAccounts.id,account!.id));
-    await db.update(s.accountPersonGrants).set({isSynthetic:true})
+    await db.update(s.accountPersonGrants).set({active:false})
       .where(eq(s.accountPersonGrants.accountId,account!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Assign an active teacher");
-    await db.update(s.accountPersonGrants).set({isSynthetic:false})
+    await db.update(s.accountPersonGrants).set({active:true})
       .where(eq(s.accountPersonGrants.accountId,account!.id));
     // Qualification and assignment alone are insufficient when instructional
     // delivery has been withdrawn. Restore the same arrangement afterward.

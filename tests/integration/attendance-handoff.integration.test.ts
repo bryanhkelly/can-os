@@ -117,8 +117,7 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     await tx.insert(s.accountPersonGrants).values({
       accountId:leadAccount.id,personId:siteLeader.id,
       role:"site_leader",siteId:site.id,organizationId:org.id,
-      active:true,isSynthetic:false,
-    });
+      active:true,});
     const staff=act("registrar",registrar.id);
     // Even with the right Section UUID, an enrollment in the wrong academic
     // year cannot be used to claim a supervised attendance record.
@@ -150,8 +149,7 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     await tx.insert(s.accountPersonGrants).values({
       accountId:staffAccount.id,personId:facilitator.id,
       role:"room_facilitator",siteId:site.id,organizationId:org.id,
-      active:true,isSynthetic:false,
-    });
+      active:true,});
     await tx.insert(s.deliveryArrangements).values({
       sectionId:section.id,academicProviderOrganizationId:org.id,
       instructorPersonId:teacher.id,facilitatorPersonId:facilitator.id,

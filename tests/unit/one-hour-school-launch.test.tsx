@@ -55,7 +55,7 @@ describe("guided school launch", () => {
     expect(html).toContain("Needs CAN");
     expect(html).toContain("cannot mark it complete");
     expect(html).not.toContain("Save school completion");
-    expect(html).toContain("View the full saved launch path");
+    expect(html).toContain("Review recorded Journey requirements");
     expect(html).toContain("Prepare your school community");
     expect(html).toContain("Review private school website");
     expect(html).toContain("while opening reviews continue");
@@ -135,4 +135,3 @@ describe("guided school launch", () => {
     expect(html).toContain("Open Site Today");
   });
 });
-

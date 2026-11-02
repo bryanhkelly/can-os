@@ -18,7 +18,7 @@ describe("FullFlow Neon project + branch identity guard", () => {
     ["missing result", undefined],
   ]) {
     it("rejects " + description, () => {
-      expect(() => assertFullFlowNeonIdentity(identity)).toThrow(/dedicated fullflow-e2e-20261022 Neon branch/);
+      expect(() => assertFullFlowNeonIdentity(identity)).toThrow(/dedicated FullFlow Neon branch/);
     });
   }
 });

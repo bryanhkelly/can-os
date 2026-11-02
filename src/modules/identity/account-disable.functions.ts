@@ -17,12 +17,12 @@ const disableInput = z.object({
 }).strict();
 
 /**
- * Only a real registrar (never the demo facilitator persona) holding the
+ * Only a non-delegated registrar holding the
  * verified admin.manage capability may disable an entire access account.
  */
 async function requireAdminRegistrar() {
  const actor = await getCommandContext(getRequest());
- if (actor.role !== "registrar" || !actor.actorPersonId || actor.demoFacilitator)
+ if (actor.role !== "registrar" || !actor.actorPersonId || actor.sessionAccountId)
   throw new AuthorizationError("real school registrar");
  assertCapability(actor, "admin.manage");
  return actor;

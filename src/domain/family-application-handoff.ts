@@ -27,7 +27,19 @@ export function schoolYearMatchesFamilyProgram(
   } | null | undefined,
   program: { id: string; organizationId: string; siteId: string | null },
 ): boolean {
-  return !!year && !!program.siteId && year.status === "active" &&
+  return !!year && year.status === "active" && schoolYearServesProgram(year, program);
+}
+
+/** A SchoolYear can serve one Program or all Programs at its owning Site. */
+export function schoolYearServesProgram(
+  year: {
+    organizationId: string;
+    siteId: string;
+    programId: string | null;
+  } | null | undefined,
+  program: { id: string; organizationId: string; siteId: string | null },
+): boolean {
+  return !!year && !!program.siteId &&
     year.organizationId === program.organizationId && year.siteId === program.siteId &&
     (year.programId === null || year.programId === program.id);
 }

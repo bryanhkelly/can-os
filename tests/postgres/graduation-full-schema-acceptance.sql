@@ -11,7 +11,7 @@ BEGIN
      AND column_name IN ('cohort_start','cohort_end','supersedes_requirement_set_id','applicability_reason'))<>4
  THEN RAISE EXCEPTION '0056 cohort columns absent'; END IF;
  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.graduation_requirement_sets'::regclass
-     AND conname='graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk'
+     AND conname='graduation_requirement_sets_supersedes_requirement_set_id_graduation_requirement_sets_id_fk'::name
      AND contype='f') THEN RAISE EXCEPTION '0056 real FK missing'; END IF;
  IF (SELECT COUNT(*) FROM pg_constraint WHERE conrelid='public.graduation_requirement_sets'::regclass
      AND conname IN ('graduation_cohort_bounds_ck','graduation_supersession_not_self_ck'))<>2

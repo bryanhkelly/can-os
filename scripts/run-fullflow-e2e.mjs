@@ -84,7 +84,6 @@ try {
       CAN_JOB_SECRET: "fullflow-e2e-job-secret-0123456789",
       CAN_ACCESS_PUBLIC_ORIGIN: "https://app.can-os.test",
       CAN_ACCESS_MAIL_OUTBOX_DIR: accessMailOutboxDir,
-      CAN_DEMO_WRITES_ENABLED: "true",
       CAN_R2_LIVE_UPLOADS_ENABLED: "false",
       CAN_R2_DEMO_UPLOADS_ENABLED: "false",
     },

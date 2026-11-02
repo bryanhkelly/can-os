@@ -73,7 +73,8 @@ describe("canonical browser fixture primitives", () => {
     })).resolves.toBe("grant-id");
 
     expect(query.mock.calls[0]?.[0]).toContain("email_verified_at");
-    expect(query.mock.calls[1]?.[0]).toContain("active, is_synthetic");
+    expect(query.mock.calls[1]?.[0]).toContain("site_id, active");
+    expect(query.mock.calls[1]?.[0]).not.toContain("is_synthetic");
     expect(query.mock.calls[1]?.[1]).toEqual([
       "account-id", "person-id", "registrar", "org-id", "site-id",
     ]);

@@ -58,7 +58,6 @@ export function verifiedTeacherAccountPredicate(input: {
     eq(accountPersonGrants.organizationId, input.providerOrganizationId),
     eq(accountPersonGrants.role, "teacher"),
     eq(accountPersonGrants.active, true),
-    eq(accountPersonGrants.isSynthetic, false),
     eq(people.active, true),
     eq(accessAccounts.disabled, false),
     isNotNull(accessAccounts.emailVerifiedAt),

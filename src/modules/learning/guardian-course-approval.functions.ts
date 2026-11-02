@@ -221,8 +221,7 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
         ))
         .where(and(
           eq(accountPersonGrants.role,"registrar"),
-          eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false),
-          eq(accountPersonGrants.organizationId,request.organizationId),
+          eq(accountPersonGrants.active,true),eq(accountPersonGrants.organizationId,request.organizationId),
           or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,request.siteId)),
         )).limit(20);
       await notifyMany(tx,registrars.map(registrar=>({

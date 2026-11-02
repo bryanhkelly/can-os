@@ -20,7 +20,7 @@ async function resources() {
 async function registrar() {
   const context = await getCommandContext(getRequest());
   assertCapability(context, "enrollment:manage");
-  if (context.role !== "registrar" || !context.actorPersonId || context.demoFacilitator) throw new AuthorizationError("verified institutional registrar required");
+  if (context.role !== "registrar" || !context.actorPersonId || context.sessionAccountId) throw new AuthorizationError("verified institutional registrar required");
   return context;
 }
 function issuerAuthorized(context: Awaited<ReturnType<typeof registrar>>, issuerId: string) {

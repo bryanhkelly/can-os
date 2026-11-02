@@ -77,7 +77,7 @@ describe("operating agreement evidence metadata", () => {
   it.each([
     { scope: { organizationIds: ["other-can"] } },
     { role: "registrar" }, { grantSiteId: "site" },
-    { capabilities: new Set() }, { demoFacilitator: true },
+    { capabilities: new Set() }, { sessionAccountId: "demo-admin" },
     { actorPersonId: "requester" },
   ])("denies an unauthorized reviewer before reading documents: %j", async patch => {
     await expect(listOperatingAgreementEvidence({ ...actor, ...patch } as AccessContext, input)).rejects.toThrow();

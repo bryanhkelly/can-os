@@ -1,5 +1,36 @@
 # FullFlow isolated Neon migration reconciliation (read-only evidence)
 
+## November 1, 2026 authorized 0060 follow-up
+
+The owner explicitly authorized applying the new tenant-identity migration to
+the FullFlow database branch and aligning the database/Git branch names.
+Neon branch `br-proud-pine-arfju8h2` in project `sweet-hall-62441909` is now named
+`FullFlow`, formerly `fullflow-e2e-20261022`; its ID and endpoint are unchanged.
+The production branch remains the default and was not migrated.
+
+- Source: FullFlow HEAD `8f3aca2efbef879c5b29bb488d5a238269e8b7f3` plus reviewed
+  local tenant-identity changes; no commit, push or merge.
+- Read-only preflight verified 60 existing migration entries and hashes, with
+  only `0060_tenant_demo_access` pending.
+- An initial check falsely reported the 0056 self-FK missing because PostgreSQL
+  truncates its ASCII identifier to 63 bytes. Catalog inspection confirmed the
+  validated self-FK and correct definition. The checker and SQL acceptance
+  assertions now use PostgreSQL identifier semantics; no constraint was changed.
+- The first migration launch stopped before SQL because Windows cannot directly
+  spawn `npm.cmd`. The wrapper now invokes its fixed npm command through
+  `cmd.exe`, retaining all identity, endpoint, drift and exact-SHA guards.
+- The guarded Drizzle command applied 0060 successfully, dropping only
+  `account_person_grants.is_synthetic`.
+- Postflight verified the same database identity, absence of that column,
+  **61 ledger rows**, latest timestamp `1793572899262`, matching SQL hashes,
+  **0 issues / 0 pending migrations / UP_TO_DATE**.
+- Executed **27 targeted unit tests**, all passed; affected-script lint passed.
+
+This authorization supersedes the earlier instruction to keep this branch
+unchanged only for this rename and migration. It does **not** establish
+historical 0053-0055 DDL provenance, provision legacy demo identities, authorize
+production deployment, or certify connected/browser release acceptance.
+
 ## November 1, 2026 reinspection — current retained E2E branch
 
 - **Reviewed FullFlow source SHA:** `1da7f875acf11983c2e8c31f190e9d4aee40d7b0`

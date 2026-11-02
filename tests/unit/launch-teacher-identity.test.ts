@@ -49,7 +49,8 @@ describe("launch teacher identity prerequisite",()=>{
       const query=new PgDialect().sqlToQuery(predicate);
       expect(query.sql).toContain('exists (');
       expect(query.sql).toContain('"email_verified_at" is not null');
-      expect(query.sql).toContain('"is_synthetic"');
+      expect(query.sql).not.toContain('"is_synthetic"');
+      expect(query.sql).toContain('"active"');
       expect(query.sql).toContain('"disabled"');
       expect(query.sql).toContain('"role_assignments"."person_id"');
       expect(query.params).toContain(providerId);

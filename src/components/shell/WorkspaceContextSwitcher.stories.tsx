@@ -28,7 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AuthorizedWorkspaces: Story = {
-  play: async ({ canvasElement }) => {
+  play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement.ownerDocument.body);
     const dialog = await canvas.findByRole("dialog", { name: "Switch workspace" });
     const search = within(dialog).getByRole("searchbox", { name: "Search workspaces" });
@@ -43,6 +43,8 @@ export const AuthorizedWorkspaces: Story = {
     await userEvent.clear(search);
     await userEvent.tab();
     expect(within(dialog).getByRole("button", { name: /teacher\s*Active/ })).toHaveFocus();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close Switch workspace" }));
+    expect(args.onClose).toHaveBeenCalled();
   },
 };
 

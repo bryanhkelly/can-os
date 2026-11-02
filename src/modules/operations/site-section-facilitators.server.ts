@@ -126,7 +126,6 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
         eq(accountPersonGrants.organizationId, section.organizationId),
         eq(accountPersonGrants.siteId, section.siteId),
         eq(accountPersonGrants.active, true),
-        eq(accountPersonGrants.isSynthetic, false),
         eq(people.active, true), eq(accessAccounts.disabled, false),
         sql`${accessAccounts.emailVerifiedAt} is not null`)).limit(1);
     if (!candidate) throw new AuthorizationError("verified Site facilitator identity");
@@ -204,7 +203,7 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
 /** An active facilitator can ONLY see the Sections to which they were appointed. */
 export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessContext,
   programId: string): Promise<string[]> {
-  if (actor.demoFacilitator || actor.role !== "room_facilitator" ||
+  if (actor.sessionAccountId || actor.role !== "room_facilitator" ||
       !actor.actorPersonId || !actor.grantSiteId || !actor.accountId || !actor.grantId ||
       !actor.scope.programIds?.includes(programId)) return [];
   // Revoking or expiring the church/CAN operating agreement must immediately
@@ -248,7 +247,6 @@ export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessConte
       sql`${roleAssignments.metadata}->>'origin' = 'local_section_facilitator'`,
       sql`${roleAssignments.metadata}->>'sectionId' = ${sections.id}::text`,
       eq(accountPersonGrants.active, true),
-      eq(accountPersonGrants.isSynthetic, false),
       eq(people.active, true), eq(accessAccounts.disabled, false),
       sql`${accessAccounts.emailVerifiedAt} is not null`,
       lte(programResponsibilityAssignments.effectiveFrom, now),
@@ -311,7 +309,7 @@ export async function listSectionFacilitators(actor: AccessContext, programId: s
         eq(accountPersonGrants.siteId, program.siteId),
         eq(accountPersonGrants.role, "room_facilitator"),
         eq(accountPersonGrants.active, true),
-        eq(accountPersonGrants.isSynthetic, false), eq(people.active, true),
+        eq(people.active, true),
         eq(accessAccounts.disabled, false),
         sql`${accessAccounts.emailVerifiedAt} is not null`)).limit(100),
   ]);

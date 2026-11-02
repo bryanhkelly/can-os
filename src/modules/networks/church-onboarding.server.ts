@@ -38,7 +38,7 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
   /** Runs inside the same transaction as organization, Site, and invitation provisioning. */
   onProvisioned?: (tx: ChurchProvisioningTransaction, result: ChurchBootstrapResult) => Promise<void>;
 } = {}) {
-  if (actor.demoFacilitator || actor.grantSiteId !== null ||
+  if (actor.sessionAccountId || actor.grantSiteId !== null ||
       actor.scope.organizationIds?.length !== 1 || !actor.actorPersonId)
     throw new AuthorizationError("real organization-wide CAN steward");
   const canOrganizationId = actor.scope.organizationIds[0]!;

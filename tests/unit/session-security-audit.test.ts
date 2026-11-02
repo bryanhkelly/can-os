@@ -20,8 +20,23 @@ describe("verified session security audit",()=>{
    action:"identity.session.started",
    resourceType:"account",resourceId:"account-1",
    actorPersonId:"person-1",
-   context:{accountId:"account-1",sessionId:"session-1",
+   context:{accountId:"account-1",sessionAccountId:"account-1",sessionId:"session-1",
     grantId:"grant-1",role:"teacher",outcome:"success",method:"email_link"},
+  }));
+ });
+ it("records the effective account separately from the owner of a switched session",async()=>{
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.membership.selected",accountId:"source-account",
+   sessionAccountId:"admin-account",actorPersonId:"source-person",
+   sessionId:"session-1",grantId:"grant-2",role:"student",
+  });
+  expect(state.writeAudit).toHaveBeenCalledWith(tx,expect.objectContaining({
+   resourceId:"admin-account",
+   actorPersonId:"source-person",
+   context:expect.objectContaining({
+    accountId:"source-account",sessionAccountId:"admin-account",
+    sessionId:"session-1",grantId:"grant-2",role:"student",
+   }),
   }));
  });
  it("records remote revocation without a raw cookie, token, or student information",async()=>{
@@ -34,7 +49,7 @@ describe("verified session security audit",()=>{
   });
   const row=state.writeAudit.mock.calls[0]?.[1];
   expect(row.context).toMatchObject({accountId:"account-1",
-   sessionId:"session-1",grantId:"grant-1",role:"registrar",
+   sessionAccountId:"account-1",sessionId:"session-1",grantId:"grant-1",role:"registrar",
    targetSessionId:"session-2",revokedCount:1,outcome:"success"});
   expect(JSON.stringify(row)).not.toMatch(/DO-NOT-STORE|private@example\.test|192\.0\.2\.1|rawToken/);
  });

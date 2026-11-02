@@ -9,9 +9,9 @@ BEGIN
  IF NOT EXISTS(SELECT 1 FROM organizations WHERE id='f1000000-0000-4000-8000-000000000002' AND slug='can-synthetic-demo' AND metadata->>'synthetic'='true')
  OR NOT EXISTS(SELECT 1 FROM programs WHERE id='f1000000-0000-4000-8000-000000000004' AND organization_id='f1000000-0000-4000-8000-000000000002' AND slug='synthetic-hybrid')
  THEN RAISE EXCEPTION 'Wrong synthetic organization or program'; END IF;
- IF NOT EXISTS(SELECT 1 FROM access_accounts WHERE email_normalized='alex.registrar@can-os.invalid')
- OR NOT EXISTS(SELECT 1 FROM access_accounts WHERE email_normalized='jordan.student@can-os.invalid')
- OR NOT EXISTS(SELECT 1 FROM access_accounts WHERE email_normalized='riley.teacher@can-os.invalid')
+ IF NOT EXISTS(SELECT 1 FROM access_accounts WHERE email_normalized='alex.registrar@valorschool.demo')
+ OR NOT EXISTS(SELECT 1 FROM access_accounts WHERE email_normalized='jordan.student@valorschool.demo')
+ OR NOT EXISTS(SELECT 1 FROM access_accounts WHERE email_normalized='riley.teacher@valorschool.demo')
  THEN RAISE EXCEPTION 'Existing ValorSchool identities missing'; END IF;
 END $block$;
 WITH catalog(code,title,subject) AS (VALUES
@@ -146,7 +146,7 @@ FROM items ON CONFLICT (id) DO NOTHING;
 WITH registrar AS (
  SELECT DISTINCT person_grant.person_id FROM access_accounts account
  JOIN account_person_grants person_grant ON person_grant.account_id=account.id
- WHERE account.email_normalized='alex.registrar@can-os.invalid'
+ WHERE account.email_normalized='alex.registrar@valorschool.demo'
  AND person_grant.organization_id='f1000000-0000-4000-8000-000000000002' AND person_grant.role='registrar' LIMIT 1
 )
 INSERT INTO curriculum_entitlements(id,organization_id,pack_id,status,terms_accepted_at,accepted_by_person_id,metadata)
@@ -156,7 +156,7 @@ FROM registrar ON CONFLICT (id) DO NOTHING;
 WITH registrar AS (
  SELECT DISTINCT person_grant.person_id FROM access_accounts account
  JOIN account_person_grants person_grant ON person_grant.account_id=account.id
- WHERE account.email_normalized='alex.registrar@can-os.invalid'
+ WHERE account.email_normalized='alex.registrar@valorschool.demo'
  AND person_grant.organization_id='f1000000-0000-4000-8000-000000000002' AND person_grant.role='registrar' LIMIT 1
 )
 INSERT INTO curriculum_adoptions(id,organization_id,program_id,site_id,pack_id,pack_version_id,status,adopted_by_person_id,metadata)
@@ -175,7 +175,7 @@ ON CONFLICT (id) DO NOTHING;
 WITH teacher AS (
  SELECT DISTINCT person_grant.person_id FROM access_accounts account
  JOIN account_person_grants person_grant ON person_grant.account_id=account.id
- WHERE account.email_normalized='riley.teacher@can-os.invalid'
+ WHERE account.email_normalized='riley.teacher@valorschool.demo'
  AND person_grant.organization_id='f1000000-0000-4000-8000-000000000002' AND person_grant.role='teacher' LIMIT 1
 )
 INSERT INTO section_teachers(id,section_id,person_id,role,assignment_source)
@@ -187,7 +187,7 @@ WITH student AS (
  SELECT DISTINCT p.id AS student_id FROM access_accounts account
  JOIN account_person_grants person_grant ON person_grant.account_id=account.id
  JOIN student_profiles p ON p.person_id=person_grant.person_id
- WHERE account.email_normalized='jordan.student@can-os.invalid'
+ WHERE account.email_normalized='jordan.student@valorschool.demo'
  AND person_grant.organization_id='f1000000-0000-4000-8000-000000000002' AND person_grant.role='student' LIMIT 1
 )
 INSERT INTO enrollments(id,student_profile_id,kind,status,organization_id,program_id,section_id,school_year_id,started_at,metadata)
@@ -227,7 +227,7 @@ JOIN sections s ON s.code=assignment.code AND s.metadata->>'synthetic'='true'
 JOIN programs p ON p.id=s.program_id AND p.slug='synthetic-hybrid'
 JOIN organizations o ON o.id=p.organization_id AND o.slug='can-synthetic-demo' AND o.metadata->>'synthetic'='true'
 JOIN section_teachers teacher ON teacher.section_id=s.id
-JOIN access_accounts account ON account.email_normalized='riley.teacher@can-os.invalid'
+JOIN access_accounts account ON account.email_normalized='riley.teacher@valorschool.demo'
 JOIN account_person_grants person_grant ON person_grant.account_id=account.id AND person_grant.person_id=teacher.person_id AND person_grant.role='teacher' AND person_grant.active=true
 ON CONFLICT(id) DO NOTHING;
 

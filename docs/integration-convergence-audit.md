@@ -104,13 +104,17 @@ The dedicated branch still needs reviewed migrations `0032`–`0038`.
 `tests/integration/full-flow.integration.test.ts` uses a rollback transaction
 and mocked actor/session context. It cannot by itself prove issued sessions,
 persistent UI reloads, dispatched notifications or cross-workspace projection
-integrity. The `tests/e2e/` inventory has focused browser scenarios but no
-continuous Church-Hosted or six-stage FullFlow browser story. First run the
-existing connected service fixture and fix the **first actual failing assertion**.
-Then add one persistent-disposable, cross-session Playwright story.
-Do not mark standalone GF1/GF2/GF3 tests as FullFlow acceptance.
+integrity. The continuous multi-role journey now exists at
+`tests/e2e/full-flow.spec.ts`, with its guarded runner
+`scripts/run-fullflow-e2e.mjs`; neither source presence nor test discovery is
+acceptance evidence. In this checkout the protected database variables are
+absent, so the connected service fixture and browser journey remain unexecuted.
+Once the pinned disposable database is configured, run the service fixture
+first and fix its **first actual failing assertion**, then run the browser
+journey on the same reviewed commit. Do not duplicate the story or mark
+standalone GF1/GF2/GF3 tests as FullFlow acceptance.
 
-### I-04 — Provider metadata is not CAN's institutional access [P0, confirmed]
+### I-04 — Provider metadata is not CAN's institutional access [P0, source implementation present; connected acceptance unverified]
 `startProgramLaunch` currently sets `programs.organization_id` to
 `hostOrganizationId`; `getCommandContext` projects accessible Programs from
 `programs.organization_id` and the selected account grant. Thus simply
@@ -119,8 +123,29 @@ CAN staff scoped authority to that Program. Conversely, a local registrar's
 broad built-in capability list is not proof of CAN institutional approval.
 Do not change `programs.organization_id` as an isolated patch: readiness,
 academic year, sections, enrollment, school-year and site projections join on
-these values. First design and test a narrowly scoped, effective and revocable
-academic service authorization keyed to the existing Program and Site.
+these values.
+
+The narrow Program/Site service-authorization implementation now exists in
+`src/db/schema/program-site-authorizations.ts` and
+`src/modules/programs/program-site-authorization.server.ts`. It keeps Site
+ownership with the host, limits the contract to an existing Program, records
+the requested services and agreement evidence, requires a separate CAN
+steward review with an effective window, and supports expiry, revocation,
+suspension, renewal and revalidation on dependent operations. Individual CAN
+staff access is separately delegated to an existing verified CAN account and
+scoped to that Program by
+`src/modules/programs/can-academic-staff-delegation.server.ts`; it does not
+widen the church's organization grant.
+
+Focused local unit verification passed **29 tests across 3 files**:
+`operating-agreement-lifecycle.test.ts`,
+`church-academic-launch-authority.test.ts`, and
+`church-hosted-provider.test.ts`. The database-backed
+`program-site-authorization.integration.test.ts` and
+`operating-agreement-evidence.integration.test.ts` have not been executed on
+the pinned disposable Neon branch. Therefore C3 remains **unaccepted**; this
+source-level implementation does not establish a real contract's legal
+validity or clear the C0/C1 connected-evidence prerequisites.
 
 ### I-05 — Issuer-specific transcript authority [P0, initial fail-closed guard committed]
 

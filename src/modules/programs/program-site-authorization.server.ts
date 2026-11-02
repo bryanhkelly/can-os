@@ -52,7 +52,7 @@ async function loadOperatingIdentity(
   return identity;
 }
 function assertHostRequester(actor: AccessContext, identity: OperatingProgramIdentity) {
-  if (actor.demoFacilitator || actor.role !== "registrar" || !actor.actorPersonId ||
+  if (actor.sessionAccountId || actor.role !== "registrar" || !actor.actorPersonId ||
       !actor.scope.organizationIds?.includes(identity.hostOrganizationId) ||
       !identity.siteId || !actor.scope.siteIds?.includes(identity.siteId) ||
       !actor.scope.programIds?.includes(identity.programId))
@@ -60,7 +60,7 @@ function assertHostRequester(actor: AccessContext, identity: OperatingProgramIde
   assertCapability(actor, "program.launch.start");
 }
 function assertIndependentCANReviewer(actor: AccessContext, identity: OperatingProgramIdentity) {
-  if (actor.demoFacilitator || !actor.scope.organizationIds?.includes(identity.institutionOrganizationId))
+  if (actor.sessionAccountId || !actor.scope.organizationIds?.includes(identity.institutionOrganizationId))
     throw new AuthorizationError("separate CAN institutional reviewer");
   assertCANSteward(actor, {
     id: identity.institutionOrganizationId, type: identity.institutionOrganizationType,
@@ -662,7 +662,7 @@ export async function getHostProgramSiteAuthorization(
     institutionOrganizationId: programs.academicProviderOrganizationId,
     creditIssuingOrganizationId: programs.creditIssuingOrganizationId,
   }).from(programs).where(eq(programs.id, programId)).limit(1);
-  if (!program || actor.role !== "registrar" || actor.demoFacilitator ||
+  if (!program || actor.role !== "registrar" || actor.sessionAccountId ||
       !actor.scope.organizationIds?.includes(program.organizationId) ||
       !actor.scope.programIds?.includes(programId) ||
       !program.siteId || !actor.scope.siteIds?.includes(program.siteId))
@@ -714,7 +714,7 @@ export async function getHostProgramSiteAuthorization(
  * authenticated steward. Never expose the signed agreement's private bytes.
  */
 export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
-  if (actor.demoFacilitator || actor.grantSiteId !== null || !actor.actorPersonId ||
+  if (actor.sessionAccountId || actor.grantSiteId !== null || !actor.actorPersonId ||
       actor.role !== "can_network_steward" ||
       !actor.capabilities.has("network.agreements.verify") ||
       (actor.scope.organizationIds?.length ?? 0) !== 1)

@@ -23,8 +23,8 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 ## Synthetic data is test infrastructure
 
 - Use isolated deterministic fixtures for the workflows that need acceptance testing; preserve idempotency and privacy, with no authentic student/family records in fixtures.
-- **Never** create separate production routes, user experiences, or business operations merely because a record was seeded. Synthetic provenance may still have deliberate, restricted legacy write gates; document and converge these safely rather than bypassing them.
-- `CAN_DEMO_WRITES_ENABLED` is **fail-closed**: only the literal string `true` enables the existing synthetic write gate. It is not a login, permission, or production-ready toggle.
+- **Never** create separate production routes, user experiences, or business operations merely because a record was seeded. Provenance metadata is not authorization; Valor is a canonical tenant and uses the same product APIs.
+- Approved Valor demo accounts use `000000` locally and on Netlify production without access flags. Preserve their fixed account list, active canonical Valor grants, session checks and server domain authority. These intentionally public accounts must never access authentic records. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. The obsolete `CAN_DEMO_WRITES_ENABLED` gate is retired.
 - Do not introduce new `*-demo.functions.ts` product handlers or bypass verified session/grant checks without explicit architectural review.
 - A generic product feature does not automatically require its own demo persona, special UI, or duplicate test tenant.
 

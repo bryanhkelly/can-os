@@ -15,7 +15,7 @@ import { requireCurrentNetworkAgreement } from "./network-agreement.server";
 async function verifySteward(actor: AccessContext,
   capability: "network.agreements.verify" | "network.admins.provision") {
   const ids = actor.scope.organizationIds ?? [];
-  if (ids.length !== 1 || actor.demoFacilitator) throw new AuthorizationError("verified CAN steward");
+  if (ids.length !== 1 || actor.sessionAccountId) throw new AuthorizationError("verified CAN steward");
   const [organization] = await db.select({ id: organizations.id, type: organizations.type })
     .from(organizations).where(eq(organizations.id, ids[0]!)).limit(1);
   if (!organization) throw new AuthorizationError("CAN organization");

@@ -111,14 +111,14 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
  .validator((v:unknown)=>consentInput.parse(v))
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
-  if(actor.role!=="guardian"||!actor.actorPersonId||actor.demoFacilitator)
+  if(actor.role!=="guardian"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real verified guardian");
   assertCapability(actor,"enrollment.apply");
   const studentEmail=normalizeAccessEmail(data.studentEmail);
   // The real passwordless issuer deliberately never sends to .invalid.
   // Refuse an undeliverable testing address BEFORE recording guardian consent,
   // instead of approving an enrollment handoff whose link cannot be sent.
-  if(studentEmail.endsWith(".invalid"))
+  if(studentEmail.endsWith(".invalid")||studentEmail.endsWith(".demo"))
    throw new Error("Provide a deliverable student email to receive the learning sign-in link");
   await db.transaction(async tx=>{
    const app=await eligibleStudent(tx,data.applicationId);
@@ -219,8 +219,7 @@ export const getStudentLearningHandoff=createServerFn({method:"GET"})
        eq(accountPersonGrants.siteId,app.siteId!),
        eq(accountPersonGrants.role,"student"),
        eq(accountPersonGrants.active,true),
-       eq(accountPersonGrants.isSynthetic,false),
-     )).limit(1);
+       )).limit(1);
    if(!grant || consent.studentProfileId!==app.studentProfileId ||
        consent.programId!==app.programId || consent.siteId!==app.siteId)
      return {status:"access_unavailable" as const,
@@ -234,7 +233,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
  .validator((v:unknown)=>studentAccessReviewInput.parse(v))
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
-  if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+  if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real school registrar");
   assertCapability(actor,"enrollment.activate");
   const email=await db.transaction(async tx=>{
@@ -272,7 +271,6 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      const grants=await tx.select({
        personId:accountPersonGrants.personId,
        role:accountPersonGrants.role,
-       isSynthetic:accountPersonGrants.isSynthetic,
      }).from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
      if(grants.some(g=>g.personId!==app.studentPersonId))
       throw new AuthorizationError("student email is already bound to a different identity");
@@ -281,7 +279,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      // demo account: it could sign the child into another persona instead of
      // the independently consented learning account. Multiple same-child
      // student memberships across authorized Sites are still supported.
-     if(grants.some(g=>g.role!=="student"||g.isSynthetic))
+     if(grants.some(g=>g.role!=="student"))
       throw new AuthorizationError("student email requires a separate, real student-only account");
    }else {
      [account]=await tx.insert(accessAccounts).values({emailNormalized:normalized})

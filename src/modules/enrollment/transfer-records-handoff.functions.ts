@@ -16,7 +16,7 @@ const kind="transfer_academic_records_handoff";
 const uuid=z.string().uuid();
 async function authorizedRegistrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("verified school records registrar");
  assertCapability(actor,"enrollment:manage");
  if(!actor.scope.organizationIds?.length)
@@ -327,7 +327,6 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
          .where(and(
            eq(s.accountPersonGrants.role,"registrar"),
            eq(s.accountPersonGrants.active,true),
-           eq(s.accountPersonGrants.isSynthetic,false),
            eq(s.accountPersonGrants.organizationId,internalDestination.organizationId),
            or(isNull(s.accountPersonGrants.siteId),
              eq(s.accountPersonGrants.siteId,internalDestination.siteId)),
@@ -362,7 +361,7 @@ export const getReceivingSchoolTransferTranscript=createServerFn({method:"POST"}
  .handler(async({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCommandContext(getRequest());
-  if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+  if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real destination-school registrar");
   assertCapability(actor,"admissions:read");
   return db.transaction(async tx=>{

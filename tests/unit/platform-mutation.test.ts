@@ -145,6 +145,17 @@ describe("writeAudit", () => {
       context: { requestId: null },
     });
   });
+  it("preserves a verified delegated session owner and rejects fabricated ownership",async()=>{
+    const {tx,calls}=makeFakeTx();
+    const change={action:"enrollment.apply",entityType:"application",entityId:"app",
+      contextExtras:{sessionAccountId:"spoofed"}};
+    await writeAudit(tx,{...context,sessionAccountId:"admin-owner"},change);
+    expect(calls[0]?.values).toMatchObject({context:{sessionAccountId:"admin-owner"}});
+    await writeAudit(tx,context,change);
+    expect(calls[1]?.values).toMatchObject({context:{requestId:"req-1"}});
+    expect((calls[1]?.values as {context:Record<string,unknown>}).context)
+      .not.toHaveProperty("sessionAccountId");
+  });
 });
 
 describe("notify", () => {

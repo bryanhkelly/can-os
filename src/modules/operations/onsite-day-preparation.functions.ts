@@ -13,7 +13,7 @@ export const getOnsiteSchoolDayPreparation=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     assertOnsiteAttendanceScope(actor);
-    if(actor.role!=="site_leader"||actor.demoFacilitator)
+    if(actor.role!=="site_leader"||actor.sessionAccountId)
       throw new AuthorizationError("local director school-day preparation");
     const roster=await loadExpectedSchoolDayPreparation(actor,data);
     // Restrict the staffing projection to the Programs whose current director

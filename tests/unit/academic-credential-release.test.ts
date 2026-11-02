@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential,canRedeemTransferCredential,EXTERNAL_SCHOOL_TO_SCHOOL_RELEASE_SUPPORTED} from "@/domain/academic-credential-release";
 const now=new Date("2026-10-31T12:00:00Z");
-const valid={actorPersonId:"recipient-1",recipientPersonId:"recipient-1",recipientEmail:"person@example.org",accountEmail:"PERSON@example.org",recipientActive:true,expiresAt:new Date("2026-11-01T12:00:00Z"),revokedAt:null,now,demoFacilitator:false};
+const valid={actorPersonId:"recipient-1",recipientPersonId:"recipient-1",recipientEmail:"person@example.org",accountEmail:"PERSON@example.org",recipientActive:true,expiresAt:new Date("2026-11-01T12:00:00Z"),revokedAt:null,now,delegatedSession:false};
 describe("official academic credential release gate",()=>{
  it("permits only exact authenticated recipient with active authorization",()=>{
   expect(canDownloadAuthorizedCredential(valid)).toBe(true);
@@ -9,7 +9,7 @@ describe("official academic credential release gate",()=>{
  it.each([
   {actorPersonId:null},{actorPersonId:"another-person"},
   {accountEmail:"another@example.org"},{accountEmail:null},
-  {recipientActive:false},{demoFacilitator:true},
+  {recipientActive:false},{delegatedSession:true},
   {expiresAt:now},{expiresAt:new Date("2026-10-30T12:00:00Z")},
   {revokedAt:new Date("2026-10-31T11:00:00Z")},
  ])("rejects invalid identity or authorization: %j",override=>{
@@ -20,7 +20,7 @@ describe("official academic credential release gate",()=>{
 describe("independent credential release review",()=>{
  const valid={issuerMatches:true,studentMatches:true,verifiedRecipient:true,
   trustedInstructions:true,validAuthorityEvidence:true,registrarApproved:true,
-  demoActor:false,purpose:"transfer" as const,
+  delegatedSession:false,purpose:"transfer" as const,
   expiresAt:new Date("2026-11-01T12:00:00Z"),now};
  it("requires every independent verification and registrar approval",()=>{
   expect(canAuthorizeAcademicCredentialRelease(valid)).toBe(true);
@@ -28,8 +28,8 @@ describe("independent credential release review",()=>{
    expect(canAuthorizeAcademicCredentialRelease({...valid,[field]:false})).toBe(false);
   }
  });
- it("rejects demo users, expired/overlong grants and unsupported purposes",()=>{
-  expect(canAuthorizeAcademicCredentialRelease({...valid,demoActor:true})).toBe(false);
+ it("rejects delegated sessions, expired/overlong grants and unsupported purposes",()=>{
+  expect(canAuthorizeAcademicCredentialRelease({...valid,delegatedSession:true})).toBe(false);
   expect(canAuthorizeAcademicCredentialRelease({...valid,expiresAt:now})).toBe(false);
   expect(canAuthorizeAcademicCredentialRelease({...valid,expiresAt:new Date("2027-01-01T12:00:00Z")})).toBe(false);
   expect(canAuthorizeAcademicCredentialRelease({...valid,purpose:"freeform" as never})).toBe(false);

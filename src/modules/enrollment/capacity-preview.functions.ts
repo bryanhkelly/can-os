@@ -3,6 +3,7 @@ import {and,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
+import {schoolYearServesProgram} from "@/domain/family-application-handoff";
 
 /** Counts actual active enrollments and unexpired held offers by school year. */
 export const getAdmissionsCapacity=createServerFn({method:"GET"})
@@ -50,6 +51,69 @@ export const updateAdmissionsCapacity=createServerFn({method:"POST"})
   });
  });
 
+/** Program/SchoolYear pairs in the registrar's scope that can receive a pool. */
+export const listSeatPoolCandidates=createServerFn({method:"GET"})
+ .validator((input:unknown)=>operationsSelectionSchema.parse(input??{}))
+ .handler(async({data})=>{
+  const actor=await requireActor(["registrar"],"enrollment.decide");
+  const scoped=await resolveOperationsSelection(actor,data);
+  if(!scoped.programIds.length||!process.env.DATABASE_URL)return [];
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const programRows=await db.select({
+   id:s.programs.id,name:s.programs.name,organizationId:s.programs.organizationId,siteId:s.programs.siteId,
+  }).from(s.programs).where(inArray(s.programs.id,scoped.programIds)).limit(100);
+  if(!programRows.length)return [];
+  const years=await db.select({
+   id:s.schoolYears.id,name:s.schoolYears.name,status:s.schoolYears.status,
+   programId:s.schoolYears.programId,organizationId:s.schoolYears.organizationId,siteId:s.schoolYears.siteId,
+  }).from(s.schoolYears).where(inArray(s.schoolYears.organizationId,
+   [...new Set(programRows.map(program=>program.organizationId))]));
+  const pools=await db.select({
+   programId:s.admissionSeatPools.programId,schoolYearId:s.admissionSeatPools.schoolYearId,
+  }).from(s.admissionSeatPools).where(inArray(s.admissionSeatPools.programId,
+   programRows.map(program=>program.id)));
+  return programRows.flatMap(program=>years
+   .filter(year=>year.status!=="closed"&&schoolYearServesProgram(year,program)&&
+    !pools.some(pool=>pool.programId===program.id&&pool.schoolYearId===year.id))
+   .map(year=>({programId:program.id,programName:program.name,schoolYearId:year.id,yearName:year.name})));
+ });
+
+/** Create one audited pool for an authorized Program and its matching SchoolYear. */
+export const createAdmissionsSeatPool=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  programId:z.string().uuid(),schoolYearId:z.string().uuid(),
+  capacity:z.number().int("Capacity must be a positive whole number")
+   .min(1,"Capacity must be a positive whole number")
+   .max(100000,"Capacity must be a positive whole number"),
+ }).strict().parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["registrar"],"enrollment.decide");
+  assertProgramGranted(actor,data.programId);
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [program]=await tx.select({
+    id:s.programs.id,organizationId:s.programs.organizationId,siteId:s.programs.siteId,
+   }).from(s.programs).where(eq(s.programs.id,data.programId)).for("share").limit(1);
+   const [year]=await tx.select({
+    programId:s.schoolYears.programId,organizationId:s.schoolYears.organizationId,
+    siteId:s.schoolYears.siteId,status:s.schoolYears.status,
+   }).from(s.schoolYears).where(eq(s.schoolYears.id,data.schoolYearId)).for("share").limit(1);
+   if(!program||!year||!schoolYearServesProgram(year,program))
+    throw new Error("School year does not belong to this program or host site");
+   if(year.status==="closed")throw new Error("Seat pools cannot be created for a closed school year");
+   const [pool]=await tx.insert(s.admissionSeatPools).values({
+    programId:data.programId,schoolYearId:data.schoolYearId,capacity:data.capacity,
+   }).onConflictDoNothing({
+    target:[s.admissionSeatPools.programId,s.admissionSeatPools.schoolYearId],
+   }).returning({id:s.admissionSeatPools.id});
+   if(!pool)throw new Error("A seat pool already exists for this program and school year. Adjust its capacity instead.");
+   await recordAudit(tx,actor,{
+    action:"admissions.capacity.create",resourceType:"admission_seat_pool",resourceId:pool.id,
+    before:null,after:{capacity:data.capacity},
+    scope:{programId:data.programId,schoolYearId:data.schoolYearId},
+   });
+   return {poolId:pool.id};
+  });
+ });
+
 /** Compatibility for older route imports. */
-export const getSyntheticAdmissionsCapacity=getAdmissionsCapacity;
-export const updateSyntheticAdmissionsCapacity=updateAdmissionsCapacity;

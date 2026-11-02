@@ -1,6 +1,6 @@
 -- DISPOSABLE TEST DATA ONLY. Never execute in production.
 -- This intentionally synthetic recipient is DENIED by production recipient guards
--- (account_person_grants.is_synthetic=true and email not verified).
+-- (tenant test identity with an unverified email).
 -- Used to verify the inbox's safe empty state and cross-persona denial.
 INSERT INTO transcript_issuances
  (id,student_profile_id,issued_by_person_id,issuing_organization_id,purpose,snapshot)

@@ -7,11 +7,11 @@ export type CredentialReleaseGate = {
   expiresAt:Date;
   revokedAt:Date|null;
   now:Date;
-  demoFacilitator:boolean;
+  delegatedSession:boolean;
 };
 /** The authenticated account must match the named, active recipient exactly. */
 export function canDownloadAuthorizedCredential(input:CredentialReleaseGate):boolean {
-  return !input.demoFacilitator && !!input.actorPersonId &&
+  return !input.delegatedSession && !!input.actorPersonId &&
     input.actorPersonId===input.recipientPersonId && input.recipientActive &&
     !!input.accountEmail?.trim() &&
     input.accountEmail.trim().toLowerCase()===input.recipientEmail.trim().toLowerCase() &&
@@ -27,13 +27,13 @@ export type CredentialReleaseReview = {
   trustedInstructions:boolean;
   validAuthorityEvidence:boolean;
   registrarApproved:boolean;
-  demoActor:boolean;
+  delegatedSession:boolean;
   purpose:CredentialReleasePurpose;
   expiresAt:Date;
   now:Date;
 };
 export function canAuthorizeAcademicCredentialRelease(input:CredentialReleaseReview):boolean {
-  return !input.demoActor && input.issuerMatches && input.studentMatches &&
+  return !input.delegatedSession && input.issuerMatches && input.studentMatches &&
     input.verifiedRecipient && input.trustedInstructions &&
     input.validAuthorityEvidence && input.registrarApproved &&
     RELEASE_PURPOSES.includes(input.purpose) &&

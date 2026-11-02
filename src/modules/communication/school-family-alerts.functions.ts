@@ -22,7 +22,7 @@ const actionType="school_family_bulletin";
 
 async function registrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+ if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
   throw new AuthorizationError("real institutional school registrar");
  assertCapability(actor,"communication.send");
  if(!actor.scope.organizationIds?.length||!actor.scope.siteIds?.length||
@@ -76,7 +76,6 @@ export const publishSchoolFamilyAlert=createServerFn({method:"POST"})
        eq(s.accountPersonGrants.personId,s.guardianRelationships.guardianPersonId),
        eq(s.accountPersonGrants.role,"guardian"),
        eq(s.accountPersonGrants.active,true),
-       eq(s.accountPersonGrants.isSynthetic,false),
        eq(s.accountPersonGrants.organizationId,program.organizationId),
        or(isNull(s.accountPersonGrants.siteId),
          eq(s.accountPersonGrants.siteId,program.siteId)),

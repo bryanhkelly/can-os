@@ -6,6 +6,7 @@ import { EventTypes } from "@/domain/event-types";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 import { enrollmentFormState } from "@/domain/enrollment-form";
 import { enrollmentFormRevision } from "./enrollment-form.server";
+import { enrollmentDocumentStorageVerified } from "@/domain/r2-document-access";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,eq,inArray,asc } from "drizzle-orm";
@@ -130,7 +131,7 @@ export const reviewRequirementDocument=createServerFn({method:"POST"})
       .where(and(eq(s.documents.id,documentId),eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.subjectId,requirement.id),eq(s.documents.storageProvider,"cloudflare_r2"))).for("update").limit(1);
     if(!record||record.metadata.applicationId!==app.id)throw new Error("Document is outside this enrollment requirement");
     if(record.metadata.isCurrent===false)throw new Error("Superseded documents cannot be reviewed");
-    if(record.metadata.storageVerified!==true&&record.metadata.synthetic!==true)
+    if(!enrollmentDocumentStorageVerified(record.metadata,scope.organizationId))
      throw new Error("The uploaded file has not passed storage verification");
     reviewedDocument=record;
    }

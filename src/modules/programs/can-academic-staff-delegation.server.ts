@@ -22,7 +22,7 @@ const serviceFor = (role: AcademicStaffRole) => role === "teacher"
 async function scopedCANProgram(
   tx: Pick<typeof db,"select">, actor: AccessContext, programId: string,
 ) {
-  if (actor.demoFacilitator || !actor.actorPersonId || actor.grantSiteId !== null ||
+  if (actor.sessionAccountId || !actor.actorPersonId || actor.grantSiteId !== null ||
       actor.scope.organizationIds?.length !== 1)
     throw new AuthorizationError("verified independent CAN steward identity");
   const [row] = await tx.select({
@@ -63,7 +63,6 @@ async function verifiedStaff(
       isNull(accountPersonGrants.siteId),
       eq(accountPersonGrants.role,role),
       eq(accountPersonGrants.active,true),
-      eq(accountPersonGrants.isSynthetic,false),
       eq(people.active,true),
       eq(accessAccounts.disabled,false),
       sql`${accessAccounts.emailVerifiedAt} is not null`,
@@ -205,8 +204,7 @@ export async function listCANAcademicProgramStaff(
         eq(accountPersonGrants.organizationId,program.institutionId),
         isNull(accountPersonGrants.siteId),
         inArray(accountPersonGrants.role,["teacher","registrar"]),
-        eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false),
-        eq(people.active,true),eq(accessAccounts.disabled,false),
+        eq(accountPersonGrants.active,true),eq(people.active,true),eq(accessAccounts.disabled,false),
         sql`${accessAccounts.emailVerifiedAt} is not null`,
       )).orderBy(asc(people.legalLastName)).limit(101),
     db.select({

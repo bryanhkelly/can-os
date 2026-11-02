@@ -8,7 +8,6 @@ import { applicationGuardianContact } from "@/domain/application-guardian-contac
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
-import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
@@ -307,8 +306,6 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     const [person]=await tx.select({metadata:people.metadata}).from(people)
      .where(eq(people.id,existingStudent.personId)).limit(1);
     if(!person)throw new AuthorizationError("existing student identity");
-    assertRecordWriteAllowed(existingStudent.metadata,"registrar");
-    assertRecordWriteAllowed(person.metadata,"registrar");
     synthetic=existingStudent.metadata.synthetic===true||person.metadata.synthetic===true;
    }
    const idempotencyKey="registrar-inquiry:"+data.requestId;
@@ -555,7 +552,6 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
     .for("update").limit(1);
    if(!app||(actor.scope.programIds !== undefined && !actor.scope.programIds.includes(app.programId)))
     throw new AuthorizationError("admissions application");
-   assertRecordWriteAllowed(app.metadata,"registrar");
    const [scope]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
     .from(programs).where(eq(programs.id,app.programId)).limit(1);
    if(!scope||!actor.scope.organizationIds?.includes(scope.organizationId)||
@@ -652,7 +648,6 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
     (actor.scope.siteIds!==undefined&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
     throw new AuthorizationError("guardian membership scope");
-   assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
@@ -697,7 +692,6 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    const [newGrant]=await tx.insert(accountPersonGrants).values({
     accountId:account!.id,personId:contact.id,role:"guardian",
     organizationId:program.organizationId,siteId:program.siteId,
-    isSynthetic:app.metadata.synthetic===true,
    }).returning({id:accountPersonGrants.id});
    await writeAudit(tx,actor,{
     action:"admissions.guardian_access.provision",entityType:"account_person_grant",
@@ -780,7 +774,6 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
       !actor.scope.organizationIds?.includes(app.organizationId)||
       (actor.scope.siteIds!==undefined&&(!app.siteId||!actor.scope.siteIds.includes(app.siteId))))
     throw new AuthorizationError("guardian relationship verification Program, school and site scope");
-   assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
    const [learner]=await tx.select({personId:studentProfiles.personId})
     .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
