@@ -4,6 +4,7 @@ import { useState } from "react";
 import { listJurisdictionProfileReviews,saveJurisdictionProfileReview,publishJurisdictionProfile } from "@/modules/programs/jurisdiction-profile.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { WorkspaceShell } from "@/components/workspace";
 
 export const Route=createFileRoute("/operations/jurisdiction-profiles")({
@@ -15,8 +16,7 @@ function ReviewPage(){
  if(!result.ok)return <LoaderFailure title="Jurisdiction profiles" eyebrow="CAN OS · Policy review" outcome={result}/>;
  return <WorkspaceShell>
   <div className="space-y-5">
-   <header><h1 className="text-2xl font-bold">Jurisdiction profiles</h1>
-    <p className="text-sm text-muted-foreground">Editorial review workspace. Unverified drafts are not displayed as authoritative guidance to churches. Saving does not publish or authorize a school.</p></header>
+   <WorkflowIntro eyebrow="CAN OS · Policy review" title="Jurisdiction profiles" description="Review state operating models, funding, requirements and official sources before publishing guidance. Publication does not authorize a school to open." />
    {result.data.length===0?<p>No jurisdiction profiles have been prepared.</p>:result.data.map(item=><ReviewEditor key={item.id} item={item}/>)}
   </div>
  </WorkspaceShell>;
