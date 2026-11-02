@@ -56,8 +56,8 @@ function ReviewEditor({item}:{item:Item}){
   catch(error){setMessage(error instanceof Error?error.message:"Unable to publish");}
   finally{setSaving(false);}
  }
- return <details className="rounded-xl border bg-card p-4">
-  <summary className="cursor-pointer font-semibold">{item.name} · {item.revision} · {item.status} · {item.verificationStatus}</summary>
+ return <details className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+  <summary className="cursor-pointer font-serif text-lg font-semibold">{item.name} · {item.revision} · {item.status} · {item.verificationStatus}</summary>
   <div className="mt-4 space-y-3">
    <label className="block text-sm">Title<input className="mt-1 w-full rounded border bg-background p-2" value={title} disabled={!editable} onChange={e=>setTitle(e.target.value)}/></label>
    <label className="block text-sm">Summary<textarea className="mt-1 w-full rounded border bg-background p-2" rows={3} value={summary} disabled={!editable} onChange={e=>setSummary(e.target.value)}/></label>
