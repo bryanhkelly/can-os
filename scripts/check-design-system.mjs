@@ -27,7 +27,8 @@ for (const name of canonicalEvidence) {
     if (relativePath.endsWith(".stories.tsx") || relativePath.endsWith("/index.tsx")) return false;
     return new RegExp("export\\s+(?:function|const)\\s+" + name + "\\b").test(readFileSync(file, "utf8"));
   });
-  if (implementationFiles.length !== 1 || !relative(root, implementationFiles[0]).startsWith("evidence/")) {
+  const implementationPath = implementationFiles[0] && relative(root, implementationFiles[0]).replaceAll("\\", "/");
+  if (implementationFiles.length !== 1 || !implementationPath?.startsWith("evidence/")) {
     console.error(`Canonical evidence component ${name} must have exactly one implementation in components/evidence`);
     process.exitCode = 1;
   }

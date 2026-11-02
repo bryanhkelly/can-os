@@ -5,31 +5,53 @@ import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearn
 import {FirstSchoolDayHandoff} from "@/components/enrollment/FirstSchoolDayHandoff";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
+import { getActiveEnrollmentCounts, getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
 import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
 import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment,withdrawIssuedAdmissionOffer } from "@/modules/enrollment/admissions-offer.functions";
-import { admissionsPipelineSummary, pipelineStages, type AdmissionsStage } from "@/domain/admissions-pipeline";
+import { pipelineStages, type AdmissionsStage } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
 import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-const loadAdmissions = async (selection:{siteId?:string;programId?:string}={}) => ({
- rows: await getAdmissionsDashboard({data:selection}),
- options: await getAdmissionOfferOptions({data:selection}),
- sites: await listMySites(),
- programs: await listAdmissionsPrograms(),
-});
+const formatStatus=(status:string)=>status.replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
+
+const loadAdmissions = async (selection:{
+ siteId?:string;programId?:string;application?:string;stage?:AdmissionsStage;page?:number;
+}={}) => {
+ const [dashboard,options,enrollmentCounts,sites,programs]=await Promise.all([
+  getAdmissionsDashboard({data:{
+   siteId:selection.siteId,programId:selection.programId,applicationId:selection.application,
+   stage:selection.stage,page:selection.page,
+  }}),
+  selection.application
+   ?getAdmissionOfferOptions({data:{
+    siteId:selection.siteId,programId:selection.programId,applicationId:selection.application,
+   }})
+   :Promise.resolve([]),
+  getActiveEnrollmentCounts({data:{siteId:selection.siteId,programId:selection.programId}}),
+  listMySites(),
+  listAdmissionsPrograms(),
+ ]);
+ return {...dashboard,options,enrollmentCounts,sites,programs};
+};
 
 export const Route = createFileRoute("/admissions/")({
-  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;stage?:AdmissionsStage}=>({
+  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;stage?:AdmissionsStage;page?:number}=>({
     siteId:typeof search.siteId==="string"?search.siteId:undefined,
     programId:typeof search.programId==="string"?search.programId:undefined,
-    application:typeof search.application==="string"?search.application:undefined,
+    application:typeof search.application==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.application)?search.application:undefined,
     stage:pipelineStages.find(stage=>stage===search.stage),
+    page:typeof search.page==="number"&&Number.isInteger(search.page)&&search.page>0
+      ?Math.min(search.page,10_000)
+      :typeof search.page==="string"&&/^\d+$/.test(search.page)&&Number(search.page)>0
+        ?Math.min(Number(search.page),10_000):undefined,
   }),
-  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
+  loaderDeps:({search})=>({
+   siteId:search.siteId,programId:search.programId,application:search.application,
+   stage:search.stage,page:search.page,
+  }),
   loader:({deps})=>safeLoader(()=>loadAdmissions(deps),{
     authMessage:"Sign in with an authorized registrar account to view the admissions command center.",
   })(),
@@ -43,8 +65,10 @@ function Admissions() {
 }
 
 function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissions>> }) {
-  const { rows, options, sites, programs } = data;
+  const { rows, detail, summary, page, pageSize, filteredTotal, hasMore, options, enrollmentCounts, sites, programs } = data;
   const selected=Route.useSearch();
+  const pageCount=Math.max(1,Math.ceil(filteredTotal/pageSize));
+  const activeEnrollmentCount=enrollmentCounts.reduce((total,row)=>total+row.activeStudents,0);
   const programChoices=programs.filter(program=>!selected.siteId||program.siteId===selected.siteId);
   const openScope=(siteId?:string,programId?:string)=>{
     const query=new URLSearchParams();
@@ -52,7 +76,6 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
     if(programId)query.set("programId",programId);
     void router.navigate({href:"/admissions"+(query.size?"?"+query.toString():"")});
   };
-  const summary = admissionsPipelineSummary(rows);
   const router = useRouter();
   const [pending, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [interactive,setInteractive]=useState(false);
@@ -75,7 +98,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><Link to="/admissions/invite-families" className="rounded-lg border px-3 py-2 text-sm">Invite transfer families</Link><Link to="/admissions/transcripts" search={{query:""}} className="rounded-lg border px-3 py-2 text-sm">Official transcripts</Link><Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg border px-3 py-2 text-sm">Program capacity</Link></div>}
     >
       <WorkflowIntro eyebrow="Admissions & enrollment" title="A thoughtful path from inquiry to enrollment." description="Track each family's progress, review decisions, and hand accepted offers into authorized enrollment. Guardian verification remains independent." actions={<Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Open intake <ArrowUpRight className="size-4" /></Link>} />
-      {error && <p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
+      {error && <p role="alert" className="mt-4 rounded-xl border border-destructive/40 p-3 text-destructive">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
         <label className="text-sm">School
@@ -98,7 +121,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         <StatCard label="Awaiting decision" value={summary.awaitingDecision} />
         <StatCard label="Blocking requirements" value={summary.missingRequirements} />
       </div>
-      <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active program enrollments across applications: <strong>{rows.reduce((n, x) => n + x.enrollments.length, 0)}</strong></p></div>
+      <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active students across programs: <strong>{activeEnrollmentCount}</strong></p></div>
       <h2 className="mt-9 font-serif text-2xl">Pipeline</h2>
       <DetailNavigation label="Admissions stages">
        <Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId}} aria-current={!selected.stage?"page":undefined}>All ({summary.total})</Link>
@@ -109,7 +132,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
        <table className="w-full text-left text-sm">
         <caption className="sr-only">Authorized admissions pipeline and next steps</caption>
         <thead className="border-b bg-muted/50"><tr><th scope="col" className="p-4">Applicant</th><th scope="col" className="p-4">Program</th><th scope="col" className="p-4">Stage</th><th scope="col" className="p-4">Next step</th></tr></thead>
-        <tbody className="divide-y">{rows.filter(row=>!selected.stage||row.stage===selected.stage).map(row=>{
+        <tbody className="divide-y">{rows.map(row=>{
          const offer=selectActionableOffer(row.offers);
          const next=row.enrollments.length && row.activeSectionCount===0?"Assign staffed instructional class":
           row.enrollments.length && row.studentAccessStatus==="access_unavailable"?"Review revoked student access":
@@ -124,25 +147,34 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
           row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
          return <tr key={row.id} className="align-top hover:bg-muted/40">
-          <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
-          <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{row.disposition==="waitlisted"?"waitlisted":row.stage}</StatusBadge></td>
-          <td className="p-4"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{next}</Link></td>
+          <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
+          <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></td>
+          <td className="p-4"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{next}</Link></td>
          </tr>;
         })}</tbody>
        </table>
-       {!rows.some(row=>!selected.stage||row.stage===selected.stage)&&<p className="p-5 text-sm text-muted-foreground">No applications in this stage and scope.</p>}
+       {!rows.length&&<p className="p-5 text-sm text-muted-foreground">No applications in this stage and scope.</p>}
       </div>}
+      {!selected.application&&pageCount>1&&<nav aria-label="Admissions pages" className="mt-4 flex items-center justify-between gap-3 text-sm">
+       {page>1
+        ?<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page-1}} className="rounded border px-3 py-2">Previous page</Link>
+        :<span aria-disabled="true" className="rounded border px-3 py-2 opacity-50">Previous page</span>}
+       <span>Page {page} of {pageCount} · {filteredTotal} applications</span>
+       {hasMore
+        ?<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className="rounded border px-3 py-2">Next page</Link>
+        :<span aria-disabled="true" className="rounded border px-3 py-2 opacity-50">Next page</span>}
+      </nav>}
       <h2 className="mt-9 font-serif text-2xl">Applications</h2>
-      {selected.application&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId}} className="mt-3 inline-block text-sm underline">View all applications</Link>}
-      {selected.application&&!rows.some(row=>row.id===selected.application)&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}
-      <div className="mt-4 space-y-3">{rows.filter(row=>row.id===selected.application).map(x => {
+      {selected.application&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:selected.page&&selected.page>1?selected.page:undefined}} className="mt-3 inline-block text-sm underline">View all applications</Link>}
+      {selected.application&&!detail&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}
+      <div className="mt-4 space-y-3">{detail&&[detail].map(x => {
         const years = options.find(o => o.applicationId === x.id)?.years ?? [];
         const latest = selectActionableOffer(x.offers);
         const activated = latest ? x.enrollments.some(e => e.schoolYearId === latest.schoolYearId) : false;
         return <article key={x.id} className="rounded-xl border p-4">
           <h3 className="mb-2 font-serif text-2xl">{x.studentName??x.id}</h3>
           <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
-          <p className="mt-1 text-sm capitalize text-muted-foreground">{x.stage} · {x.outstandingRequirements} outstanding blocking requirements</p>
+          <p className="mt-1 text-sm text-muted-foreground">{formatStatus(x.stage)} · {x.outstandingRequirements} outstanding blocking requirements</p>
           {x.disposition==="waitlisted"&&<p role="status" className="mt-2 text-sm">Waitlisted - restore this application to review in admissions intake before issuing an offer.</p>}
           <Link to="/admissions/intake" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-block text-xs underline">Manage admissions decisions and waitlist →</Link>
           <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
@@ -277,7 +309,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
         Refresh eligible classes
       </button>
     </div>
-    {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+    {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     {acceptedOfferId&&!enrollmentActivated&&transferBlocker&&
       <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
         <strong>Receiving-school enrollment blocked:</strong> {transferBlocker}
@@ -290,7 +322,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
         {sections.filter(s => s.enrolled).map(s =>
           <span key={s.id} className="rounded-full border px-2 py-1 text-xs">Assigned: {s.title}</span>)}
       </div>
-      {sections.some(s => !s.enrolled && !s.readyForPlacement) && <p role="status" className="text-xs text-amber-700">
+      {sections.some(s => !s.enrolled && !s.readyForPlacement) && <p role="status" className="text-xs text-warning">
         Some classes cannot accept students yet: verify an institutional teacher
         with a published first lesson, a current CAN–church academic agreement,
          an open add/drop window, and available Section capacity.

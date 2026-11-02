@@ -18,15 +18,20 @@ vi.mock("@/modules/communication/notification-center.functions", () => ({ readNo
 describe("School Experiences calendar status display", () => {
   it("labels cancelled events distinctly from scheduled events", () => {
     const html = renderToStaticMarkup(<LiveSchoolExperiences data={{
-      connected: true, viewerRole: "student", notices: [], slots: [], bookings: [],
+      connected: true, viewerRole: "student",
+      notices: [{ id: "notice-1", title: "Synthetic announcement", body: "Synthetic update.", acknowledged: false }],
+      slots: [], bookings: [],
       events: [
         { id: "cancelled", title: "Cancelled assembly", startsAt: "2030-01-01T12:00:00Z", timezone: "UTC", status: "cancelled" },
         { id: "scheduled", title: "Upcoming assembly", startsAt: "2030-01-02T12:00:00Z", timezone: "UTC", status: "scheduled" },
       ],
     }} />);
-    expect(html).toMatch(/Cancelled assembly[\s\S]*?>Cancelled<\/p>/);
-    expect(html).toMatch(/Upcoming assembly[\s\S]*?>Scheduled<\/p>/);
-    expect(html.match(/>Cancelled<\/p>/g)).toHaveLength(1);
-    expect(html.match(/>Scheduled<\/p>/g)).toHaveLength(1);
+    expect(html).toMatch(/Cancelled assembly[\s\S]*?>Cancelled<\/span>/);
+    expect(html).toMatch(/Upcoming assembly[\s\S]*?>Scheduled<\/span>/);
+    expect(html.match(/>Cancelled<\/span>/g)).toHaveLength(1);
+    expect(html.match(/>Scheduled<\/span>/g)).toHaveLength(1);
+    expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=cancelled"');
+    expect(html).toContain("focus-visible:outline-2");
+    expect(html).toContain("min-h-11");
   });
 });

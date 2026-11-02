@@ -39,6 +39,7 @@ describe("canonical workspace navigation",()=>{
   const markup=renderToStaticMarkup(createElement(RouterProvider,{router}));
   const selected=markup.match(/<a[^>]*aria-current="page"[^>]*>/)?.[0];
   expect(selected).toContain('href="/student/my-school"');
+  expect(selected).toContain("focus-visible:ring-2");
   expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
   expect(markup).not.toContain('href="/counselor"');
  });

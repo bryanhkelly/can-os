@@ -3,11 +3,13 @@ import {lazy,Suspense,useEffect,useState,type ReactNode} from "react";
 import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy,ShieldAlert} from "lucide-react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {ContextTray,WorkspaceNotice} from "@/components/workspace";
+import {Button} from "@/components/ui/button";
 import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
 
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
 const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConversation").then(module=>({default:module.AskCanConversation})));
+const focusRingClass="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",safeguarding_responder:"/safeguarding",safeguarding_lead:"/safeguarding",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
@@ -35,7 +37,7 @@ export function SidebarLinks({links,activePath}:{links:{title:string;path:string
     item.path.includes("support")||item.path.includes("coach")||item.path.includes("counselor")?LifeBuoy:
     item.path.includes("assignments")||item.path.includes("gradebook")?ClipboardList:Home;
    return <Link key={item.path} to={item.path} aria-current={activePath===item.path?"page":undefined}
-    className={"flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium "+(activePath===item.path?"bg-muted text-foreground":"text-muted-foreground hover:bg-muted hover:text-foreground")}>
+    className={"flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium "+focusRingClass+" "+(activePath===item.path?"bg-muted text-foreground":"text-muted-foreground hover:bg-muted hover:text-foreground")}>
     <Icon className="size-4 shrink-0" aria-hidden="true"/>{item.title}</Link>;
   })}
  </nav>;
@@ -80,44 +82,44 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  }
  return <><div className={current?"min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]":"min-h-screen"}>
  {current&&<aside aria-label="Workspace sidebar" className="hidden border-r bg-card lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-  <div className="border-b p-5"><Link to={workspaceHome[current.role]??"/"} className="font-serif text-xl font-semibold">CAN OS</Link><p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Church Academy Network</p></div>
+  <div className="border-b p-5"><Link to={workspaceHome[current.role]??"/"} className={"rounded-sm font-serif text-xl font-semibold "+focusRingClass}>CAN OS</Link><p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Church Academy Network</p></div>
   <div className="p-4"><p className="text-xs uppercase tracking-widest text-muted-foreground">{current.role} workspace</p><p className="mt-2 text-sm font-semibold">{current.firstName} {current.lastName}</p>
    <p className="mt-1 text-xs text-muted-foreground">{authenticated?.sites.map(site=>site.name).join(", ")}</p></div>
   <SidebarLinks links={links} activePath={activePath}/>
-  <div className="border-t p-4"><Link to="/profiles" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold"><Users className="size-4" aria-hidden="true"/>My profile</Link>
-   <Link to="/account/sessions" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm"><Settings className="size-4" aria-hidden="true"/>Account sessions</Link>
-   {current.role==="student"&&<Link to="/student/settings" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm"><Settings className="size-4" aria-hidden="true"/>Preferences</Link>}</div>
+  <div className="border-t p-4"><Link to="/profiles" className={"flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold hover:bg-muted "+focusRingClass}><Users className="size-4" aria-hidden="true"/>My profile</Link>
+   <Link to="/account/sessions" className={"flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted "+focusRingClass}><Settings className="size-4" aria-hidden="true"/>Account sessions</Link>
+   {current.role==="student"&&<Link to="/student/settings" className={"flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted "+focusRingClass}><Settings className="size-4" aria-hidden="true"/>Preferences</Link>}</div>
  </aside>}
  <div className="min-w-0"><header aria-label="Workspace top bar" className="sticky top-0 z-30 border-b bg-card px-4 py-3 sm:px-6">
   <div className="flex min-w-0 flex-wrap items-center gap-3">
-   {current&&<button type="button" aria-label={menuOpen?"Close workspace navigation":"Open workspace navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(value=>!value)} className="rounded-lg border p-2 lg:hidden"><Menu className="size-4"/></button>}
+   {current&&<Button variant="outline" size="icon" aria-label={menuOpen?"Close workspace navigation":"Open workspace navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(value=>!value)} className="lg:hidden"><Menu aria-hidden="true"/></Button>}
    {current?<button type="button" aria-label="Switch workspace" disabled={changing} aria-haspopup="dialog" aria-expanded={switcherOpen} onClick={()=>{setSwitcherError("");setSwitcherOpen(true)}} className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <span className="shrink-0 font-serif text-lg font-semibold">CAN OS</span><span className="min-w-0 border-l pl-2"><span className="block text-xs font-semibold capitalize">{current.role.replaceAll("_"," ")}</span><span className="block truncate text-xs text-muted-foreground">{authenticated?.sites.length===1?authenticated.sites[0]?.name:authenticated?.sites.length?authenticated.sites.length+" schools":"Your workspace"}</span></span><ChevronDown className="size-4 shrink-0" aria-hidden="true"/>
-   </button>:<Link to="/" className="mr-auto font-serif text-xl font-semibold">CAN OS</Link>}
-   {current&&<button type="button" aria-label="Search or ask CAN" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/> <span className="hidden sm:inline">Search or ask CAN</span><span className="sm:hidden">Search</span></button>}
-   {current&&<button type="button" onClick={()=>setTray("ask")} aria-label="Ask CAN" aria-haspopup="dialog" className="rounded-lg border p-2 text-xs"><MessageCircle className="size-4" aria-hidden="true"/></button>}
-   {current&&<button type="button" onClick={()=>setTray("notifications")} aria-label="Notifications" aria-haspopup="dialog" className="rounded-lg border p-2"><Bell className="size-4" aria-hidden="true"/></button>}
-   {authenticated?<button type="button" aria-label="Account menu" aria-haspopup="dialog" aria-expanded={accountOpen} onClick={()=>setAccountOpen(true)} className="rounded-full border bg-muted p-2"><UserRound className="size-4" aria-hidden="true"/></button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
+   </button>:<Link to="/" className={"mr-auto rounded-sm font-serif text-xl font-semibold "+focusRingClass}>CAN OS</Link>}
+   {current&&<Button variant="outline" size="sm" aria-label="Search or ask CAN" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))}><Search aria-hidden="true"/> <span className="hidden sm:inline">Search or ask CAN</span><span className="sm:hidden">Search</span></Button>}
+   {current&&<Button variant="outline" size="icon" onClick={()=>setTray("ask")} aria-label="Ask CAN" aria-haspopup="dialog"><MessageCircle aria-hidden="true"/></Button>}
+   {current&&<Button variant="outline" size="icon" onClick={()=>setTray("notifications")} aria-label="Notifications" aria-haspopup="dialog"><Bell aria-hidden="true"/></Button>}
+   {authenticated?<Button variant="ghost" size="icon" aria-label="Account menu" aria-haspopup="dialog" aria-expanded={accountOpen} onClick={()=>setAccountOpen(true)} className="rounded-full border bg-muted"><UserRound aria-hidden="true"/></Button>:session&&<Link to="/access" className={"rounded-lg px-2 py-2 text-xs font-semibold "+focusRingClass}>Sign in</Link>}
    {(error||sessionError)&&<WorkspaceNotice tone="danger" className="w-full">{error||sessionError}</WorkspaceNotice>}
-   {authenticated?.demoFacilitator&&<WorkspaceNotice className="w-full">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</WorkspaceNotice>}
+   {authenticated?.demoAccountSwitching&&<WorkspaceNotice className="w-full">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared demo data. User switches are audited.</WorkspaceNotice>}
   </div>
  </header>{children}</div></div>
  {authenticated&&<><WorkspaceContextSwitcher session={authenticated} open={switcherOpen} changing={changing}
   error={switcherError} onClose={()=>setSwitcherOpen(false)}
   onSwitch={id=>void changeSession(()=>switchGrant(id),true)}/>
  <ContextTray title="Account" open={accountOpen} onClose={()=>setAccountOpen(false)}>
-  <div className="space-y-2 text-sm"><Link to="/profiles" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">My profile</Link><Link to="/account/sessions" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account sessions</Link>{current?.role==="student"&&<Link to="/student/settings" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account settings</Link>}<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="block w-full rounded-lg p-3 text-left font-semibold hover:bg-muted">Sign out</button></div>
+  <div className="space-y-2 text-sm"><Link to="/profiles" onClick={()=>setAccountOpen(false)} className={"block rounded-lg p-3 hover:bg-muted "+focusRingClass}>My profile</Link><Link to="/account/sessions" onClick={()=>setAccountOpen(false)} className={"block rounded-lg p-3 hover:bg-muted "+focusRingClass}>Account sessions</Link>{current?.role==="student"&&<Link to="/student/settings" onClick={()=>setAccountOpen(false)} className={"block rounded-lg p-3 hover:bg-muted "+focusRingClass}>Account settings</Link>}<Button variant="ghost" size="sm" disabled={changing} onClick={()=>void changeSession(signOut)} className="w-full justify-start">Sign out</Button></div>
  </ContextTray></>}
  {current&&<><ContextTray title="Workspace navigation" open={menuOpen} onClose={()=>setMenuOpen(false)}>
   <p className="mb-3 text-sm font-semibold">{current.firstName} {current.lastName} · {current.role}</p>
-  <SidebarLinks links={links} activePath={activePath}/><Link to="/profiles" className="mt-3 block border-t p-3 text-sm underline">My profile</Link><Link to="/account/sessions" className="block p-3 text-sm underline">Account sessions</Link>
+  <SidebarLinks links={links} activePath={activePath}/><Link to="/profiles" className={"mt-3 block rounded-lg border-t p-3 text-sm underline "+focusRingClass}>My profile</Link><Link to="/account/sessions" className={"block rounded-lg p-3 text-sm underline "+focusRingClass}>Account sessions</Link>
  </ContextTray><ContextTray title="Notifications" open={tray==="notifications"} onClose={()=>setTray(null)}>
   <Suspense fallback={<p role="status">Loading notifications...</p>}><NotificationTray onNavigate={()=>setTray(null)}/></Suspense>
  </ContextTray>
  <ContextTray title="Ask CAN" open={tray==="ask"} onClose={()=>setTray(null)}>
   <p className="text-sm text-muted-foreground">Your conversations follow you between workspaces. Answers and proposed actions use your verified permissions; this page does not expand them.</p>
-  <Link to="/ask" onClick={()=>setTray(null)} className="mt-2 inline-block text-sm underline">Open full conversation page</Link>
-  {current.role==="guardian"&&<Link to="/guardian/watching" onClick={()=>setTray(null)} className="ml-4 text-sm underline">Things CAN Is Watching</Link>}
+  <Link to="/ask" onClick={()=>setTray(null)} className={"mt-2 inline-block rounded-sm text-sm underline "+focusRingClass}>Open full conversation page</Link>
+  {current.role==="guardian"&&<Link to="/guardian/watching" onClick={()=>setTray(null)} className={"ml-4 inline-block rounded-sm text-sm underline "+focusRingClass}>Things CAN Is Watching</Link>}
   <Suspense fallback={<p role="status">Loading Ask CAN...</p>}><AskCanConversation/></Suspense>
  </ContextTray></>}
  </>;

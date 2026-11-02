@@ -2,7 +2,7 @@ vi.mock("@/modules/operations/onsite-day-preparation.functions",()=>({getOnsiteS
 vi.mock("@/modules/operations/onsite-room-plan.functions",()=>({getOnsiteRoomPlanningFn:vi.fn(),submitOnsiteRoomPlanFn:vi.fn(),reviewOnsiteRoomPlanFn:vi.fn()}));
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { SiteDayPage } from "@/routes/site.day";
+import { SiteDayPage } from "@/components/operations/SiteDayPage";
 import { workspaceHome, workspaceLinks } from "@/components/shell/WorkspaceNavigation";
 
 vi.mock("@tanstack/react-router", async importOriginal => ({

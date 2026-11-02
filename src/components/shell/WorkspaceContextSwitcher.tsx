@@ -7,7 +7,7 @@ type WorkspaceGrant = AuthenticatedSession["grants"][number];
 
 export function workspaceGrantSearchText(grant: WorkspaceGrant, sites: AuthenticatedSession["sites"]) {
   const site = sites.find(item => item.id === grant.siteId);
-  return `${grant.firstName} ${grant.lastName} ${grant.role.replaceAll("_", " ")} ${site?.name ?? ""}`.toLowerCase();
+  return `${grant.firstName} ${grant.lastName} ${grant.role.replaceAll("_", " ")} ${grant.email ?? ""} ${site?.name ?? ""}`.toLowerCase();
 }
 
 export function WorkspaceContextSwitcher({ session, open, changing, error, onClose, onSwitch }: {
@@ -39,8 +39,8 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
         {current?.role.replaceAll("_", " ")} · {session.sites.find(site => site.id === current?.siteId)?.name ?? "Authorized workspace"}
       </p>
     </div>
-    {session.demoFacilitator && <WorkspaceNotice className="mb-4">
-      Review identities are limited to this authorized demo session. Changes affect synthetic data and are audited.
+    {session.demoAccountSwitching && <WorkspaceNotice className="mb-4">
+      Demo account switching is limited to this session. Each identity is rechecked before selection; changes affect shared demo data and are audited.
     </WorkspaceNotice>}
     {error && <WorkspaceNotice ref={errorRef} tone="danger" className="mb-4">
       No workspace was changed. {error}

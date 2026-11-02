@@ -62,6 +62,26 @@ describe("Student Today summary navigation", () => {
     expect(html).toMatch(/<a href="\/student\/courses"[^>]*>[\s\S]*?Classes<\/p>/);
     expect(html).toMatch(/<a href="\/student\/assignments"[^>]*>[\s\S]*?Upcoming assignments<\/p>/);
     expect(html).toMatch(/<a href="\/student\/assignments\?filter=missing"[^>]*><p[^>]*>Missing work<\/p>/);
+    expect(html).toContain('href="/student/experiences"');
+    expect(html).toContain("School &amp; community");
+  });
+
+  it("distinguishes coursework states and keeps keyboard focus visible", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [], events: [], openActions: [], recoveryCandidates: [],
+      coursework: [
+        { assessmentId: "missing", assessmentTitle: "Synthetic missing work", status: "assigned", timeliness: "missing", dueAt: null, instructions: null },
+        { assessmentId: "late", assessmentTitle: "Synthetic late work", status: "assigned", timeliness: "late", dueAt: null, instructions: null },
+        { assessmentId: "returned", assessmentTitle: "Synthetic revision", status: "returned", timeliness: "late", dueAt: null, instructions: null },
+      ],
+    }} />);
+    expect(html).toContain("Missing");
+    expect(html).toContain(">Late</span>");
+    expect(html).toContain("Revision requested");
+    expect(html).toContain("focus-visible:outline-2");
+    expect(html).toContain("No scheduled events today.");
   });
 
   it("shows student-owned support tasks exactly once in Student Today without staff case data", () => {
@@ -88,7 +108,7 @@ describe("Student Today summary navigation", () => {
     />);
     expect(html.match(/Meet your academic tutor/g)).toHaveLength(1);
     expect(html).toContain('href="/student/experiences?action=support-task"');
-    expect(html).toContain("No additional actions outside your learning support list.");
+    expect(html).toContain("No additional open actions outside your learning support list.");
     expect(html).not.toContain("Private counselor");
     expect(html).not.toContain("safeguarding");
   });

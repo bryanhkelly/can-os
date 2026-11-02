@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 export function ContextTray({ title, open, onClose, children }: {
   title: string; open: boolean; onClose: () => void; children: ReactNode;
@@ -17,7 +18,7 @@ export function ContextTray({ title, open, onClose, children }: {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between gap-3 border-b bg-card px-5 py-4">
         <h2 className="font-semibold">{title}</h2>
-        <button type="button" onClick={onClose} aria-label={`Close ${title}`} className="rounded-lg border px-3 py-2 text-sm">Close</button>
+        <Button variant="outline" size="sm" onClick={onClose} aria-label={`Close ${title}`}>Close</Button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-5">{open && children}</div>
     </div>

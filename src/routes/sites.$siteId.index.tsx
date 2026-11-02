@@ -2,12 +2,12 @@ import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, CalendarDays, ClipboardCheck, Globe2 } from "lucide-react";
 import { getSiteToday } from "@/modules/operations/site-today.functions";
-import { WorkspaceShell } from "@/components/workspace";
+import { StatCard, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
-import { AttentionQueue } from "@/components/operations/AttentionQueue";
+import { SiteTodayPriorities } from "@/components/operations/SiteTodayPriorities";
 import { SiteOwnedActionResolution } from "@/components/operations/SiteOwnedActionResolution";
 
 export const Route = createFileRoute("/sites/$siteId/")({
@@ -68,7 +68,7 @@ function SiteTodayPage() {
     </nav>
     {blockedOpenings.length>0&&
       <section role="alert" aria-label="School opening authorization"
-        className="mt-6 border-l-4 border-rose-500 bg-muted/40 px-5 py-4">
+        className="mt-6 border-l-4 border-destructive bg-muted/40 px-5 py-4">
         <h2 className="font-semibold">School opening is not currently authorized</h2>
         <p className="mt-1 text-sm">
           A church-hosted school at this site is not approved to operate right now. The supervised
@@ -90,18 +90,16 @@ function SiteTodayPage() {
           })}
         </ul>
       </section>}
+    <SiteTodayPriorities items={data.attentionItems} siteId={data.site.id} siteTimezone={data.site.timezone}
+      ownedActionIds={ownedFollowUps.map(action => `action:${action.id}`)}
+      staffingExceptionCount={staffingExceptions.length}
+      studentExceptionCount={studentExceptions.length}/>
     <OpeningHandoffs handoffs={data.openingHandoffs}/>
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {[
-        ["Active enrollment", String(data.enrollment.count), data.enrollment.note],
-        ["Attendance recorded", data.attendance.count ? String(data.attendance.count) : "No records", data.attendance.note],
-        ["Present records", data.attendance.count ? String(data.attendance.present) : "—", "Today’s recorded attendance observations"],
-        ["Open actions", String(data.actions.length), "Scoped outstanding site actions"],
-      ].map(([label, value, note]) => <section key={label} className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-2 font-serif text-3xl">{value}</p>
-        <p className="mt-2 text-xs text-muted-foreground">{note}</p>
-      </section>)}
+      <StatCard label="Active enrollment" value={data.enrollment.count} hint={data.enrollment.note}/>
+      <StatCard label="Attendance recorded" value={data.attendance.count ? data.attendance.count : "No records"} hint={data.attendance.note}/>
+      <StatCard label="Present records" value={data.attendance.count ? data.attendance.present : "—"} hint="Today’s recorded attendance observations"/>
+      <StatCard label="Open actions" value={data.actions.length} hint="Scoped outstanding site actions"/>
     </div>
     <section aria-label="Supervised school day" className="mt-8 rounded-2xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -125,7 +123,7 @@ function SiteTodayPage() {
       </div>
       {data.schoolDay.projectionTruncated&&<p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">Some source listings were capped. This is not a complete school-day review; resolve the source-data volume before attestation.</p>}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <div>
+        <div id="staffing-exceptions" tabIndex={-1}>
           <h3 className="font-semibold">Staff coverage and check-in</h3>
           <p className="mt-1 text-xs text-muted-foreground">{data.schoolDay.staffing.unacknowledged} blocks awaiting duty response · {data.schoolDay.staffing.coverageExceptions} coverage exceptions · {data.schoolDay.staffing.witnessedBlocks} independently witnessed blocks</p>
           <div className="mt-3 space-y-2">
@@ -142,7 +140,7 @@ function SiteTodayPage() {
             {!staffingExceptions.length&&<p className="rounded-lg border p-3 text-sm text-muted-foreground">No current staffing or check-in exceptions in the authorized plan.</p>}
           </div>
         </div>
-        <div>
+        <div id="student-exceptions" tabIndex={-1}>
           <h3 className="font-semibold">Student attendance, exceptions and dismissal</h3>
           <p className="mt-1 text-xs text-muted-foreground">{data.schoolDay.exceptions.pendingGuardianExplanations} pending family explanations · {data.schoolDay.exceptions.healthVisits} health visits · {data.schoolDay.exceptions.sentHome} sent home · {data.schoolDay.exceptions.incidents} incidents</p>
           <div className="mt-3 space-y-2">
@@ -171,8 +169,7 @@ function SiteTodayPage() {
     </section>
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <section>
-        {ownedFollowUps.length>0&&<SiteOwnedActionResolution actions={ownedFollowUps}/>}
-        <AttentionQueue items={data.attentionItems} empty="No opening, staffing, admissions, document, family or academic work needs attention in your current site scope."/>
+        {ownedFollowUps.length>0&&        <SiteOwnedActionResolution actions={ownedFollowUps} timezone={data.site.timezone}/>}
         <h2 className="mt-8 font-serif text-2xl">Today's schedule</h2>
         <div className="mt-4 space-y-3">
           {data.events.map(event => <article key={event.id} className="flex items-start gap-4 rounded-xl border bg-card p-4">
