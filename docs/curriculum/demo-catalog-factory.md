@@ -12,13 +12,13 @@ Output is deterministic and carries an explicit provenance record. The deeper ex
 
 ## Import
 
-Use an **isolated Neon database branch** and the existing synthetic demonstration publisher organization. Obtain its UUID from the branch and supply that ID explicitly.
+Use an **isolated Neon database branch** and a dedicated organization named **CAN Demo Publisher** (slug `can-demo-publisher`, type `other_partner`, metadata `demoPublisher: true`, `isSynthetic: true`). The importer rejects any other publisher. Create this organization in the target database before importing. The validation Neon branch already contains it, with UUID `3340246a-4e2d-46cf-aa79-0adaa9feb2c8`.
 
 ```bash
 DATABASE_URL="<branch-specific connection string>" \
   node --import tsx scripts/import-demo-curriculum.mjs \
   --file /tmp/can-demo-catalog.json \
-  --publisher "<synthetic-organization-uuid>"
+  --publisher "<can-demo-publisher-uuid>"
 ```
 
 This is a dry run. To load drafts, set `DEMO_CURRICULUM_ALLOW_WRITE=1` and add `--apply`. Never point the command at a live production database without deliberately reviewing the target and publisher. The importer verifies course content with the existing Zod schema and wraps all records in one transaction. Re-runs with identical input are idempotent by SHA-256 digest and course code. Different input creates new draft versions rather than rewriting published versions.
