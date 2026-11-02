@@ -26,7 +26,8 @@ function ReviewEditor({item}:{item:Item}){
  const router=useRouter();
  const [title,setTitle]=useState(item.title);
  const [summary,setSummary]=useState(item.summary);
- const [profile,setProfile]=useState(JSON.stringify(item.profile,null,2));
+ const [profile,setProfile]=useState<Record<string,unknown>>(item.profile && typeof item.profile==="object"&&!Array.isArray(item.profile)?item.profile as Record<string,unknown>:{});
+ const models=Array.isArray(profile.operatingModels)?profile.operatingModels as string[]:[];
  const [sources,setSources]=useState<Array<{title:string;url:string;authority:string;checkedAt:string}>>(
   Array.isArray(item.evidence)?item.evidence.filter((s):s is {title:string;url:string;authority:string;checkedAt:string}=>Boolean(s&&typeof s==="object"&&"url" in s&&"title" in s&&"authority" in s&&"checkedAt" in s)):[]);
  function editSource(index:number,field:"title"|"url"|"authority"|"checkedAt",value:string){
@@ -38,7 +39,7 @@ function ReviewEditor({item}:{item:Item}){
  async function save(){
   setSaving(true);setMessage("");
   try{
-   const parsedProfile=JSON.parse(profile);
+   const parsedProfile={...profile,summary};
    const parsedEvidence=sources;
    if(!parsedProfile||Array.isArray(parsedProfile)||typeof parsedProfile!=="object")throw Error("Profile must be a JSON object");
 
@@ -60,7 +61,11 @@ function ReviewEditor({item}:{item:Item}){
   <div className="mt-4 space-y-3">
    <label className="block text-sm">Title<input className="mt-1 w-full rounded border bg-background p-2" value={title} disabled={!editable} onChange={e=>setTitle(e.target.value)}/></label>
    <label className="block text-sm">Summary<textarea className="mt-1 w-full rounded border bg-background p-2" rows={3} value={summary} disabled={!editable} onChange={e=>setSummary(e.target.value)}/></label>
-   <label className="block text-sm">Structured profile (JSON)<textarea className="mt-1 w-full rounded border bg-background p-2 font-mono text-xs" rows={14} value={profile} disabled={!editable} onChange={e=>setProfile(e.target.value)}/></label>
+   <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+    <div className="flex items-center justify-between"><h3 className="font-semibold">Operating models</h3>{editable&&<button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>setProfile(v=>({...v,operatingModels:[...models,""]}))}>Add model</button>}</div>
+    {models.length===0&&<p className="text-sm text-muted-foreground">Add applicable models after researching state rules.</p>}
+    {models.map((model,i)=><div key={i} className="flex gap-2"><input aria-label={`Operating model ${i+1}`} className="w-full rounded-lg border bg-background p-2 text-sm" disabled={!editable} value={model} onChange={e=>setProfile(v=>({...v,operatingModels:models.map((x,j)=>i===j?e.target.value:x)}))}/>{editable&&<button type="button" className="text-sm underline" onClick={()=>setProfile(v=>({...v,operatingModels:models.filter((_,j)=>i!==j)}))}>Remove</button>}</div>)}
+   </section>
    <section className="space-y-3" aria-label="Evidence sources">
     <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Official source evidence</h3>
      {editable&&<button type="button" className="rounded border px-3 py-1 text-sm" onClick={()=>setSources(previous=>[...previous,{title:"",url:"",authority:"",checkedAt:new Date().toISOString()}])}>Add source</button>}</div>
