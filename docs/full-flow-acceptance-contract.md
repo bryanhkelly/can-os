@@ -10,6 +10,9 @@ Connected acceptance supports the reviewed `main` and `FullFlow` Git branches.
 Dispatch the workflow on the branch whose exact commit is being evaluated.
 The shared source guard rejects other branches, tags, detached local checkouts,
 missing CI commit identity and a checked-out SHA that differs from `GITHUB_SHA`.
+It also rejects tracked changes and nonignored untracked files, so a reported
+commit cannot conceal local application or test edits. Commit changes before
+acceptance; ignored generated build/test outputs remain permitted.
 `main` source support does **not** authorize testing against the Neon `main`
 database: the pinned nonproduction FullFlow database, distinct admissions target,
 endpoint/branch attestation and exact-SHA migration approval remain mandatory.

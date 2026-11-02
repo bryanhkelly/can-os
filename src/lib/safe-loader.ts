@@ -39,7 +39,11 @@ export function safeLoader<T>(
       const classification = classifyLoaderError(error);
       if (classification.kind === "unexpected") {
         if (options?.onUnexpectedError) options.onUnexpectedError(error);
-        else if (typeof window === "undefined") console.error("Loader failed", error);
+        // Driver errors may contain SQL parameters, student data or credentials.
+        // Default logs receive only our own bounded classification.
+        else if (typeof window === "undefined") console.error("Loader failed", {
+          kind: classification.kind, retryable: classification.retryable,
+        });
       }
       const authError = classification.kind === "authentication"
         ? options?.authMessage ?? DEFAULT_AUTH_MESSAGE

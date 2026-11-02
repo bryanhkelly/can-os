@@ -1,17 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { z } from "zod";
-
-const applicationSchema = z.object({
-  churchName: z.string().trim().min(2).max(160),
-  siteName: z.string().trim().min(2).max(160),
-  timezone: z.string().trim().min(3).max(80),
-  churchWebsite: z.union([z.literal(""), z.string().trim().url().max(500).refine(v => v.startsWith("https://"))]).optional(),
-  leaderTitle: z.string().trim().min(2).max(100),
-  contactEmail: z.string().trim().email().max(254).toLowerCase(),
-  firstName: z.string().trim().min(1).max(80),
-  lastName: z.string().trim().min(1).max(80),
-}).strict();
+import { churchApplicationSchema as applicationSchema, churchApplicationLimits,
+  type ChurchApplicationField } from "@/domain/church-application";
 
 export const Route = createFileRoute("/church/apply")({
   server: { handlers: {
@@ -56,12 +46,26 @@ function ChurchApplicationPage() {
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  function change(key: keyof typeof form, value: string) { setForm(s => ({ ...s, [key]: value })); }
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ChurchApplicationField, string[]>>>({});
+  function change(key: keyof typeof form, value: string) {
+    setForm(s => ({ ...s, [key]: value }));
+    setFieldErrors(errors => ({ ...errors, [key]: undefined }));
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setError("");
+    if (busy) return;
+    const parsed = applicationSchema.safeParse(form);
+    if (!parsed.success) {
+      setFieldErrors(parsed.error.flatten().fieldErrors);
+      setError("Check the highlighted fields.");
+      const firstField = parsed.error.issues[0]?.path[0];
+      if (typeof firstField === "string") document.getElementById(`church-${firstField}`)?.focus();
+      return;
+    }
+    setFieldErrors({}); setBusy(true);
     try {
       const response = await fetch("/church/apply", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed.data),
       });
       if (!response.ok) {
         setError(response.status === 429 ? "Applications are busy. Try again shortly." :
@@ -83,22 +87,30 @@ function ChurchApplicationPage() {
       <p className="mt-2">CAN will review the information and verify church authority. If approved, the authorized church leader will receive a secure email invitation to start school setup.</p>
       <p className="mt-2 text-sm text-muted-foreground">Submitting an application does not approve the church, authorize operation, or open enrollment.</p>
       <Link to="/access" className="mt-4 inline-block underline">Already invited? Sign in</Link>
-    </section> : <form onSubmit={submit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2">
+    </section> : <form noValidate onSubmit={submit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2">
       {([
         ["churchName","Church name"],["siteName","Proposed school site name"],
         ["firstName","Your first name"],["lastName","Your last name"],
         ["leaderTitle","Your role at the church"],["contactEmail","Your work email"],
-      ] as const).map(([key,label]) => <label key={key} className="text-sm font-semibold">{label}
-        <input required type={key==="contactEmail"?"email":"text"} maxLength={key==="contactEmail"?254:160}
-          className={field} value={form[key]} onChange={event=>change(key,event.target.value)} /></label>)}
+      ] as const).map(([key,label]) => <label key={key} className="text-sm font-semibold"><span id={`church-${key}-label`}>{label}</span>
+        <input id={`church-${key}`} required type={key==="contactEmail"?"email":"text"} maxLength={churchApplicationLimits[key]}
+          aria-invalid={Boolean(fieldErrors[key])} aria-describedby={fieldErrors[key]?`church-${key}-error`:undefined}
+          aria-labelledby={`church-${key}-label`}
+          className={field} value={form[key]} onChange={event=>change(key,event.target.value)} />
+        {fieldErrors[key]&&<span id={`church-${key}-error`} className="mt-1 block text-sm text-destructive">{fieldErrors[key]?.[0]}</span>}
+      </label>)}
       <label className="text-sm font-semibold">School timezone
-        <select className={field} value={form.timezone} onChange={event=>change("timezone",event.target.value)}>
+        <select id="church-timezone" aria-invalid={Boolean(fieldErrors.timezone)} className={field} value={form.timezone} onChange={event=>change("timezone",event.target.value)}>
           {["America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC"].map(tz=><option value={tz} key={tz}>{tz.replaceAll("_"," ")}</option>)}
         </select>
       </label>
-      <label className="text-sm font-semibold">Church website (optional)
-        <input type="url" placeholder="https://…" maxLength={500} className={field}
-          value={form.churchWebsite} onChange={event=>change("churchWebsite",event.target.value)}/></label>
+      <label className="text-sm font-semibold"><span id="church-website-label">Church website (optional)</span>
+        <input id="church-churchWebsite" type="url" placeholder="https://…" maxLength={churchApplicationLimits.churchWebsite} className={field}
+          aria-invalid={Boolean(fieldErrors.churchWebsite)} aria-describedby={fieldErrors.churchWebsite?"church-website-error":undefined}
+          aria-labelledby="church-website-label"
+          value={form.churchWebsite} onChange={event=>change("churchWebsite",event.target.value)}/>
+        {fieldErrors.churchWebsite&&<span id="church-website-error" className="mt-1 block text-sm text-destructive">{fieldErrors.churchWebsite[0]}</span>}
+      </label>
       <p className="text-xs text-muted-foreground sm:col-span-2">CAN will verify church authorization outside this form. Email ownership is also checked by a one-time sign-in link after approval.</p>
       {error&&<p role="alert" className="text-sm text-destructive sm:col-span-2">{error}</p>}
       <button type="submit" disabled={busy} className="rounded-lg bg-foreground px-4 py-3 font-semibold text-background disabled:opacity-50 sm:col-span-2">{busy?"Sending…":"Request church onboarding"}</button>
