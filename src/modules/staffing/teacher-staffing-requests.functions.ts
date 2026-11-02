@@ -22,20 +22,14 @@ const requestSchema = scope.extend({
   sectionId: uuid.optional(),
 }).strict();
 
-function requireIsolatedTeacherPreview() {
-  if (process.env.CAN_DEMO_TEACHER_PREVIEW_ENABLED !== "true" ||
-      process.env.CAN_DEMO_ISOLATED_ENV !== "true") {
-    throw new AuthorizationError("CAN demo teacher requests require an isolated demonstration environment");
-  }
-}
 type TeacherSelection = z.infer<typeof requestSchema>;
-function selectionMetadata(data: TeacherSelection) {
+function selectionMetadata(data: TeacherSelection, isSynthetic: boolean) {
   return {
     requestOrigin: "can_teacher_marketplace",
     courseVersionId: data.courseVersionId,
     teacherPersonId: data.teacherPersonId,
     sectionId: data.sectionId ?? null,
-    syntheticPreview: true,
+    isSynthetic,
     staffingAuthorization: "not_granted",
   };
 }
@@ -44,10 +38,9 @@ function sameSelection(saved: Record<string, unknown>, expected: ReturnType<type
     saved.courseVersionId === expected.courseVersionId &&
     saved.teacherPersonId === expected.teacherPersonId &&
     (saved.sectionId ?? null) === expected.sectionId &&
-    saved.syntheticPreview === true;
+    saved.isSynthetic === expected.isSynthetic;
 }
 async function authorizedSchoolSelection(programId: string) {
-  requireIsolatedTeacherPreview();
   const actor = await requireActor(["registrar"], "program.launch.start");
   if (!actor.scope.programIds?.includes(programId))
     throw new AuthorizationError("school staffing program scope");
@@ -58,20 +51,20 @@ async function authorizedSchoolSelection(programId: string) {
   return { actor, market, versionIds };
 }
 
-/** Record a school administrator's selected CAN demo teacher as a request,
+/** Record a school administrator's selected CAN-managed teacher as a request,
  * not a Section, credential, capacity reservation, or teaching assignment.
  * The existing launch staffing service remains the sole assignment path.
  */
-export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
+export const requestTeacherStaffing = createServerFn({ method: "POST" })
   .validator((input: unknown) => requestSchema.parse(input))
   .handler(async ({ data }) => {
     const { actor, market, versionIds } = await authorizedSchoolSelection(data.programId);
     if (!versionIds.has(data.courseVersionId))
       throw new AuthorizationError("staffing requests require an adopted course version");
-    const metadata = selectionMetadata(data);
     return db.transaction(async tx => {
       const [school] = await tx.select({
         organizationId: programs.organizationId, siteId: programs.siteId,
+        academicProviderOrganizationId: programs.academicProviderOrganizationId,
       }).from(programs).where(eq(programs.id, data.programId)).limit(1);
       if (!school?.siteId || school.siteId !== market.program.siteId ||
           !actor.scope.organizationIds?.includes(school.organizationId) ||
@@ -89,9 +82,13 @@ export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
         )).limit(1);
         if (!klass) throw new AuthorizationError("class must belong to the selected school course");
       }
-      // Server-side capability, membership, ownership, and demo-only offering
-      // checks prevent forging a Person ID or selecting a different publisher.
-      const [match] = await tx.select({ personId: people.id })
+      // Server-side capability and provider checks prevent forging a Person ID
+      // or choosing an instructor that CAN has not put on this marketplace.
+      const [match] = await tx.select({
+        personId: people.id, providerId: organizations.id,
+        providerMetadata: organizations.metadata, courseMetadata: courseTemplates.metadata,
+        offeringMetadata: instructionalCapacityOfferings.metadata,
+      })
         .from(courseTemplateVersions)
         .innerJoin(courseTemplates, eq(courseTemplates.id, courseTemplateVersions.courseTemplateId))
         .innerJoin(instructorCapabilities, eq(instructorCapabilities.courseTemplateId, courseTemplates.id))
@@ -110,13 +107,21 @@ export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
           eq(instructorCapabilities.active, true),
           eq(instructorAvailabilityWindows.active, true),
           eq(instructionalCapacityOfferings.status, "open"),
-          eq(organizations.slug, "can-demo-teaching-provider"),
-          sql`${organizations.metadata}->>'demoProvider' = 'true'`,
-          sql`${organizations.metadata}->>'isSynthetic' = 'true'`,
-          sql`${instructionalCapacityOfferings.metadata}->>'previewOnly' = 'true'`,
-          sql`${people.metadata}->>'sourceSystem' = 'can-demo-teacher-marketplace-factory'`,
+          or(
+            and(eq(organizations.id, school.academicProviderOrganizationId),
+              sql`coalesce(${organizations.metadata}->>'isSynthetic', 'false') <> 'true'`,
+              sql`coalesce(${instructionalCapacityOfferings.metadata}->>'previewOnly', 'false') <> 'true'`),
+            and(
+              sql`${courseTemplates.metadata}->>'sourceSystem' = 'can-demo-catalog-factory'`,
+              sql`${organizations.metadata}->>'demoProvider' = 'true'`,
+              sql`${organizations.metadata}->>'isSynthetic' = 'true'`,
+              sql`${instructionalCapacityOfferings.metadata}->>'previewOnly' = 'true'`,
+            ),
+          ),
         )).limit(1);
-      if (!match) throw new AuthorizationError("selected instructor is not a CAN demo marketplace candidate");
+      if (!match) throw new AuthorizationError("selected instructor is not an eligible CAN marketplace candidate");
+      const isSynthetic = match.providerMetadata.isSynthetic === true;
+      const metadata = selectionMetadata(data, isSynthetic);
       // Serialize same-course/teacher/school requests, including requests for
       // the same specific class, to prevent duplicate clicks/concurrent clients.
       const selectionKey = [data.programId,data.courseVersionId,data.teacherPersonId,data.sectionId ?? "course"].join(":");
@@ -138,7 +143,7 @@ export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
         id: data.requestId,
         type: "teacher_staffing_request", status: "open", priority: "normal",
         title: "CAN instructor request: " + (course?.title ?? "Selected course"),
-        description: "School requested CAN review of an illustrative teacher match. No assignment or clearance is implied.",
+        description: "School requested CAN instructor staffing review. No assignment or clearance is implied.",
         ownerPersonId: actor.actorPersonId,
         organizationId: school.organizationId, siteId: school.siteId,
         programId: data.programId, sectionId: data.sectionId ?? null,
@@ -174,7 +179,7 @@ export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
 /** The registrar sees only requests for an authorized school, never a
  * provider-wide teacher directory or requests for unrelated church schools.
  */
-export const listDemoTeacherStaffingRequests = createServerFn({ method: "GET" })
+export const listTeacherStaffingRequests = createServerFn({ method: "GET" })
   .validator((input: unknown) => scope.parse(input))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
