@@ -24,7 +24,7 @@ beforeEach(()=>{
     let tableName="";
     return {
       from(table:Table){tableName=getTableName(table);return this;},
-      innerJoin(){return this;},where(){return this;},orderBy(){return this;},
+      innerJoin(){return this;},leftJoin(){return this;},where(){return this;},orderBy(){return this;},
       limit:async()=>state.rows[tableName]??[],
       then(resolve:(rows:unknown[])=>unknown,reject:(reason:unknown)=>unknown){
         return Promise.resolve(state.rows[tableName]??[]).then(resolve,reject);
@@ -129,5 +129,13 @@ describe("authorized notification destinations",()=>{
       programId:"program",sectionId:"section"}];
     expect((await getNotifications())[0]?.href)
       .toBe("/student/study-groups?group=group");
+  });
+  it("opens an invitation to a program-wide interest group",async()=>{
+    state.role="student";
+    notification("study_group","interest-group","study_group_invitation");
+    state.rows.study_groups=[{id:"interest-group",facilitator:"teacher",siteId:"school",
+      programId:null,sectionId:null}];
+    expect((await getNotifications())[0]?.href)
+      .toBe("/student/study-groups?group=interest-group");
   });
 });

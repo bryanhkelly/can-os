@@ -7,14 +7,18 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {RegistrarEnrollmentFormReview} from "@/components/enrollment/EnrollmentForm";
 import {FamilyReadinessOverviewCard} from "@/components/admissions/FamilyReadinessOverviewCard";
 import {familyRequirementKey,isEnrollmentDocumentCandidate} from "@/components/admissions/family-document-state";
+import {createPrivateUploadTask,documentUploadPolicy} from "@/platform/storage/private-upload";
+import {mutationErrorMessage} from "@/lib/mutation-feedback";
+import {z} from "zod";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+import {PageNavigation} from "@/components/workspace/page-navigation";
+const familyReadinessSearchSchema=siteProgramSelectionSchema.extend({
+ page:z.number().int().safe().positive().catch(1),
+ application:optionalSearchString,
+});
 const loadFamilyReadiness=(selection:{siteId?:string;programId?:string;page?:number;applicationId?:string}={})=>getFamilyReadiness({data:selection});
 export const Route=createFileRoute("/admissions/families")({
- validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;page?:number}=>({
-  page:typeof search.page==="number"&&Number.isSafeInteger(search.page)&&search.page>0?search.page:1,
-  siteId:typeof search.siteId==="string"?search.siteId:undefined,
-  programId:typeof search.programId==="string"?search.programId:undefined,
-  application:typeof search.application==="string"?search.application:undefined,
- }),
+ validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;page?:number}=>familyReadinessSearchSchema.parse(search),
  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId,page:search.page,applicationId:search.application}),
  loader:({deps})=>safeLoader(()=>loadFamilyReadiness(deps),{
   authMessage:"Sign in with an authorized registrar account to view family enrollment readiness.",
@@ -34,7 +38,8 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
  const families=[...new Set(visibleApps.map(a=>a.householdId))];
  const [files,setFiles]=useState<Record<string,File|null>>({});
- const pendingUploads=useRef(new Map<string,{file:File;key:string}>());
+ const pendingUploads=useRef(new Map<string,{file:File;task:{run:()=>Promise<unknown>}}>());
+ const uploading=useRef(false);
  const [uploadModes,setUploadModes]=useState({live:false,demo:false});
  useEffect(()=>{void getEnrollmentDocumentUploadAvailability().then(setUploadModes)
   .catch(cause=>setError(cause instanceof Error?cause.message:"Unable to load document upload availability"));},[]);
@@ -66,27 +71,30 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   finally{setBusy(null);}
  }
  async function upload(applicationId:string,requirementId:string){
+  if(uploading.current)return;
   const file=files[familyRequirementKey(applicationId,requirementId)];if(!file)return;
   if(!isEnrollmentDocumentCandidate(file)){
    setError("Choose a nonempty PDF, PNG, or JPEG document of at most 10 MB.");return;
   }
-  setBusy(requirementId);setError("");
+  uploading.current=true;setBusy(requirementId);setError("");
   try{
    const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
    const uploadIdentity=familyRequirementKey(applicationId,requirementId);
-   const previous=pendingUploads.current.get(uploadIdentity);
-   let key=previous?.file===file?previous.key:undefined;
-   if(!key){
-    const upload=await beginEnrollmentDocumentUpload({data:request});
-    const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":file.type},body:file});
-    if(!response.ok)throw new Error("Cloudflare R2 upload failed ("+response.status+")");
-    key=upload.key;pendingUploads.current.set(uploadIdentity,{file,key});
+   let attempt=pendingUploads.current.get(uploadIdentity);
+   if(attempt?.file!==file){
+    attempt={file,task:createPrivateUploadTask({file,policy:documentUploadPolicy,
+     begin:()=>beginEnrollmentDocumentUpload({data:request}),
+     finish:upload=>finishEnrollmentDocumentUpload({data:{...request,key:upload.key}}),
+    })};
+    pendingUploads.current.set(uploadIdentity,attempt);
    }
-   await finishEnrollmentDocumentUpload({data:{...request,key}});
+   await attempt.task.run();
    pendingUploads.current.delete(uploadIdentity);
-   setFiles(previous=>({...previous,[uploadIdentity]:null}));await router.invalidate();
-  }catch(e){setError(e instanceof Error?e.message:"Document upload failed");}
-  finally{setBusy(null);}
+   setFiles(previous=>({...previous,[uploadIdentity]:null}));
+   try{await router.invalidate();}
+   catch{setError("Document received, but the page could not refresh. Reopen it to review the saved document.");}
+  }catch(e){setError(mutationErrorMessage(e,"Document upload failed. Retry to finish without uploading again."));}
+  finally{uploading.current=false;setBusy(null);}
  }
  return <main className="mx-auto max-w-5xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Enrollment</p>
@@ -129,7 +137,9 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
    </article>)}</div>
   </section>)}
-  <nav aria-label="Family readiness pages" className="mt-5 flex gap-4 text-sm">{!selection.application&& (selection.page??1)>1&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)-1}} className="underline">Previous families</Link>}{!selection.application&&page.hasMore&&<Link to="/admissions/families" search={{...selection,page:page.nextPage??(selection.page??1)+1}} className="underline">Next families</Link>}</nav>
+  <PageNavigation label="Family readiness pages" className="mt-5 gap-4"
+   previous={!selection.application&&(selection.page??1)>1&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)-1}} className="underline">Previous families</Link>}
+   next={!selection.application&&page.hasMore&&<Link to="/admissions/families" search={{...selection,page:page.nextPage??(selection.page??1)+1}} className="underline">Next families</Link>}/>
   {!families.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No family enrollment cases found in your authorized programs.</p>}
   </div>
  </main>;

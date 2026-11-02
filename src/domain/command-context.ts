@@ -1,3 +1,5 @@
+import { DomainError } from "./errors";
+
 export type AuthorizationScope = {
   organizationIds?: string[];
   siteIds?: string[];
@@ -14,9 +16,10 @@ export type CommandContext = {
   sessionAccountId?: string;
 };
 
-export class AuthorizationError extends Error {
+export class AuthorizationError extends DomainError {
   constructor(capability: string) {
-    super(`Missing required capability or scope: ${capability}`);
+    super(capability === "authenticated session" ? "AUTHENTICATION_REQUIRED" : "FORBIDDEN",
+      `Missing required capability or scope: ${capability}`);
     this.name = "AuthorizationError";
   }
 }

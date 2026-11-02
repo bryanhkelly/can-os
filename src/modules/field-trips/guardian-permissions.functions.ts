@@ -23,7 +23,7 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
     consentRecordId: s.fieldTripParticipants.consentRecordId,
     tripId: s.fieldTrips.id, tripStatus: s.fieldTrips.status,
     title: s.fieldTrips.title, destination: s.fieldTrips.destination,
-    siteId: s.fieldTrips.siteId, programId: s.fieldTrips.programId,
+    siteId: s.fieldTrips.siteId, programId: s.fieldTrips.programId, timezone: s.sites.timezone,
     departsAt: s.fieldTrips.departsAt, returnsAt: s.fieldTrips.returnsAt,
     permissionDueAt: s.fieldTrips.permissionDueAt, feeAmountCents: s.fieldTrips.feeAmountCents,
     metadata: s.fieldTrips.metadata,
@@ -31,6 +31,7 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
     studentName: s.people.legalFirstName, studentLastName: s.people.legalLastName,
   }).from(s.fieldTripParticipants)
     .innerJoin(s.fieldTrips, eq(s.fieldTrips.id, s.fieldTripParticipants.fieldTripId))
+    .innerJoin(s.sites, eq(s.sites.id, s.fieldTrips.siteId))
     .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.fieldTripParticipants.studentProfileId))
     .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
     .innerJoin(s.guardianRelationships, guardianRelationshipPredicate({
@@ -59,6 +60,7 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
       return {
         participantId: row.participantId, tripId: row.tripId,
         title: row.title, destination: row.destination,
+        timezone: row.timezone,
         studentName: row.studentName + " " + row.studentLastName,
         departsAt: row.departsAt.toISOString(), returnsAt: row.returnsAt.toISOString(),
         deadline: row.permissionDueAt?.toISOString() ?? null,

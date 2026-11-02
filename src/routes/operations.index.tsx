@@ -6,13 +6,12 @@ import { getOperationsActions } from "@/modules/operations/action-workspace.func
 import { OperationsWorkspace } from "@/components/operations/OperationsWorkspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+
+const operationsSearchSchema=siteProgramSelectionSchema.extend({action:optionalSearchString});
 
 export const Route = createFileRoute("/operations/")({
-  validateSearch: (search: Record<string, unknown>): { siteId?: string; programId?: string; action?: string } => ({
-    siteId: typeof search.siteId === "string" ? search.siteId : undefined,
-    programId: typeof search.programId === "string" ? search.programId : undefined,
-    action: typeof search.action === "string" ? search.action : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { siteId?: string; programId?: string; action?: string } => operationsSearchSchema.parse(search),
   beforeLoad: async ({ search }) => {
     if (search.action) return;
     // Resume is a convenience, not a prerequisite for operating an existing school.

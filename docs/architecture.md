@@ -8,6 +8,25 @@ CAN OS is a production operating system for distributed Christian education. The
 
 ## Architectural stance
 
+### Client-safe failures
+
+Server functions use the shared Start function middleware to replace thrown
+failures with a safe code/message before serialization. Authentication,
+authorization, validation, conflict, unavailable, cancellation and unexpected failures use
+explicit codes from `src/domain/errors.ts`; use `DomainError` for intentional
+domain failures, never message-substring classification. Unknown exceptions are
+logged on the server and receive generic client text. Diagnostic messages,
+custom properties and original stacks are not copied across the wire. Router
+redirects, not-found signals and Response control flow remain unchanged.
+
+Loaders and mutation feedback share `normalizeClientError`; serialized error
+objects do not need an Error prototype. Loaders retain context-specific sign-in
+and permission presentation. Mutation feedback distinguishes command rejection
+from a successful command followed by failed refresh and blocks repeat commands
+after the latter. Ordinary Error messages are not approved client-facing text.
+
+### Application structure
+
 CAN OS begins as a **modular monolith**, not a microservice system.
 
 - One production web application
@@ -17,6 +36,66 @@ CAN OS begins as a **modular monolith**, not a microservice system.
 - Server-enforced authorization
 - Background workers only where asynchronous work is actually required
 - External services for commodity capabilities such as email, SMS, video, payments, object storage, and AI foundation models
+
+### Dates, timestamps and Site timezones
+
+`src/modules/calendar/timezone.ts` owns calendar-date validation/arithmetic,
+timezone date keys, local-input conversion, day boundaries and display.
+Date-only values are strict `YYYY-MM-DD` calendar dates, not instants:
+`formatDateOnly` never shifts them into a viewer's adjacent day. Timestamp
+strings require an explicit UTC offset; `formatTimestamp` and local-input
+conversion require an explicit resource timezone. Invalid values fail
+validation rather than silently using the browser/server timezone.
+
+Group and trip read models expose their canonical Site timezone. Scheduling,
+rescheduling and display use that timezone, including trip permission deadlines,
+and label it in the UI. The compatibility `siteLocalTimeToIso` wrapper rejects
+nonexistent and ambiguous DST wall times; legacy calendar conversion keeps its
+earlier-overlap default. Explicit earlier/later policies remain available where
+the owning workflow supports them.
+
+Attendance shares date keys, calendar-day arithmetic and day starts. Half-open
+day bounds resolve actual local boundaries independently, including 23/25-hour
+days, shifted midnight and skipped dates; wholly skipped input dates are rejected.
+Expected-attendance query coverage includes each authorized Site's local date.
+Site Today due dates and attendance-excuse dates display in the owning Site's
+timezone. The staff attendance date picker retains its viewer-local initial
+date; an explicitly selected roster date remains authoritative.
+
+### Route search selections
+
+`src/lib/route-search.ts` shares Site/Program and group/session selection
+schemas. Routes compose those fields with their own supported parameters;
+unknown keys are stripped rather than expanding every route's contract.
+The group-only workspace does not acquire a session parameter, nor do
+program-only routes acquire Site selection.
+
+Existing URL policies remain distinct: ordinary selections preserve strings
+(including empty strings) and ignore non-string values without coercion.
+Attendance and admissions application UUID hints ignore malformed IDs;
+curriculum's UUID Program selection still rejects them. Route-specific page
+defaults/caps, stage allowlists, application/interest links, invitation roles,
+website return grants and loader dependency mappings remain local contracts.
+These selections are navigation hints only: server APIs still enforce resource
+scope and relationships, and parsing never grants access or chooses an
+authorized Site/Program on the user's behalf.
+
+### Directory search and list presentation
+
+Student and teacher directories share `useDebouncedDirectorySearch`: a 250 ms
+trimmed-query debounce, disposed-request protection, client-safe errors and an
+explicit retry. Stable domain adapters retain the existing authorized directory
+APIs and row DTOs; this hook neither caches private records nor replaces server
+scope checks. Requests already sent are ignored after disposal, not assumed
+cancelled at the transport layer.
+
+Directory and admissions pipeline tables compose existing `ui/table` primitives.
+Columns, profile links, row headers and next-step decisions stay with their
+owning routes. `PageNavigation` shares only labelled navigation, optional
+noninteractive boundary indicators and link slots. Routes retain page arithmetic,
+server-provided continuation values, total counts, search parameters and whether
+unavailable controls are hidden or displayed. Intake preserves independent
+application and student-directory pages; detail views do not acquire paging links.
 
 ## Core invariant
 
@@ -35,6 +114,28 @@ Authorized students with no finalized grades still see the report and transcript
 empty states. Directory searches retain their debounce and stale-response cleanup;
 a successful retry clears the preceding error. Data loading and authorization
 remain in the existing route/server functions, not a generic form or CRUD engine.
+
+Reusable workflow controls are presentation-only compositions in
+`src/components/workspace`: `SiteProgramFields` renders controlled School/Program
+choices and clears the Program when the School changes, while callers own
+authorized options, required/all-selection labels and navigation.
+`LocalDateTimeField` labels the explicit resource timezone without converting
+values or choosing a DST policy. `MutationFeedback` presents the shared mutation
+state, distinguishing command rejection from saved-but-refresh-failed and
+retaining real saved-record links where available.
+
+`ActionDialog` uses the browser's modal dialog for focus containment and restores
+the triggering focus on close. Cancel/Escape do not submit; pending commands
+disable cancellation and inputs. Domain callers own rationale constraints,
+consent language, command execution and when to close after success. Insights
+uses a reason dialog and study-group rescheduling uses explicit local datetime
+fields; server authorization and scheduling checks remain authoritative.
+
+Evidence and qualifications share `FileSelectionField` and `UploadedFileNotice`
+for file selection/clearing and stored-bytes retry presentation. They do not
+perform uploads or approve records: existing upload tasks, domain adapters and
+private-document policies remain unchanged. Insights and qualifications reuse
+`QueryState` for mutually exclusive loading, failure/retry and content states.
 
 ## Organization model
 

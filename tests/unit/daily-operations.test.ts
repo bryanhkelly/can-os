@@ -236,4 +236,21 @@ describe("role-scoped attention adapters", () => {
       ownerName: "You",
     });
   });
+
+  it("routes enrollment documents to the child's application checklist and labels the stage", () => {
+    const items = buildGuardianAttention([{
+      id: "enrollment-1",
+      kind: "action",
+      type: "enrollment_document",
+      title: "Sign Jordan's enrollment consent form",
+      detail: "The school needs a guardian signature.",
+      href: "/guardian/admission-offers?student=jordan&application=application-1",
+      priority: "high",
+    }]);
+    expect(items[0]).toMatchObject({
+      category: "documents",
+      href: "/guardian/admission-offers?student=jordan&application=application-1",
+      nextStep: "Open enrollment checklist",
+    });
+  });
 });

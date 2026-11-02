@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { eq } from "drizzle-orm";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { db } from "@/db/client";
-import { studentProfiles } from "@/db/schema";
+import { guardianRelationships, studentProfiles } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { getStudentToday } from "./student-today.server";
@@ -30,11 +31,18 @@ export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async
       inArray(programs.siteId, context.scope.siteIds))).limit(1);
   if (!membership) throw new AuthorizationError("active student membership");
   setResponseHeader("Cache-Control","private, no-store");
+  const [guardianRelationship] = await db.select({ id: guardianRelationships.id })
+    .from(guardianRelationships)
+    .where(guardianRelationshipPredicate({
+      studentPersonId: context.actorPersonId,
+      access: "enrollment",
+    })).limit(1);
   const snapshot = await getStudentToday(profile.id,new Date(),{
     siteIds:context.scope.siteIds,programIds:context.scope.programIds??[],
   });
   return {
     ...snapshot,
+    hasEnrollmentGuardian: Boolean(guardianRelationship),
     firstWeek: await readFirstClassrooms(snapshot.sections.map(section => section.sectionId)),
     coursework: snapshot.coursework.map(({ feedback, response, ...item }) => item),
     recoveryCandidates: snapshot.recoveryCandidates.map(({ feedback, response, ...item }) => item),

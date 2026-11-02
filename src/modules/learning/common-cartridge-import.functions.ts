@@ -13,7 +13,7 @@ import { readMarketplace } from "./curriculum-marketplace.server";
 import { authorizeClass, classActor } from "./class-access.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
-import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config, signPrivateObjectUrl } from "@/platform/storage/r2";
+import { createPrivateUpload, verifyPrivateObject, resolveR2Config, signPrivateObjectUrl } from "@/platform/storage/r2";
 import { EventTypes } from "@/domain/event-types";
 const context=z.object({programId:z.string().uuid()}).strict();
 const incoming=context.extend({
@@ -242,10 +242,10 @@ export const beginCommonCartridgeStaticLessonImport=createServerFn({method:"POST
   const {lesson,digest,htmlBytes,htmlHash}=inspectHtmlInput(data);
   if(htmlBytes.length<16)throw new Error("Static HTML lesson must contain at least 16 bytes.");
   const resourceId=randomUUID(),key=`learning/cartridge-static/${resourceId}/${randomUUID()}`;
-  return {resourceId,key,content:htmlBytes.toString("base64"),contentType:"text/html",
+  return {resourceId,content:htmlBytes.toString("base64"),contentType:"text/html",
    contentLength:htmlBytes.length,htmlSha256:htmlHash,cartridgeSha256:digest,
-   preview:{title:lesson.title,html:lesson.html},expiresInSeconds:180,
-   uploadUrl:createPrivateUploadUrl({key,keyPattern:htmlKeyPattern,contentType:"text/html",
+   preview:{title:lesson.title,html:lesson.html},
+   ...createPrivateUpload({key,keyPattern:htmlKeyPattern,contentType:"text/html",
      contentLength:htmlBytes.length,minContentLength:1,maxContentLength:128*1024,
      expiresSeconds:180,preventOverwrite:true})};
  });

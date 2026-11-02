@@ -1,5 +1,6 @@
 import { OnsiteRoomPlanningPanel } from "./OnsiteRoomPlanningPanel";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Qualifications } from "@/components/profiles/Qualifications";
 import { getOnsiteSupervisionPlan } from "@/modules/operations/onsite-supervision.functions";
 import {
@@ -116,10 +117,10 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
     </p>
     {loading&&<p role="status" className="mt-3 text-sm">Loading planned staff coverage…</p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-    {!loading&&<button type="button" className="mt-3 text-sm underline"
+    {!loading&&<Button type="button" variant="ghost" size="sm" className="mt-3 underline"
       onClick={()=>{setLoading(true);setError("");setNonce(n=>n+1)}}>
       Refresh supervision plan
-    </button>}
+    </Button>}
     {dutyMessage&&<p role="status" className="mt-3 text-sm">{dutyMessage}</p>}
     {plan&&<>
       {responses&&<p className="mt-3 text-sm">
@@ -188,36 +189,31 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
             (onsite.canReport&&!onsite.ownPresenceReported ||
              onsite.canWitness&&!onsite.witnessedBothAdults)&&
             <div className="mt-2 flex flex-wrap gap-2">
-              {onsite.canReport&&!onsite.ownPresenceReported&&<button type="button"
+              {onsite.canReport&&!onsite.ownPresenceReported&&<Button type="button" variant="outline" size="sm"
                 disabled={!!presenceBusy}
-                onClick={()=>void recordPresence(block.sectionId,block.periodId!,"report")}
-                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                onClick={()=>void recordPresence(block.sectionId,block.periodId!,"report")}>
                 I am physically present in this room
-              </button>}
-              {onsite.canWitness&&!onsite.witnessedBothAdults&&<button type="button"
+              </Button>}
+              {onsite.canWitness&&!onsite.witnessedBothAdults&&<Button type="button" variant="outline" size="sm"
                 disabled={!!presenceBusy}
-                onClick={()=>void recordPresence(block.sectionId,block.periodId!,"witness")}
-                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                onClick={()=>void recordPresence(block.sectionId,block.periodId!,"witness")}>
                 I personally witnessed both named adults here
-              </button>}
+              </Button>}
             </div>}
           {onsite?.canReportInterruption&&onsite.ownPresenceReportId&&
             <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" disabled={!!presenceBusy}
-                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"temporary_absence")}
-                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+              <Button type="button" variant="outline" size="sm" disabled={!!presenceBusy}
+                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"temporary_absence")}>
                 Report temporary absence from this room
-              </button>
-              <button type="button" disabled={!!presenceBusy}
-                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"early_departure")}
-                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={!!presenceBusy}
+                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"early_departure")}>
                 Report early departure
-              </button>
-              <button type="button" disabled={!!presenceBusy}
-                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"uncovered_handoff")}
-                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={!!presenceBusy}
+                onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"uncovered_handoff")}>
                 Report an uncovered handoff
-              </button>
+              </Button>
             </div>}
           {duty&&<p className="mt-2 text-xs font-semibold" role="status">
             Duty response: {duty.status==="accepted"?"All required named adults report availability":
@@ -228,16 +224,14 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
           {duty?.canRespond&&<p className="mt-1 text-xs">Your {block.ownDutyRole??"assigned"} duty response: {duty.ownStatus.replaceAll("_"," ")}</p>}
           {duty?.canRespond&&duty.ownStatus==="not_reported"&&block.periodId&&<>
             <div className="mt-3 flex flex-wrap gap-2">
-              {duty.canAccept&&<button type="button" disabled={!!dutyBusy}
-                onClick={()=>void answerDuty(block.sectionId,block.periodId!,"accepted")}
-                className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+              {duty.canAccept&&<Button type="button" variant="outline" size="sm" disabled={!!dutyBusy}
+                onClick={()=>void answerDuty(block.sectionId,block.periodId!,"accepted")}>
                 I can cover this scheduled block
-              </button>}
-              <button type="button" disabled={!!dutyBusy}
-                onClick={()=>void answerDuty(block.sectionId,block.periodId!,"cannot_cover")}
-                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+              </Button>}
+              <Button type="button" variant="outline" size="sm" disabled={!!dutyBusy}
+                onClick={()=>void answerDuty(block.sectionId,block.periodId!,"cannot_cover")}>
                 I cannot cover this block
-              </button>
+              </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               For coverage gaps, contact your site leader directly. The app does not arrange a substitute.

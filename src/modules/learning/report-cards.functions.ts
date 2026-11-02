@@ -1,3 +1,4 @@
+import { personDisplayName, personLegalName } from "@/domain/person-name";
 import {
 assertCapability,
 AuthorizationError,
@@ -381,7 +382,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           lastName:s.people.legalLastName,preferredName:s.people.preferredName})
           .from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
           .where(inArray(s.studentProfiles.id,studentIds));
-        const byStudent=new Map(names.map(row=>[row.id,`${row.preferredName??row.firstName} ${row.lastName}`]));
+        const byStudent=new Map(names.map(row=>[row.id,personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName })]));
         const blockers=[] as {studentProfileId:string;studentName:string;assessmentId:string;assessmentTitle:string;status:string}[];
         for(const studentId of studentIds){
           if(existingByStudent.get(studentId)?.status==="finalized")continue;
@@ -878,7 +879,7 @@ export const getSectionGradeFinalization = createServerFn({ method: "GET" })
       grades: gradeRows.map((row) => ({
         id: row.id,
         studentProfileId: row.studentProfileId,
-        studentName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
+        studentName: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
         gradingPeriodId: row.gradingPeriodId,
         letterGrade: row.letterGrade,
         percentage: row.percentage,
@@ -1057,7 +1058,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
       const candidate = byStudent.get(row.studentProfileId) ?? {
         studentProfileId: row.studentProfileId,
         studentPersonId: row.studentPersonId,
-        studentName: `${row.firstName} ${row.lastName}`,
+        studentName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
         issuers: new Map<string, { id: string; name: string }>(),
         recordCount: 0,
       };

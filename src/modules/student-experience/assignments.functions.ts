@@ -64,9 +64,10 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   timeliness:s.submissions.timeliness,submittedAt:s.submissions.submittedAt,
   gradedAt:s.submissions.gradedAt,score:s.submissions.score,
   response:s.submissions.response,feedback:s.submissions.feedback,
-  course:s.sections.title,attemptNumber:s.submissions.attemptNumber,metadata:s.assessments.metadata,assessmentStatus:s.assessments.status,
+  course:s.sections.title,timezone:s.sites.timezone,attemptNumber:s.submissions.attemptNumber,metadata:s.assessments.metadata,assessmentStatus:s.assessments.status,
  }).from(s.assessments)
  .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+ .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
  .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,studentId)))
  .where(and(inArray(s.assessments.sectionId,ids),inArray(s.assessments.status,["published","closed"]),
   or(isNull(s.assessments.availableAt),lte(s.assessments.availableAt,now))))

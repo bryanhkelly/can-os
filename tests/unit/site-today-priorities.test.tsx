@@ -32,6 +32,7 @@ describe("Site Today priorities", () => {
   it("surfaces the source-ranked next action and links to the recorded exception lists", () => {
     const html = renderToStaticMarkup(
       <SiteTodayPriorities items={items} siteId="site" ownedActionIds={[]}
+        siteTimezone="America/Los_Angeles"
         staffingExceptionCount={1} studentExceptionCount={2}/>,
     );
     expect(html).toContain("Next authorized action");
@@ -48,6 +49,7 @@ describe("Site Today priorities", () => {
   it("states an empty priority view without inferring readiness or permission", () => {
     const html = renderToStaticMarkup(
       <SiteTodayPriorities items={[]} siteId="site" ownedActionIds={[]}
+        siteTimezone="America/Los_Angeles"
         staffingExceptionCount={0} studentExceptionCount={0}/>,
     );
     expect(html).toContain("No current exceptions");
@@ -62,7 +64,7 @@ describe("Site Today priorities", () => {
     if (!ownedAction) throw new Error("Missing test action");
     const html = renderToStaticMarkup(
       <SiteTodayPriorities items={[{ ...ownedAction, id: "action:coverage" }]}
-        siteId="site" ownedActionIds={["action:coverage"]}
+        siteId="site" siteTimezone="America/Los_Angeles" ownedActionIds={["action:coverage"]}
         staffingExceptionCount={1} studentExceptionCount={0}/>,
     );
     expect(html).toContain('href="/sites/site#site-owned-follow-ups"');

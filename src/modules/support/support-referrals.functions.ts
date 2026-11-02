@@ -1,4 +1,5 @@
 import { AuthorizationError } from "@/domain/command-context";
+import { personLegalName } from "@/domain/person-name";
 import { EventTypes } from "@/domain/event-types";
 import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notify } from "@/platform/mutation";
@@ -121,7 +122,7 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
       ? db.select().from(s.supportServices).where(inArray(s.supportServices.referralId, referralIds)) : [],
     (() => { const ids = [...new Set(referrals.map((r: { ownerPersonId: string | null }) => r.ownerPersonId).filter((x: string | null): x is string => Boolean(x)))]; return ids.length ? db.select({ id: s.people.id, firstName: s.people.legalFirstName, lastName: s.people.legalLastName }).from(s.people).where(inArray(s.people.id, ids)) : []; })(),
   ]);
-  const names = new Map(owners.map((w: { id: string; firstName: string; lastName: string }) => [w.id, `${w.firstName} ${w.lastName}`]));
+  const names = new Map(owners.map((w: { id: string; firstName: string; lastName: string }) => [w.id, personLegalName({ legalFirstName: w.firstName, legalLastName: w.lastName })]));
   return referrals.map((row: any) => {
     const plan = plans.find((p: any) => p.referralId === row.referralId);
     return {
@@ -156,7 +157,7 @@ export const listTeacherReferralStudents=createServerFn({method:"GET"}).handler(
    inArray(s.sections.siteId,actor.scope.siteIds??[]),
    inArray(s.sections.programId,actor.scope.programIds??[])));
  return [...new Map(rows.map(row=>[row.id,{
-  id:row.id,name:`${row.firstName} ${row.lastName}`,
+  id:row.id,name:personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
   sectionTitle:row.sectionTitle
  }])).values()].sort((a,b)=>a.name.localeCompare(b.name));
 });

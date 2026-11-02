@@ -9,6 +9,22 @@ One permanent human identity.
 
 A Person may simultaneously be a student, guardian, teacher, volunteer, pastor, board member, coach, alumnus, or staff member.
 
+Person-name presentation uses `src/domain/person-name.ts`:
+`personShortName` chooses the preferred name, then legal first name (or surname
+when it is the only name); `personDisplayName` joins preferred-or-legal first
+name with the legal surname; `personLegalName` joins legal fields only and never
+substitutes a preferred name. These helpers trim and collapse whitespace and
+treat blank fields as absent without changing stored identity data. Missing
+names display `Unknown person` unless the caller supplies a contextual label.
+They do not parse a full name, deduplicate words, or determine identity.
+
+Messaging contacts, search results and equivalent workspace labels share display
+formatting; greetings and message sender labels intentionally use short names.
+Official transcript/diploma output, legal-record lists and pickup identity
+verification retain legal formatting. Identity verification passes an empty
+missing-name fallback, not a presentation label; authorization and name matching
+remain in their existing domain policies.
+
 School profiles use this permanent identity and current scoped teaching,
 enrollment or guardian relationships. They do not expose clinical, contact or
 credential evidence. A profile photo is an existing verified `Document` with
@@ -220,6 +236,14 @@ Site-scoped canonical instructional calendar including school days, holidays, cl
 
 ### Section
 A delivered instance for a specific Term, roster, teachers, Program, and schedule context.
+
+Teachers can submit a scoped class setup request as a canonical Action. The
+request remains pending for the Program registrar; it is not a Section, course
+release, instructor assignment, enrollment or authorization grant. Only the
+registrar launch workflow can fulfill it, after validating published
+curriculum, the academic term and schedule, institutional authority, and
+instructor eligibility. Fulfillment links the Action to the new Section in the
+same transaction; a registrar decline requires a reason and is audited.
 
 The launch academic-readiness projection reports whether the assigned
 instructor has any current verified qualification evidence. Review decisions
@@ -501,7 +525,7 @@ Canonical human communication record with contextual links to students, sections
 Academic peer group tied to a Section, subject, cohort, Program, or approved learning purpose.
 
 ### StudyGroupMembership
-Explicit Person-to-StudyGroup relationship with role, eligibility, approval, moderation, and lifecycle state.
+Explicit Person-to-StudyGroup relationship with role, eligibility, approval, moderation, and lifecycle state. A group invitation is a scoped notification, not a membership grant; joining still requires the canonical request, guardian-consent, and facilitator-approval workflow.
 
 ### Document
 Managed artifact with ownership, purpose, sensitivity, and retention metadata.

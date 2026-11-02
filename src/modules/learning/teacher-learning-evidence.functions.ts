@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -83,7 +84,7 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
     return {
       sectionId: row.sectionId, sectionTitle: titles.get(row.sectionId) ?? "Class",
       studentProfileId: row.studentProfileId, studentPersonId: row.studentPersonId,
-      studentName: row.firstName + " " + row.lastName,
+      studentName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
       observedEvents7d: activity?.count ?? 0,
       latestObservedAt: activity?.lastAt.toISOString() ?? null,
       latestEventId: activity?.latestEventId ?? null,

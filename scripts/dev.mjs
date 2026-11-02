@@ -4,13 +4,14 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
+import { verifyAdmissionsNeonBranch } from "./verify-admissions-neon-branch.mjs";
 
 export function developmentEnvironment(directory, inherited = process.env) {
   const envFile = resolve(directory, ".env.local");
   const local = existsSync(envFile) ? parseEnv(readFileSync(envFile, "utf8")) : {};
   const env = { ...local, ...inherited };
   if (env.NODE_ENV === "production") throw new Error("Local development must not run in production mode.");
-  if (!env.DATABASE_URL) throw new Error("Configure DATABASE_URL in FullFlow's ignored .env.local or the environment.");
+  if (!env.DATABASE_URL) throw new Error("Configure DATABASE_URL in .env.local or the environment.");
   let database;
   try {
     database = new URL(env.DATABASE_URL);
@@ -23,18 +24,27 @@ export function developmentEnvironment(directory, inherited = process.env) {
   if (!env.CAN_ACCESS_TOKEN_PEPPER || env.CAN_ACCESS_TOKEN_PEPPER.length < 32) {
     throw new Error("Configure CAN_ACCESS_TOKEN_PEPPER with at least 32 characters before starting.");
   }
-  return { ...env, NODE_ENV: "development" };
+  return { ...env, NODE_ENV: env.APP_ENV === "test" ? "test" : "development" };
 }
 
 async function main() {
   const directory = fileURLToPath(new URL("..", import.meta.url));
   const env = developmentEnvironment(directory);
   try {
-    await verifyFullFlowNeonBranch(env.DATABASE_URL);
-  } catch {
-    throw new Error("Development database verification failed. Use the dedicated nonproduction FullFlow Neon branch.");
+    const admissionsTestBranchId = env.CAN_ADMISSIONS_TEST_BRANCH_ID ?? env.CAN_E2E_TEST_BRANCH_ID;
+    if (env.APP_ENV === "test" && admissionsTestBranchId) {
+      await verifyAdmissionsNeonBranch({
+        ...env,
+        CAN_ADMISSIONS_TEST_BRANCH_ID: admissionsTestBranchId,
+      });
+    } else {
+      await verifyFullFlowNeonBranch(env.DATABASE_URL);
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? ` ${error.message}` : "";
+    throw new Error(`Development database verification failed.${detail}`, { cause: error });
   }
-  console.log("Verified FullFlow development database and session configuration.");
+  console.log("Verified nonproduction development database and session configuration.");
   const args = process.argv.slice(2);
   if (args.includes("--check")) return;
   const child = spawn(process.execPath, [

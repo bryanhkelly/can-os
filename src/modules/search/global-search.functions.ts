@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personDisplayName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
@@ -32,14 +33,6 @@ const ALL_ROLES = ["student", "teacher", "guardian", "registrar", "specialist", 
 
 function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, "");
-}
-
-function displayName(person: {
-  preferredName: string | null;
-  legalFirstName: string;
-  legalLastName: string;
-}): string {
-  return person.preferredName ?? `${person.legalFirstName} ${person.legalLastName}`;
 }
 
 function day(value: Date | null | undefined): string {
@@ -293,7 +286,7 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
     seen.add(row.personId);
     hits.push({
       id: `student-${row.personId}`,
-      label: displayName(row),
+      label: personDisplayName(row),
       sub: row.gradeLevel ? `Grade ${row.gradeLevel}` : "Student",
       to:
         actor.role === "guardian"

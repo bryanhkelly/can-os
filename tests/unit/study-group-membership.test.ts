@@ -3,6 +3,7 @@ import { listStudyGroups } from "@/modules/study-groups/study-group-queries.func
 import {
   decideCanonicalGroupConsent,
   decideCanonicalGroupMembership,
+  inviteCanonicalGroupMembers,
   requestCanonicalGroupMembership,
 } from "@/modules/study-groups/canonical-membership.functions";
 
@@ -75,6 +76,34 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("canonical study group membership transitions", () => {
+  it("notifies only eligible students without granting membership", async () => {
+    requireActor.mockResolvedValue(actorFor("teacher", "facilitator"));
+    select.mockReturnValueOnce(query([{ ...groupRow, facilitatorPersonId: "facilitator" }]))
+      .mockReturnValueOnce(query(enrolledRow))
+      .mockReturnValueOnce(query([]));
+    await expect(inviteCanonicalGroupMembers({
+      data: { groupId: "group", studentPersonIds: ["student"] },
+    })).resolves.toEqual({ invitedCount: 1 });
+    expect(values).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        recipientPersonId: "student",
+        type: "study_group_invitation",
+        resourceId: "group",
+      }),
+    ]));
+    expect(insert).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects invitations outside the group's active enrollment scope", async () => {
+    requireActor.mockResolvedValue(actorFor("teacher", "facilitator"));
+    select.mockReturnValueOnce(query([{ ...groupRow, facilitatorPersonId: "facilitator" }]))
+      .mockReturnValueOnce(query([]));
+    await expect(inviteCanonicalGroupMembers({
+      data: { groupId: "group", studentPersonIds: ["outsider"] },
+    })).rejects.toThrow("active student program enrollment");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
   it.each(["approved", "pending"])("preserves %s membership on repeated requests", async (status) => {
     const group = query([groupRow]);
     select.mockReturnValueOnce(group)

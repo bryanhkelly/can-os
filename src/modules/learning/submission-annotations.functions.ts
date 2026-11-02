@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personDisplayName } from "@/domain/person-name";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -41,7 +42,7 @@ export const getSubmissionAnnotations = createServerFn({ method: "GET" })
       .where(eq(s.submissionAnnotations.submissionId, submission.id)).orderBy(s.submissionAnnotations.createdAt);
     return { annotations: rows.map(row => ({
       id: row.id, quote: row.quote, comment: row.comment, startOffset: row.startOffset, endOffset: row.endOffset,
-      createdAt: row.createdAt.toISOString(), author: `${row.preferredName ?? row.author} ${row.lastName}`,
+      createdAt: row.createdAt.toISOString(), author: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.author, legalLastName: row.lastName }),
     })) };
   });
 

@@ -5,6 +5,9 @@ import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
 import { attachmentAccept, attachmentMimeForFileName } from "@/modules/learning/attachment-mimes";
 import { GuardianPickupPanel } from "@/components/operations/GuardianPickupPanel";
+import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { formatTimestamp } from "@/modules/calendar/timezone";
 
 // Shared with the server-side excuse attachment validation (attachment-mimes).
 const excuseAttachmentAccept = attachmentAccept;
@@ -32,6 +35,8 @@ function GuardianAttendancePage() {
   const [notice, setNotice] = useState("");
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [excuseFiles, setExcuseFiles] = useState<Record<string, File | null>>({});
+  const uploads = useRef(new Map<string,{file:File;task:{run:()=>Promise<unknown>}}>());
+  const attaching = useRef(false);
 
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
@@ -91,26 +96,33 @@ function GuardianAttendancePage() {
 
   const attachDocument = async (absence: Absence) => {
     const file = excuseFiles[absence.attendanceEventId];
-    if (!file) return;
+    if (!file || attaching.current) return;
+    attaching.current=true;
     setBusy(`${absence.attendanceEventId}:attach`);
     setNotice("");
     setError("");
     try {
       const contentType = excuseAttachmentMime(file.name);
       if (!contentType) throw new Error("Unsupported file type. Use PDF, PNG or JPG.");
-      if (file.size < 16 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 16 bytes to 10 MB");
-      const upload = await createExcuseAttachmentUpload({
-        data: { attendanceEventId: absence.attendanceEventId, fileName: file.name, contentType, sizeBytes: file.size },
-      });
-      const put = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: file });
-      if (!put.ok) throw new Error("Upload failed; please try again");
-      await attachDocumentToExcuse({ data: { attendanceEventId: absence.attendanceEventId, documentId: upload.documentId } });
+      let attempt=uploads.current.get(absence.attendanceEventId);
+      if(attempt?.file!==file){
+        attempt={file,task:createPrivateUploadTask({file,contentType,policy:documentUploadPolicy,
+          begin:()=>createExcuseAttachmentUpload({data:{
+            attendanceEventId:absence.attendanceEventId,fileName:file.name,contentType,sizeBytes:file.size,
+          }}),
+          finish:upload=>attachDocumentToExcuse({data:{attendanceEventId:absence.attendanceEventId,documentId:upload.documentId}}),
+        })};
+        uploads.current.set(absence.attendanceEventId,attempt);
+      }
+      await attempt.task.run();
+      uploads.current.delete(absence.attendanceEventId);
       setNotice(`Document attached for ${absence.studentName}.`);
       setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: null }));
       setDocCounts(current => ({ ...current, [absence.attendanceEventId]: (current[absence.attendanceEventId] ?? 0) + 1 }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to attach document");
+      setError(mutationErrorMessage(cause,"Unable to attach document. Retry to finish without uploading the file again."));
     } finally {
+      attaching.current=false;
       setBusy("");
     }
   };
@@ -138,7 +150,7 @@ function GuardianAttendancePage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">{absence.studentName}</h2>
-                <p className="text-xs text-muted-foreground">{new Date(absence.expectedAt).toLocaleDateString()}</p>
+                <p className="text-xs text-muted-foreground">{formatTimestamp(absence.expectedAt,absence.timezone,{dateStyle:"medium"})}</p>
               </div>
               <StatusBadge tone={
                 absence.status==="present"||absence.excuse?.status==="approved"?"success":

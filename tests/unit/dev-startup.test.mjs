@@ -10,7 +10,7 @@ const database = "postgresql://fixture:fixture@development.invalid/fixture";
 beforeEach(() => { directory = mkdtempSync(join(tmpdir(), "can-os-dev-startup-")); });
 afterEach(() => { rmSync(directory, { recursive: true }); });
 
-describe("FullFlow development startup", () => {
+describe("Local development startup", () => {
   it("loads the checkout's local database and stable session key without login flags", () => {
     writeFileSync(join(directory, ".env.local"), `DATABASE_URL=${database}\nCAN_ACCESS_TOKEN_PEPPER=${key}\n`);
     const env = developmentEnvironment(directory, {});
@@ -24,6 +24,14 @@ describe("FullFlow development startup", () => {
     expect(developmentEnvironment(directory, {
       DATABASE_URL: database, CAN_ACCESS_TOKEN_PEPPER: key, PATH: "fixture-path",
     })).toMatchObject({ DATABASE_URL: database, CAN_ACCESS_TOKEN_PEPPER: key, PATH: "fixture-path" });
+  });
+  it("preserves test runtime mode for isolated acceptance runs", () => {
+    expect(developmentEnvironment(directory, {
+      DATABASE_URL: database,
+      CAN_ACCESS_TOKEN_PEPPER: key,
+      APP_ENV: "test",
+      NODE_ENV: "test",
+    })).toMatchObject({ APP_ENV: "test", NODE_ENV: "test" });
   });
   it.each([
     [{ CAN_ACCESS_TOKEN_PEPPER: key }, "Configure DATABASE_URL"],

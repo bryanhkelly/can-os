@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personDisplayName } from "@/domain/person-name";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -9,7 +10,7 @@ import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
-import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 
 const selection = z.object({ personId: z.string().uuid().optional() });
 const photoKeyPattern = /^profiles\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
@@ -76,7 +77,7 @@ export const getPersonProfile = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "private, no-store");
     const viewer = await actor(), personId = data.personId ?? viewer.actorPersonId;
     const profile = await authorizedProfile(viewer, personId);
-    return { personId, name: `${profile.person.preferredName ?? profile.person.firstName} ${profile.person.lastName}`,
+    return { personId, name: personDisplayName({ legalFirstName: profile.person.firstName, legalLastName: profile.person.lastName, preferredName: profile.person.preferredName }),
       kind: profile.kind, sections: profile.sections, isSelf: personId === viewer.actorPersonId,
       viewerRole: viewer.role };
   });
@@ -105,8 +106,8 @@ export const beginProfilePhotoUpload = createServerFn({ method: "POST" })
     const viewer = await actor();
     await authorizedProfile(viewer, viewer.actorPersonId);
     const key = `profiles/${viewer.actorPersonId}/${crypto.randomUUID()}`;
-    return { key, uploadUrl: createPrivateUploadUrl({ key, keyPattern: photoKeyPattern,
-      contentType: data.mimeType, contentLength: data.size, minContentLength: 16, maxContentLength: 2 * 1024 * 1024, expiresSeconds: 180 }) };
+    return createPrivateUpload({ key, keyPattern: photoKeyPattern,
+      contentType: data.mimeType, contentLength: data.size, minContentLength: 16, maxContentLength: 2 * 1024 * 1024, expiresSeconds: 180 });
   });
 
 export const finishProfilePhotoUpload = createServerFn({ method: "POST" })

@@ -1,19 +1,18 @@
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { dateKeyInTimezone, formatTimestamp } from "@/modules/calendar/timezone";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
 import { ExcuseAttachments } from "@/components/operations/ExcuseAttachments";
+import {optionalSearchUuid,siteProgramSelectionSchema} from "@/lib/route-search";
 import {
   listExpectedOnsiteRoster, markExpectedOnsiteAttendance,
   listExpectedPendingExcuses, reviewCurrentAttendanceExcuse,
 } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
+const attendanceSearchSchema=siteProgramSelectionSchema.pick({programId:true}).extend({programId:optionalSearchUuid});
 export const Route = createFileRoute("/staff/attendance")({
-  validateSearch: (search: Record<string, unknown>): { programId?: string } => ({
-    programId: typeof search.programId === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.programId)
-      ? search.programId : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { programId?: string } => attendanceSearchSchema.parse(search),
   component: StaffAttendancePage,
 });
 
@@ -40,9 +39,7 @@ function writeQueue(items:OfflineMark[]){
 
 
 function todayLocal(): string {
-  const now = new Date();
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return dateKeyInTimezone(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
 }
 
 function StaffAttendancePage() {
@@ -311,7 +308,7 @@ function StaffAttendancePage() {
               <div>
                 <h3 className="text-lg font-semibold">{excuse.studentName}</h3>
                 <p className="text-xs text-muted-foreground">
-                  Marked {excuse.eventStatus} on {new Date(excuse.expectedAt).toLocaleDateString()} · submitted {new Date(excuse.submittedAt).toLocaleDateString()}
+                  Marked {excuse.eventStatus} on {formatTimestamp(excuse.expectedAt,excuse.timezone,{dateStyle:"medium"})} · submitted {formatTimestamp(excuse.submittedAt,excuse.timezone,{dateStyle:"medium"})} ({excuse.timezone})
                 </p>
               </div>
               <span className="rounded-full border px-3 py-1 text-xs">Submitted</span>

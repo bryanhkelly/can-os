@@ -21,7 +21,12 @@ vi.mock("@/modules/learning/class-access.server",()=>({
   accessibleClasses:async()=>[{id:"10000000-0000-4000-8000-000000000006"}],
 }));
 vi.mock("@/platform/mutation",()=>({writeAudit:vi.fn(),emitEvent:vi.fn(),notify:vi.fn()}));
-vi.mock("@/platform/storage/r2",()=>({signPrivateObjectUrl:()=>"https://isolated.test/object",verifyPrivateObject:vi.fn()}));
+vi.mock("@/platform/storage/r2",()=>({
+  createPrivateUpload:({key,contentType,expiresSeconds}:{key:string;contentType:string;expiresSeconds?:number})=>({
+    key,uploadUrl:"https://isolated.test/upload",uploadHeaders:{"Content-Type":contentType},expiresInSeconds:expiresSeconds??180,
+  }),
+  signPrivateObjectUrl:()=>"https://isolated.test/object",verifyPrivateObject:vi.fn(),
+}));
 vi.mock("@/db/client",async()=>{
   const {PGlite}=await import("@electric-sql/pglite");
   const {drizzle}=await import("drizzle-orm/pglite");

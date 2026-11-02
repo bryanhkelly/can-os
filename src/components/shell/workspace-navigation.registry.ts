@@ -29,7 +29,6 @@ export const workspaceLinks = {
     { title: "Report a safety concern", path: "/safeguarding" },
     { title: "Today", path: "/site/day" },
     { title: "Attendance", path: "/staff/attendance" },
-    { title: "Roster", path: "/site/day" },
   ],
   site_staff: [
     { title: "Report a safety concern", path: "/safeguarding" },
@@ -69,7 +68,7 @@ export const workspaceLinks = {
   ],
   guardian: [
     { title: "Home", path: "/guardian" },
-    { title: "Children", path: "/guardian/academics" },
+    { title: "Children & academics", path: "/guardian/academics" },
     { title: "School", path: "/guardian/experiences" },
     { title: "Calendar", path: "/calendar" },
     { title: "Messages", path: "/messages" },

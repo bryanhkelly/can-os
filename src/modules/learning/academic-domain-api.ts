@@ -1,4 +1,5 @@
 import { and, desc, eq, exists, inArray, or } from "drizzle-orm";
+import { personDisplayName } from "@/domain/person-name";
 import { db } from "@/db/client";
 import { assessments, enrollments, guardianRelationships, people, sections, sectionTeachers, studentProfiles, submissions, type EvidenceRef } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -83,7 +84,7 @@ export async function resolveVisibleStudents(
     byProfile.set(row.studentProfileId, {
       studentProfileId: row.studentProfileId,
       personId: row.personId,
-      displayName: `${row.preferredName ?? row.legalFirstName} ${row.legalLastName}`,
+      displayName: personDisplayName(row),
     });
   }
 

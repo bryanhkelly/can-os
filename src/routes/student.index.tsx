@@ -62,5 +62,6 @@ export const Route = createFileRoute("/student/")({
 function StudentTodayPage() {
   const result = Route.useLoaderData();
   if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Student" title="Your learning day" outcome={result} />;
-  return <StudentExperience liveData={result.data.today} success={result.data.success} support={result.data.support} />;
+  return <StudentExperience liveData={result.data.today} success={result.data.success}
+    support={result.data.support} />;
 }

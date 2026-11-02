@@ -13,6 +13,7 @@ export type DailyAttentionItem = {
   nextStep: string;
   ownerName: string | null;
   dueAt: string | null;
+  timezone?: string;
   priority: "critical" | "high" | "normal";
   secondaryHref?: string;
   secondaryLabel?: string;
@@ -257,7 +258,7 @@ export function buildTeacherAttention(data: {
 
 export function buildGuardianAttention(items: readonly {
   id: string; kind: string; type?: string; title: string; detail?: string;
-  href: string; priority?: string; dueAt?: string | null;
+  href: string; priority?: string; dueAt?: string | null; timezone?: string;
 }[]): DailyAttentionItem[] {
   return items.map(item => {
     const workspace = familyActionWorkspaceLink(item);
@@ -266,19 +267,22 @@ export function buildGuardianAttention(items: readonly {
     const guardianWorkspace = workspace?.startsWith("/guardian/") ? workspace : null;
     return {
       id: `${item.kind}:${item.id}`,
-      category: item.kind === "excuse" ? "family" :
+      category: item.type === "enrollment_document" ? "documents" :
+        item.kind === "excuse" ? "family" :
         item.type?.includes("grade") || item.type?.includes("assignment") ? "academic" : "family",
       title: item.title,
       detail: item.detail ?? "",
       href: guardianWorkspace ?? item.href,
       nextStep: item.kind === "excuse" ? "Submit excuse" :
         item.kind === "attendance_review" ? "Review school decision" :
+        item.type === "enrollment_document" ? "Open enrollment checklist" :
         item.type === "assignment_revision_limit" ? "Review feedback with school" :
         item.kind === "schoolwork" ? "Review assignment" :
         item.kind === "course_approval" ? "Review class request" :
         guardianWorkspace ? "Review permission" : item.kind === "action" ? "Review action" : "View update",
       ownerName: "You",
       dueAt: item.dueAt ?? null,
+      timezone: item.timezone,
       priority: item.priority === "urgent" ? "critical" : item.priority === "high" ? "high" : "normal",
       // Do not offer an inaccessible staff-only Action detail as a second CTA.
     };

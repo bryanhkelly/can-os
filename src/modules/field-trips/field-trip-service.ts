@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { personDisplayName } from "@/domain/person-name";
 import {
 consentRecords,
 enrollments,
@@ -827,9 +828,7 @@ export async function getFieldTripSafetyPacket(
       students.push({
         participantId: row.participantId,
         studentProfileId: row.studentProfileId,
-        displayName:
-          row.preferredName ??
-          `${row.legalFirstName} ${row.legalLastName}`,
+        displayName: personDisplayName(row),
         health: {
           emergencySummary: row.emergencySummary,
           allergySummary: row.allergySummary,
@@ -837,9 +836,7 @@ export async function getFieldTripSafetyPacket(
         },
         emergencyContacts: contacts.map((contact) => ({
           personId: contact.personId,
-          name:
-            contact.preferredName ??
-            `${contact.legalFirstName} ${contact.legalLastName}`,
+          name: personDisplayName(contact),
           phone: contact.phone,
         })),
       });

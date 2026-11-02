@@ -1,44 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { listTeachers } from "@/modules/profiles/directory.functions";
 import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
+import { useDebouncedDirectorySearch } from "@/lib/use-debounced-directory-search";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 export const Route = createFileRoute("/staff/teachers")({ component: StaffTeachersPage });
 
-type TeacherRow = Awaited<ReturnType<typeof listTeachers>>["teachers"][number];
+const findTeachers = async (query?: string) => (await listTeachers({ data: { query } })).teachers;
 
 function StaffTeachersPage() {
   const [query, setQuery] = useState("");
-  const [teachers, setTeachers] = useState<TeacherRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    const handle = setTimeout(() => {
-      listTeachers({ data: { query: query.trim() || undefined } })
-        .then((result) => {
-          if (active) {
-            setTeachers(result.teachers);
-            setError("");
-            setLoading(false);
-          }
-        })
-        .catch(() => {
-          if (active) {
-            setTeachers([]);
-            setError("Sign in with an authorized staff account.");
-            setLoading(false);
-          }
-        });
-    }, 250);
-    return () => {
-      active = false;
-      clearTimeout(handle);
-    };
-  }, [query]);
+  const { rows: teachers, loading, error, retry } = useDebouncedDirectorySearch(
+    query, findTeachers, "Teacher search is unavailable. Try again.",
+  );
 
   return (
     <WorkspaceShell eyebrow="CAN OS · Staff" title="Teacher directory"
@@ -53,27 +29,27 @@ function StaffTeachersPage() {
             placeholder="First or last name"
           />
         </label>
-        <QueryState loading={loading && "Loading teachers…"} error={error} isEmpty={teachers.length === 0}
+        <QueryState loading={loading && "Loading teachers…"} error={error} onRetry={retry} isEmpty={teachers.length === 0}
           empty={<EmptyState className="mt-8" title="No teachers matched your search at your school sites." />}>
-          <div className="mt-8 overflow-x-auto rounded-xl border bg-card">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-5 py-3 font-semibold">Teacher</th>
-                  <th className="px-5 py-3 font-semibold">Sections</th>
-                  <th className="px-5 py-3 font-semibold">Students</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="mt-8 rounded-xl border bg-card">
+            <Table aria-label="Teacher directory" className="text-left">
+              <TableHeader>
+                <TableRow className="text-xs uppercase tracking-wider text-muted-foreground">
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Teacher</TableHead>
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Sections</TableHead>
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Students</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {teachers.map((teacher) => (
-                  <tr key={teacher.personId} className="border-b last:border-0 align-top">
-                    <td className="px-5 py-3 font-semibold"><ProfilePhoto personId={teacher.personId} name={teacher.name}/><Link to="/profiles" search={{person:teacher.personId}} className="mt-2 inline-block underline">{teacher.name}</Link></td>
-                    <td className="px-5 py-3">{teacher.sections.join(", ")}</td>
-                    <td className="px-5 py-3">{teacher.studentCount}</td>
-                  </tr>
+                  <TableRow key={teacher.personId}>
+                    <TableCell className="px-5 py-3 align-top font-semibold"><ProfilePhoto personId={teacher.personId} name={teacher.name}/><Link to="/profiles" search={{person:teacher.personId}} className="mt-2 inline-block underline">{teacher.name}</Link></TableCell>
+                    <TableCell className="px-5 py-3 align-top">{teacher.sections.join(", ")}</TableCell>
+                    <TableCell className="px-5 py-3 align-top">{teacher.studentCount}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </QueryState>
     </WorkspaceShell>

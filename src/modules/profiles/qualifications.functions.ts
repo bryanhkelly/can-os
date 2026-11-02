@@ -13,7 +13,8 @@ import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { emitEvent } from "@/platform/mutation";
-import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { DomainError } from "@/domain/errors";
 import { assertScopedQualificationReviewer, reviewQualification } from "./qualification-review.server";
 
 import { EventTypes } from "@/domain/event-types";
@@ -171,10 +172,9 @@ export const beginQualificationUpload = createServerFn({ method: "POST" })
     assertUploadsEnabled();
     await catalogEntry(data,db,actor);
     const key = `qualifications/${actor.actorPersonId}/${crypto.randomUUID()}`;
-    return { key, uploadHeaders: { "Content-Type": data.mimeType, "If-None-Match": "*" },
-      uploadUrl: createPrivateUploadUrl({ key, keyPattern, contentType: data.mimeType,
+    return createPrivateUpload({ key, keyPattern, contentType: data.mimeType,
         contentLength: data.size, minContentLength: 16, maxContentLength: 10 * 1024 * 1024,
-        expiresSeconds: 180, preventOverwrite: true }) };
+        expiresSeconds: 180, preventOverwrite: true });
   });
 
 export const finishQualificationUpload = createServerFn({ method: "POST" })
@@ -197,7 +197,7 @@ export const finishQualificationUpload = createServerFn({ method: "POST" })
           existing.issuedAt?.toISOString() !== (data.claim.issuedAt ? new Date(data.claim.issuedAt).toISOString() : undefined) ||
           existing.expiresAt?.toISOString() !== (data.claim.expiresAt ? new Date(data.claim.expiresAt).toISOString() : undefined) ||
           !document || document.fileName !== data.claim.fileName || document.mimeType !== data.claim.mimeType ||
-          document.metadata.size !== data.claim.size) throw new Error("This upload was already submitted with different qualification details");
+          document.metadata.size !== data.claim.size) throw new DomainError("CONFLICT","This upload was already submitted with different qualification details");
         return { claimId, created: false };
       }
       await catalogEntry(data.claim,tx,actor);

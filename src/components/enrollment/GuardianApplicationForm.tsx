@@ -70,8 +70,16 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   const requested = programs.find(item => item.id === requestedProgramId);
   const [programId, setProgramId] = useState(
     requestedProgramId ? requested?.id ?? "" : programs.length === 1 ? programs[0]!.id : "");
-
   const [schoolYearId, setSchoolYearId] = useState("");
+  const [previousRequestedProgramId, setPreviousRequestedProgramId] = useState(requestedProgramId);
+  if (previousRequestedProgramId !== requestedProgramId) {
+    setPreviousRequestedProgramId(requestedProgramId);
+    if (requestedProgramId) {
+      setProgramId(requested?.id ?? "");
+      setSchoolYearId("");
+    }
+  }
+
   const selection = guardianApplicationSelection(programs, {
     requestedProgramId, familyStartRequestId, programId, schoolYearId,
   });
@@ -306,4 +314,3 @@ export function GuardianApplicationForm({ programs, households, students = [], t
     </form>}
   </GuidedSetupShell>;
 }
-

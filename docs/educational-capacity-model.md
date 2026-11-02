@@ -207,6 +207,13 @@ Site-bound explicit teacher replacement also uses this command, then completes
 the outgoing instructor's delivery and removes its teaching relationship.
 Site-less legacy replacement remains unchanged.
 
+Teachers without an active Section can submit a Program-scoped class setup
+request for registrar review. Requests are Actions, not provisional Sections or
+teacher assignments. The registrar fulfills a request only through the existing
+launch provisioning command, which rechecks curriculum, schedule, institutional
+authority and teaching eligibility in the Section transaction; declines require
+a reason. A request never grants access to the resulting class.
+
 Program activation rechecks launch staffing under the same site lock, locks
 credential parent rows against canonical review, and captures the actual rule
 and verification-event references in its activation audit. This is an opening

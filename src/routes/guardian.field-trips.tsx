@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { formatTimestamp } from "@/modules/calendar/timezone";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { WorkspaceShell } from "@/components/workspace";
 import {
   listGuardianFieldTripPermissions, signGuardianFieldTripPermission,
@@ -27,36 +29,34 @@ function GuardianTrips() {
 
 function TripPermissions({ items }: { items: Trip[] }) {
   const router = useRouter();
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
-  const [busy, setBusy] = useState("");
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
   async function sign(participantId: string) {
-    setBusy(participantId); setNotice(""); setError("");
-    try {
-      await signGuardianFieldTripPermission({
+    await mutation.run(
+      () => signGuardianFieldTripPermission({
         data: { participantId, acknowledged: true },
-      });
-      setNotice("Your field trip permission was recorded.");
-      try { await router.invalidate(); }
-      catch { setError("Your signature was saved, but the invitation list could not refresh. Reopen this page instead of signing again."); }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign permission.");
-    } finally {
-      setBusy("");
-    }
+      }),
+      {
+        successMessage: "Your field trip permission was recorded.",
+        commandErrorMessage: "Could not sign permission.",
+        refreshErrorMessage: "Your signature was saved, but the invitation list could not refresh. Reopen this page instead of signing again.",
+      },
+    );
   }
   async function decline(participantId:string,studentName:string){
     if(busy)return;
     if(!window.confirm("Decline or withdraw field-trip permission for "+studentName+"? The school will be notified and this child cannot board without valid permission. If your child has already boarded, contact the school immediately."))return;
-    setBusy(participantId);setNotice("");setError("");
-    try{
-      const result=await declineGuardianFieldTripPermission({data:{participantId,confirmed:true,note:""}});
-      setNotice(result.saved?"Your refusal was recorded and the school was notified.":"Your refusal was already recorded.");
-      try{await router.invalidate();}
-      catch{setError("Your decision was saved, but this list could not refresh. Reopen it before submitting again.");}
-    }catch(err){setError(err instanceof Error?err.message:"Unable to decline trip participation.");}
-    finally{setBusy("");}
+    await mutation.run(
+      () => declineGuardianFieldTripPermission({data:{participantId,confirmed:true,note:""}}),
+      {
+        successMessage: result => result.saved
+          ? "Your refusal was recorded and the school was notified."
+          : "Your refusal was already recorded.",
+        commandErrorMessage: "Unable to decline trip participation.",
+        refreshErrorMessage: "Your decision was saved, but this list could not refresh. Reopen it before submitting again.",
+      },
+    );
   }
   const money = (cents: number) => new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD",
@@ -68,8 +68,9 @@ function TripPermissions({ items }: { items: Trip[] }) {
       subtitle="Review published school permission language and respond to invitations for your children. Permission and fees are separate steps."
       actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
     >
-      {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {mutation.pending && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">Saving permission decision...</p>}
+      {mutation.notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
       <div className="mt-7 space-y-4">
         {items.map(item => <article key={item.participantId} className="rounded-xl border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.studentName}</p>
@@ -77,11 +78,11 @@ function TripPermissions({ items }: { items: Trip[] }) {
           <p className="mt-2 text-sm">{item.destination}</p>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div><dt className="text-xs text-muted-foreground">Departure</dt>
-              <dd>{new Date(item.departsAt).toLocaleString()}</dd></div>
+              <dd>{formatTimestamp(item.departsAt, item.timezone)} ({item.timezone})</dd></div>
             <div><dt className="text-xs text-muted-foreground">Return</dt>
-              <dd>{new Date(item.returnsAt).toLocaleString()}</dd></div>
+              <dd>{formatTimestamp(item.returnsAt, item.timezone)} ({item.timezone})</dd></div>
             <div><dt className="text-xs text-muted-foreground">Permission deadline</dt>
-              <dd>{item.deadline ? new Date(item.deadline).toLocaleString() : "Before departure"}</dd></div>
+              <dd>{item.deadline ? formatTimestamp(item.deadline, item.timezone) : "Before departure"}</dd></div>
             <div><dt className="text-xs text-muted-foreground">Fee</dt>
               <dd>{item.feeAmountCents ? money(item.feeAmountCents) : "No fee"}</dd></div>
           </dl>

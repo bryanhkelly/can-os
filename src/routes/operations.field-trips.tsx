@@ -2,7 +2,14 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { formatTimestamp } from "@/modules/calendar/timezone";
+import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
+import { DomainError } from "@/domain/errors";
 import { WorkspaceShell } from "@/components/workspace";
+import {SiteProgramFields} from "@/components/workspace/site-program-fields";
+import {MutationFeedback} from "@/components/workspace/mutation-feedback";
+import {LocalDateTimeField} from "@/components/workspace/local-datetime-field";
 import {
   approveCanonicalFieldTrip, inviteCanonicalFieldTripStudent,
   listFieldTripOperations, proposeCanonicalFieldTrip,
@@ -19,12 +26,6 @@ export const Route = createFileRoute("/operations/field-trips")({
 type Data = Awaited<ReturnType<typeof listFieldTripOperations>>;
 type Trip = Data["trips"][number];
 
-function asIso(value: string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) throw new Error("Enter a valid date and time.");
-  return date.toISOString();
-}
-
 function FieldTripOperations() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) {
@@ -35,9 +36,8 @@ function FieldTripOperations() {
 
 function FieldTripOperationsView({ data }: { data: Data }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [siteId, setSiteId] = useState(data.sites[0]?.id ?? "");
   const [programId, setProgramId] = useState("");
   const [title, setTitle] = useState("");
@@ -49,19 +49,13 @@ function FieldTripOperationsView({ data }: { data: Data }) {
   const [permissionVersion, setPermissionVersion] = useState("2026.1");
   const [permissionText, setPermissionText] = useState("");
   const [candidate, setCandidate] = useState<Record<string, string>>({});
+  const selectedSite = data.sites.find(site => site.id === siteId);
 
   async function run(work: () => Promise<unknown>, message: string) {
-    if (busy) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await work();
-      await router.invalidate();
-      setNotice(message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save field trip change.");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.run(work, {
+      successMessage: message,
+      commandErrorMessage: "Unable to save field trip change.",
+    });
   }
 
   return (
@@ -71,8 +65,7 @@ function FieldTripOperationsView({ data }: { data: Data }) {
         <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
         <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}>
-      {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      <div className="mt-5"><MutationFeedback state={mutation} pendingMessage="Saving field trip change..."/></div>
       <section className="mt-7 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">Propose a field trip</h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -85,10 +78,11 @@ function FieldTripOperationsView({ data }: { data: Data }) {
             const feeDollars = Number(fee);
             if (!Number.isFinite(feeDollars) || feeDollars < 0 ||
               Math.round(feeDollars * 100) > 1000000) throw new Error("Enter a valid fee.");
+            if (!selectedSite) throw new DomainError("VALIDATION_FAILED", "Choose a school before scheduling a trip.");
             await proposeCanonicalFieldTrip({ data: {
               siteId, programId: programId || null, title, destination,
-              departsAt: asIso(departsAt), returnsAt: asIso(returnsAt),
-              permissionDueAt: asIso(permissionDueAt),
+              departsAt: siteLocalTimeToIso(departsAt, selectedSite.timezone), returnsAt: siteLocalTimeToIso(returnsAt, selectedSite.timezone),
+              permissionDueAt: siteLocalTimeToIso(permissionDueAt, selectedSite.timezone),
               feeAmountCents: Math.round(feeDollars * 100),
               permissionVersion, permissionText,
             } });
@@ -97,22 +91,9 @@ function FieldTripOperationsView({ data }: { data: Data }) {
             setFee("0");
           }, "Field trip proposed. Review and approve it below.");
         }}>
-          <label className="text-sm">School
-            <select required value={siteId}
-              onChange={event => { setSiteId(event.target.value); setProgramId(""); }}
-              className="mt-1 block w-full rounded border bg-background p-2">
-              {data.sites.map(site =>
-                <option key={site.id} value={site.id}>{site.name}</option>)}
-            </select>
-          </label>
-          <label className="text-sm">Program
-            <select value={programId} onChange={event => setProgramId(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2">
-              <option value="">All enrolled programs at this school</option>
-              {data.programs.filter(p => p.siteId === siteId).map(program =>
-                <option key={program.id} value={program.id}>{program.name}</option>)}
-            </select>
-          </label>
+          <SiteProgramFields sites={data.sites} programs={data.programs} siteId={siteId} programId={programId}
+            siteRequired programPlaceholder="All enrolled programs at this school" disabled={busy}
+            onChange={(site,program)=>{setSiteId(site);setProgramId(program);}}/>
           <label className="text-sm">Trip title
             <input required minLength={3} maxLength={150} value={title}
               onChange={event => setTitle(event.target.value)}
@@ -123,21 +104,9 @@ function FieldTripOperationsView({ data }: { data: Data }) {
               onChange={event => setDestination(event.target.value)}
               className="mt-1 block w-full rounded border bg-background p-2" />
           </label>
-          <label className="text-sm">Departure
-            <input required type="datetime-local" value={departsAt}
-              onChange={event => setDepartsAt(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
-          <label className="text-sm">Return
-            <input required type="datetime-local" value={returnsAt}
-              onChange={event => setReturnsAt(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
-          <label className="text-sm">Permission deadline
-            <input required type="datetime-local" value={permissionDueAt}
-              onChange={event => setPermissionDueAt(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
+          <LocalDateTimeField label="Departure" timezone={selectedSite?.timezone} value={departsAt} onChange={setDepartsAt} required disabled={busy}/>
+          <LocalDateTimeField label="Return" timezone={selectedSite?.timezone} value={returnsAt} onChange={setReturnsAt} required disabled={busy}/>
+          <LocalDateTimeField label="Permission deadline" timezone={selectedSite?.timezone} value={permissionDueAt} onChange={setPermissionDueAt} required disabled={busy}/>
           <label className="text-sm">Trip fee (USD)
             <input required type="number" min={0} max={10000} step="0.01" value={fee}
               onChange={event => setFee(event.target.value)}
@@ -189,8 +158,8 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
           {trip.siteName} · {trip.destination}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Departs {new Date(trip.departsAt).toLocaleString()} ·
-          Permission closes {trip.deadline ? new Date(trip.deadline).toLocaleString() : "before departure"}
+          Departs {formatTimestamp(trip.departsAt, trip.timezone)} ({trip.timezone}) ·
+          Permission closes {trip.deadline ? formatTimestamp(trip.deadline, trip.timezone) : "before departure"}
         </p>
       </div>
       <span className="rounded-full border px-3 py-1 text-xs">{trip.status}</span>

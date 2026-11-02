@@ -42,6 +42,10 @@ describe("canonical workspace navigation",()=>{
   expect(getWorkspaceLinks("unknown_role")).toBeUndefined();
   expect(getWorkspaceHome("unknown_role")).toBeUndefined();
  });
+ it("does not give a role duplicate labels for one destination",()=>{
+  const facilitatorLinks=getWorkspaceLinks("room_facilitator")??[];
+  expect(new Set(facilitatorLinks.map(item=>item.path)).size).toBe(facilitatorLinks.length);
+ });
  it("marks only the selected destination and preserves its concrete route",async()=>{
   const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/my-school"})});
   const router=createRouter({routeTree:root,history:createMemoryHistory({initialEntries:["/"]})});

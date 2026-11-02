@@ -1,6 +1,7 @@
 import { getCapacityCandidates, swapCommittedInstructor } from "@/modules/staffing/educational-capacity.functions";
 import {useEffect,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
+import {useMutationFeedback, type MutationOutcome} from "@/lib/mutation-feedback";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
  transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist,offerLifecycleWaitlistSeat
@@ -24,16 +25,21 @@ export function SectionLifecycleWorkspace({programId,staff}:{programId:string;st
 }
 export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Snapshot;staff:{personId:string;first:string;last:string}[];onChanged:()=>Promise<void>}){
  const router=useRouter();
+ const mutation=useMutationFeedback(async()=>{await onChanged();await router.invalidate();});
+ const busy=mutation.pending||mutation.refreshFailed;
  const [reason,setReason]=useState("");
- const [busy,setBusy]=useState("");
- const [error,setError]=useState("");
- const [message,setMessage]=useState("");
- async function run(id:string,operation:()=>Promise<unknown>,success:string){
-  if(reason.trim().length<5){setError("Provide an explanation (at least 5 characters) for the operational record.");return;}
-  setBusy(id);setError("");setMessage("");
-  try{await operation();await onChanged();await router.invalidate();setMessage(success);setReason("");}
-  catch(e){setError(e instanceof Error?e.message:"Lifecycle change failed");}
-  finally{setBusy("");}
+ const [validationError,setValidationError]=useState("");
+ async function run(id:string,operation:()=>Promise<unknown>,success:string):Promise<MutationOutcome<unknown>>{
+  void id;
+  if(reason.trim().length<5){
+   const error=new Error("Provide an explanation (at least 5 characters) for the operational record.");
+   setValidationError(error.message);
+   return {status:"failed",error};
+  }
+  setValidationError("");
+  const result=await mutation.run(operation,{successMessage:success,commandErrorMessage:"Lifecycle change failed."});
+  if(result.status==="saved"||result.status==="refresh-failed")setReason("");
+  return result;
  }
  return <section className="mt-9 space-y-4" aria-label="Operational lifecycle">
   <h2 className="font-serif text-2xl">School operations · lifecycle management</h2>
@@ -43,15 +49,17 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
     placeholder="Document the decision and any necessary student/teacher follow-up"
     className="mt-1 block w-full rounded border bg-background p-2"/>
   </label>
-  {error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{error}</p>}
-  {message&&<p role="status" className="rounded border p-3 text-sm">{message}</p>}
+  {validationError&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{validationError}</p>}
+  {mutation.pending&&<p role="status" className="rounded border p-3 text-sm">Saving lifecycle change...</p>}
+  {mutation.error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="rounded border p-3 text-sm">{mutation.notice}</p>}
   {sections.map(section=><LifecycleSection key={section.id} section={section} staff={staff}
-   busy={Boolean(busy)} reason={reason} allSections={sections} run={run} onChanged={onChanged}/>)}
+   busy={busy} reason={reason} allSections={sections} run={run}/>)}
  </section>;
 }
-function LifecycleSection({section,staff,busy,reason,allSections,run,onChanged}:{
+function LifecycleSection({section,staff,busy,reason,allSections,run}:{
  section:Snapshot[number];staff:{personId:string;first:string;last:string}[];
- busy:boolean;reason:string;allSections:Snapshot;onChanged:()=>Promise<void>;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<void>
+ busy:boolean;reason:string;allSections:Snapshot;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<MutationOutcome<unknown>>
 }){
  const [newTeacher,setNewTeacher]=useState("");
  const [outgoing,setOutgoing]=useState("");
@@ -85,7 +93,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run,onChanged}:
       {staff.filter(p=>!section.teachers.some(t=>t.personId===p.personId)).map(p=><option key={p.personId} value={p.personId}>{p.first} {p.last}</option>)}
      </select>
     </label>
-    <CapacityReplacement section={section} reason={reason} onChanged={onChanged}/>
+    <CapacityReplacement section={section} reason={reason} busy={busy} run={run}/>
     <button type="button" disabled={busy||!section.active||!outgoing||!newTeacher}
      onClick={()=>void run(section.id,()=>replaceLifecycleTeacher({data:{sectionId:section.id,oldPersonId:outgoing,newPersonId:newTeacher,reason}}),"Instructor replacement recorded.")}
      className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50">Replace instructor</button>
@@ -168,12 +176,10 @@ function LifecycleSection({section,staff,busy,reason,allSections,run,onChanged}:
  </article>;
 }
 
-function CapacityReplacement({section,reason,onChanged}:{section:Snapshot[number];reason:string;onChanged:()=>Promise<void>}) {
+function CapacityReplacement({section,reason,busy,run}:{section:Snapshot[number];reason:string;busy:boolean;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<MutationOutcome<unknown>>}){
  const [reservationId,setReservationId]=useState("");
  const [offeringId,setOfferingId]=useState("");
  const [candidates,setCandidates]=useState<Awaited<ReturnType<typeof getCapacityCandidates>>>([]);
- const [error,setError]=useState("");
- const [busy,setBusy]=useState(false);
  useEffect(()=>{
   let alive=true;
   if(!section.demandId)return;
@@ -199,11 +205,8 @@ function CapacityReplacement({section,reason,onChanged}:{section:Snapshot[number
   </label>
   <button disabled={busy||!reservationId||!offeringId||reason.trim().length<5} type="button"
     className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50" onClick={async()=>{
-     setBusy(true);setError("");
-     try{await swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}});await onChanged();setReservationId("");setOfferingId("")}
-     catch(e){setError(e instanceof Error?e.message:"Unable to replace instructor")}
-     finally{setBusy(false)}
+     const result=await run(section.id,()=>swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}}),"Instructor replacement recorded.");
+     if(result.status==="saved"||result.status==="refresh-failed"){setReservationId("");setOfferingId("")}
     }}>Commit replacement</button>
-  {error&&<p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
  </div>;
 }

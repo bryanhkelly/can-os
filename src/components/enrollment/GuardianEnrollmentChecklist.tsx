@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRouter } from "@tanstack/react-router";
 import { getGuardianEnrollmentChecklist } from "@/modules/enrollment/guardian-enrollment-checklist.functions";
 import { beginEnrollmentDocumentUpload, finishEnrollmentDocumentUpload, getEnrollmentDocumentDownload,
@@ -10,51 +12,59 @@ type Availability = Awaited<ReturnType<typeof getEnrollmentDocumentUploadAvailab
 
 export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: string }) {
   const router = useRouter();
-  const [data, setData] = useState<{ checklist: Checklist; availability: Availability } | null>(null);
+  const [data, setData] = useState<Checklist | null>(null);
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const [availabilityError, setAvailabilityError] = useState(false);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [files, setFiles] = useState<Record<string, File | null>>({});
   const [notice, setNotice] = useState("");
-  const pending = useRef(new Map<string, { file: File; key: string }>());
+  const pending = useRef(new Map<string, { file: File; task: {run: () => Promise<unknown>} }>());
+  const inFlight = useRef(false);
   useEffect(() => {
     let current = true;
-    setData(null); setError("");
-    void Promise.all([
-      getGuardianEnrollmentChecklist({ data: { applicationId } }),
-      // A storage outage must not block consent forms or the enrollment checklist.
-      getEnrollmentDocumentUploadAvailability().catch(() => ({ live: false, demo: false })),
-    ]).then(([checklist, availability]) => {
-      if (current) setData({ checklist, availability });
+    setData(null); setAvailability(null); setAvailabilityError(false); setError("");
+    void getGuardianEnrollmentChecklist({ data: { applicationId } }).then(checklist => {
+      if (current) setData(checklist);
     }).catch(cause => {
       if (current) setError(cause instanceof Error ? cause.message : "Unable to load enrollment checklist");
+    });
+    // Upload availability is independent so a storage outage cannot block forms.
+    void getEnrollmentDocumentUploadAvailability().then(result => {
+      if (current) setAvailability(result);
+    }).catch(() => {
+      if (current) setAvailabilityError(true);
     });
     return () => { current = false; };
   }, [applicationId, attempt]);
 
   async function upload(requirementId: string) {
+    if(inFlight.current)return;
     const file = files[requirementId];
     if (!file) { setError("Choose a PDF, JPEG or PNG file first."); return; }
+    inFlight.current=true;
     setBusy(requirementId); setError(""); setNotice("");
     try {
       const request = { applicationId, requirementId, fileName: file.name, mimeType: file.type, size: file.size };
-      const previous = pending.current.get(requirementId);
-      let key = previous?.file === file ? previous.key : undefined;
-      if (!key) {
-        const upload = await beginEnrollmentDocumentUpload({ data: request });
-        const response = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-        if (!response.ok) throw new Error(`Document upload failed (${response.status}). Please retry.`);
-        key = upload.key;
-        pending.current.set(requirementId, { file, key });
+      const taskKey=applicationId+":"+requirementId;
+      let attempt = pending.current.get(taskKey);
+      if(attempt?.file!==file){
+        attempt={file,task:createPrivateUploadTask({file,policy:documentUploadPolicy,
+          begin:()=>beginEnrollmentDocumentUpload({data:request}),
+          finish:upload=>finishEnrollmentDocumentUpload({data:{...request,key:upload.key}}),
+        })};
+        pending.current.set(taskKey,attempt);
       }
-      await finishEnrollmentDocumentUpload({ data: { ...request, key } });
-      pending.current.delete(requirementId);
+      await attempt.task.run();
+      pending.current.delete(taskKey);
       setFiles(current => ({ ...current, [requirementId]: null }));
       setNotice("Document received. Admissions must review it before this requirement is complete.");
       setAttempt(value => value + 1);
-      await router.invalidate();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to upload enrollment document"); }
-    finally { setBusy(null); }
+      try { await router.invalidate(); }
+      catch { setError("Document received, but the page could not refresh. Reopen the checklist to review it."); }
+    } catch (cause) { setError(mutationErrorMessage(cause,"Unable to upload enrollment document. Retry to finish without uploading again.")); }
+    finally { inFlight.current=false; setBusy(null); }
   }
   async function openDocument(requirementId: string, documentId: string) {
     setBusy(requirementId); setError("");
@@ -72,8 +82,12 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
       onClick={() => setAttempt(value => value + 1)}>Retry checklist</button>}</div>}
     {notice && <p role="status">{notice}</p>}
     {!data && !error && <p role="status">Loading enrollment checklist...</p>}
-    {data && <EnrollmentChecklistItems checklist={data.checklist}
-      uploadsEnabled={data.checklist.synthetic ? data.availability.demo : data.availability.live}
+    {data && <EnrollmentChecklistItems checklist={data}
+      uploadsEnabled={availability
+        ? data.synthetic ? availability.demo : availability.live
+        : false}
+      uploadsAvailabilityPending={!availability && !availabilityError}
+      uploadsAvailabilityError={availabilityError}
       busy={busy} files={files} onFile={(id, file) => setFiles(current => ({ ...current, [id]: file }))}
       onUpload={upload} onOpen={openDocument} onChanged={async () => {
         setAttempt(value => value + 1); await router.invalidate();
@@ -81,8 +95,10 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
   </section>;
 }
 
-export function EnrollmentChecklistItems({ checklist, uploadsEnabled, busy, files, onFile, onUpload, onOpen, onChanged }: {
-  checklist: Checklist; uploadsEnabled: boolean; busy: string | null; files: Record<string, File | null>;
+export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAvailabilityPending = false,
+  uploadsAvailabilityError = false, busy, files, onFile, onUpload, onOpen, onChanged }: {
+  checklist: Checklist; uploadsEnabled: boolean; uploadsAvailabilityPending?: boolean;
+  uploadsAvailabilityError?: boolean; busy: string | null; files: Record<string, File | null>;
   onFile: (requirementId: string, file: File | null) => void;
   onUpload: (requirementId: string) => Promise<void>;
   onOpen: (requirementId: string, documentId: string) => Promise<void>;
@@ -90,7 +106,11 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, busy, file
 }) {
   return <div className="space-y-3">
     {checklist.closed && <p role="status">This checklist is now a historical record. Contact admissions for further changes.</p>}
-    {!checklist.closed && !uploadsEnabled && <p role="status">Online document uploads are not enabled for this application.
+    {!checklist.closed && uploadsAvailabilityPending && checklist.requirements.some(requirement =>
+      !requirement.form && requirement.status !== "complete") && <p role="status">Checking secure document upload availability.</p>}
+    {!checklist.closed && uploadsAvailabilityError && <p role="status">Secure document upload availability could not be confirmed.
+      You can still complete forms; contact admissions to submit documents.</p>}
+    {!checklist.closed && !uploadsEnabled && !uploadsAvailabilityPending && !uploadsAvailabilityError && <p role="status">Online document uploads are not enabled for this application.
       Contact admissions to arrange submission. You can still view recorded document reviews.</p>}
     {checklist.requirements.map(requirement => <article key={requirement.id} className="space-y-2 rounded border p-3">
       <h4 className="font-semibold">{requirement.title}{requirement.blocking ? " (required)" : " (optional)"}</h4>

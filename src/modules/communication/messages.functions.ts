@@ -1,4 +1,5 @@
 import { roleCapabilities } from "@/domain/access-context";
+import { personDisplayName, personShortName } from "@/domain/person-name";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -46,7 +47,7 @@ async function fetchDisplayNames(
   return new Map(
     rows.map((row) => [
       row.id,
-      `${row.preferredName ?? row.legalFirstName} ${row.legalLastName}`.trim(),
+      personDisplayName(row),
     ]),
   );
 }
@@ -557,7 +558,7 @@ export const getThread = createServerFn({ method: "GET" })
         id: row.id,
         body: row.body,
         sentAt: row.sentAt.toISOString(),
-        senderName: row.preferredName ?? row.legalFirstName,
+        senderName: personShortName(row),
         own: row.senderPersonId === actorPersonId,
       })),
     };

@@ -11,13 +11,11 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+const websiteSearchSchema=siteProgramSelectionSchema.extend({returnGrantId:optionalSearchString});
 
 export const Route = createFileRoute("/site-website")({
-  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;returnGrantId?:string}=>({
-    siteId:typeof search.siteId==="string"?search.siteId:undefined,
-    programId:typeof search.programId==="string"?search.programId:undefined,
-    returnGrantId:typeof search.returnGrantId==="string"?search.returnGrantId:undefined,
-  }),
+  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;returnGrantId?:string}=>websiteSearchSchema.parse(search),
   loaderDeps:({search})=>({siteId:search.siteId}),
   loader:({deps})=>safeLoader(
     () => getPartnerWebsitePreviewView({data:{siteId:deps.siteId}}),

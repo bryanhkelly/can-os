@@ -5,6 +5,7 @@ import { Route as Students } from "@/routes/staff.students.index";
 import { Route as Teachers } from "@/routes/staff.teachers";
 import { Route as StudentReport } from "@/routes/student.report-card";
 import { Route as GuardianReport } from "@/routes/guardian.report-cards";
+import { Route as GuardianAcademics } from "@/routes/guardian.academics";
 import { QueryState } from "@/components/workspace";
 import { getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
 import { getStudentReportCard, getStudentTranscript } from "@/modules/learning/report-cards.functions";
@@ -40,10 +41,16 @@ vi.mock("@/modules/profiles/directory.functions", () => ({
 vi.mock("@/modules/learning/report-cards.functions", () => ({
   getStudentReportCard: vi.fn(), getStudentTranscript: vi.fn(),
 }));
-vi.mock("@/modules/learning/guardian-academic-queries.functions", () => ({ getGuardianStudents: vi.fn() }));
+vi.mock("@/modules/learning/guardian-academic-queries.functions", () => ({
+  getGuardianStudents: vi.fn(),
+  getGuardianAssignments: vi.fn(),
+}));
+vi.mock("@/components/learning/SubmissionAnnotations", () => ({ SubmissionAnnotations: () => null }));
+vi.mock("@/components/learning/AssignmentConversation", () => ({ AssignmentConversation: () => null }));
+vi.mock("@/components/learning/GuardianGradeResponse", () => ({ GuardianGradeResponseHistory: () => null }));
 vi.mock("@/components/profiles/ProfilePhoto", () => ({ ProfilePhoto: () => null }));
 
-function render(route: typeof Students | typeof Teachers | typeof StudentReport | typeof GuardianReport) {
+function render(route: typeof Students | typeof Teachers | typeof StudentReport | typeof GuardianReport | typeof GuardianAcademics) {
   state.index = 0;
   state.effects = [];
   const Page = route.options.component;
@@ -116,6 +123,8 @@ describe.each([
     const html = render(route);
     expect(html).toContain(`href="${href}"`);
     expect(html).toContain(">0</td>");
+    expect(html).toContain(`aria-label="${name === "students" ? "Student" : "Teacher"} directory"`);
+    expect(html.match(/scope="col"/g)).toHaveLength(name === "students" ? 4 : 3);
     expect(html).not.toContain('role="alert"');
     expect(html).not.toContain('role="status"');
   });
@@ -129,6 +138,7 @@ describe.each([
     await vi.advanceTimersByTimeAsync(249);
     expect(fetch).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenLastCalledWith({ data: { query: undefined } });
     expect(render(route)).toContain('role="alert"');
     if (typeof cleanup === "function") cleanup();
     state.values[0] = "  Alex  ";
@@ -152,6 +162,61 @@ describe.each([
     resolve({ [key]: [row] });
     await Promise.resolve();
     expect(state.values[1]).toEqual([]);
+  });
+  it("cancels the debounce before a request starts", async () => {
+    vi.useFakeTimers();
+    render(route);
+    const cleanup = state.effects[0]?.();
+    if (typeof cleanup === "function") cleanup();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("coalesces repeated edits into the final trimmed query", async () => {
+    vi.useFakeTimers();
+    fetch.mockResolvedValue({ [key]: [row] });
+    state.values[0] = "A";
+    render(route);
+    const cleanup = state.effects[0]?.();
+    await vi.advanceTimersByTimeAsync(200);
+    if (typeof cleanup === "function") cleanup();
+    state.values[0] = "  Alex  ";
+    render(route);
+    state.effects[0]?.();
+    await vi.advanceTimersByTimeAsync(249);
+    expect(fetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith({ data: { query: "Alex" } });
+  });
+  it("does not let an older rejection replace newer search results", async () => {
+    vi.useFakeTimers();
+    let reject!: (reason: unknown) => void;
+    fetch.mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+    render(route);
+    const cleanup = state.effects[0]?.();
+    await vi.advanceTimersByTimeAsync(250);
+    if (typeof cleanup === "function") cleanup();
+    state.values[0] = "New search";
+    fetch.mockResolvedValueOnce({ [key]: [row] });
+    render(route);
+    state.effects[0]?.();
+    await vi.advanceTimersByTimeAsync(250);
+    reject(new Error("Private diagnostics"));
+    await Promise.resolve();
+    const html = render(route);
+    expect(html).toContain(`href="${href}"`);
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain("Private diagnostics");
+  });
+  it("presents serialized authorization failures safely and offers retry", async () => {
+    vi.useFakeTimers();
+    fetch.mockRejectedValueOnce({ code: "FORBIDDEN", message: "Private diagnostics" });
+    render(route);
+    state.effects[0]?.();
+    await vi.advanceTimersByTimeAsync(250);
+    const html = render(route);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Retry");
+    expect(html).not.toContain("Private diagnostics");
   });
 });
 
@@ -221,5 +286,17 @@ describe("report-card shared presentation", () => {
       expect(getStudentTranscript).not.toHaveBeenCalled();
       expect(html).toContain("This student is unavailable");
     }
+  });
+});
+
+describe("guardian academic access guidance", () => {
+  it("explains that enrollment forms precede academic visibility", () => {
+    state.values = [[], "", [], false, false, ""];
+    const html = render(GuardianAcademics);
+    expect(html).toContain("No enrolled children are showing in academics yet.");
+    expect(html).toContain("lists current admissions and enrollment steps by child and stage");
+    expect(html).toContain("Family home and enrollment steps");
+    expect(html).toContain('href="/messages"');
+    expect(html).not.toContain('href="/guardian/apply"');
   });
 });

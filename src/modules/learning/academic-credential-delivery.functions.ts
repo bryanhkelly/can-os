@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,gt,inArray,isNotNull,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
@@ -28,13 +29,13 @@ async function documentData(db:Awaited<ReturnType<typeof resources>>["db"],s:Awa
   const [student]=await db.select({first:s.people.legalFirstName,last:s.people.legalLastName}).from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId)).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
   const [org]=await db.select({name:s.organizations.name}).from(s.organizations).where(eq(s.organizations.id,record.issuingOrganizationId)).limit(1);
   const lines=(snapshot.rows as Array<{sectionTitle:string;letterGrade:string|null;creditsEarned:number|null;schoolYearName:string}>).map(row=>`${row.schoolYearName} | ${row.sectionTitle} | ${row.letterGrade??"N/A"} | Credits: ${row.creditsEarned??"Not recorded"}`);
-  return {studentProfileId:record.studentProfileId,issuerId:record.issuingOrganizationId,title:"OFFICIAL ACADEMIC TRANSCRIPT",issuer:org?.name??"",student:`${student?.first??""} ${student?.last??""}`,identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines};
+  return {studentProfileId:record.studentProfileId,issuerId:record.issuingOrganizationId,title:"OFFICIAL ACADEMIC TRANSCRIPT",issuer:org?.name??"",student:personLegalName({legalFirstName:student?.first,legalLastName:student?.last},""),identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines};
  }
  const [record]=await db.select({id:s.diplomaIssuances.id,issuedAt:s.diplomaIssuances.issuedAt,revokedAt:s.diplomaIssuances.revokedAt,decision:s.graduationDecisions.decision,issuerId:s.graduationDecisions.issuingOrganizationId,studentId:s.graduationDecisions.studentProfileId}).from(s.diplomaIssuances).innerJoin(s.graduationDecisions,eq(s.graduationDecisions.id,s.diplomaIssuances.graduationDecisionId)).where(eq(s.diplomaIssuances.id,credentialId)).limit(1);
  if(!record||record.decision!=="approved"||record.revokedAt)throw new Error("No active diploma credential");
  const [student]=await db.select({first:s.people.legalFirstName,last:s.people.legalLastName}).from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId)).where(eq(s.studentProfiles.id,record.studentId)).limit(1);
  const [org]=await db.select({name:s.organizations.name}).from(s.organizations).where(eq(s.organizations.id,record.issuerId)).limit(1);
- return {studentProfileId:record.studentId,issuerId:record.issuerId,title:"DIPLOMA",issuer:org?.name??"",student:`${student?.first??""} ${student?.last??""}`,identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines:["Has satisfied the institution's approved graduation requirements.","Issued by the school of record."]};
+ return {studentProfileId:record.studentId,issuerId:record.issuerId,title:"DIPLOMA",issuer:org?.name??"",student:personLegalName({legalFirstName:student?.first,legalLastName:student?.last},""),identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines:["Has satisfied the institution's approved graduation requirements.","Issued by the school of record."]};
 }
 export const renderAcademicCredential=createServerFn({method:"GET"})
  .validator((value:unknown)=>target.parse(value))

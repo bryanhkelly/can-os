@@ -16,7 +16,7 @@ import { readExtendedSeasonApprovals, extendedStaffingSignature } from "./extend
 import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
 import { validateDocumentUpload } from "@/modules/enrollment/r2-documents.server";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
-import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 
@@ -110,13 +110,11 @@ export async function beginExtendedEvidenceUpload(actor: AccessContext, input: E
     throw new Error("Evidence renewal is only available for a planned or registering season");
   if (new Date(input.expiresAt) <= new Date()) throw new Error("Evidence expiry must be in the future");
   const key = `extended-learning/${season.seasonId}/${randomUUID()}`;
-  return { key, uploadHeaders: { "Content-Type": input.mimeType, "If-None-Match": "*" },
-    uploadUrl: createPrivateUploadUrl({
+  return createPrivateUpload({
       key, keyPattern, contentType: input.mimeType, contentLength: input.size,
       minContentLength: 16, maxContentLength: 10 * 1024 * 1024,
       expiresSeconds: 180, preventOverwrite: true,
-    }),
-  };
+    });
 }
 
 export async function finishExtendedEvidenceUpload(actor: AccessContext,

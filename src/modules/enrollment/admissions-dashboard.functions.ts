@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personDisplayName } from "@/domain/person-name";
 import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -202,7 +203,7 @@ export const getAdmissionsDashboard = createServerFn({ method: "GET" })
       const applicationJourneys = journeys.filter(journey => journey.participantId === record.id);
       return {
         id: record.id,
-        studentName: `${record.preferredName ?? record.firstName} ${record.lastName}`,
+        studentName: personDisplayName({ preferredName: record.preferredName, legalFirstName: record.firstName, legalLastName: record.lastName }),
         programId: record.programId,
         program: record.program,
         stage: record.stage,

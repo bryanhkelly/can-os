@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { personShortName } from "@/domain/person-name";
 import { ArrowUpRight, BookOpen, CalendarDays } from "lucide-react";
 import { DailyCanvas, selectDailyCanvasContent, type DailyCanvasContent } from "./DailyCanvas";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
-import { EmptyState, WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { EmptyState, WorkspaceShell, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
 import { StudentSuccessSupportPanel } from "./StudentSuccessSupportPanel";
@@ -17,7 +18,7 @@ export function StudentExperience({ liveData, success, support }: {
   success?: StudentSuccessPriorities | null;
   support?: StudentSuccessSupportSummary | null;
 }) {
- const displayName=liveData.student.preferredName??liveData.student.firstName;
+ const displayName=personShortName({ preferredName: liveData.student.preferredName, legalFirstName: liveData.student.firstName });
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
  const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
  const overdueCount=success ? success.overdue : missing.length;
@@ -38,6 +39,9 @@ export function StudentExperience({ liveData, success, support }: {
    primaryAction={starter ? <Link to="/student/assignments" search={{section:starter.sectionId,assessment:starter.firstWeek.assessment!.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start first-week work <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">View my classes <ArrowUpRight className="size-4" /></Link>}
    secondaryAction={<Link to="/student/assignments" className="inline-flex min-h-11 items-center rounded-xl border border-white/70 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Assignments</Link>}
   />
+  {liveData.hasEnrollmentGuardian === false && <WorkspaceNotice tone="danger">
+   Your student record does not have a verified guardian with enrollment permission. Study-group requests need guardian permission. Ask your school office to verify the parent or guardian on your record; you cannot add or verify a guardian from this student account.
+  </WorkspaceNotice>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
    <Link to="/student/courses" className="rounded-xl border bg-card p-5 transition-colors hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><BookOpen className="size-4" /> Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
    <Link to="/student/assignments" className="rounded-xl border bg-card p-5 transition-colors hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarDays className="size-4" /> {success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
@@ -84,7 +88,7 @@ export function StudentExperience({ liveData, success, support }: {
       ?"attention":item.status==="graded"?"success":"neutral";
      return <article key={item.assessmentId} className="rounded-xl border bg-background p-4">
      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold"><Link to="/student/assignments" search={{assessment:item.assessmentId}} className="hover:underline focus-visible:outline-2">{item.assessmentTitle}</Link></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions."}</p></div><StatusBadge tone={tone}>{status}</StatusBadge></div>
-     <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt):"No due date"}</p>
+     <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt,liveData.sections.find(section=>section.sectionId===item.sectionId)?.timezone):"No due date"}</p>
      <Link to="/student/assignments" search={{assessment:item.assessmentId}} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Open assignment →</Link>
     </article>;
     })}
@@ -94,6 +98,7 @@ export function StudentExperience({ liveData, success, support }: {
    <WorkspacePanel title="Schedule" description="Events from your enrolled classes and school.">
     <div className="space-y-3">{liveData.events.map(event=><article key={event.id} className="rounded-xl border bg-background p-4">
      <h3 className="font-semibold"><Link to="/calendar" search={{date:dateKeyInTimezone(new Date(event.startsAt).toISOString(),event.timezone),event:event.id}} className="hover:underline focus-visible:outline-2">{event.title}</Link></h3>
+     {event.cancelled&&<StatusBadge tone="attention">Cancelled</StatusBadge>}
      <p className="mt-1 text-sm text-muted-foreground">{format(event.startsAt,event.timezone)} · {event.timezone}</p>
      {event.description&&<p className="mt-2 text-sm">{event.description}</p>}
     </article>)}

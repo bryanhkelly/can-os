@@ -4,7 +4,7 @@ import { AuthorizationError, type CommandContext } from "@/domain/command-contex
 const state=vi.hoisted(()=>({
   authority:vi.fn(),evaluate:vi.fn(),staffingContext:vi.fn(),requireActor:vi.fn(),
   audit:vi.fn(),event:vi.fn(),notify:vi.fn(),lockSite:vi.fn(),assertCourse:vi.fn(),
-  dbRows:[] as unknown[][],txRows:[] as unknown[][],insertRows:[] as unknown[][],
+  dbRows:[] as unknown[][],txRows:[] as unknown[][],insertRows:[] as unknown[][],updateRows:[] as unknown[][],
   tx:null as any,
 }));
 
@@ -52,7 +52,7 @@ vi.mock("@/modules/programs/teacher-policy.server",()=>({
 }));
 
 import { assignLaunchInstructor } from "@/modules/staffing/launch-staffing.server";
-import { provisionLaunchSection, setLaunchSectionCredits } from "@/modules/programs/launch-academics.functions";
+import { declineLaunchClassRequest, provisionLaunchSection, setLaunchSectionCredits } from "@/modules/programs/launch-academics.functions";
 
 const actor={
   actorPersonId:"host-registrar",role:"registrar",capabilities:new Set(["program.launch.start"]),
@@ -73,10 +73,18 @@ const input={programId:"program",sectionId:"section",teacherPersonId:"can-teache
 beforeEach(()=>{
   vi.clearAllMocks();
   state.dbRows=[];state.txRows=[];state.insertRows=[];
+  state.updateRows=[];
   state.tx={
     select:()=>selectChain(state.txRows),
     insert:()=>insertChain(state.insertRows),
-    update:vi.fn(()=>({set:()=>({where:vi.fn(()=>Promise.resolve())})})),
+    update:vi.fn(()=>({set:()=>({where:()=>{
+      const result:any={
+        returning:()=>Promise.resolve(state.updateRows.shift()??[]),
+        then:(resolve:(value:unknown)=>unknown,reject?:(reason:unknown)=>unknown)=>
+          Promise.resolve().then(resolve,reject),
+      };
+      return result;
+    }})})),
   };
   state.staffingContext.mockResolvedValue(section);
   state.evaluate.mockResolvedValue({
@@ -126,6 +134,40 @@ describe("issuer-bearing launch credit authority",()=>{
     expect(state.tx.update).toHaveBeenCalledOnce();
     expect(state.event).toHaveBeenCalledOnce();
     expect(state.audit).toHaveBeenCalledOnce();
+  });
+
+  describe("teacher class request review",()=>{
+    const requestId="10000000-0000-4000-8000-000000000001";
+    const request={
+      id:requestId,type:"section_creation_request",status:"open",ownerPersonId:"teacher",
+      organizationId:"church",siteId:"site",programId:"program",
+      subjectType:"program",subjectId:"program",
+      metadata:{requestOrigin:"teacher_classes",requestedClassTitle:"Biology Lab"},
+      resolutionNote:null,
+    };
+
+    it("declines a request in the registrar's scoped program and records reason, audit, and event",async()=>{
+      state.dbRows=[[program]];
+      state.txRows=[[request]];
+      state.updateRows=[[{id:requestId}]];
+      await expect(declineLaunchClassRequest({data:{
+        programId:"program",requestId,reason:"No schedule is available this term.",
+      }})).resolves.toEqual({declined:true,replayed:false});
+      expect(state.tx.update).toHaveBeenCalledOnce();
+      expect(state.audit).toHaveBeenCalledOnce();
+      expect(state.event).toHaveBeenCalledOnce();
+    });
+
+    it("does not allow a teacher request to be reviewed outside its program",async()=>{
+      state.dbRows=[[program]];
+      state.txRows=[[]];
+      await expect(declineLaunchClassRequest({data:{
+        programId:"program",requestId,reason:"No schedule is available this term.",
+      }})).rejects.toThrow("Class request not found in this program");
+      expect(state.tx.update).not.toHaveBeenCalled();
+      expect(state.audit).not.toHaveBeenCalled();
+      expect(state.event).not.toHaveBeenCalled();
+    });
   });
 
   it("denies credit changes after authority expires without mutating the Section",async()=>{

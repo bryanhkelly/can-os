@@ -8,6 +8,7 @@ import {
   summarizeExpectedOnsiteAttendance, type AttendanceFact, type AttendanceProgram,
   type ExpectedAttendanceSummary,
 } from "@/domain/expected-attendance";
+import { addCalendarDays, dateKeyInTimezone } from "@/modules/calendar/timezone";
 
 /**
  * GF4 scoped read projection. The caller must already have resolved the
@@ -27,13 +28,15 @@ export async function loadExpectedAttendanceCoverage(
   const siteIds = [...new Set(permittedPrograms.map(p => p.siteId)
     .filter((siteId): siteId is string => !!siteId))];
   const programIds = permittedPrograms.map(p => p.id);
-  const minDate = day?.date ?? new Date(asOf.getTime() - (windowDays + 4) * 86400000)
-    .toISOString().slice(0, 10);
-  const maxDate = day?.date ?? asOf.toISOString().slice(0, 10);
+  const siteRows = siteIds.length ? await db.select({ id: sites.id, timezone: sites.timezone })
+    .from(sites).where(inArray(sites.id, siteIds)) : [];
+  const timezones = new Map(siteRows.map(site => [site.id, site.timezone]));
+  const localDates = permittedPrograms.map(program =>
+    dateKeyInTimezone(asOf, program.siteId ? timezones.get(program.siteId) ?? "UTC" : "UTC"));
+  const minDate = day?.date ?? addCalendarDays([...localDates].sort()[0]!, -(windowDays + 4));
+  const maxDate = day?.date ?? [...localDates].sort().at(-1)!;
 
-  const [siteRows, yearRows, enrollmentRows] = await Promise.all([
-    siteIds.length ? db.select({ id: sites.id, timezone: sites.timezone })
-      .from(sites).where(inArray(sites.id, siteIds)) : Promise.resolve([]),
+  const [yearRows, enrollmentRows] = await Promise.all([
     siteIds.length ? db.select({
       id: schoolYears.id, siteId: schoolYears.siteId,
       organizationId: schoolYears.organizationId, programId: schoolYears.programId,
@@ -85,7 +88,6 @@ export async function loadExpectedAttendanceCoverage(
       inArray(scheduleTemplatePeriods.scheduleTemplateId, schedules.map(s => s.id))) :
       Promise.resolve([]),
   ]);
-  const timezones = new Map(siteRows.map(site => [site.id, site.timezone]));
   for (const program of permittedPrograms) {
     results.set(program.id, summarizeExpectedOnsiteAttendance({
       program, years: yearRows, calendars, calendarDays, schedules, periods,

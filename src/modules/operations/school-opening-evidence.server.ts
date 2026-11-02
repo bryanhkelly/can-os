@@ -11,7 +11,7 @@ import {
   type finishSchoolOpeningEvidenceUploadSchema, type reviewSchoolOpeningEvidenceSchema,
   type schoolOpeningEvidenceDownloadSchema,
 } from "@/domain/school-opening-evidence";
-import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 import { validateDocumentUpload } from "@/modules/enrollment/r2-documents.server";
 import {
@@ -51,9 +51,8 @@ export async function beginSchoolOpeningEvidenceUpload(actor:AccessContext,input
   validateDocumentUpload(input.fileName,input.mimeType,input.size);
   await currentSubmissionContext(actor,input);
   const key=`school-opening/${input.programId}/${randomUUID()}`;
-  return {key,uploadHeaders:{"Content-Type":input.mimeType,"If-None-Match":"*"},
-    uploadUrl:createPrivateUploadUrl({key,keyPattern,contentType:input.mimeType,contentLength:input.size,
-      minContentLength:16,maxContentLength:10*1024*1024,expiresSeconds:180,preventOverwrite:true})};
+  return createPrivateUpload({key,keyPattern,contentType:input.mimeType,contentLength:input.size,
+      minContentLength:16,maxContentLength:10*1024*1024,expiresSeconds:180,preventOverwrite:true});
 }
 
 export async function finishSchoolOpeningEvidenceUpload(actor:AccessContext,input:FinishInput) {

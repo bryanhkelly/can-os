@@ -8,7 +8,8 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { authorizeClass } from "./class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
 import { writeAudit } from "@/platform/mutation";
-import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload,signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
+import { DomainError } from "@/domain/errors";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
@@ -158,7 +159,7 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
         after: { assessmentId: assessment.id, storageProvider: "cloudflare_r2" },
         context: { accountId: context.accountId, sessionId: context.sessionId },
       });
-      return { documentId: document.id, key, uploadUrl: signLearningObject("PUT", key, data.contentType, 180), expiresInSeconds: 180 };
+      return { documentId: document.id, ...createPrivateUpload({ key, keyPattern: learningKeyPattern, contentType: data.contentType, expiresSeconds: 180 }) };
     });
   });
 
@@ -216,7 +217,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
           .set({ response: merged.response, updatedAt: new Date() })
           .where(and(eq(s.submissions.id, latest.id), eq(s.submissions.status, "assigned")))
           .returning({ id: s.submissions.id });
-        if (!updated) throw new Error("Assignment changed in another tab; refresh before attaching");
+        if (!updated) throw new DomainError("CONFLICT","Assignment changed in another tab; refresh before attaching");
         await writeAudit(tx, {
           actorPersonId: studentPersonId,
           action: "assignment.attachment.attach",
@@ -321,7 +322,7 @@ export const createExcuseAttachmentUpload = createServerFn({ method: "POST" })
         after: { attendanceEventId: data.attendanceEventId, storageProvider: "cloudflare_r2" },
         context: { accountId: context.accountId, sessionId: context.sessionId },
       });
-      return { documentId: document.id, key, uploadUrl: signLearningObject("PUT", key, data.contentType, 180), expiresInSeconds: 180 };
+      return { documentId: document.id, ...createPrivateUpload({ key, keyPattern: learningKeyPattern, contentType: data.contentType, expiresSeconds: 180 }) };
     });
   });
 
@@ -358,7 +359,7 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
         .where(eq(s.attendanceExcuses.attendanceEventId, data.attendanceEventId))
         .orderBy(desc(s.attendanceExcuses.createdAt)).limit(1).for("update");
       if (!excuse) throw new Error("Submit the excuse before attaching documents");
-      if (excuse.status !== "submitted") throw new Error("This excuse has already been reviewed; documents can no longer be attached");
+      if (excuse.status !== "submitted") throw new DomainError("CONFLICT","This excuse has already been reviewed; documents can no longer be attached");
       if (excuse.documentIds.includes(document.id)) {
         return { excuseId: excuse.id, attached: true, alreadyAttached: true };
       }
@@ -366,7 +367,7 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
         .set({ documentIds: [...excuse.documentIds, document.id], updatedAt: new Date() })
         .where(and(eq(s.attendanceExcuses.id, excuse.id), eq(s.attendanceExcuses.status, "submitted")))
         .returning({ id: s.attendanceExcuses.id });
-      if (!updated) throw new Error("Excuse changed in another tab; refresh before attaching");
+      if (!updated) throw new DomainError("CONFLICT","Excuse changed in another tab; refresh before attaching");
       await writeAudit(tx, {
         actorPersonId: context.actorPersonId,
         action: "attendance.excuse.document.attach",

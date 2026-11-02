@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
+import { personLegalName } from "@/domain/person-name";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, people, programResponsibilityAssignments,
@@ -411,7 +412,7 @@ export async function listSiteLocalDelegations(actor: AccessContext, programId: 
     responsibilities: responsibilities.filter(row => row.key in localResponsibilityRoles)
       .map(row => ({ id: row.id, key: row.key as LocalResponsibility,
         personId: row.personId, personName: row.firstName && row.lastName
-          ? row.firstName + " " + row.lastName : "No current assignee",
+          ? personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }, "No current assignee") : "No current assignee",
         effectiveFrom: row.validFrom?.toISOString() ?? null,
         effectiveThrough: row.validThrough?.toISOString() ?? null })),
     candidates: [...new Map(candidates.filter(row =>

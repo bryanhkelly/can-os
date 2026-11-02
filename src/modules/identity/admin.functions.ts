@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
@@ -174,7 +175,7 @@ export const listAccessAccounts = createServerFn({ method: "GET" }).handler(asyn
     });
     entry.grants.push({
       grantId: row.grantId, personId: row.personId,
-      personName: `${row.firstName} ${row.lastName}`,
+      personName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
       role: row.role, organizationId: row.organizationId, siteId: row.siteId, active: row.grantActive,
       onboarding,
     });

@@ -4,6 +4,7 @@ import {listCanonicalGuardianGroupConsents} from "@/modules/study-groups/canonic
 import {decideCanonicalGroupConsent} from "@/modules/study-groups/canonical-membership.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {WorkspaceShell} from "@/components/workspace";
 export const Route=createFileRoute("/guardian/group-permissions")({
  validateSearch:(search:Record<string,unknown>):{action?:string}=>({
@@ -21,17 +22,18 @@ function GuardianConsents(){
 function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>}){
  const router=useRouter();
  const {action}=Route.useSearch();
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const [acknowledged,setAcknowledged]=useState<Record<string,boolean>>({});
  async function decide(actionId:string,approve:boolean){
-  setBusy(true);setError("");setNotice("");
-  try{const result=await decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===true}});
-   setNotice("obsolete" in result&&result.obsolete?"Request cleared — it was no longer active.":approve?"Permission granted; facilitator review still applies.":"Permission declined.");
-   try{await router.invalidate();}
-   catch{setError("Your decision was saved, but the permission list could not refresh. Reopen it rather than submitting twice.");}
-  }
-  catch(e){setError(e instanceof Error?e.message:"Unable to save permission");}
-  finally{setBusy(false);}
+  await mutation.run(
+   ()=>decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===true}}),
+   {
+    successMessage:result=>"obsolete" in result&&result.obsolete?"Request cleared — it was no longer active.":approve?"Permission granted; facilitator review still applies.":"Permission declined.",
+    commandErrorMessage:"Unable to save permission.",
+    refreshErrorMessage:"Your decision was saved, but the permission list could not refresh. Reopen it rather than submitting twice.",
+   },
+  );
  }
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Study group permissions"
   subtitle="Decide whether your student may participate in a teacher-facilitated group. The facilitator must also approve membership."
@@ -40,8 +42,9 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
    <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
    <Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
   </div>}>
-  {notice&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">{notice}</p>}
-  {error&&<p className="mt-5 rounded-lg border border-red-500 p-3 text-sm" role="alert">{error}</p>}
+  {mutation.pending&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">Saving permission decision...</p>}
+  {mutation.notice&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">{mutation.notice}</p>}
+  {mutation.error&&<p className="mt-5 rounded-lg border border-red-500 p-3 text-sm" role="alert">{mutation.error}</p>}
   {action&&<Link to="/guardian/group-permissions" className="mt-4 inline-block text-sm underline">View all group permissions</Link>}
   {action&&!items.some(item=>item.id===action)&&<p role="alert" className="mt-4 rounded-xl border p-4">This permission request is unavailable in your current family workspace.</p>}
   <div className="mt-7 space-y-3">{items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className="rounded-xl border bg-card p-5">

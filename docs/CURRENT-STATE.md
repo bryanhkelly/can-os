@@ -1,5 +1,40 @@
 # CAN OS — current implementation snapshot
 
+## Neon primary branch alignment and migration reconciliation (2026-11-02)
+
+- With explicit operator authorization, renamed the Neon primary production
+  branch from `production` to `main`. Its identity remains project
+  `sweet-hall-62441909`, branch `br-restless-sea-ar9ooo55`; the database
+  endpoint and connection remain unchanged. The configured `DATABASE_URL`
+  resolves to this primary branch.
+- Retained recovery branch `main-pre-migration-recovery-20261102`
+  (`br-cold-wave-ar20md5i`) at parent LSN `0/3872B58`, with active read-only
+  endpoint `ep-holy-dawn-arit5vw1`. Rehearsal branch
+  `main-migration-rehearsal-20261102` (`br-wispy-haze-arrqlvpn`) was created
+  from that recovery point. Both branches remain available.
+- The production ledger already contained exact current entries for
+  `0026_brief_ink` and `0027_big_lady_deathstrike`, plus one extra legacy
+  `0026_charming_dark_beast` record. From main HEAD
+  `20840bbd0aeac0bc6f45bf89dae3ec3006e1eed1`, applied migrations `0028`–`0059`
+  in per-migration transactions with 10-second lock and 180-second statement
+  timeouts. Recorded `0060_tenant_demo_access` only after confirming its sole
+  `is_synthetic` column-drop effect was already present. Existing ledger rows
+  were preserved; the final ledger has 62 rows, all 61 current journal
+  timestamps represented, and one retained legacy row.
+- A fresh post-commit connection verified exact hashes for `0028`–`0060` and
+  catalog parity against the clean replay: 165 tables, 1,786 columns, 2,040
+  constraints, 506 indexes, 224 enum labels and 6 triggers. Fifteen older
+  journal entries retain pre-existing hash mismatches; these and the legacy
+  row were not rewritten. The rehearsal data comparison preserved all common
+  columns in existing tables; the only row-count difference was the two
+  intended qualification definitions. The live admissions-interest table has
+  zero records.
+- With explicit operator authorization, deleted all seven Neon branches
+  prefixed `delete-` and verified none remain. `main`, `FullFlow`, `test01`,
+  the new recovery branch and the rehearsal branch remain. No application
+  deployment or end-to-end release acceptance is implied by this schema
+  reconciliation.
+
 ## FullFlow review fixes (November 1, 2026)
 
 Local source fixes preserve the existing tenant redesign and migration history:

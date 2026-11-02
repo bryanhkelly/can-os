@@ -35,7 +35,10 @@ export async function verifyAdmissionsNeonBranch(env = process.env) {
     throw new Error("Admissions branch verification requires the production CAN_APPLICATION_DB_HOST comparison.");
   }
   const { testUrl } = assertIsolatedTestDatabaseTarget({
-    env,
+    // The browser app deliberately receives TEST_DATABASE_URL as DATABASE_URL.
+    // The independent production-host and Neon branch checks below still guard
+    // this target; the app URL must not be mistaken for the production endpoint.
+    env: { ...env, DATABASE_URL: undefined },
     fail(message) { throw new Error(message); },
   });
   // Fail closed on missing/misconfigured branch declarations BEFORE opening

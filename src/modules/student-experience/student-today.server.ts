@@ -39,11 +39,13 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       sectionId: sections.id,
       sectionTitle: sections.title,
       siteId: sections.siteId,
+      timezone: sites.timezone,
       programId: sections.programId,
       schoolYearId: enrollments.schoolYearId,
     })
     .from(enrollments)
     .innerJoin(sections, eq(enrollments.sectionId, sections.id))
+    .innerJoin(sites,eq(sites.id,sections.siteId))
     .innerJoin(terms,eq(terms.id,sections.termId))
     .innerJoin(activeProgramMembership,and(
       eq(activeProgramMembership.studentProfileId,enrollments.studentProfileId),
@@ -95,6 +97,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       siteId: scheduledOccurrences.siteId,
       sectionId: scheduledOccurrences.sectionId,
       sourceType: calendarEvents.sourceType,
+      metadata: calendarEvents.metadata,
     })
     .from(calendarEvents)
     .innerJoin(
@@ -189,7 +192,10 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     dayStartUtc: startOfDay,
     dayEndUtc: endOfDay,
     sections: activeSections,
-    events,
+    events: events.map(({metadata,...event})=>({
+      ...event,
+      cancelled:metadata.cancelled===true,
+    })),
     coursework: currentCoursework,
     openActions,
     recoveryCandidates: currentCoursework.filter(row =>

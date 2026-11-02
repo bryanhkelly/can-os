@@ -12,6 +12,15 @@ import { AdmissionsInquiryForm } from "@/components/admissions/AdmissionsInquiry
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary } from "@/components/admissions/AdmissionsPipelineSummary";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
+import {z} from "zod";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+const intakeSearchSchema=siteProgramSelectionSchema.extend({
+ page:z.number().int().safe().positive().catch(1),
+ studentPage:z.number().int().safe().positive().catch(1),
+ search:optionalSearchString.transform(value=>value?.slice(0,100)),
+ application:optionalSearchString,
+ interest:optionalSearchString,
+});
 const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string;application?:string})=>{
  const [records,programs,existingStudentPage,publicInterests,selectedInterestPage,stageCounts]=await Promise.all([
   listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.application?undefined:selection.search,applicationId:selection.application}}),
@@ -25,15 +34,7 @@ const load=async(selection:{interest?:string;siteId?:string;programId?:string;pa
   linkedInterest:selectedInterestPage?.items[0]??null,stageCounts};
 };
 export const Route=createFileRoute("/admissions/intake")({
- validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string;page?:number;studentPage?:number;search?:string}=>({
-  page:typeof search.page==="number"&&Number.isSafeInteger(search.page)&&search.page>0?search.page:1,
-  studentPage:typeof search.studentPage==="number"&&Number.isSafeInteger(search.studentPage)&&search.studentPage>0?search.studentPage:1,
-  search:typeof search.search==="string"?search.search.slice(0,100):undefined,
-  application:typeof search.application==="string"?search.application:undefined,
-  siteId:typeof search.siteId==="string"?search.siteId:undefined,
-  programId:typeof search.programId==="string"?search.programId:undefined,
-  interest:typeof search.interest==="string"?search.interest:undefined,
- }),
+ validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string;page?:number;studentPage?:number;search?:string}=>intakeSearchSchema.parse(search),
  loaderDeps:({search})=>({interest:search.interest,siteId:search.siteId,programId:search.programId,page:search.page,studentPage:search.studentPage,search:search.search,application:search.application}),
  loader:({deps})=>safeLoader(()=>load(deps),{authMessage:"Sign in as a registrar to manage admissions."})(),
  component:IntakePage
@@ -187,4 +188,3 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   </section>
  </WorkspaceShell>;
 }
-

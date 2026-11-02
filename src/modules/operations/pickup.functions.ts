@@ -1,4 +1,5 @@
 import { requireCompletePickupSafetyRows } from "@/domain/pickup-projection-completeness";
+import { personDisplayName, personLegalName } from "@/domain/person-name";
 import { mayIndependentlyResolveCustodyHold } from "@/domain/pickup-custody-review-policy";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -369,14 +370,14 @@ export const getGuardianPickupWorkspace = createServerFn({ method: "GET" })
       students: students.map(student => ({
         studentProfileId: student.studentProfileId,
         studentPersonId: student.studentPersonId,
-        studentName: student.studentName ?? student.legalFirstName + " " + student.legalLastName,
+        studentName: personDisplayName({ preferredName: student.studentName, legalFirstName: student.legalFirstName, legalLastName: student.legalLastName }),
         householdId: student.householdId,
         programId: student.programId,
         programName: student.programName,
         schoolLocalToday: siteDate(new Date(), student.siteTimezone),
         authorizations: authorizations.filter(row => matches(row, student)).map(row => ({
           ...row,
-          pickupName: row.legalFirstName + " " + row.legalLastName,
+          pickupName: personLegalName(row),
         })),
         holds: projectGuardianPickupHolds(
           holds.filter(row => matches(row, student)), actor.actorPersonId!,
@@ -912,7 +913,7 @@ export const getOnsitePickupRoster = createServerFn({ method: "GET" })
             .map(row => row.householdId))],
           authorizedAdults: authorizations.filter(same).filter(row =>
             row.startsOn <= data.date && (!row.expiresOn || row.expiresOn >= data.date))
-            .map(row => ({ ...row, pickupName: row.legalFirstName + " " + row.legalLastName })),
+            .map(row => ({ ...row, pickupName: personLegalName(row) })),
           activeHolds: holds.filter(same).map(row => {
             const pending=pendingResolutions.find(proposal=>proposal.holdId===row.id);
             return {
@@ -1043,7 +1044,7 @@ export const recordVerifiedPickupRelease = createServerFn({ method: "POST" })
           eq(pickupCustodyHolds.programId, data.programId),
           eq(pickupCustodyHolds.status, "active"),
         ));
-      const expectedLegalName = authorization.legalFirstName + " " + authorization.legalLastName;
+      const expectedLegalName = personLegalName(authorization, "");
       const decision = evaluatePickupRelease({
         attendanceStatus: attendance.status,
         alreadyReleased: !!priorRelease,

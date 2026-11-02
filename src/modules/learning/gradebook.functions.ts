@@ -1,4 +1,5 @@
 import { assessmentAttemptLimit, assertAssessmentAttemptAllowed, MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
+import { personDisplayName } from "@/domain/person-name";
 import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { createAssessmentStatus } from "@/domain/assessment-publication";
 import { assertAssessmentSchedule } from "@/domain/assessment-schedule";
@@ -238,7 +239,7 @@ export const getGradebook = createServerFn({ method: "GET" })
    students: studentRows.map(row => ({
     studentProfileId: row.studentProfileId,
     personId: row.personId,
-    displayName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
+    displayName: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
    })),
    assessments: assessmentRows.map(row => ({
     id: row.id,

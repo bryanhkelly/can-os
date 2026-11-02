@@ -27,6 +27,7 @@ const snapshot: Snapshot = {
   program: { id: "program", name: "School", status: "launching", organizationId: "org",
     academicProviderOrganizationId: "org", siteId: "site", deliveryModel: { onsite: true } },
   years: [], terms: [], catalog: [], scheduleOptions: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
+  classRequests: [],
   qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,canPublishTeacherPolicy:true,
   teacherPolicies: [], canReviseTeacherPolicy: false,
   academicAuthority: { teacherAssignment: true, creditConfiguration: true },

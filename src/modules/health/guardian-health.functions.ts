@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -110,7 +111,7 @@ export const getGuardianHealthWorkspace = createServerFn({ method: "GET" })
       lastSchoolReview,
       approvedEmergencyContact: profile?.metadata.approvedEmergencyContact as
         { name: string; phone: string; relationship: string } | undefined,
-      studentName: [child.firstName, child.lastName].filter(Boolean).join(" "),
+      studentName: personLegalName({ legalFirstName: child.firstName, legalLastName: child.lastName }),
       profile: profile ? {
         allergySummary: profile.allergySummary,
         emergencySummary: profile.emergencySummary,

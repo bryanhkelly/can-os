@@ -1,6 +1,7 @@
-import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
+import { normalizeClientError } from "./client-error";
 
-export type LoaderFailureKind = "authentication" | "authorization" | "unavailable" | "unexpected";
+export type LoaderFailureKind = ReturnType<typeof normalizeClientError>["kind"];
 export type LoadOutcome<T> =
   | { ok: true; data: T }
   | { ok: false; authError: string | null; message: string; kind?: LoaderFailureKind; retryable?: boolean };
@@ -8,33 +9,19 @@ export type LoadOutcome<T> =
 const DEFAULT_AUTH_MESSAGE = "Sign in with an authorized account to view this page.";
 
 /** Explicit error classes avoid guessing security state from arbitrary message text. */
-export class AuthenticationRequiredError extends Error {
-  constructor() { super("Authentication required"); this.name = "AuthenticationRequiredError"; }
+export class AuthenticationRequiredError extends DomainError {
+  constructor() { super("AUTHENTICATION_REQUIRED"); this.name = "AuthenticationRequiredError"; }
 }
-export class DataUnavailableError extends Error {
-  constructor(message = "Data is temporarily unavailable") { super(message); this.name = "DataUnavailableError"; }
+export class DataUnavailableError extends DomainError {
+  constructor(message = "Data is temporarily unavailable") { super("UNAVAILABLE", message); this.name = "DataUnavailableError"; }
 }
 export class RetryableLoaderError extends Error {
   constructor(message = "Please try again") { super(message); this.name = "RetryableLoaderError"; }
 }
 
 export function classifyLoaderError(error: unknown): { kind: LoaderFailureKind; retryable: boolean } {
-  const name = error instanceof Error ? error.name : "";
-  if (error instanceof AuthenticationRequiredError || name === "AuthenticationRequiredError")
-    return { kind: "authentication", retryable: false };
-  // The existing verified-session provider uses this exact capability marker
-  // for a missing session. Do not treat other capability denials as sign-in.
-  if (name === "AuthorizationError" &&
-      error instanceof Error &&
-      error.message === "Missing required capability or scope: authenticated session")
-    return { kind: "authentication", retryable: false };
-  if (error instanceof AuthorizationError || name === "AuthorizationError")
-    return { kind: "authorization", retryable: false };
-  if (error instanceof DataUnavailableError || name === "DataUnavailableError")
-    return { kind: "unavailable", retryable: true };
-  if (error instanceof RetryableLoaderError || name === "RetryableLoaderError")
-    return { kind: "unexpected", retryable: true };
-  return { kind: "unexpected", retryable: false };
+  const { kind, retryable } = normalizeClientError(error);
+  return { kind, retryable };
 }
 
 /**
@@ -50,7 +37,10 @@ export function safeLoader<T>(
       return { ok: true, data: await load() };
     } catch (error) {
       const classification = classifyLoaderError(error);
-      if (classification.kind === "unexpected") options?.onUnexpectedError?.(error);
+      if (classification.kind === "unexpected") {
+        if (options?.onUnexpectedError) options.onUnexpectedError(error);
+        else if (typeof window === "undefined") console.error("Loader failed", error);
+      }
       const authError = classification.kind === "authentication"
         ? options?.authMessage ?? DEFAULT_AUTH_MESSAGE
         : classification.kind === "authorization"
@@ -60,7 +50,7 @@ export function safeLoader<T>(
         ? "An unexpected error occurred. Please try again."
         : classification.kind === "unavailable"
           ? "This information is temporarily unavailable."
-          : authError ?? "Unable to load this page.";
+          : authError ?? normalizeClientError(error).message;
       return { ok: false, authError, message, ...classification };
     }
   };

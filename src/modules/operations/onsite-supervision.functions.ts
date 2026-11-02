@@ -1,4 +1,5 @@
 import { assertSchoolDayPreparation } from "@/domain/onsite-day-preparation";
+import { personLegalName } from "@/domain/person-name";
 import { effectiveRoomPrimary } from "@/domain/onsite-room-plan";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
@@ -356,7 +357,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           periodId:period?.periodId??null,periodLabel:period?.label??null,
           startsAtLocal:period?.starts??null,endsAtLocal:period?.ends??null,
           facilitatorPersonId:personId,
-          facilitatorName:approved&&person?person.firstName+" "+person.lastName:null,
+          facilitatorName:approved&&person?personLegalName({ legalFirstName: person.firstName, legalLastName: person.lastName }):null,
           verifiedSiteStaffGrant:approved,
           verifiedSafeguardingScreening:safety.screening,
           verifiedSafeguardingTraining:safety.training,
@@ -397,7 +398,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       ownDutyRole:assignedPersonId===actor.actorPersonId?"primary" as const:
         _backupPersonId===actor.actorPersonId?"backup" as const:null,
       backupFacilitatorName:_backupPersonId&&block.namedBackupVerified&&peopleById.has(_backupPersonId)
-        ? peopleById.get(_backupPersonId)!.firstName+" "+peopleById.get(_backupPersonId)!.lastName:null,
+        ? personLegalName({ legalFirstName: peopleById.get(_backupPersonId)!.firstName, legalLastName: peopleById.get(_backupPersonId)!.lastName }):null,
       // An acknowledgment is valid only for this exact assignment/time
       // fingerprint. Changes to the scheduled duty invalidate older records.
       planToken:createHash("sha256").update(JSON.stringify([

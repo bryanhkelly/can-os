@@ -1,10 +1,9 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+
+const operationsSearchSchema=siteProgramSelectionSchema.extend({action:optionalSearchString});
 
 export const Route = createFileRoute("/operations")({
-  validateSearch: (search: Record<string, unknown>): { siteId?: string; programId?: string; action?: string } => ({
-    siteId: typeof search.siteId === "string" ? search.siteId : undefined,
-    programId: typeof search.programId === "string" ? search.programId : undefined,
-    action: typeof search.action === "string" ? search.action : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { siteId?: string; programId?: string; action?: string } => operationsSearchSchema.parse(search),
   component: Outlet,
 });

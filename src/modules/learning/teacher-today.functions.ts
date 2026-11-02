@@ -1,4 +1,5 @@
 import { latestSubmissionCondition } from "./latest-submission.server";
+import { personLegalName } from "@/domain/person-name";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
@@ -117,7 +118,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   sectionId: row.sectionId,
   assessmentId: row.assessmentId,
   studentProfileId: row.studentProfileId,
-  studentName: `${row.firstName} ${row.lastName}`,
+  studentName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
   assessmentTitle: row.assessmentTitle,
   sectionTitle: row.sectionTitle,
   submittedAt: row.submittedAt?.toISOString() ?? null,
@@ -181,7 +182,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
     sectionId: assessment.sectionId,
     assessmentId: assessment.id,
     studentProfileId: student.studentProfileId,
-    studentName: `${student.firstName} ${student.lastName}`,
+    studentName: personLegalName({ legalFirstName: student.firstName, legalLastName: student.lastName }),
     assessmentTitle: assessment.title,
     sectionTitle: assessment.sectionTitle,
     dueAt: assessment.dueAt!.toISOString(),

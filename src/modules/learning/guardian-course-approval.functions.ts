@@ -2,7 +2,7 @@ import { db } from "@/db/client";
 import {
 accessAccounts,accountPersonGrants,actions,consentRecords,
 enrollments,guardianRelationships,
-people,programs,sections,studentProfiles,terms
+people,programs,sections,sites as siteTable,studentProfiles,terms
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -13,6 +13,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
 const CONSENT_TYPE = "course_registration_add_decision";
@@ -33,12 +34,14 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     ownerPersonId: actions.ownerPersonId, studentProfileId: studentProfiles.id,
     sectionId: sections.id, sectionTitle: sections.title, sectionCode: sections.code,
     siteId: sections.siteId, programId: sections.programId,
+    timezone: siteTable.timezone,
     requestSiteId: actions.siteId, requestProgramId: actions.programId,
     requestOrganizationId: actions.organizationId,
     organizationId: programs.organizationId, schoolYearId: terms.schoolYearId,
     studentName: people.legalFirstName, studentLastName: people.legalLastName,
   }).from(actions)
     .innerJoin(sections, eq(sections.id, actions.subjectId))
+    .innerJoin(siteTable,eq(siteTable.id,sections.siteId))
     .innerJoin(programs, eq(programs.id, sections.programId))
     .innerJoin(terms, eq(terms.id, sections.termId))
     .innerJoin(studentProfiles, eq(studentProfiles.personId, actions.ownerPersonId))
@@ -109,7 +112,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     )) return null;
     const policy = await getSectionRegistrationPolicy(row.sectionId);
     if (!policy.guardianApprovalRequired) return null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = dateKeyInTimezone(new Date().toISOString(),row.timezone);
     if (today > policy.addDropEndsOn) return null;
     return {
       id: row.id,
@@ -120,6 +123,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
       status: row.status,
       myDecision: (latest.get(row.id + ":" + actor.actorPersonId) as string | undefined) ?? null,
       deadline: policy.addDropEndsOn,
+      timezone: row.timezone,
     };
   }));
   return result.filter((item): item is NonNullable<typeof item> => item !== null);

@@ -9,6 +9,10 @@ import {createSubmissionAttachmentUpload,attachDocumentToSubmission,listSubmissi
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell,StatusBadge,WorkspaceNotice} from "@/components/workspace";
+import {useHydrated} from "@/lib/use-hydrated";
+import {createPrivateUploadTask,documentUploadPolicy} from "@/platform/storage/private-upload";
+import {attachmentAccept,attachmentMimeForFileName as attachmentMime} from "@/modules/learning/attachment-mimes";
+import {mutationErrorMessage} from "@/lib/mutation-feedback";
 
 const loadAssignments=()=>getAssignments();
 export const Route=createFileRoute("/student/assignments")({
@@ -21,16 +25,8 @@ export const Route=createFileRoute("/student/assignments")({
  component:StudentAssignments
 });
 
-const attachmentAccept=".pdf,.png,.jpg,.jpeg";
-const attachmentMimes:Record<string,string>={
- pdf:"application/pdf",
- png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",
-};
-function attachmentMime(name:string){
- return attachmentMimes[name.split(".").pop()?.toLowerCase()??""]??null;
-}
-function formatDate(value:string|null){
- return value?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"No due date";
+function formatDate(value:string|null,timeZone?:string){
+ return value?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",...(timeZone?{timeZone}:{})}).format(new Date(value)):"No due date";
 }
 type AssignmentData=Awaited<ReturnType<typeof loadAssignments>>;
 function StudentAssignments(){
@@ -54,6 +50,8 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const saveGeneration=useRef(0);
  const feedbackRef=useRef<HTMLParagraphElement>(null);
  const saving=useRef(false);
+ const uploads=useRef(new Map<string,Map<File,{run:()=>Promise<unknown>}>>());
+ const hydrated=useHydrated();
  useEffect(()=>{
   if(error||notice)feedbackRef.current?.focus();
  },[error,notice]);
@@ -85,7 +83,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   return()=>{active=false};
  },[selected]);
  useEffect(()=>{
-  if(!editable||!chosen||busy||draft===(chosen.responseText??""))return;
+  if(!hydrated||!editable||!chosen||busy||draft===(chosen.responseText??""))return;
   const generation=++saveGeneration.current;
   const task=setTimeout(()=>{
    if(generation!==saveGeneration.current)return;
@@ -95,7 +93,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     .catch(()=>{if(generation===saveGeneration.current)setDraftStatus("error")});
   },950);
   return()=>{clearTimeout(task);saveGeneration.current++};
- },[chosen?.assessmentId,chosen?.status,chosen?.responseText,editable,busy,draft]);
+ },[chosen?.assessmentId,chosen?.status,chosen?.responseText,editable,busy,draft,hydrated]);
  async function saveWork(submitFinal:boolean){
   if(saving.current)return;
   if(!chosen||!editable){
@@ -116,15 +114,24 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     attach:async(file:File)=>{
      setProgress("Uploading "+file.name+"...");
      const contentType=attachmentMime(file.name);
-     if(!contentType||file.size<16||file.size>10*1024*1024)
+     if(!contentType)
       throw new Error("Unsupported file type or size: "+file.name);
-     const upload=await createSubmissionAttachmentUpload({data:{
-      assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size
-     }});
-     const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":contentType},body:file});
-     if(!response.ok)throw new Error("Upload failed for "+file.name+". Your draft is saved; retry before submitting.");
-     setProgress("Verifying "+file.name+"...");
-     await attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
+     let files=uploads.current.get(chosen.assessmentId);
+     if(!files){files=new Map();uploads.current.set(chosen.assessmentId,files);}
+     let task=files.get(file);
+     if(!task){
+      task=createPrivateUploadTask({file,contentType,policy:documentUploadPolicy,
+       begin:()=>createSubmissionAttachmentUpload({data:{
+        assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size,
+       }}),
+       finish:upload=>{
+        setProgress("Verifying "+file.name+"...");
+        return attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
+       },
+      });
+      files.set(file,task);
+     }
+     await task.run();
     },
     attached:(file:File)=>setPendingFiles(current=>current.filter(item=>item!==file)),
    };
@@ -148,7 +155,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     setNotice(current=>current+" The latest view could not load. Reload to review your saved work.");
    }
   }catch(cause){
-   const message=cause instanceof Error?cause.message:submitFinal?"Unable to submit assignment":"Unable to save draft";
+   const message=mutationErrorMessage(cause,submitFinal?"Unable to submit assignment":"Unable to save draft");
    setError(message+" Your assignment has not been confirmed as submitted. Your response and pending files are retained; correct the problem and retry.");
   }finally{saving.current=false;setBusy(false);setProgress("");}
  }
@@ -177,7 +184,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      className={"block w-full rounded-xl border bg-card p-5 text-left "+(selected===item.assessmentId?"border-foreground":"")}>
      <p className="text-xs text-muted-foreground">{item.course} · {item.status??"not started"}</p>
      <h2 className="mt-2 font-semibold">{item.title}</h2>
-     <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(item.dueAt)}</p>
+     <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(item.dueAt,item.timezone)}</p>
      {item.score!==null&&item.score!==undefined&&<p className="mt-2 text-sm">Score: {item.score} / {item.pointsPossible??100}</p>}
     </Link>)}
    </section>
@@ -198,18 +205,18 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        search={{section:chosen.sectionId,tab:"lessons",lesson:chosen.metadata.curriculumLessonId}}
        className="mt-2 inline-block text-sm underline">Review publisher lesson: {chosen.metadata.curriculumLessonTitle??chosen.metadata.curriculumLessonId}</Link>}
      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{chosen.instructions??"Follow your teacher's instructions."}</p>
-     <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt)} · {chosen.assessmentStatus}</p>
+     <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt,chosen.timezone)} · {chosen.assessmentStatus}</p>
      {chosen.metadata.maxAttempts!==null&&<p className="mt-3 text-xs text-muted-foreground">
       Attempt {chosen.attemptNumber??1} of {chosen.metadata.maxAttempts} permitted attempts
      </p>}
      {attemptLimitReached&&<p role="status" className="mt-3 text-sm">This assignment's attempt limit has been reached. Contact your teacher about next steps.</p>}
      {!chosen.workAvailability.actionable&&<p className="mt-3 text-sm" role="status">
       {chosen.workAvailability.reason==="unreleased"
-       ?"Opens "+formatDate(chosen.availableAt)
+       ?"Opens "+formatDate(chosen.availableAt,chosen.timezone)
        :"Closed for student work. Your saved work and feedback remain available."}
      </p>}
      {chosen.submissionId&&chosen.submittedAt&&<p className="mt-3 text-xs text-muted-foreground">
-      Submitted {new Date(chosen.submittedAt).toLocaleString()} · Receipt: {chosen.submissionId}
+      Submitted {formatDate(chosen.submittedAt,chosen.timezone)} · Receipt: {chosen.submissionId}
      </p>}
      <div className="mt-3"><StatusBadge tone={chosen.timeliness==="missing"?"attention":chosen.status==="graded"?"success":"neutral"}>{chosen.status??"Assigned"}{chosen.timeliness==="missing"?" · Missing":chosen.timeliness==="late"?" · Late":""}</StatusBadge></div>
      {chosen.metadata.rubric&&<p className="mt-4 rounded-lg bg-muted p-3 text-sm">Rubric: {chosen.metadata.rubric}</p>}
@@ -240,21 +247,21 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
       }}>{file.fileName}</button>)}</div>}
      {editable?<div className="mt-6" aria-busy={busy}>
       <label className="text-sm font-semibold">Your response (optional when submitting a file)
-       <textarea disabled={busy} rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
+       <textarea disabled={!hydrated||busy} rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
       </label>
       <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus==="saving"?"Saving…":draftStatus==="saved"?"Saved":draftStatus==="error"?"Could not autosave":"Ready"}</p>
       <>
         <label className="mt-4 block text-sm font-semibold">Attachments (PDF, PNG or JPEG; maximum 10 MB each)
-         <input type="file" multiple accept={attachmentAccept} disabled={busy}
+         <input type="file" multiple accept={attachmentAccept} disabled={!hydrated||busy}
           onChange={event=>setPendingFiles(Array.from(event.target.files??[]))}
           className="mt-2 block w-full rounded-lg border p-2 text-xs"/>
         </label>
         {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Not yet uploaded: {pendingFiles.map(file=>file.name).join(", ")}. Choose Save draft or Submit assignment to save these files.</p>}
        </>
-      <button type="button" disabled={busy} onClick={()=>saveWork(false)}
+      <button type="button" disabled={!hydrated||busy} onClick={()=>saveWork(false)}
        className="mr-3 mt-4 rounded-lg border px-5 py-3 text-sm font-semibold disabled:opacity-40">Save draft</button>
-      <button type="button" disabled={busy||!canSubmit} onClick={()=>saveWork(true)}
+      <button type="button" disabled={!hydrated||busy||!canSubmit} onClick={()=>saveWork(true)}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">{busy?"Saving assignment...":"Submit assignment"}</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
      {busy&&<p role="status" className="mt-4 text-sm">{progress}</p>}

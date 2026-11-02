@@ -144,6 +144,35 @@ Project `sweet-hall-62441909` (inventory only; **no Neon branches deleted**):
 
 Deletion of Neon branches is destructive and requires separate explicit confirmation. Check whether CI, deployment env, backup policy or any restoration procedure refers to each candidate before deleting. The FullFlow E2E branch has migrations 0057–0059 and must remain available.
 
+## Follow-up branch retirement (2026-11-02)
+
+With explicit operator authorization, deleted archived test checkpoint
+`delete-gf2-end-to-end-verify-20261016` (`br-spring-waterfall-ardxs4wa`). Before
+deletion it was nonprimary, unprotected, archived, had no compute activity or
+endpoint, and had no repository references outside this inventory. Neon
+confirmed the branch is absent after deletion. No production, FullFlow, test01,
+or recovery branch was deleted.
+
+The operator then authorized deleting every branch whose Neon display name
+starts with `delete-`. Deleted and verified absent:
+
+- `delete-production-pre-reconcile-20261019` (`br-noisy-wind-ar1wkf98`)
+- `delete-production-pre-0026-2026-10-20T16-46-37-985Z` (`br-delicate-mode-art59p1b`)
+- `delete-fullflow-pre-0032-0038-20261023` (`br-spring-heart-arjhajgf`)
+- `delete-fullflow-pre-0039-0040-20261023` (`br-long-tooth-arg8xm19`)
+- `delete-fullflow-pre-0043-0045-20261024` (`br-patient-surf-ar8kreuo`)
+- `delete-gf26-integrity-20261016` (`br-royal-mouse-arc11hc2`)
+
+Only `main`, `FullFlow`, and `test01` remained immediately after deletion. The
+old renamed production and FullFlow recovery snapshots are no longer available.
+Before the authorized production reconciliation on November 2, 2026, a fresh
+main recovery branch (`main-pre-migration-recovery-20261102`,
+`br-cold-wave-ar20md5i`) and child rehearsal branch
+(`main-migration-rehearsal-20261102`, `br-wispy-haze-arrqlvpn`) were created
+and retained. The recovery branch was parented to production at LSN
+`0/3872B58`; its read-only endpoint is `ep-holy-dawn-arit5vw1`. No branch
+prefixed `delete-` remains.
+
 ## First administrative retirement result
 
 Closed superseded agent draft PRs #203, #204, #205, #206, #208, #209, #210, #211, #213 and #214; #207 and #212 had already been closed. Preserved all head branches and commit SHAs. Remaining open PRs #172, #173, #174 and #175 retained pending separate disposition. GitHub connector currently offers PR closure but no remote branch-delete action, so branch deletion has not been executed.

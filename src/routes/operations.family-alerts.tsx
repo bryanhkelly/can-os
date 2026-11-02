@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getSchoolFamilyAlerts, publishSchoolFamilyAlert, retryFailedSchoolFamilyAlertDeliveries } from "@/modules/communication/school-family-alerts.functions";
 
 export const Route=createFileRoute("/operations/family-alerts")({
@@ -23,48 +24,50 @@ function SchoolFamilyAlertsPage(){
 }
 function Publisher({data}:{data:Data}){
  const router=useRouter();
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const [programId,setProgramId]=useState(data.programs[0]?.id??"");
  const [kind,setKind]=useState<Kind>("urgent_school_update");
  const [title,setTitle]=useState(""),[message,setMessage]=useState("");
- const [busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const pendingId=useRef<string|null>(null);
- const clearPending=()=>{pendingId.current=null;setNotice("");};
+ const clearPending=()=>{pendingId.current=null;};
  async function publish(event:FormEvent){
   event.preventDefault();
   if(busy||!programId||title.trim().length<8||message.trim().length<20)return;
   if(!window.confirm("Publish this "+kind.replaceAll("_"," ")+" to every currently verified enrolled family in the selected Program? The message becomes visible in the family notification center. This does not close school, modify schedules, or guarantee email/SMS delivery."))return;
-  setBusy(true);setError("");setNotice("");
   pendingId.current??=crypto.randomUUID();
-  try{
+  await mutation.run(async()=>{
    const result=await publishSchoolFamilyAlert({data:{
-     programId,kind,title:title.trim(),message:message.trim(),
-     mutationId:pendingId.current,confirmed:true,
+    programId,kind,title:title.trim(),message:message.trim(),
+    mutationId:pendingId.current!,confirmed:true,
    }});
-   setNotice(result.published
-     ?`Published to ${result.recipientCount} currently authorized family accounts via in-app notifications.`
-     :`Already published; ${result.recipientCount} family notifications were recorded.`);
    pendingId.current=null;setTitle("");setMessage("");
-   try{await router.invalidate();}
-   catch{setError("The publication was saved but the history failed to refresh. Do not publish the same notice again.");}
-  }catch(e){setError(e instanceof Error?e.message:"Unable to publish school notice. No delivery can be assumed.");}
-  finally{setBusy(false);}
+   return result;
+  },{
+   successMessage:result=>result.published
+    ?`Published to ${result.recipientCount} currently authorized family accounts via in-app notifications.`
+    :`Already published; ${result.recipientCount} family notifications were recorded.`,
+   commandErrorMessage:"Unable to publish school notice. No delivery can be assumed.",
+   refreshErrorMessage:"The publication was saved but the history failed to refresh. Do not publish the same notice again.",
+  });
  }
  async function retry(alertId:string){
   if(busy)return;
   if(!window.confirm("Retry exhausted email/SMS provider attempts for this recent notice? Accepted messages will not be resent."))return;
-  setBusy(true);setError("");setNotice("");
-  try{
-   const result=await retryFailedSchoolFamilyAlertDeliveries({data:{alertId,confirmed:true}});
-   setNotice(result.requeued+" failed delivery attempts requeued. The worker will recheck current family authorization.");
-   await router.invalidate();
-  }catch(e){setError(e instanceof Error?e.message:"Could not retry deliveries.");}
-  finally{setBusy(false);}
+  await mutation.run(
+   ()=>retryFailedSchoolFamilyAlertDeliveries({data:{alertId,confirmed:true}}),
+   {
+    successMessage:result=>result.requeued+" failed delivery attempts requeued. The worker will recheck current family authorization.",
+    commandErrorMessage:"Could not retry deliveries.",
+   },
+  );
  }
  return <WorkspaceShell eyebrow="CAN OS · School operations" title="Urgent family communications"
   subtitle="Publish verified family notices through in-app notifications, school email and opt-in SMS. Provider acceptance is not evidence of inbox or phone delivery."
   actions={<Link to="/operations" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
-  {notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{notice}</p>}
-  {error&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">{error}</p>}
+  {mutation.pending&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">Saving family communication...</p>}
+  {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{mutation.notice}</p>}
+  {mutation.error&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
   <form onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="text-lg font-semibold">Compose a school notice</h2>
    <label className="block text-sm font-semibold">School Program

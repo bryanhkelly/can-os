@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { studentAcademicTimeline } from "@/domain/student-academic-timeline";
+import { personDisplayName } from "@/domain/person-name";
 
 /**
  * Staff directory authorization: teacher, registrar, specialist and counselor,
@@ -40,10 +41,6 @@ async function requireStaffDirectoryContext(): Promise<StaffContext & { role: St
 
 type Db = Awaited<typeof import("@/db/client")>["db"];
 type Schema = typeof import("@/db/schema");
-
-function displayName(first: string, last: string, preferred: string | null): string {
-  return `${preferred?.trim() || first} ${last}`;
-}
 
 /**
  * Student profile IDs visible to this caller at their scoped sites.
@@ -227,7 +224,7 @@ export const searchStudents = createServerFn({ method: "GET" })
     return {
       students: rows.map((row) => ({
         personId: row.personId,
-        name: displayName(row.legalFirstName, row.legalLastName, row.preferredName),
+        name: personDisplayName(row),
         gradeLevel: row.gradeLevel,
         activeSectionCount: sectionCounts.get(row.profileId)?.size ?? 0,
         openMissingWorkCount: missing.get(row.profileId) ?? 0,
@@ -438,7 +435,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
     const teachersBySection = new Map<string, string[]>();
     for (const row of teacherRows) {
       const names = teachersBySection.get(row.sectionId) ?? [];
-      names.push(displayName(row.firstName, row.lastName, row.preferredName));
+      names.push(personDisplayName({ legalFirstName: row.firstName, legalLastName: row.lastName, preferredName: row.preferredName }));
       teachersBySection.set(row.sectionId, names);
     }
 
@@ -446,7 +443,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
       viewerRole: context.role,
       identity: {
         personId: profile.personId,
-        name: displayName(profile.legalFirstName, profile.legalLastName, profile.preferredName),
+        name: personDisplayName(profile),
         gradeLevel: profile.gradeLevel,
       },
       timeline: studentAcademicTimeline({
@@ -454,7 +451,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
         grades:gradeRows,attendance:attendanceRows,actions:actionRows,
       }),
       guardians: guardianRows.map((row) => ({
-        name: displayName(row.firstName, row.lastName, row.preferredName),
+        name: personDisplayName({ legalFirstName: row.firstName, legalLastName: row.lastName, preferredName: row.preferredName }),
         relationshipLabel: row.relationshipLabel,
       })),
       sections: visibleSections.map((row) => ({
@@ -549,7 +546,7 @@ export const listTeachers = createServerFn({ method: "GET" })
       const entry =
         teacherMap.get(row.personId) ?? {
           personId: row.personId,
-          name: displayName(row.legalFirstName, row.legalLastName, row.preferredName),
+          name: personDisplayName(row),
           sections: new Map<string, string>(),
         };
       entry.sections.set(row.sectionId, row.sectionTitle);

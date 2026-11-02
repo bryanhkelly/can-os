@@ -4,7 +4,8 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import type { Actor, ActorRole } from "@/modules/identity/actors.server";
 import {
-  createFacilitatedGroup, createStudentStudyGroup, requestCanonicalGroupMembership,
+  createFacilitatedGroup, createStudentStudyGroup, inviteCanonicalGroupMembers,
+  listCanonicalGroupInvitees, requestCanonicalGroupMembership,
   decideCanonicalGroupConsent, decideCanonicalGroupMembership,
 } from "@/modules/study-groups/canonical-membership.functions";
 import {
@@ -17,7 +18,7 @@ import {
 import { createAcademicTimeFixture } from "./helpers/academic-time";
 import { listCanonicalGuardianGroupConsents } from "@/modules/study-groups/canonical-workspace.functions";
 import {
-  listStudentStudyGroupClassmates, listStudentStudyGroupSections,
+  hasStudentStudyGroupGuardian, listStudentStudyGroupClassmates, listStudentStudyGroupSections,
 } from "@/modules/study-groups/study-group-queries.functions";
 
 const state = vi.hoisted(() => ({ actor: null as Actor | null }));
@@ -101,7 +102,49 @@ describe("canonical study group commands", () => {
     } });
     const [group] = await db.select().from(s.studyGroups).where(eq(s.studyGroups.id, groupId));
     expect(group).toMatchObject({ kind: "interest", programId: null, sectionId: null });
+    expect(await listCanonicalGroupInvitees({ data: { groupId } })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ personId: student!.id, firstName: "Student" }),
+        expect.objectContaining({ personId: otherStudent!.id, firstName: "OtherStudent" }),
+      ]),
+    );
+    await expect(inviteCanonicalGroupMembers({
+      data: { groupId, studentPersonIds: [outsider!.id] },
+    })).rejects.toThrow();
+    await expect(inviteCanonicalGroupMembers({
+      data: { groupId, studentPersonIds: [student!.id] },
+    })).resolves.toEqual({ invitedCount: 1 });
+    const [groupInvitation] = await db.select().from(s.notifications).where(and(
+      eq(s.notifications.recipientPersonId, student!.id),
+      eq(s.notifications.resourceId, groupId),
+      eq(s.notifications.type, "study_group_invitation"),
+    ));
+    expect(groupInvitation?.body).toContain("guardian permission and facilitator approval");
+    const [inviteAudit] = await db.select().from(s.auditEvents).where(and(
+      eq(s.auditEvents.action, "study_group.members.invite"),
+      eq(s.auditEvents.resourceId, groupId),
+    ));
+    expect(inviteAudit?.after).toMatchObject({ invitedCount: 1 });
+    const [inviteEvent] = await db.select().from(s.domainEvents).where(and(
+      eq(s.domainEvents.eventType, "StudyGroupMembersInvited"),
+      eq(s.domainEvents.aggregateId, groupId),
+    ));
+    expect(inviteEvent?.payload).toMatchObject({ invitedCount: 1 });
+    expect(await db.select().from(s.studyGroupMemberships).where(and(
+      eq(s.studyGroupMemberships.groupId, groupId),
+      eq(s.studyGroupMemberships.personId, student!.id),
+    ))).toHaveLength(0);
 
+    state.actor = actor("student", student!.id);
+    await expect(hasStudentStudyGroupGuardian()).resolves.toBe(true);
+    await requestCanonicalGroupMembership({ data: { groupId } });
+    expect(await db.select().from(s.studyGroupMemberships).where(and(
+      eq(s.studyGroupMemberships.groupId, groupId),
+      eq(s.studyGroupMemberships.personId, student!.id),
+      eq(s.studyGroupMemberships.status, "pending"),
+    ))).toHaveLength(1);
+    state.actor = actor("student", outsider!.id);
+    await expect(hasStudentStudyGroupGuardian()).resolves.toBe(false);
     state.actor = actor("student", student!.id);
     await expect(listStudentStudyGroupSections()).resolves.toEqual([
       { id: section!.id, title: "Group Section" },

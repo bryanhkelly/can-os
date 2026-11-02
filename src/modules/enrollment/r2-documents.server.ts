@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolveR2Config, signPrivateObjectUrl } from "@/platform/storage/r2";
 
-const documentKeyPattern = /^enrollment\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
+export const documentKeyPattern = /^enrollment\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
 
 export const r2Config = resolveR2Config;
 

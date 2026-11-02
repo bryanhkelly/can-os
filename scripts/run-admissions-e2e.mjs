@@ -14,8 +14,15 @@ if (process.argv.includes("--preflight")) process.exit(0);
 
 // Browser acceptance must independently verify the actual nonproduction Neon
 // branch, not merely trust the provided test database URL.
+const applicationDatabaseHost = process.env.CAN_APPLICATION_DB_HOST ??
+  (process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : undefined);
 const branchCheck = spawnSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
-  stdio: "inherit", env: process.env,
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    APP_ENV: "test",
+    CAN_APPLICATION_DB_HOST: applicationDatabaseHost,
+  },
 });
 if (branchCheck.error) throw branchCheck.error;
 if (branchCheck.status !== 0) process.exit(branchCheck.status ?? 1);
@@ -29,7 +36,7 @@ try {
     stdio: "inherit",
     env: {
       ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL,
-      CAN_APPLICATION_DB_HOST: process.env.CAN_APPLICATION_DB_HOST ?? new URL(process.env.DATABASE_URL).hostname,
+      CAN_APPLICATION_DB_HOST: applicationDatabaseHost,
       APP_ENV: "test", NODE_ENV: "test", PLAYWRIGHT_BASE_URL: "http://localhost:3187",
       CAN_ACCESS_TOKEN_PEPPER: "admissions-e2e-pepper-0123456789abcdef",
       CAN_ACCESS_PUBLIC_ORIGIN: "https://app.can-os.test",

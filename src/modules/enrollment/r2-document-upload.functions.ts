@@ -9,7 +9,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,sql } from "drizzle-orm";
 import { z } from "zod";
-import { newDocumentKey,r2Config,signR2Object,validateDocumentUpload,verifyDocumentObject } from "./r2-documents.server";
+import { createPrivateUpload } from "@/platform/storage/r2";
+import { DomainError } from "@/domain/errors";
+import { documentKeyPattern,newDocumentKey,r2Config,signR2Object,validateDocumentUpload,verifyDocumentObject } from "./r2-documents.server";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upload"){
 
@@ -40,7 +42,8 @@ export const beginEnrollmentDocumentUpload=createServerFn({method:"POST"})
   await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   await requirementScope(data.applicationId,data.requirementId);
   const key=newDocumentKey(data.applicationId,data.requirementId);
-  return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180),expiresInSeconds:180};
+  return createPrivateUpload({key,keyPattern:documentKeyPattern,contentType:data.mimeType,
+    contentLength:data.size,minContentLength:16,maxContentLength:10*1024*1024,expiresSeconds:180});
  });
 export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),key:z.string().regex(/^enrollment\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
@@ -59,7 +62,7 @@ export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
    if(existing){
     if(existing.uploadedByPersonId!==actor.actorPersonId||existing.fileName!==data.fileName||
       existing.mimeType!==data.mimeType||existing.metadata.size!==data.size||existing.metadata.applicationId!==data.applicationId)
-     throw new Error("This upload was already recorded with different input");
+     throw new DomainError("CONFLICT","This upload was already recorded with different input");
     return {documentId:existing.id,created:false};
    }
    const [journey]=await tx.select({id:journeys.id,status:journeys.status}).from(journeys)

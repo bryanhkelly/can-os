@@ -21,6 +21,38 @@ Legacy fixture-only document evidence is accepted without a storage-verification
 
 ## Enrollment workflow
 
+### Shared private upload contract
+
+Enrollment, qualifications, profile photos, assignment/attendance attachments and
+the evidence uploader return `{ key, uploadUrl, uploadHeaders, expiresInSeconds }`.
+`expiresInSeconds` is the signed PUT lifetime (normally 180 seconds), not a
+document's validity date or the pending learning metadata's authorization window.
+Browsers send the returned headers exactly, including `Content-Type` and, for
+immutable evidence, `If-None-Match: *`.
+
+The shared browser transport validates files/contracts and accepts an AbortSignal.
+An in-page upload task retains successful bytes and retries only the domain finish
+command after a finish failure; repeated concurrent calls share the same task.
+This state is memory-only: navigating away can abandon an unrecorded object.
+Cancellation after a successful PUT retains its key for finish retry. A failed
+PUT does not finalize. No transport helper grants authority or marks a document
+verified; every finish command keeps its existing relationship, scope, signature,
+transactional audit and domain-event checks.
+
+Export the bucket's Cloudflare CORS configuration as JSON with
+`rules[].allowed.origins`, `methods` and `headers`, then run:
+
+```sh
+node --import tsx scripts/check-r2-cors.mjs exported-cors.json https://approved.example
+```
+
+List every approved origin as another argument. The checker requires a PUT rule
+with both `Content-Type` and `If-None-Match` for each origin, rejects unapproved
+origins and wildcard origins/headers, and exits nonzero on invalid configuration.
+It only inspects the supplied export: it neither configures nor certifies the
+live bucket. Live preflight, conditional writes and authenticated browser/storage
+acceptance remain separate operational checks.
+
 The `beginEnrollmentDocumentUpload`, `finishEnrollmentDocumentUpload`, and `getEnrollmentDocumentDownload` functions expose the canonical API directly; unused synthetic-named aliases have been retired. The server checks active registrar/guardian identity, site/program membership and, for guardians, enrollment-management authority for the named child. A two-stage upload validates an allowed PDF, JPEG or PNG (16 bytes–10 MB), binds a three-minute PUT URL to the application and requirement, and checks the uploaded object's HEAD length and MIME type and a bounded 16-byte signature. The finish command rechecks the open journey/requirement and stores a versioned, restricted document and audit history. Registrars can review and approve/reject verified documents; linked guardians receive rejection/request notifications.
 
 Downloads require fresh authorization on each request and return a short-lived private GET URL. Archived completed journeys remain readable to authorized actors; new writes to them are prohibited.

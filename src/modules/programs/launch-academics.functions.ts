@@ -1,5 +1,6 @@
 import { db } from "@/db/client";
 import {
+actions,
 complianceFrameworks,complianceFrameworkVersions,compliancePolicyApplicability,compliancePolicyRules,
 people,
 programs,roleAssignments,schoolYears,
@@ -125,15 +126,40 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    const {metadata,...publicRow}=row;
    return {...publicRow,creditUnits:verifiedSectionCreditUnits(metadata),teachers:assignments.filter(a=>a.sectionId===row.id),
     candidates,
-    readiness:{...readiness,items:readiness.items.map(({evidence,...item})=>item)}};
+    readiness:{...readiness,items:readiness.items.map(({evidence:_evidence,...item})=>item)}};
   }));
   const classrooms=await readFirstClassrooms(sectionRows.map(row=>row.id),new Map(
    sectionSnapshots.map(section=>[section.id,
     section.readiness.items.find(item=>item.key==="launch_staffing")?.state==="ready"])));
   const classroomSections=sectionSnapshots.map(section=>({...section,
    classroom:classrooms.find(classroom=>classroom.sectionId===section.id)!}));
+  const classRequestRows=program.siteId?await db.select({
+   id:actions.id,ownerPersonId:actions.ownerPersonId,
+   firstName:people.legalFirstName,preferredName:people.preferredName,lastName:people.legalLastName,
+   metadata:actions.metadata,createdAt:actions.createdAt,
+  }).from(actions).innerJoin(people,eq(people.id,actions.ownerPersonId))
+   .where(and(eq(actions.type,"section_creation_request"),eq(actions.status,"open"),
+    eq(actions.organizationId,program.organizationId),eq(actions.siteId,program.siteId),
+    eq(actions.programId,program.id),eq(actions.subjectType,"program"),eq(actions.subjectId,program.id)))
+   .orderBy(asc(actions.createdAt)): [];
+  const classRequests=classRequestRows.map(request=>{
+   const {requestedClassTitle,requestedCourseOrSubject,desiredTerm}=request.metadata;
+   const optionalText=(key:string)=>{
+    const value=request.metadata[key];
+    if(value!==undefined&&typeof value!=="string")throw new Error(`Class request has invalid ${key}`);
+    return typeof value==="string"?value:"";
+   };
+   if(typeof requestedClassTitle!=="string"||typeof requestedCourseOrSubject!=="string"||
+    typeof desiredTerm!=="string"||!request.ownerPersonId)
+    throw new Error("Class request is missing its required details");
+   return {id:request.id,programId:program.id,requesterPersonId:request.ownerPersonId,
+    requesterName:[request.preferredName||request.firstName,request.lastName].filter(Boolean).join(" "),
+    requestedClassTitle,requestedCourseOrSubject,desiredTerm,
+    schedulePreference:optionalText("schedulePreference"),notes:optionalText("notes"),
+    createdAt:request.createdAt.toISOString()};
+  });
   return {program,years,terms:termRows,scheduleOptions,catalog,teachingStaff,sections:classroomSections,
-   qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,
+   qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,classRequests,
    canPublishTeacherPolicy,canReviseTeacherPolicy,academicAuthority};
  });
 
@@ -143,6 +169,7 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   code:z.string().trim().min(2).max(32),title:z.string().trim().min(2).max(160),
   teacherPersonId:uuid,
   scheduleTemplateId:uuid,
+  classRequestId:uuid.optional(),
   credits:z.number().positive().max(10).refine(v=>verifiedSectionCreditUnits({credits:v})!==null).optional(),
  }).parse(v))
  .handler(async({data})=>{
@@ -161,7 +188,23 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
    await assertLaunchEligibleCourse(program, data.courseTemplateVersionId, tx);
    if(data.credits!==undefined)
     await requireChurchHostedOperatingServices(tx,program.id,creditServices);
-   {
+    const classRequest=data.classRequestId?await (async()=>{
+     const [request]=await tx.select().from(actions).where(and(
+      eq(actions.id,data.classRequestId!),eq(actions.type,"section_creation_request"),
+      eq(actions.programId,program.id),eq(actions.siteId,program.siteId!),
+      eq(actions.organizationId,program.organizationId),eq(actions.subjectType,"program"),
+      eq(actions.subjectId,program.id),
+     )).for("update").limit(1);
+     if(!request||!request.ownerPersonId)throw new Error("Class request not found in this program");
+     const {requestedClassTitle,requestedCourseOrSubject,desiredTerm}=request.metadata;
+     if(typeof requestedClassTitle!=="string"||typeof requestedCourseOrSubject!=="string"||
+       typeof desiredTerm!=="string"||request.metadata.requestOrigin!=="teacher_classes")
+       throw new Error("Class request is missing its required details");
+     if(request.status!=="open"&&request.status!=="resolved")
+      throw new Error("Class request is no longer available for setup");
+     return request;
+    })():null;
+    {
     const [version]=await tx.select({curriculum:courseTemplateVersions.curriculum}).from(courseTemplateVersions).where(eq(courseTemplateVersions.id,data.courseTemplateVersionId)).limit(1);
     if(!version)throw new Error("Course version unavailable");
     requireAccessibleFirstLesson(version.curriculum);
@@ -197,6 +240,37 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
     await assignLaunchInstructor(tx,actor,{programId:program.id,sectionId:existing.id,
      teacherPersonId:data.teacherPersonId});
    }
+   if(classRequest){
+    const provisionedSetup={
+     termId:data.termId,courseTemplateVersionId:data.courseTemplateVersionId,
+     code:data.code,title:data.title,teacherPersonId:data.teacherPersonId,
+     scheduleTemplateId:data.scheduleTemplateId,credits:data.credits??null,
+    };
+    if(classRequest.status==="resolved"){
+     const savedSetup=classRequest.metadata.provisionedSetup;
+     if(classRequest.metadata.provisionedSectionId!==existing.id||
+      !savedSetup||JSON.stringify(savedSetup)!==JSON.stringify(provisionedSetup))
+      throw new Error("Class request was already fulfilled by a different Section");
+    }else{
+     const resolvedAt=new Date();
+     const [updatedRequest]=await tx.update(actions).set({
+      status:"resolved",resolutionNote:"Class setup completed by the registrar.",
+      resolvedAt,updatedAt:resolvedAt,
+      metadata:{...classRequest.metadata,provisionedSectionId:existing.id,provisionedSetup},
+     }).where(and(eq(actions.id,classRequest.id),eq(actions.status,"open")))
+      .returning({id:actions.id});
+     if(!updatedRequest)throw new Error("Class request changed before setup could be completed");
+     await emitEvent(tx,{eventType:EventTypes.SectionCreationRequestFulfilled,
+      aggregateType:"action",aggregateId:classRequest.id,actorPersonId:actor.actorPersonId,
+      payload:{programId:program.id,sectionId:existing.id}});
+     await writeAudit(tx,actor,{
+      action:"section_creation.fulfill",entityType:"action",entityId:classRequest.id,
+      scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+      before:{status:classRequest.status},
+      after:{status:"resolved",sectionId:existing.id},
+     });
+    }
+   }
    if(created){
     await emitEvent(tx, {eventType:EventTypes.SectionProvisioned,
      aggregateType:"section",aggregateId:existing.id,actorPersonId:actor.actorPersonId,
@@ -210,6 +284,43 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
       courseTemplateVersionId:data.courseTemplateVersionId,firstLessonValidated:true,credits:data.credits??null}});
    }
    return {sectionId:existing.id,created:Boolean(created)};
+  });
+ });
+export const declineLaunchClassRequest=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({programId:uuid,requestId:uuid,
+  reason:z.string().trim().min(5).max(1000)}).parse(v))
+ .handler(async({data})=>{
+  const {actor,program}=await setupContext(data.programId);
+  if(!program.siteId)throw new AuthorizationError("class request site scope");
+  return db.transaction(async tx=>{
+   const [request]=await tx.select().from(actions).where(and(
+    eq(actions.id,data.requestId),eq(actions.type,"section_creation_request"),
+    eq(actions.programId,program.id),eq(actions.siteId,program.siteId!),
+    eq(actions.organizationId,program.organizationId),eq(actions.subjectType,"program"),
+    eq(actions.subjectId,program.id),
+   )).for("update").limit(1);
+   if(!request)throw new Error("Class request not found in this program");
+   if(request.status==="cancelled"&&request.resolutionNote===data.reason)
+    return {declined:true,replayed:true};
+   if(request.status!=="open")throw new Error("Class request is no longer pending");
+   if(request.metadata.requestOrigin!=="teacher_classes"||
+    typeof request.metadata.requestedClassTitle!=="string")
+    throw new Error("Class request is missing its required details");
+   const resolvedAt=new Date();
+   const [updatedRequest]=await tx.update(actions).set({
+    status:"cancelled",resolutionNote:data.reason,resolvedAt,updatedAt:resolvedAt,
+   }).where(and(eq(actions.id,request.id),eq(actions.status,"open")))
+    .returning({id:actions.id});
+   if(!updatedRequest)throw new Error("Class request changed before the decision was recorded");
+   await emitEvent(tx,{eventType:EventTypes.SectionCreationRequestDeclined,
+    aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,
+    payload:{programId:program.id}});
+   await writeAudit(tx,actor,{
+    action:"section_creation.decline",entityType:"action",entityId:request.id,
+    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+    before:{status:request.status},after:{status:"cancelled",reason:data.reason},
+   });
+   return {declined:true,replayed:false};
   });
  });
 export const assignLaunchTeacher=createServerFn({method:"POST"})

@@ -18,15 +18,14 @@ import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-openin
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { siteDate } from "@/domain/expected-attendance";
+import { personDisplayName } from "@/domain/person-name";
+import { addCalendarDays, dateOnlyDayStartInTimezone, isValidDateOnly } from "@/modules/calendar/timezone";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
 import { closeObsoleteAttendanceExcuse, recordAttendanceRevision, submitAttendanceExcuse, reviewAttendanceExcuse } from "./attendance-service";
 
 const uuid = z.string().uuid();
-const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
-  const date = new Date(value + "T12:00:00.000Z");
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}, "Invalid school date");
+const dateField = z.string().refine(isValidDateOnly, "Invalid school date");
 const occurrence = (date: string) => date + ":site-day";
 
 async function staff(capability: string) {
@@ -57,26 +56,6 @@ async function guardian() {
       !actor.scope.programIds?.length || !actor.scope.siteIds?.length)
     throw new AuthorizationError("verified guardian attendance grant");
   return actor;
-}
-
-/** Convert midnight in the school's zone into an absolute instant (DST-safe). */
-function siteDayStart(date: string, timeZone: string): Date {
-  const target = Date.parse(date + "T00:00:00.000Z");
-  const format = new Intl.DateTimeFormat("en-US", {
-    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  });
-  let instant = target;
-  for (let i = 0; i < 4; i++) {
-    const wall = Object.fromEntries(format.formatToParts(new Date(instant))
-      .filter(p => p.type !== "literal").map(p => [p.type, p.value]));
-    const actual = Date.UTC(Number(wall.year), Number(wall.month) - 1, Number(wall.day),
-      Number(wall.hour), Number(wall.minute));
-    const delta = target - actual;
-    if (!delta) break;
-    instant += delta;
-  }
-  return new Date(instant);
 }
 
 async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string, preparation=false) {
@@ -244,7 +223,7 @@ async function resolveExpectedRoster(actor: AccessContext,
     const host = activePrograms.find(p => p.id === row.programId)!;
     byKey.set(row.programId + ":" + row.studentProfileId, {
       studentProfileId: row.studentProfileId, programId: row.programId,
-      studentName: row.preferredName ?? (row.firstName + " " + row.lastName),
+      studentName: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
       sectionTitle: null, siteId: host.siteId!, sectionId: null,
     });
   }
@@ -256,7 +235,7 @@ async function resolveExpectedRoster(actor: AccessContext,
     const old = byKey.get(key);
     byKey.set(key, {
       studentProfileId: row.studentProfileId, programId: row.programId,
-      studentName: row.preferredName ?? (row.firstName + " " + row.lastName),
+      studentName: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
       sectionTitle: old?.sectionTitle ?? row.sectionTitle,
       siteId: row.siteId!, sectionId: old?.sectionId ?? row.sectionId,
     });
@@ -267,7 +246,7 @@ async function resolveExpectedRoster(actor: AccessContext,
     const host=activePrograms.find(program=>program.id===row.programId);
     if(!host||host.siteId!==row.siteId)continue;
     memberships.set(row.programId+":"+row.sectionId+":"+row.studentProfileId,{
-      studentProfileId:row.studentProfileId,studentName:row.preferredName??row.firstName+" "+row.lastName,
+      studentProfileId:row.studentProfileId,studentName:personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
       programId:row.programId,sectionId:row.sectionId,sectionTitle:row.sectionTitle,
     });
   }
@@ -275,7 +254,7 @@ async function resolveExpectedRoster(actor: AccessContext,
     independentPrograms.has(row.programId)&&expectedIds.get(row.programId)?.has(row.studentProfileId)&&
     !byKey.has(row.programId+":"+row.studentProfileId)).map(row=>[row.programId+":"+row.studentProfileId,{
       studentProfileId:row.studentProfileId,programId:row.programId!,
-      studentName:row.preferredName??row.firstName+" "+row.lastName,
+      studentName:personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
     }])).values()]:[];
   return { roster: [...byKey.values()], sectionMemberships:[...memberships.values()], unplacedStudents, coverage, programsAtSite };
 }
@@ -296,7 +275,7 @@ export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
       siteId: site.id, siteName: site.name, timeZone: site.timezone,
       date: siteDate(new Date(), site.timezone),
       canPrepareSchoolDays:actor.role==="site_leader"&&!actor.sessionAccountId,
-      preparationThrough:siteDate(new Date(Date.now()+30*86400_000),site.timezone),
+      preparationThrough:addCalendarDays(siteDate(new Date(),site.timezone),30),
       note: "Staff-recorded onsite attendance. Online activity does not establish physical presence or departure.",
     };
   });
@@ -498,7 +477,7 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
       assertOnsiteAttendanceScope(actor, program.siteId);
       // Permit bounded staff-attested corrections for a missed onsite day;
       // never permit unrestricted backdating or future attendance.
-      const earliest = siteDate(new Date(Date.now() - 30 * 86400_000), program.timezone);
+      const earliest = addCalendarDays(siteDate(new Date(), program.timezone), -30);
       if (data.date < earliest || data.date > siteDate(new Date(), program.timezone))
         throw new AuthorizationError("onsite staff attendance limited to recent school-local days");
       if (data.expectedPreviousEventId === undefined)
@@ -517,7 +496,7 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
       programId: eligible.programId, siteId: eligible.siteId,
       sectionId: eligible.sectionId ?? undefined,
       occurrenceKey: occurrence(data.date), status: data.status,
-      expectedAt: siteDayStart(data.date, program.timezone),
+      expectedAt: dateOnlyDayStartInTimezone(data.date, program.timezone),
       mutationId: data.mutationId, note: data.note,
       expectedPreviousEventId: data.expectedPreviousEventId,
       requireExpectedOnsiteDate: data.date,
@@ -569,6 +548,11 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
       gte(attendanceEvents.expectedAt, cutoff),
       lte(attendanceEvents.expectedAt, new Date())));
     if (!records.length) return { absences: [] };
+    const recordSiteIds = [...new Set(records.map(row => row.siteId)
+      .filter((siteId): siteId is string => siteId !== null))];
+    const timezones = recordSiteIds.length ? await db.select({ id: sites.id, timezone: sites.timezone })
+      .from(sites).where(inArray(sites.id, recordSiteIds)) : [];
+    const timezoneBySite = new Map(timezones.map(row => [row.id, row.timezone]));
     const facts = effectiveAttendanceEvents(records);
     const allByOccurrence = new Map<string, typeof records>();
     for (const row of records) {
@@ -588,7 +572,7 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
 
     const profileToPerson = new Map(profiles.map(p => [p.id, p.personId]));
     const nameByPerson = new Map(relationships.map(r => [r.studentPersonId,
-      r.preferredName ?? (r.firstName + " " + r.lastName)]));
+      personDisplayName({ preferredName: r.preferredName, legalFirstName: r.firstName, legalLastName: r.lastName })]));
     return {
       absences: facts.filter(f => {
         const key = [f.studentProfileId, f.programId, f.occurrenceKey].join(":");
@@ -612,6 +596,7 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
             studentPersonId: profileToPerson.get(f.studentProfileId) ?? "",
             studentName: nameByPerson.get(profileToPerson.get(f.studentProfileId) ?? "") ?? "Student",
             expectedAt: f.expectedAt.toISOString(),
+            timezone: timezoneBySite.get(f.siteId ?? "") ?? "UTC",
             status: f.status, originalStatus: earliest.status,
             historicalExcuses: excuses.filter(row => history.some(event => event.id === row.attendanceEventId) &&
               row.id !== excuse?.id).map(row => ({
@@ -692,13 +677,15 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
       submittedAt: attendanceExcuses.createdAt,
       eventStatus: attendanceEvents.status,
       expectedAt: attendanceEvents.expectedAt,
+      timezone: sites.timezone,
       preferredName: people.preferredName,
       legalFirstName: people.legalFirstName, legalLastName: people.legalLastName,
     }).from(attendanceExcuses)
       .innerJoin(attendanceEvents, eq(attendanceEvents.id, attendanceExcuses.attendanceEventId))
       .innerJoin(studentProfiles, eq(studentProfiles.id, attendanceEvents.studentProfileId))
       .innerJoin(people, eq(people.id, studentProfiles.personId))
-      .innerJoin(programs, eq(programs.id, attendanceEvents.programId));
+      .innerJoin(programs, eq(programs.id, attendanceEvents.programId))
+      .innerJoin(sites, eq(sites.id, attendanceEvents.siteId));
     const rows = actor.role === "teacher" ? await base
       .innerJoin(sectionTeachers, eq(sectionTeachers.sectionId, attendanceEvents.sectionId))
       .where(and(
@@ -739,8 +726,9 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
       return {
         excuseId: r.excuseId, attendanceEventId: r.attendanceEventId,
         currentAttendanceEventId: current?.id ?? null,
-        studentName: r.preferredName ?? r.legalFirstName + " " + r.legalLastName,
+        studentName: personDisplayName(r),
         expectedAt: r.expectedAt.toISOString(), eventStatus: current?.status ?? r.eventStatus,
+        timezone: r.timezone,
         reason: r.reason, submittedAt: r.submittedAt.toISOString(),
         attachments: r.documentIds
           .filter(id => attachmentNameById.has(id))

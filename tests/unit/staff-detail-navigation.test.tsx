@@ -43,8 +43,8 @@ beforeEach(()=>{
   state.data={ok:true,data:{
     enabled:true,writesEnabled:true,membershipEnabled:true,creationEnabled:true,moderationEnabled:true,scopes:[],
     groups:[
-      {id:"english",title:"English group",sessions:[{id:"session",title:"Essay review",startsAt:"2030-01-01",endsAt:"2030-01-02",cancelled:false}]},
-      {id:"math",title:"Unrelated math group",sessions:[]},
+      {id:"english",title:"English group",timezone:"America/Los_Angeles",sessions:[{id:"session",title:"Essay review",startsAt:"2030-01-01T18:00:00Z",endsAt:"2030-01-01T19:00:00Z",cancelled:false}]},
+      {id:"math",title:"Unrelated math group",timezone:"America/Los_Angeles",sessions:[]},
     ],
     queue:[
       {groupId:"english",groupTitle:"English group",personId:"student",personName:"Jordan"},

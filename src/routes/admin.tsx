@@ -1,4 +1,5 @@
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { personDisplayName } from "@/domain/person-name";
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { KeyRound, UserRoundPlus } from "lucide-react";
@@ -16,12 +17,13 @@ import { launchStaffInvitationDefaults } from "@/domain/launch-staff-invitation"
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {siteProgramSelectionSchema} from "@/lib/route-search";
+const adminSearchSchema=siteProgramSelectionSchema.pick({siteId:true}).extend({
+ inviteRole:z.enum(["registrar","site_website_editor"]).optional().catch(undefined),
+});
 
 export const Route = createFileRoute("/admin")({
-  validateSearch: (search: Record<string, unknown>): {siteId?: string; inviteRole?: string} => ({
-    siteId: typeof search.siteId === "string" ? search.siteId : undefined,
-    inviteRole: search.inviteRole === "registrar" || search.inviteRole === "site_website_editor" ? search.inviteRole : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): {siteId?: string; inviteRole?: string} => adminSearchSchema.parse(search),
   component: AdminConsolePage,
 });
 
@@ -283,7 +285,7 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
           {people.length > 0 && <div className="mt-4 grid gap-4">
             {people.map(person => <article key={person.personId} className="rounded-lg border p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <h3 className="font-semibold">{person.preferredName ?? person.firstName} {person.lastName}</h3>
+                <h3 className="font-semibold">{personDisplayName({ preferredName: person.preferredName, legalFirstName: person.firstName, legalLastName: person.lastName })}</h3>
                 <span className="rounded-full border px-3 py-1 text-xs">{person.active ? "Active" : "Inactive"}</span>
               </div>
               {person.grants.length > 0 && <ul className="mt-2 space-y-1 text-sm text-muted-foreground">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { reviseLaunchTeacherPolicy } from "@/modules/programs/teacher-policy.functions";
 import type { listLaunchTeacherPolicies } from "@/modules/programs/teacher-policy.server";
 
@@ -9,13 +10,12 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
   canRevise: boolean; changed: () => Promise<void>;
 }) {
   const latest = policies.at(-1);
+  const mutation = useMutationFeedback(changed);
+  const busy = mutation.pending || mutation.refreshFailed;
   const [keys, setKeys] = useState<string[]>([]);
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   if (!policies.length) return null;
   return <section className="mt-5 border-t pt-4">
     <h3 className="font-semibold">Published policy versions</h3>
@@ -29,17 +29,18 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
     </li>)}</ol>
     {!canRevise ? <p className="mt-3 text-sm">Revisions require an explicit institutional staffing-policy publisher grant
       and a pre-opening program.</p> : latest && <form className="mt-4 space-y-3" onSubmit={async event => {
-      event.preventDefault(); setBusy(true); setError(""); setNotice("");
-      try {
-        await reviseLaunchTeacherPolicy({ data: {
+      event.preventDefault();
+      const outcome = await mutation.run(
+        () => reviseLaunchTeacherPolicy({ data: {
           programId, expectedVersionId: latest.id, qualificationKeys: keys,
           effectiveFrom: effectiveFrom + ":00.000Z", reason, confirmed: true,
-        } });
-        await changed(); setNotice("Policy revision published. Review updated staffing blockers before opening.");
-        setConfirmed(false);
-      } catch (failure) {
-        setError(failure instanceof Error ? failure.message : "Unable to publish policy revision");
-      } finally { setBusy(false); }
+        } }),
+        {
+          successMessage: "Policy revision published. Review updated staffing blockers before opening.",
+          commandErrorMessage: "Unable to publish policy revision.",
+        },
+      );
+      if (outcome.status === "saved") setConfirmed(false);
     }}>
       <h3 className="font-semibold">Publish a reviewed revision</h3>
       <p className="text-sm">Select the complete replacement requirement set, not just additions.
@@ -63,8 +64,9 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
       </label>
       <button type="submit" disabled={busy || !confirmed || !keys.length || !effectiveFrom || reason.trim().length < 10}
         className="rounded border px-3 py-2 text-sm disabled:opacity-50">Publish policy revision</button>
-      {error && <p role="alert" className="text-sm">{error}</p>}
-      {notice && <p role="status" className="text-sm">{notice}</p>}
+      {mutation.pending && <p role="status" className="text-sm">Publishing policy revision...</p>}
+      {mutation.error && <p role="alert" className="text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
+      {mutation.notice && <p role="status" className="text-sm">{mutation.notice}</p>}
     </form>}
   </section>;
 }

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, inArray, or, isNull, desc } from "drizzle-orm";
@@ -18,14 +19,23 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
   setResponseHeader("Cache-Control", "private, no-store");
   const sites = actorSiteIds(actor);
   const programs = actor.scope.programIds ?? [];
-  if (!programs.length) return { role: actor.role, groups: [], sections: [] };
+  const studentGuardianRows = actor.role === "student" ? await db.select({
+    id: s.guardianRelationships.id,
+  }).from(s.guardianRelationships).where(guardianRelationshipPredicate({
+    studentPersonId: actor.actorPersonId, access: "enrollment",
+  })).limit(1) : [];
+  const hasEnrollmentGuardian = actor.role === "student" ? studentGuardianRows.length > 0 : null;
+  if (!programs.length) return {
+    role: actor.role, groups: [], sections: [], hasEnrollmentGuardian,
+  };
   const groups = await db.select({
     id: s.studyGroups.id, siteId: s.studyGroups.siteId, programId: s.studyGroups.programId,
     sectionId: s.studyGroups.sectionId, facilitatorPersonId: s.studyGroups.facilitatorPersonId,
     title: s.studyGroups.title, description: s.studyGroups.description,
     kind: s.studyGroups.kind,
     maxMembers: s.studyGroups.maxMembers,
-  }).from(s.studyGroups).where(and(
+    timezone: s.sites.timezone,
+  }).from(s.studyGroups).innerJoin(s.sites, eq(s.sites.id, s.studyGroups.siteId)).where(and(
     eq(s.studyGroups.status, "active"), inArray(s.studyGroups.siteId, sites),
     or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs)),
   )).orderBy(desc(s.studyGroups.createdAt)).limit(100);
@@ -61,7 +71,9 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     : studentPrograms.some(p => p.siteId === g.siteId &&
       (!g.programId || p.programId === g.programId)) &&
       (!g.sectionId || studentSectionIds.has(g.sectionId)));
-  if (!allowed.length) return { role: actor.role, groups: [], sections: teaching };
+  if (!allowed.length) return {
+    role: actor.role, groups: [], sections: teaching, hasEnrollmentGuardian,
+  };
 
   const ids = allowed.map(x => x.id);
   const [memberships, sessions, pendingMembers, posts, reports, roster] = await Promise.all([
@@ -172,6 +184,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
 
   return {
     role: actor.role,
+    hasEnrollmentGuardian,
     sections: teaching,
     groups: allowed.map(g => {
       const own = memberships.find(m => m.groupId === g.id && m.personId === actor.actorPersonId);
@@ -187,6 +200,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
         })) : [];
       return {
         id: g.id, title: g.title, description: g.description,
+        timezone: g.timezone,
         kind: g.kind,
         maxMembers: g.maxMembers,
         membershipStatus: own?.status ?? null,
@@ -200,11 +214,11 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
         reports: actor.role === "teacher" ? reports.filter(r => r.groupId === g.id) : [],
         roster: actor.role === "teacher" ? roster.filter(r => r.groupId === g.id)
           .map(r => ({ personId: r.studentPersonId,
-            studentName: r.firstName + " " + r.lastName })) : [],
+            studentName: personLegalName({ legalFirstName: r.firstName, legalLastName: r.lastName }) })) : [],
         pendingMembers: actor.role === "teacher"
           ? pendingMembers.filter(m => m.groupId === g.id).map(m => ({
             id: m.id, studentPersonId: m.studentPersonId,
-            studentName: m.firstName + " " + m.lastName, guardianReady: canReview(m),
+            studentName: personLegalName({ legalFirstName: m.firstName, legalLastName: m.lastName }), guardianReady: canReview(m),
           })) : [],
       };
     }),

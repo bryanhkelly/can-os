@@ -5,6 +5,8 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, EmptyState } from "@/components/workspace";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { useHydrated } from "@/lib/use-hydrated";
 
 const loadCourseRegistration=async(section?:string)=>{
  const registration=await getCourseRegistration();
@@ -34,7 +36,9 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  const {section}=Route.useSearch();
  const visibleSections=section?sections.filter(item=>item.id===section):sections;
   const router=useRouter();
-  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const hydrated=useHydrated();
+ const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const actionBusy=!hydrated||busy;
  async function run(fn:()=>Promise<unknown>,message:string){
   setBusy(true);setError("");setNotice("");
   try{await fn();await router.invalidate();setNotice(message)}
@@ -43,7 +47,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  }
  const active=sections.filter(s=>s.enrollmentStatus==="active");
  const credits=active.reduce((n,s)=>n+s.credits,0);
- const today=new Date().toISOString().slice(0,10);
+ const today=new Date();
  return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
   <nav className="flex flex-wrap items-center gap-4">
    {role==="student"&&<Link to="/student/courses" className="text-xs font-semibold underline">My classes</Link>}
@@ -84,10 +88,10 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
      {role==="registrar"?<span className="rounded-lg border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
      <div className="flex flex-wrap gap-2">
       {pending?<span className="rounded-lg bg-stone-warm px-3 py-2 text-xs font-semibold">Request pending</span>:enrolled?<>
-       {today<=s.policy.addDropEndsOn&&<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"drop"}}),"Drop request sent to the registrar.")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">Request drop</button>}
-       {today<=s.policy.withdrawalEndsOn&&<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"withdraw"}}),"Withdrawal request sent for review.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">Request withdrawal</button>}
-       {today>s.policy.withdrawalEndsOn&&<span className="text-xs text-muted-foreground">Change period closed</span>}
-      </>:today<=s.policy.addDropEndsOn?<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"add"}}),"Course request sent to the registrar.")} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">{s.policy.guardianApprovalRequired?"Request guardian approval":"Request class"}</button>:<span className="text-xs text-muted-foreground">Registration closed</span>}
+       {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn&&<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"drop"}}),"Drop request sent to the registrar.")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">Request drop</button>}
+       {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.withdrawalEndsOn&&<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"withdraw"}}),"Withdrawal request sent for review.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">Request withdrawal</button>}
+       {dateKeyInTimezone(today.toISOString(),s.timezone)>s.policy.withdrawalEndsOn&&<span className="text-xs text-muted-foreground">Change period closed</span>}
+      </>:dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn?<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"add"}}),"Course request sent to the registrar.")} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">{s.policy.guardianApprovalRequired?"Request guardian approval":"Request class"}</button>:<span className="text-xs text-muted-foreground">Registration closed</span>}
      </div>}
     </div>
    </article>;
@@ -96,7 +100,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
   <p className="mt-2 text-sm text-muted-foreground">Each request belongs to the signed-in student and an authorized school program. Registrar decisions update the enrollment record and notify the student.</p>
   <div className="mt-4 space-y-3">{requests.map(r=><div key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
    <div className="flex-1"><p className="text-sm font-semibold">{r.title}</p><p className="mt-1 text-xs text-muted-foreground">{String(r.operation)} · {r.status}</p></div>
-   {role==="registrar"&&r.status==="open"&&<div className="flex gap-2"><button disabled={busy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:false}}),"Request declined.")} className="rounded-lg border border-border px-3 py-2 text-xs">Decline</button><button disabled={busy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:true}}),"Enrollment decision recorded.")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background">Approve</button></div>}
+   {role==="registrar"&&r.status==="open"&&<div className="flex gap-2"><button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:false}}),"Request declined.")} className="rounded-lg border border-border px-3 py-2 text-xs">Decline</button><button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:true}}),"Enrollment decision recorded.")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background">Approve</button></div>}
   </div>)}{!requests.length&&<p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">No course change requests yet.</p>}</div>
   <p className="mt-9 text-xs leading-6 text-muted-foreground">A withdrawal retains a W notation on the enrollment record; official transcript display and guardian consent for classes that require it are not yet finalized. Schedule conflicts, prerequisites, capacity and credits are rechecked by the enrollment service when adding a class.</p>
  </main>;

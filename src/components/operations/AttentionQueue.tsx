@@ -37,7 +37,9 @@ export function AttentionQueue({ items = [], empty = "Nothing needs your attenti
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <p>
             {item.ownerName ? `Owner: ${item.ownerName}` : "Owner: unassigned or determined by the owning workflow"}
-            {" · "}{item.dueAt ? `Due ${new Date(item.dueAt).toLocaleDateString()}` : "No deadline recorded"}
+            {" · "}{item.dueAt ? `Due ${new Intl.DateTimeFormat("en-US",{
+              dateStyle:"medium",...(item.timezone?{timeZone:item.timezone}:{}),
+            }).format(new Date(item.dueAt))}` : "No deadline recorded"}
           </p>
           <div className="flex flex-wrap gap-3 font-semibold text-foreground">
             {item.secondaryHref && <a href={item.secondaryHref} className="underline">{item.secondaryLabel ?? "Open workspace"} →</a>}

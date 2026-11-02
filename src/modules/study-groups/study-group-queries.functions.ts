@@ -1,7 +1,8 @@
 import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
+import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
+import {guardianRelationshipPredicate} from "@/domain/guardian-relationship";
 import{and,eq,desc,inArray,sql,isNull,or,asc,ne}from"drizzle-orm";
 import{alias}from"drizzle-orm/pg-core";
 import{z} from "zod";
@@ -69,6 +70,18 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
   (!group.programId||row.programId===group.programId))&&(!group.sectionId||sections.some(section=>section.id===group.sectionId)));
 });
 
+export const hasStudentStudyGroupGuardian=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await groupActor("student");
+ setResponseHeader("Cache-Control","private, no-store");
+ const {db,s}=await context();
+ const [guardian]=await db.select({id:s.guardianRelationships.id})
+  .from(s.guardianRelationships)
+  .where(guardianRelationshipPredicate({
+   studentPersonId:actor.actorPersonId!,access:"enrollment",
+  })).limit(1);
+ return Boolean(guardian);
+});
+
 export const listStudentStudyGroupSections=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await groupActor("student");
  const {db,s}=await context();
@@ -123,7 +136,7 @@ export const listStudentStudyGroupClassmates=createServerFn({method:"GET"})
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  const actor=await groupActor("student");
  const {db,s}=await context();
- const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
+ const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt,timezone:s.sites.timezone}).from(s.studyGroups).innerJoin(s.sites,eq(s.sites.id,s.studyGroups.siteId)).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
  if(!group||group.status!=="active")throw new AuthorizationError("active study group required");
  await eligibleStudent(db,actor.actorPersonId!,group,actor.scope.programIds??[]);
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);

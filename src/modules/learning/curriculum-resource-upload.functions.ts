@@ -10,7 +10,7 @@ import { readClassContent } from "@/domain/class-content";
 import { curriculumPdfKeyPattern, maxCurriculumPdfBytes, hasPdfMagic, isCurriculumPdfKeyForResource } from "@/domain/curriculum-resource-file";
 import { requireActor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
-import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config } from "@/platform/storage/r2";
+import { createPrivateUpload, verifyPrivateObject, resolveR2Config } from "@/platform/storage/r2";
 import { readMarketplace } from "./curriculum-marketplace.server";
 
 import { EventTypes } from "@/domain/event-types";
@@ -70,8 +70,7 @@ export const beginCurriculumPdfUpload = createServerFn({method:"POST"})
     const resourceId = randomUUID();
     const key = `learning/supplements/${resourceId}/${randomUUID()}`;
     return {
-      resourceId,key,expiresInSeconds:180,
-      uploadUrl:createPrivateUploadUrl({
+      resourceId,...createPrivateUpload({
         key,keyPattern,contentType:"application/pdf",
         contentLength:data.size,minContentLength:16,maxContentLength:maxPdf,
         expiresSeconds:180,preventOverwrite:true,

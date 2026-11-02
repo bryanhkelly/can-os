@@ -41,7 +41,9 @@ export function ClassDirectoryCards({
       </div>
       {!classes.length && (
         <p role="status" className="mt-7 rounded-xl border p-5 text-sm">
-          No active classes are available in this membership.
+          {role === "teacher"
+            ? "No active classes are currently assigned to you."
+            : "No active classes are available in this membership."}
         </p>
       )}
     </>

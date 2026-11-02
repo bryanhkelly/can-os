@@ -28,7 +28,7 @@ export async function runScheduledJobs(): Promise<{
   const safeguarding = await escalateOverdueSafeguardingConcerns();
   const schoolFamilyDeliveries = await processSchoolFamilyOutboundDeliveries();
   const missing = await markOverdueSubmissionsMissing();
-  const processed = await processPendingDomainEvents();
+  const processed = await processPendingDomainEvents(500);
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();
   const deliveries = await processQueuedSubscriptionDeliveries();

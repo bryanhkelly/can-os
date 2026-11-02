@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { personDisplayName as name } from "@/domain/person-name";
 import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
@@ -19,7 +20,6 @@ type ResponderWorkspace = Extract<Workspace, { mode: "responder" }>;
 type CaseDetail = Awaited<ReturnType<typeof getAssignedSafeguardingCase>>;
 type OverdueList = Awaited<ReturnType<typeof getOverdueUnacknowledgedSafeguardingCases>>["overdue"];
 const date = (value: Date | string) => new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-const name = (row: { preferredName: string | null; legalFirstName: string; legalLastName: string }) => row.preferredName ?? `${row.legalFirstName} ${row.legalLastName}`;
 
 export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
   workspace: ResponderWorkspace;

@@ -56,6 +56,13 @@ Informational `StatCard`s remain visually static; linked metrics opt into the
 `interactive` variant and sit inside a keyboard-focusable link. Daily Canvas
 uses dedicated semantic surface/foreground tokens, while emergency content
 uses destructive tokens and never renders editorial verse or campaign content.
+School-day operation and supervision controls compose the shared `Button`,
+`Input`, and `Label` primitives; the existing server-owned workflow and
+authorization behavior remains unchanged. Each room-facilitator role now has
+one canonical destination for the school-day view.
+Launch academic setup composes shared buttons, labels, inputs, selects,
+textareas, and `StatCard`s rather than route-local controls. The generic
+`Textarea` primitive has a colocated form-controls story.
 
 ## Controlled institution/site branding
 
@@ -73,11 +80,10 @@ This increment integrates the GF22 **application-entry vertical slice**. It does
 
 ## Current validation evidence
 
-- Typecheck and production application build: **passed**.
-- Storybook static build: **passed**. Local Chromium interaction and axe checks: **26 tests passed** across seven story files.
-- Focused design, workspace, and Action authorization regression suite: **35 tests passed**.
-- Full unit suite: **1,319 tests passed, 5 failed**, plus three suite import failures. The remaining failures are the previously recorded Drizzle snapshot, event-registry, router-mock, and workflow-script assertions in unchanged areas.
-- ESLint: **0 errors**; 243 legacy warnings remain visible for incremental cleanup. Shared ownership audit: **75 component files, no duplicate exports**.
-- Route contracts: **91 source routes, 91 recorded, 0 issues**.
+- Typecheck and production application build for the current increment: **passed**.
+- Full unit suite: **2,750 tests passed** across 440 test files.
+- ESLint completed with **0 errors**; existing warnings remain visible, including generated output. Shared component inventory: **199 files checked**.
+- Route contracts: **107 source routes, 107 recorded, 0 issues**.
+- Local Chromium Storybook interaction/axe checks: **72 tests passed** across 18 story files. The static Storybook build was not rerun for this increment.
 - Chromatic upload: **not run**; no project token is configured in this environment. The local static build and Chromatic configuration are ready.
 - Guarded admissions browser preflight: **blocked before execution** because `TEST_DATABASE_URL` is not configured. A disposable Neon child of `test01` is required; production must not be used. No current GF22 or FullFlow browser acceptance is claimed.

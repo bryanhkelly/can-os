@@ -12,17 +12,20 @@ import { PublishedLessonNavigation } from "@/components/learning/PublishedLesson
 import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
 import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
 import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
+import { ClassCreationRequestForm } from "@/components/learning/ClassCreationRequestForm";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { classResources, type ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
+import { getTeacherClassRequestOptions } from "@/modules/programs/section-creation-requests.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
 import { deriveClassNextSteps } from "@/domain/student-success";
 
@@ -37,7 +40,10 @@ export const Route = createFileRoute("/classes")({
   loader: ({ deps }) => safeLoader(async () => {
     const directory = await getClassDirectory();
     const workspace = deps.section ? await getClassWorkspace({ data: { sectionId: deps.section, studentPersonId: deps.student } }) : null;
-    return { directory, workspace };
+    const classRequestOptions = !workspace && directory.role === "teacher"
+      ? await getTeacherClassRequestOptions()
+      : null;
+    return { directory, workspace, classRequestOptions };
   }, { authMessage: "Sign in with an authorized student, parent or teacher account to open classes." })(),
   component: ClassesPage,
 });
@@ -46,20 +52,20 @@ function ClassesPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Classes" title="Classes" outcome={outcome}/>;
-  const { directory, workspace } = outcome.data;
+  const { directory, workspace, classRequestOptions } = outcome.data;
   if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson}/>;
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
     subtitle="Published learning, class updates and the teaching team, backed by your current relationships and enrollment.">
     <ClassDirectoryCards classes={directory.classes} role={directory.role} />
+    {classRequestOptions && <ClassCreationRequestForm options={classRequestOptions}/>}
   </WorkspaceShell>;
 }
 
 type Workspace = Awaited<ReturnType<typeof getClassWorkspace>>;
 export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Workspace; tab?: (typeof tabs)[number]; lessonId?: string }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [resourceTitle,setResourceTitle]=useState("");
@@ -91,10 +97,10 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     assessments: assessmentEvidence,
   });
   async function run(command: () => Promise<unknown>, success: string) {
-    setBusy(true); setError(""); setNotice("");
-    try { await command(); await router.invalidate(); setNotice(success); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to complete this class operation."); }
-    finally { setBusy(false); }
+    await mutation.run(command, {
+      successMessage: success,
+      commandErrorMessage: "Unable to complete this class operation.",
+    });
   }
   async function download(resourceId: string) {
     await run(async () => {
@@ -162,8 +168,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     </nav></WorkspacePanel>}>
     <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
       <Link key={value} to="/classes" search={{ ...search, tab: value }} aria-current={tab === value ? "page" : undefined} className="capitalize">{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</Link>)}</DetailNavigation>
-    {error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{notice}</p>}
+    {mutation.pending && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">Saving class change...</p>}
+    {mutation.error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
+    {mutation.notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
     {tab === "overview" && <div className="grid gap-5">
       {data.role !== "teacher" && <StudentNextStepsPanel nextSteps={nextSteps} search={search} />}
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
@@ -371,7 +378,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
             setTitle("");setBody("");announcementId.current=null;
           },"Class announcement published.");
         }} />}
-      <ClassAnnouncementFeed announcements={data.announcements} />
+      <ClassAnnouncementFeed announcements={data.announcements} timezone={data.section.timezone} />
     </div>}
   </WorkspaceShell>;
 }

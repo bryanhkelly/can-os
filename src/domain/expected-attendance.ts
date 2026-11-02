@@ -1,3 +1,5 @@
+import { addCalendarDays as shiftDay, calendarWeekday as weekday, dateKeyInTimezone } from "@/modules/calendar/timezone";
+
 /**
  * GF4: calendar-and-schedule-derived attendance expectations.
  *
@@ -78,22 +80,8 @@ export type ExpectedAttendanceSummary = {
   windowThrough: string;
 };
 
-const dayUTC = (value: string) => new Date(value + "T12:00:00.000Z");
-const shiftDay = (value: string, days: number): string => {
-  const date = dayUTC(value);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-};
-const weekday = (value: string) => dayUTC(value).getUTCDay();
-
 /** Date-only comparisons remain in the site's timezone (including DST). */
-export function siteDate(value: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(value);
-  const get = (type: string) => parts.find(p => p.type === type)?.value ?? "";
-  return [get("year"), get("month"), get("day")].join("-");
-}
+export const siteDate = dateKeyInTimezone;
 
 export function summarizeExpectedOnsiteAttendance(input: {
   program: AttendanceProgram;

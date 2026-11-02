@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -232,7 +233,7 @@ export const getGuardianEnrollmentChangeOptions=createServerFn({method:"GET"})
      inArray(s.programs.organizationId,actor.scope.organizationIds??[]),
    )).limit(100);
   return [...new Map(rows.map(row=>[row.studentPersonId+":"+row.programId,{
-    studentPersonId:row.studentPersonId,studentName:row.firstName+" "+row.lastName,
+    studentPersonId:row.studentPersonId,studentName:personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
     programId:row.programId,schoolName:row.schoolName,
   }])).values()];
  });

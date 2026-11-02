@@ -377,8 +377,14 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       sql,
       `insert into compliance_policy_applicability (
          framework_version_id, organization_id, site_id, program_id, jurisdiction_id, role_key
-       ) values ($1, null, null, null, null, 'teacher') returning id`,
-      [fixture.complianceFrameworkVersionId],
+       ) values ($1, $2, $3, $4, $5, 'teacher') returning id`,
+      [
+        fixture.complianceFrameworkVersionId,
+        fixture.hostOrgId,
+        fixture.siteId,
+        fixture.programId,
+        fixture.jurisdictionId,
+      ],
     );
 
     fixture.deliveryArrangementId = await insertFixtureId(

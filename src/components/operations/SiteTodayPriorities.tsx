@@ -1,6 +1,7 @@
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { StatusBadge, WorkspacePanel } from "@/components/workspace";
 import type { DailyAttentionItem } from "@/domain/daily-operations";
+import { formatTimestamp } from "@/modules/calendar/timezone";
 
 function exceptionSummary(count: number) {
   return count === 0 ? "No current exceptions" : `${count} to review`;
@@ -33,10 +34,7 @@ export function SiteTodayPriorities({
       ? `/sites/${encodeURIComponent(siteId)}#site-owned-follow-ups`
       : nextAction.href
     : undefined;
-  const formatDueDate = (date: string) => new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeZone: siteTimezone,
-  }).format(new Date(date));
+  const formatDueDate = (date: string) => formatTimestamp(date, siteTimezone, { dateStyle: "medium" });
   const signals = [
     {
       label: "Staffing",

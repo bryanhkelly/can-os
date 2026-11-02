@@ -50,7 +50,7 @@ describe("shared evidence presentation", () => {
 
   it("renders disabled upload controls when deployment disables private uploads", () => {
     const html = renderToStaticMarkup(<EvidenceUploader disabled
-      adapter={{ begin: async () => ({ key: "k", uploadUrl: "/private", uploadHeaders: {} }),
+      adapter={{ begin: async () => ({ key: "k", uploadUrl: "https://private.test/put", uploadHeaders: {"Content-Type":"application/pdf"}, expiresInSeconds:180 }),
         finish: async () => {} }}
       makeInput={() => ({ fileName: "test.pdf", mimeType: "application/pdf" as const,
         size: 1, expiresAt: "2027-01-01" })}

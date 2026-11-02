@@ -14,6 +14,20 @@ import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions
 import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import {z} from "zod";
+import {optionalSearchUuid,siteProgramSelectionSchema} from "@/lib/route-search";
+import { PageNavigation } from "@/components/workspace/page-navigation";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+
+const admissionsSearchSchema=siteProgramSelectionSchema.extend({
+ application:optionalSearchUuid,
+ stage:z.unknown().transform(value=>pipelineStages.find(stage=>stage===value)),
+ page:z.unknown().transform(value=>
+  typeof value==="number"&&Number.isInteger(value)&&value>0
+   ?Math.min(value,10_000)
+   :typeof value==="string"&&/^\d+$/.test(value)&&Number(value)>0
+    ?Math.min(Number(value),10_000):undefined),
+});
 
 const formatStatus=(status:string)=>status.replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());
 
@@ -38,16 +52,7 @@ const loadAdmissions = async (selection:{
 };
 
 export const Route = createFileRoute("/admissions/")({
-  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;stage?:AdmissionsStage;page?:number}=>({
-    siteId:typeof search.siteId==="string"?search.siteId:undefined,
-    programId:typeof search.programId==="string"?search.programId:undefined,
-    application:typeof search.application==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.application)?search.application:undefined,
-    stage:pipelineStages.find(stage=>stage===search.stage),
-    page:typeof search.page==="number"&&Number.isInteger(search.page)&&search.page>0
-      ?Math.min(search.page,10_000)
-      :typeof search.page==="string"&&/^\d+$/.test(search.page)&&Number(search.page)>0
-        ?Math.min(Number(search.page),10_000):undefined,
-  }),
+  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;stage?:AdmissionsStage;page?:number}=>admissionsSearchSchema.parse(search),
   loaderDeps:({search})=>({
    siteId:search.siteId,programId:search.programId,application:search.application,
    stage:search.stage,page:search.page,
@@ -128,11 +133,11 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
        {summary.byStage.map(item=><Link key={item.stage} to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:item.stage}}
         aria-current={selected.stage===item.stage?"page":undefined} className="capitalize">{item.stage} ({item.count})</Link>)}
       </DetailNavigation>
-      {!selected.application&&<div className="overflow-x-auto rounded-xl border bg-card">
-       <table className="w-full text-left text-sm">
+      {!selected.application&&<div className="rounded-xl border bg-card">
+       <Table className="text-left">
         <caption className="sr-only">Authorized admissions pipeline and next steps</caption>
-        <thead className="border-b bg-muted/50"><tr><th scope="col" className="p-4">Applicant</th><th scope="col" className="p-4">Program</th><th scope="col" className="p-4">Stage</th><th scope="col" className="p-4">Next step</th></tr></thead>
-        <tbody className="divide-y">{rows.map(row=>{
+        <TableHeader className="bg-muted/50"><TableRow><TableHead scope="col" className="p-4">Applicant</TableHead><TableHead scope="col" className="p-4">Program</TableHead><TableHead scope="col" className="p-4">Stage</TableHead><TableHead scope="col" className="p-4">Next step</TableHead></TableRow></TableHeader>
+        <TableBody className="divide-y">{rows.map(row=>{
          const offer=selectActionableOffer(row.offers);
          const next=row.enrollments.length && row.activeSectionCount===0?"Assign staffed instructional class":
           row.enrollments.length && row.studentAccessStatus==="access_unavailable"?"Review revoked student access":
@@ -146,24 +151,20 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           offer?.status==="issued"?"Awaiting family response":
           offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
           row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
-         return <tr key={row.id} className="align-top hover:bg-muted/40">
+         return <TableRow key={row.id} className="align-top hover:bg-muted/40">
           <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
-          <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></td>
-          <td className="p-4"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{next}</Link></td>
-         </tr>;
-        })}</tbody>
-       </table>
+          <TableCell className="p-4 align-top">{row.program}</TableCell><TableCell className="p-4 align-top"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></TableCell>
+          <TableCell className="p-4 align-top"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{next}</Link></TableCell>
+         </TableRow>;
+        })}</TableBody>
+       </Table>
        {!rows.length&&<p className="p-5 text-sm text-muted-foreground">No applications in this stage and scope.</p>}
       </div>}
-      {!selected.application&&pageCount>1&&<nav aria-label="Admissions pages" className="mt-4 flex items-center justify-between gap-3 text-sm">
-       {page>1
-        ?<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page-1}} className="rounded border px-3 py-2">Previous page</Link>
-        :<span aria-disabled="true" className="rounded border px-3 py-2 opacity-50">Previous page</span>}
+      {!selected.application&&pageCount>1&&<PageNavigation label="Admissions pages" className="mt-4 justify-between" showUnavailable
+       previous={page>1&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page-1}} className="rounded border px-3 py-2">Previous page</Link>}
+       next={hasMore&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className="rounded border px-3 py-2">Next page</Link>}>
        <span>Page {page} of {pageCount} · {filteredTotal} applications</span>
-       {hasMore
-        ?<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className="rounded border px-3 py-2">Next page</Link>
-        :<span aria-disabled="true" className="rounded border px-3 py-2 opacity-50">Next page</span>}
-      </nav>}
+      </PageNavigation>}
       <h2 className="mt-9 font-serif text-2xl">Applications</h2>
       {selected.application&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:selected.page&&selected.page>1?selected.page:undefined}} className="mt-3 inline-block text-sm underline">View all applications</Link>}
       {selected.application&&!detail&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}

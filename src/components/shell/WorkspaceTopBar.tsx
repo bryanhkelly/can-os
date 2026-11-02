@@ -32,9 +32,9 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
         <Menu aria-hidden="true" />
       </Button>}
       {member
-        ? <button type="button" aria-label="Switch workspace" disabled={changing} aria-haspopup="dialog"
+        ? <Button variant="outline" aria-label="Switch workspace" disabled={changing} aria-haspopup="dialog"
           aria-expanded={switcherOpen} onClick={onOpenSwitcher}
-          className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center justify-start gap-2 rounded-xl border-border/70 bg-background px-3 py-2 text-left">
           <span className="shrink-0 font-serif text-lg font-semibold">CAN OS</span>
           <span className="min-w-0 border-l pl-2">
             <span className="block text-xs font-semibold capitalize">{member.role.replaceAll("_", " ")}</span>
@@ -43,7 +43,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
             </span>
           </span>
           <ChevronDown className="size-4 shrink-0" aria-hidden="true" />
-        </button>
+        </Button>
         : <Link to="/" className="mr-auto rounded-sm font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>}
       {member && <>
         <Button variant="outline" size="sm" aria-label="Search or ask CAN" onClick={onOpenSearch}>

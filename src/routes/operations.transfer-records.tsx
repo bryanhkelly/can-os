@@ -3,6 +3,7 @@ import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   listTransferRecordsHandoffs,completeTransferRecordsHandoff,
 } from "@/modules/enrollment/transfer-records-handoff.functions";
@@ -24,8 +25,8 @@ function TransferRecordsRoute(){
 }
 function TransferRecordsWorkspace({items}:{items:Items}){
  const router=useRouter();
- const [busy,setBusy]=useState<string|null>(null);
- const [notice,setNotice]=useState(""),[error,setError]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const [selected,setSelected]=useState<Record<string,string>>({});
  const [methods,setMethods]=useState<Record<string,DeliveryMethod>>({});
  const [receipts,setReceipts]=useState<Record<string,string>>({});
@@ -40,23 +41,23 @@ function TransferRecordsWorkspace({items}:{items:Items}){
    if(!window.confirm(internal
      ?"Release the selected official transcript INSIDE CAN OS to the exact linked receiving-school application under its signed guardian consent? The authorized receiving registrar will gain read-only access immediately."
      :"Confirm the named school's identity was independently verified and the selected official transcript was ACTUALLY transferred through an approved secure channel? This will record your signed institutional attestation."))return;
-   setBusy(item.id);setError("");setNotice("");
-   try{
-     const result=await completeTransferRecordsHandoff({data:{
+   await mutation.run(
+     ()=>completeTransferRecordsHandoff({data:{
        handoffActionId:item.id,issuanceId,
        recipientSchoolName:item.destinationSchoolName,
        deliveryMethod:methods[item.id]??"approved_secure_exchange",
        receiptReference,confirmedRecipientVerified:true,confirmedSecureDelivery:true,
-     }});
-     setNotice(result.completed
+     }}),
+     {
+      successMessage:result=>result.completed
        ?internal
          ?"Official transcript released inside CAN OS to the verified receiving school. Access is scoped and audited; the family was notified."
          :"The official transcript handoff was recorded with evidence. The family was notified."
-       :"This handoff was already completed.");
-     try{await router.invalidate();}
-     catch{setError("The record was saved but the workspace did not refresh. Do not submit again.");}
-   }catch(e){setError(e instanceof Error?e.message:"Could not verify the records handoff.");}
-   finally{setBusy(null);}
+       :"This handoff was already completed.",
+      commandErrorMessage:"Could not verify the records handoff.",
+      refreshErrorMessage:"The record was saved but the workspace did not refresh. Do not submit again.",
+     },
+   );
  }
  return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Transfer records coordination"
    subtitle="Issue official records through the credit issuer. Release securely within CAN to an authorized receiving school, or attest an externally completed secure transfer with delivery evidence."
@@ -64,8 +65,9 @@ function TransferRecordsWorkspace({items}:{items:Items}){
      <Link to="/operations" className="rounded border px-3 py-2 text-sm">Operations</Link>
      <Link to="/admissions/transcripts" search={{query:""}} className="rounded border px-3 py-2 text-sm">Official transcripts</Link>
    </div>}>
-   {notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{notice}</p>}
-   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-4 text-sm">{error}</p>}
+   {mutation.pending&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">Saving records handoff...</p>}
+   {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{mutation.notice}</p>}
+   {mutation.error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-4 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
    <section className="mt-7 space-y-4">
     {items.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
       <h2 className="text-lg font-semibold">{item.studentName}</h2>
@@ -122,12 +124,12 @@ function TransferRecordsWorkspace({items}:{items:Items}){
             "I authorize CAN OS to release this exact official transcript electronically to the linked receiving-school registrar now.":
             "The exact official transcript selected above has actually been transferred through the indicated approved secure channel."}</span>
         </label>
-        <button type="button" disabled={busy!==null||!item.consentRecorded||!item.issuances.length||
+        <button type="button" disabled={busy||!item.consentRecorded||!item.issuances.length||
           (methods[item.id]!=="can_internal_school_records"&&(receipts[item.id]??"").trim().length<12)||
           !verified[item.id]||!delivered[item.id]}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           onClick={()=>void complete(item)}>
-          {busy===item.id?"Saving handoff…":methods[item.id]==="can_internal_school_records"?
+          {mutation.pending?"Saving handoff…":methods[item.id]==="can_internal_school_records"?
             "Release official transcript inside CAN":"Record verified secure records handoff"}
         </button>
       </div>}

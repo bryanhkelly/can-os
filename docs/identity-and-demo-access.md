@@ -23,9 +23,11 @@ Valor is an ordinary canonical Organization/Site tenant, not a separate workflow
 FullFlow is the authoritative connected checkout. Its `npm run dev` command
 loads its own ignored `.env.local`, preserves explicit shell overrides, checks
 the database and stable session key, and verifies the dedicated nonproduction
-FullFlow Neon branch before starting. `npm run dev -- --check` performs those
-checks without starting a server. It never provisions accounts on login or
-automatically repairs data. Netlify production configuration remains separate.
+FullFlow Neon branch before starting. An explicitly pinned `APP_ENV=test`
+admissions run instead verifies its configured nonproduction Neon branch.
+`npm run dev -- --check` performs the applicable checks without starting a
+server. Startup never provisions accounts on login or automatically repairs
+data. Netlify production configuration remains separate.
 
 The older sibling checkout has a different applicant model; it is not an
 alternate source for FullFlow identity code. FullFlow's prospective-family

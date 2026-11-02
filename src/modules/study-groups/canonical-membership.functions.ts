@@ -6,9 +6,11 @@ import { validateGroupInput } from "@/domain/study-groups";
 import { recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { emitEvent,notify,notifyMany } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray,isNull,sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { assertGroupScope,eligibleStudent } from "./canonical-membership.server";
+import { assertGroupScope,eligibleStudent,facilitatedGroup } from "./canonical-membership.server";
 
 import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
@@ -178,6 +180,126 @@ export const createFacilitatedGroup = createServerFn({ method: "POST" })
         payload: { sectionId: scope.sectionId, siteId: scope.siteId, programId: scope.programId },
       });
       return { groupId: group.id };
+    });
+  });
+
+export const listCanonicalGroupInvitees = createServerFn({ method: "GET" })
+  .validator(z.object({ groupId: uuid }).parse)
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["teacher"]);
+    setResponseHeader("Cache-Control", "private, no-store");
+    return db.transaction(async tx => {
+      const group = await facilitatedGroup(tx, actor, data.groupId);
+      if (!group.siteId) throw new AuthorizationError("group site");
+      const programEnrollment = alias(s.enrollments, "study_group_invitee_program_enrollment");
+      const sectionEnrollment = alias(s.enrollments, "study_group_invitee_section_enrollment");
+      const columns = {
+        personId: s.people.id,
+        firstName: s.people.legalFirstName,
+        lastName: s.people.legalLastName,
+      };
+      const candidates = group.sectionId
+        ? await tx.selectDistinct(columns).from(s.studentProfiles)
+          .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+          .innerJoin(programEnrollment, and(
+            eq(programEnrollment.studentProfileId, s.studentProfiles.id),
+            eq(programEnrollment.kind, "program"), eq(programEnrollment.status, "active"),
+          ))
+          .innerJoin(s.programs, and(
+            eq(s.programs.id, programEnrollment.programId),
+            eq(s.programs.siteId, group.siteId),
+          ))
+          .innerJoin(sectionEnrollment, and(
+            eq(sectionEnrollment.studentProfileId, s.studentProfiles.id),
+            eq(sectionEnrollment.sectionId, group.sectionId),
+            eq(sectionEnrollment.kind, "section"), eq(sectionEnrollment.status, "active"),
+          ))
+          .innerJoin(s.sections, and(
+            eq(s.sections.id, group.sectionId),
+            eq(s.sections.active, true),
+            eq(s.sections.siteId, group.siteId),
+            eq(s.sections.programId, programEnrollment.programId),
+          ))
+          .where(and(
+            inArray(programEnrollment.programId, actor.scope.programIds ?? []),
+            group.programId ? eq(programEnrollment.programId, group.programId) : undefined,
+          ))
+          .orderBy(asc(s.people.legalFirstName), asc(s.people.legalLastName)).limit(500)
+        : await tx.selectDistinct(columns).from(s.studentProfiles)
+          .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+          .innerJoin(programEnrollment, and(
+            eq(programEnrollment.studentProfileId, s.studentProfiles.id),
+            eq(programEnrollment.kind, "program"), eq(programEnrollment.status, "active"),
+          ))
+          .innerJoin(s.programs, and(
+            eq(s.programs.id, programEnrollment.programId),
+            eq(s.programs.siteId, group.siteId),
+          ))
+          .where(inArray(programEnrollment.programId, actor.scope.programIds ?? []))
+          .orderBy(asc(s.people.legalFirstName), asc(s.people.legalLastName)).limit(500);
+      const memberships = await tx.select({
+        personId: s.studyGroupMemberships.personId,
+        status: s.studyGroupMemberships.status,
+      }).from(s.studyGroupMemberships)
+        .where(eq(s.studyGroupMemberships.groupId, group.id));
+      const unavailable = new Set(memberships
+        .filter(member => member.status === "pending" || member.status === "approved")
+        .map(member => member.personId));
+      return candidates.filter(candidate =>
+        candidate.personId !== actor.actorPersonId && !unavailable.has(candidate.personId));
+    });
+  });
+
+export const inviteCanonicalGroupMembers = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    groupId: uuid,
+    studentPersonIds: z.array(uuid).min(1).max(30)
+      .refine(ids => new Set(ids).size === ids.length, "Choose each student only once."),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["teacher"]);
+    return db.transaction(async tx => {
+      const group = await facilitatedGroup(tx, actor, data.groupId);
+      for (const studentPersonId of data.studentPersonIds) {
+        if (studentPersonId === actor.actorPersonId)
+          throw new Error("You cannot invite yourself to a study group.");
+        await eligibleStudent(tx, studentPersonId, group, actor.scope.programIds ?? []);
+        const [membership] = await tx.select({ status: s.studyGroupMemberships.status })
+          .from(s.studyGroupMemberships)
+          .where(and(
+            eq(s.studyGroupMemberships.groupId, group.id),
+            eq(s.studyGroupMemberships.personId, studentPersonId),
+          )).limit(1);
+        if (membership?.status === "pending" || membership?.status === "approved")
+          throw new Error("A selected student already has an active membership request or membership.");
+      }
+      await notifyMany(tx, data.studentPersonIds.map(recipientPersonId => ({
+        recipientPersonId,
+        type: "study_group_invitation",
+        status: "unread" as const,
+        title: "Study group invitation",
+        body: `You were invited to ${group.title}. Request membership in Study Groups; guardian permission and facilitator approval may be required.`,
+        resourceType: "study_group",
+        resourceId: group.id,
+      })));
+      await recordAudit(tx, actor, {
+        action: "study_group.members.invite",
+        resourceType: "study_group",
+        resourceId: group.id,
+        scope: { siteId: group.siteId, programId: group.programId, sectionId: group.sectionId },
+        after: { invitedCount: data.studentPersonIds.length },
+      });
+      await emitEvent(tx, {
+        eventType: EventTypes.StudyGroupMembersInvited,
+        aggregateType: "study_group",
+        aggregateId: group.id,
+        actorPersonId: actor.actorPersonId,
+        siteId: group.siteId,
+        programId: group.programId,
+        sectionId: group.sectionId,
+        payload: { invitedCount: data.studentPersonIds.length },
+      });
+      return { invitedCount: data.studentPersonIds.length };
     });
   });
 

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Input } from "./input";
 import { Label } from "./label";
 import { Select } from "./select";
+import { Textarea } from "./textarea";
 
 const meta = { title: "Foundations/Form controls" } satisfies Meta;
 export default meta;
@@ -13,6 +14,8 @@ export const Default: Story = {
       <Select id="story-school" defaultValue="high-school"><option value="high-school">CAN High School</option></Select></div>
     <div className="space-y-2"><Label htmlFor="story-name">Student legal first name</Label>
       <Input id="story-name" placeholder="Enter a legal first name" /></div>
+    <div className="space-y-2"><Label htmlFor="story-notes">Review notes</Label>
+      <Textarea id="story-notes" placeholder="Add a concise note" /></div>
   </div>,
 };
 

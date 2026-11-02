@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { EmptyState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import { resolveOwnedSiteOperationalAction } from "@/modules/operations/action-workspace.functions";
+import { formatTimestamp } from "@/modules/calendar/timezone";
 
 type OwnedFollowUp = {
   id: string;
@@ -67,7 +68,7 @@ export function SiteOwnedActionResolution({ actions, timezone }: { actions: Owne
           <span className="font-medium">{action.title}</span>
           <span className="text-xs text-muted-foreground">
             {followUpLabels[action.type] ?? action.type.replaceAll("_", " ")}
-            {action.dueAt ? " · due " + new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: timezone }).format(new Date(action.dueAt)) : ""}
+            {action.dueAt ? " · due " + formatTimestamp(action.dueAt, timezone, { dateStyle: "medium" }) : ""}
           </span>
         </div>
         {action.description &&

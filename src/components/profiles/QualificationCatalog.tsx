@@ -1,22 +1,24 @@
 import { useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { createQualificationCatalogEntry } from "@/modules/profiles/qualification-catalog.functions";
 
 export function QualificationCatalog({ programId, canAuthor, changed }: {
   programId: string; canAuthor: boolean; changed: () => Promise<void>;
 }) {
+  const mutation = useMutationFeedback(changed);
+  const busy = mutation.pending || mutation.refreshFailed;
   const [key, setKey] = useState(""), [title, setTitle] = useState(""), [kind, setKind] = useState("");
   const [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   async function save() {
-    setBusy(true); setError(""); setNotice("");
-    try {
-      const result = await createQualificationCatalogEntry({ data: { programId, key, title, kind, reason, confirmed: true } });
-      await changed();
-      setNotice(result.created ? "Shared qualification definition added. Select it in the program policy when appropriate." :
-        "An identical definition already exists. No catalog entry or requirement was changed.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to create qualification catalog entry.");
-    } finally { setBusy(false); }
+    await mutation.run(
+      () => createQualificationCatalogEntry({ data: { programId, key, title, kind, reason, confirmed: true } }),
+      {
+        successMessage: result => result.created
+          ? "Shared qualification definition added. Select it in the program policy when appropriate."
+          : "An identical definition already exists. No catalog entry or requirement was changed.",
+        commandErrorMessage: "Unable to create qualification catalog entry.",
+      },
+    );
   }
   return <section className="mt-7 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Shared qualification catalog</h2>
@@ -50,7 +52,8 @@ export function QualificationCatalog({ programId, canAuthor, changed }: {
         {busy ? "Saving definition..." : "Add shared definition"}
       </button>
     </form>}
-    {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-3 text-sm">{notice}</p>}
+    {mutation.pending && <p role="status" className="mt-3 text-sm">Saving qualification definition...</p>}
+    {mutation.error && <p role="alert" className="mt-3 text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
+    {mutation.notice && <p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
   </section>;
 }

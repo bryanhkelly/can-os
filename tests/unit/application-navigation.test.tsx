@@ -140,6 +140,32 @@ function successful(data:unknown){state.data={ok:true,data};}
 describe("application contextual navigation",()=>{
   beforeEach(()=>{state.search={};state.data=null;});
 
+  it("keeps admissions pagination scope and stage with disabled first/last boundaries",()=>{
+    state.search={siteId:"school",programId:"program",stage:"inquiry"};
+    successful({page:1,pageSize:40,filteredTotal:81,hasMore:true});
+    let html=render(Admissions);
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry&amp;page=2"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain("Page 1 of 3");
+    successful({page:3,pageSize:40,filteredTotal:81,hasMore:false});
+    html=render(Admissions);
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry&amp;page=2"');
+    expect(html).not.toContain("page=4");
+    state.search.application="selected";
+    expect(render(Admissions)).not.toContain('aria-label="Admissions pages"');
+  });
+  it("retains the family readiness server-provided next page and hides links in detail views",()=>{
+    state.search={siteId:"school",programId:"program",page:3};
+    successful({items:[],hasMore:true,nextPage:7});
+    let html=render(Families);
+    expect(html).toContain('href="/admissions/families?siteId=school&amp;programId=program&amp;page=2"');
+    expect(html).toContain('href="/admissions/families?siteId=school&amp;programId=program&amp;page=7"');
+    state.search.application="selected";
+    html=render(Families);
+    expect(html).not.toContain("Previous families");
+    expect(html).not.toContain("Next families");
+  });
+
   it("opens the requested course and links to only that class's assignments",()=>{
     state.search={section:"english"};
     const policy={addDropEndsOn:"2030-01-01",withdrawalEndsOn:"2030-02-01",prerequisites:[],guardianApprovalRequired:false};

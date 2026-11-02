@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -71,14 +72,14 @@ export const listFieldTripOperations = createServerFn({ method: "GET" }).handler
     organizationId: s.sites.organizationId, programId: s.fieldTrips.programId,
     departsAt: s.fieldTrips.departsAt, returnsAt: s.fieldTrips.returnsAt,
     permissionDueAt: s.fieldTrips.permissionDueAt, feeAmountCents: s.fieldTrips.feeAmountCents,
-    metadata: s.fieldTrips.metadata, siteName: s.sites.name,
+    metadata: s.fieldTrips.metadata, siteName: s.sites.name, timezone: s.sites.timezone,
   }).from(s.fieldTrips).innerJoin(s.sites, eq(s.sites.id, s.fieldTrips.siteId))
     .where(inArray(s.fieldTrips.siteId, sites))
     .orderBy(asc(s.fieldTrips.departsAt)).limit(100);
   const trips = all.filter(t => actor.scope.organizationIds?.includes(t.organizationId) &&
     (!t.programId || actor.scope.programIds?.includes(t.programId)));
   const authorizedSites = await db.select({
-    id: s.sites.id, name: s.sites.name, organizationId: s.sites.organizationId,
+    id: s.sites.id, name: s.sites.name, organizationId: s.sites.organizationId, timezone: s.sites.timezone,
   }).from(s.sites).where(inArray(s.sites.id, sites));
   const allowedSites = authorizedSites.filter(site =>
     actor.scope.organizationIds?.includes(site.organizationId));
@@ -122,7 +123,7 @@ export const listFieldTripOperations = createServerFn({ method: "GET" }).handler
     sites: allowedSites, programs,
     trips: trips.map(trip => ({
       id: trip.id, title: trip.title, destination: trip.destination,
-      status: trip.status, siteId: trip.siteId, siteName: trip.siteName,
+      status: trip.status, siteId: trip.siteId, siteName: trip.siteName, timezone: trip.timezone,
       programId: trip.programId, departsAt: trip.departsAt.toISOString(),
       returnsAt: trip.returnsAt.toISOString(), deadline: trip.permissionDueAt?.toISOString() ?? null,
       feeAmountCents: trip.feeAmountCents ?? 0,
@@ -132,12 +133,12 @@ export const listFieldTripOperations = createServerFn({ method: "GET" }).handler
         .map(student => [student.studentProfileId, student] as const)).values()]
         .map(student => ({
           id: student.studentProfileId,
-          name: student.firstName + " " + student.lastName,
+          name: personLegalName({ legalFirstName: student.firstName, legalLastName: student.lastName }),
           invited: roster.some(r => r.tripId === trip.id &&
             r.studentProfileId === student.studentProfileId),
         })),
       roster: roster.filter(student => student.tripId === trip.id).map(student => ({
-        id: student.id, name: student.firstName + " " + student.lastName,
+        id: student.id, name: personLegalName({ legalFirstName: student.firstName, legalLastName: student.lastName }),
         status: student.status, feeObligationCreated: !!student.obligationId,
         departure: attendance.find(row => row.tripId === trip.id &&
           row.studentProfileId === student.studentProfileId &&

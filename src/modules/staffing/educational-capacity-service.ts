@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { personLegalName } from "@/domain/person-name";
 import {
 courseTemplates,
 courseTemplateVersions,
@@ -433,7 +434,7 @@ export async function findCapacityCandidates(
       return {
         offeringId: row.offeringId,
         personId: row.personId,
-        instructorName: `${row.firstName} ${row.lastName}`,
+        instructorName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
         capabilityId: row.capabilityId,
         modality: row.modality,
         maxSeats: row.maxSeats,

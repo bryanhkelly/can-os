@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personShortName } from "@/domain/person-name";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -107,9 +108,11 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
   const sectionIds = await activeSectionIds(s, student.studentProfileId, siteIds,context.scope.programIds??[]);
   let missingCount = 0;
   let nextDueAt: string | null = null;
+  let nextDueTimezone: string | null = null;
   const workToReview: Array<{
    assessmentId: string; sectionId: string; title: string;
-   status: string; dueAt: string | null; revisionLimitReached: boolean;
+   status: string; dueAt: string | null; timezone: string;
+   revisionLimitReached: boolean;
   }> = [];
   if (sectionIds.length) {
    const published = await db.select({
@@ -121,10 +124,13 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     availableAt: s.assessments.availableAt,
     closesAt: s.assessments.closesAt,
     dueAt: s.assessments.dueAt,
+    timezone: s.sites.timezone,
     submissionId: s.submissions.id,
     submissionStatus: s.submissions.status,
     attemptNumber: s.submissions.attemptNumber,
    }).from(s.assessments)
+    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
     .leftJoin(s.submissions, and(
      eq(s.submissions.assessmentId, s.assessments.id),
      eq(s.submissions.studentProfileId, student.studentProfileId),
@@ -166,6 +172,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
       status,
       revisionLimitReached,
       dueAt: row.dueAt?.toISOString() ?? null,
+      timezone: row.timezone,
      });
     }
     // A closed assignment does not stop being missing. Teachers continue to
@@ -177,7 +184,10 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
      missingCount += 1;
     if (!actionable || !row.dueAt) continue;
     if (row.dueAt.getTime() >= now.getTime() && incomplete) {
-     if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) nextDueAt = row.dueAt.toISOString();
+     if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) {
+      nextDueAt = row.dueAt.toISOString();
+      nextDueTimezone = row.timezone;
+     }
     }
    }
   }
@@ -206,7 +216,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
   return {
    studentPersonId: student.studentPersonId,
    studentProfileId: student.studentProfileId,
-   displayName: student.firstName ?? student.legalFirstName,
+   displayName: personShortName({ preferredName: student.firstName, legalFirstName: student.legalFirstName }),
    lastName: student.lastName,
    sectionCount: sectionIds.length,
    awaitingSections: sectionIds.length === 0,
@@ -219,6 +229,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    unexcusedAbsences,
    unexcusedTardies,
    nextDueAt,
+   nextDueTimezone,
    status: workToReview.length > 0 || missingCount > 0 || unexcusedAbsences > 0 || unexcusedTardies > 0 ?
     "needs_attention" as const : sectionIds.length === 0 ? "awaiting_courses" as const : "on_track" as const,
   };
@@ -249,13 +260,16 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const openActions = await db.select({
   id: s.actions.id,
   type: s.actions.type,
+  programId: s.actions.programId,
   subjectType: s.actions.subjectType,
   subjectId: s.actions.subjectId,
   title: s.actions.title,
   description: s.actions.description,
   priority: s.actions.priority,
   dueAt: s.actions.dueAt,
+  timezone: s.sites.timezone,
  }).from(s.actions)
+  .innerJoin(s.sites,eq(s.sites.id,s.actions.siteId))
   .where(and(
    eq(s.actions.ownerPersonId, actor),
    // Ownership alone is not authority after a family changes or leaves schools.
@@ -273,6 +287,29 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  const students = await guardianStudents(s, actor, siteIds,context.scope.programIds??[]);
  const studentPersonByProfile = new Map(students.map(row => [row.studentProfileId, row.studentPersonId]));
  const authorizedStudentIds = new Set(students.map(row => row.studentPersonId));
+ const enrollmentActionProfiles=[...new Set(openActions.filter(row=>
+  row.type==="enrollment_document"&&row.subjectType==="student_profile").map(row=>row.subjectId))];
+ const enrollmentApplications=enrollmentActionProfiles.length?await db.select({
+  applicationId:s.applications.id,studentProfileId:s.applications.studentProfileId,
+  studentPersonId:s.studentProfiles.personId,programId:s.applications.programId,
+ }).from(s.applications)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.applications.studentProfileId))
+  .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+  .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+   guardianPersonId:actor,studentPersonId:s.studentProfiles.personId,access:"enrollment",
+  }))
+  .where(and(
+   inArray(s.applications.studentProfileId,enrollmentActionProfiles),
+   inArray(s.applications.programId,context.scope.programIds??[]),
+   inArray(s.programs.siteId,siteIds),
+   notInArray(s.applications.stage,["declined","withdrawn"]),
+  ))
+  .orderBy(desc(s.applications.updatedAt)): [];
+ const enrollmentApplicationByActionScope=new Map<string,typeof enrollmentApplications[number]>();
+ for(const application of enrollmentApplications){
+  const key=`${application.studentProfileId}:${application.programId}`;
+  if(!enrollmentApplicationByActionScope.has(key))enrollmentApplicationByActionScope.set(key,application);
+ }
  // The guardian attendance workspace owns the current correction chain and
  // school excuse status. Reuse its authorized projection instead of making a
  // second decision from raw event/exception rows (which missed tardiness).
@@ -291,6 +328,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    childName:row.studentName,
    studentPersonId:row.studentPersonId,
    expectedAt:row.expectedAt,
+   timezone:row.timezone,
    attendanceStatus:row.status,
    rejected:row.excuse?.status==="rejected",
   }));
@@ -341,19 +379,26 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   studentPersonId: row.studentPersonId,
   createdAt: "",
  }));
- const actionItems = openActions.filter(row => row.type !== "study_group_consent").map(row => ({
-  id: row.id,
-  kind: "action" as const,
-  studentPersonId: row.subjectType === "student_profile"
-   ? studentPersonByProfile.get(row.subjectId) ?? null : null,
-  type: row.type,
-  title: row.title,
-  detail: row.description ?? "",
-  href: `/guardian?action=${encodeURIComponent(row.id)}`,
-  priority:row.priority,
-  dueAt:row.dueAt?.toISOString()??null,
-  createdAt: row.dueAt?.toISOString() ?? "",
- }));
+ const actionItems = openActions.filter(row => row.type !== "study_group_consent").map(row => {
+  const enrollmentApplication=row.type==="enrollment_document"
+   ? enrollmentApplicationByActionScope.get(`${row.subjectId}:${row.programId}`) : undefined;
+  return {
+   id: row.id,
+   kind: "action" as const,
+   studentPersonId: row.subjectType === "student_profile"
+    ? enrollmentApplication?.studentPersonId??studentPersonByProfile.get(row.subjectId)??null : null,
+   type: row.type,
+   title: row.title,
+   detail: row.description ?? "",
+   href: enrollmentApplication
+    ? `/guardian/admission-offers?student=${encodeURIComponent(enrollmentApplication.studentPersonId)}&application=${encodeURIComponent(enrollmentApplication.applicationId)}`
+    : `/guardian?action=${encodeURIComponent(row.id)}`,
+   priority:row.priority,
+   dueAt:row.dueAt?.toISOString()??null,
+   timezone:row.timezone,
+   createdAt: row.dueAt?.toISOString() ?? "",
+  };
+ });
  const absenceItems = excuseItems.map(row => ({
   id: row.id,
   kind: row.rejected ? "attendance_review" as const : "excuse" as const,
@@ -363,8 +408,9 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    row.attendanceStatus==="tardy" ? "Tardiness needs an excuse" : "Absence needs an excuse"}`,
   detail: row.rejected
    ? "The school's response needs review. Contact the school if this mark is incorrect."
-   : `${row.attendanceStatus==="tardy" ? "Tardiness" : "Absence"} on ${new Date(row.expectedAt).toLocaleDateString()} has no excuse yet.`,
+   : `${row.attendanceStatus==="tardy" ? "Tardiness" : "Absence"} on ${new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:row.timezone}).format(new Date(row.expectedAt))} has no excuse yet.`,
   href: `/guardian/attendance?student=${encodeURIComponent(row.studentPersonId)}&attendance=${encodeURIComponent(row.id)}`,
+  timezone: row.timezone,
   createdAt: row.expectedAt,
  }));
 

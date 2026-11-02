@@ -4,17 +4,18 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { Button } from "@/components/ui/button";
 import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { GuardianApplicationForm } from "@/components/enrollment/GuardianApplicationForm";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
 import {
   getGuardianFamilyApplicationWorkspace,
   startGuardianFamilyApplication,
 } from "@/modules/enrollment/guardian-family-applications.functions";
 
+const applicationSearchSchema=siteProgramSelectionSchema.pick({programId:true}).extend({
+ familyStart:optionalSearchString,
+ application:optionalSearchString,
+});
 export const Route = createFileRoute("/guardian/apply")({
-  validateSearch: (search: Record<string, unknown>): { programId?: string; familyStart?: string; application?: string } => ({
-    programId: typeof search.programId === "string" ? search.programId : undefined,
-    familyStart: typeof search.familyStart === "string" ? search.familyStart : undefined,
-    application: typeof search.application === "string" ? search.application : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { programId?: string; familyStart?: string; application?: string } => applicationSearchSchema.parse(search),
   loader: safeLoader(getGuardianFamilyApplicationWorkspace, {
     authMessage: "Sign in with your verified family account to apply to a school.",
   }),
@@ -87,4 +88,3 @@ function GuardianApplyWorkspace({ data }: {
     </div>
   </WorkspaceShell>;
 }
-

@@ -63,7 +63,7 @@ function GuardianAcademicsPage() {
  const summary = guardianAssignmentSummary(visible, new Date());
 
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Guardian" title="Academic progress"
-  subtitle="Review class assignments, instructions and released teacher feedback for your connected children."
+  subtitle="Review your children's class assignments, instructions and released teacher feedback."
   breadcrumbs={<><Link to="/guardian" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
   actions={<Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>}>
    {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
@@ -75,7 +75,16 @@ function GuardianAcademicsPage() {
    {(loading || loadingStudents) && <p className="mt-8 text-sm" role="status">Loading academic progress…</p>}
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
    {student&&!selected&&!loadingStudents&&!error&&<p role="alert" className="mt-8 rounded-lg border p-4 text-sm">This student is unavailable in your current family workspace. Choose an authorized student above.</p>}
-   {!loading && !loadingStudents && !error && students.length === 0 && <p className="mt-8 text-sm">No students with academic-viewing permission were found at your school.</p>}
+   {!loading && !loadingStudents && !error && students.length === 0 && <div className="mt-8 rounded-xl border bg-card p-5">
+    <p className="font-semibold">No enrolled children are showing in academics yet.</p>
+    <p className="mt-2 text-sm text-muted-foreground">
+     Your family home lists current admissions and enrollment steps by child and stage. Open your child's item there to continue a form. If your child is already enrolled but missing from academics, contact the school.
+    </p>
+    <div className="mt-4 flex flex-wrap gap-3 text-sm">
+     <Link to="/guardian" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Family home and enrollment steps</Link>
+     <Link to="/messages" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Message the school</Link>
+    </div>
+   </div>}
    {!loading && !loadingStudents && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
    {(section||assessment)&&<Link to="/guardian/academics" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
    {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5 rounded-xl border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}

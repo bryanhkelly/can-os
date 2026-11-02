@@ -22,6 +22,9 @@ const branchHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").t
 if (branchHost === process.env.CAN_APPLICATION_DB_HOST.replace(/-pooler(?=\.)/, "").toLowerCase()) {
   throw new Error("Browser tests must not use the application database endpoint.");
 }
+const devUrl = new URL(baseURL);
+const devHost = devUrl.hostname;
+const devPort = devUrl.port || "5173";
 // Even a direct "npx playwright test" invocation must attest the actual
 // nonproduction Neon project/branch before beforeAll fixtures can write.
 execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
@@ -46,7 +49,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev",
+    command: `npm run dev -- --host ${devHost} --port ${devPort} --strictPort`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 180_000,

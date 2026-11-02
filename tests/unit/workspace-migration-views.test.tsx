@@ -29,6 +29,7 @@ vi.mock("@/modules/learning/course-registration.functions", () => ({
 }));
 vi.mock("@/modules/student-experience/assignments.functions", () => ({ getAssignments: vi.fn() }));
 vi.mock("@/modules/family/family-home.functions", () => ({ getFamilyHome: vi.fn(), getGuardianNeedsYou: vi.fn() }));
+vi.mock("@/modules/enrollment/guardian-admission-offers.functions", () => ({ getGuardianAdmissionOffers: vi.fn() }));
 vi.mock("@/modules/profiles/directory.functions", () => ({ getStudent360: vi.fn() }));
 vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
   listGuardianEffectiveAbsences: vi.fn(), submitEffectiveAttendanceExcuse: vi.fn(),
@@ -40,7 +41,7 @@ vi.mock("@/components/operations/GuardianPickupPanel", () => ({ GuardianPickupPa
 
 const section = {
   id: "english", title: "English Literature", code: "ENG", subject: "English", description: "Read and discuss.",
-  credits: 1, mode: "hybrid", enrollmentId: "enrollment", enrollmentStatus: "active" as const, withdrawalNotation: null,
+  credits: 1, mode: "hybrid", timezone: "America/Los_Angeles", enrollmentId: "enrollment", enrollmentStatus: "active" as const, withdrawalNotation: null,
   policy: { capacity: 20, prerequisites: [], addDropEndsOn: "2099-01-01", withdrawalEndsOn: "2099-02-01", guardianApprovalRequired: false, meetingKey: null },
 };
 const registration = { connected: true, viewerRole: "student" as const, sections: [section], requests: [] };
@@ -141,6 +142,27 @@ describe("family and student profiles", () => {
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
     expect(html).not.toContain("student=child-profile");
   });
+  it("shows a named child and exact application stage while enrollment is in progress", () => {
+    const application: ComponentProps<typeof FamilyHomeView>["enrollmentApplications"] = [{
+      applicationId: "application-1", studentPersonId: "jordan-person", studentName: "Jordan Example",
+      program: "Synthetic High School", applicationStage: "accepted", waitlisted: false,
+      transferOriginExited: null,
+      blockers: [{ id: "consent-1", title: "Enrollment consent form", status: "awaiting_submission" }],
+      offers: [],
+    }];
+    const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={[{
+      id: "enrollment-action", kind: "action", type: "enrollment_document",
+      title: "Sign Jordan's enrollment consent form", detail: "A guardian signature is needed.",
+      href: "/guardian/admission-offers?student=jordan-person&application=application-1",
+      studentPersonId: "jordan-person", priority: "high", dueAt: null, createdAt: "",
+    }]} enrollmentApplications={application} loading={false} error=""/>);
+    expect(html).toContain("Jordan Example");
+    expect(html).toContain("Accepted · enrollment checklist");
+    expect(html).toContain("Enrollment consent form · awaiting submission");
+    expect(html).toContain('href="/guardian/admission-offers?student=jordan-person&amp;application=application-1"');
+    expect(html).toContain("Open enrollment checklist →");
+    expect(html).not.toContain("No active enrollments to show yet");
+  });
   it("filters the family home by the selected child and retains action context", () => {
     const children: ComponentProps<typeof FamilyHomeView>["children"] = [
       { studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
@@ -152,7 +174,7 @@ describe("family and student profiles", () => {
     ];
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""
       student="child-person" action="consent-1"/>);
-    expect(html).toContain("Showing Jordan’s school information.");
+    expect(html).toContain("Showing Jordan’s family information.");
     expect(html).toContain('href="/guardian?action=consent-1"');
     expect(html).toContain('href="/guardian/academics?student=child-person"');
     expect(html).not.toContain("Casey Sample");

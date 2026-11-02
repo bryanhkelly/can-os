@@ -107,7 +107,7 @@ test("GF2: verified family handoff through separate student learning, feedback a
     await registrar.page.getByLabel("Independent student identity check").selectOption("institutional_school_record");
     await registrar.page.getByLabel("I independently checked the student's identity", { exact: false }).check();
     await registrar.page.getByRole("button", { name: "Approve verified student account and send sign-in link", exact: true }).click();
-    await expect(registrar.page.getByText("Student access approved.", { exact: false })).toBeVisible();
+    await expect(registrar.page.getByText("Student access approval is saved.", { exact: false })).toBeVisible();
 
     const studentGrants = await sql.query(
       `select id, person_id, role, active from account_person_grants
@@ -142,7 +142,7 @@ test("GF2: verified family handoff through separate student learning, feedback a
       await expect(studentPage.getByText("E2E Logic II", { exact: true }).first()).toBeVisible();
       await expectProtectedPageDenied(studentPage, `/admissions?${selected}`, {
         denial: studentPage.getByRole("alert"),
-        message: "registrar",
+        message: "You do not have permission to view this page.",
         protectedContent: ["Registrar: Issue offer"],
       });
 
@@ -184,7 +184,7 @@ test("GF2: verified family handoff through separate student learning, feedback a
 
       const guardianAcademics = `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${assessmentId}`;
       await guardian.page.goto(guardianAcademics);
-      await expect(guardian.page.getByText("Grade: 9 / 10", { exact: true })).toBeVisible();
+      await expect(guardian.page.getByText(/^Grade: 9(?:\.0{1,2})? \/ 10(?:\.0{1,2})?$/)).toBeVisible();
       await expectVisibleAfterReload(guardian.page, guardian.page.getByText(`Teacher feedback: ${firstFeedback}`, { exact: true }));
 
       await teacher.page.goto(teacherAssessment);
@@ -201,7 +201,7 @@ test("GF2: verified family handoff through separate student learning, feedback a
       await expect(teacher.page.getByText("Grade posted.", { exact: true })).toBeVisible();
       await expectVisibleAfterReload(studentPage, studentPage.getByText(revisedFeedback, { exact: true }));
       await guardian.page.reload();
-      await expect(guardian.page.getByText("Grade: 10 / 10", { exact: true })).toBeVisible();
+      await expect(guardian.page.getByText(/^Grade: 10(?:\.0{1,2})? \/ 10(?:\.0{1,2})?$/)).toBeVisible();
       await expect(guardian.page.getByText(`Teacher feedback: ${revisedFeedback}`, { exact: true })).toBeVisible();
 
       // Withdrawal is a student request plus registrar decision through the

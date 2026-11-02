@@ -4,10 +4,12 @@ import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-rea
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { listGuardianGradeFollowUps } from "@/modules/learning/guardian-grade-response.functions";
 import { listGuardianCourseApprovals } from "@/modules/learning/guardian-course-approval.functions";
+import { getGuardianAdmissionOffers } from "@/modules/enrollment/guardian-admission-offers.functions";
 import { WorkspaceShell, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
 import { prioritizeFamilyNeeds } from "@/domain/family-needs";
 import { buildGuardianAttention } from "@/domain/daily-operations";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
+import { dateTimeInputInTimezone } from "@/modules/calendar/timezone";
 
 export const Route = createFileRoute("/guardian/")({
  validateSearch:(search:Record<string,unknown>):{action?:string;student?:string}=>({
@@ -21,6 +23,7 @@ type Child = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 type NeedItem = Awaited<ReturnType<typeof getGuardianNeedsYou>>["items"][number];
 type GradeFollowUp = Awaited<ReturnType<typeof listGuardianGradeFollowUps>>["items"][number];
 type CourseApproval = Awaited<ReturnType<typeof listGuardianCourseApprovals>>[number];
+type EnrollmentApplication = Awaited<ReturnType<typeof getGuardianAdmissionOffers>>[number];
 
 function FamilyHomePage() {
  const {action,student}=Route.useSearch();
@@ -33,6 +36,8 @@ function FamilyHomePage() {
  const [gradeFollowUpsWarning, setGradeFollowUpsWarning] = useState("");
  const [courseApprovals, setCourseApprovals] = useState<CourseApproval[]>([]);
  const [courseApprovalsWarning, setCourseApprovalsWarning] = useState("");
+ const [enrollmentApplications, setEnrollmentApplications] = useState<EnrollmentApplication[]>([]);
+ const [enrollmentWarning, setEnrollmentWarning] = useState("");
 
  useEffect(() => {
   let active = true;
@@ -46,7 +51,10 @@ function FamilyHomePage() {
   ), listGuardianCourseApprovals().then(
    items => ({items,unavailable:false}),
    () => ({items:[] as CourseApproval[],unavailable:true}),
-  )]).then(([home, needsYou, schoolQuestions, classApprovals]) => {
+  ), getGuardianAdmissionOffers().then(
+   items => ({items,unavailable:false}),
+   () => ({items:[] as EnrollmentApplication[],unavailable:true}),
+  )]).then(([home, needsYou, schoolQuestions, classApprovals, enrollment]) => {
    if (!active) return;
    setChildren(home.children);
    setNeeds(needsYou.items);
@@ -60,6 +68,10 @@ function FamilyHomePage() {
    setGradeFollowUpsWarning(schoolQuestions.unavailable ? "School question status is temporarily unavailable. Open academics to review your child's feedback." : "");
    setCourseApprovals(classApprovals.items.filter(item=>!item.myDecision));
    setCourseApprovalsWarning(classApprovals.unavailable ? "Course approval status is unavailable. Open course approvals to check student requests." : "");
+   setEnrollmentApplications(enrollment.items);
+   setEnrollmentWarning(enrollment.unavailable
+    ? "Enrollment status is temporarily unavailable. Open applications and enrollment offers to review current steps."
+    : "");
    setLoading(false);
   }).catch(() => {
    if (active) { setError("Sign in with an authorized guardian account to view your family home."); setLoading(false); }
@@ -69,24 +81,31 @@ function FamilyHomePage() {
 
  return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} needsWarning={needsWarning}
   gradeFollowUps={gradeFollowUps} gradeFollowUpsWarning={gradeFollowUpsWarning}
-  courseApprovals={courseApprovals} courseApprovalsWarning={courseApprovalsWarning} action={action} student={student}/>;
+   courseApprovals={courseApprovals} courseApprovalsWarning={courseApprovalsWarning}
+   enrollmentApplications={enrollmentApplications} enrollmentWarning={enrollmentWarning}
+   action={action} student={student}/>;
 }
 
 export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeFollowUps=[],gradeFollowUpsWarning,
- courseApprovals=[],courseApprovalsWarning,action,student}:{
+  courseApprovals=[],courseApprovalsWarning,enrollmentApplications=[],enrollmentWarning,action,student}:{
  children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;
  gradeFollowUps?:GradeFollowUp[];gradeFollowUpsWarning?:string;
- courseApprovals?:CourseApproval[];courseApprovalsWarning?:string;action?:string;student?:string;
+ courseApprovals?:CourseApproval[];courseApprovalsWarning?:string;
+ enrollmentApplications?:EnrollmentApplication[];enrollmentWarning?:string;action?:string;student?:string;
 }){
  const selectedChild=children.find(child=>child.studentPersonId===student);
- const visibleChildren=selectedChild?[selectedChild]:children;
+ const selectedEnrollment=enrollmentApplications.find(app=>app.studentPersonId===student);
+ const visibleChildren=student?(selectedChild?[selectedChild]:[]):children;
+ const visibleEnrollmentApplications=enrollmentApplications.filter(app=>
+  !children.some(child=>child.studentPersonId===app.studentPersonId)&&
+  (!student||app.studentPersonId===student)&&
+  app.applicationStage!=="declined"&&app.applicationStage!=="withdrawn");
+ const childCount=new Set([...visibleChildren.map(child=>child.studentPersonId),
+  ...visibleEnrollmentApplications.map(app=>app.studentPersonId)]).size;
  // Site-wide notices remain visible; child-specific tasks follow the picker.
- const visibleNeeds=needs.filter(item=>!selectedChild||!item.studentPersonId||
-  item.studentPersonId===selectedChild.studentPersonId);
- const visibleQuestions=gradeFollowUps.filter(question=>!selectedChild||
-  question.studentPersonId===selectedChild.studentPersonId);
- const visibleApprovals=courseApprovals.filter(item=>!selectedChild||
-  item.studentPersonId===selectedChild.studentPersonId);
+ const visibleNeeds=needs.filter(item=>!student||!item.studentPersonId||item.studentPersonId===student);
+ const visibleQuestions=gradeFollowUps.filter(question=>!student||question.studentPersonId===student);
+ const visibleApprovals=courseApprovals.filter(item=>!student||item.studentPersonId===student);
  const approvalNeeds=visibleApprovals.map(item=>({
   id:item.id,
   kind:"course_approval",
@@ -94,7 +113,8 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   title:item.studentName+": approve class addition",
   detail:item.sectionTitle+" · reply before registration closes.",
   href:"/guardian/course-approvals?action="+encodeURIComponent(item.id),
-  dueAt:item.deadline+"T23:59:59",
+  dueAt:dateTimeInputInTimezone(item.deadline+"T23:59",item.timezone),
+  timezone:item.timezone,
   priority:"high",
  }));
  const schoolworkItems=visibleChildren.flatMap(child=>child.workToReview.map(work=>({
@@ -108,6 +128,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   href:"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)+
    "&section="+encodeURIComponent(work.sectionId)+"&assessment="+encodeURIComponent(work.assessmentId),
   dueAt:work.dueAt,
+  timezone:work.timezone,
   priority:work.status==="returned"?"high":"normal",
  })));
  const prioritized=prioritizeFamilyNeeds([...visibleNeeds,...approvalNeeds,...schoolworkItems],Date.now());
@@ -116,10 +137,10 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   width="wide"
   eyebrow="CAN OS · Family"
   title="Family home"
-  subtitle="Everything that needs your attention across your children, in one place."
+  subtitle="Your children, enrollment steps, and school follow-ups in one place."
   actions={<div className="flex flex-wrap gap-2">
    <Link to="/guardian/apply" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
-    Apply to school
+    Start a new school application
    </Link>
    <Link to="/guardian/enrichment" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
     Summer &amp; enrichment
@@ -148,7 +169,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Show</span><Link to="/guardian" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/guardian" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-    <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
+    <StatCard label={student?"Selected child":"Your children"} value={childCount}/>
     <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":visibleNeeds.length+visibleApprovals.length+schoolworkCount}/>
     <StatCard label="Overdue unfinished work" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
@@ -189,18 +210,39 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
 
    <section aria-label="Your children" className="mt-12">
     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your children</h2>
-    {selectedChild&&<p className="mt-2 text-sm text-muted-foreground">Showing {selectedChild.displayName}’s school information. <Link to="/guardian" search={{action,student:undefined}} className="inline-flex min-h-11 items-center font-semibold underline focus-visible:outline-2">Show all children</Link></p>}
-    {children.length === 0 && <div className="mt-4 rounded-xl border bg-card p-5">
-     <p className="font-semibold">Waiting for your first child to be enrolled?</p>
-     <p className="mt-2 text-sm text-muted-foreground">Your school must connect a verified guardian relationship before your child appears here. You can review any pending admission offer or enrollment checklist without an active class assignment.</p>
+    {student&&(selectedChild||selectedEnrollment)&&<p className="mt-2 text-sm text-muted-foreground">Showing {selectedChild?.displayName??selectedEnrollment?.studentName}’s family information. <Link to="/guardian" search={{action,student:undefined}} className="inline-flex min-h-11 items-center font-semibold underline focus-visible:outline-2">Show all children</Link></p>}
+    {children.length === 0 && visibleEnrollmentApplications.length===0 && <div className="mt-4 rounded-xl border bg-card p-5">
+     <p className="font-semibold">No active enrollments to show yet</p>
+     <p className="mt-2 text-sm text-muted-foreground">Children with an application or enrollment step in progress appear below by name and school stage. Once enrollment is active, their school information appears here.</p>
      <Link to="/guardian/admission-offers" search={{student:undefined}}
        className="mt-3 inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
        View applications and enrollment offers →
      </Link>
-     <p className="mt-2 text-xs text-muted-foreground">If your verified family account has been invited to an eligible school, you can submit a new application. Otherwise, contact admissions to connect your family membership. Signing in alone does not authorize student access.</p>
-     <Link to="/guardian/apply" className="mt-3 inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
-       Start or check my application →
-     </Link>
+    </div>}
+    {enrollmentWarning&&<p role="status" className="mt-4 rounded-xl border p-4 text-sm">{enrollmentWarning}</p>}
+    {visibleEnrollmentApplications.length>0&&<div className="mt-6 space-y-3" aria-label="Admissions and enrollment in progress">
+     <h3 className="font-serif text-xl font-semibold">Admissions &amp; enrollment in progress</h3>
+     {visibleEnrollmentApplications.map(app=>{
+      const activeOffer=app.offers.find(offer=>offer.enrollmentActive);
+      const issuedOffer=app.offers.find(offer=>offer.status==="issued");
+      const stage=app.waitlisted?"Waitlisted":activeOffer?"Enrollment active":
+       issuedOffer?"Offer issued":app.applicationStage==="accepted"?"Accepted · enrollment checklist":
+       `Admissions · ${app.applicationStage.replaceAll("_"," ")}`;
+      return <article key={app.applicationId} className="rounded-xl border bg-card p-4">
+       <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h3 className="font-semibold">{app.studentName}</h3><p className="mt-1 text-sm text-muted-foreground">{app.program}</p></div>
+        <StatusBadge tone={app.waitlisted?"attention":activeOffer?"success":issuedOffer?"info":"neutral"}>{stage}</StatusBadge>
+       </div>
+       {app.blockers.length>0&&<ul className="mt-3 space-y-1 text-sm">
+        {app.blockers.map(requirement=><li key={requirement.id}>{requirement.title} · {requirement.status.replaceAll("_"," ")}</li>)}
+       </ul>}
+       {activeOffer?.progress.message&&<p className="mt-3 text-sm text-muted-foreground">{activeOffer.progress.message}</p>}
+       <Link to="/guardian/admission-offers" search={{student:app.studentPersonId,application:app.applicationId}}
+        className="mt-3 inline-flex min-h-11 items-center font-semibold underline focus-visible:outline-2">
+        Open {app.studentName.split(" ")[0]}'s admissions and enrollment →
+       </Link>
+      </article>;
+     })}
     </div>}
     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
      {visibleChildren.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
@@ -220,7 +262,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Overdue</Link></dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Absences</Link></dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Tardies</Link></dt><dd className="text-lg font-semibold">{child.unexcusedTardies}</dd></div>
-       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Intl.DateTimeFormat("en-US",{dateStyle:"medium",...(child.nextDueTimezone?{timeZone:child.nextDueTimezone}:{})}).format(new Date(child.nextDueAt)) : "—"}</dd></div>
       </dl>
       <p className="mt-4 text-sm text-muted-foreground">{child.missingCount>0?`${child.missingCount} overdue assignment(s) need follow-through.`:child.workNeedsAttentionCount>0?`${child.workNeedsAttentionCount} assignment(s) to complete or revise.`:child.unexcusedAbsences>0||child.unexcusedTardies>0?"Unexcused attendance marks remain. Check Attendance for the school's review status.":child.awaitingSections?"Your school is arranging class placement.":"No overdue unfinished work or unexcused attendance cases in this summary."}</p>
       {child.workToReview.length>0&&<div className="mt-4 rounded-lg border p-3">

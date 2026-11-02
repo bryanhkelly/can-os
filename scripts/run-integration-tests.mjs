@@ -11,6 +11,8 @@ function fail(message) {
 }
 
 const { testUrl } = assertIsolatedTestDatabaseTarget({ env: process.env, fail });
+const applicationDatabaseHost = process.env.CAN_APPLICATION_DB_HOST ??
+  (process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : undefined);
 const mode = process.argv[2];
 if (mode === "demo-registrar") {
   if (!process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL) {
@@ -33,7 +35,12 @@ if (process.argv.includes("--preflight")) {
 // that the target is the approved isolated CI database.
 if (mode === "admissions-offers") {
   const branchCheck = spawnSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
-    stdio: "inherit", env: process.env,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      APP_ENV: "test",
+      CAN_APPLICATION_DB_HOST: applicationDatabaseHost,
+    },
   });
   if (branchCheck.error) throw branchCheck.error;
   if (branchCheck.status !== 0) fail("Admissions Neon branch identity check failed.");
@@ -50,7 +57,12 @@ if (mode !== "admissions-offers" && mode !== "full-flow" && mode !== "journey-c"
   }
   const branchCheck = spawnSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
     stdio: "inherit",
-    env: { ...process.env, CAN_ADMISSIONS_TEST_BRANCH_ID: expectedBranchId },
+    env: {
+      ...process.env,
+      APP_ENV: "test",
+      CAN_APPLICATION_DB_HOST: applicationDatabaseHost,
+      CAN_ADMISSIONS_TEST_BRANCH_ID: expectedBranchId,
+    },
   });
   if (branchCheck.error) throw branchCheck.error;
   if (branchCheck.status !== 0) fail("Integration Neon project/branch identity check failed.");

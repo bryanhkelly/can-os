@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPrivateUploadTask, photoUploadPolicy } from "@/platform/storage/private-upload";
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { z } from "zod";
 import { getPersonProfile, beginProfilePhotoUpload, finishProfilePhotoUpload } from "@/modules/profiles/person-profile.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
@@ -23,19 +25,24 @@ function ProfilePage(){
 export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPersonProfile>>}){
   const [file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const [revision,setRevision]=useState(0);
+  const pending = useRef<{file: File; task: {run: () => Promise<unknown>}} | null>(null);
+  const saving = useRef(false);
   async function save(){
-    if(!file)return;
+    if(!file||saving.current)return;
+    saving.current=true;
     setBusy(true);setError("");setNotice("");
     try{
-      if(file.type!=="image/jpeg"&&file.type!=="image/png")throw new Error("Choose a JPEG or PNG photo.");
       const data={fileName:file.name,mimeType:file.type,size:file.size};
-      const upload=await beginProfilePhotoUpload({data});
-      const response=await fetch(upload.uploadUrl,{method:"PUT",body:file,headers:{"Content-Type":file.type}});
-      if(!response.ok)throw new Error("Photo upload failed. Your existing photo was not changed.");
-      await finishProfilePhotoUpload({data:{...data,key:upload.key}});
+      if(pending.current?.file!==file)pending.current={file,task:createPrivateUploadTask({
+        file,policy:photoUploadPolicy,
+        begin:()=>beginProfilePhotoUpload({data}),
+        finish:upload=>finishProfilePhotoUpload({data:{...data,key:upload.key}}),
+      })};
+      await pending.current.task.run();
+      pending.current=null;
       setRevision(value=>value+1);setFile(null);setNotice("Profile photo saved.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to save profile photo.");}
-    finally{setBusy(false);}
+    }catch(cause){setError(mutationErrorMessage(cause,"Unable to save profile photo. Retry to finish an uploaded photo without uploading again."));}
+    finally{saving.current=false;setBusy(false);}
   }
   return <WorkspaceShell eyebrow="CAN OS · People" title={profile.name} subtitle={profile.kind} width="standard"
     actions={<ProfilePhoto personId={profile.personId} name={profile.name} revision={revision}/>}>

@@ -66,6 +66,17 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain("School &amp; community");
   });
 
+  it("surfaces the guardian verification prerequisite on Student Today", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [], coursework: [], events: [], openActions: [], recoveryCandidates: [],
+      hasEnrollmentGuardian: false,
+    }} />);
+    expect(html).toContain("Your student record does not have a verified guardian with enrollment permission.");
+    expect(html).toContain("you cannot add or verify a guardian from this student account.");
+  });
+
   it("distinguishes coursework states and keeps keyboard focus visible", () => {
     const html = renderToStaticMarkup(<StudentExperience liveData={{
       student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
@@ -82,6 +93,25 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain("Revision requested");
     expect(html).toContain("focus-visible:outline-2");
     expect(html).toContain("No scheduled events today.");
+  });
+
+  it("uses the class Site timezone for due times and labels cancelled schedule items", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date("2030-01-01T12:00:00Z"), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [{ sectionId: "pacific", sectionTitle: "English", siteId: "site",
+        timezone: "America/Los_Angeles", programId: "program", schoolYearId: "year" }],
+      coursework: [{ assessmentId: "essay", assessmentTitle: "English essay", status: "assigned",
+        timeliness: "on_time", dueAt: new Date("2030-01-01T08:00:00Z"), instructions: null,
+        sectionId: "pacific" }],
+      events: [{ id: "cancelled-event", title: "Cancelled assembly", description: null, type: "assembly",
+        startsAt: new Date("2030-01-01T08:00:00Z"), endsAt: null, timezone: "America/Los_Angeles",
+        siteId: "site", sectionId: null, sourceType: null, cancelled: true }],
+      openActions: [], recoveryCandidates: [],
+    }} />);
+    expect(html).toContain("Due Jan 1, 2030, 12:00 AM");
+    expect(html).toMatch(/Cancelled assembly[\s\S]*>Cancelled<\/span>/);
+    expect(html).toContain("America/Los_Angeles");
   });
 
   it("shows student-owned support tasks exactly once in Student Today without staff case data", () => {

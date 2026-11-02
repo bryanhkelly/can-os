@@ -1,4 +1,5 @@
 import { and, eq, inArray, or } from "drizzle-orm";
+import { personDisplayName } from "@/domain/person-name";
 import { alias } from "drizzle-orm/pg-core";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -45,6 +46,7 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
   const query = transaction ?? db;
   const [section] = await query.select({
     id: s.sections.id, title: s.sections.title, code: s.sections.code, siteId: s.sections.siteId,
+    timezone: s.sites.timezone,
     programId: s.sections.programId, schoolYearId: s.terms.schoolYearId,
     versionId: s.sections.courseTemplateVersionId,
     curriculum: s.courseTemplateVersions.curriculum, contentStatus: s.courseTemplateVersions.status,
@@ -53,6 +55,7 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
     .innerJoin(s.courseTemplateVersions, eq(s.courseTemplateVersions.id, s.sections.courseTemplateVersionId))
     .innerJoin(s.courseTemplates, eq(s.courseTemplates.id, s.courseTemplateVersions.courseTemplateId))
     .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
+    .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
     .where(and(eq(s.sections.id, sectionId), eq(s.sections.active, true))).limit(1);
   if (!section) throw new AuthorizationError("active class");
   // An independent CAN teacher receives ONLY this Section, never the
@@ -219,6 +222,6 @@ export async function accessibleClasses(actor: Actor) {
     : await query.where(and(studentScope, eq(s.studentProfiles.personId, actor.actorPersonId))).orderBy(s.sections.title);
   return [...new Map(rows.map(row => [`${row.id}:${row.studentPersonId}`, {
     id: row.id, title: row.title, code: row.code, studentPersonId: row.studentPersonId,
-    studentName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
+    studentName: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
   }])).values()];
 }

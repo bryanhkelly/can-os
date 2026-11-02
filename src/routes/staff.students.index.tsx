@@ -1,43 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { searchStudents } from "@/modules/profiles/directory.functions";
 import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
+import { useDebouncedDirectorySearch } from "@/lib/use-debounced-directory-search";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 export const Route = createFileRoute("/staff/students/")({ component: StaffStudentsPage });
 
-type StudentRow = Awaited<ReturnType<typeof searchStudents>>["students"][number];
+const findStudents = async (query?: string) => (await searchStudents({ data: { query } })).students;
 
 function StaffStudentsPage() {
   const [query, setQuery] = useState("");
-  const [students, setStudents] = useState<StudentRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    const handle = setTimeout(() => {
-      searchStudents({ data: { query: query.trim() || undefined } })
-        .then((result) => {
-          if (active) {
-            setStudents(result.students);
-            setError("");
-            setLoading(false);
-          }
-        })
-        .catch(() => {
-          if (active) {
-            setStudents([]);
-            setError("Sign in with an authorized staff account.");
-            setLoading(false);
-          }
-        });
-    }, 250);
-    return () => {
-      active = false;
-      clearTimeout(handle);
-    };
-  }, [query]);
+  const { rows: students, loading, error, retry } = useDebouncedDirectorySearch(
+    query, findStudents, "Student search is unavailable. Try again.",
+  );
 
   return (
     <WorkspaceShell eyebrow="CAN OS · Staff" title="Student directory"
@@ -52,33 +28,33 @@ function StaffStudentsPage() {
             placeholder="First or last name"
           />
         </label>
-        <QueryState loading={loading && "Loading students…"} error={error} isEmpty={students.length === 0}
+        <QueryState loading={loading && "Loading students…"} error={error} onRetry={retry} isEmpty={students.length === 0}
           empty={<EmptyState className="mt-8" title="No students matched your search at your school sites." />}>
-          <div className="mt-8 overflow-x-auto rounded-xl border bg-card">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-5 py-3 font-semibold">Student</th>
-                  <th className="px-5 py-3 font-semibold">Grade</th>
-                  <th className="px-5 py-3 font-semibold">Active sections</th>
-                  <th className="px-5 py-3 font-semibold">Missing work</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="mt-8 rounded-xl border bg-card">
+            <Table aria-label="Student directory" className="text-left">
+              <TableHeader>
+                <TableRow className="text-xs uppercase tracking-wider text-muted-foreground">
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Student</TableHead>
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Grade</TableHead>
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Active sections</TableHead>
+                  <TableHead scope="col" className="px-5 py-3 font-semibold">Missing work</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {students.map((student) => (
-                  <tr key={student.personId} className="border-b last:border-0">
-                    <td className="px-5 py-3">
+                  <TableRow key={student.personId}>
+                    <TableCell className="px-5 py-3">
                       <Link className="font-semibold underline" to="/staff/students/$personId" params={{personId:student.personId}}>
                         {student.name}
                       </Link>
-                    </td>
-                    <td className="px-5 py-3">{student.gradeLevel ?? "—"}</td>
-                    <td className="px-5 py-3">{student.activeSectionCount}</td>
-                    <td className="px-5 py-3">{student.openMissingWorkCount}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="px-5 py-3">{student.gradeLevel ?? "—"}</TableCell>
+                    <TableCell className="px-5 py-3">{student.activeSectionCount}</TableCell>
+                    <TableCell className="px-5 py-3">{student.openMissingWorkCount}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </QueryState>
     </WorkspaceShell>

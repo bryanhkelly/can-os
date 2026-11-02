@@ -1,4 +1,5 @@
 import { readCurriculumDeliveryAccess, requireCurriculumDeliveryAccess } from "./curriculum-delivery-access.server";
+import { personDisplayName } from "@/domain/person-name";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -162,13 +163,14 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     return {
       lessonCompletionCounts,
       role: actor.role, section: { id: section.id, programId: section.programId, title: section.title, code: section.code, description: section.description,
+        timezone: section.timezone,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
       studentPersonId, content, teacherGuides, curriculumAccess, supplements:allSupplements,
       assessmentEvidence, assessmentEvidenceSummary:summarizeClassAssessmentEvidence(assessmentEvidence),
-      teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
+      teachers: teachers.map(row => ({ personId: row.personId, name: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }) })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),
       roster: [...new Map(roster.map(row => [row.profileId, {
-        profileId: row.profileId, personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}`,
+        profileId: row.profileId, personId: row.personId, name: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
         completedLessons: rosterProgress.filter(progress => progress.profileId === row.profileId && lessonIds.has(progress.lessonId)).length,
       }])).values()],
       announcements: announcements.map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt.toISOString(),

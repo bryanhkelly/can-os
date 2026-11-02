@@ -1,4 +1,5 @@
 import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
+import { personDisplayName } from "@/domain/person-name";
 import { db } from "@/db/client";
 import {
   accessAccounts,
@@ -1172,7 +1173,7 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
       },
       concern,
       student: student ? {
-        name: student.preferredName ?? `${student.legalFirstName} ${student.legalLastName}`,
+        name: personDisplayName(student),
       } : null,
       evidence,
       externalReports,

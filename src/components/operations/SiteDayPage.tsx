@@ -2,10 +2,14 @@ import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPrep
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
 import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { addCalendarDays, formatDateOnly } from "@/modules/calendar/timezone";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   getOnsiteStaffDayContext, getSiteDayOpeningStatuses, listExpectedOnsiteRoster,
   markExpectedOnsiteAttendance,
@@ -108,7 +112,7 @@ export function SiteDayPage() {
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Onsite school" title={context?.siteName ?? "Site Today"}
     subtitle="Supervise the scheduled school day and record staff-observed attendance. Learning activity is not physical presence.">
     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-      <span>{date || "Loading school date"}</span>
+      <span>{date ? formatDateOnly(date) : "Loading school date"}</span>
       {context && <span>{context.timeZone}</span>}
       <span>Attendance does not authorize student release.</span>
     </div>
@@ -138,28 +142,36 @@ export function SiteDayPage() {
         </ul>
       </section>}
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
-    {context&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap gap-3">
-      <button type="button" aria-pressed={!preparing} className="rounded border px-3 py-2 text-sm font-semibold"
-        onClick={()=>{setPreparing(false);setDate(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</button>
-      {context.canPrepareSchoolDays&&<button type="button" aria-pressed={preparing} className="rounded border px-3 py-2 text-sm font-semibold"
-        onClick={()=>{const day=new Date(context.date+"T12:00:00Z");day.setUTCDate(day.getUTCDate()+1);
-          const target=day.toISOString().slice(0,10);setPreparing(true);setDate(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</button>}
-      {!preparing&&<><a href="#attendance" className="px-2 py-2 text-sm underline">Record attendance</a>
-        <a href="#supervision" className="px-2 py-2 text-sm underline">Staff duties and arrival</a>
-        <a href="#pickup" className="px-2 py-2 text-sm underline">Student pickup</a>
-        <a href="#day-review" className="px-2 py-2 text-sm underline">Reconcile the day</a></>}
+    {context&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap items-center gap-3">
+      <Button variant={!preparing ? "secondary" : "outline"} aria-pressed={!preparing}
+        onClick={()=>{setPreparing(false);setDate(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</Button>
+      {context.canPrepareSchoolDays&&<Button variant={preparing ? "secondary" : "outline"} aria-pressed={preparing}
+        onClick={()=>{const target=addCalendarDays(context.date,1);
+          setPreparing(true);setDate(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</Button>}
+      {!preparing&&<><Button asChild variant="ghost" size="sm" className="underline">
+          <a href="#attendance">Record attendance</a>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="underline">
+          <a href="#supervision">Staff duties and arrival</a>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="underline">
+          <a href="#pickup">Student pickup</a>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="underline">
+          <a href="#day-review">Reconcile the day</a>
+        </Button></>}
     </nav>}
     {preparing&&<p role="status" className="mt-4 rounded border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
-    {context && <label className="mt-6 block max-w-sm text-sm font-semibold">
+    {context && <Label className="mt-6 block max-w-sm">
       {preparing?"School-local preparation date":"School-local attendance date"}
-      <input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
-        className="mt-2 w-full rounded border bg-background p-3"
+      <Input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
+        className="mt-2"
         onChange={event => {
           setDate(event.target.value); setNotice(""); setNotes({});
           if (event.target.value) void load(event.target.value,preparing);
         }} />
       <span className="mt-1 block text-xs text-muted-foreground">{context.timeZone}</span>
-    </label>}
+    </Label>}
     {notice && <p role="status" className="mt-4 rounded border p-3 text-sm">{notice}</p>}
     {error && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
     {loading && !error && <p role="status" className="mt-5 text-sm">Loading scheduled roster…</p>}
@@ -213,18 +225,19 @@ export function SiteDayPage() {
                 className="mt-1 w-full rounded border p-2 text-sm"/>
             </label>}
             <div className="mt-4 flex flex-wrap gap-2">
-              {marks.map(status => <button key={status} type="button"
+              {marks.map(status => <Button key={status} type="button" size="sm"
+                variant={student.status===status ? "secondary" : "outline"}
                 disabled={!!busy || !date || date > (context?.date ?? "")}
-                className="rounded border px-3 py-2 text-xs font-semibold capitalize disabled:opacity-50"
+                className="capitalize"
                 onClick={() => void mark(student, status)}>
                 Record {status}
-              </button>)}
+              </Button>)}
             </div>
           </section>;
         })}
       </div>
-      <button type="button" onClick={() => void load(date)}
-        className="mt-6 text-sm underline">Refresh school roster</button>
+      <Button type="button" variant="ghost" size="sm" onClick={() => void load(date)}
+        className="mt-6 underline">Refresh school roster</Button>
     </>}
     {roster && !preparing && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
     {roster && !preparing && <div id="day-review"><OnsiteDayReconciliationPanel date={date} roster={roster} refreshRevision={schoolDayRevision} /></div>}

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { personLegalName } from "@/domain/person-name";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -103,7 +104,7 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         resolutionNote: row.resolutionNote,
         sectionId: row.sectionId, sectionTitle: row.sectionTitle,
         studentProfileId: row.studentProfileId, studentPersonId: row.studentPersonId,
-        studentName: `${row.firstName} ${row.lastName}`,
+        studentName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
         studentGoal: (() => {
           const goal = goalByParent.get(row.id);
           return goal && goal.ownerPersonId === row.studentPersonId &&

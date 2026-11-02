@@ -7,10 +7,15 @@ export interface ClassAnnouncement {
   createdAt: string | Date;
 }
 
-export function ClassAnnouncementFeed({ announcements }: { announcements: readonly ClassAnnouncement[] }) {
+export function ClassAnnouncementFeed({ announcements, timezone }: {
+  announcements: readonly ClassAnnouncement[];
+  timezone: string;
+}) {
   return <>
     {announcements.slice().reverse().map(item =>
-      <WorkspacePanel key={item.id} title={item.title} description={new Date(item.createdAt).toLocaleString()}>
+      <WorkspacePanel key={item.id} title={item.title} description={new Intl.DateTimeFormat("en-US",{
+        dateStyle:"medium",timeStyle:"short",timeZone:timezone,
+      }).format(new Date(item.createdAt))}>
         <p className="whitespace-pre-wrap text-sm leading-7">{item.body}</p>
       </WorkspacePanel>)}
     {!announcements.length &&

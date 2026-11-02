@@ -1,14 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { dateTimeInputValue, formatTimestamp } from "@/modules/calendar/timezone";
+import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import { WorkspaceShell } from "@/components/workspace";
+import {groupSessionSelectionSchema} from "@/lib/route-search";
 import { getCanonicalGroupWorkspace } from "@/modules/study-groups/canonical-workspace.functions";
 import {
   createCanonicalGroupPost, reportCanonicalGroupPost, resolveCanonicalGroupReport,
 } from "@/modules/study-groups/canonical-moderation.functions";
 import {
-  createFacilitatedGroup, requestCanonicalGroupMembership,
+  createFacilitatedGroup, inviteCanonicalGroupMembers, listCanonicalGroupInvitees,
+  requestCanonicalGroupMembership,
   decideCanonicalGroupMembership, leaveCanonicalGroup,
 } from "@/modules/study-groups/canonical-membership.functions";
 import {
@@ -16,10 +21,9 @@ import {
   recordCanonicalGroupAttendance,
 } from "@/modules/study-groups/canonical-sessions.functions";
 
+const groupSearchSchema=groupSessionSelectionSchema.pick({group:true});
 export const Route = createFileRoute("/groups")({
-  validateSearch:(search:Record<string,unknown>):{group?:string}=>({
-    group:typeof search.group==="string"?search.group:undefined,
-  }),
+  validateSearch:(search:Record<string,unknown>):{group?:string}=>groupSearchSchema.parse(search),
   loader: safeLoader(() => getCanonicalGroupWorkspace(), {
     authMessage: "Sign in as a student or teacher to access your study groups.",
   }),
@@ -27,29 +31,23 @@ export const Route = createFileRoute("/groups")({
 });
 type Workspace = Awaited<ReturnType<typeof getCanonicalGroupWorkspace>>;
 type Group = Workspace["groups"][number];
+type InviteeLoad = {
+  groupId: string;
+  invitees: Awaited<ReturnType<typeof listCanonicalGroupInvitees>>;
+  error: string;
+};
 
 function GroupsPage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Groups" title="Study groups" outcome={outcome} />;
   return <GroupsView data={outcome.data} />;
 }
-function toIso(local: string) {
-  const date = new Date(local);
-  if (!Number.isFinite(date.getTime())) throw new Error("Choose a valid date and time.");
-  return date.toISOString();
-}
-function localTime(iso: string) {
-  const date = new Date(iso);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-}
 
 function GroupsView({ data }: { data: Workspace }) {
   const router = useRouter();
   const {group:requestedGroup}=Route.useSearch();
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [sectionId, setSectionId] = useState(data.sections[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -63,19 +61,37 @@ function GroupsView({ data }: { data: Workspace }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [reportingPost, setReportingPost] = useState("");
   const [reportReason, setReportReason] = useState("");
+  const [inviteGroup, setInviteGroup] = useState("");
+  const [selectedInviteeIds, setSelectedInviteeIds] = useState<string[]>([]);
+  const [inviteeLoad, setInviteeLoad] = useState<InviteeLoad>({
+    groupId: "", invitees: [], error: "",
+  });
+  const invitees = inviteeLoad.groupId === inviteGroup ? inviteeLoad.invitees : [];
+  const inviteesError = inviteeLoad.groupId === inviteGroup ? inviteeLoad.error : "";
+  const inviteesLoading = Boolean(inviteGroup) && inviteeLoad.groupId !== inviteGroup;
+
+  useEffect(() => {
+    let active = true;
+    if (!inviteGroup) return () => { active = false; };
+    listCanonicalGroupInvitees({ data: { groupId: inviteGroup } })
+      .then(result => {
+        if (active) setInviteeLoad({ groupId: inviteGroup, invitees: result, error: "" });
+      })
+      .catch(error => {
+        if (active) setInviteeLoad({
+          groupId: inviteGroup,
+          invitees: [],
+          error: error instanceof Error ? error.message : "Unable to load eligible students.",
+        });
+      });
+    return () => { active = false; };
+  }, [inviteGroup]);
 
   async function run(work: () => Promise<unknown>, message: string) {
-    if (busy) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await work();
-      await router.invalidate();
-      setNotice(message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save group change.");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.run(work, {
+      successMessage: message,
+      commandErrorMessage: "Unable to save group change.",
+    });
   }
 
   return (
@@ -86,8 +102,13 @@ function GroupsView({ data }: { data: Workspace }) {
       actions={<Link to={data.role === "teacher" ? "/teacher" : "/student"}
         className="rounded-lg border px-3 py-2 text-sm">Workspace home</Link>}
     >
-      {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-4 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {mutation.pending && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">Saving group change...</p>}
+      {mutation.notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-4 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
+      {data.role === "student" && data.hasEnrollmentGuardian === false &&
+        <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">
+          A linked guardian is required to request study group membership. Ask your school to verify your guardian relationship.
+        </p>}
       {requestedGroup&&<Link to="/groups" className="mt-4 inline-block text-sm underline">View all study groups</Link>}
       {requestedGroup&&!data.groups.some(group=>group.id===requestedGroup)&&<p role="alert" className="mt-4 rounded-lg border p-4 text-sm">This group is unavailable in your current workspace.</p>}
       {data.role === "teacher" && <section className="mt-8 rounded-xl border bg-card p-5">
@@ -152,7 +173,7 @@ function GroupsView({ data }: { data: Workspace }) {
                       () => leaveCanonicalGroup({ data: { groupId: group.id } }),
                       "You left the study group.",
                     )}>Leave group</button>
-                : <button disabled={busy} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
+                : <button disabled={busy || data.hasEnrollmentGuardian !== true} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
                     onClick={() => void run(
                       () => requestCanonicalGroupMembership({ data: { groupId: group.id } }),
                       "Membership requested. A guardian and the facilitator must approve.",
@@ -161,6 +182,11 @@ function GroupsView({ data }: { data: Workspace }) {
           </div>
           {data.role === "teacher" && <TeacherGroupControls
             group={group} busy={busy} run={run}
+            inviteGroup={inviteGroup} setInviteGroup={setInviteGroup}
+            setInviteeLoad={setInviteeLoad}
+            invitees={invitees} selectedInviteeIds={selectedInviteeIds}
+            setSelectedInviteeIds={setSelectedInviteeIds}
+            inviteesLoading={inviteesLoading} inviteesError={inviteesError}
             sessionGroup={sessionGroup} setSessionGroup={setSessionGroup}
             sessionTitle={sessionTitle} setSessionTitle={setSessionTitle}
             agenda={agenda} setAgenda={setAgenda}
@@ -174,7 +200,7 @@ function GroupsView({ data }: { data: Workspace }) {
               {group.posts.map(post => <div key={post.id} className="rounded-lg border p-3">
                 <p className="text-sm whitespace-pre-wrap">{post.body}</p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {new Date(post.createdAt).toLocaleString()}
+                  {formatTimestamp(post.createdAt, group.timezone)}
                 </p>
                 {data.role === "student" && <button type="button"
                   className="mt-2 text-xs underline"
@@ -229,7 +255,7 @@ function GroupsView({ data }: { data: Workspace }) {
             {group.sessions.map(session => <div key={session.id} className="rounded-lg border p-3">
               <p className="text-sm font-semibold">{session.title}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {new Date(session.startsAt).toLocaleString()} · {session.location || "Location to be confirmed"}
+                {formatTimestamp(session.startsAt, group.timezone)} ({group.timezone}) · {session.location || "Location to be confirmed"}
                 {session.cancelled ? " · Cancelled" : ""}
               </p>
               {session.agenda && <p className="mt-2 text-sm">{session.agenda}</p>}
@@ -257,10 +283,18 @@ function GroupsView({ data }: { data: Workspace }) {
 }
 
 function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
+  inviteGroup, setInviteGroup, invitees, selectedInviteeIds, setSelectedInviteeIds,
+  setInviteeLoad, inviteesLoading, inviteesError,
   sessionTitle, setSessionTitle, agenda, setAgenda, sessionStarts, setSessionStarts,
   sessionEnds, setSessionEnds, reschedules, setReschedules,
 }: {
   group: Group; busy: boolean; run: (work: () => Promise<unknown>, message: string) => Promise<void>;
+  inviteGroup: string; setInviteGroup: (value: string) => void;
+  setInviteeLoad: (value: InviteeLoad) => void;
+  invitees: Awaited<ReturnType<typeof listCanonicalGroupInvitees>>;
+  selectedInviteeIds: string[];
+  setSelectedInviteeIds: (value: string[] | ((previous: string[]) => string[])) => void;
+  inviteesLoading: boolean; inviteesError: string;
   sessionGroup: string; setSessionGroup: (value: string) => void;
   sessionTitle: string; setSessionTitle: (value: string) => void;
   agenda: string; setAgenda: (value: string) => void;
@@ -290,6 +324,45 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
       </div>
     </div>)}
     {!group.pendingMembers.length && <p className="text-xs text-muted-foreground">No pending memberships.</p>}
+    <button type="button" disabled={busy}
+      className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
+      onClick={() => {
+        setSelectedInviteeIds([]);
+        if (inviteGroup !== group.id) setInviteeLoad({ groupId: "", invitees: [], error: "" });
+        setInviteGroup(inviteGroup === group.id ? "" : group.id);
+      }}>
+      {inviteGroup === group.id ? "Close invitations" : "Invite students"}
+    </button>
+    {inviteGroup === group.id && <form className="space-y-3 rounded-lg border p-4"
+      onSubmit={event => {
+        event.preventDefault();
+        void run(async () => {
+          await inviteCanonicalGroupMembers({ data: {
+            groupId: group.id, studentPersonIds: selectedInviteeIds,
+          } });
+          setSelectedInviteeIds([]);
+          setInviteGroup("");
+        }, "Invitations sent. Students still need guardian permission and facilitator approval to join.");
+      }}>
+      <p className="text-xs text-muted-foreground">
+        Invitations notify students; they must request membership before joining.
+      </p>
+      {inviteesLoading && <p role="status" className="text-xs text-muted-foreground">Loading eligible students...</p>}
+      {inviteesError && <p role="alert" className="text-xs text-destructive">{inviteesError}</p>}
+      {!inviteesLoading && !inviteesError && invitees.length === 0 &&
+        <p className="text-xs text-muted-foreground">No eligible students are available to invite.</p>}
+      {invitees.map(student => <label key={student.personId} className="flex items-center gap-2 text-sm">
+        <input type="checkbox" disabled={busy} checked={selectedInviteeIds.includes(student.personId)}
+          onChange={event => setSelectedInviteeIds(ids => event.target.checked
+            ? [...ids, student.personId]
+            : ids.filter(id => id !== student.personId))} />
+        {student.firstName} {student.lastName}
+      </label>)}
+      <button disabled={busy || inviteesLoading || selectedInviteeIds.length === 0}
+        className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
+        {busy ? "Sending invitations..." : "Send invitations"}
+      </button>
+    </form>}
     <h3 className="text-sm font-semibold">Content moderation</h3>
     {group.reports.map(report => <div key={report.id}
       className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
@@ -337,8 +410,8 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
         event.preventDefault();
         void run(async () => {
           await createCanonicalGroupSession({ data: {
-            groupId: group.id, title: sessionTitle, agenda, startsAt: toIso(sessionStarts),
-            endsAt: toIso(sessionEnds),
+            groupId: group.id, title: sessionTitle, agenda, startsAt: siteLocalTimeToIso(sessionStarts, group.timezone),
+            endsAt: siteLocalTimeToIso(sessionEnds, group.timezone),
           } });
           setSessionTitle(""); setAgenda(""); setSessionStarts(""); setSessionEnds("");
           setSessionGroup("");
@@ -353,12 +426,12 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
         <input value={agenda} onChange={event => setAgenda(event.target.value)}
           className="mt-1 block w-full rounded border bg-background p-2" />
       </label>
-      <label className="text-sm">Start
+      <label className="text-sm">Start ({group.timezone})
         <input required type="datetime-local" value={sessionStarts}
           onChange={event => setSessionStarts(event.target.value)}
           className="mt-1 block w-full rounded border bg-background p-2" />
       </label>
-      <label className="text-sm">End
+      <label className="text-sm">End ({group.timezone})
         <input required type="datetime-local" value={sessionEnds}
           onChange={event => setSessionEnds(event.target.value)}
           className="mt-1 block w-full rounded border bg-background p-2" />
@@ -371,18 +444,18 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
     {group.sessions.filter(session => !session.cancelled && new Date(session.startsAt) > new Date())
       .map(session => {
         const edited = reschedules[session.id] ?? {
-          start: localTime(session.startsAt), end: localTime(session.endsAt),
+          start: dateTimeInputValue(session.startsAt, group.timezone), end: dateTimeInputValue(session.endsAt, group.timezone),
         };
         return <div key={session.id} className="rounded-lg border p-3">
           <p className="mb-2 text-sm font-semibold">Change {session.title}</p>
           <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs">Start
+            <label className="text-xs">Start ({group.timezone})
               <input type="datetime-local" value={edited.start}
                 onChange={event => setReschedules({
                   ...reschedules, [session.id]: { ...edited, start: event.target.value },
                 })} className="mt-1 block rounded border bg-background p-2" />
             </label>
-            <label className="text-xs">End
+            <label className="text-xs">End ({group.timezone})
               <input type="datetime-local" value={edited.end}
                 onChange={event => setReschedules({
                   ...reschedules, [session.id]: { ...edited, end: event.target.value },
@@ -392,7 +465,7 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
               onClick={() => void run(() => reviseCanonicalGroupSession({ data: {
                 sessionId: session.id, action: "reschedule",
-                startsAt: toIso(edited.start), endsAt: toIso(edited.end),
+                startsAt: siteLocalTimeToIso(edited.start, group.timezone), endsAt: siteLocalTimeToIso(edited.end, group.timezone),
               } }), "Session rescheduled.")}>Save time</button>
             <button type="button" disabled={busy}
               className="rounded-lg border border-amber-500 px-3 py-2 text-xs disabled:opacity-50"

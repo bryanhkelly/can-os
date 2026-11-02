@@ -1,4 +1,5 @@
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { personDisplayName } from "@/domain/person-name";
 import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
@@ -10,6 +11,7 @@ import { and,desc,eq,inArray,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
 async function studentProfileFor(actor: Actor) {
@@ -31,8 +33,9 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
   const [catalog, memberships, requests] = await Promise.all([
     db.select({ id:s.sections.id, title:s.sections.title, code:s.sections.code, metadata:s.sections.metadata,
       templateId:s.courseTemplates.id, subject:s.courseTemplates.subject, description:s.courseTemplates.description,
-      termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn,
+      termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn,timezone:s.sites.timezone,
     }).from(s.sections)
+      .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
       .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
       .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
       .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
@@ -53,8 +56,9 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
     const policy=await getSectionRegistrationPolicy(course.id);
     return {
       id:course.id,title:course.title,code:course.code,subject:course.subject,description:course.description,
+      timezone:course.timezone,
       teachers:teachers.filter(teacher=>teacher.sectionId===course.id).map(teacher=>({
-        personId:teacher.personId,name:`${teacher.preferredName??teacher.firstName} ${teacher.lastName}`,
+        personId:teacher.personId,name:personDisplayName({ preferredName: teacher.preferredName, legalFirstName: teacher.firstName, legalLastName: teacher.lastName }),
       })),
       credits:policy.credits,
       mode:typeof course.metadata.deliveryMode==="string"?course.metadata.deliveryMode:"hybrid",
@@ -82,8 +86,9 @@ export const requestCourseChange = createServerFn({ method:"POST" })
     const studentId=await studentProfileFor(actor);
     const [{ db },s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
-      const [section]=await tx.select({id:s.sections.id,title:s.sections.title,metadata:s.sections.metadata,programId:s.sections.programId,siteId:s.sections.siteId,schoolYearId:s.terms.schoolYearId,organizationId:s.programs.organizationId,termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn})
+      const [section]=await tx.select({id:s.sections.id,title:s.sections.title,metadata:s.sections.metadata,programId:s.sections.programId,siteId:s.sections.siteId,timezone:s.sites.timezone,schoolYearId:s.terms.schoolYearId,organizationId:s.programs.organizationId,termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn})
         .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId)).innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+        .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
         .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,sites),eq(s.sections.active,true))).limit(1);
       if(!section) throw new Error("Section not offered at this Site");
       assertProgramGranted(actor,section.programId);
@@ -94,7 +99,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
       if(!programMembership)throw new Error("Student must have an active enrollment in this school year and program");
       const policy=await getSectionRegistrationPolicy(section.id,tx);
-      const today=new Date().toISOString().slice(0,10);
+      const today=dateKeyInTimezone(new Date().toISOString(),section.timezone);
       if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
       if(data.operation==="withdraw" && today>policy.withdrawalEndsOn) throw new Error("Withdrawal window has closed.");
       if(data.operation==="add" && today>policy.addDropEndsOn) throw new Error("Registration window has closed.");

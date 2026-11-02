@@ -5,8 +5,10 @@ import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClas
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
 import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { z } from "zod";
+import { useRef, useState } from "react";
+import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import {uuidProgramSelectionSchema} from "@/lib/route-search";
 import { schoolCurriculumNextActions } from "@/domain/curriculum-next-actions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -18,9 +20,8 @@ import { validateOneRosterCsvBundle, applyOneRosterClassMappings } from "@/modul
 import { CurriculumProgramNavigation } from "@/components/learning/CurriculumProgramNavigation";
 import { previewRosterClasses } from "@/components/learning/oneroster-class-preview";
 
-const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
- validateSearch:(search:Record<string,unknown>)=>searchSchema.parse(search),
+ validateSearch:(search:Record<string,unknown>)=>uuidProgramSelectionSchema.parse(search),
  loaderDeps:({search})=>({programId:search.programId}),
  loader:({deps})=>safeLoader(async()=>{
   const programs=await getCurriculumAdopterPrograms();
@@ -43,7 +44,8 @@ function CurriculumMarketplacePage(){
 }
 function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed,error=mutation.error,notice=mutation.notice;
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
  const [adoptionReview,setAdoptionReview]=useState<string|null>(null);
  const [adoptionConfirmed,setAdoptionConfirmed]=useState<Record<string,boolean>>({});
@@ -52,6 +54,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [title,setTitle]=useState(""),[kind,setKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link"),[url,setUrl]=useState("");
  const [pdfFile,setPdfFile]=useState<File|null>(null),[rightsConfirmed,setRightsConfirmed]=useState(false);
  const [pdfKey,setPdfKey]=useState(0);
+ const pendingPdf=useRef<{file:File;identity:string;task:{run:()=>Promise<unknown>}}|null>(null);
  const [cartridgeFile,setCartridgeFile]=useState<File|null>(null);
  const [cartridgeReport,setCartridgeReport]=useState<Awaited<ReturnType<typeof validateCommonCartridgeImport>>|null>(null);
  const [cartridgeSection,setCartridgeSection]=useState(""),[cartridgeLinks,setCartridgeLinks]=useState<string[]>([]);
@@ -63,10 +66,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const rosterClasses=previewRosterClasses(rosterCsv);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
-  setBusy(true);setError("");setNotice("");
-  try{await task();await router.invalidate();setNotice(success);}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save curriculum change.");}
-  finally{setBusy(false);}
+  await mutation.run(task,{successMessage:success,commandErrorMessage:"Unable to save curriculum change."});
  }
  const installed=market?.packs.filter(pack=>pack.entitlement==="active")??[];
  const adopted=installed.filter(pack=>pack.adoption?.status==="active" && pack.adoption.versionId===pack.versionId);
@@ -225,19 +225,21 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
        onClick={()=>void perform(async()=>{
          if(!pdfFile)throw new Error("Select a PDF.");
-         if(pdfFile.size<16||pdfFile.size>10*1024*1024)throw new Error("PDF must be between 16 bytes and 10 MB.");
          const params={programId:market.program.id,courseVersionId,scope,title,
            ...(scope==="section"?{sectionId}:{}),
            ...(lessonId.trim()?{lessonId:lessonId.trim()}:{}),
            fileName:pdfFile.name,size:pdfFile.size};
-         const signed=await beginCurriculumPdfUpload({data:params});
-         const uploaded=await fetch(signed.uploadUrl,{
-           method:"PUT",headers:{"Content-Type":"application/pdf","If-None-Match":"*"},
-           body:pdfFile,
-         });
-         if(!uploaded.ok)throw new Error("Private PDF upload failed. No curriculum resource was created.");
-         await finishCurriculumPdfUpload({data:{...params,
-           resourceId:signed.resourceId,key:signed.key,acknowledgedRights:true}});
+         const identity=JSON.stringify(params);
+         if(pendingPdf.current?.file!==pdfFile||pendingPdf.current.identity!==identity){
+           pendingPdf.current={file:pdfFile,identity,task:createPrivateUploadTask({
+             file:pdfFile,contentType:"application/pdf",policy:{...documentUploadPolicy,contentTypes:["application/pdf"]},
+             begin:()=>beginCurriculumPdfUpload({data:params}),
+             finish:signed=>finishCurriculumPdfUpload({data:{...params,
+               resourceId:signed.resourceId,key:signed.key,acknowledgedRights:true}}),
+           })};
+         }
+         await pendingPdf.current.task.run();
+         pendingPdf.current=null;
          setPdfFile(null);setPdfKey(v=>v+1);setRightsConfirmed(false);
        },"Private PDF uploaded and attached to the selected curriculum scope.")}>Upload PDF</button>
       {!data.pdfUpload.enabled&&<p className="text-xs text-muted-foreground" role="status">

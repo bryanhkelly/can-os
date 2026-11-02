@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ClassWorkspace } from "@/routes/classes";
+import { ClassCreationRequestForm } from "@/components/learning/ClassCreationRequestForm";
+import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
 import { TeacherDiscussionsView } from "@/routes/teacher.discussions";
 import { Route as StudentDiscussions } from "@/routes/student.discussions";
 import { classContentSchema } from "@/domain/class-content";
@@ -21,6 +23,9 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 vi.mock("@/modules/learning/class-workspace.functions", () => ({
   getClassDirectory: vi.fn(), getClassWorkspace: vi.fn(), getClassResourceDownload: vi.fn(), setLessonCompletion: vi.fn(),
+}));
+vi.mock("@/modules/programs/section-creation-requests.functions", () => ({
+  getTeacherClassRequestOptions: vi.fn(), submitTeacherClassRequest: vi.fn(),
 }));
 vi.mock("@/modules/learning/class-communication.functions", () => ({ publishClassAnnouncement: vi.fn() }));
 vi.mock("@/modules/learning/class-supplements.functions", () => ({ addClassSupplement: vi.fn() }));
@@ -47,6 +52,26 @@ const workspace: ComponentProps<typeof ClassWorkspace>["data"] = {
   announcements: [{ id: "announcement", title: "Reading notes", body: "Bring your notes.", createdAt: "2026-10-01T12:00:00Z" }],
 };
 beforeEach(() => { state.search = {}; state.data = null; });
+
+describe("teacher class directory", () => {
+  it("explains missing assignments and provides a registrar request form", () => {
+    const empty = renderToStaticMarkup(<ClassDirectoryCards classes={[]} role="teacher"/>);
+    expect(empty).toContain("No active classes are currently assigned to you.");
+    const form = renderToStaticMarkup(<ClassCreationRequestForm options={{
+      programs: [{ id: "program", name: "North School" }],
+      requests: [],
+    }}/>);
+    expect(form).toContain("Request a class");
+    expect(form).toContain("Send a class setup request to your registrar.");
+    expect(form).toContain("Submit class request");
+  });
+
+  it("explains when a teacher membership has no program scope", () => {
+    const form = renderToStaticMarkup(<ClassCreationRequestForm options={{ programs: [], requests: [] }}/>);
+    expect(form).toContain("not scoped to a school program yet");
+    expect(form).not.toContain("Submit class request");
+  });
+});
 
 describe("published class workspace", () => {
   it("opens exact class lessons and keeps progress separate from grades and attendance", () => {

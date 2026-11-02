@@ -2,7 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const state=vi.hoisted(()=>({slots:[] as unknown[],cursor:0,events:[] as string[],submit:vi.fn()}));
 vi.mock("react",async original=>({...await original<typeof import("react")>(),
-  useEffect:()=>{},useRef:()=>({current:0}),
+  useEffect:()=>{},useRef:(initial:unknown)=>({current:initial}),
   useState:(initial:unknown)=>{
     const index=state.cursor++;
     if(!(index in state.slots))state.slots[index]=typeof initial==="function"?initial():initial;
@@ -24,13 +24,17 @@ vi.mock("@/modules/student-experience/assignments.functions",()=>({
   saveAssignmentResponse:state.submit,
 }));
 vi.mock("@/modules/learning/submission-attachments.functions",()=>({
-  createSubmissionAttachmentUpload:async()=>{state.events.push("authorize upload");return {uploadUrl:"https://private.test/put",documentId:"document"};},
+  createSubmissionAttachmentUpload:async()=>{state.events.push("authorize upload");return {
+    key:"private-key",uploadUrl:"https://private.test/put",documentId:"document",
+    uploadHeaders:{"Content-Type":"application/pdf"},expiresInSeconds:180,
+  };},
   attachDocumentToSubmission:async()=>{state.events.push("verify and attach");return {attached:true};},
   listSubmissionAttachments:async()=>({attachments:[]}),getSubmissionAttachmentDownload:vi.fn(),
 }));
 vi.mock("@/components/learning/SubmissionAnnotations",()=>({SubmissionAnnotations:()=>null}));
 vi.mock("@/components/learning/AssignmentConversation",()=>({AssignmentConversation:()=>null}));
 vi.mock("@/components/student/AssignmentAttemptHistory",()=>({AssignmentAttemptHistory:()=>null}));
+vi.mock("@/lib/use-hydrated",()=>({useHydrated:()=>true}));
 import {Route} from "@/routes/student.assignments";
 type Props={children?:ReactNode;type?:string;disabled?:boolean;onChange?:(event:unknown)=>void;onClick?:()=>Promise<void>};
 function nodes(node:ReactNode):ReactElement<Props>[] {
@@ -52,7 +56,7 @@ afterEach(()=>vi.unstubAllGlobals());
 it("lets a student select a worksheet and submit it without filler text, in durable order",async()=>{
   let controls=render();
   expect(controls.find(node=>node.props.children==="Submit assignment")?.props.disabled).toBe(true);
-  controls.find(node=>node.props.type==="file")?.props.onChange?.({target:{files:[{name:"worksheet.pdf",size:100}]}});
+  controls.find(node=>node.props.type==="file")?.props.onChange?.({target:{files:[new File(["isolated worksheet fixture"],"worksheet.pdf",{type:"application/pdf"})]}});
   controls=render();
   const submit=controls.find(node=>node.props.children==="Submit assignment");
   expect(submit?.props.disabled).toBe(false);

@@ -1,4 +1,5 @@
 import { AuthorizationError } from "@/domain/command-context";
+import { personDisplayName } from "@/domain/person-name";
 import { EventTypes } from "@/domain/event-types";
 import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
@@ -185,7 +186,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
   for (const profile of profiles as any[]) {
     const entry = byStudent.get(profile.id);
     if (entry) {
-      entry.name = `${profile.preferredName ?? profile.firstName} ${profile.lastName}`;
+      entry.name = personDisplayName({ preferredName: profile.preferredName, legalFirstName: profile.firstName, legalLastName: profile.lastName });
       entry.personId = profile.personId;
       entry.gradeLevel = profile.gradeLevel;
     }

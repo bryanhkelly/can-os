@@ -1,13 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { acceptInsight, dismissInsight, listInsights,listInsightScopeOptions } from "@/modules/operations/insights.functions";
+import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+import {SiteProgramFields} from "@/components/workspace/site-program-fields";
+import {MutationFeedback} from "@/components/workspace/mutation-feedback";
+import {ActionDialog} from "@/components/workspace/action-dialog";
+import {QueryState} from "@/components/workspace";
+const insightsSearchSchema=siteProgramSelectionSchema.extend({insight:optionalSearchString});
 
 export const Route = createFileRoute("/operations/insights")({
- validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;insight?:string}=>({
-  siteId:typeof search.siteId==="string"?search.siteId:undefined,
-  programId:typeof search.programId==="string"?search.programId:undefined,
-  insight:typeof search.insight==="string"?search.insight:undefined,
- }),
+ validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;insight?:string}=>insightsSearchSchema.parse(search),
  component:InsightsPage
 });
 
@@ -30,7 +33,6 @@ function InsightsPage() {
  const selection=Route.useSearch();
  const [scopes,setScopes]=useState<Awaited<ReturnType<typeof listInsightScopeOptions>>>([]);
  const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
- const programOptions=scopes.filter(s=>!selection.siteId||s.siteId===selection.siteId);
  const selectScope=(siteId?:string,programId?:string)=>{
   const qs=new URLSearchParams();
   if(siteId)qs.set("siteId",siteId);
@@ -40,62 +42,57 @@ function InsightsPage() {
  const [status, setStatus] = useState<StatusFilter>("open");
  const [insights, setInsights] = useState<Insight[]>([]);
  const [loading, setLoading] = useState(true);
- const [busy, setBusy] = useState("");
- const [error, setError] = useState("");
- const [notice, setNotice] = useState("");
+ const [loadError, setLoadError] = useState("");
  const [createdActionId,setCreatedActionId]=useState("");
+ const [dismissTarget,setDismissTarget]=useState<Insight|null>(null);
+ const [dismissReason,setDismissReason]=useState("");
+ const [scopeError,setScopeError]=useState("");
 
- const load = useCallback(async (filter: StatusFilter) => {
+ const load = useCallback(async (filter: StatusFilter, refreshAfterSave = false) => {
   setLoading(true);
-  setError("");
+  setLoadError("");
   try {
    const result = await listInsights({ data: { status: filter,siteId:selection.siteId,programId:selection.programId,insightId:selection.insight } });
    setInsights(result.insights);
-  } catch {
+  } catch (cause) {
    setInsights([]);
-   setError("Sign in with an authorized staff account to review insights.");
+   if (refreshAfterSave) throw cause;
+   setLoadError("Sign in with an authorized staff account to review insights.");
   } finally {
    setLoading(false);
   }
  }, [selection.siteId,selection.programId,selection.insight]);
+ const mutation=useMutationFeedback(()=>load(status,true));
+ const busy=mutation.pending||mutation.refreshFailed;
 
- useEffect(()=>{let active=true;void listInsightScopeOptions().then(rows=>{if(active)setScopes(rows)}).catch(()=>{});return()=>{active=false};},[]);
+ useEffect(()=>{let active=true;void listInsightScopeOptions().then(rows=>{if(active){setScopes(rows);setScopeError("");}}).catch(()=>{if(active)setScopeError("School and program choices could not load. Reopen this page to try again.");});return()=>{active=false};},[]);
  useEffect(() => {
-  setCreatedActionId("");setNotice("");
+  setCreatedActionId("");
   void load(status);
  }, [status, load]);
 
  const accept = async (insight: Insight) => {
-  setBusy(insight.id);
-  setNotice("");
   setCreatedActionId("");
-  try {
+  await mutation.run(async()=>{
    const result=await acceptInsight({ data: { insightId: insight.id } });
    setCreatedActionId(result.actionId);
-   setNotice(`Action created from "${insight.title}".`);
-   await load(status);
-  } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Unable to accept insight");
-  } finally {
-   setBusy("");
-  }
+   return result;
+  },{
+   successMessage:`Action created from "${insight.title}".`,
+   commandErrorMessage:"Unable to accept insight.",
+  });
  };
 
  const dismiss = async (insight: Insight) => {
-  const reason = window.prompt("Why is this insight being dismissed? (5-500 characters)");
-  if (reason === null) return;
-  setBusy(insight.id);
-  setNotice("");
   setCreatedActionId("");
-  try {
-   await dismissInsight({ data: { insightId: insight.id, reason } });
-   setNotice(`Dismissed "${insight.title}".`);
-   await load(status);
-  } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Unable to dismiss insight");
-  } finally {
-   setBusy("");
-  }
+  const outcome=await mutation.run(
+   ()=>dismissInsight({ data: { insightId: insight.id, reason:dismissReason } }),
+   {
+    successMessage:`Dismissed "${insight.title}".`,
+    commandErrorMessage:"Unable to dismiss insight.",
+   },
+  );
+  if(outcome.status==="saved"||outcome.status==="refresh-failed")setDismissTarget(null);
  };
 
  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
@@ -106,26 +103,15 @@ function InsightsPage() {
     Signals surfaced from school activity, with the evidence behind each one. Review the evidence chain before accepting an insight as an Action or dismissing it.
    </p>
    <div className="mt-5 flex flex-wrap gap-4 rounded-xl border p-4">
-    <label className="text-sm">School
-     <select aria-label="Insight school" className="ml-2 rounded border bg-background p-2"
-      value={selection.siteId??""} onChange={e=>selectScope(e.target.value||undefined)}>
-      <option value="">All permitted schools</option>
-      {sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-     </select>
-    </label>
-    <label className="text-sm">Program
-     <select aria-label="Insight program" className="ml-2 rounded border bg-background p-2"
-      value={selection.programId??""} onChange={e=>selectScope(selection.siteId,e.target.value||undefined)}>
-      <option value="">All permitted programs</option>
-      {programOptions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-     </select>
-    </label>
+    <SiteProgramFields sites={sites} programs={scopes} siteId={selection.siteId??""} programId={selection.programId??""}
+      labelPrefix="Insight" sitePlaceholder="All permitted schools" programPlaceholder="All permitted programs"
+      onChange={(site,program)=>selectScope(site||undefined,program||undefined)}/>
    </div>
-   {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}{createdActionId&&<>
+   {scopeError&&<p role="alert" className="mt-4 text-sm">{scopeError}</p>}
+   <div className="mt-4"><MutationFeedback state={mutation} pendingMessage="Saving insight decision..." successAction={createdActionId&&<>
     {" "}<Link to="/actions/$actionId" params={{actionId:createdActionId}} className="font-semibold underline">Open created Action</Link>
-   </>}</p>}
-   {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
-   {!error && <>
+   </>}/></div>
+   <QueryState error={loadError} onRetry={()=>void load(status)}>
     {selection.insight?<Link to="/operations/insights" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-6 inline-block text-sm underline">All insights</Link>:<div className="mt-6 flex gap-2" role="tablist" aria-label="Insight status filter">
      {tabs.map(tab => <button
       key={tab.id}
@@ -138,11 +124,10 @@ function InsightsPage() {
        : "rounded-full border px-4 py-1.5 text-xs font-bold text-muted-foreground"}
      >{tab.label}</button>)}
     </div>}
-    {loading && <p role="status" className="mt-8 text-sm">Loading insights…</p>}
-    {!loading && insights.length === 0 && (selection.insight
+    <QueryState loading={loading?"Loading insights...":undefined} isEmpty={insights.length===0} empty={selection.insight
      ?<p role="alert" className="mt-8 rounded-xl border p-5 text-sm">This insight is unavailable in your current workspace.</p>
-     :<p className="mt-8 rounded-xl border p-5 text-sm">No {tabs.find(tab => tab.id === status)?.label.toLowerCase()} insights in your scope.</p>)}
-    {!loading && insights.length > 0 && <div className="mt-6 grid gap-4">
+     :<p className="mt-8 rounded-xl border p-5 text-sm">No {tabs.find(tab => tab.id === status)?.label.toLowerCase()} insights in your scope.</p>}>
+    <div className="mt-6 grid gap-4">
      {insights.map(insight => <article key={insight.id} className="rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div>
@@ -171,12 +156,23 @@ function InsightsPage() {
        </ul>
       </div>}
       {insight.status === "open" && <div className="mt-4 flex flex-wrap gap-3">
-       <button type="button" className="rounded border px-3 py-1 text-xs font-bold disabled:opacity-50" disabled={busy !== ""} onClick={() => accept(insight)}>Accept &amp; create Action</button>
-       <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy !== ""} onClick={() => dismiss(insight)}>Dismiss</button>
+       <button type="button" className="rounded border px-3 py-1 text-xs font-bold disabled:opacity-50" disabled={busy} onClick={() => accept(insight)}>Accept &amp; create Action</button>
+       <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy} onClick={() => {setDismissReason("");setDismissTarget(insight);}}>Dismiss</button>
       </div>}
      </article>)}
-    </div>}
-   </>}
+    </div>
+    </QueryState>
+   </QueryState>
+   {dismissTarget&&<ActionDialog open title={`Dismiss "${dismissTarget.title}"`} confirmLabel="Dismiss insight"
+     description="Explain why this insight is being dismissed (5-500 characters)."
+     pending={mutation.pending} confirmDisabled={busy||dismissReason.trim().length<5}
+     onClose={()=>setDismissTarget(null)} onConfirm={()=>void dismiss(dismissTarget)}>
+     <label className="block text-sm">Dismissal reason
+       <textarea required minLength={5} maxLength={500} value={dismissReason}
+         onChange={event=>setDismissReason(event.target.value)} className="mt-1 block w-full rounded border p-2"/>
+     </label>
+     <MutationFeedback state={mutation} pendingMessage="Saving insight decision..."/>
+   </ActionDialog>}
   </div>
  </main>;
 }

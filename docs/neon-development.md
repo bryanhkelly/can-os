@@ -4,6 +4,12 @@ CAN OS uses Neon PostgreSQL as the production system of record.
 
 ## Environments
 
+The Neon primary production branch is named `main` (project
+`sweet-hall-62441909`, branch ID `br-restless-sea-ar9ooo55`). It remains the
+live production database; matching the Git branch name does not make it a
+test target. Use an isolated nonproduction branch for test migrations and
+fixtures. `DATABASE_URL` currently resolves to this primary branch.
+
 ## Admissions and GF1 CI acceptance (FullFlow)
 
 Both `Admissions Neon Acceptance` and `GF1 Neon Acceptance` run against
@@ -340,10 +346,16 @@ transaction; existing ledger entries were not rewritten. This is not permission
 to stamp unverified histories on other branches.
 
 Confirm the Neon project, branch and endpoint with management metadata before
-any rollout. The reconciled target is branch `production` at endpoint
+any rollout. The reconciled primary production target is branch `main`
+(formerly `production`; branch ID `br-restless-sea-ar9ooo55`) at endpoint
 `ep-autumn-glade-ar9r1t5q`; endpoint `ep-noisy-bird-arruu0it` belongs to `test01`.
 Neither connection variable names nor a passing `db:generate` establish target
-identity or migration status.
+identity or migration status. On November 2, 2026, production was reconciled
+through journal migration `0060_tenant_demo_access`; its already-satisfied
+column-drop effect was verified rather than re-executed. The recovery and
+rehearsal branches remain retained, and older migration hash mismatches were
+preserved without rewriting history. See [CURRENT-STATE.md](./CURRENT-STATE.md)
+for the exact branch identities and postflight evidence.
 
 ### Calendar scheduled-occurrence rollout
 
