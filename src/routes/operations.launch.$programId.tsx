@@ -6,12 +6,7 @@ import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcad
 
 export const Route = createFileRoute("/operations/launch/$programId")({
   loader: ({ params }) => safeLoader(
-    async () => ({
-      ...(await getLaunchAcademicSetup({ data: { programId: params.programId } })),
-      demoTeacherMarketplaceEnabled:
-        process.env.CAN_DEMO_TEACHER_PREVIEW_ENABLED === "true" &&
-        process.env.CAN_DEMO_ISOLATED_ENV === "true",
-    }),
+    () => getLaunchAcademicSetup({ data: { programId: params.programId } }),
     { authMessage: "Sign in with a registrar grant for this program." },
   )(),
   component: LaunchAcademicSetup,
