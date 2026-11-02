@@ -75,6 +75,7 @@ function ReviewEditor({item}:{item:Item}){
       <label className="text-sm">Program name<input className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.name} onChange={e=>update({name:e.target.value})}/></label>
       <label className="text-sm">Eligibility status<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.eligibilityStatus} onChange={e=>update({eligibilityStatus:e.target.value})}>{["unknown","under_review","conditional","verified"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></label>
       <label className="text-sm sm:col-span-2">Program summary<textarea className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.summary} onChange={e=>update({summary:e.target.value})}/></label>
+      <label className="text-sm sm:col-span-2">Supporting official source<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.evidenceIds?.[0]??""} onChange={e=>update({evidenceIds:e.target.value?[e.target.value]:[]})}><option value="">Not linked yet</option>{sources.map(source=><option key={source.url} value={source.url}>{source.title||source.url}</option>)}</select></label>
       {editable&&<button type="button" className="text-left text-sm underline" onClick={()=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).filter((_,j)=>i!==j)}))}>Remove program</button>}
      </div>;
     })}
