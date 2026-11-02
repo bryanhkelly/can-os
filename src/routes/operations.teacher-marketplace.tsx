@@ -4,8 +4,8 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import { uuidProgramSelectionSchema } from "@/lib/route-search";
 import { getCurriculumAdopterPrograms } from "@/modules/learning/curriculum-marketplace.functions";
-import { getDemoTeacherMarketplace } from "@/modules/staffing/demo-teacher-marketplace.functions";
-import { listDemoTeacherStaffingRequests, requestDemoTeacherStaffing } from "@/modules/staffing/teacher-staffing-requests.functions";
+import { getTeacherMarketplace } from "@/modules/staffing/teacher-marketplace.functions";
+import { listTeacherStaffingRequests, requestTeacherStaffing } from "@/modules/staffing/teacher-staffing-requests.functions";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/operations/teacher-marketplace")({
@@ -13,13 +13,13 @@ export const Route = createFileRoute("/operations/teacher-marketplace")({
   loaderDeps: ({ search }) => ({ programId: search.programId }),
   loader: ({ deps }) => safeLoader(async () => ({
     programs: await getCurriculumAdopterPrograms(),
-    market: deps.programId ? await getDemoTeacherMarketplace({ data: { programId: deps.programId } }) : null,
-    staffingRequests: deps.programId ? await listDemoTeacherStaffingRequests({ data: { programId: deps.programId } }) : null,
-  }), { authMessage: "An authorized school registrar in an isolated CAN demonstration environment is required." })(),
-  component: DemoTeacherMarketplacePage,
+    market: deps.programId ? await getTeacherMarketplace({ data: { programId: deps.programId } }) : null,
+    staffingRequests: deps.programId ? await listTeacherStaffingRequests({ data: { programId: deps.programId } }) : null,
+  }), { authMessage: "An authorized school registrar is required." })(),
+  component: TeacherMarketplacePage,
 });
 
-function DemoTeacherMarketplacePage() {
+function TeacherMarketplacePage() {
   const result = Route.useLoaderData();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -35,7 +35,7 @@ function DemoTeacherMarketplacePage() {
     const selectionKey = `${courseVersionId}:${teacherPersonId}`;
     setSubmitting(selectionKey);
     try {
-      const outcome = await requestDemoTeacherStaffing({ data: {
+      const outcome = await requestTeacherStaffing({ data: {
         requestId: crypto.randomUUID(),
         programId: market.program.id, courseVersionId, teacherPersonId,
         ...(targetSection[courseVersionId] ? { sectionId: targetSection[courseVersionId] } : {}),
@@ -60,9 +60,9 @@ function DemoTeacherMarketplacePage() {
     </p>
     {error && <p role="alert" className="rounded-lg border border-destructive px-4 py-3 text-sm">{error}</p>}
     {notice && <p role="status" className="rounded-lg border px-4 py-3 text-sm">{notice}</p>}
-    <p role="status" className="rounded-lg border px-4 py-3 text-sm">
-      Demonstration marketplace. All profiles, experience, availability and seat counts are synthetic.
-      No teacher listed here is credential-verified or approved for real-world assignment.
+    <p className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
+      CAN Academy manages teacher onboarding and staffing. Course matches are recommendations;
+      assignment requires current qualifications, availability, capacity and CAN authorization.
     </p>
     <nav aria-label="Choose school program" className="flex flex-wrap gap-2">
       {programs.map(program => <Link key={program.id} to="/operations/teacher-marketplace"
@@ -74,16 +74,12 @@ function DemoTeacherMarketplacePage() {
         <div>
           <h2 className="font-serif text-2xl">{market.program.name}</h2>
           <p className="text-sm text-muted-foreground">
-            {market.courses.filter(course => !course.previewOnly).length} adopted courses · {market.courses.filter(course => course.previewOnly).length} preview courses · {market.matchedTeachers} illustrative teachers
+            {market.courses.length} adopted courses · {market.matchedTeachers} teacher candidates
           </p>
         </div>
         <Link to="/operations/launch/$programId" params={{ programId: market.program.id }}
           className="rounded-lg border px-4 py-2 text-sm underline">Open class staffing</Link>
       </div>
-      {market.courses.some(course => course.previewOnly) && <p role="status" className="rounded-lg border px-4 py-3 text-sm">
-        Draft demo courses are shown for discovery only. A school must adopt an authorized published
-        curriculum release before requesting a teacher for that course.
-      </p>}
       {market.courses.length > 0 && <label className="block max-w-md space-y-1 text-sm">
         <span className="font-medium">Search courses and teachers</span>
         <input className="w-full rounded-lg border bg-background px-3 py-2" type="search"
@@ -101,11 +97,10 @@ function DemoTeacherMarketplacePage() {
           <div>
             <p className="text-xs text-muted-foreground">{course.subject} · {course.code}</p>
             <h3 className="font-serif text-xl">{course.title}</h3>
-            {course.previewOnly && <p className="mt-1 text-xs text-muted-foreground">Demo curriculum preview · not adopted</p>}
-          </div>
+           </div>
           <p className="text-xs text-muted-foreground">{course.sectionCount} current classes</p>
         </div>
-        {!course.previewOnly && course.sections.length > 0 && <label className="block max-w-sm space-y-1 text-sm">
+        {course.sections.length > 0 && <label className="block max-w-sm space-y-1 text-sm">
           <span className="font-medium">Apply selection to</span>
           <select value={targetSection[course.versionId] ?? ""}
             onChange={event => setTargetSection(previous => ({ ...previous, [course.versionId]: event.target.value }))}
@@ -119,15 +114,15 @@ function DemoTeacherMarketplacePage() {
         {course.teacherOptions.length ? <div className="grid gap-3 md:grid-cols-2">
           {course.teacherOptions.map(teacher => <article key={teacher.personId}
             className="space-y-1 rounded-lg border p-3">
-            <p className="font-semibold">{teacher.name} <span className="text-xs font-normal text-muted-foreground">· Demo</span></p>
-            <p className="text-sm text-muted-foreground">Live online · Illustrative capacity: {teacher.illustrativeSeatCapacity} seats</p>
-            <p className="text-xs text-muted-foreground">Teaching eligibility not verified. Assignment requires CAN approval.</p>
+            <p className="font-semibold">{teacher.name}{teacher.isSynthetic && <span className="text-xs font-normal text-muted-foreground"> · Sample profile</span>}</p>
+            <p className="text-sm text-muted-foreground">{teacher.modality.replaceAll("_", " ")} · Offered capacity: {teacher.indicativeSeatCapacity} seats (subject to confirmation)</p>
+            <p className="text-xs text-muted-foreground">Teacher qualification, scheduling and assignment require CAN approval.</p>
             {(() => {
               const sectionId = targetSection[course.versionId] || null;
               const pendingRequest = staffingRequests?.requests.find(request =>
                 request.status === "open" && request.courseVersionId === course.versionId &&
                 request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
-              return course.previewOnly ? <p className="mt-2 text-xs text-muted-foreground">Adopt a published curriculum release to request this teacher.</p> : <Button type="button" size="sm" variant="outline" className="mt-2"
+              return <Button type="button" size="sm" variant="outline" className="mt-2"
                 disabled={Boolean(pendingRequest) || submitting !== null}
                 onClick={() => void selectTeacher(course.versionId, teacher.personId)}>
                 {pendingRequest ? "CAN review requested" : submitting === `${course.versionId}:${teacher.personId}`
@@ -135,7 +130,7 @@ function DemoTeacherMarketplacePage() {
               </Button>;
             })()}
           </article>)}
-        </div> : <p className="text-sm text-muted-foreground">No demo teacher matches this course. CAN staffing review required.</p>}
+        </div> : <p className="text-sm text-muted-foreground">No CAN teacher currently matches this course. CAN staffing review may be required.</p>}
       </section>)}
       {market.courses.length > 0 && courses.length === 0 &&
         <p className="rounded-lg border p-4 text-sm">No matches for this search.</p>}
