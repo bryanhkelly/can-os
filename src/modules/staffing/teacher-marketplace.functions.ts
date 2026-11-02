@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -24,6 +24,9 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
     const market = await readMarketplace(actor, data.programId);
     const [school] = await db.select({
       academicProviderOrganizationId: programs.academicProviderOrganizationId,
+      organizationId: programs.organizationId,
+      siteId: programs.siteId,
+      jurisdictionId: programs.jurisdictionId,
     }).from(programs).where(eq(programs.id, data.programId)).limit(1);
     // readMarketplace above verifies the actor's institution and program.
     if (!school) throw new Error("Selected school program no longer exists");
@@ -50,7 +53,10 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
       weeklyPattern: instructorAvailabilityWindows.weeklyPattern,
     }).from(courseTemplateVersions)
       .innerJoin(courseTemplates, eq(courseTemplates.id, courseTemplateVersions.courseTemplateId))
-      .innerJoin(instructorCapabilities, eq(instructorCapabilities.courseTemplateId, courseTemplates.id))
+      .innerJoin(instructorCapabilities, or(
+        eq(instructorCapabilities.courseTemplateId, courseTemplates.id),
+        and(isNull(instructorCapabilities.courseTemplateId), eq(instructorCapabilities.subject, courseTemplates.subject)),
+      ))
       .innerJoin(people, eq(people.id, instructorCapabilities.personId))
       .innerJoin(memberships, eq(memberships.personId, people.id))
       .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
@@ -61,6 +67,11 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
         eq(instructorAvailabilityWindows.id, instructionalCapacityOfferings.availabilityWindowId))
       .where(and(
         inArray(courseTemplateVersions.id, versionIds),
+        or(isNull(instructionalCapacityOfferings.organizationId), eq(instructionalCapacityOfferings.organizationId, school.organizationId)),
+        or(isNull(instructionalCapacityOfferings.siteId), school.siteId ? eq(instructionalCapacityOfferings.siteId, school.siteId) : sql`false`),
+        or(isNull(instructionalCapacityOfferings.programId), eq(instructionalCapacityOfferings.programId, data.programId)),
+        or(isNull(instructionalCapacityOfferings.jurisdictionId), eq(instructionalCapacityOfferings.jurisdictionId, school.jurisdictionId)),
+        gte(instructorAvailabilityWindows.endsAt, new Date()),
         or(
           and(eq(organizations.id, school.academicProviderOrganizationId),
             sql`coalesce(${organizations.metadata}->>'isSynthetic', 'false') <> 'true'`,
