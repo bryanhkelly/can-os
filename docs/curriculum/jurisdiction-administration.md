@@ -33,3 +33,34 @@ The dedicated CAN Demo Publisher is identified through publisher organization ow
 4. Implement demo-publisher approval reconciliation for all jurisdictions.
 5. Integrate readiness checks with program setup and adoption; verify no bypass of real-world regulatory requirements.
 6. Validate admin authorization, audit history and a full church program adoption flow.
+
+## First-class state profile and school setup integration
+
+Each jurisdiction has a canonical, linkable state profile page, with a stable URL and an authorized public/setup projection of the same versioned source data. Never duplicate legal rules into launch-only tables.
+
+### State profile information architecture
+- State overview: who can operate, supported CAN program models, applicability and confidence/verification status.
+- Funding pathways: programs, eligibility conditions, provider participation requirements, restrictions, deadlines, authoritative citations, and CAN readiness.
+- Launch requirements: responsibilities explicitly split among CAN as school of record, host church, and family; blockers vs follow-up actions.
+- Academic and curriculum policy: approval status by version and purpose, graduation/credit considerations and evidence.
+- Operations: attendance, student records, safeguarding, staff requirements, reporting and calendar obligations.
+- Sources and history: source URL, issuing authority, effective date, last verified date, superseded versions and reviewer.
+- Administrator controls: draft/review/publish workflow, change impact preview, and jurisdiction-specific exceptions.
+
+### One-hour school launch
+- Derive jurisdiction from the selected school site address; allow authorized correction and require confirmation before proceeding.
+- Show a concise 'Your state' card during setup with eligibility, CAN-supported model, funding opportunities, and top three actions.
+- Reuse canonical Journey/Action/readiness records to render the state-specific launch checklist. Do not create a parallel checklist or duplicate launch state.
+- Classify every requirement as CAN-owned, church-owned or family-owned and as required-before-opening, required-before-enrollment or follow-up.
+- Link each item to the full state profile and its evidence; expose detailed legal material progressively, not as a mandatory reading task.
+- Separate 'configured' from 'authorized to open'; no state profile or simulated demo approval grants real authorization.
+- Re-evaluate readiness when a site moves, a program type changes, or a jurisdiction rule becomes effective; preserve decision history.
+- Public-facing content may summarize verified rules and funding pathways but must omit internal deliberations, confidential documents and unverified claims.
+
+### Acceptance criteria
+1. Admin can open a stable first-class profile for TX or FL, review current policy and evidence, and publish a versioned update.
+2. A church selecting a Texas site sees the Texas profile summary and only relevant state requirements in the one-hour launch flow.
+3. Requirements remain owned by existing canonical readiness/action services; the profile provides policy inputs, not duplicate tasks.
+4. Changing the site to Florida recalculates applicable requirements without losing unrelated setup progress.
+5. Funding opportunities are described as conditional; approval, eligibility and authorization are independently represented.
+6. Curriculum and delivery remain separate: curriculum approval is scoped by jurisdiction and academic purpose; schedules belong to the program/section.
