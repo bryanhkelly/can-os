@@ -1,4 +1,4 @@
-import { PUBLIC_SITE_DOMAIN, slugFromPublicSiteHost } from "./public-site-address";
+import { PUBLIC_SITE_DOMAIN, slugFromPublicSiteHost } from "./public-site-address.ts";
 
 /** Only these known platform hosts can serve CAN OS, never a partner site. */
 const platformHosts = new Set([
