@@ -1,10 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import { uuidProgramSelectionSchema } from "@/lib/route-search";
 import { getCurriculumAdopterPrograms } from "@/modules/learning/curriculum-marketplace.functions";
 import { getDemoTeacherMarketplace } from "@/modules/staffing/demo-teacher-marketplace.functions";
+import { listDemoTeacherStaffingRequests, requestDemoTeacherStaffing } from "@/modules/staffing/teacher-staffing-requests.functions";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/operations/teacher-marketplace")({
   validateSearch: (search: Record<string, unknown>) => uuidProgramSelectionSchema.parse(search),
@@ -12,15 +14,39 @@ export const Route = createFileRoute("/operations/teacher-marketplace")({
   loader: ({ deps }) => safeLoader(async () => ({
     programs: await getCurriculumAdopterPrograms(),
     market: deps.programId ? await getDemoTeacherMarketplace({ data: { programId: deps.programId } }) : null,
+    staffingRequests: deps.programId ? await listDemoTeacherStaffingRequests({ data: { programId: deps.programId } }) : null,
   }), { authMessage: "An authorized school registrar in an isolated CAN demonstration environment is required." })(),
   component: DemoTeacherMarketplacePage,
 });
 
 function DemoTeacherMarketplacePage() {
   const result = Route.useLoaderData();
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [targetSection, setTargetSection] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   if (!result.ok) return <LoaderFailure title="CAN teacher marketplace" outcome={result}/>;
-  const { programs, market } = result.data;
+  const { programs, market, staffingRequests } = result.data;
+  async function selectTeacher(courseVersionId: string, teacherPersonId: string) {
+    if (!market || submitting) return;
+    setError(""); setNotice("");
+    const selectionKey = `${courseVersionId}:${teacherPersonId}`;
+    setSubmitting(selectionKey);
+    try {
+      const outcome = await requestDemoTeacherStaffing({ data: {
+        requestId: crypto.randomUUID(),
+        programId: market.program.id, courseVersionId, teacherPersonId,
+        ...(targetSection[courseVersionId] ? { sectionId: targetSection[courseVersionId] } : {}),
+      } });
+      await router.invalidate();
+      setNotice(outcome.replayed ? "Your existing CAN staffing request is recorded." :
+        "CAN staffing request recorded. Teacher assignment is not yet authorized.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The teacher request could not be saved.");
+    } finally { setSubmitting(null); }
+  }
   const search = query.trim().toLowerCase();
   const courses = market?.courses.filter(course =>
     !search || [course.code, course.title, course.subject, ...course.teacherOptions.map(t => t.name)]
@@ -32,6 +58,8 @@ function DemoTeacherMarketplacePage() {
       After selecting your school curriculum, review CAN-managed instructor options by course.
       A course recommendation can be carried into class staffing, with individual section overrides.
     </p>
+    {error && <p role="alert" className="rounded-lg border border-destructive px-4 py-3 text-sm">{error}</p>}
+    {notice && <p role="status" className="rounded-lg border px-4 py-3 text-sm">{notice}</p>}
     <p role="status" className="rounded-lg border px-4 py-3 text-sm">
       Demonstration marketplace. All profiles, experience, availability and seat counts are synthetic.
       No teacher listed here is credential-verified or approved for real-world assignment.
@@ -72,12 +100,35 @@ function DemoTeacherMarketplacePage() {
           </div>
           <p className="text-xs text-muted-foreground">{course.sectionCount} current classes</p>
         </div>
+        {course.sections.length > 0 && <label className="block max-w-sm space-y-1 text-sm">
+          <span className="font-medium">Apply selection to</span>
+          <select value={targetSection[course.versionId] ?? ""}
+            onChange={event => setTargetSection(previous => ({ ...previous, [course.versionId]: event.target.value }))}
+            className="w-full rounded-lg border bg-background px-3 py-2">
+            <option value="">Course-wide staffing request</option>
+            {course.sections.map(section => <option key={section.id} value={section.id}>
+              {section.code} · {section.title}
+            </option>)}
+          </select>
+        </label>}
         {course.teacherOptions.length ? <div className="grid gap-3 md:grid-cols-2">
           {course.teacherOptions.map(teacher => <article key={teacher.personId}
             className="space-y-1 rounded-lg border p-3">
             <p className="font-semibold">{teacher.name} <span className="text-xs font-normal text-muted-foreground">· Demo</span></p>
             <p className="text-sm text-muted-foreground">Live online · Illustrative capacity: {teacher.illustrativeSeatCapacity} seats</p>
             <p className="text-xs text-muted-foreground">Teaching eligibility not verified. Assignment requires CAN approval.</p>
+            {(() => {
+              const sectionId = targetSection[course.versionId] || null;
+              const pendingRequest = staffingRequests?.requests.find(request =>
+                request.status === "open" && request.courseVersionId === course.versionId &&
+                request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
+              return <Button type="button" size="sm" variant="outline" className="mt-2"
+                disabled={Boolean(pendingRequest) || submitting !== null}
+                onClick={() => void selectTeacher(course.versionId, teacher.personId)}>
+                {pendingRequest ? "CAN review requested" : submitting === `${course.versionId}:${teacher.personId}`
+                  ? "Submitting…" : "Request CAN staffing review"}
+              </Button>;
+            })()}
           </article>)}
         </div> : <p className="text-sm text-muted-foreground">No demo teacher matches this course. CAN staffing review required.</p>}
       </section>)}
