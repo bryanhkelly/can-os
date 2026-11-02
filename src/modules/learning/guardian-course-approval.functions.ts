@@ -225,7 +225,7 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
           eq(accessAccounts.disabled,false),
         ))
         .where(and(
-          eq(accountPersonGrants.role,"registrar"),
+          inArray(accountPersonGrants.role, ["registrar", "site_admin"]),
           eq(accountPersonGrants.active,true),eq(accountPersonGrants.organizationId,request.organizationId),
           or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,request.siteId)),
         )).limit(20);

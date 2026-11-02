@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db,type Database } from "@/db/client";
 import { accessAccounts,accountPersonGrants,admissionOffers,applications,actions,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,publicAdmissionsInterests,studentProfiles } from "@/db/schema";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
@@ -41,13 +42,13 @@ const applicant=z.union([
 ]);
 export const registrar=createServerOnlyFn(async()=>{
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("admissions registrar");
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("admissions registrar");
  assertCapability(actor,"enrollment.decide");
  return actor;
 });
 export const listAdmissionsIntakePrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||!actor.scope.organizationIds?.length)
   throw new AuthorizationError("admissions registrar");
  assertCapability(actor,"enrollment.decide");
  return db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs)

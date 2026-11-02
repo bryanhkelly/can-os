@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -36,7 +37,7 @@ const requestInput = z.object({
 
 async function requireLocalSite(siteId: string, capability: "network.affiliations.request" | "network.affiliations.read") {
   const actor = await getCommandContext(getRequest());
-  if (actor.role !== "registrar" || !actor.actorPersonId) throw new AuthorizationError("local school administrator");
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId) throw new AuthorizationError("local school administrator");
   assertCapability(actor, capability);
   const [site] = await db.select({
     id: sites.id, name: sites.name, organizationId: sites.organizationId,
@@ -52,7 +53,7 @@ async function requireLocalSite(siteId: string, capability: "network.affiliation
 /** Requestable networks have a real verified active HQ grant; no school records are exposed. */
 export const listAffiliationNetworks = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await getCommandContext(getRequest());
-  if (actor.role !== "registrar" || !actor.actorPersonId) throw new AuthorizationError("local school administrator");
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId) throw new AuthorizationError("local school administrator");
   assertCapability(actor, "network.affiliations.read");
   const networks = await db.selectDistinct({ id: organizations.id, name: organizations.name })
     .from(organizations)

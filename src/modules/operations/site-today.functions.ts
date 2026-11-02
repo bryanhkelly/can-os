@@ -1,3 +1,4 @@
+import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -26,7 +27,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
   .validator((input: unknown) => requestSchema.parse(input))
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
-    if (!actor.actorPersonId || !["registrar","site_leader"].includes(actor.role) ||
+    if (!actor.actorPersonId || !rolesAllow(["registrar","site_leader"], actor.role) ||
         !actor.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site.today.read");
     }
@@ -151,14 +152,14 @@ export const getSiteToday = createServerFn({ method: "GET" })
     // Only registrars receive student-free admissions and academic aggregates.
     // A local church/site leader keeps opening, staffing and assigned work,
     // without gaining broad family, document or intervention visibility.
-    const operationalActor = actor.role === "registrar" ? {...actor,scope:{...actor.scope,
+    const operationalActor = hasRegistrarAuthority(actor.role) ? {...actor,scope:{...actor.scope,
       siteIds:[site.id],programIds}} : null;
     const [operationalRecord,staffingRecord] = operationalActor ? await Promise.all([
       readFullFlowOperations(operationalActor),
       getSchoolOperationsCommandCenter(operationalActor),
     ]) : [null,null];
     const attentionItems = buildDailyOperationsAttention({
-      role: actor.role as "registrar"|"site_leader",
+      role: actor.role as "registrar"|"site_admin"|"site_leader",
       actorPersonId: actor.actorPersonId,
       actions: serializedActions.map(action => ({...action,
         priority: action.priority === "urgent" ? "critical" : action.priority === "low" ? "normal" : action.priority,

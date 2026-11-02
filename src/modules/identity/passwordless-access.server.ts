@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
@@ -13,6 +14,7 @@ import { recordSessionSecurityEvent } from "./session-security-audit.server";
 import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
+import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -117,7 +119,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   // The same leader may sign in again before completing setup. Prefer the
   // existing approved church grant over unrelated memberships, and resume that
   // exact Site rather than dropping them into a generic admissions workspace.
-  const activeRegistrarIds = grants.filter(grant=>grant.role==="registrar").map(grant=>grant.id);
+  const activeRegistrarIds = grants.filter(grant=>hasRegistrarAuthority(grant.role)).map(grant=>grant.id);
   const returningOnboarding = !onboardingInvitation && activeRegistrarIds.length
     ? await tx.select({
         siteId: churchOnboardingRequests.siteId,
@@ -160,11 +162,11 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
-/** Shared-code sign-in is limited to the fixed, tenant-scoped demo identities. */
+/** Shared-code sign-in requires an explicitly provisioned, currently valid demo binding. */
 export async function redeemDemoAccess(
  rawEmail:string,
  code:string,
-):Promise<{setCookie:string;accountId:string;role:string}> {
+):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
  if(code!==LOCAL_DEMO_ACCESS_CODE) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
@@ -172,7 +174,8 @@ export async function redeemDemoAccess(
  try{email=normalizeAccessEmail(rawEmail);}catch{
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
- if(!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email)) {
+ if(!isDemoAccountEmail(email) ||
+   (email.endsWith("@valorschool.demo")&&!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email))) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
  // Fail with a safe configuration category before doing database work.
@@ -188,12 +191,21 @@ export async function redeemDemoAccess(
    .limit(1);
   if(!account)throw new InvalidAccessCredentialError("Invalid demo credentials");
   step="grant_lookup";
-  const {grants}=await readSessionGrants(account.id,account.email,tx);
+  if(!email.endsWith("@valorschool.demo")){
+   const bindings=await readDemoStaffBindings(account.id,tx);
+   if(bindings.length){
+    const pending=await listPendingStaffInvitations(tx,account.id);
+    await acceptStaffInvitations(tx,account.id,pending.filter(invitation=>
+     bindings.some(binding=>matchesDemoStaffBinding(binding,invitation,email))),now);
+   }
+  }
+  const {grants,launchSiteId}=await readSessionGrants(account.id,account.email,tx);
   const accountGrants=grants.filter(candidate=>candidate.accountId===account.id);
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
    ?accountGrants.find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
    :accountGrants.length===1?accountGrants[0]:undefined;
-  if(!grant||!isApprovedDemoGrant(grant,email))throw new InvalidAccessCredentialError("Invalid demo credentials");
+  if(!grant||(email.endsWith("@valorschool.demo")&&!isApprovedDemoGrant(grant,email)))
+   throw new InvalidAccessCredentialError("Invalid demo credentials");
   const secret=issueOpaqueSecret();
   step="session_creation";
   const [session]=await tx.insert(accessSessions).values({
@@ -214,6 +226,7 @@ export async function redeemDemoAccess(
   return {
    accountId:account.id,
    role:grant.role,
+   ...(launchSiteId ? {launchSiteId} : {}),
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000),
   };
  });

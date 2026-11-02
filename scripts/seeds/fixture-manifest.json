@@ -13,6 +13,11 @@
     "identity-demo-accounts.sql"
   ],
   "routes": {
+    "/schools/new": {
+      "persona": "anonymous visitor",
+      "fixtureRequired": false,
+      "rationale": "Public bootstrap starts with an empty school. Isolated setup tests create distinct .demo tenants rather than copying Valor fixtures."
+    },
     "/actions/$actionId": {
       "persona": "registrar, teacher, specialist, counselor",
       "seeds": [

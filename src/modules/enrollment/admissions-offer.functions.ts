@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority, rolesAllow } from "@/domain/school-roles";
 import {createServerFn} from "@tanstack/react-start";
 import {and,asc,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
@@ -12,7 +13,7 @@ import {familyApplicationSchoolYearId} from "@/domain/family-application-handoff
 
 async function authorizedActor(role:"registrar"|"guardian",capability:string,programId:string){
  const actor=await getCommandContext(getRequest());
- if(actor.role!==role||!actor.actorPersonId)throw new AuthorizationError(role+" admission access");
+ if(!rolesAllow([role],actor.role)||!actor.actorPersonId)throw new AuthorizationError(role+" admission access");
  assertCapability(actor,capability);
  if(role==="guardian"){
   // Guardian access remains bound to the explicit Program grant and the
@@ -37,7 +38,7 @@ export const getAdmissionOfferOptions=createServerFn({method:"GET"})
  .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("registrar offer options");
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("registrar offer options");
  assertCapability(actor,"enrollment.decide");
  const scoped=await resolveOperationsSelection(actor,{siteId:data.siteId,programId:data.programId});
  if(!process.env.DATABASE_URL||!data.applicationId||!scoped.programIds.length)return [];

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { eq, desc, and, inArray, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -50,7 +51,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
        eq(s.fieldTrips.programId,s.enrollments.programId)),
    )):[];
  const guardianTripIds=new Set(guardianTripRows.map(row=>row.id));
- const staffTripRows=tripNoticeIds.length&&context.role==="registrar"?
+ const staffTripRows=tripNoticeIds.length&&hasRegistrarAuthority(context.role)?
   await db.select({id:s.fieldTrips.id}).from(s.fieldTrips)
    .where(and(inArray(s.fieldTrips.id,tripNoticeIds),
      eq(s.fieldTrips.proposedByPersonId,personId),
@@ -82,7 +83,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const permittedSchoolAlerts=new Set(accessibleSchoolAlerts.map(row=>row.id));
  const handoffIds=rows.filter(n=>n.type==="program_opening_handoff"&&n.resourceType==="action"&&n.resourceId)
   .map(n=>n.resourceId!);
- const handoffs=handoffIds.length&&context.role==="registrar"?await db.select({id:s.actions.id,siteId:s.actions.siteId})
+ const handoffs=handoffIds.length&&hasRegistrarAuthority(context.role)?await db.select({id:s.actions.id,siteId:s.actions.siteId})
   .from(s.actions).where(and(inArray(s.actions.id,handoffIds),eq(s.actions.type,"program_opening_handoff"),
    eq(s.actions.ownerPersonId,personId),inArray(s.actions.siteId,context.scope.siteIds??[]),
    inArray(s.actions.programId,context.scope.programIds??[]),
@@ -154,7 +155,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const familyChangeChildByAction=new Map(familyChangeActions.map(row=>[row.id,row.studentPersonId]));
  const operatorChangeNoticeIds=rows.filter(n=>n.type==="guardian_enrollment_change_requested"&&
   n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
- const operatorChangeActions=operatorChangeNoticeIds.length&&context.role==="registrar"?
+ const operatorChangeActions=operatorChangeNoticeIds.length&&hasRegistrarAuthority(context.role)?
   await db.select({id:s.actions.id}).from(s.actions).where(and(
    inArray(s.actions.id,operatorChangeNoticeIds),
    eq(s.actions.type,"guardian_enrollment_change_request"),
@@ -166,7 +167,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const recordsHandoffNoticeIds=rows.filter(n=>
    n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId
  ).map(n=>n.resourceId!);
- const scopedHandoffNotices=recordsHandoffNoticeIds.length&&context.role==="registrar"?
+ const scopedHandoffNotices=recordsHandoffNoticeIds.length&&hasRegistrarAuthority(context.role)?
    await db.select({id:s.actions.id}).from(s.actions).where(and(
      inArray(s.actions.id,recordsHandoffNoticeIds),
      eq(s.actions.type,"transfer_academic_records_handoff"),
@@ -189,7 +190,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.actions.programId,context.scope.programIds??[]),
    inArray(s.actions.organizationId,context.scope.organizationIds??[]),
   )):[];
- const healthStaffActionIds=new Set(context.role==="registrar"?healthReviewActions.map(row=>row.id):[]);
+ const healthStaffActionIds=new Set(hasRegistrarAuthority(context.role)?healthReviewActions.map(row=>row.id):[]);
  const requestedHealthChildren=healthReviewActions.filter(row=>
   context.role==="guardian"&&row.requestedBy.requestedByGuardianPersonId===personId);
  const verifiedHealthChildren=requestedHealthChildren.length?await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
@@ -202,7 +203,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   permittedHealthPersons.has(row.studentPersonId)).map(row=>[row.id,row.studentPersonId]));
  const registrarCourseDecisionIds=rows.filter(n=>n.type==="course_registration_guardian_decision_for_registrar"&&
   n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
- const registrarCourseActions=registrarCourseDecisionIds.length&&context.role==="registrar"?
+ const registrarCourseActions=registrarCourseDecisionIds.length&&hasRegistrarAuthority(context.role)?
   await db.select({id:s.actions.id}).from(s.actions).where(and(
    inArray(s.actions.id,registrarCourseDecisionIds),
    eq(s.actions.type,"course_registration_request"),
@@ -241,7 +242,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="transfer_destination_transcript_ready"&&
    n.resourceType==="application"&&n.resourceId
  ).map(n=>n.resourceId!);
- const receivingTranscriptApplications=transcriptNoticeIds.length&&context.role==="registrar"?
+ const receivingTranscriptApplications=transcriptNoticeIds.length&&hasRegistrarAuthority(context.role)?
    await db.select({id:s.applications.id})
      .from(s.applications)
      .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
@@ -445,7 +446,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
        action.metadata.requestedByGuardianPersonId===personId)
        verifiedGradeActions.set(action.id,
          `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}&submission=${encodeURIComponent(action.submissionId)}`);
-   }else if(context.role==="registrar"){
+   }else if(hasRegistrarAuthority(context.role)){
      for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
        verifiedGradeActions.set(action.id,`/operations?action=${encodeURIComponent(action.id)}`);
    }else if(context.role==="teacher"){
@@ -563,7 +564,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
    n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?"/guardian/field-trips":
-   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="registrar"&&staffTripIds.has(n.resourceId)?"/operations/field-trips":
+   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&hasRegistrarAuthority(context.role)&&staffTripIds.has(n.resourceId)?"/operations/field-trips":
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="transfer_destination_transcript_ready"&&n.resourceType==="application"&&n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)?
    `/admissions/intake?application=${encodeURIComponent(n.resourceId)}`:
@@ -601,7 +602,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
       `/classes?section=${encodeURIComponent(thread.contextId)}&tab=announcements`:null;
     return memberThreadIds.has(thread.id)?`/messages?thread=${encodeURIComponent(thread.id)}`:null;})():
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&context.role==="registrar"?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
    n.type==="course_registration_guardian_review"&&context.role==="guardian"?"/guardian/course-approvals":
    n.type==="field_trip_permission_requested"&&context.role==="guardian"?"/guardian/field-trips":
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
@@ -609,7 +610,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
    n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/site/day#pickup":
-   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });

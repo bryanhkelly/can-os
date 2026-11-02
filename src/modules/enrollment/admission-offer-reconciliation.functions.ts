@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, eq, lt } from "drizzle-orm";
@@ -17,7 +18,7 @@ export const reconcileExpiredAdmissionOffers = createServerFn({ method: "POST" }
   .validator((value: unknown) => z.object({ programId: z.string().uuid() }).parse(value))
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
-    if (actor.role !== "registrar" || !actor.actorPersonId ||
+    if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId ||
         !actor.scope.programIds?.includes(data.programId))
       throw new AuthorizationError("registrar offer reconciliation scope");
     assertCapability(actor, "enrollment.decide");

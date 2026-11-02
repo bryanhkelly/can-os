@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { familyActionWorkspaceLink } from "./family-needs";
 
 export type DailyAttentionCategory =
@@ -82,7 +83,7 @@ function actionHref(action: DailyOperationsAction): string {
   return "/operations?" + query.toString();
 }
 
-function actionAttention(action: DailyOperationsAction, role: "registrar" | "site_leader"): DailyAttentionItem {
+function actionAttention(action: DailyOperationsAction, role: "registrar" | "site_admin" | "site_leader"): DailyAttentionItem {
   const category = actionCategory(action);
   return {
     id: "action:" + action.id,
@@ -122,7 +123,7 @@ function sortAttention(items: DailyAttentionItem[]): DailyAttentionItem[] {
  * student-free admissions and academic aggregates in their verified scope.
  */
 export function buildDailyOperationsAttention(input: {
-  role: "registrar" | "site_leader";
+  role: "registrar" | "site_admin" | "site_leader";
   actorPersonId: string;
   actions: readonly DailyOperationsAction[];
   staffingIssues?: readonly DailyStaffingIssue[];
@@ -130,7 +131,7 @@ export function buildDailyOperationsAttention(input: {
 }): DailyAttentionItem[] {
   const actions = input.actions.filter(action =>
     !restrictedBroadActionTypes.has(action.type ?? "") &&
-    (input.role === "registrar" || action.ownerPersonId === input.actorPersonId ||
+    (hasRegistrarAuthority(input.role) || action.ownerPersonId === input.actorPersonId ||
       action.type === "program_opening_handoff" || action.openingHandoff ||
       (action.type === "onsite_coverage_gap" && action.ownerPersonId === null)));
   const items = actions.map(action => actionAttention(action, input.role));

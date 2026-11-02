@@ -1,8 +1,9 @@
+import { rolesAllow } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { applications,documents,journeyRequirements,journeys } from "@/db/schema";
 import {assertR2DemoEnabled,enrollmentDocumentStorageVerified} from "@/domain/r2-document-access";
 import { EventTypes } from "@/domain/event-types";
-import { isDemoTenantOrganization } from "@/domain/local-demo-access";
+import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -20,7 +21,7 @@ async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upl
  const app=await authorizeEnrollmentApplication(context,applicationId);
  if(mode==="upload"&&["withdrawn","declined"].includes(app.stage))
   throw new Error("This application is closed to enrollment document changes");
- if(mode==="upload"&&isDemoTenantOrganization(app.organizationId)){
+ if(mode==="upload"&&await isDemoTenantOrganization(app.organizationId)){
   assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
  }else if(mode==="upload"&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
   throw new Error("Live enrollment document uploads are not enabled for this deployment");
@@ -117,7 +118,7 @@ export const getEnrollmentDocumentDownload=createServerFn({method:"POST"})
 /** Deployment switches only; never exposes R2 credentials. */
 export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET"}).handler(async()=>{
  const context=await getCommandContext(getRequest());
- if(!context.actorPersonId||!["registrar","guardian"].includes(context.role))
+ if(!context.actorPersonId||!rolesAllow(["registrar","guardian"], context.role))
   throw new Error("Enrollment document access denied");
  let configured=true;
  try{r2Config()}catch{configured=false}

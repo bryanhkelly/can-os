@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { accountPersonGrants,actions,guardianRelationships,people,programs,sites,studentProfiles } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -21,7 +22,7 @@ import { assertLocalDelegationIssuer } from "@/domain/site-local-delegation-poli
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
- if(!actor.actorPersonId||actor.role!=="registrar"||!actor.scope.siteIds?.length)
+ if(!actor.actorPersonId||!hasRegistrarAuthority(actor.role)||!actor.scope.siteIds?.length)
   throw new AuthorizationError("authorized school operator");
  return actor;
 }
@@ -56,7 +57,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
      [record.description??"Guardian requests transfer",
       "Destination: "+(typeof record.metadata.destinationSchoolName==="string"?record.metadata.destinationSchoolName:"Not specified"),
       ...(typeof record.metadata.intendedLastDay==="string"?["Requested last day: "+record.metadata.intendedLastDay]:[]),
-      ...(actor.role==="registrar"&&typeof record.metadata.destinationSchoolContactEmail==="string"?
+      ...(hasRegistrarAuthority(actor.role)&&typeof record.metadata.destinationSchoolContactEmail==="string"?
         ["Destination records contact: "+record.metadata.destinationSchoolContactEmail]:[]),
      ].join(" · ")
    :record.description??record.type.replaceAll("_"," "),
@@ -80,7 +81,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
    enrollmentChangeKind:record?.type==="guardian_enrollment_change_request"&&
      (record.metadata.kind==="withdrawal"||record.metadata.kind==="transfer")?record.metadata.kind:null};
  }));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor","site_leader"])));
+ const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor","site_leader"])));
  const [siteChoices,programChoices]=await Promise.all([
   db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
   actor.scope.programIds?.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,actor.scope.programIds),isNotNull(programs.siteId),...(data.siteId?[eq(programs.siteId,data.siteId)]:[]))) : Promise.resolve([]),
@@ -174,7 +175,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    }
    if(data.ownerPersonId&&!coverageGap){
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
-    const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"]))).limit(1);
+    const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
     if(academic)await assertAcademicActionStaff(tx,data.ownerPersonId,record);
    }

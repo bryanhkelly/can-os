@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getStudent360 } from "@/modules/profiles/directory.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
 
 const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
@@ -96,7 +97,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
               ?canOpenReferrals
                 ?<Link to="/support" search={{referral:action.id}} className="hover:underline">{action.title}</Link>
                 :action.title
-              :profile.viewerRole==="registrar"||action.type==="academic_intervention"
+              :hasRegistrarAuthority(profile.viewerRole)||action.type==="academic_intervention"
                 ?<Link to="/actions/$actionId" params={{actionId:action.id}} className="hover:underline">{action.title}</Link>
                 :action.title}</h3>
               <StatusBadge tone={action.priority === "high" || action.priority === "urgent" ? "attention" : "neutral"}>{action.status.replaceAll("_", " ")}</StatusBadge></div>

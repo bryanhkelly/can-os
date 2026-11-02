@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -10,7 +11,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
  */
 export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await getCommandContext(getRequest());
-  if (!actor.actorPersonId || actor.role !== "registrar" || !actor.scope.siteIds?.length)
+  if (!actor.actorPersonId || !hasRegistrarAuthority(actor.role) || !actor.scope.siteIds?.length)
     throw new AuthorizationError("authorized school operator");
   const { getOutboxHealth } = await import("@/workers/domain-event-worker");
   return getOutboxHealth();

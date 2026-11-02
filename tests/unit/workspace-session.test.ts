@@ -26,6 +26,7 @@ beforeEach(() => {
     const query = {
       from: () => query,
       innerJoin: () => query,
+      leftJoin: () => query,
       where: (filter: SQL) => {
         state.filters.push(filter);
         return query;
@@ -44,6 +45,7 @@ describe("shared workspace session read", () => {
       [{ email: "staff@example.org" }],
       [{ id: "student-grant", accountId: "account", personId: "person", role: "student",
         firstName: "Test", lastName: "Learner", active: true }],
+      [], [],
       [{ id: "site", name: "School", organizationId: "org" }],
       [{ id: "program", name: "Program", siteId: "site" }],
     ];
@@ -59,8 +61,8 @@ describe("shared workspace session read", () => {
     expect(queries[0]?.params).toEqual(["account"]);
     expect(queries[1]?.params.slice(0, 4)).toEqual(["account", true, false, true]);
     expect(queries[1]?.params).toContain("student");
-    expect(queries[2]?.params).toEqual(["site"]);
-    expect(queries[3]?.params).toEqual(["program"]);
+    expect(queries[4]?.params).toEqual(["site"]);
+    expect(queries[5]?.params).toEqual(["program"]);
     expect(queries[1]?.sql).toContain("people");
     expect(queries[1]?.sql).toContain("active");
     expect(result).not.toHaveProperty("sessionId");
@@ -78,7 +80,7 @@ describe("shared workspace session read", () => {
     ];
     const result = await readWorkspaceSession(new Request("http://localhost/access/session"));
     expect(result).toMatchObject({ authenticated: true, sites: [], programs: [] });
-    expect(state.select).toHaveBeenCalledTimes(2);
+    expect(state.select).toHaveBeenCalledTimes(4);
   });
 
   it("returns signed out for authorization failures without reading display data", async () => {

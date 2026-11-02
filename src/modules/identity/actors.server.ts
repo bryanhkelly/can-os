@@ -3,8 +3,9 @@ import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit,type MutationTx } from "@/platform/mutation";
 import { getRequest } from "@tanstack/react-start/server";
+import { rolesAllow } from "@/domain/school-roles";
 
-export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "specialist" | "counselor" | "room_facilitator" | "site_leader" | "site_staff" | "safeguarding_responder" | "safeguarding_lead";
+export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "site_admin" | "specialist" | "counselor" | "room_facilitator" | "site_leader" | "site_staff" | "safeguarding_responder" | "safeguarding_lead";
 
 export type Actor = AccessContext & { actorPersonId: string };
 
@@ -18,7 +19,7 @@ export async function requireActor(
 ): Promise<Actor> {
   const context = await getCommandContext(getRequest());
   if (!context.actorPersonId) throw new AuthorizationError("authenticated person");
-  if (!roles.includes(context.role as ActorRole)) {
+  if (!rolesAllow(roles, context.role)) {
     throw new AuthorizationError(`role: ${roles.join(" or ")}`);
   }
   if (capability) assertCapability(context, capability);

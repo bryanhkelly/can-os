@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { AuthorizationError } from "@/domain/command-context";
 import {
   registerReadScope,
@@ -40,7 +41,7 @@ async function insightReadScope({ db, s, ops }: ReadScopeHelpers, context: Scope
     if (!siteIds.length) return ops.sql`false`;
     return ops.and(ops.isNotNull(s.insights.sectionId), ops.inArray(s.sections.siteId, siteIds));
   }
-  if (context.role === "registrar") {
+  if (hasRegistrarAuthority(context.role)) {
     if (!siteIds.length) return ops.sql`false`;
     const siteWide: Parameters<typeof ops.or>[0][] = [ops.inArray(s.insights.siteId, siteIds)];
     if (orgIds.length) siteWide.push(ops.inArray(s.insights.organizationId, orgIds));
@@ -69,7 +70,7 @@ export async function assertInsightManageScope(
     if (!section?.siteId || !siteIds.includes(section.siteId)) throw new AuthorizationError("insight site scope");
     return;
   }
-  if (context.role !== "registrar") throw new AuthorizationError("insight site scope");
+  if (!hasRegistrarAuthority(context.role)) throw new AuthorizationError("insight site scope");
   const inScope = (insight.siteId !== null && siteIds.includes(insight.siteId))
     || (insight.organizationId !== null && orgIds.includes(insight.organizationId));
   if (!inScope) throw new AuthorizationError("insight site scope");

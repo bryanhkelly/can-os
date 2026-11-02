@@ -1,3 +1,4 @@
+import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -266,7 +267,7 @@ export async function reviewAttendanceExcuse(
 ): Promise<{ excuseId: string; correctionAttendanceEventId?: string }> {
   assertCapability(context, "attendance.excuse.review");
   const reviewerRole = (context as CommandContext & { role?: string }).role;
-  if (!context.actorPersonId || !["registrar", "teacher"].includes(reviewerRole ?? ""))
+  if (!context.actorPersonId || !rolesAllow(["registrar", "teacher"], reviewerRole ?? ""))
     throw new Error("Verified staff reviewer identity is required");
   const actorPersonId = context.actorPersonId;
   let submitterEmailNotice: { submittedByPersonId: string; organizationId: string } | undefined;
@@ -463,7 +464,7 @@ export async function closeObsoleteAttendanceExcuse(
   input: { excuseId: string; reason: string; expectedCurrentEventId: string },
 ): Promise<{ excuseId: string }> {
   assertCapability(context, "attendance.excuse.review");
-  if ((context as CommandContext & { role?: string }).role !== "registrar" || !context.actorPersonId)
+  if (!hasRegistrarAuthority((context as CommandContext & { role?: string }).role) || !context.actorPersonId)
     throw new Error("A verified registrar must close an obsolete excuse");
   const reason = input.reason.trim();
   if (reason.length < 10 || reason.length > 2000)

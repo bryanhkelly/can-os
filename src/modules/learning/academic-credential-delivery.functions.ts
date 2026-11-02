@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { personLegalName } from "@/domain/person-name";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
@@ -17,7 +18,7 @@ async function resources(){const [{db},s]=await Promise.all([import("@/db/client
 async function registrar(){
  const context=await getCommandContext(getRequest());
  assertCapability(context,"enrollment:manage");
- if(context.role!=="registrar"||!context.actorPersonId||context.sessionAccountId)throw new AuthorizationError("verified issuer registrar");
+ if(!hasRegistrarAuthority(context.role)||!context.actorPersonId||context.sessionAccountId)throw new AuthorizationError("verified issuer registrar");
  return context;
 }
 async function documentData(db:Awaited<ReturnType<typeof resources>>["db"],s:Awaited<ReturnType<typeof resources>>["s"],kind:"transcript"|"diploma",credentialId:string){

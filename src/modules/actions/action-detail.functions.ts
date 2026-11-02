@@ -1,3 +1,4 @@
+import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { eq } from "drizzle-orm";
@@ -11,7 +12,7 @@ export const getActionDetail = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
     setResponseHeader("Cache-Control", "private, no-store");
-    if (!actor.actorPersonId || !["registrar", "teacher", "specialist", "counselor"].includes(actor.role)) {
+    if (!actor.actorPersonId || !rolesAllow(["registrar", "teacher", "specialist", "counselor"], actor.role)) {
       throw new AuthorizationError("staff Action detail");
     }
     assertCapability(actor, "action.resolve");
@@ -29,7 +30,7 @@ export const getActionDetail = createServerFn({ method: "GET" })
       }
       if (action.type === "academic_intervention" && action.subjectType === "student_profile" && action.sectionId) {
         await assertAcademicActionAuthority(tx, actor, action);
-      } else if (actor.role !== "registrar" || !action.siteId) {
+      } else if (!hasRegistrarAuthority(actor.role) || !action.siteId) {
         throw new AuthorizationError("Action requires its owning workspace");
       }
       return {
@@ -39,8 +40,8 @@ export const getActionDetail = createServerFn({ method: "GET" })
         resolvedAt: action.resolvedAt?.toISOString() ?? null,
         resolutionNote: action.resolutionNote,
         siteId: action.siteId, programId: action.programId,
-        canManageOperations: actor.role === "registrar" && action.siteId !== null,
-        workspaceHome: actor.role === "registrar" ? "/operations" as const
+        canManageOperations: hasRegistrarAuthority(actor.role) && action.siteId !== null,
+        workspaceHome: hasRegistrarAuthority(actor.role) ? "/operations" as const
           : actor.role === "teacher" ? "/teacher" as const
           : actor.role === "counselor" ? "/counselor" as const : "/coach" as const,
       };

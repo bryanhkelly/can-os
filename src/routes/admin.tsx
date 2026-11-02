@@ -124,6 +124,8 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
       });
       setNotice(!result.pending
         ? `${values.email} already has an active grant; no new invitation was sent.`
+        : "demoAccess" in result && result.demoAccess
+          ? `Demo invitation recorded for ${values.email}. Sign in with code 000000 to accept the exact-school role; no email is sent.`
         : result.emailSent
           ? `Invitation emailed to ${values.email}. Their exact-site role stays inactive until they accept the secure link.`
           : `Invitation recorded for ${values.email}, but email delivery was not confirmed. Retry the same invitation; no duplicate grant will be created.`);

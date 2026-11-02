@@ -4,6 +4,20 @@ This document defines production concepts. Prototype object names do not overrid
 
 ## Identity and relationships
 
+### Site Admin
+
+`site_admin` is a distinct Site-bound school setup and administration role above
+registrar. It inherits registrar workflow capabilities without changing its
+audited role or weakening resource scope, relationships, institutional grants,
+independent review or opening-readiness requirements. It cannot provision
+network administrators. A registrar cannot appoint or deactivate a Site Admin.
+
+Public `.demo` school bootstrap creates a new canonical Organization/Site and
+its initial Site Admin, then reuses normal Launch Studio for Program creation.
+Exact demo registry and staff-invitation bindings, not the domain suffix or
+fixture provenance alone, authorize shared-code identities. See
+[identity and demo access](./identity-and-demo-access.md).
+
 ### Person
 One permanent human identity.
 

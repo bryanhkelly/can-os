@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -50,7 +51,7 @@ export async function scheduleExtendedSessions(
     facilitatorPersonId?: string;
   },
 ) {
-  if (actor.role !== "registrar" || !actor.actorPersonId)
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId)
     throw new AuthorizationError("extended-learning registrar");
   assertCapability(actor, "program.launch.start");
   const actorPersonId = actor.actorPersonId;

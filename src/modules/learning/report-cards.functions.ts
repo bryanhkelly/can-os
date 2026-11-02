@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { personDisplayName, personLegalName } from "@/domain/person-name";
 import {
 assertCapability,
@@ -978,7 +979,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
     setResponseHeader("Cache-Control", "private, no-store");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "enrollment:manage");
-    if (context.role !== "registrar" || !context.actorPersonId) {
+    if (!hasRegistrarAuthority(context.role) || !context.actorPersonId) {
       throw new AuthorizationError("registrar transcript issuance");
     }
     const query = data.query.trim();
@@ -1116,7 +1117,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await getCommandContext(getRequest());
     assertCapability(context, "enrollment:manage");
-    if (context.role !== "registrar" || !context.actorPersonId) {
+    if (!hasRegistrarAuthority(context.role) || !context.actorPersonId) {
       throw new AuthorizationError("registrar transcript issuance");
     }
     if (!UUID.test(data.studentPersonId)) {

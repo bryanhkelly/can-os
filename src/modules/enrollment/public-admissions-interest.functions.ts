@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { parseInterestPageCursor, makeInterestPageCursor } from "@/domain/public-admissions-interest";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -16,7 +17,7 @@ async function requireAdmissionsIntakeReader() {
   const actor = await getCommandContext(getRequest());
   const programIds = actor.scope.programIds;
   const organizationIds = actor.scope.organizationIds;
-  if (actor.role !== "registrar" || !actor.actorPersonId ||
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId ||
     !programIds?.length || !organizationIds?.length)
     throw new AuthorizationError("admissions intake registrar");
   assertCapability(actor, "enrollment.decide");

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -58,7 +59,7 @@ export function verifyCANSchoolApprover(actor:AccessContext,institutionId:string
 }
 
 export function verifyChurchEvidenceSubmitter(actor:AccessContext,school:ChurchSchoolIdentity) {
-  if(actor.sessionAccountId || actor.role!=="registrar" || !actor.actorPersonId ||
+  if(actor.sessionAccountId || !hasRegistrarAuthority(actor.role) || !actor.actorPersonId ||
     !actor.scope.organizationIds?.includes(school.organizationId) ||
     !actor.scope.siteIds?.includes(school.siteId) ||
     !actor.scope.programIds?.includes(school.programId))
@@ -67,7 +68,7 @@ export function verifyChurchEvidenceSubmitter(actor:AccessContext,school:ChurchS
 }
 
 export function verifySchoolOpeningReader(actor:AccessContext,school:ChurchSchoolIdentity):"host"|"can" {
-  if(actor.role==="registrar") {
+  if(hasRegistrarAuthority(actor.role)) {
     verifyChurchEvidenceSubmitter(actor,school);
     return "host";
   }

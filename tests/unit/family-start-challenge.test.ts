@@ -1,6 +1,7 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({transaction:vi.fn(),audit:vi.fn(),event:vi.fn(),insert:vi.fn(),rows:[] as unknown[][]}));
 vi.mock("@/db/client",()=>({db:{transaction:state.transaction}}));
+vi.mock("@/modules/identity/demo-school-tenants.server",()=>({isDemoTenantOrganization:async()=>false}));
 vi.mock("@/db/schema",()=>Object.fromEntries(["programs","programPublications","publicFamilyStartRequests","sitePublications","sites"].map(name=>[name,new Proxy({name},{get:(t,key)=>String(key)})])));
 vi.mock("@/domain/access-tokens",()=>({hashAccessSecret:()=>"hash",issueOpaqueSecret:()=>"single-use-secret"}));
 vi.mock("@/domain/public-family-start",()=>({publicFamilyStartInput:{},verifiedFamilyStartEmail:vi.fn()}));

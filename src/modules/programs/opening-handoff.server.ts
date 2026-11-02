@@ -27,7 +27,7 @@ export async function listOpeningOperators(program: Pick<ProgramScope,"organizat
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
     .where(and(eq(accountPersonGrants.organizationId, program.organizationId),
-      eq(accountPersonGrants.siteId, program.siteId), eq(accountPersonGrants.role, "registrar"),
+      eq(accountPersonGrants.siteId, program.siteId), inArray(accountPersonGrants.role, ["registrar", "site_admin"]),
       eq(accountPersonGrants.active, true), eq(people.active, true), eq(accessAccounts.disabled, false)))
     .orderBy(asc(people.legalLastName), asc(people.legalFirstName));
   return [...new Map(rows.map(row => [row.personId, row])).values()];

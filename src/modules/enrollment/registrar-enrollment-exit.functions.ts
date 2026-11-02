@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
@@ -26,7 +27,7 @@ export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
  .validator((value:unknown)=>input.parse(value))
  .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real institution registrar");
  assertCapability(actor,"enrollment.activate");
  return db.transaction(async tx=>{

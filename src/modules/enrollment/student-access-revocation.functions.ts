@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
@@ -21,7 +22,7 @@ const revocationInput = z.object({
 /** Same authorizer shape as student learning access provisioning. */
 async function studentAccessRegistrar() {
  const actor = await getCommandContext(getRequest());
- if (actor.role !== "registrar" || !actor.actorPersonId || actor.sessionAccountId)
+ if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || actor.sessionAccountId)
   throw new AuthorizationError("real school registrar");
  assertCapability(actor, "enrollment.activate");
  return actor;

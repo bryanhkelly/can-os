@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import type { AccessContext } from "./access-context";
 import { AuthorizationError } from "./command-context";
 
@@ -11,7 +12,7 @@ export function assertSitePublicationScope(
   actor: AccessContext,
   site: { id: string; organizationId: string },
 ): void {
-  if (!actor.actorPersonId || actor.role !== "registrar" ||
+  if (!actor.actorPersonId || !hasRegistrarAuthority(actor.role) ||
       !actor.capabilities.has(sitePublicationManageCapability) ||
       !actor.scope.organizationIds?.includes(site.organizationId) ||
       !actor.scope.siteIds?.includes(site.id)) {

@@ -22,7 +22,8 @@ export const LOCAL_DEMO_ADMIN = {
 } as const;
 
 export function isDemoAccountEmail(email: string): boolean {
-  return email.toLowerCase().endsWith(`@${DEMO_ACCOUNT_DOMAIN}`);
+  const normalized = email.trim().toLowerCase();
+  return /^[^@\s]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.demo$/.test(normalized);
 }
 
 export function isDemoSchoolGrant(grant: {

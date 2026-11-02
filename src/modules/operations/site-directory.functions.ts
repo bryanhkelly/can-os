@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -9,7 +10,7 @@ import { AuthorizationError } from "@/domain/command-context";
 /** Enumerate only sites in both the authenticated site and organization scope. */
 export const listMySites = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await getCommandContext(getRequest());
-  if (!actor.actorPersonId || actor.role !== "registrar") {
+  if (!actor.actorPersonId || !hasRegistrarAuthority(actor.role)) {
     throw new AuthorizationError("site.today.read");
   }
   const siteIds = actor.scope.siteIds ?? [];

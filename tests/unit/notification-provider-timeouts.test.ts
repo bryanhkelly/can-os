@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/db/client", () => ({ db: {} }));
+vi.mock("@/modules/identity/demo-school-tenants.server", () => ({
+  isDemoTenantOrganization: async () => false,
+}));
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { sendOptedInSms } from "@/platform/subscriptions/preferences";
 

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -40,11 +41,13 @@ import {
 } from "./public-family-start.server";
 import { requestInvitedFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { DomainError } from "@/domain/errors";
 
 function assertFamilyInvitationRegistrar(context: AccessContext, programId?: string): void {
   assertCapability(context, "program.read");
   assertCapability(context, "communication.send");
-  if (context.role !== "registrar" || !context.actorPersonId) {
+  if (!hasRegistrarAuthority(context.role) || !context.actorPersonId) {
     throw new AuthorizationError("registrar family outreach workspace");
   }
   if (programId) assertProgramScope(context, programId);
@@ -94,6 +97,8 @@ export async function sendFamilyInvitationBatch(
     assertOrganizationScope(context, destination.organizationId);
     assertSiteScope(context, destination.siteId);
     assertProgramScope(context, destination.programId);
+    if (await isDemoTenantOrganization(destination.organizationId, tx))
+      throw new DomainError("FORBIDDEN", "External family outreach is suppressed for demo schools");
 
     const [existing] = await tx.select({
       id: communicationThreads.id,
@@ -528,6 +533,8 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   recipient: FamilyInvitationBatchMetadata["recipients"][number],
   subject: string, metadata: FamilyInvitationBatchMetadata) {
   const school = await resolvePreopeningInterestDestination(db, programId);
+  if (await isDemoTenantOrganization(school.organizationId))
+    throw new DomainError("FORBIDDEN", "External family outreach is suppressed for demo schools");
   if (metadata.siteId !== school.siteId) throw new AuthorizationError("original pre-opening Site");
   const configuredOrigin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
   if (!configuredOrigin) throw new Error("Family interest response host is not configured");

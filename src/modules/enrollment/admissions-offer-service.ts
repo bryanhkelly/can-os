@@ -16,10 +16,11 @@ import { requireSectionForChurchHostedActivation } from "@/domain/accepted-offer
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { activateSectionEnrollment } from "./section-allocation.service";
 import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility";
+import { rolesAllow } from "@/domain/school-roles";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
- if(context.role!==role||!context.actorPersonId)throw new AuthorizationError("authorized "+role+" admission session");
+ if(!rolesAllow([role],context.role)||!context.actorPersonId)throw new AuthorizationError("authorized "+role+" admission session");
 };
 type Transaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 async function requireAdmissionsProgramScope(context:AccessContext,programId:string,tx:Transaction){

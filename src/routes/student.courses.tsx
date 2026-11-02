@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getCourseRegistration, requestCourseChange, decideCourseChange } from "@/modules/learning/course-registration.functions";
@@ -51,14 +52,14 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
   <nav className="flex flex-wrap items-center gap-4">
    {role==="student"&&<Link to="/student/courses" className="text-xs font-semibold underline">My classes</Link>}
-   <Link to={role==="registrar"?"/operations":"/student"} search={{siteId:undefined,programId:undefined}} className="text-xs text-muted-foreground hover:underline">Back to workspace</Link>
+   <Link to={hasRegistrarAuthority(role)?"/operations":"/student"} search={{siteId:undefined,programId:undefined}} className="text-xs text-muted-foreground hover:underline">Back to workspace</Link>
    {role==="student"&&<Link to="/student/study-groups" className="text-xs font-semibold underline underline-offset-4">Study groups</Link>}
   </nav>
   <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Course registration</p>
   <h1 className="mt-2 font-serif text-5xl">Choose your classes.</h1>
   <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Review your school’s available classes and request a schedule change. A registrar reviews each request before enrollment changes. Drops and withdrawals have different deadlines and academic consequences.</p>
   <div className="mt-6 flex flex-wrap items-center gap-3">
-   <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">Signed in as {role==="registrar"?"School Registrar":"Student"}</span>
+   <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">Signed in as {hasRegistrarAuthority(role)?"School Registrar":"Student"}</span>
    <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">{connected?"School records connected":"School records unavailable"}</span>
   </div>
   {error&&<p role="alert" className="mt-4 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}
@@ -85,7 +86,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
       {s.policy.guardianApprovalRequired&&<p className="mt-1 text-xs text-amber-700">This class requires guardian permission. Your guardian can review your pending request under Family → Course approvals.</p>}
       {s.withdrawalNotation&&<p className="mt-1 text-xs font-semibold">Transcript notation: {String(s.withdrawalNotation)}</p>}
      </div>
-     {role==="registrar"?<span className="rounded-lg border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
+     {hasRegistrarAuthority(role)?<span className="rounded-lg border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
      <div className="flex flex-wrap gap-2">
       {pending?<span className="rounded-lg bg-stone-warm px-3 py-2 text-xs font-semibold">Request pending</span>:enrolled?<>
        {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn&&<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"drop"}}),"Drop request sent to the registrar.")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">Request drop</button>}
@@ -100,7 +101,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
   <p className="mt-2 text-sm text-muted-foreground">Each request belongs to the signed-in student and an authorized school program. Registrar decisions update the enrollment record and notify the student.</p>
   <div className="mt-4 space-y-3">{requests.map(r=><div key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
    <div className="flex-1"><p className="text-sm font-semibold">{r.title}</p><p className="mt-1 text-xs text-muted-foreground">{String(r.operation)} · {r.status}</p></div>
-   {role==="registrar"&&r.status==="open"&&<div className="flex gap-2"><button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:false}}),"Request declined.")} className="rounded-lg border border-border px-3 py-2 text-xs">Decline</button><button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:true}}),"Enrollment decision recorded.")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background">Approve</button></div>}
+   {hasRegistrarAuthority(role)&&r.status==="open"&&<div className="flex gap-2"><button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:false}}),"Request declined.")} className="rounded-lg border border-border px-3 py-2 text-xs">Decline</button><button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:true}}),"Enrollment decision recorded.")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background">Approve</button></div>}
   </div>)}{!requests.length&&<p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">No course change requests yet.</p>}</div>
   <p className="mt-9 text-xs leading-6 text-muted-foreground">A withdrawal retains a W notation on the enrollment record; official transcript display and guardian consent for classes that require it are not yet finalized. Schedule conflicts, prerequisites, capacity and credits are rechecked by the enrollment service when adding a class.</p>
  </main>;

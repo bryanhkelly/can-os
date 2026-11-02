@@ -55,7 +55,7 @@ const db = {
   execute: vi.fn(async () => undefined),
   transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(db)),
 };
-vi.mock("@/db/client", () => ({ db }));
+vi.mock("@/db/client", () => ({ get db() { return db; } }));
 
 import "@/modules/identity/admin.functions";
 
@@ -65,6 +65,7 @@ const input = {
 };
 
 beforeEach(() => {
+  actor.role = "registrar";
   state.selects.length = 0; state.inserts.length = 0;
   state.requestAccess.mockReset(); state.requestAccess.mockResolvedValue({ accepted: true });
   db.select.mockClear(); db.insert.mockClear(); db.transaction.mockClear();
@@ -129,5 +130,51 @@ describe("authorized church-local invitation provisioning", () => {
     await expect(state.handlers[3]!({ data: { ...input, siteId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2" } }))
       .rejects.toThrow(/sibling school/);
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+  it("allows a Site Admin to invite an exact-school demo teacher without sending email", async () => {
+    actor.role = "site_admin";
+    state.selects.push(
+      [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "christian_school" }],
+      [{ domain: "newschool.demo", enabled: true }],
+      [], [], [], [],
+    );
+    const result = await state.handlers[3]!({ data: {
+      ...input, email: "teacher@newschool.demo", role: "teacher",
+    } });
+    expect(result).toMatchObject({ created: true, pending: true, emailSent: false });
+    expect(state.requestAccess).not.toHaveBeenCalled();
+    expect(state.inserts.find(row => row.table === accountPersonGrants)?.value).toMatchObject({
+      siteId: input.siteId, active: false, role: "teacher",
+    });
+    expect(state.inserts.find(row => row.table === domainEvents)?.value).toMatchObject({
+      eventType: EventTypes.StaffInvitationIssued, aggregateId: "grant-1",
+      payload: {
+        organizationId: actor.scope.organizationIds[0], siteId: input.siteId,
+        accountId: "account-1", personId: "person-1", role: "teacher",
+      },
+    });
+  });
+  it("does not allow a registrar to deactivate the school's Site Admin", async () => {
+    state.selects.push(
+      [{ siteId: actor.grantSiteId }],
+      [{ id: "dddddddd-dddd-4ddd-8ddd-ddddddddddd9", accountId: "administrator-account",
+        organizationId: actor.scope.organizationIds[0], siteId: input.siteId,
+        active: true, role: "site_admin" }],
+    );
+    await expect(state.handlers[4]!({ data: {
+      grantId: "dddddddd-dddd-4ddd-8ddd-ddddddddddd9", active: false,
+    } })).rejects.toThrow("grant organization scope");
+    expect(state.inserts).toEqual([]);
+  });
+  it("refuses authentic email addresses in a publicly accessible demo school", async () => {
+    state.selects.push(
+      [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "christian_school" }],
+      [{ domain: "newschool.demo", enabled: true }],
+    );
+    await expect(state.handlers[3]!({ data: input })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(state.inserts).toEqual([]);
+    expect(state.requestAccess).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,7 @@ import { WorkspaceNotice } from "@/components/workspace";
 import { getWorkspaceScopeLabel } from "./workspace-scope";
 
 export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable, sessionError,
-  error, demoAccountSwitching, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
+  error, demoAccountSwitching, demoTenant, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
   onOpenSwitcher, onOpenSearch, onOpenAsk, onOpenNotifications, onOpenAccount }: {
   member?: { role: string; firstName: string; lastName: string; siteId: string | null };
   sites: readonly { id: string; name: string }[];
@@ -14,6 +14,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   sessionError: string | null;
   error: string;
   demoAccountSwitching: boolean;
+  demoTenant?: boolean;
   changing: boolean;
   menuOpen: boolean;
   switcherOpen: boolean;
@@ -69,6 +70,9 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
       {(error || sessionError) && <WorkspaceNotice tone="danger" className="w-full">{error || sessionError}</WorkspaceNotice>}
       {demoAccountSwitching && <WorkspaceNotice className="w-full">
         Demo admin session: acting as {member?.firstName} {member?.lastName} ({member?.role}). Changes affect shared demo data. User switches are audited.
+      </WorkspaceNotice>}
+      {demoTenant && !demoAccountSwitching && <WorkspaceNotice className="w-full">
+        Demo school: use synthetic data only. These shared accounts and changes are visible to other participants. External email and SMS are suppressed.
       </WorkspaceNotice>}
     </div>
   </header>;

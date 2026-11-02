@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
 import {z} from "zod";
@@ -10,7 +11,7 @@ import {
 const uuid=z.string().uuid();
 async function actor(){
  const ctx=await getCommandContext(getRequest());
- if(!ctx.actorPersonId||ctx.role!=="registrar")throw new AuthorizationError("registrar lifecycle");
+ if(!ctx.actorPersonId||!hasRegistrarAuthority(ctx.role))throw new AuthorizationError("registrar lifecycle");
  return {...ctx,actorPersonId:ctx.actorPersonId};
 }
 export const getSectionLifecycle=createServerFn({method:"GET"})

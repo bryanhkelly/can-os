@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { launchOpeningDate } from "@/domain/launch-opening-date";
 import { defaultScheduleDayPattern, scheduleDayPattern } from "@/domain/schedule-day-pattern";
 import { db } from "@/db/client";
@@ -19,7 +20,7 @@ const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const id = z.object({ schoolYearId: uuid });
 async function operator(capability = "academic_year.manage") {
  const context = await getCommandContext(getRequest());
- if (!context.actorPersonId || context.role !== "registrar" || !context.scope.organizationIds?.length) throw new AuthorizationError("academic year operator");
+ if (!context.actorPersonId || !hasRegistrarAuthority(context.role) || !context.scope.organizationIds?.length) throw new AuthorizationError("academic year operator");
  assertCapability(context, capability);
  // A verified organization-wide grant has no site filter. Preserve narrow
  // site-scoped grants unchanged, but do not treat an empty list as denial.

@@ -1,3 +1,4 @@
+import { rolesAllow } from "@/domain/school-roles";
 import { assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
 import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -444,7 +445,7 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
 async function excuseReviewActor() {
   const context = await getCommandContext(getRequest());
   assertCapability(context, "attendance.excuse.review");
-  if (!["teacher", "registrar"].includes(context.role) || !context.actorPersonId ||
+  if (!rolesAllow(["teacher", "registrar"], context.role) || !context.actorPersonId ||
     !context.scope.siteIds?.length || !context.scope.programIds?.length ||
     !context.scope.organizationIds?.length) {
     throw new AuthorizationError("attendance excuse review grant");

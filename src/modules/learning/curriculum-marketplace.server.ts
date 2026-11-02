@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -28,7 +29,7 @@ async function authorizedProgram(actor: Actor, programId: string, tx: Pick<Tx, "
 
 /** A school may buy/adopt without holding a publisher's authoring grant. */
 export async function readCurriculumAdopterPrograms(actor:Actor){
- if(actor.role!=="registrar"||
+ if(!hasRegistrarAuthority(actor.role)||
    !actor.capabilities.has(adoptionCapability)&&!actor.capabilities.has(publishCapability))
   throw new AuthorizationError("school curriculum program access");
  const orgIds=actor.scope.organizationIds??[];

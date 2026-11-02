@@ -1,4 +1,5 @@
 export const EventTypes = {
+  SchoolSetupCompleted: "SchoolSetupCompleted",
   OnsiteRoomPlanReviewed: "OnsiteRoomPlanReviewed",
   OnsiteRoomPlanSubmitted: "OnsiteRoomPlanSubmitted",
   ApplicationStarted: "ApplicationStarted",

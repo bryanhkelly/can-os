@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sitePublications } from "@/db/schema";
@@ -86,7 +87,7 @@ export async function provisionNewSitePublicationDraft(
 ): Promise<{ slug: string; host: string; status: "draft" }> {
   assertCapability(actor, "program.launch.start");
   assertOrganizationScope(actor, site.organizationId);
-  if (actor.role !== "registrar" || !actor.actorPersonId || actor.grantSiteId !== null) {
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || actor.grantSiteId !== null) {
     throw new Error("New Site draft provisioning requires an organization-wide registrar");
   }
   const result = await ensureReservation(tx, actor, site, "site_onboarding");

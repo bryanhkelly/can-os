@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSchoolDayPreparation } from "@/domain/onsite-day-preparation";
 import { personLegalName } from "@/domain/person-name";
 import { effectiveRoomPrimary } from "@/domain/onsite-room-plan";
@@ -71,7 +72,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
     const oldest=siteDate(new Date(Date.now()-30*86400_000),site.timezone);
     if(data.registrarFirstDay){
       if(!data.preparation || !data.programId || !data.sectionId ||
-         actor.role!=="registrar" || !actor.actorPersonId || actor.sessionAccountId ||
+         !hasRegistrarAuthority(actor.role) || !actor.actorPersonId || actor.sessionAccountId ||
          !actor.scope.siteIds?.includes(site.id) ||
          !actor.scope.programIds?.includes(data.programId))
         throw new AuthorizationError("registrar first-day Site Program and Section scope");

@@ -8,7 +8,7 @@ const read = (path:string) =>
 describe("Phase D live family-to-school handoff contracts",()=>{
   it("starts onsite readiness only from an authorized, accepted real application",()=>{
     const source=read("src/modules/enrollment/first-school-day-handoff.functions.ts");
-    expect(source).toContain('actor.role !== "registrar"');
+    expect(source).toContain('!hasRegistrarAuthority(actor.role)');
     expect(source).toContain('assertCapability(actor,"enrollment.activate")');
     expect(source).toContain('actor.scope.programIds?.includes(app.programId)');
     expect(source).toContain('app.stage !== "accepted"');
@@ -42,7 +42,7 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     const attendance=read("src/modules/attendance/onsite-attendance-workflow.functions.ts");
     const future=attendance.slice(attendance.indexOf("export const loadExpectedFirstDayPreparationForActor="),
       attendance.indexOf("export const loadExpectedSchoolDayPreparation="));
-    expect(future).toContain('actor.role!=="registrar"');
+    expect(future).toContain('!hasRegistrarAuthority(actor.role)');
     expect(future).toContain('assertCapability(actor,"enrollment.activate")');
     expect(future).toContain('resolveExpectedRoster(actor,data.date,data.programId,data.studentProfileId,data.siteId,true)');
     expect(future).not.toContain("attendanceEvents");

@@ -1,4 +1,4 @@
-import { and, eq, or, isNull } from "drizzle-orm";
+import { inArray, and, eq, or, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { accountPersonGrants, enrollments, programs, sections, sectionTeachers, terms } from "@/db/schema";
@@ -78,7 +78,7 @@ export async function assertAcademicActionStaff(
       eq(accountPersonGrants.personId, personId),
       eq(accountPersonGrants.active, true),
       eq(accountPersonGrants.organizationId, resource.organizationId),
-      or(eq(accountPersonGrants.role, "registrar"), eq(accountPersonGrants.role, "specialist"), eq(accountPersonGrants.role, "counselor")),
+      or(inArray(accountPersonGrants.role, ["registrar", "site_admin"]), eq(accountPersonGrants.role, "specialist"), eq(accountPersonGrants.role, "counselor")),
       resource.siteId === null ? isNull(accountPersonGrants.siteId)
         : or(isNull(accountPersonGrants.siteId), eq(accountPersonGrants.siteId, resource.siteId)),
     )).limit(1);

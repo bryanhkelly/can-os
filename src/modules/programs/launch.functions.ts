@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
@@ -67,7 +68,7 @@ const startLaunchInput = z.object({
 async function registrarContext(capability: string) {
   const context = await getCommandContext(getRequest());
   assertCapability(context, capability);
-  if (context.role !== "registrar") {
+  if (!hasRegistrarAuthority(context.role)) {
     throw new AuthorizationError("registrar program launch workspace");
   }
   return context;
@@ -79,7 +80,8 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) {
-      return { organizations: [], academicProviderOrganizations: [], creditIssuingOrganizations: [], sites: [], jurisdictions: [] };
+      return { organizations: [], academicProviderOrganizations: [], creditIssuingOrganizations: [], sites: [], jurisdictions: [],
+        schoolSetupAdministrator: context.role === "site_admin" };
     }
     const [{ db }, s, { and, asc, eq, inArray, or }] = await Promise.all([
       import("@/db/client"),
@@ -125,6 +127,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       creditIssuingOrganizations: academicProviderOrganizations,
       sites: siteRows,
       jurisdictions: jurisdictionRows,
+      schoolSetupAdministrator: context.role === "site_admin",
     };
   },
 );
@@ -579,5 +582,4 @@ export const getLaunchEntry = createServerFn({ method: "GET" })
     ));
     return launchEntrySelection({ programs: records, sites: options.sites, selection: data });
   });
-
 

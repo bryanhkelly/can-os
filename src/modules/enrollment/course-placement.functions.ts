@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import {activateSectionEnrollment} from "./section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -15,7 +16,7 @@ import { canAddStudentToSection } from "@/domain/section-registration-window";
 
 async function registrar() {
   const actor = await getCommandContext(getRequest());
-  if (actor.role !== "registrar" || !actor.actorPersonId)
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId)
     throw new AuthorizationError("registrar course placement");
   assertCapability(actor, "enrollment.activate");
   return actor;

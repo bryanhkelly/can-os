@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { memberships, people, roleAssignments } from "@/db/schema";
@@ -10,7 +11,7 @@ export async function hasInstitutionalProgramCapability(
   actor: Actor, program: InstitutionalProgramScope, capability: string,
   executor: Pick<typeof db, "select"> = db,
 ) {
-  if (actor.role !== "registrar" || !actor.capabilities.has(capability) ||
+  if (!hasRegistrarAuthority(actor.role) || !actor.capabilities.has(capability) ||
     !actor.scope.organizationIds?.includes(program.organizationId) ||
     !actor.scope.programIds?.includes(program.id) || !program.siteId ||
     !actor.scope.siteIds?.includes(program.siteId)) return false;

@@ -16,6 +16,10 @@ import {
   listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE,
 } from "@/modules/identity/staff-invitations.server";
 import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
+import { demoSchoolTenants } from "@/db/schema";
+import { DomainError } from "@/domain/errors";
+import { isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
+import { readDemoStaffBindings } from "./demo-staff-access.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
 
@@ -186,7 +190,7 @@ export const listAccessAccounts = createServerFn({ method: "GET" }).handler(asyn
 
 /**
  * Provision an inactive exact-Site invitation and deliver the canonical access
- * link. Only email-link acceptance activates the grant. Retries reuse the same
+ * link (or registered demo shared-code acceptance). Retries reuse the same
  * account/person/grant and the access challenge's normal delivery cooldown.
  */
 export const inviteStaffMember = createServerFn({ method: "POST" })
@@ -210,14 +214,33 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     const emailNormalized = data.email.toLowerCase();
     const invitation = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"staff-invitation:" + emailNormalized}))`);
+      const [demoSchool] = await tx.select({ domain: demoSchoolTenants.domain, enabled: demoSchoolTenants.enabled })
+        .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
+      if (demoSchool ? !demoSchool.enabled || emailNormalized.split("@")[1] !== demoSchool.domain :
+        isDemoAccountEmail(emailNormalized) || isValorOrganization(organizationId)) {
+        throw new DomainError("FORBIDDEN", "Demo staff must belong to their explicitly provisioned demo school domain");
+      }
       let [account] = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
         .where(eq(accessAccounts.emailNormalized, emailNormalized)).limit(1);
+      if (account && demoSchool) {
+        const bindings = await readDemoStaffBindings(account.id, tx);
+        if (!bindings.some(binding => binding.enabled && binding.domain === demoSchool.domain &&
+          binding.payload.accountId === account!.id && binding.payload.role === data.role))
+          throw new DomainError("FORBIDDEN", "Existing accounts require an exact demo staff invitation binding");
+      }
       if (!account) {
         [account] = await tx.insert(accessAccounts).values({ emailNormalized }).returning({ id: accessAccounts.id });
         await recordAudit(tx, actor, {
           action: "admin.access_account.create", resourceType: "access_account", resourceId: account!.id,
           after: { emailNormalized },
         });
+      }
+      if (demoSchool) {
+        const foreign = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
+          .where(and(eq(accountPersonGrants.accountId, account!.id),
+            sql`(${accountPersonGrants.organizationId} IS DISTINCT FROM ${organizationId}::uuid
+              OR ${accountPersonGrants.siteId} IS DISTINCT FROM ${siteId}::uuid)`)).limit(1);
+        if (foreign.length) throw new DomainError("FORBIDDEN", "An existing identity belongs to another school");
       }
       const [existingPersonGrant] = await tx.select({ personId: accountPersonGrants.personId })
         .from(accountPersonGrants).where(eq(accountPersonGrants.accountId, account!.id)).limit(1);
@@ -268,7 +291,8 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       });
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
     });
-    if (!invitation.pending) return { ...invitation, emailSent: false };
+    if (!invitation.pending || isDemoAccountEmail(emailNormalized))
+      return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized) };
     try {
       await requestOneTimeAccess(emailNormalized);
       return { ...invitation, emailSent: true };
@@ -299,7 +323,7 @@ export const setGrantActive = createServerFn({ method: "POST" })
         throw new AuthorizationError("grant organization scope");
       }
       const pending = (await listPendingStaffInvitations(tx, grant.accountId)).some(invitation => invitation.id === grant.id);
-      if (pending) throw new AuthorizationError("pending staff invitations must be accepted through the recipient's email link");
+      if (pending) throw new AuthorizationError("pending staff invitations must be accepted through the recipient's sign-in");
       const [updated] = await tx.update(accountPersonGrants)
         .set({ active: data.active, updatedAt: new Date() })
         .where(eq(accountPersonGrants.id, grant.id))

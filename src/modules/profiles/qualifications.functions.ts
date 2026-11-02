@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -85,7 +86,7 @@ async function authorizedSubject(actor: Actor, input: z.infer<typeof selection>,
     await ownCredentialSubject(actor, executor);
     return { personId, canSubmit: true };
   }
-  if (actor.role !== "registrar" || !input.programId ||
+  if (!hasRegistrarAuthority(actor.role) || !input.programId ||
     !actor.scope.programIds?.includes(input.programId)) throw new AuthorizationError("credential review program");
   assertCapability(actor, "profiles.credentials.verify");
   const [program] = await executor.select().from(programs).where(eq(programs.id, input.programId)).limit(1);

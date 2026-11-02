@@ -23,7 +23,7 @@ import { personDisplayName } from "@/domain/person-name";
 
 type StaffContext = CommandContext & { role: string };
 
-const staffRoles = ["teacher", "registrar", "specialist", "counselor"] as const;
+const staffRoles = ["teacher", "registrar", "site_admin", "specialist", "counselor"] as const;
 type StaffRole = (typeof staffRoles)[number];
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

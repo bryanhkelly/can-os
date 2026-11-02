@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
@@ -22,7 +23,7 @@ const disableInput = z.object({
  */
 async function requireAdminRegistrar() {
  const actor = await getCommandContext(getRequest());
- if (actor.role !== "registrar" || !actor.actorPersonId || actor.sessionAccountId)
+ if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || actor.sessionAccountId)
   throw new AuthorizationError("real school registrar");
  assertCapability(actor, "admin.manage");
  return actor;
@@ -107,7 +108,7 @@ export const disableAccessAccount = createServerFn({ method: "POST" })
     accountId: account.id,
     actorPersonId: actor.actorPersonId,
     sessionId: actor.sessionId,
-    role: "registrar",
+    role: actor.role,
     revokedCount: revoked.length,
    });
    await emitEvent(tx, {

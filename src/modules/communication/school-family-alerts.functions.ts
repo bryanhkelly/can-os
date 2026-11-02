@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -22,7 +23,7 @@ const actionType="school_family_bulletin";
 
 async function registrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
   throw new AuthorizationError("real institutional school registrar");
  assertCapability(actor,"communication.send");
  if(!actor.scope.organizationIds?.length||!actor.scope.siteIds?.length||

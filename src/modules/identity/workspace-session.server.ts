@@ -4,6 +4,7 @@ import { accessAccounts, sites, programs } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "./command-context.server";
 import { readSessionGrants } from "./session-grants.server";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 
 export async function readWorkspaceSession(request: Request) {
   let context;
@@ -33,6 +34,7 @@ export async function readWorkspaceSession(request: Request) {
   ]);
   return {
     authenticated: true as const,
+    ...(isDemoAccountEmail(account.email) ? { demoTenant: true as const } : {}),
     ...(demoAccountSwitching ? { demoAccountSwitching: true as const } : {}),
     sites: siteChoices, programs: programChoices, activeGrantId: context.grantId,
     role: context.role, grants: grants.map(grant => ({

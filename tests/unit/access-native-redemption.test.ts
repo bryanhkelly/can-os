@@ -32,6 +32,12 @@ describe("native session redemption",()=>{
   expect(state.token).toHaveBeenCalledWith("fixture-token");
   expect(response.headers.get("Location")).toBe("/operations/launch?siteId=site");
  });
+ it("routes a new school Site Admin to that Site's Launch Studio",async()=>{
+  state.demo.mockResolvedValue({role:"site_admin",setCookie:cookie,launchSiteId:"new-school-site"});
+  const response=await state.handler!({request:form({email:"admin@school.demo",code:"fixture"})});
+  expect(response.status).toBe(303);
+  expect(response.headers.get("Location")).toBe("/operations/launch?siteId=new-school-site");
+ });
  it("denies a cross-origin form before quota or credential work",async()=>{
   expect((await state.handler!({request:form({email:"admin@example.test",code:"fixture"},"https://other.example")})).status).toBe(403);
   expect(state.admit).not.toHaveBeenCalled();expect(state.demo).not.toHaveBeenCalled();

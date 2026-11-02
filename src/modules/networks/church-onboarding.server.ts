@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { inArray, and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, documents, organizations, people, sites,
@@ -147,7 +147,7 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
       eq(accountPersonGrants.personId, personId),
       eq(accountPersonGrants.organizationId, church.id),
       eq(accountPersonGrants.siteId, site.id),
-      eq(accountPersonGrants.role, "registrar"),
+      inArray(accountPersonGrants.role, ["registrar", "site_admin"]),
     )).limit(1);
     if (existingGrant?.active) {
       return complete({ churchId: church.id, siteId: site.id, grantId: existingGrant.id,

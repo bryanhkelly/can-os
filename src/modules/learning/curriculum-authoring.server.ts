@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -35,7 +36,7 @@ async function ownedCourse(tx: Transaction, courseId: string, organizationId: st
 }
 
 export async function readCurriculumPrograms(actor: Actor) {
-  if (actor.role !== "registrar" || !actor.capabilities.has(curriculumPublisherCapability))
+  if (!hasRegistrarAuthority(actor.role) || !actor.capabilities.has(curriculumPublisherCapability))
     throw new AuthorizationError("curriculum publisher session");
   const rows = await db.select({ id: programs.id, name: programs.name,
     organizationId: programs.organizationId, siteId: programs.siteId }).from(programs).where(and(

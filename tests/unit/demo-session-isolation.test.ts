@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "synthetic-session-isolation-key-at-least-32-characters");
   state.select.mockImplementation(() => {
     const query = {
-      from: () => query, innerJoin: () => query,
+      from: () => query, innerJoin: () => query, leftJoin: () => query,
       where: () => {
         const rows = Promise.resolve(state.rows.shift() ?? []);
         return Object.assign(rows, { limit: () => rows });
@@ -31,6 +31,35 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("public demo session isolation", () => {
+  const school = {
+    domain: "newschool.demo", organizationId: "new-organization", siteId: "new-site",
+    adminAccountId: "new-account", adminPersonId: "new-person", adminGrantId: "new-grant",
+    enabled: true, siteOrganizationId: "new-organization",
+  };
+  const newGrant = {
+    id: school.adminGrantId, accountId: school.adminAccountId, personId: school.adminPersonId,
+    organizationId: school.organizationId, siteId: school.siteId, role: "site_admin", active: true,
+    email: "admin.demo@newschool.demo",
+  };
+  it("resolves a newly provisioned demo administrator without enabling Valor delegation", async () => {
+    state.rows = [[newGrant], [school]];
+    expect(await readSessionGrants(newGrant.accountId, newGrant.email)).toEqual({
+      grants: [newGrant], demoAccountSwitching: false, launchSiteId: school.siteId,
+    });
+  });
+  it.each([
+    { accountId: "foreign-account" }, { personId: "foreign-person" },
+    { role: "registrar" }, { organizationId: "foreign-school" }, { siteId: "foreign-site" },
+  ])("denies a newly issued demo session after identity changes %j", async change => {
+    state.rows = [[{ ...newGrant, ...change }], [school]];
+    expect((await readSessionGrants(newGrant.accountId, newGrant.email)).grants).toEqual([]);
+  });
+  it.each([
+    { enabled: false }, { siteOrganizationId: "authentic-organization" },
+  ])("retains the demo restriction after disablement or Site ownership changes %j", async change => {
+    state.rows = [[{ ...newGrant, email: "ordinary@example.test" }], [{ ...school, ...change }]];
+    expect((await readSessionGrants(newGrant.accountId, "ordinary@example.test")).grants).toEqual([]);
+  });
   it.each([
     { accountId: "another-account" }, { personId: "another-person" },
     { role: "registrar" }, { organizationId: "another-organization" },

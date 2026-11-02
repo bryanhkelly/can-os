@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { enrollments,programs,sections,terms } from "@/db/schema";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
@@ -12,7 +13,7 @@ import { EventTypes } from "@/domain/event-types";
 const uuid=z.string().uuid(),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 async function registrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId)throw new AuthorizationError("course policy registrar");
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId)throw new AuthorizationError("course policy registrar");
  assertCapability(actor,"registrations:approve");
  return actor;
 }

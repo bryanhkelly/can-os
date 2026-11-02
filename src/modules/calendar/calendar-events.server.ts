@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -72,7 +73,7 @@ async function authorizeRevision(
   }
   assertCapability(actor, "calendar.event.manage");
 
-  if (actor.role === "registrar") {
+  if (hasRegistrarAuthority(actor.role)) {
     if (!event.siteId || !(actor.scope.siteIds ?? []).includes(event.siteId)) {
       throw new AuthorizationError("calendar site scope");
     }

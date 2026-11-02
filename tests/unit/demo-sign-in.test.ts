@@ -5,12 +5,20 @@ import { AccessInfrastructureError } from "@/domain/access-errors";
 
 const state = vi.hoisted(() => ({
   select: vi.fn(), insert: vi.fn(), grants: vi.fn(), audit: vi.fn(),
+  bindings: vi.fn(), pending: vi.fn(), accept: vi.fn(),
 }));
 vi.mock("@/db/client", () => {
   const tx = { select: state.select, insert: state.insert };
   return { db: { transaction: async (run: (value: typeof tx) => Promise<unknown>) => run(tx) } };
 });
 vi.mock("@/modules/identity/session-grants.server", () => ({ readSessionGrants: state.grants }));
+vi.mock("@/modules/identity/demo-staff-access.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/modules/identity/demo-staff-access.server")>(),
+  readDemoStaffBindings: state.bindings,
+}));
+vi.mock("@/modules/identity/staff-invitations.server", () => ({
+  listPendingStaffInvitations: state.pending, acceptStaffInvitations: state.accept,
+}));
 vi.mock("@/modules/identity/session-security-audit.server", () => ({
   recordSessionSecurityEvent: state.audit,
 }));
@@ -38,10 +46,81 @@ beforeEach(() => {
     values: () => ({ returning: async () => [{ id: "session" }] }),
   });
   state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true });
+  state.bindings.mockResolvedValue([]);
+  state.pending.mockResolvedValue([]);
+  state.accept.mockResolvedValue([]);
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe("shared demo sign-in", () => {
+  it("issues a normal audited session for an explicitly registered new-school Site Admin", async () => {
+    const email = "admin.demo@newschool.demo";
+    state.select.mockReturnValue({
+      from: () => ({ where: () => ({ limit: async () => [{ id: "new-school-account", email }] }) }),
+    });
+    state.grants.mockResolvedValue({
+      grants: [{ ...grant, id: "new-school-grant", accountId: "new-school-account", role: "site_admin" }],
+      demoAccountSwitching: false, launchSiteId: "new-school-site",
+    });
+    expect(await redeemDemoAccess(email, "000000")).toMatchObject({
+      accountId: "new-school-account", role: "site_admin", launchSiteId: "new-school-site",
+    });
+  });
+  it("rejects a .demo email without an explicitly registered grant", async () => {
+    state.grants.mockResolvedValue({ grants: [], demoAccountSwitching: false });
+    await expect(redeemDemoAccess("unregistered@newschool.demo", "000000"))
+      .rejects.toThrow("Invalid demo credentials");
+    expect(state.insert).not.toHaveBeenCalled();
+  });
+  const staff = {
+    id: "staff-grant", accountId: "staff-account", personId: "staff-person",
+    organizationId: "staff-school", siteId: "staff-site", role: "teacher",
+  };
+  const binding = {
+    grantId: staff.id, domain: "newschool.demo", organizationId: staff.organizationId,
+    siteId: staff.siteId, enabled: true, siteOrganizationId: staff.organizationId,
+    payload: { accountId: staff.accountId, personId: staff.personId, role: staff.role, siteId: staff.siteId },
+  };
+  function prepareStaff() {
+    state.select.mockReturnValue({
+      from: () => ({ where: () => ({ limit: async () => [{ id: staff.accountId, email: "teacher@newschool.demo" }] }) }),
+    });
+    state.bindings.mockResolvedValue([binding]);
+    state.pending.mockResolvedValue([staff]);
+  }
+  it("accepts only exact-bound pending staff before issuing an audited shared-code session", async () => {
+    prepareStaff();
+    const foreign = { ...staff, id: "foreign-grant", organizationId: "another-school" };
+    state.pending.mockResolvedValue([staff, foreign]);
+    state.grants.mockResolvedValue({ grants: [staff], demoAccountSwitching: false });
+    expect(await redeemDemoAccess("teacher@newschool.demo", "000000"))
+      .toMatchObject({ accountId: staff.accountId, role: "teacher" });
+    expect(state.accept).toHaveBeenCalledWith(expect.anything(), staff.accountId, [staff], expect.any(Date));
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      grantId: staff.id, role: staff.role,
+    }));
+  });
+  it.each([
+    { enabled: false },
+    { siteId: "foreign-site" },
+    { payload: { ...binding.payload, personId: "authentic-person" } },
+    { payload: { ...binding.payload, role: "registrar" } },
+  ])("never accepts a changed or disabled demo staff invitation %j", async change => {
+    prepareStaff();
+    state.bindings.mockResolvedValue([{ ...binding, ...change }]);
+    state.grants.mockResolvedValue({ grants: [], demoAccountSwitching: false });
+    await expect(redeemDemoAccess("teacher@newschool.demo", "000000")).rejects.toThrow("Invalid demo credentials");
+    expect(state.accept).toHaveBeenCalledWith(expect.anything(), staff.accountId, [], expect.any(Date));
+    expect(state.insert).not.toHaveBeenCalled();
+  });
+  it("does not reactivate an accepted but revoked staff grant during shared-code sign-in", async () => {
+    prepareStaff();
+    state.pending.mockResolvedValue([]);
+    state.grants.mockResolvedValue({ grants: [], demoAccountSwitching: false });
+    await expect(redeemDemoAccess("teacher@newschool.demo", "000000")).rejects.toThrow("Invalid demo credentials");
+    expect(state.accept).toHaveBeenCalledWith(expect.anything(), staff.accountId, [], expect.any(Date));
+    expect(state.insert).not.toHaveBeenCalled();
+  });
   it.each(["development", "production"])("signs in in %s with both legacy flags disabled", async mode => {
     vi.stubEnv("NODE_ENV", mode);
     vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "false");

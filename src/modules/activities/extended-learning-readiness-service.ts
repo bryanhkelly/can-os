@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { actions, activities, activitySeasons, programs, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -22,7 +23,7 @@ export async function ensureExtendedReadinessAssignments(
   actor: AccessContext,
   input: { seasonId: string; recipientPersonId: string },
 ) {
-  if (actor.role !== "registrar" || !actor.actorPersonId)
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId)
     throw new AuthorizationError("extended-learning registrar");
   assertCapability(actor, "program.launch.start");
 

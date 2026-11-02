@@ -4,6 +4,15 @@
   "generatedFromBranch": "main",
   "routes": [
     {
+      "file": "src/routes/schools.new.tsx",
+      "route": "/schools/new",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/__root.tsx",
       "route": "<root>",
       "owner": "shell",

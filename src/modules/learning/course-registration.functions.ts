@@ -15,6 +15,7 @@ import { getSectionRegistrationPolicy } from "./section-registration-policy-serv
 import { todayInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 async function studentProfileFor(actor: Actor) {
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  const [profile] = await db.select({ id: s.studentProfiles.id }).from(s.studentProfiles).where(eq(s.studentProfiles.personId, actor.actorPersonId)).limit(1);
@@ -27,7 +28,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
   setResponseHeader("Cache-Control", "private, no-store");
   const sites = actorSiteIds(actor);
   const programIds = actor.scope.programIds ?? [];
-  const viewerRole = actor.role as "student" | "registrar";
+  const viewerRole = hasRegistrarAuthority(actor.role) ? "registrar" as const : "student" as const;
   if (!process.env.DATABASE_URL || !programIds.length) return { connected: !!process.env.DATABASE_URL, viewerRole, sections: [], requests: [] };
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const studentId = viewerRole === "student" ? await studentProfileFor(actor) : null;

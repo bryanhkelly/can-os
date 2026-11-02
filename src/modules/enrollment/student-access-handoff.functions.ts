@@ -1,3 +1,4 @@
+import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq } from "drizzle-orm";
@@ -174,7 +175,7 @@ export const getStudentLearningHandoff=createServerFn({method:"GET"})
  .handler(async({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCommandContext(getRequest());
-  if(!actor.actorPersonId || !["guardian","registrar"].includes(actor.role))
+  if(!actor.actorPersonId || !rolesAllow(["guardian","registrar"], actor.role))
    throw new AuthorizationError("authorized student access handoff");
   const app=await readHandoffApplication(db,data.applicationId);
   if(!actor.scope.programIds?.includes(app.programId)||
@@ -233,7 +234,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
  .validator((v:unknown)=>studentAccessReviewInput.parse(v))
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
-  if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
+  if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real school registrar");
   assertCapability(actor,"enrollment.activate");
   const email=await db.transaction(async tx=>{

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
@@ -171,7 +172,7 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
         event.type === "personal"
           ? ownedEventIds.has(event.id)
           : canManageStaff && (
-              actor.role === "registrar"
+              hasRegistrarAuthority(actor.role)
                 ? Boolean(event.siteId) && sites.includes(event.siteId!) &&
                   (!event.programId || (actor.scope.programIds ?? []).includes(event.programId))
                 : actor.role === "teacher"

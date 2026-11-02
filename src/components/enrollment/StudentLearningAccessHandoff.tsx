@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { useEffect,useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -76,7 +77,7 @@ function ApplicationLearningAccessHandoff({
  if(status==="blocked"&&blocker)return <section aria-label="Student learning account" className="mt-4 rounded-lg border p-4 text-sm">
   <h4 className="font-semibold">Student learning account · Next requirement</h4>
   <p role="status" className="mt-2">{blocker.message}</p>
-  {role==="registrar"?(blocker.target==="academic_setup"
+  {hasRegistrarAuthority(role)?(blocker.target==="academic_setup"
    ?<Link to="/operations/launch/$programId" params={{programId:blocker.programId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>
    :<Link to="/admissions" search={{siteId:blocker.siteId??undefined,programId:blocker.programId,application:blocker.applicationId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>)
    :<Link to="/messages" className="mt-3 inline-block underline">Ask admissions to complete this requirement</Link>}
@@ -88,7 +89,7 @@ function ApplicationLearningAccessHandoff({
   <p role="status" className="mt-2">A prior guardian authorization was approved, but the
    student's current school login grant is no longer available. A sign-in link
    cannot restore a revoked grant or disabled account.</p>
-  <p className="mt-2">{role==="registrar"
+  <p className="mt-2">{hasRegistrarAuthority(role)
     ? "Review the original student grant, account status and school authorization. Restore access only through the independently authorized student-access restoration workflow."
     : "Contact admissions to review the student's separate school account. Your guardian sign-in does not restore the student's access."}</p>
   <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
@@ -129,7 +130,7 @@ function ApplicationLearningAccessHandoff({
      <p>Guardian authorization received. A registrar must verify the student's
       identity and email destination before access is granted.</p>
      {role==="guardian"&&<Link to="/messages" className="mt-3 inline-block underline">Ask admissions about student access</Link>}
-     {role==="registrar"&&<>
+     {hasRegistrarAuthority(role)&&<>
       <p>Guardian-approved student address: <strong>{email}</strong></p>
       <label className="block">Independent student identity check
        <select value={reviewMethod} onChange={event=>setReviewMethod(
@@ -153,7 +154,7 @@ function ApplicationLearningAccessHandoff({
     </>:status==="approved"?<>
      <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>
      {role==="guardian"&&<Link to="/access" className="mt-3 inline-block rounded border px-3 py-2 font-semibold">Open student sign-in</Link>}
-     {role==="registrar"&&<button disabled={busy}
+     {hasRegistrarAuthority(role)&&<button disabled={busy}
        className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
        {busy?"Requesting…":"Request student sign-in link again"}
      </button>}

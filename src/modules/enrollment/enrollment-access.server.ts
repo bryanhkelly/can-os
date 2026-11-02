@@ -1,3 +1,4 @@
+import { rolesAllow } from "@/domain/school-roles";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { applications, guardianRelationships, programs, studentProfiles } from "@/db/schema";
@@ -8,7 +9,7 @@ import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility
 export async function authorizeEnrollmentApplication(
   actor: AccessContext, applicationId: string, executor: Pick<typeof db, "select"> = db,
 ) {
-  if (!actor.actorPersonId || !["registrar", "guardian"].includes(actor.role))
+  if (!actor.actorPersonId || !rolesAllow(["registrar", "guardian"], actor.role))
     throw new AuthorizationError("registrar or managing guardian enrollment access");
   assertCapability(actor, actor.role === "guardian" ? "enrollment.apply" : "enrollment.decide");
   const [application] = await executor.select({

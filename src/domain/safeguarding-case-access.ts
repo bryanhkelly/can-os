@@ -1,3 +1,4 @@
+import { rolesAllow } from "@/domain/school-roles";
 import type { AccessContext } from "@/domain/access-context";
 import {
   assertCapability,
@@ -77,7 +78,7 @@ export function assertSafeguardingConfigurationScope(
   siteId: string,
 ): void {
   assertCapability(actor, "safeguarding.policy.manage");
-  if (!actor.actorPersonId || !["registrar", "safeguarding_lead"].includes(actor.role)) {
+  if (!actor.actorPersonId || !rolesAllow(["registrar", "safeguarding_lead"], actor.role)) {
     throw new AuthorizationError("safeguarding operational policy manager");
   }
   assertOrganizationScope(actor, organizationId);

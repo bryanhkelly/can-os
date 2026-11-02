@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { activities, activitySeasons, programs, sites } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -19,7 +20,7 @@ type NewSeason = {
 
 /** Atomically plans an Activity and its first Season; never opens guardian registration. */
 export async function createExtendedSeasonDraft(context: AccessContext, input: NewSeason) {
-  if (context.role !== "registrar" || !context.actorPersonId)
+  if (!hasRegistrarAuthority(context.role) || !context.actorPersonId)
     throw new AuthorizationError("extended-learning registrar");
   assertCapability(context, "program.launch.start");
   if (!(context.scope.programIds ?? []).includes(input.programId))

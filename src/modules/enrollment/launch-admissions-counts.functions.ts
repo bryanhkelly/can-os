@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, count, eq, inArray, sql } from "drizzle-orm";
@@ -13,7 +14,7 @@ export const getLaunchAdmissionsCounts = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
     setResponseHeader("Cache-Control", "private, no-store");
-    if (actor.role !== "registrar" || !actor.actorPersonId || !actor.scope.organizationIds?.length) {
+    if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || !actor.scope.organizationIds?.length) {
       throw new AuthorizationError("launch admissions totals");
     }
     assertCapability(actor, "enrollment.decide");

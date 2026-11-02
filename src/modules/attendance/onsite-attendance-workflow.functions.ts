@@ -1,3 +1,4 @@
+import { rolesAllow, hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSchoolDayPreparation } from "@/domain/onsite-day-preparation";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -39,7 +40,7 @@ async function staff(capability: string) {
     assertOnsiteAttendanceScope(actor);
   } else {
     assertCapability(actor, capability);
-    if (!["registrar", "teacher"].includes(actor.role))
+    if (!rolesAllow(["registrar", "teacher"], actor.role))
       throw new AuthorizationError("verified attendance staff role");
   }
   if (!actor.actorPersonId || !actor.scope.organizationIds?.length ||
@@ -149,7 +150,7 @@ async function resolveExpectedRoster(actor: AccessContext,
       }
     }
   }
-  const programRoster = (actor.role === "registrar" ||
+  const programRoster = (hasRegistrarAuthority(actor.role) ||
     actor.role === "site_leader" || actor.role === "site_staff") ? await db.select({
     studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
     preferredName: people.preferredName, firstName: people.legalFirstName,
@@ -326,7 +327,7 @@ export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:Ac
 export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(actor:AccessContext,data:{
   date:string;programId:string;siteId:string;studentProfileId:string;
 })=>{
-  if(actor.role!=="registrar" || !actor.actorPersonId || actor.sessionAccountId)
+  if(!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || actor.sessionAccountId)
     throw new AuthorizationError("verified registrar future first-day preparation");
   assertCapability(actor,"enrollment.activate");
   if(!actor.scope.organizationIds?.length ||
@@ -735,7 +736,7 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
           .map(id => ({ documentId: id, fileName: attachmentNameById.get(id)! })),
         canReview: current?.id === r.attendanceEventId &&
           (current?.status === "absent" || current?.status === "tardy"),
-        canClose: actor.role === "registrar" && !!current && current.id !== r.attendanceEventId,
+        canClose: hasRegistrarAuthority(actor.role) && !!current && current.id !== r.attendanceEventId,
       };
     }) };
   });
@@ -747,7 +748,7 @@ export const closeStaleAttendanceExcuse = createServerFn({ method: "POST" })
   }).strict().parse(value))
   .handler(async ({ data }) => {
     const actor = await staff("attendance.excuse.review");
-    if (actor.role !== "registrar") throw new AuthorizationError("registrar obsolete excuse closure");
+    if (!hasRegistrarAuthority(actor.role)) throw new AuthorizationError("registrar obsolete excuse closure");
     return closeObsoleteAttendanceExcuse(actor, data);
   });
 

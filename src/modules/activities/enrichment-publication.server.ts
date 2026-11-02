@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -30,7 +31,7 @@ export async function publishExtendedSeason(
     operationalResponsibilityConfirmed: true;
   },
 ) {
-  if (actor.role !== "registrar" || !actor.actorPersonId)
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId)
     throw new AuthorizationError("verified registrar");
   assertCapability(actor, "program.launch.start");
   if (!Number.isSafeInteger(input.feeAmountCents) || input.feeAmountCents < 0 ||

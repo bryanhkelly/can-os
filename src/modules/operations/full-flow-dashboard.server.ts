@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -17,7 +18,7 @@ import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-s
  * checked in SQL. The projection returns aggregate counts, not student PII.
  */
 export async function readFullFlowOperations(actor: AccessContext) {
-  if (actor.role !== "registrar" || !actor.actorPersonId)
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId)
     throw new AuthorizationError("authorized school operations membership");
   assertCapability(actor, "program.launch.start");
   const orgIds = actor.scope.organizationIds ?? [];

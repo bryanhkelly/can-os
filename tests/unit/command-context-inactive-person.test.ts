@@ -14,6 +14,7 @@ vi.mock("@/db/client",()=>({
     const query={
       from:()=>query,
       innerJoin:()=>query,
+      leftJoin:()=>query,
       where:(where:SQL)=>{state.filters.push(where);return query;},
       limit:()=>Promise.resolve(rows),
       then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>Promise.resolve(rows).then(resolve,reject),
@@ -39,7 +40,7 @@ describe("server session must enforce active-person memberships",()=>{
       headers:{cookie:`${accessSessionCookie}=${secret}`},
     }))).rejects.toThrow("active membership");
     const sql=new PgDialect();
-    expect(state.filters).toHaveLength(2);
+    expect(state.filters).toHaveLength(4);
     const sessionPredicate=sql.sqlToQuery(state.filters[0]!);
     expect(sessionPredicate.sql).toContain("updated_at");
     const dates=sessionPredicate.params.map(value=>

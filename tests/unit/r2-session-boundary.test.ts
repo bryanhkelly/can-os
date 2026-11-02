@@ -13,6 +13,7 @@ vi.mock("@/db/client",()=>({
   const query={
    from:()=>query,
    innerJoin:()=>query,
+   leftJoin:()=>query,
    where:()=>query,
    limit:async()=>{state.selects++;return rows;},
    then:(resolve:(value:unknown)=>unknown,reject:(error:unknown)=>unknown)=>{

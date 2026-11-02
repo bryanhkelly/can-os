@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -200,7 +201,7 @@ export async function getSchoolOpeningEvidenceDownload(actor:AccessContext,input
     throw new AuthorizationError("school-opening evidence within this exact school");
   return db.transaction(async tx=>{
     await writeAudit(tx,actor,{action:"school.opening.evidence.read",entityType:"document",entityId:document.id,
-      scope:scope(school,actor.role==="registrar"?school.organizationId:school.institutionId),
+      scope:scope(school,hasRegistrarAuthority(actor.role)?school.organizationId:school.institutionId),
       after:{category:document.category,version:document.metadata.version??1}});
     return {downloadUrl:signPrivateObjectUrl({method:"GET",key:document.storageKey,keyPattern,expiresSeconds:60}),
       expiresInSeconds:60};

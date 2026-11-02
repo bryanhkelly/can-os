@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
@@ -16,7 +17,7 @@ const kind="transfer_academic_records_handoff";
 const uuid=z.string().uuid();
 async function authorizedRegistrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("verified school records registrar");
  assertCapability(actor,"enrollment:manage");
  if(!actor.scope.organizationIds?.length)
@@ -325,7 +326,7 @@ export const completeTransferRecordsHandoff=createServerFn({method:"POST"})
            eq(s.accessAccounts.disabled,false),
          ))
          .where(and(
-           eq(s.accountPersonGrants.role,"registrar"),
+           inArray(s.accountPersonGrants.role, ["registrar", "site_admin"]),
            eq(s.accountPersonGrants.active,true),
            eq(s.accountPersonGrants.organizationId,internalDestination.organizationId),
            or(isNull(s.accountPersonGrants.siteId),
@@ -361,7 +362,7 @@ export const getReceivingSchoolTransferTranscript=createServerFn({method:"POST"}
  .handler(async({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCommandContext(getRequest());
-  if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
+  if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real destination-school registrar");
   assertCapability(actor,"admissions:read");
   return db.transaction(async tx=>{

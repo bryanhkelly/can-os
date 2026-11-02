@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName } from "@/domain/person-name";
 import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
@@ -28,7 +29,7 @@ export const getAdmissionsDashboard = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
     setResponseHeader("Cache-Control", "private, no-store");
-    if (actor.role !== "registrar" || !actor.actorPersonId || !actor.scope.organizationIds?.length) {
+    if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || !actor.scope.organizationIds?.length) {
       throw new AuthorizationError("registrar admissions dashboard");
     }
     assertCapability(actor, "enrollment.decide");
@@ -271,7 +272,7 @@ export const getActiveEnrollmentCounts = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
     setResponseHeader("Cache-Control", "private, no-store");
-    if (actor.role !== "registrar" || !actor.actorPersonId || !actor.scope.organizationIds?.length) {
+    if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || !actor.scope.organizationIds?.length) {
       throw new AuthorizationError("registrar enrollment totals");
     }
     assertCapability(actor, "enrollment.decide");

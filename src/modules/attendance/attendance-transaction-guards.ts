@@ -1,3 +1,4 @@
+import { rolesAllow } from "@/domain/school-roles";
 import { and, eq, inArray } from "drizzle-orm";
 import type { db } from "@/db/client";
 import {
@@ -43,7 +44,7 @@ export async function assertExpectedOnsiteMarkInTransaction(
   if (onsite) assertOnsiteAttendanceScope(context as AccessContext, input.siteId);
   if (input.occurrenceKey !== input.date + ":site-day" ||
       !input.siteId || !context.actorPersonId ||
-      !(onsite || ["registrar", "teacher"].includes(role ?? "")) ||
+      !(onsite || rolesAllow(["registrar", "teacher"], role ?? "")) ||
       !context.scope.programIds?.includes(input.programId) ||
       !context.scope.siteIds?.includes(input.siteId))
     throw new AuthorizationError("attendance occurrence, staff and site scope");

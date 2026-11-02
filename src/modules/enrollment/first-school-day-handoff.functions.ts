@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gte, asc, desc } from "drizzle-orm";
@@ -23,7 +24,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control","private, no-store");
     const actor = await getCommandContext(getRequest());
-    if (actor.role !== "registrar" || !actor.actorPersonId || actor.sessionAccountId)
+    if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId || actor.sessionAccountId)
       throw new AuthorizationError("verified registrar first-day handoff");
     assertCapability(actor,"enrollment.activate");
 

@@ -33,6 +33,7 @@ function AccessPage(){
    <button disabled={busy} type="submit" className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">{isDemoEmail?"Sign in":"Email me an access link"}</button>
   </form>
   <p role="status">{status||(search.error?accessFormErrors[search.error]:"")}</p>
+  <p className="text-sm"><Link to="/schools/new" className="font-semibold underline">Create a new .demo school</Link></p>
   <p className="text-sm"><Link to="/church/apply" className="font-semibold underline">Church leader? Request to launch a school →</Link></p>
   <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
  </main>;

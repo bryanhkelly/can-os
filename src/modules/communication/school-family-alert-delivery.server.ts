@@ -4,7 +4,7 @@ import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { sendNotificationEmail } from "./notification-email.server";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "@/platform/subscriptions/preferences";
-import { isDemoTenantOrganization } from "@/domain/local-demo-access";
+import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 
 const MAX_ATTEMPTS=5;
 const LEASE_MS=120_000;
@@ -78,7 +78,7 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
         !record.programId||!record.siteId||!record.organizationId){
        await suppress("invalid_school_alert");return;
      }
-     if(isDemoTenantOrganization(record.organizationId)){
+     if(await isDemoTenantOrganization(record.organizationId)){
        await suppress("demo_tenant_external_delivery");return;
      }
      // Never use a cached recipient list as ongoing permission. A guardian

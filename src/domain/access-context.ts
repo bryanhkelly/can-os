@@ -25,7 +25,7 @@ export type AccessContext = CommandContext & {
 };
 
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
-export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
+const baseRoleCapabilities = {
  // Network partners govern affiliation and their own sites; never student or school operations.
  can_network_steward: ["network.agreements.verify", "network.admins.provision"],
  network_admin: ["network.sites.read", "network.sites.manage", "network.affiliations.read", "network.affiliations.review"],
@@ -49,6 +49,11 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
  safeguarding_lead: ["notifications:manage","safeguarding.case.read","safeguarding.respond","safeguarding.evidence.add","safeguarding.external_report.record","safeguarding.policy.manage"],
  specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
  counselor: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
+} satisfies Readonly<Record<string, readonly string[]>>;
+
+export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
+ ...baseRoleCapabilities,
+ site_admin: [...baseRoleCapabilities.registrar, "school.setup.manage"],
 });
 
 /** This may be called only after authenticating a server session and fetching grants from Neon. */

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { AuthorizationError } from "./command-context";
 import type { AccessContext } from "./access-context";
 
@@ -11,7 +12,7 @@ export function assertLocalDelegationIssuer(actor: AccessContext, resource: {
   organizationId: string; siteId: string; programId: string;
 }) {
   if (actor.sessionAccountId || !actor.actorPersonId ||
-      actor.role !== "registrar" || !actor.capabilities.has("admin.manage") ||
+      !hasRegistrarAuthority(actor.role) || !actor.capabilities.has("admin.manage") ||
       !actor.scope.organizationIds?.includes(resource.organizationId) ||
       !actor.scope.siteIds?.includes(resource.siteId) ||
       !actor.scope.programIds?.includes(resource.programId) ||

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -68,7 +69,7 @@ export async function signEnrollmentForm(actor: Actor, input: {
 export async function reviewEnrollmentForm(actor: Actor, input: {
   applicationId: string; requirementId: string; submissionId: string; status: "accepted" | "rejected"; reason: string;
 }) {
-  if (actor.role !== "registrar") throw new Error("Registrar review is required for enrollment forms.");
+  if (!hasRegistrarAuthority(actor.role)) throw new Error("Registrar review is required for enrollment forms.");
   return db.transaction(async tx => {
     const app = await authorizeEnrollmentApplication(actor, input.applicationId, tx);
     if (["withdrawn", "declined"].includes(app.stage)) throw new Error("This application is closed.");

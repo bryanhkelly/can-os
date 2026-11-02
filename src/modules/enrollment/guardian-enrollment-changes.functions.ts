@@ -145,7 +145,7 @@ export const requestGuardianEnrollmentChange=createServerFn({method:"POST"})
       eq(s.accessAccounts.disabled,false),
     ))
     .where(and(
-      eq(s.accountPersonGrants.role,"registrar"),
+      inArray(s.accountPersonGrants.role, ["registrar", "site_admin"]),
       eq(s.accountPersonGrants.active,true),
       eq(s.accountPersonGrants.organizationId,child.organizationId),
       or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,child.siteId)),

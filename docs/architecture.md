@@ -37,6 +37,23 @@ CAN OS begins as a **modular monolith**, not a microservice system.
 - Background workers only where asynchronous work is actually required
 - External services for commodity capabilities such as email, SMS, video, payments, object storage, and AI foundation models
 
+### Public school bootstrap and Site Admin
+
+Public `/schools/new` bootstrap classifies supported `.demo` domains into new,
+isolated canonical Organization/Site tenants. An explicit registry binds each
+tenant's initial Site Admin to its account, person and grant; immutable normal
+staff-invitation evidence binds subsequent shared-code staff. A domain suffix
+or synthetic metadata is not authority. Creation, registry, audit and domain
+events commit together, with domain-serialized, conflict-aware retries.
+
+`site_admin` inherits registrar workflows within the same resource, scope and
+relationship boundaries and adds school setup management. It does not become a
+network administrator, bypass independent review or gain sibling-Site access.
+Registrars cannot appoint or deactivate Site Admins. The bootstrap hands off to
+normal Launch Studio and domain commands, not a duplicate demo product engine.
+See [identity and demo access](./identity-and-demo-access.md) for shared-account,
+delivery and deployment boundaries.
+
 ### Dates, timestamps and Site timezones
 
 `src/modules/calendar/timezone.ts` owns calendar-date validation/arithmetic,

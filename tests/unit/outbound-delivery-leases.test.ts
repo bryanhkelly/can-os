@@ -52,6 +52,7 @@ vi.mock("@/db/client", () => {
           return rows.map(row => ({ ...row, subscriptionId: "watch", domainEventId: "event" }));
         }
         if (tableName === "subscriptions") return [{ status: "active", subscriberPersonId: "person", sourceConversationId: null }];
+        if (tableName === "demo_school_tenants") return [];
         if (tableName === "domain_events") return [{ eventType: "AssignmentBecameMissing" }];
         if (tableName === "guardian_relationships") return state.guardianAuthorized ? [{ id: "relationship" }] : [];
         if (tableName === "account_person_grants") {

@@ -2,7 +2,7 @@
 
 ## Tenant architecture (FullFlow local redesign)
 
-Valor is an ordinary canonical Organization/Site tenant, not a separate workflow engine. Account/person grants no longer carry `is_synthetic`. Historical migrations and optional fixture provenance metadata remain historical evidence, not authorization. Ordinary accounts retain one-time email links via Resend, which is a transport provider, not session authority. Restricted Valor accounts use the explicit fixed-code access path described below.
+Valor is an ordinary canonical Organization/Site tenant, not a separate workflow engine. Account/person grants no longer carry `is_synthetic`. Historical migrations and optional fixture provenance metadata remain historical evidence, not authorization. Ordinary accounts retain one-time email links via Resend, which is a transport provider, not session authority. Restricted Valor accounts and explicitly provisioned public `.demo` school accounts use the shared-code paths described below.
 
 ## Required boundaries
 
@@ -17,6 +17,54 @@ Valor is an ordinary canonical Organization/Site tenant, not a separate workflow
 9. **Audit**: log effective account/person/grant/role, session owner when delegated, resource, action, correlation ID, timestamp and outcome on consequential mutations; enforce append-only history at DB level. A shared demo code does not identify the individual human visitor.
 10. **Demo identity access**: the approved `@valorschool.demo` accounts sign in with `000000` locally or on Netlify production, without demo-access flags. These shared accounts are intentionally public and must remain confined to Valor's synthetic tenant; they do not identify the human visitor. The database must already contain their active canonical grants, and `CAN_ACCESS_TOKEN_PEPPER` must be configured to issue sessions. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. `CAN_DEMO_WRITES_ENABLED` is retired; domain authorization, business invariants and transactional evidence apply to every tenant. External email/SMS is suppressed for Valor; R2 retains separate tenant-classified deployment switches.
 11. **Future authentication**: interface `verifyIdentityCredential(request): Promise<{ accountId: string } | null>` is replaceable by a future auth provider. Services depend on account/person/context, never on Resend or provider-specific claims.
+
+## Public `.demo` school setup
+
+Anyone may submit `/schools/new` with a school name, an unused single-label
+`.demo` domain, a valid IANA timezone and explicit synthetic-only confirmation.
+This provisions a **new**, separate canonical Organization and Site, never
+another school within Valor or an existing authentic organization. It does
+not register DNS or publish a public website. Non-demo domains are not supported
+by this anonymous bootstrap; `valorschool.demo` remains reserved.
+
+The transaction creates the initial Site-bound `site_admin`, membership,
+institutional assignment, exact identity registry, AuditEvent and DomainEvents.
+The administrator signs in as `admin.demo@<school>.demo` with `000000` and resumes
+the normal `/operations/launch?siteId=...` workflow. No Program or enrollment is
+fabricated by bootstrap. Identical retries reuse the existing setup; mismatched,
+disabled or revoked bindings conflict rather than silently repairing access.
+Same-origin checks, a bounded JSON submission and anonymous admission limiting
+apply. Trusted-edge per-source abuse protection remains an operational concern.
+
+**Site Admin is above registrar within the assigned Site.** It has registrar
+workflow capabilities plus school setup management, while retaining the actual
+`site_admin` role in command contexts and audits. It has no network provisioning
+authority, access to sibling Sites, or waiver of resource/relationship,
+independent-review and readiness gates. Ordinary registrar staff management
+cannot appoint, modify or deactivate a Site Admin.
+
+Normal staff invitations in registered demo schools must use that school's
+domain. Explicitly invited accounts accept pending exact-Site grants with
+`000000`, without outbound email. Immutable `StaffInvitationIssued` evidence
+binds each account/person/role/grant to its original tenant. Revoked accepted
+invitations must not be reactivated. A `.demo` suffix alone never authorizes an
+account, and changing a registered identity's email or grant cannot turn it
+into an authentic account. Disabling a tenant removes access without enabling
+external delivery.
+
+Registry-aware delivery rules suppress external email/SMS for these schools;
+R2 keeps its separate deployment gates. Public family email-verification and
+outreach flows reject demo source organizations rather than inventing delivered
+mail. This bootstrap does not imply shared-code guardian/student provisioning
+or acceptance of the entire school lifecycle. All contents must remain
+synthetic, and shared accounts do not identify individual human visitors.
+
+Deployment requires [migration 0061](../drizzle/0061_demo_school_tenants.sql)
+before serving this code, including for the identity registry queries used by
+ordinary sessions. It has not been applied as part of this implementation.
+Unit, build and static contract checks are not database or browser acceptance;
+run the rollback setup integration test against an explicitly attested,
+approved nonproduction branch before claiming end-to-end readiness.
 
 ## Local startup and checkout authority
 

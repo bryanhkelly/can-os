@@ -25,6 +25,7 @@ export * from "./admissions-offers";
 export * from "./study-groups";
 export * from "./report-cards";
 export * from "./access";
+export * from "./demo-school-tenants";
 export * from "./support";
 export * from "./conversations";
 export * from "./subscriptions";

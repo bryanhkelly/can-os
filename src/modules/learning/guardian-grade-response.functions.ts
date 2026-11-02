@@ -253,7 +253,7 @@ export const requestGuardianGradeResponse = createServerFn({ method: "POST" })
           .from(accountPersonGrants)
           .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
           .where(and(
-            eq(accountPersonGrants.role, "registrar"),
+            inArray(accountPersonGrants.role, ["registrar", "site_admin"]),
             eq(accountPersonGrants.organizationId, record.organizationId),
             eq(accountPersonGrants.active, true),
             eq(accessAccounts.disabled, false),

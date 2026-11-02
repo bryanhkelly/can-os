@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createHash } from "node:crypto";
 import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -52,7 +53,7 @@ async function loadOperatingIdentity(
   return identity;
 }
 function assertHostRequester(actor: AccessContext, identity: OperatingProgramIdentity) {
-  if (actor.sessionAccountId || actor.role !== "registrar" || !actor.actorPersonId ||
+  if (actor.sessionAccountId || !hasRegistrarAuthority(actor.role) || !actor.actorPersonId ||
       !actor.scope.organizationIds?.includes(identity.hostOrganizationId) ||
       !identity.siteId || !actor.scope.siteIds?.includes(identity.siteId) ||
       !actor.scope.programIds?.includes(identity.programId))
@@ -328,7 +329,7 @@ export async function revokeProgramSiteAuthorization(
     const identity = await loadOperatingIdentity(tx, record.programId);
     // Both contracting parties have the ability to withdraw the operating
     // relationship, but neither can approve on behalf of the other party.
-    if (actor.role === "registrar") {
+    if (hasRegistrarAuthority(actor.role)) {
       assertHostRequester(actor, identity);
     } else {
       assertIndependentCANReviewer(actor, identity);
@@ -662,7 +663,7 @@ export async function getHostProgramSiteAuthorization(
     institutionOrganizationId: programs.academicProviderOrganizationId,
     creditIssuingOrganizationId: programs.creditIssuingOrganizationId,
   }).from(programs).where(eq(programs.id, programId)).limit(1);
-  if (!program || actor.role !== "registrar" || actor.sessionAccountId ||
+  if (!program || !hasRegistrarAuthority(actor.role) || actor.sessionAccountId ||
       !actor.scope.organizationIds?.includes(program.organizationId) ||
       !actor.scope.programIds?.includes(programId) ||
       !program.siteId || !actor.scope.siteIds?.includes(program.siteId))

@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -60,7 +61,7 @@ async function seasonIdentity(reader: Reader, seasonId: string) {
 }
 
 function verifySubmitter(actor: AccessContext, season: Awaited<ReturnType<typeof seasonIdentity>>) {
-  if (actor.sessionAccountId || actor.role !== "registrar" || !actor.actorPersonId ||
+  if (actor.sessionAccountId || !hasRegistrarAuthority(actor.role) || !actor.actorPersonId ||
       !actor.scope.organizationIds?.includes(season.organizationId) ||
       !actor.scope.siteIds?.includes(season.siteId) ||
       !actor.scope.programIds?.includes(season.programId))
@@ -82,7 +83,7 @@ async function verifyReviewer(actor: AccessContext, season: Awaited<ReturnType<t
 
 async function assertReader(actor: AccessContext, season: Awaited<ReturnType<typeof seasonIdentity>>,
   reader: Reader) {
-  if (actor.role === "registrar") verifySubmitter(actor, season);
+  if (hasRegistrarAuthority(actor.role)) verifySubmitter(actor, season);
   else await verifyReviewer(actor, season, reader);
 }
 
@@ -283,7 +284,7 @@ export async function readExtendedEvidence(actor: AccessContext, seasonId: strin
     siteMatchesProgram: true, capacity: season.capacity,
   }], db, now)).get(seasonId) ?? unavailableExtendedSeasonApprovals;
   return {
-    seasonId, seasonName: season.seasonName, canSubmit: actor.role === "registrar",
+    seasonId, seasonName: season.seasonName, canSubmit: hasRegistrarAuthority(actor.role),
     canReview: actor.role === "can_network_steward",
     uploadsEnabled: process.env.CAN_R2_SCHOOL_OPENING_UPLOADS_ENABLED === "true",
     opening: extendedRegistrationOpeningReadiness({

@@ -10,6 +10,8 @@ import { sendAccessLinkViaResend, type AccessEmailSender } from "@/modules/ident
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
+import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { DomainError } from "@/domain/errors";
 const LIFETIME_MS=10*60*1000;
 const COOLDOWN_MS=60*1000;
 type Reader=Pick<typeof db,"select">;
@@ -90,6 +92,8 @@ export async function requestVerifiedFamilyStart(
  const token=issueOpaqueSecret(),tokenHash=hashAccessSecret(token,pepper);
  const outcome=await db.transaction(async tx=>{
   const {school,contact,evidence}=await prepare(tx);
+  if(await isDemoTenantOrganization(school.organizationId,tx))
+   throw new DomainError("FORBIDDEN","External family email verification is suppressed for demo schools");
   const email=contact.email;
   // Prevent parallel requests from multiplying messages to the same email.
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${email + ":" + school.programId}))`);

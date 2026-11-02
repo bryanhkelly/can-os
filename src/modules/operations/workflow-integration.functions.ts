@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { loadExpectedAttendanceCoverage } from "@/modules/attendance/expected-attendance-queries";
@@ -20,7 +21,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await getCommandContext(getRequest());
   assertCapability(actor, "program.read");
-  if (actor.role !== "registrar" || !actor.actorPersonId) {
+  if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId) {
     throw new AuthorizationError("registrar workflow integration");
   }
   // Do not substitute organization membership for a verified program grant.

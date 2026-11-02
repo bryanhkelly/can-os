@@ -72,6 +72,7 @@ for (const eventType of [
   EventTypes.SectionCreditConfigured,
   EventTypes.ActionDeadlineChanged,
   EventTypes.SiteCreated,
+  EventTypes.SchoolSetupCompleted,
   EventTypes.SchoolYearCreated,
   EventTypes.SchoolYearActivated,
   EventTypes.AcademicCalendarChanged,

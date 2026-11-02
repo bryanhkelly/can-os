@@ -2,6 +2,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
+import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
+import { readDemoSchoolForAccount } from "./demo-school-tenants.server";
+import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { AuthorizationError } from "@/domain/command-context";
 import {
   isDemoAccountEmail,
@@ -71,6 +74,23 @@ export async function readSessionGrants(accountId: string, email: string, reader
     accountId === LOCAL_DEMO_ADMIN.accountId || normalizedEmail === LOCAL_DEMO_ADMIN.email;
   const ownGrants = (await listActiveAccountGrants(accountId, reader))
     .filter(grant => grant.accountId === accountId);
+
+  const valorAccount = LOCAL_DEMO_ACCOUNTS.some(account => account.accountId === accountId) ||
+    normalizedEmail.endsWith("@valorschool.demo");
+  if (!valorAccount) {
+    const school = await readDemoSchoolForAccount(accountId, reader);
+    if (school) {
+      const grants = ownGrants.filter(grant => matchesDemoSchoolAdministrator(school, grant, normalizedEmail));
+      return { grants, demoAccountSwitching: false, launchSiteId: school.siteId };
+    }
+    const bindings = await readDemoStaffBindings(accountId, reader);
+    if (bindings.length) {
+      return { grants: ownGrants.filter(grant =>
+        bindings.some(binding => matchesDemoStaffBinding(binding, grant, normalizedEmail))),
+      demoAccountSwitching: false };
+    }
+    if (demoAccount) return { grants: [], demoAccountSwitching: false };
+  }
 
   if (!adminAccount && !demoAccount) {
     return { grants: ownGrants, demoAccountSwitching: false };

@@ -17,6 +17,7 @@ export const workspaceHome = {
   guardian: "/guardian",
   teacher: "/teacher",
   registrar: "/operations",
+  site_admin: "/operations/launch",
   specialist: "/coach",
   counselor: "/counselor",
   network_admin: "/network",
@@ -25,7 +26,21 @@ export const workspaceHome = {
 
 export type WorkspaceRole = keyof typeof workspaceHome;
 
+const schoolAdministrationLinks = [
+  { title: "Operations", path: "/operations", icon: "clipboard",
+    owns: ["/operations/launch", "/operations/launch/$programId", "/operations/workflows",
+      "/operations/insights", "/operations/course-policies", "/operations/course-requests",
+      "/operations/family-alerts", "/operations/field-trips", "/operations/health-review", "/operations/transfer-records", "/readiness", "/classes"] },
+  { title: "Admissions", path: "/admissions", icon: "clipboard", owns: ["/admissions/*"] },
+  { title: "Students", path: "/staff/students", icon: "users", owns: ["/staff/students/$personId"] },
+  { title: "Sites", path: "/sites", icon: "home", owns: ["/sites/$siteId", "/sites/$siteId/publish"] },
+  { title: "School years", path: "/operations/school-years", icon: "calendar" },
+  { title: "Curriculum", path: "/operations/curriculum", icon: "book", owns: ["/operations/curriculum-marketplace"] },
+  { title: "Administration", path: "/admin", icon: "users" },
+] satisfies readonly WorkspaceNavigationItem[];
+
 export const workspaceLinks = {
+  site_admin: schoolAdministrationLinks,
   site_website_editor: [{ title: "Website", path: "/site-website", icon: "home" }],
   room_facilitator: [
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },
@@ -87,18 +102,7 @@ export const workspaceLinks = {
     { title: "Calendar", path: "/calendar", icon: "calendar" },
     { title: "Messages", path: "/messages", icon: "messages" },
   ],
-  registrar: [
-    { title: "Operations", path: "/operations", icon: "clipboard",
-      owns: ["/operations/launch", "/operations/launch/$programId", "/operations/workflows",
-        "/operations/insights", "/operations/course-policies", "/operations/course-requests",
-        "/operations/family-alerts", "/operations/field-trips", "/operations/health-review", "/operations/transfer-records", "/readiness", "/classes"] },
-    { title: "Admissions", path: "/admissions", icon: "clipboard", owns: ["/admissions/*"] },
-    { title: "Students", path: "/staff/students", icon: "users", owns: ["/staff/students/$personId"] },
-    { title: "Sites", path: "/sites", icon: "home", owns: ["/sites/$siteId", "/sites/$siteId/publish"] },
-    { title: "School years", path: "/operations/school-years", icon: "calendar" },
-    { title: "Curriculum", path: "/operations/curriculum", icon: "book", owns: ["/operations/curriculum-marketplace"] },
-    { title: "Administration", path: "/admin", icon: "users" },
-  ],
+  registrar: schoolAdministrationLinks,
   specialist: [
     { title: "Caseload", path: "/coach", icon: "support" },
     { title: "Students", path: "/staff/students", icon: "users", owns: ["/staff/students/$personId"] },

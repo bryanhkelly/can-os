@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -39,7 +40,7 @@ async function parent(){
 }
 async function medicalRegistrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||actor.sessionAccountId)
+ if(!hasRegistrarAuthority(actor.role)||!actor.actorPersonId||actor.sessionAccountId)
    throw new AuthorizationError("real school medical-review registrar");
  assertCapability(actor,"health.manage");
  return actor;
@@ -112,7 +113,7 @@ export const requestGuardianHealthUpdate=createServerFn({method:"POST"})
    });
    const operators=await tx.selectDistinct({personId:s.accountPersonGrants.personId})
      .from(s.accountPersonGrants).where(and(
-       eq(s.accountPersonGrants.role,"registrar"),
+       inArray(s.accountPersonGrants.role, ["registrar", "site_admin"]),
        eq(s.accountPersonGrants.active,true),eq(s.accountPersonGrants.organizationId,student.organizationId),
        sql`(${s.accountPersonGrants.siteId} IS NULL OR ${s.accountPersonGrants.siteId} = ${student.siteId})`,
      )).limit(20);

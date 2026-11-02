@@ -1,3 +1,4 @@
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 type Grant={id:string;personId:string;role:string;siteId:string|null;organizationId:string|null};
 
 /** Choose only an existing membership of the same signed-in person. The
@@ -10,7 +11,7 @@ export function launchWebsiteHandoffGrant(grants:readonly Grant[],input:{
  const candidates=grants.filter(grant=>grant.personId===current.personId&&(
   input.destination==="editor"
    ?grant.role==="site_website_editor"&&grant.siteId===input.siteId&&grant.organizationId===current.organizationId
-   :grant.id===input.returnGrantId&&grant.role==="registrar"&&(
+   :grant.id===input.returnGrantId&&hasRegistrarAuthority(grant.role)&&(
      grant.siteId===input.siteId||(grant.siteId===null&&grant.organizationId===current.organizationId)
     )
  ));
