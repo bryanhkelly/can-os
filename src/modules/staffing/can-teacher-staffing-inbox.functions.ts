@@ -7,7 +7,7 @@ import { actions, people, programs } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { recordAudit, requireActor } from "@/modules/identity/actors.server";
-import { emitEvent } from "@/platform/mutation";
+import { emitEvent, notify } from "@/platform/mutation";
 
 /**
  * CAN provider-side staffing inbox. Authorization comes from a verified
@@ -88,6 +88,7 @@ export const reviewCANTeacherStaffingRequest = createServerFn({ method: "POST" }
         programId: actions.programId, organizationId: actions.organizationId,
         siteId: actions.siteId, subjectType: actions.subjectType,
         type: actions.type,
+        ownerPersonId: actions.ownerPersonId,
         resolvedAt: actions.resolvedAt,
       }).from(actions).where(eq(actions.id, data.requestId)).for("update").limit(1);
       if (!request || request.type !== "teacher_staffing_request" ||
@@ -142,6 +143,14 @@ export const reviewCANTeacherStaffingRequest = createServerFn({ method: "POST" }
           reviewState: metadata.canStaffingReviewState,
           ...(data.decision === "decline" ? { reason: data.reason } : {}),
         },
+      });
+      if (request.ownerPersonId) await notify(tx, {
+        recipientPersonId: request.ownerPersonId,
+        type: "staffing_review",
+        status: "unread",
+        title: data.decision === "decline" ? "CAN declined your teacher request" : "CAN is reviewing your teacher request",
+        body: data.decision === "decline" ? data.reason : "CAN Academy has started reviewing your staffing request. No teacher assignment is confirmed yet.",
+        resourceType: "action", resourceId: request.id,
       });
       await emitEvent(tx, {
         eventType: data.decision === "decline"
