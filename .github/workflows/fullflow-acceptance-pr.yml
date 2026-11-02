@@ -3,6 +3,7 @@ name: FullFlow Acceptance PR Static Gates
 on:
   pull_request:
     branches:
+      - main
       - FullFlow
     paths:
       - ".github/workflows/fullflow-acceptance-pr.yml"
