@@ -17,7 +17,7 @@ const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
   await client.query("BEGIN");
-  if(apply){const db=await client.query("SELECT current_database() AS name");if(db.rows[0].name!==process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)throw Error("Database identity mismatch");}
+  if(apply){const db=await client.query("SELECT current_database() AS name");if(db.rows[0].name!==process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)throw Error("Database identity mismatch");const expectedBranch=process.env.DEMO_CURRICULUM_EXPECTED_BRANCH_ID;if(!expectedBranch||!/^br-[a-z0-9-]+$/.test(expectedBranch))throw Error("Writes require DEMO_CURRICULUM_EXPECTED_BRANCH_ID");const branch=await client.query("SELECT current_setting('neon.branch_id',true) AS id");if(branch.rows[0]?.id!==expectedBranch)throw Error("Neon branch identity mismatch; refusing demo approval writes");}
   const publisher=await client.query("SELECT id FROM organizations WHERE slug='can-demo-publisher' AND metadata->>'demoPublisher'='true'");
   if(publisher.rowCount!==1)throw Error("Dedicated demo publisher not found");
   const pack=await client.query("SELECT id FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug='can-os-demo-catalog'",[publisher.rows[0].id]);
