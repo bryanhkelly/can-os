@@ -533,6 +533,15 @@ export async function createScheduleTemplate(
     assertProgramScope(context, input.programId ?? year.programId);
     assertSiteScope(context, year.siteId);
 
+    if (year.programId && input.programId && year.programId !== input.programId)
+      throw new Error("Schedule Program must match its school year");
+    if (input.programId) {
+      const [program] = await tx.select({ organizationId: programs.organizationId, siteId: programs.siteId })
+        .from(programs).where(eq(programs.id, input.programId)).limit(1);
+      if (!program || program.organizationId !== year.organizationId || program.siteId !== year.siteId)
+        throw new Error("Schedule Program must belong to the school year's organization and Site");
+    }
+
     if (
       input.effectiveFrom < year.startsOn ||
       (input.effectiveThrough && input.effectiveThrough > year.endsOn)

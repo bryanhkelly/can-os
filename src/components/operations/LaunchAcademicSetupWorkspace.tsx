@@ -1,4 +1,5 @@
 import { LaunchTeacherQualificationPolicy } from "@/components/operations/LaunchTeacherQualificationPolicy";
+import { SchoolYearScheduleSetup } from "@/components/operations/SchoolYearScheduleSetup";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSectionRow } from "@/components/operations/LaunchSectionRow";
 import {useState} from "react";
@@ -103,11 +104,20 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     {!data.terms.length&&<li>Prepare an academic year and its terms using the recommended-year action above.</li>}
     {!data.scheduleOptions.some(option=>option.schoolYearId===selectedTerm?.schoolYearId)&&<li>No instructional schedule exists for the selected year. <Link to="/operations/school-years" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Configure and review a school-year schedule</Link>.</li>}
     {!data.catalog.some(course=>course.recommendation.recommended)&&<li>No available published course has an accessible first lesson. <Link to="/operations/curriculum" className="underline">Review and publish instruction-ready curriculum</Link>.</li>}
-    {!data.teachingStaff.length&&<li>Assign an authorized instructor and verify qualifications using the staffing controls below.</li>}
+    {!data.teachingStaff.length&&<li>No eligible instructor is assigned to this school. Ask your CAN academic staffing administrator to assign a teacher to this Program, then refresh this workspace. The teacher must submit qualification evidence from their profile for independent review.</li>}
     {!data.academicAuthority.teacherAssignment&&<li>Complete institutional instructional service authorization before assigning teachers.</li>}
     {data.terms.length>0&&data.scheduleOptions.some(option=>option.schoolYearId===selectedTerm?.schoolYearId)&&data.catalog.some(course=>course.recommendation.recommended)&&data.teachingStaff.length>0&&data.academicAuthority.teacherAssignment&&<li>Reviewed choices are available. The recommended course and a matching schedule are preselected; a sole authorized instructor is suggested but must be reviewed.</li>}
    </ul>
   </section>
+  {selectedYear&&!suggestedSchedule&&<SchoolYearScheduleSetup key={selectedYear.id}
+   schoolYearId={selectedYear.id} programId={data.program.id} startsOn={selectedYear.startsOn}
+   endsOn={selectedYear.endsOn} timezone={selectedYear.timezone} disabled={busy}
+   changed={()=>router.invalidate()}/>}
+  {!data.teachingStaff.length&&<section aria-label="Instructor staffing handoff" className="mt-4 rounded-xl border bg-card p-5 text-sm">
+   <h3 className="font-semibold">Get your instructor assigned</h3>
+   <p className="mt-2">Request an instructor for {data.program.name} from your CAN academic staffing administrator. Include the planned course and term. A local website or registrar invitation does not appoint a CAN teacher.</p>
+   <button type="button" disabled={busy} onClick={()=>void run(async()=>{},"Instructor choices refreshed from current staffing records.")} className="mt-3 rounded border px-3 py-2">Refresh instructor choices</button>
+  </section>}
   <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="teacher-class-requests">
    <h2 id="teacher-class-requests" className="font-serif text-2xl">Teacher class requests</h2>
    <p className="mt-2 text-sm text-muted-foreground">Review teacher proposals here. Creating a request does not create a Section; approved course content, school-year schedule, instructor qualifications and the existing launch checks still apply.</p>
@@ -165,9 +175,12 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   {!data.catalog.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
    No published course templates are available from this program's academic provider. Publish curriculum before creating sections.
   </p>}
-  <QualificationCatalog programId={data.program.id} canAuthor={data.canAuthorCatalog}
-   changed={async()=>{await router.invalidate();}}/>
-  <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
+  <details className="mt-5 rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Teacher requirements and shared qualification definitions</summary>
+   <p className="mt-2 text-sm">Review existing requirements before creating definitions or publishing a new policy. These controls are for authorized academic administrators.</p>
+   <QualificationCatalog programId={data.program.id} canAuthor={data.canAuthorCatalog}
+    changed={async()=>{await router.invalidate();}}/>
+   <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
+  </details>
   <section id="classroom-create" className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
    {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
@@ -206,8 +219,8 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     </Select></Label>
     <Label>Class code<Input value={code} onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1"/></Label>
     <Label>Class title<Input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1"/></Label>
-    <Label className="sm:col-span-2">Instructor (required for guided launch)<Select required value={effectiveTeacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1">
-     <option value="">Assign later</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
+    <Label className="sm:col-span-2">Instructor (required for guided launch)<Select required value={effectiveTeacherId} disabled={!data.academicAuthority.teacherAssignment||!data.teachingStaff.length} onChange={e=>setTeacherId(e.target.value)} className="mt-1">
+     <option value="">{data.teachingStaff.length?"Choose an authorized instructor":"Awaiting instructor assignment"}</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </Select></Label>
     <Label className="sm:col-span-2">Course credit units
      <Input aria-label="Credit units for new section" type="number" min="0.01" max="10" step="0.01"
