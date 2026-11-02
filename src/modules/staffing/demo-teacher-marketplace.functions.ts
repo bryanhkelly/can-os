@@ -24,7 +24,7 @@ export const getDemoTeacherMarketplace = createServerFn({ method: "GET" })
     const actor = await requireActor(["registrar"]);
     // This must remain off on live deployments, even if synthetic rows exist.
     if (process.env.CAN_DEMO_TEACHER_PREVIEW_ENABLED !== "true" ||
-        process.env.NODE_ENV === "production" && process.env.CAN_DEMO_ISOLATED_ENV !== "true")
+        process.env.CAN_DEMO_ISOLATED_ENV !== "true")
       throw new AuthorizationError("Demo teacher marketplace requires an isolated demonstration environment");
     const market = await readMarketplace(actor, data.programId);
     const adopted = market.packs.filter(pack => pack.entitlement === "active" &&
@@ -62,6 +62,7 @@ export const getDemoTeacherMarketplace = createServerFn({ method: "GET" })
         sql`${people.metadata}->>'sourceSystem' = 'can-demo-teacher-marketplace-factory'`,
         sql`${instructionalCapacityOfferings.metadata}->>'demoOnly' = 'true'`,
         eq(instructorCapabilities.active, true),
+        eq(people.active, true),
         eq(instructorAvailabilityWindows.active, true),
         eq(instructionalCapacityOfferings.status, "open"),
       ));
@@ -85,6 +86,7 @@ export const getDemoTeacherMarketplace = createServerFn({ method: "GET" })
       return {
         ...course,
         teacherOptions: teachers,
+        sections: market.sections.filter(section => section.courseVersionId === course.versionId).map(section => ({ id: section.id, title: section.title, code: section.code })),
         sectionCount: market.sections.filter(section => section.courseVersionId === course.versionId).length,
       };
     });
