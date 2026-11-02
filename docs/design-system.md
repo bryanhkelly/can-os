@@ -11,6 +11,7 @@ The existing frontend already used Tailwind v4, class-variance-authority, React 
 | Semantic color, typography, density, and brand mappings | `src/styles.css` |
 | Buttons and native form controls | `src/components/ui/` |
 | Panels, metrics, status, feedback, loading/empty/error | `src/components/workspace/` |
+| Role navigation registry, sidebar, top bar, and support panels | `src/components/shell/` |
 | Guided Setup, Checklist Workspace, Split Review | `src/components/workflow/` |
 | Controlled institution/site brand validation | `src/design-system/brand-theme.tsx` |
 | Executable component and workflow documentation | colocated `*.stories.tsx` |
@@ -50,6 +51,11 @@ Storybook play tests exercise keyboard tab order, required-field validation, sub
 `can-os-design/no-hardcoded-colors` rejects palette-specific utilities such as `bg-blue-600` in shared design primitives and `/guardian/apply`; legacy application occurrences are warnings while migration proceeds. `scripts/check-design-system.mjs` fails duplicate exported component names across the shared tree. Existing general lint findings remain visible as warnings rather than triggering unrelated production repairs.
 
 Use `primary`, `foreground`, `muted-foreground`, `card`, `border`, `success`, `warning`, `danger`, and `info` according to meaning. Do not introduce persona hues or raw hex values in component class names. Token definitions are centralized in `styles.css`.
+
+Informational `StatCard`s remain visually static; linked metrics opt into the
+`interactive` variant and sit inside a keyboard-focusable link. Daily Canvas
+uses dedicated semantic surface/foreground tokens, while emergency content
+uses destructive tokens and never renders editorial verse or campaign content.
 
 ## Controlled institution/site branding
 
