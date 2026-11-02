@@ -163,32 +163,21 @@ The dedicated synthetic generator, optional seeding command and guarded
 Neon loader are developer/data-operations utilities only. They are not
 required by application startup, school launch or instructor selection.
 
-### One-command seed entry point
+### Data generation and import (optional development operations)
 
-```bash
-npm run demo:academic-marketplace
-# Local deterministic manifests only, no connection or database write
+No `run demo` command is needed by the application. The factory and importer
+scripts are optional maintenance tools for building, validating and loading
+synthetic data into an isolated Neon development branch. The application
+uses its normal database tables and marketplace workflows after loading.
 
-DEMO_CURRICULUM_PUBLISHER_ID="<verified-demo-publisher-uuid>" \
-DATABASE_URL="<isolated-neon-branch-url>" \
-npm run demo:academic-marketplace -- --inspect
-# Read-only curriculum import plan on the explicitly chosen branch
-```
-
-To apply, provide the already documented database/host confirmations and
-both importer opt-ins, then use:
-
-```bash
-npm run demo:academic-marketplace -- --apply
-```
-
-The script reuses the existing guarded import commands in order: first 120
-curriculum draft records, then 30 demo teacher profiles and their
-course-specific capabilities/preview offerings. Idempotent retries do not
-produce duplicate versions or teacher records. Because each stage commits
-separately, a failed second stage may leave the imported course drafts
-available for a safe retry. No publication, internal academic approvals or
-classroom staffing occurs in this command.
+Generate curriculum and matching teacher records with
+`scripts/demo-curriculum-factory.mjs` and
+`scripts/demo-teacher-marketplace-factory.mjs`. Import drafts with
+`scripts/import-demo-curriculum.mjs` and then
+`scripts/import-demo-teachers.mjs`; both require their documented write
+confirmations. Draft content must pass normal publication and school
+adoption to become selectable. Importing does not create instructor
+permissions, class assignments or real qualifications.
 
 **Observed isolated-Neon state (read-only verification, 2026-11-02):**
 `demo-curriculum-validation-20261102` contains the CAN Demo Publisher,
