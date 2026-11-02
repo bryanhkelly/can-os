@@ -12,13 +12,14 @@ const states=[
   ["AR","Arkansas"],["IA","Iowa"],["OK","Oklahoma"],["WI","Wisconsin"],
 ];
 const apply=process.argv.includes("--apply");
-if(apply && process.env.JURISDICTION_SEED_ALLOW_WRITE!=="1")throw Error("Set JURISDICTION_SEED_ALLOW_WRITE=1 before writing");
+if(apply && (process.env.JURISDICTION_SEED_ALLOW_WRITE!=="1" || !process.env.JURISDICTION_SEED_DATABASE_CONFIRMED))throw Error("Set write opt-in and exact confirmed database name before writing");
 if(!process.env.DATABASE_URL)throw Error("DATABASE_URL required");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 const report=[];
 try{
  await client.query("BEGIN");
+ if(apply){const db=await client.query("SELECT current_database() AS name");if(db.rows[0].name!==process.env.JURISDICTION_SEED_DATABASE_CONFIRMED)throw Error("Database identity mismatch");}
  for(const [regionCode,name] of states){
   const j=await client.query("SELECT id,code FROM jurisdictions WHERE region_code=$1 OR code=ANY($2::text[]) ORDER BY CASE WHEN region_code=$1 THEN 0 ELSE 1 END LIMIT 1",[regionCode,[regionCode,`US-${regionCode}`,`US_${regionCode}`]]);
   if(!j.rowCount){report.push({state:regionCode,status:"jurisdiction_missing"});continue;}
