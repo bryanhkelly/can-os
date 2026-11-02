@@ -122,12 +122,23 @@ function TeacherMarketplacePage() {
               const pendingRequest = staffingRequests?.requests.find(request =>
                 request.status === "open" && request.courseVersionId === course.versionId &&
                 request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
-              return <Button type="button" size="sm" variant="outline" className="mt-2"
-                disabled={Boolean(pendingRequest) || submitting !== null}
-                onClick={() => void selectTeacher(course.versionId, teacher.personId)}>
-                {pendingRequest ? "CAN review requested" : submitting === `${course.versionId}:${teacher.personId}`
-                  ? "Submitting…" : "Request CAN staffing review"}
-              </Button>;
+              const recentDecline = staffingRequests?.requests.find(request =>
+                request.status === "cancelled" && request.reviewState === "declined" &&
+                request.courseVersionId === course.versionId &&
+                request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
+              return <div className="mt-2 space-y-2">
+                {recentDecline && <p className="text-xs text-muted-foreground">
+                  Previous request declined{recentDecline.declineReason ? `: ${recentDecline.declineReason}` : "."}
+                </p>}
+                <Button type="button" size="sm" variant="outline"
+                  disabled={Boolean(pendingRequest) || submitting !== null}
+                  onClick={() => void selectTeacher(course.versionId, teacher.personId)}>
+                  {pendingRequest ? pendingRequest.reviewState === "in_review"
+                    ? "Under CAN review" : "CAN review requested"
+                    : submitting === `${course.versionId}:${teacher.personId}`
+                      ? "Submitting…" : "Request CAN staffing review"}
+                </Button>
+              </div>;
             })()}
           </article>)}
         </div> : <p className="text-sm text-muted-foreground">No CAN teacher currently matches this course. CAN staffing review may be required.</p>}
