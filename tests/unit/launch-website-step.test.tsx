@@ -9,7 +9,7 @@ describe("private website preparation in Launch Mode",()=>{
  it("shows the safe preview, real hosting limitation and next family step",()=>{
   const html=renderToStaticMarkup(<LaunchWebsitePreview data={{programId:"program",programName:"Hope School",siteId:"site",host:"hope-school.can-os.com",status:"draft",hostingConfigured:false,includesSuggestions:true,previewHtml:"<p>Private draft</p>"}}/>);
   expect(html).toContain('sandbox=""');expect(html).toContain('referrerPolicy="no-referrer"');
-  expect(html).toContain("Public hosting disabled");expect(html).toContain("not saved editorial revisions");
+  expect(html).toContain("Ask your CAN contact to finish connecting your school website address");expect(html).toContain("not saved editorial revisions");
   expect(html).toContain('href="#invite-families"');expect(html).toContain("Invite your church website editor");
  });
 });

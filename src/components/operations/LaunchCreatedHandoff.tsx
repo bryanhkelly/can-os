@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { isExtendedLearningType, programTypes } from "@/domain/program-offerings";
+import { programTypes } from "@/domain/program-offerings";
 
 export type LaunchCreatedResult = {
   programId: string;
@@ -16,15 +16,13 @@ export type LaunchCreatedResult = {
 export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null}){
  return <>
             {created && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
-              <p>Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
-                <code>{created.journeyId}</code> is now in the checklist below.</p>
+              <p className="font-semibold">Your school has been saved.</p>
+              <p className="mt-1">Continue with your academic year, first classroom, school website and family invitations. Your progress is saved as you go.</p>
               <nav aria-label="Next steps for your new program" className="mt-4 flex flex-wrap gap-3">
-                <Link to="/operations/launch/$programId" params={{programId:created.programId}}
-                  search={{siteId:created.publicSiteDraft?.siteId,programId:undefined}}
-                  className="rounded-lg border px-3 py-2 text-sm font-semibold">1. Set up classes and staff →</Link>
-                {!isExtendedLearningType(created.programType) && <Link to="/admissions/intake"
-                  search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
-                  className="rounded-lg border px-3 py-2 text-sm font-semibold">2. Start the first family inquiry →</Link>}
+                <Link to="/operations/launch" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                  hash="launch-academic-year" className="rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">Continue school setup →</Link>
+                <Link to="/operations/launch" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                  hash="invite-families" className="rounded-lg border px-4 py-3 text-sm font-semibold">Invite families →</Link>
               </nav>
               <p className="mt-3 text-xs text-muted-foreground">These are planning actions, not authorization to open. Institutional agreements, academic readiness and child safety must still be independently approved before active enrollment or onsite attendance.</p>
               {created.publicSiteDraft && <details className="mt-3 rounded-lg border p-3">

@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
+import { ChurchApplicationConfirmation } from "@/components/church/ChurchApplicationConfirmation";
 import { churchApplicationSchema as applicationSchema, churchApplicationLimits,
   type ChurchApplicationField } from "@/domain/church-application";
 
@@ -44,7 +45,7 @@ function ChurchApplicationPage() {
     churchWebsite: "", leaderTitle: "", contactEmail: "", firstName: "", lastName: "",
   });
   const [busy, setBusy] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState<{churchName:string;siteName:string;contactEmail:string}|null>(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<ChurchApplicationField, string[]>>>({});
   function change(key: keyof typeof form, value: string) {
@@ -73,7 +74,7 @@ function ChurchApplicationPage() {
           "Unable to submit right now. Please try again.");
         return;
       }
-      setSubmitted(true);
+      setSubmitted({churchName:parsed.data.churchName,siteName:parsed.data.siteName,contactEmail:parsed.data.contactEmail});
     } catch { setError("Unable to connect. Please try again."); }
     finally { setBusy(false); }
   }
@@ -82,12 +83,7 @@ function ChurchApplicationPage() {
       <h1 className="mt-2 font-serif text-4xl">Bring a school to your church</h1>
       <p className="mt-3 text-muted-foreground">Tell us about your church and your proposed school location. CAN will independently verify that you are authorized to represent the church before issuing access.</p>
     </div>
-    {submitted ? <section role="status" className="rounded-xl border bg-card p-6">
-      <h2 className="font-serif text-2xl">Request received</h2>
-      <p className="mt-2">CAN will review the information and verify church authority. If approved, the authorized church leader will receive a secure email invitation to start school setup.</p>
-      <p className="mt-2 text-sm text-muted-foreground">Submitting an application does not approve the church, authorize operation, or open enrollment.</p>
-      <Link to="/access" className="mt-4 inline-block underline">Already invited? Sign in</Link>
-    </section> : <form noValidate onSubmit={submit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2">
+    {submitted ? <ChurchApplicationConfirmation {...submitted}/> : <form noValidate onSubmit={submit} className="grid gap-4 rounded-xl border bg-card p-6 sm:grid-cols-2">
       {([
         ["churchName","Church name"],["siteName","Proposed school site name"],
         ["firstName","Your first name"],["lastName","Your last name"],

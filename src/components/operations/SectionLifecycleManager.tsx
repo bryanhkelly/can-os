@@ -1,3 +1,5 @@
+import { normalizeClientError } from "@/lib/client-error";
+import { SectionWaitlistPicker, lifecycleStudentLabel } from "./SectionWaitlistPicker";
 import { getCapacityCandidates, swapCommittedInstructor } from "@/modules/staffing/educational-capacity.functions";
 import {useEffect,useRef,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
@@ -15,21 +17,27 @@ import {
 type Snapshot=Awaited<ReturnType<typeof getSectionLifecycle>>;
 type LifecycleRun = (id:string, operation:()=>Promise<unknown>, success:string,
  onReconciled?:()=>void)=>Promise<MutationOutcome<unknown>>;
-export function SectionLifecycleWorkspace({programId,staff}:{programId:string;staff:{personId:string;first:string;last:string}[]}){
+type LifecycleWorkspaceProps={programId:string;staff:{personId:string;first:string;last:string}[]};
+export function SectionLifecycleWorkspace(props:LifecycleWorkspaceProps){
+ return <LifecycleWorkspaceContent key={props.programId} {...props}/>;
+}
+function LifecycleWorkspaceContent({programId,staff}:LifecycleWorkspaceProps){
  const [sections,setSections]=useState<Snapshot>([]);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [attempt,setAttempt]=useState(0);
  const reload=async()=>setSections(await getSectionLifecycle({data:{programId}}));
  useEffect(()=>{
   let active=true;
   getSectionLifecycle({data:{programId}}).then(rows=>{if(active)setSections(rows)})
-   .catch(()=>{if(active)setError("Unable to load lifecycle records.")})
+   .catch(failure=>{if(active)setError(normalizeClientError(failure,"Unable to load lifecycle records. Try again.").message)})
    .finally(()=>{if(active)setLoading(false)});
   return ()=>{active=false};
- },[programId]);
+ },[programId,attempt]);
  return <div>{loading?<p className="mt-6 text-sm">Loading operational lifecycle…</p>:error?
-  <p role="alert" className="mt-6 text-sm">{error}</p>:
-  <SectionLifecycleManager sections={sections} staff={staff} onChanged={reload}/>}</div>;
+  <div className="mt-6 space-y-2"><p role="alert" className="text-sm">{error}</p>
+   <Button variant="outline" size="sm" onClick={()=>{setLoading(true);setError("");setSections([]);setAttempt(value=>value+1);}}>Retry lifecycle records</Button></div>:
+  <SectionLifecycleManager key={programId} sections={sections} staff={staff} onChanged={reload}/>}</div>;
 }
 export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Snapshot;staff:{personId:string;first:string;last:string}[];onChanged:()=>Promise<void>}){
  const router=useRouter();
@@ -80,12 +88,12 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
 }){
  const [newTeacher,setNewTeacher]=useState("");
  const [outgoing,setOutgoing]=useState("");
- const [student,setStudent]=useState("");
  const [start,setStart]=useState(section.startsAt?.slice(0,16)??"");
  const [end,setEnd]=useState(section.endsAt?.slice(0,16)??"");
  const [schedule,setSchedule]=useState(section.scheduleTemplateId??"");
  const [enrollmentId,setEnrollmentId]=useState("");
  const [destination,setDestination]=useState("");
+ const selectedEnrollment=section.students.some(item=>item.id===enrollmentId)?enrollmentId:"";
  const destinations=allSections.filter(candidate=>candidate.id!==section.id&&candidate.active&&
    candidate.programId===section.programId&&candidate.termId===section.termId);
  const selectedDestination=destinations.some(candidate=>candidate.id===destination)?destination:"";
@@ -141,10 +149,10 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
    </div>
    <div className="rounded-lg border p-3">
     <h4 className="font-semibold text-sm">Enrollment transition</h4>
-    <Field className="mt-2" label="Enrolled student ID">
-      <Select value={enrollmentId} onChange={e=>setEnrollmentId(e.target.value)}>
+    <Field className="mt-2" label="Enrolled student">
+      <Select value={selectedEnrollment} onChange={e=>setEnrollmentId(e.target.value)}>
        <option value="">Choose enrollment</option>
-       {section.students.map(e=><option key={e.id} value={e.id}>{e.studentProfileId}</option>)}
+       {section.students.map(e=><option key={e.id} value={e.id}>{lifecycleStudentLabel(e)}</option>)}
       </Select>
     </Field>
     <Field className="mt-2" label="Outcome">
@@ -159,23 +167,21 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       </Select>
     </Field>
     {!destinations.length&&<p className="mt-2 text-xs text-muted-foreground">No other active section is available in this program and term.</p>}
-    <Button variant="outline" size="sm" disabled={busy||!enrollmentId||!selectedDestination} onClick={()=>void run(section.id,
-      ()=>transferLifecycleEnrollment({data:{enrollmentId,destinationSectionId:selectedDestination,reason}}),"Student transferred atomically.")}
+    <Button variant="outline" size="sm" disabled={busy||!selectedEnrollment||!selectedDestination} onClick={()=>void run(section.id,
+      ()=>transferLifecycleEnrollment({data:{enrollmentId:selectedEnrollment,destinationSectionId:selectedDestination,reason}}),"Student transferred atomically.")}
       className="mt-2">Transfer student</Button>
-    <Button variant="outline" size="sm" disabled={busy||!enrollmentId} onClick={()=>void run(section.id,
-      ()=>transitionLifecycleEnrollment({data:{enrollmentId,status:enrollmentStatus,reason}}),"Enrollment status updated.")}
+    <Button variant="outline" size="sm" disabled={busy||!selectedEnrollment} onClick={()=>void run(section.id,
+      ()=>transitionLifecycleEnrollment({data:{enrollmentId:selectedEnrollment,status:enrollmentStatus,reason}}),"Enrollment status updated.")}
       className="mt-3">Record transition</Button>
    </div>
    <div className="rounded-lg border p-3">
     <h4 className="font-semibold text-sm">Waitlist and closure</h4>
-    <Field className="mt-2" label="Student profile ID for waitlist">
-     <Input value={student} onChange={e=>setStudent(e.target.value)} placeholder="Student UUID"/>
-    </Field>
-    <Button variant="outline" size="sm" disabled={busy||!section.active||!student} onClick={()=>void run(section.id,
-      ()=>queueLifecycleWaitlist({data:{sectionId:section.id,studentProfileId:student,reason}}),"Student placed on waitlist.")}
-      className="mt-2">Add to waitlist</Button>
+    <SectionWaitlistPicker sectionId={section.id} disabled={busy||!section.active}
+     onAdd={(studentProfileId,reset)=>void run(section.id,
+      ()=>queueLifecycleWaitlist({data:{sectionId:section.id,studentProfileId,reason}}),
+      "Student placed on waitlist.",reset)}/>
     {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 rounded border p-2 text-xs">
-     <span>{w.subjectId} · {w.status}</span>
+     <span>{lifecycleStudentLabel(w)} · {w.status}</span>
      {w.status!=="in_progress"&&<Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
        ()=>offerLifecycleWaitlistSeat({data:{actionId:w.id,expiresAt:new Date(Date.now()+3*86400000).toISOString()}}),
        "A three-day waitlist offer was recorded.")}>Offer seat</Button>}

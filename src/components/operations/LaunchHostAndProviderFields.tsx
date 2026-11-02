@@ -1,3 +1,4 @@
+import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { Link } from "@tanstack/react-router";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 
@@ -47,25 +48,29 @@ export function LaunchHostAndProviderFields({ options, hostOrganizationId, setHo
                     </select>
                   </label>
                   <label className="block text-xs">
-                    Site (optional)
+                    School location
                     <select aria-label="Site" className={selectClass} value={siteId} onChange={(e) => setSiteId(e.target.value)} disabled={!hostOrganizationId}>
-                      <option value="">No local site</option>
+                      <option value="">Choose a school location…</option>
                       {hostSites.map((site) => (
                         <option key={site.id} value={site.id}>{site.name} · {site.timezone}</option>
                       ))}
                     </select>
                   </label>
                   <div className="rounded-lg border p-3">
-                    <p className="text-xs font-semibold">New host site</p>
+                    <p className="text-xs font-semibold">Add a school location</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <input aria-label="New site name" placeholder="Campus name" className={inputClass} value={newSiteName} onChange={e=>setNewSiteName(e.target.value)}/>
+                      <input aria-label="New site name" placeholder="Campus name" className={inputClass} value={newSiteName} onChange={e=>{const value=e.target.value;setNewSiteName(value);if(!newSiteSlug||newSiteSlug===suggestedLaunchSlug(newSiteName))setNewSiteSlug(suggestedLaunchSlug(value));}}/>
                       <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
-                      <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
+                      <label className="text-xs">Location time zone
+                       <select aria-label="New site timezone" className={selectClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
+                        {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
+                       </select>
+                      </label>
                     </div>
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
                       This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
                     </p>}
-                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
+                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Save school location</button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
                       <p className="font-semibold">Your website draft is prepared</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>

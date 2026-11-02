@@ -19,6 +19,12 @@ export const getSectionLifecycle=createServerFn({method:"GET"})
   const rows=await sectionLifecycleSnapshot(await actor(),data.programId);
   return rows.map(row=>({...row,waitlist:row.waitlist.map(({metadata,...w})=>w)}));
  });
+export const searchLifecycleWaitlistStudents=createServerFn({method:"GET"})
+ .validator((v:unknown)=>z.object({sectionId:uuid,query:z.string().trim().min(2).max(100)}).parse(v))
+ .handler(async({data})=>{
+  const {searchSectionWaitlistStudents}=await import("./section-waitlist-search.server");
+  return searchSectionWaitlistStudents(await actor(),data.sectionId,data.query);
+ });
 export const setSectionLifecycleState=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({sectionId:uuid,active:z.boolean(),reason:z.string().trim().min(5).max(1000)}).parse(v))
  .handler(async({data})=>{await changeSectionState(await actor(),data.sectionId,data.active,data.reason);return {ok:true}});

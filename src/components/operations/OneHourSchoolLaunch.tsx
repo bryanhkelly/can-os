@@ -3,6 +3,9 @@ import { LaunchOpeningTask } from "@/components/operations/LaunchOpeningTask";
 import { SchoolOwnedCompletion, LaunchEvidenceStatement, InstitutionalEvidenceReview } from "@/components/operations/LaunchRequirementActions";
 import { LaunchTaskDestination } from "@/components/operations/LaunchTaskDestination";
 import { useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { normalizeClientError } from "@/lib/client-error";
 import { resolveLaunchResume } from "@/domain/launch-resume";
 import { Link, useRouter } from "@tanstack/react-router";
 import { StatusBadge } from "@/components/workspace";
@@ -39,9 +42,11 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   selectedSiteId?: string;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [openingSaving, setOpeningSaving] = useState(false);
+  const mutation = useMutationFeedback(async () => { await router.invalidate(); });
   const [error, setError] = useState("");
   const [opened, setOpened] = useState<{ name: string; siteId: string | null } | null>(null);
+  const busy = openingSaving || mutation.pending || mutation.refreshFailed || Boolean(opened);
   const { launches, launch, unavailable } = resolveLaunchResume(allLaunches, {
     siteId: selectedSiteId, programId: selectedProgramId,
   });
@@ -80,49 +85,20 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
 
   const guidance = buildLaunchGuidance(launch);
   const next = guidance.nextTask;
-  async function run(operation: () => Promise<unknown>) {
-    setBusy(true);
-    setError("");
-    try {
-      await operation();
-      try {
-        await router.invalidate();
-      } catch {
-        setError("The action was saved, but launch progress could not refresh. Reopen this school before repeating the action.");
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save launch progress");
-    } finally {
-      setBusy(false);
-    }
+  async function run(operation: () => Promise<unknown>, successMessage = "Launch progress saved.") {
+    if (busy) return false;
+    const result = await mutation.run(operation, { successMessage,
+      commandErrorMessage: "Unable to save launch progress. Please try again." });
+    return result.status === "saved" || result.status === "refresh-failed";
   }
   async function complete(requirementId: string) {
     await run(() => completeLaunchRequirement({ data: { journeyRequirementId: requirementId, confirmed: true } }));
   }
   async function submitEvidence(requirementId: string, statement: string): Promise<boolean> {
-    setBusy(true);
-    setError("");
-    try {
-      await submitLaunchEvidence({ data: { journeyRequirementId: requirementId, statement } });
-      try { await router.invalidate(); } catch { setError("Evidence was saved but the launch could not refresh. Reopen before submitting again."); }
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to submit evidence");
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    return run(() => submitLaunchEvidence({ data: { journeyRequirementId: requirementId, statement } }), "Evidence submitted for review.");
   }
   async function reviewEvidence(requirementId: string, decision: "accepted" | "rejected", reason: string): Promise<boolean> {
-    setBusy(true); setError("");
-    try {
-      await reviewLaunchEvidence({ data: { journeyRequirementId: requirementId, decision, reason } });
-      try { await router.invalidate(); } catch { setError("Evidence decision was saved but the launch could not refresh. Reopen before retrying."); }
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to record evidence decision");
-      return false;
-    } finally { setBusy(false); }
+    return run(() => reviewLaunchEvidence({ data: { journeyRequirementId: requirementId, decision, reason } }), "Evidence review saved.");
   }
   async function saveOrientation(input: { title: string; startsAt: string; endsAt: string; timezone: string }) {
     await run(() => scheduleLaunchOrientation({ data: { programId: launch!.id, ...input } }));
@@ -130,14 +106,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   async function open(recipientPersonId?: string) {
     if (busy) return;
     const activeLaunch = launch!;
-    setBusy(true);
+    setOpeningSaving(true);
     setError("");
     try {
       // Only the canonical server command can establish opening authority.
       await activateLaunch({ data: { programId: activeLaunch.id, recipientPersonId } });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "School opening was not confirmed. Refresh its readiness before retrying.");
-      setBusy(false);
+      setError(normalizeClientError(cause, "School opening was not confirmed. Refresh its readiness before retrying.").message);
+      setOpeningSaving(false);
       return;
     }
     // A router error after server success must not encourage a second activation.
@@ -154,7 +130,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     } catch {
       setError("Opening was recorded, but navigation could not refresh. Use the saved Site Today link below; do not activate again.");
     } finally {
-      setBusy(false);
+      setOpeningSaving(false);
     }
   }
 
@@ -204,6 +180,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       </select>
     </label>}
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    <MutationFeedback state={mutation} pendingMessage="Saving launch progress…"/>
     {launch.status === "active" && launch.siteId && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
       {launch.name} is active. Daily work now lives with the opening handoff, staffing, admissions and academic activity in Site Today.{" "}
       <Link to="/sites/$siteId" params={{ siteId: launch.siteId }} className="font-semibold underline">Open Site Today →</Link>
