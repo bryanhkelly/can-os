@@ -19,6 +19,12 @@ const apply=argv.includes("--apply");
 if (!file || !publisher || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(publisher)) throw Error("Use --file <generated.json> --publisher <organization UUID>");
 if (apply && process.env.DEMO_CURRICULUM_ALLOW_WRITE !== "1") throw Error("Writes require DEMO_CURRICULUM_ALLOW_WRITE=1");
 if (!process.env.DATABASE_URL) throw Error("DATABASE_URL is required");
+if (apply) {
+  const expectedHost=process.env.DEMO_CURRICULUM_EXPECTED_HOST;
+  if (!expectedHost) throw Error("Writes require DEMO_CURRICULUM_EXPECTED_HOST set to the isolated Neon branch hostname");
+  const actualHost=new URL(process.env.DATABASE_URL).hostname;
+  if (actualHost !== expectedHost) throw Error("Database host mismatch; refusing demo curriculum import");
+}
 const source=readFileSync(file,"utf8"), manifest=JSON.parse(source);
 const {classContentSchema}=await import("../src/domain/class-content.ts");
 if (manifest.format !== "can-os-demo-catalog-v1" || manifest.provenance?.isSynthetic !== true || manifest.provenance?.adoptionAuthorized !== false || manifest.pack?.visibility !== "private") throw Error("Unsafe demo manifest");
