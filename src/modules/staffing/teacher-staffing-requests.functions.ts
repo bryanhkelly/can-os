@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -65,6 +65,7 @@ export const requestTeacherStaffing = createServerFn({ method: "POST" })
       const [school] = await tx.select({
         organizationId: programs.organizationId, siteId: programs.siteId,
         academicProviderOrganizationId: programs.academicProviderOrganizationId,
+        jurisdictionId: programs.jurisdictionId,
       }).from(programs).where(eq(programs.id, data.programId)).limit(1);
       if (!school?.siteId || school.siteId !== market.program.siteId ||
           !actor.scope.organizationIds?.includes(school.organizationId) ||
@@ -91,7 +92,10 @@ export const requestTeacherStaffing = createServerFn({ method: "POST" })
       })
         .from(courseTemplateVersions)
         .innerJoin(courseTemplates, eq(courseTemplates.id, courseTemplateVersions.courseTemplateId))
-        .innerJoin(instructorCapabilities, eq(instructorCapabilities.courseTemplateId, courseTemplates.id))
+        .innerJoin(instructorCapabilities, or(
+          eq(instructorCapabilities.courseTemplateId, courseTemplates.id),
+          and(isNull(instructorCapabilities.courseTemplateId), eq(instructorCapabilities.subject, courseTemplates.subject)),
+        ))
         .innerJoin(people, eq(people.id, instructorCapabilities.personId))
         .innerJoin(memberships, eq(memberships.personId, people.id))
         .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
@@ -103,6 +107,11 @@ export const requestTeacherStaffing = createServerFn({ method: "POST" })
         .where(and(
           eq(courseTemplateVersions.id, data.courseVersionId),
           eq(people.id, data.teacherPersonId),
+          or(isNull(instructionalCapacityOfferings.organizationId), eq(instructionalCapacityOfferings.organizationId, school.organizationId)),
+          or(isNull(instructionalCapacityOfferings.siteId), eq(instructionalCapacityOfferings.siteId, school.siteId)),
+          or(isNull(instructionalCapacityOfferings.programId), eq(instructionalCapacityOfferings.programId, data.programId)),
+          or(isNull(instructionalCapacityOfferings.jurisdictionId), eq(instructionalCapacityOfferings.jurisdictionId, school.jurisdictionId)),
+          gte(instructorAvailabilityWindows.endsAt, new Date()),
           eq(people.active, true),
           eq(instructorCapabilities.active, true),
           eq(instructorAvailabilityWindows.active, true),
