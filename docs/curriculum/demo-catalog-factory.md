@@ -136,3 +136,63 @@ be adopted until the separate authorized demo-publication path is provided.
 - Run the teacher import on isolated Neon and exercise the authenticated
   marketplace and school staffing journeys. Until then code is not database-
   or browser-accepted.
+
+## November 2 — Post-setup CAN teacher selection
+
+School administrators complete school configuration and curriculum adoption
+before making staffing choices. A dedicated post-setup action in the academic
+launch workspace opens `/operations/teacher-marketplace?programId=<uuid>`.
+The market shows CAN-managed teachers mapped by course, with per-Section
+targeting when a class already exists. Teachers can serve multiple church
+schools only through independently verified scheduling, authorizations and
+shared-capacity reservations.
+
+In isolated demos, the screen also displays the dedicated publisher's latest
+synthetic course drafts as **preview-only**. Draft courses and associated
+teacher matches are not adopted curricula and cannot be requested or assigned.
+Requests are enabled only for versions with active entitlement/adoption.
+The client validates and submits the chosen teacher and optional class to
+`requestDemoTeacherStaffing`. The server verifies the institutional program
+scope, exact adopted course release, current demo-provider membership,
+matching instructor capability, active preview offering, and class ownership
+before creating an idempotent program-scoped `teacher_staffing_request`
+Action with audit and domain-event evidence.
+
+An open request appears on the school screen, but **does not** issue a
+teacher credential, staffing role, delivery arrangement or `section_teachers`
+assignment. Existing CAN-authorized launch staffing is still the direct
+assignment/confirmation path. The CAN provider-facing review queue, real
+two-sided consent and capacity booking are separately outstanding.
+
+### One-command seed entry point
+
+```bash
+npm run demo:academic-marketplace
+# Local deterministic manifests only, no connection or database write
+
+DEMO_CURRICULUM_PUBLISHER_ID="<verified-demo-publisher-uuid>" \
+DATABASE_URL="<isolated-neon-branch-url>" \
+npm run demo:academic-marketplace -- --inspect
+# Read-only curriculum import plan on the explicitly chosen branch
+```
+
+To apply, provide the already documented database/host confirmations and
+both importer opt-ins, then use:
+
+```bash
+npm run demo:academic-marketplace -- --apply
+```
+
+The script reuses the existing guarded import commands in order: first 120
+curriculum draft records, then 30 demo teacher profiles and their
+course-specific capabilities/preview offerings. Idempotent retries do not
+produce duplicate versions or teacher records. Because each stage commits
+separately, a failed second stage may leave the imported course drafts
+available for a safe retry. No publication, internal academic approvals or
+classroom staffing occurs in this command.
+
+**Observed isolated-Neon state (read-only verification, 2026-11-02):**
+`demo-curriculum-validation-20261102` contains the CAN Demo Publisher,
+but no demo course templates, teacher provider, demo teachers or teacher
+staffing Actions yet. Generating manifests or merging this PR does not load
+the database.
