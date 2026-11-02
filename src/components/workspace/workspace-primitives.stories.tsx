@@ -31,6 +31,14 @@ export const Metrics: Story = {
   </div>,
 };
 
+export const InteractiveMetric: Story = {
+  render: () => <div className="bg-background p-6">
+    <a href="#details" className="group block max-w-sm rounded-2xl focus-visible:outline-none">
+      <StatCard interactive label="Needs your attention" value="3" hint="Open the related items" />
+    </a>
+  </div>,
+};
+
 export const Loading: Story = {
   render: () => <div className="bg-background p-6"><QueryState loading="Loading authorized applications…" /></div>,
 };

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { StatusBadge, WorkspacePanel, type StatusTone } from "@/components/workspace";
+import { StatCard, StatusBadge, WorkspacePanel, type StatusTone } from "@/components/workspace";
 
 describe("workspace design primitives", () => {
   it.each([
@@ -35,6 +35,17 @@ describe("workspace design primitives", () => {
     expect(html).toContain("Authorized context");
     expect(html).toContain("Review");
     expect(html).toContain("Evidence");
+  });
+
+  it("keeps informational metrics still and gives linked metrics explicit hover and keyboard feedback", () => {
+    const informational = renderToStaticMarkup(<StatCard label="Applications" value="18" />);
+    expect(informational).not.toContain("hover:shadow-md");
+    expect(informational).not.toContain("group-focus-visible:ring-2");
+
+    const interactive = renderToStaticMarkup(<StatCard interactive label="Needs review" value="4" />);
+    expect(interactive).toContain("hover:shadow-md");
+    expect(interactive).toContain("group-hover:shadow-md");
+    expect(interactive).toContain("group-focus-visible:ring-2");
   });
 
   it("retains the approved semantic foundation without decorative role hues", () => {
