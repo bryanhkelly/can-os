@@ -74,12 +74,16 @@ function DemoTeacherMarketplacePage() {
         <div>
           <h2 className="font-serif text-2xl">{market.program.name}</h2>
           <p className="text-sm text-muted-foreground">
-            {market.courses.length} adopted courses · {market.matchedTeachers} illustrative teacher profiles
+            {market.courses.filter(course => !course.previewOnly).length} adopted courses · {market.courses.filter(course => course.previewOnly).length} preview courses · {market.matchedTeachers} illustrative teachers
           </p>
         </div>
         <Link to="/operations/launch/$programId" params={{ programId: market.program.id }}
           className="rounded-lg border px-4 py-2 text-sm underline">Open class staffing</Link>
       </div>
+      {market.courses.some(course => course.previewOnly) && <p role="status" className="rounded-lg border px-4 py-3 text-sm">
+        Draft demo courses are shown for discovery only. A school must adopt an authorized published
+        curriculum release before requesting a teacher for that course.
+      </p>}
       {market.courses.length > 0 && <label className="block max-w-md space-y-1 text-sm">
         <span className="font-medium">Search courses and teachers</span>
         <input className="w-full rounded-lg border bg-background px-3 py-2" type="search"
@@ -97,10 +101,11 @@ function DemoTeacherMarketplacePage() {
           <div>
             <p className="text-xs text-muted-foreground">{course.subject} · {course.code}</p>
             <h3 className="font-serif text-xl">{course.title}</h3>
+            {course.previewOnly && <p className="mt-1 text-xs text-muted-foreground">Demo curriculum preview · not adopted</p>}
           </div>
           <p className="text-xs text-muted-foreground">{course.sectionCount} current classes</p>
         </div>
-        {course.sections.length > 0 && <label className="block max-w-sm space-y-1 text-sm">
+        {!course.previewOnly && course.sections.length > 0 && <label className="block max-w-sm space-y-1 text-sm">
           <span className="font-medium">Apply selection to</span>
           <select value={targetSection[course.versionId] ?? ""}
             onChange={event => setTargetSection(previous => ({ ...previous, [course.versionId]: event.target.value }))}
@@ -122,7 +127,7 @@ function DemoTeacherMarketplacePage() {
               const pendingRequest = staffingRequests?.requests.find(request =>
                 request.status === "open" && request.courseVersionId === course.versionId &&
                 request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
-              return <Button type="button" size="sm" variant="outline" className="mt-2"
+              return course.previewOnly ? <p className="mt-2 text-xs text-muted-foreground">Adopt a published curriculum release to request this teacher.</p> : <Button type="button" size="sm" variant="outline" className="mt-2"
                 disabled={Boolean(pendingRequest) || submitting !== null}
                 onClick={() => void selectTeacher(course.versionId, teacher.personId)}>
                 {pendingRequest ? "CAN review requested" : submitting === `${course.versionId}:${teacher.personId}`
