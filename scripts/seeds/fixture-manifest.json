@@ -1567,6 +1567,20 @@
       "downstreamRecords": [
         "audit_events"
       ]
+    },
+    "/operations/jurisdiction-profiles": {
+      "persona": "authorized network jurisdiction policy administrator",
+      "fixtureRequired": false,
+      "rationale": "Review profiles require an explicitly authorized network policy administrator and sourced jurisdiction research. The eight draft records are provisioned separately on the isolated jurisdiction-review database; generic school fixtures must not fabricate verified government sources.",
+      "interactions": [
+        "review jurisdiction operating models and funding programs",
+        "edit requirements and attach authoritative sources",
+        "publish a reviewed profile after source checks"
+      ],
+      "downstreamRecords": [
+        "jurisdiction_profile_versions",
+        "audit_events"
+      ]
     }
   }
 }
