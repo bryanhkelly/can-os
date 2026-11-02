@@ -1,24 +1,32 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
+import { accessLandingPath } from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
 export const Route=createFileRoute("/access/verify")({
  server:{handlers:{
   POST:async({request})=>{
+   const nativeForm=request.headers.get("content-type")?.split(";")[0]?.trim()==="application/x-www-form-urlencoded";
+   const formFailure=(error:"invalid"|"unavailable"|"rate_limited")=>new Response(null,{status:303,
+    headers:{Location:"/access?error="+error,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    if(new URL(request.url).origin!==request.headers.get("origin"))return Response.json({error:"Invalid request origin"},{status:403});
    // Enforce the shared global admission ceiling before parsing credentials.
    // Do not derive rate keys from untrusted forwarded headers, email or tokens.
    try {
     const gate=await import("@/modules/identity/anonymous-auth-admission.server");
     const denial=gate.anonymousAuthAdmissionResponse(await gate.admitAnonymousAuthRequest("verify"));
-    if(denial)return denial;
+    if(denial)return nativeForm?formFailure(denial.status===429?"rate_limited":"unavailable"):denial;
    }catch{
     logAuthenticationUnavailable("admission");
+    if(nativeForm)return formFailure("unavailable");
     return Response.json({error:"Authentication temporarily unavailable."},
      {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
    }
    let value:unknown;
-   try{value=await request.json();}catch{return Response.json({error:"Invalid request"},{status:400});}
+   try{
+    if(nativeForm){const form=await request.formData();value={email:form.get("email"),code:form.get("code"),token:form.get("token")};}
+    else value=await request.json();
+   }catch{return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});}
    const payload=value&&typeof value==="object"?value:null;
    try{
     const {redeemLocalDemoAccess,redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
@@ -27,11 +35,16 @@ export const Route=createFileRoute("/access/verify")({
      :payload&&"token" in payload&&typeof payload.token==="string"
       ?await redeemOneTimeAccess(payload.token)
       :null;
-    if(!result)return Response.json({error:"Invalid request"},{status:400});
+    if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
+    if(nativeForm)return new Response(null,{status:303,headers:{
+     Location:accessLandingPath(result.role,"launchSiteId" in result?result.launchSiteId:undefined),
+     "Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer",
+    }});
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch(error){
     if(!(error instanceof InvalidAccessCredentialError)&&!(error instanceof AuthorizationError)){
      logAuthenticationUnavailable("verification",error);
+     if(nativeForm)return formFailure("unavailable");
      return Response.json({error:"Authentication temporarily unavailable."},
       {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
     }
@@ -46,6 +59,7 @@ export const Route=createFileRoute("/access/verify")({
     }catch{
      logAuthenticationUnavailable("rejection_audit");
     }
+    if(nativeForm)return formFailure("invalid");
     return Response.json({error:"Invalid or expired access link"},
      {status:401,headers:{"Cache-Control":"no-store"}});
    }
@@ -54,7 +68,6 @@ export const Route=createFileRoute("/access/verify")({
  component:VerifyAccess,
 });
 function VerifyAccess(){
- const [status,setStatus]=useState("Use the button to complete your sign-in.");
  const [working,setWorking]=useState(false);
  const [token,setToken]=useState<string|null>(null);
  const [ready,setReady]=useState(false);
@@ -68,25 +81,12 @@ function VerifyAccess(){
   }
   setReady(true);
  },[]);
- async function verify(){
-  setWorking(true);
-  try{
-   if(!token){setStatus("Access link is missing.");return;}
-   const res=await fetch("/access/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});
-   if(res.status===429){setStatus("Sign-in requests are temporarily limited. Please try again shortly.");return;}
-   if(res.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
-   if(!res.ok){setStatus("This access link is invalid or expired.");return;}
-   setToken(null);
-   const body=await res.json() as {role?:string;launchSiteId?:string};
-   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
-   window.location.replace(body.role==="registrar" && body.launchSiteId
-    ? "/operations/launch?siteId="+encodeURIComponent(body.launchSiteId)
-    : home[body.role??""]??"/access");
-  }catch{setStatus("Unable to complete sign-in.");}finally{setWorking(false);}
- }
  return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
   <h1 className="font-serif text-3xl">Confirm your CAN OS access</h1>
-  <p role="status">{status}</p>
-  <button disabled={working||!ready||!token} onClick={verify} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>
+  <p role="status">{ready&&!token?"The access link is missing. Request a new sign-in link to continue.":"Use the button to complete your sign-in."}</p>
+  <form action="/access/verify" method="post" onSubmit={()=>setWorking(true)}>
+  <input type="hidden" name="token" value={token??""}/>
+  <button type="submit" disabled={working||!ready||!token} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>
+  </form>
  </main>;
 }
