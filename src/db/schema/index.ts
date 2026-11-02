@@ -54,3 +54,5 @@ export * from "./academic-credential-delivery";
 
 export * from "./curriculum-year-adoptions";
 export * from "./finance";
+
+export * from "./jurisdiction-profiles";
