@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -29,9 +29,38 @@ export const getDemoTeacherMarketplace = createServerFn({ method: "GET" })
     const market = await readMarketplace(actor, data.programId);
     const adopted = market.packs.filter(pack => pack.entitlement === "active" &&
       pack.adoption?.status === "active" && pack.adoption.versionId === pack.versionId);
-    const courses = adopted.flatMap(pack => pack.courses.map(course => ({
-      code: course.code, title: course.title, subject: course.subject, versionId: course.courseVersionId,
+    const adoptedCourses = adopted.flatMap(pack => pack.courses.map(course => ({
+      code: course.code, title: course.title, subject: course.subject,
+      versionId: course.courseVersionId, previewOnly: false,
     })));
+    // Before a demo school has adopted any published packs, show the
+    // dedicated publisher's synthetic draft catalog for DISCOVERY ONLY.
+    // Preview rows are not entitlements, licensed adoption or class-ready.
+    const previewRows = await db.select({
+      templateId: courseTemplates.id, code: courseTemplates.code,
+      title: courseTemplates.title, subject: courseTemplates.subject,
+      versionId: courseTemplateVersions.id,
+      version: courseTemplateVersions.version,
+    }).from(courseTemplates)
+      .innerJoin(courseTemplateVersions,
+        eq(courseTemplateVersions.courseTemplateId, courseTemplates.id))
+      .innerJoin(organizations, eq(organizations.id, courseTemplates.owningOrganizationId))
+      .where(and(
+        eq(organizations.slug, "can-demo-publisher"),
+        sql`${organizations.metadata}->>'demoPublisher' = 'true'`,
+        sql`${organizations.metadata}->>'isSynthetic' = 'true'`,
+        sql`${courseTemplates.metadata}->>'sourceSystem' = 'can-demo-catalog-factory'`,
+        sql`${courseTemplates.code} like 'CAN-DEMO-%'`,
+      )).orderBy(courseTemplates.code, desc(courseTemplateVersions.version));
+    const latest = new Map<string, (typeof previewRows)[number]>();
+    for (const row of previewRows) if (!latest.has(row.templateId)) latest.set(row.templateId, row);
+    const adoptedCodes = new Set(adoptedCourses.map(course => course.code));
+    const courses = [...adoptedCourses, ...[...latest.values()]
+      .filter(row => !adoptedCodes.has(row.code))
+      .map(row => ({
+        code: row.code, title: row.title, subject: row.subject,
+        versionId: row.versionId, previewOnly: true,
+      }))];
     const versionIds = [...new Set(courses.map(course => course.versionId))];
     if (!versionIds.length) return { program: market.program, courses: [], matchedTeachers: 0 };
 
