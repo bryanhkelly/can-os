@@ -66,6 +66,19 @@ function ReviewEditor({item}:{item:Item}){
     {models.length===0&&<p className="text-sm text-muted-foreground">Add applicable models after researching state rules.</p>}
     {models.map((model,i)=><div key={i} className="flex gap-2"><input aria-label={`Operating model ${i+1}`} className="w-full rounded-lg border bg-background p-2 text-sm" disabled={!editable} value={model} onChange={e=>setProfile(v=>({...v,operatingModels:models.map((x,j)=>i===j?e.target.value:x)}))}/>{editable&&<button type="button" className="text-sm underline" onClick={()=>setProfile(v=>({...v,operatingModels:models.filter((_,j)=>i!==j)}))}>Remove</button>}</div>)}
    </section>
+   <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+    <div className="flex items-center justify-between"><h3 className="font-semibold">Funding programs</h3>{editable&&<button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>setProfile(v=>({...v,fundingPrograms:[...(Array.isArray(v.fundingPrograms)?v.fundingPrograms:[]),{id:crypto.randomUUID(),name:"",summary:"",eligibilityStatus:"unknown",evidenceIds:[]}]}))}>Add funding program</button>}</div>
+    {(Array.isArray(profile.fundingPrograms)?profile.fundingPrograms:[]).map((entry:unknown,i:number)=>{
+     const program=entry as {id:string;name:string;summary:string;eligibilityStatus:string;evidenceIds:string[]};
+     const update=(patch:Partial<typeof program>)=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).map((p,j)=>i===j?{...p,...patch}:p)}));
+     return <div key={program.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+      <label className="text-sm">Program name<input className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.name} onChange={e=>update({name:e.target.value})}/></label>
+      <label className="text-sm">Eligibility status<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.eligibilityStatus} onChange={e=>update({eligibilityStatus:e.target.value})}>{["unknown","under_review","conditional","verified"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></label>
+      <label className="text-sm sm:col-span-2">Program summary<textarea className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.summary} onChange={e=>update({summary:e.target.value})}/></label>
+      {editable&&<button type="button" className="text-left text-sm underline" onClick={()=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).filter((_,j)=>i!==j)}))}>Remove program</button>}
+     </div>;
+    })}
+   </section>
    <section className="space-y-3" aria-label="Evidence sources">
     <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Official source evidence</h3>
      {editable&&<button type="button" className="rounded border px-3 py-1 text-sm" onClick={()=>setSources(previous=>[...previous,{title:"",url:"",authority:"",checkedAt:new Date().toISOString()}])}>Add source</button>}</div>
