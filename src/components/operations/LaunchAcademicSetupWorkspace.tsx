@@ -21,7 +21,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatCard } from "@/components/workspace/stat-card";
 
-export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>> & {demoTeacherMarketplaceEnabled?:boolean};
+export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const router=useRouter();
  const [termId,setTermId]=useState(data.terms.find(term=>data.scheduleOptions.some(schedule=>schedule.schoolYearId===term.schoolYearId))?.id??data.terms[0]?.id??"");
@@ -66,7 +66,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <StatCard label="Published course versions" value={data.catalog.length}/>
    <StatCard label="Sections provisioned" value={data.sections.length}/>
   </div>
-  {data.demoTeacherMarketplaceEnabled && <section aria-label="Choose CAN teachers" className="mt-5 rounded-xl border bg-card p-5">
+  <section aria-label="Choose CAN teachers" className="mt-5 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Next: choose your teachers</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Your curriculum determines which CAN Academy instructors are suggested. Review teachers by course
@@ -76,7 +76,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       className="mt-3 inline-flex rounded-lg border px-4 py-2 text-sm font-semibold underline">
       Browse CAN teachers for this school's curriculum
     </Link>
-  </section>}
+  </section>
   <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
    <p role="status" className="mt-4 rounded-lg border border-warning/40 p-4 text-sm">
