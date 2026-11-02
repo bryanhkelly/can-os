@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -77,6 +78,7 @@ export const saveJurisdictionProfileReview=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const context=await getCommandContext(getRequest());
   assertCapability(context,"jurisdiction.profile.manage");
+  jurisdictionProfileSchema.parse({...data.profile,summary:data.summary,evidence:data.evidence});
   const [existing]=await db.select({status:jurisdictionProfileVersions.status})
    .from(jurisdictionProfileVersions).where(eq(jurisdictionProfileVersions.id,data.id)).limit(1);
   if(!existing || !["draft","in_review"].includes(existing.status))throw Error("Only unpublished reviews can be edited");
@@ -104,6 +106,7 @@ export const publishJurisdictionProfile=createServerFn({method:"POST"})
     .where(eq(jurisdictionProfileVersions.id,data.id)).limit(1);
    if(!record || record.status!=="in_review")throw Error("Profile must be in review before publication");
    const sources=record.evidence;
+   jurisdictionProfileSchema.parse({...record.profile,summary:record.summary,evidence:sources});
    if(!Array.isArray(sources)||sources.length===0)throw Error("Add authoritative sources before publishing");
    for(const source of sources){
     if(!source || typeof source!=="object" || typeof source.url!=="string" || !source.url.startsWith("https://") || !source.authority || !source.checkedAt)
