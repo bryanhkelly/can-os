@@ -31,16 +31,18 @@ for (const course of manifest.courses) {
   if (!parsed.success) throw Error(`Invalid lesson content for ${course.code}: ${parsed.error.message}`);
 }
 const hash=createHash("sha256").update(source).digest("hex");
+const courseHash=c=>createHash("sha256").update(JSON.stringify({code:c.code,title:c.title,subject:c.subject,description:c.description,learning:c.learning})).digest("hex");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
   await client.query("BEGIN");
   const org=await client.query("SELECT id,slug,type,metadata FROM organizations WHERE id=$1", [publisher]);
   if (org.rowCount !== 1 || org.rows[0].slug !== "can-demo-publisher" || org.rows[0].metadata?.demoPublisher !== true) throw Error("Only the dedicated CAN Demo Publisher organization can own demo curriculum");
-  const existing=await client.query("SELECT id FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug=$2", [publisher,manifest.pack.slug]);
+  const existing=await client.query("SELECT id,metadata FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug=$2", [publisher,manifest.pack.slug]);
   if (existing.rowCount > 1) throw Error("Ambiguous demo pack");
   let packId=existing.rows[0]?.id;
   if (packId) {
+    if (existing.rows[0].metadata?.sourceHash === undefined) throw Error("Refusing to modify a pack not created by this importer");
     const versions=await client.query("SELECT count(*)::int AS count FROM curriculum_pack_versions WHERE pack_id=$1 AND status<>'draft'",[packId]);
     if (versions.rows[0].count) throw Error("Refusing to modify previously released demo pack");
   }
@@ -50,7 +52,7 @@ try {
   for (const c of manifest.courses) {
     const result=await client.query("SELECT t.id, v.id AS version_id, v.status, v.curriculum FROM course_templates t LEFT JOIN LATERAL (SELECT id,status,curriculum FROM course_template_versions WHERE course_template_id=t.id ORDER BY version DESC LIMIT 1) v ON true WHERE t.owning_organization_id=$1 AND t.code=$2",[publisher,c.code]);
     if (!result.rowCount) plan.create++;
-    else if (result.rows[0].curriculum?.demoSourceHash === hash) plan.unchanged++;
+    else if (result.rows[0].curriculum?.demoSourceHash === courseHash(c)) plan.unchanged++;
     else plan.update++;
   }
   if (!apply) {await client.query("ROLLBACK");console.log(JSON.stringify(plan,null,2));}
@@ -75,12 +77,12 @@ try {
         }
         const prev=await client.query("SELECT version,curriculum FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
         let versionId;
-        if (prev.rows[0]?.curriculum?.demoSourceHash === hash) {
+        if (prev.rows[0]?.curriculum?.demoSourceHash === courseHash(c)) {
           const previousId=await client.query("SELECT id FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
           versionId=previousId.rows[0].id;
         } else {
           versionId=randomUUID();
-          await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,templateId,(prev.rows[0]?.version??0)+1,JSON.stringify({learning:c.learning,demoSourceHash:hash})]);
+          await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,templateId,(prev.rows[0]?.version??0)+1,JSON.stringify({learning:c.learning,demoSourceHash:courseHash(c)})]);
         }
         await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,versionId,position++,JSON.stringify({deepDemo:c.deepDemo})]);
       }
