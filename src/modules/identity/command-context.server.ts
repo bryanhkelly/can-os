@@ -11,13 +11,23 @@ import {readSessionGrants} from "./session-grants.server";
  * Resolve the account and active persona from a server-issued session.
  * Never use client-supplied actor IDs, role names or localStorage to grant access.
  */
+type SessionFailure = "cookie_missing" | "cookie_invalid" | "session_configuration" | "session_not_current" | "membership_unavailable";
+function rejectSession(request: Request, reason: SessionFailure): never {
+ // Only fixed categories enter logs. Never include headers, tokens, hashes,
+ // account identifiers, grant identifiers, request URLs or driver exceptions.
+ // Missing cookies on ordinary public page loads are expected, not warnings.
+ if (reason !== "cookie_missing" || new URL(request.url).pathname === "/access/session")
+  console.warn("Session validation rejected", { reason });
+ throw new AuthorizationError(reason === "membership_unavailable" ? "active membership" : "authenticated session");
+}
 export async function getCommandContext(request: Request): Promise<AccessContext> {
  const cookie=request.headers.get("cookie")??"";
  const entry=cookie.split(";").map(x=>x.trim()).find(x=>x.startsWith(accessSessionCookie+"="));
  const value=entry?.slice(accessSessionCookie.length+1);
- if(!value || !/^[A-Za-z0-9_-]{40,}$/.test(value)) throw new AuthorizationError("authenticated session");
+ if(!value) return rejectSession(request,"cookie_missing");
+ if(!/^[A-Za-z0-9_-]{40,}$/.test(value)) return rejectSession(request,"cookie_invalid");
  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
- if(!pepper) throw new AuthorizationError("authenticated session");
+ if(!pepper || pepper.length<32) return rejectSession(request,"session_configuration");
  const digest=hashAccessSecret(value,pepper);
  const now=new Date();
  const [session]=await db.select({
@@ -28,10 +38,10 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
    gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false)))
   .limit(1);
- if(!session) throw new AuthorizationError("authenticated session");
+ if(!session) return rejectSession(request,"session_not_current");
  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
  const activeGrant=grants.find(grant=>grant.id===session.activeGrantId);
- if(!activeGrant)throw new AuthorizationError("active membership");
+ if(!activeGrant)return rejectSession(request,"membership_unavailable");
  const context=resolveAccessContext({
   accountId:activeGrant.accountId,
   sessionId:session.id,activeGrantId:session.activeGrantId,
