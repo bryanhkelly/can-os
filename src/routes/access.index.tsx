@@ -1,18 +1,21 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {useState} from "react";
 import { accessFormErrors } from "@/domain/access-navigation";
-import {LOCAL_DEMO_ACCOUNTS} from "@/domain/local-demo-access";
+import {isDemoAccountEmail} from "@/domain/local-demo-access";
 export const Route=createFileRoute("/access/")({
- validateSearch:(search:Record<string,unknown>):{error?:keyof typeof accessFormErrors}=>({error:typeof search.error==="string"&&Object.hasOwn(accessFormErrors,search.error)?search.error as keyof typeof accessFormErrors:undefined}),
+ validateSearch:(search:Record<string,unknown>):{email?:string;error?:keyof typeof accessFormErrors}=>({
+  email:typeof search.email==="string"?search.email:undefined,
+  error:typeof search.error==="string"&&Object.hasOwn(accessFormErrors,search.error)?search.error as keyof typeof accessFormErrors:undefined,
+ }),
  component:AccessPage,
 });
 function AccessPage(){
  const search=Route.useSearch();
- const[email,setEmail]=useState("");
+ const[email,setEmail]=useState(search.email??"");
  const[code,setCode]=useState("");
  const[status,setStatus]=useState("");
  const[busy,setBusy]=useState(false);
- const isDemoEmail=LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email.trim().toLowerCase());
+ const isDemoEmail=isDemoAccountEmail(email);
  async function submit(e:React.FormEvent<HTMLFormElement>){
   if(isDemoEmail){setBusy(true);return;}
   e.preventDefault();setBusy(true);setStatus("");

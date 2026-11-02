@@ -140,7 +140,9 @@ beforeEach(() => {
     organizationId: "org",
     programId: "program",
   }]];
-  state.txRows = [[request], [{ curriculum: {} }], [{ schoolYearId: "year" }],
+  state.txRows = [[request], [{ curriculum: {} }], [{
+    schoolYearId: "year", active: true, programId: "program", siteId: "site",
+  }],
     [{ dayOfWeek: 1, startsAtLocal: "08:00", endsAtLocal: "09:00" }],
     [{ scheduleTemplateId: "schedule" }]];
   state.insertRows = [[{
