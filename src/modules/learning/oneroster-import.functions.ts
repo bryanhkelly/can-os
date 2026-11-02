@@ -10,10 +10,11 @@ import { planOneRosterReconciliation } from "@/domain/oneroster-reconciliation";
 import { assessOneRosterPlacementReplay } from "@/domain/oneroster-placement-decision";
 import { requireActor } from "@/modules/identity/actors.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
-import { writeAudit,emitEvent } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
 import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
+import { persistCurriculumImportJob } from "./curriculum-import-job.server";
 /** Stages a roster *validation report*, never syncs live enrollments. */
 const csv=z.string().min(1).max(500_000);
 const files=z.object({
@@ -44,29 +45,17 @@ export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
    warnings:report.warnings,valid:report.valid,format:"OneRoster 1.2 CSV",
    policy:"read_only_preview_no_roster_or_grade_mutations",
   };
-  return db.transaction(async tx=>{
-   const [prior]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status})
-    .from(curriculumImportJobs).where(and(
-      eq(curriculumImportJobs.organizationId,program.organizationId),
-      eq(curriculumImportJobs.format,"oneroster"),eq(curriculumImportJobs.sha256,digest))).limit(1);
-   if(prior)return {importId:prior.id,status:prior.status,report:serialized,previouslyValidated:true};
-   const [job]=await tx.insert(curriculumImportJobs).values({
-     organizationId:program.organizationId,format:"oneroster",formatVersion:"1.2",
-     sourceName:"OneRoster CSV bundle",sha256:digest,
-     status:serialized.valid?"validated":"rejected",report:serialized,
-     metadata:{programId:data.programId,submittedByPersonId:actor.actorPersonId,previewOnly:true},
-   }).returning({id:curriculumImportJobs.id});
-   if(!job)throw new Error("Unable to record OneRoster validation.");
-   await writeAudit(tx,actor,{action:"curriculum.interop.oneroster.validate",
-     entityType:"curriculum_import_job",entityId:job.id,
-     scope:{organizationId:program.organizationId,programId:data.programId},
-     after:{format:"oneroster",sha256:digest,valid:serialized.valid}});
-   await emitEvent(tx,{eventType:EventTypes.OneRosterCsvValidated,
-     aggregateType:"curriculum_import_job",aggregateId:job.id,
-     actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:data.programId});
-   return {importId:job.id,status:serialized.valid?"validated":"rejected",
-     report:serialized,previouslyValidated:false};
+  const result=await persistCurriculumImportJob({
+   actor,organizationId:program.organizationId,programId:data.programId,
+   format:"oneroster",formatVersion:"1.2",
+   sourceName:"OneRoster CSV bundle",sha256:digest,
+   status:serialized.valid?"validated":"rejected",report:serialized,
+   metadata:{programId:data.programId,submittedByPersonId:actor.actorPersonId,previewOnly:true},
+   auditAction:"curriculum.interop.oneroster.validate",
+   auditAfter:{format:"oneroster",sha256:digest,valid:serialized.valid},
+   eventType:EventTypes.OneRosterCsvValidated,
   });
+  return {...result,report:serialized};
  });
 
 /** Explicitly reconcile external OneRoster classes to existing canonical Sections.

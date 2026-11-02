@@ -3,8 +3,9 @@
  * student submits late -> teacher grades -> grade visible (repo rule 16).
  *
  * The test is self-contained: beforeAll builds its own synthetic fixture graph
- * in Neon (see fixture.ts) and afterAll deletes it, so it can run repeatedly
- * against a disposable Neon branch. Auth uses real passwordless session rows
+ * in Neon (see fixture.ts) and afterAll removes mutable fixture state when its
+ * outbox events are resolved. Append-only evidence remains on the disposable branch.
+ * Auth uses real passwordless session rows
  * (secret hashed with CAN_ACCESS_TOKEN_PEPPER) injected as the session cookie —
  * there is no app backdoor.
  */

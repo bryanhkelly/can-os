@@ -5,11 +5,12 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, consentRecords, enrollments, guardianRelationships, people, programs,
-  sections, studentProfiles, terms,
+  sections, studentProfiles, terms, sites as siteTable,
 } from "@/db/schema";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
+import { todayInTimezone } from "@/modules/calendar/timezone";
 
 /** Registrar's canonical Action queue for pending course changes (not a shadow workflow). */
 export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).handler(async () => {
@@ -24,10 +25,12 @@ export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).han
     studentName: people.legalFirstName, studentLastName: people.legalLastName,
     sectionId: sections.id, sectionTitle: sections.title, sectionCode: sections.code,
     sectionSiteId: sections.siteId, sectionProgramId: sections.programId,
+    timezone: siteTable.timezone,
     organizationId: programs.organizationId, schoolYearId: terms.schoolYearId,
     createdAt: actions.createdAt,
   }).from(actions)
     .innerJoin(sections, eq(sections.id, actions.subjectId))
+    .innerJoin(siteTable, eq(siteTable.id, sections.siteId))
     .innerJoin(programs, eq(programs.id, sections.programId))
     .innerJoin(terms, eq(terms.id, sections.termId))
     .innerJoin(studentProfiles, eq(studentProfiles.personId, actions.ownerPersonId))
@@ -96,7 +99,7 @@ export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).han
       e.programId === row.sectionProgramId &&
       e.schoolYearId === row.schoolYearId
     );
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInTimezone(row.timezone);
     const deadline = operation === "withdraw" ? policy.withdrawalEndsOn : policy.addDropEndsOn;
     return {
       id: row.id, operation, title: row.title,

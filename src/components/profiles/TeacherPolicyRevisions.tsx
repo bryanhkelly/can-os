@@ -1,4 +1,10 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { reviseLaunchTeacherPolicy } from "@/modules/programs/teacher-policy.functions";
 import type { listLaunchTeacherPolicies } from "@/modules/programs/teacher-policy.server";
@@ -45,28 +51,24 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
       <h3 className="font-semibold">Publish a reviewed revision</h3>
       <p className="text-sm">Select the complete replacement requirement set, not just additions.
         No claims, reviews or teaching assignments are changed. This is not a policy exception or regulatory approval.</p>
-      {catalog.map(item => <label key={item.key} className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={keys.includes(item.key)} onChange={event =>
+      {catalog.map(item => <Label key={item.key} className="flex items-center gap-2 leading-6">
+        <Checkbox disabled={busy} checked={keys.includes(item.key)} onChange={event =>
           setKeys(current => event.target.checked ? [...current, item.key] : current.filter(key => key !== item.key))}/>
         {item.title} ({item.key})
-      </label>)}
-      <label className="block text-sm">Future effective date and time (UTC)
-        <input type="datetime-local" required value={effectiveFrom} onChange={event => setEffectiveFrom(event.target.value)}
-          className="mt-1 block rounded border bg-background p-2"/>
-      </label>
-      <label className="block text-sm">Reason for revision
-        <textarea required minLength={10} maxLength={2000} value={reason} onChange={event => setReason(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2"/>
-      </label>
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/>
+      </Label>)}
+      <Field label="Future effective date and time (UTC)" required>
+        <Input disabled={busy} type="datetime-local" value={effectiveFrom} onChange={event => setEffectiveFrom(event.target.value)}/>
+      </Field>
+      <Field label="Reason for revision" required>
+        <Textarea disabled={busy} minLength={10} maxLength={2000} value={reason} onChange={event => setReason(event.target.value)}/>
+      </Field>
+      <Label className="flex items-start gap-2 leading-6">
+        <Checkbox disabled={busy} checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/>
         I reviewed the complete requirement set and effective instant. Earlier policy history will be preserved.
-      </label>
-      <button type="submit" disabled={busy || !confirmed || !keys.length || !effectiveFrom || reason.trim().length < 10}
-        className="rounded border px-3 py-2 text-sm disabled:opacity-50">Publish policy revision</button>
-      {mutation.pending && <p role="status" className="text-sm">Publishing policy revision...</p>}
-      {mutation.error && <p role="alert" className="text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
-      {mutation.notice && <p role="status" className="text-sm">{mutation.notice}</p>}
+      </Label>
+      <Button type="submit" variant="outline" disabled={busy || !confirmed || !keys.length || !effectiveFrom || reason.trim().length < 10}>Publish policy revision</Button>
+      <MutationFeedback state={mutation} pendingMessage="Publishing policy revision..."/>
     </form>}
   </section>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

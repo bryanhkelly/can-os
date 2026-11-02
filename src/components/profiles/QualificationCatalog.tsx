@@ -1,4 +1,10 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { createQualificationCatalogEntry } from "@/modules/profiles/qualification-catalog.functions";
 
@@ -28,32 +34,31 @@ export function QualificationCatalog({ programId, canAuthor, changed }: {
       Adding definitions requires an explicit qualification-catalog steward grant in this institution.
       Registrar or policy-publisher status alone is not sufficient.
     </p> : <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); void save(); }}>
-      <label className="text-sm">Stable qualification key<input required value={key} minLength={3} maxLength={100}
+      <Field label="Stable qualification key" required><Input disabled={busy} value={key} minLength={3} maxLength={100}
         pattern="[a-z][a-z0-9]*([._-][a-z0-9]+)*" placeholder="teaching-license"
-        onChange={event => setKey(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
-      <label className="text-sm">Display title<input required value={title} minLength={3} maxLength={200}
-        onChange={event => setTitle(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
-      <label className="text-sm">Classification key<input required value={kind} minLength={2} maxLength={64}
+        onChange={event => setKey(event.target.value)} /></Field>
+      <Field label="Display title" required><Input disabled={busy} value={title} minLength={3} maxLength={200}
+        onChange={event => setTitle(event.target.value)} /></Field>
+      <Field label="Classification key" required><Input disabled={busy} value={kind} minLength={2} maxLength={64}
         pattern="[a-z][a-z0-9]*([._-][a-z0-9]+)*" placeholder="license"
-        onChange={event => setKind(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
-      <label className="text-sm sm:col-span-2">Reason for shared catalog addition<textarea required value={reason} minLength={10} maxLength={2000}
-        onChange={event => setReason(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
+        onChange={event => setKind(event.target.value)} /></Field>
+      <Field label="Reason for shared catalog addition" required className="sm:col-span-2"><Textarea disabled={busy} value={reason} minLength={10} maxLength={2000}
+        onChange={event => setReason(event.target.value)} /></Field>
       <p className="text-xs text-muted-foreground sm:col-span-2">
         The stable key, classification and title are shared across institutions and cannot be edited here.
         This form creates a basic evidence-backed definition, not a specialized attribute schema.
         Do not include private teacher or student details.
       </p>
-      <label className="flex gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={confirmed}
+      <Label className="flex gap-2 leading-6 sm:col-span-2"><Checkbox disabled={busy} checked={confirmed}
         onChange={event => setConfirmed(event.target.checked)} />
         I checked existing entries and confirm this shared definition. Existing claims and published requirements will not change.
-      </label>
-      <button type="submit" disabled={busy || !confirmed || !key.trim() || !title.trim() || !kind.trim() || reason.trim().length < 10}
-        className="justify-self-start rounded border px-3 py-2 text-sm disabled:opacity-50">
+      </Label>
+      <Button type="submit" variant="outline" disabled={busy || !confirmed || !key.trim() || !title.trim() || !kind.trim() || reason.trim().length < 10}
+        className="justify-self-start">
         {busy ? "Saving definition..." : "Add shared definition"}
-      </button>
+      </Button>
     </form>}
-    {mutation.pending && <p role="status" className="mt-3 text-sm">Saving qualification definition...</p>}
-    {mutation.error && <p role="alert" className="mt-3 text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
-    {mutation.notice && <p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving qualification definition..."/>
   </section>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

@@ -7,8 +7,16 @@ import { LocalDateTimeField } from "./local-datetime-field";
 import { ActionDialog } from "./action-dialog";
 import { FileSelectionField, UploadedFileNotice } from "@/components/evidence/FileSelectionField";
 import { QueryState } from "./query-state";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
-const meta = { title: "Foundations/Reusable workflow controls" } satisfies Meta;
+const meta = { title: "Foundations/Reusable workflow controls",
+  parameters: { chromatic: { modes: {
+    light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" },
+  } } },
+} satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -40,12 +48,12 @@ function DialogExample({ pending = false }: { pending?: boolean }) {
   const [reason, setReason] = useState("");
   const [count, setCount] = useState(0);
   return <>
-    <button onClick={() => setOpen(true)}>Review decision</button>
+    <Button onClick={() => setOpen(true)}>Review decision</Button>
     <p>Confirmed: {count}</p>
     <ActionDialog open={open} title="Review decision" description="Provide a reason before confirming."
       confirmLabel="Confirm decision" pending={pending} onClose={() => setOpen(false)}
       onConfirm={() => { setCount(value => value + 1); setOpen(false); }}>
-      <label>Reason<textarea required minLength={5} value={reason} onChange={event => setReason(event.target.value)} /></label>
+      <Label>Reason<Textarea required minLength={5} value={reason} onChange={event => setReason(event.target.value)} /></Label>
     </ActionDialog>
   </>;
 }
@@ -56,7 +64,7 @@ export const ReasonDialog: Story = {
     const trigger = canvas.getByRole("button", { name: "Review decision" });
     await userEvent.click(trigger);
     const dialog = canvas.getByRole("dialog", { name: "Review decision" });
-    await expect(within(dialog).getByLabelText("Reason")).toHaveFocus();
+    await expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
     await userEvent.click(within(dialog).getByRole("button", { name: "Confirm decision" }));
     await expect(canvas.getByText("Confirmed: 0")).toBeInTheDocument();
     // Synthetic Escape events do not invoke the browser's native dialog cancel action.
@@ -86,6 +94,19 @@ export const PendingDialog: Story = {
     await expect(canvas.getByText("Confirmed: 0")).toBeInTheDocument();
   },
 };
+
+function DeclineExample() {
+  const [open, setOpen] = useState(false);
+  const [declined, setDeclined] = useState(false);
+  return <>
+    <Button variant="outline" onClick={() => setOpen(true)} disabled={declined}>Decline offer</Button>
+    {declined && <p role="status">Offer declined. Your school has been notified.</p>}
+    <ActionDialog open={open} title="Decline school offer?" destructive confirmLabel="Decline offer"
+      description="The school will be notified and you may need to contact admissions to reapply."
+      onClose={() => setOpen(false)} onConfirm={() => { setDeclined(true); setOpen(false); }}/>
+  </>;
+}
+export const DestructiveConfirmation: Story = { render: () => <DeclineExample/> };
 
 function DateTimeExample() {
   const [value, setValue] = useState("2027-01-15T09:30");
@@ -131,6 +152,51 @@ export const SavedButRefreshFailed: Story = {
   },
 };
 export const UploadedNotRecorded: Story = { render: () => <UploadedFileNotice /> };
+
+function RefreshRecoveryExample() {
+  const [commands, setCommands] = useState(0);
+  const [refreshes, setRefreshes] = useState(0);
+  const mutation = useMutationFeedback(async () => {
+    setRefreshes(value => value + 1);
+    if (refreshes < 2) throw new Error("Isolated refresh outage");
+  });
+  return <>
+    <Button disabled={mutation.pending || mutation.refreshFailed}
+      onClick={() => void mutation.run(async () => { setCommands(value => value + 1); }, {
+        successMessage: "Request saved.", commandErrorMessage: "Request failed.",
+      })}>Save request</Button>
+    <p>Commands: {commands}</p>
+    <p>Refreshes: {refreshes}</p>
+    <MutationFeedback state={mutation} pendingMessage="Saving request..."/>
+  </>;
+}
+export const RetrySavedRefresh: Story = {
+  render: () => <RefreshRecoveryExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Save request" }));
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Request saved.");
+    await expect(canvas.getByRole("button", { name: "Save request" })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: "Retry refresh" }));
+    await expect(canvas.getByRole("alert")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Save request" })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: "Retry refresh" }));
+    await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
+    await expect(canvas.getByText("Commands: 1")).toBeInTheDocument();
+    await expect(canvas.getByText("Refreshes: 3")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Save request" })).toBeEnabled();
+  },
+};
+export const DarkRefreshRecovery: Story = {
+  globals: { theme: "dark" },
+  render: () => <RefreshRecoveryExample/>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Save request" }));
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Request saved.");
+    await expect(canvas.getByRole("button", { name: "Retry refresh" })).toBeVisible();
+  },
+};
 
 function QueryExample() {
   const [failed, setFailed] = useState(true);

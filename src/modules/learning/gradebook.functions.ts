@@ -5,16 +5,15 @@ import { createAssessmentStatus } from "@/domain/assessment-publication";
 import { assertAssessmentSchedule } from "@/domain/assessment-schedule";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { authorizeClass,accessibleClasses } from "./class-access.server";
-import type { Actor } from "@/modules/identity/actors.server";
+import { requireActor, type Actor } from "@/modules/identity/actors.server";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
-import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { assertPublisherLessonReference,publisherLessonChoices } from "@/domain/publisher-course-references";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -44,8 +43,7 @@ function readGradingDraft(value: unknown) {
  * a host church-wide Site or Program grant through this path.
  */
 async function teacherActor(sectionId?: string) {
- const context = await getCommandContext(getRequest());
- if (context.role !== "teacher" || !context.actorPersonId) throw new AuthorizationError("teacher gradebook access");
+ const context = await requireActor(["teacher"]);
  if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length)
   throw new AuthorizationError("named teacher Section or Site scope");
  if (sectionId) await authorizeClass(context as Actor, sectionId);

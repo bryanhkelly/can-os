@@ -42,9 +42,7 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
    <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
    <Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
   </div>}>
-  {mutation.pending&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">Saving permission decision...</p>}
-  {mutation.notice&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">{mutation.notice}</p>}
-  {mutation.error&&<p className="mt-5 rounded-lg border border-red-500 p-3 text-sm" role="alert">{mutation.error}</p>}
+  <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
   {action&&<Link to="/guardian/group-permissions" className="mt-4 inline-block text-sm underline">View all group permissions</Link>}
   {action&&!items.some(item=>item.id===action)&&<p role="alert" className="mt-4 rounded-xl border p-4">This permission request is unavailable in your current family workspace.</p>}
   <div className="mt-7 space-y-3">{items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
@@ -68,3 +66,4 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
   </div>
  </WorkspaceShell>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

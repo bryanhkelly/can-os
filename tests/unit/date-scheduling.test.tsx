@@ -1,5 +1,8 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 
 const state=vi.hoisted(()=>({
   slots:[] as unknown[],cursor:0,data:{} as unknown,
@@ -82,8 +85,8 @@ function render(route:{options:{component?:unknown}}){
   return nodes((page.type as (props:Props)=>ReactNode)(page.props));
 }
 function changeLabel(controls:ReactElement<Props>[],label:string,value:string){
-  const field=controls.find(node=>node.type==="label"&&text(node.props.children).startsWith(label));
-  const input=field&&nodes(field.props.children).find(node=>node.type==="input"||node.type==="select");
+  const field=controls.find(node=>(node.type==="label"||node.type===Label)&&text(node.props.children).startsWith(label));
+  const input=field&&nodes(field.props.children).find(node=>node.type==="input"||node.type==="select"||node.type===Input||node.type===Select);
   if(!input?.props.onChange)throw new Error(`Missing input ${label}`);
   input.props.onChange({target:{value}});
 }
@@ -107,7 +110,7 @@ describe("site-local scheduling forms",()=>{
     changeLabel(controls,"Return","2027-01-15T14:00");
     changeLabel(controls,"Permission deadline","2027-01-14T16:00");
     controls=render(Trips);
-    expect(controls.some(node=>node.type==="label"&&text(node.props.children).includes(timezone))).toBe(true);
+    expect(controls.some(node=>(node.type==="label"||node.type===Label)&&text(node.props.children).includes(timezone))).toBe(true);
     await submit(controls);
     expect(state.propose).toHaveBeenCalledWith({data:expect.objectContaining({
       siteId:"school",departsAt:"2027-01-15T17:30:00.000Z",
@@ -171,7 +174,7 @@ describe("site-local scheduling forms",()=>{
     controls.find(node=>node.type==="button"&&text(node.props.children)==="Reschedule")?.props.onClick?.();
     controls=render(TeacherGroups);
     const dialog=()=>controls.find(node=>node.props.onConfirm);
-    expect(controls.find(node=>node.type==="input"&&node.props.value==="2027-01-15T09:30")).toBeDefined();
+    expect(controls.find(node=>(node.type==="input"||node.type===Input)&&node.props.value==="2027-01-15T09:30")).toBeDefined();
     dialog()?.props.onClose?.();
     expect(state.revise).not.toHaveBeenCalled();
     controls=render(TeacherGroups);

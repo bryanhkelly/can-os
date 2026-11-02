@@ -36,5 +36,26 @@ export default tseslint.config(
     files: ["src/components/{ui,workspace,workflow}/**/*.tsx", "src/routes/guardian.apply.tsx"],
     rules: { "can-os-design/no-hardcoded-colors": "error" },
   },
+  {
+    files: [
+      "src/components/learning/ClassCreationRequestForm.tsx",
+      "src/components/workspace/{site-program-fields,local-datetime-field}.tsx",
+      "src/components/evidence/FileSelectionField.tsx",
+      "src/components/shell/WorkspaceContextSwitcher.tsx",
+      "src/components/shell/{CommandPalette,WorkspaceSearchDialog}.tsx",
+      "src/components/operations/{OpeningHandoffs,ObsoleteExcuseClosure,SectionLifecycleManager}.tsx",
+      "src/components/admissions/AdmissionsInquiryForm.tsx",
+      "src/components/profiles/{TeacherPolicyRevisions,QualificationCatalog}.tsx",
+      "src/components/workspace/{query-state,directory-table}.tsx",
+      "src/routes/staff.teachers.tsx",
+      "src/routes/guardian.admission-offers.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": ["error", {
+        selector: "JSXOpeningElement[name.name=/^(button|input|select|textarea|label)$/]",
+        message: "Use the canonical Button, Input, Select, Textarea, or Label primitive.",
+      }],
+    },
+  },
   ...storybook.configs["flat/recommended"],
 );

@@ -15,6 +15,12 @@ export type MutationOutcome<T> =
   | { status: "duplicate" }
   | { status: "refresh-required" };
 
+export type RefreshOutcome =
+  | { status: "refreshed" }
+  | { status: "not-required" }
+  | { status: "refresh-failed" }
+  | { status: "duplicate" };
+
 export type MutationRunOptions<T> = {
   successMessage: string | ((value: T) => string);
   commandErrorMessage: string;
@@ -34,8 +40,30 @@ export function mutationErrorMessage(error: unknown, fallback: string): string {
 export function createMutationRunner({ refresh, update }: MutationRunnerOptions) {
   let inFlight = false;
   let refreshRequired = false;
+  let failedRefresh: (() => Promise<unknown>) | undefined;
+  let savedNotice = "";
+  let refreshError = "";
 
-  return async function run<T>(
+  async function retryRefresh(): Promise<RefreshOutcome> {
+    if (inFlight) return { status: "duplicate" };
+    if (!refreshRequired || !failedRefresh) return { status: "not-required" };
+    inFlight = true;
+    update({ pending: true, error: "", notice: savedNotice, refreshFailed: true });
+    try {
+      await failedRefresh();
+      refreshRequired = false;
+      failedRefresh = undefined;
+      update({ pending: false, error: "", notice: savedNotice, refreshFailed: false });
+      return { status: "refreshed" };
+    } catch {
+      update({ pending: false, error: refreshError, notice: savedNotice, refreshFailed: true });
+      return { status: "refresh-failed" };
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  async function run<T>(
     command: () => Promise<T>,
     options: MutationRunOptions<T>,
   ): Promise<MutationOutcome<T>> {
@@ -65,10 +93,13 @@ export function createMutationRunner({ refresh, update }: MutationRunnerOptions)
         await (options.refresh ?? refresh)();
       } catch {
         refreshRequired = true;
+        failedRefresh = options.refresh ?? refresh;
+        savedNotice = notice;
+        refreshError = options.refreshErrorMessage
+          ?? "The command succeeded, but this page could not refresh. Retry the refresh before submitting again.";
         update({
           pending: false,
-          error: options.refreshErrorMessage
-            ?? "The command succeeded, but this page could not refresh. Reopen it before submitting again.",
+          error: refreshError,
           notice,
           refreshFailed: true,
         });
@@ -80,7 +111,8 @@ export function createMutationRunner({ refresh, update }: MutationRunnerOptions)
     } finally {
       inFlight = false;
     }
-  };
+  }
+  return Object.assign(run, { retryRefresh });
 }
 
 export function useMutationFeedback(refresh: () => Promise<unknown>) {
@@ -95,15 +127,19 @@ export function useMutationFeedback(refresh: () => Promise<unknown>) {
     refreshRef.current = refresh;
   }, [refresh]);
   const runnerRef = useRef<ReturnType<typeof createMutationRunner> | null>(null);
-  const run = useCallback(async <T,>(
-    command: () => Promise<T>,
-    options: MutationRunOptions<T>,
-  ): Promise<MutationOutcome<T>> => {
+  const getRunner = useCallback(() => {
     runnerRef.current ??= createMutationRunner({
       refresh: () => refreshRef.current(),
       update: setFeedback,
     });
-    return runnerRef.current(command, options);
+    return runnerRef.current;
   }, []);
-  return { ...feedback, run };
+  const run = useCallback(async <T,>(
+    command: () => Promise<T>,
+    options: MutationRunOptions<T>,
+  ): Promise<MutationOutcome<T>> => {
+    return getRunner()(command, options);
+  }, [getRunner]);
+  const retryRefresh = useCallback(() => getRunner().retryRefresh(), [getRunner]);
+  return { ...feedback, run, retryRefresh };
 }

@@ -6,9 +6,11 @@ export function LocalDateTimeField({ label, timezone, value, onChange, required,
   required?: boolean;
   disabled?: boolean;
 }) {
-  return <label className="block text-sm">{label} ({timezone || "choose a school or group"})
-    <input type="datetime-local" value={value} required={required} disabled={disabled}
+  return <Label className="block">{label} ({timezone || "choose a school or group"})
+    <Input type="datetime-local" value={value} required={required} disabled={disabled}
       onChange={event => onChange(event.target.value)}
-      className="mt-1 block w-full rounded border bg-background p-2" />
-  </label>;
+      className="mt-1" />
+  </Label>;
 }
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";

@@ -1,23 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { personLegalName } from "@/domain/person-name";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { STUDENT_LEARNING_GOAL_TYPE } from "@/domain/teacher-student-goal";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { accessibleClasses } from "./class-access.server";
-import type { Actor } from "@/modules/identity/actors.server";
+import { requireActor, type Actor } from "@/modules/identity/actors.server";
 import {
   teacherFollowUpResolutionInput,
   teacherFollowUpResolutionNote,
 } from "@/domain/teacher-learning-followup";
 
 async function teacherActor() {
-  const { getCommandContext } = await import("@/modules/identity/command-context.server");
-  const actor = await getCommandContext(getRequest());
-  if (actor.role !== "teacher" || !actor.actorPersonId)
-    throw new AuthorizationError("verified teacher required");
-  assertCapability(actor, "teacher:read");
+  const actor = await requireActor(["teacher"], "teacher:read");
   if (!(actor.scope.siteIds?.length && actor.scope.programIds?.length) &&
       !actor.scope.sectionIds?.length)
     throw new AuthorizationError("authorized named teaching Section");

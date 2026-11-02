@@ -54,9 +54,9 @@ describe("obsolete attendance excuse closure boundary",()=>{
    currentAttendanceEventId:input.expectedCurrentEventId}} onSaved={async()=>{}}/>);
   expect(html).toContain("current attendance mark and its history stay unchanged");
   expect(html).toContain("visible to the guardian");
-  expect(html).toContain('<textarea required="" minLength="10" maxLength="2000"');
-  expect(html).toContain('type="checkbox" required=""');
-  expect(html).toMatch(/<button disabled="" type="submit"[^>]*>Close obsolete excuse<\/button>/);
+  expect(html).toMatch(/<textarea\b(?=[^>]*\brequired="")(?=[^>]*\bminLength="10")(?=[^>]*\bmaxLength="2000")[^>]*>/);
+  expect(html).toMatch(/<input\b(?=[^>]*\btype="checkbox")(?=[^>]*\brequired="")[^>]*>/);
+  expect(html).toMatch(/<button\b(?=[^>]*\bdisabled="")(?=[^>]*\btype="submit")[^>]*>Close obsolete excuse<\/button>/);
  });
  it("passes a validated registrar command to the transactional service",async()=>{
   await expect(closeStaleAttendanceExcuse({data:input})).resolves.toEqual({excuseId:input.excuseId});

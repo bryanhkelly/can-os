@@ -73,9 +73,7 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
  <div className="space-y-6">
  {!writesEnabled&&<WorkspaceNotice>You may join approved groups, participate in their moderated discussions, and report concerning content. Session RSVPs remain unavailable until the session workflow is released.</WorkspaceNotice>}
  {hasEnrollmentGuardian===false&&<WorkspaceNotice tone="danger">A linked guardian is required to request membership or create a study group. Ask your school to verify your guardian relationship before continuing.</WorkspaceNotice>}
- {mutation.pending&&<WorkspaceNotice>Saving study group change...</WorkspaceNotice>}
- {mutation.notice&&<WorkspaceNotice tone="success">{mutation.notice}</WorkspaceNotice>}
- {mutation.error&&<WorkspaceNotice tone="danger">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</WorkspaceNotice>}
+ <MutationFeedback state={mutation} pendingMessage="Saving study group change..."/>
  {sections.length===0&&<EmptyState title="No active enrolled classes are currently available for creating a study group."/>}
  {sections.length>0&&(!creationEnabled||!writesEnabled)&&<WorkspaceNotice>Creating study groups is unavailable right now.</WorkspaceNotice>}
  {sections.length>0&&creationEnabled&&writesEnabled&&<WorkspacePanel title="Create a study group"
@@ -138,3 +136,4 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
  </div>
  </WorkspaceShell>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

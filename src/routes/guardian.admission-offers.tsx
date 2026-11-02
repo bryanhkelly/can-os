@@ -7,6 +7,10 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {GuardianEnrollmentChecklist} from "@/components/enrollment/GuardianEnrollmentChecklist";
 import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
 import {EmptyState,StatusBadge,WorkspaceNotice,WorkspacePanel,WorkspaceShell} from "@/components/workspace";
+import {Button} from "@/components/ui/button";
+import {ActionDialog} from "@/components/workspace/action-dialog";
+import {MutationFeedback} from "@/components/workspace/mutation-feedback";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
 
 const loadGuardianOffers=(studentPersonId?:string)=>getGuardianAdmissionOffers({data:{studentPersonId}});
 export const Route=createFileRoute("/guardian/admission-offers")({
@@ -30,21 +34,17 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
  const router=useRouter();
  const {student,offer,application}=Route.useSearch();
  const [checklist,setChecklist]=useState<string|null>(null);
- const [pending,setBusy]=useState<string|null>(null),[error,setError]=useState("");
- const [notice,setNotice]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const [declineTarget,setDeclineTarget]=useState<{offerId:string;studentName:string;program:string}|null>(null);
  const [interactive,setInteractive]=useState(false);
  useEffect(()=>setInteractive(true),[]);
- const busy=interactive?pending:"hydrating";
+ const busy=!interactive||mutation.pending||mutation.refreshFailed;
  async function respond(offerId:string,decision:"accept"|"decline"){
-  if(decision==="decline"&&!window.confirm("Decline this school offer? The school will be notified and you may need to contact admissions to reapply."))return;
-  setBusy(offerId);setError("");setNotice("");
-  try{
-   await respondToAdmissionOffer({data:{offerId,decision}});
-   setNotice(decision==="accept"?"Offer accepted. Your school will complete the remaining enrollment and class placement steps.":"Offer declined. Your school has been notified.");
-   try{await router.invalidate();}
-   catch{setError("Your response was saved, but the offer list could not be refreshed. Reopen this page; do not respond again.");}
-  }catch(e){setError(e instanceof Error?e.message:"Unable to respond to offer");}
-  finally{setBusy(null);}
+  const result=await mutation.run(()=>respondToAdmissionOffer({data:{offerId,decision}}),{
+   successMessage:decision==="accept"?"Offer accepted. Your school will complete the remaining enrollment and class placement steps.":"Offer declined. Your school has been notified.",
+   commandErrorMessage:"Unable to respond to offer.",
+  });
+  if(result.status==="saved"||result.status==="refresh-failed")setDeclineTarget(null);
  }
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment offers"
   subtitle="Review offers for students whose enrollment you are authorized to manage."
@@ -52,8 +52,14 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   actions={<Link to="/guardian/apply" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
   <div className="space-y-6">
   {student&&<Link to="/guardian/admission-offers" className="inline-block text-xs font-semibold underline">View offers for all children →</Link>}
-  {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
-  {notice&&<p role="status" className="rounded-lg border p-3 text-sm">{notice}</p>}
+  {!declineTarget&&<MutationFeedback state={mutation} pendingMessage="Saving offer response..."/>}
+  <ActionDialog open={!!declineTarget} title="Decline school offer?"
+    description={`Decline the offer for ${declineTarget?.studentName ?? "this student"} at ${declineTarget?.program ?? "this school"}? The school will be notified and you may need to contact admissions to reapply.`}
+    confirmLabel="Decline offer" destructive pending={mutation.pending} confirmDisabled={busy}
+    onClose={()=>setDeclineTarget(null)}
+    onConfirm={()=>{if(declineTarget)void respond(declineTarget.offerId,"decline");}}>
+    <MutationFeedback state={mutation} pendingMessage="Saving offer response..."/>
+  </ActionDialog>
   {offer&&<Link to="/guardian/admission-offers" search={{student}} className="inline-block text-sm underline">View all offers for this child</Link>}
   {offer&&!applications.some(app=>app.offers.some(item=>item.id===offer))&&<WorkspaceNotice tone="danger">This offer is unavailable in your current family workspace.</WorkspaceNotice>}
   {application&&!applications.some(app=>app.applicationId===application)&&<WorkspaceNotice tone="danger">This enrollment application is unavailable in your current family workspace.</WorkspaceNotice>}
@@ -67,8 +73,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     </p>}
     {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
-    <button type="button" aria-expanded={checklist===app.applicationId||application===app.applicationId}
-      className="mt-3 rounded border px-3 py-2 text-sm" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</button>
+    <Button variant="outline" aria-expanded={checklist===app.applicationId||application===app.applicationId}
+      className="mt-3" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</Button>
     {(checklist===app.applicationId||application===app.applicationId)&&<GuardianEnrollmentChecklist key={app.applicationId} applicationId={app.applicationId}/>}
     {app.offers.filter(item=>!offer||item.id===offer).map(o=><div className="mt-3 border-t pt-3" key={o.id}>
      <StatusBadge tone={o.status==="accepted"?"success":o.status==="issued"?"info":o.status==="declined"||o.status==="revoked"?"danger":"neutral"}>Offer status: {o.status}</StatusBadge>
@@ -79,8 +85,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
        {app.blockers.map(requirement=><li key={requirement.id}>{requirement.title} · {requirement.status.replaceAll("_"," ")}</li>)}
      </ul>}
      {o.status==="issued"&&(!o.expiresAt||new Date(o.expiresAt).getTime()>Date.now())&&<div className="mt-3 flex gap-3">
-       <button disabled={busy!==null||!o.progress.canAccept} className="rounded border px-4 py-2 disabled:opacity-50" onClick={()=>respond(o.id,"accept")}>Accept</button>
-       <button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"decline")}>Decline</button>
+       <Button variant="outline" disabled={busy||!o.progress.canAccept} onClick={()=>void respond(o.id,"accept")}>Accept</Button>
+       <Button variant="outline" disabled={busy} onClick={()=>setDeclineTarget({offerId:o.id,studentName:app.studentName,program:app.program})}>Decline</Button>
      </div>}
      {o.enrollmentActive&&<div className="mt-3 space-y-2">
        <p className="text-sm">{o.sectionCount
@@ -104,8 +110,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
       {app.blockers.length>0&&<p className="mt-2 text-sm">
         {app.blockers.length} required {app.blockers.length===1?"item needs":"items need"} review.
       </p>}
-      <button type="button" className="mt-3 rounded border px-3 py-2 text-sm font-semibold"
-        onClick={()=>setChecklist(app.applicationId)}>Review enrollment checklist →</button>
+      <Button variant="outline" className="mt-3"
+        onClick={()=>setChecklist(app.applicationId)}>Review enrollment checklist →</Button>
      </div>}
   </WorkspacePanel>)}
   {applications.length===0&&<div>

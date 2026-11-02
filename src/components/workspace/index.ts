@@ -10,3 +10,4 @@ export { MutationFeedback } from "./mutation-feedback";
 export { LocalDateTimeField } from "./local-datetime-field";
 export { ActionDialog } from "./action-dialog";
 export { PageNavigation } from "./page-navigation";
+export { DirectoryTable, type DirectoryColumn, type DirectorySort } from "./directory-table";

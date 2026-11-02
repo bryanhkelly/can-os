@@ -68,9 +68,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
       subtitle="Review published school permission language and respond to invitations for your children. Permission and fees are separate steps."
       actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
     >
-      {mutation.pending && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">Saving permission decision...</p>}
-      {mutation.notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
-      {mutation.error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
+      <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
       <div className="mt-7 space-y-4">
         {items.map(item => <article key={item.participantId} className="rounded-xl border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.studentName}</p>
@@ -139,3 +137,4 @@ function TripPermissions({ items }: { items: Trip[] }) {
     </WorkspaceShell>
   );
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

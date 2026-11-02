@@ -1,12 +1,20 @@
 import { getCapacityCandidates, swapCommittedInstructor } from "@/modules/staffing/educational-capacity.functions";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
 import {useMutationFeedback, type MutationOutcome} from "@/lib/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
  transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist,offerLifecycleWaitlistSeat
 } from "@/modules/programs/section-lifecycle.functions";
 type Snapshot=Awaited<ReturnType<typeof getSectionLifecycle>>;
+type LifecycleRun = (id:string, operation:()=>Promise<unknown>, success:string,
+ onReconciled?:()=>void)=>Promise<MutationOutcome<unknown>>;
 export function SectionLifecycleWorkspace({programId,staff}:{programId:string;staff:{personId:string;first:string;last:string}[]}){
  const [sections,setSections]=useState<Snapshot>([]);
  const [loading,setLoading]=useState(true);
@@ -29,7 +37,17 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
  const busy=mutation.pending||mutation.refreshFailed;
  const [reason,setReason]=useState("");
  const [validationError,setValidationError]=useState("");
- async function run(id:string,operation:()=>Promise<unknown>,success:string):Promise<MutationOutcome<unknown>>{
+ const resetSavedDraft=useRef<(()=>void)|undefined>(undefined);
+ async function retryRefresh(){
+  const outcome=await mutation.retryRefresh();
+  if(outcome.status==="refreshed"){
+   setReason("");
+   resetSavedDraft.current?.();
+   resetSavedDraft.current=undefined;
+  }
+  return outcome;
+ }
+ const run:LifecycleRun=async(id,operation,success,onReconciled)=>{
   void id;
   if(reason.trim().length<5){
    const error=new Error("Provide an explanation (at least 5 characters) for the operational record.");
@@ -38,28 +56,27 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
   }
   setValidationError("");
   const result=await mutation.run(operation,{successMessage:success,commandErrorMessage:"Lifecycle change failed."});
-  if(result.status==="saved"||result.status==="refresh-failed")setReason("");
+  if(result.status==="saved"){setReason("");onReconciled?.();}
+  else if(result.status==="refresh-failed")resetSavedDraft.current=onReconciled;
   return result;
  }
  return <section className="mt-9 space-y-4" aria-label="Operational lifecycle">
   <h2 className="font-serif text-2xl">School operations · lifecycle management</h2>
   <p className="text-sm text-muted-foreground">Manage staffing transitions, schedule corrections, section closure and enrollment exceptions. Every change is audited. Sections cannot close with active students or reserved instruction.</p>
-  <label className="block text-sm">Reason for operational change
-   <textarea value={reason} onChange={e=>setReason(e.target.value)} rows={2} maxLength={1000}
-    placeholder="Document the decision and any necessary student/teacher follow-up"
-    className="mt-1 block w-full rounded border bg-background p-2"/>
-  </label>
-  {validationError&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{validationError}</p>}
-  {mutation.pending&&<p role="status" className="rounded border p-3 text-sm">Saving lifecycle change...</p>}
-  {mutation.error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
-  {mutation.notice&&<p role="status" className="rounded border p-3 text-sm">{mutation.notice}</p>}
+  <MutationFeedback state={{...mutation,retryRefresh}} pendingMessage="Saving lifecycle change..."/>
+  <fieldset disabled={busy} aria-busy={mutation.pending} className="space-y-4">
+  <Field label="Reason for operational change" error={validationError}>
+   <Textarea value={reason} onChange={e=>setReason(e.target.value)} rows={2} maxLength={1000}
+    placeholder="Document the decision and any necessary student/teacher follow-up"/>
+  </Field>
   {sections.map(section=><LifecycleSection key={section.id} section={section} staff={staff}
    busy={busy} reason={reason} allSections={sections} run={run}/>)}
+  </fieldset>
  </section>;
 }
 function LifecycleSection({section,staff,busy,reason,allSections,run}:{
  section:Snapshot[number];staff:{personId:string;first:string;last:string}[];
- busy:boolean;reason:string;allSections:Snapshot;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<MutationOutcome<unknown>>
+ busy:boolean;reason:string;allSections:Snapshot;run:LifecycleRun
 }){
  const [newTeacher,setNewTeacher]=useState("");
  const [outgoing,setOutgoing]=useState("");
@@ -81,102 +98,99 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
   <div className="mt-4 grid gap-3 md:grid-cols-2">
    <div className="rounded-lg border p-3">
     <h4 className="font-semibold text-sm">Instructor replacement</h4>
-    <label className="mt-2 block text-xs">Outgoing teacher
-     <select value={outgoing} onChange={e=>setOutgoing(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+    <Field className="mt-2" label="Outgoing teacher">
+     <Select value={outgoing} onChange={e=>setOutgoing(e.target.value)}>
       <option value="">Select outgoing instructor</option>
       {section.teachers.map(t=><option key={t.personId} value={t.personId}>{staff.find(p=>p.personId===t.personId)?.first??t.personId} {staff.find(p=>p.personId===t.personId)?.last??""}</option>)}
-     </select>
-    </label>
-    <label className="mt-2 block text-xs">Replacement teacher
-     <select value={newTeacher} onChange={e=>setNewTeacher(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+     </Select>
+    </Field>
+    <Field className="mt-2" label="Replacement teacher">
+     <Select value={newTeacher} onChange={e=>setNewTeacher(e.target.value)}>
       <option value="">Select replacement</option>
       {staff.filter(p=>!section.teachers.some(t=>t.personId===p.personId)).map(p=><option key={p.personId} value={p.personId}>{p.first} {p.last}</option>)}
-     </select>
-    </label>
+     </Select>
+    </Field>
     <CapacityReplacement section={section} reason={reason} busy={busy} run={run}/>
-    <button type="button" disabled={busy||!section.active||!outgoing||!newTeacher}
+    <Button variant="outline" size="sm" disabled={busy||!section.active||!outgoing||!newTeacher}
      onClick={()=>void run(section.id,()=>replaceLifecycleTeacher({data:{sectionId:section.id,oldPersonId:outgoing,newPersonId:newTeacher,reason}}),"Instructor replacement recorded.")}
-     className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50">Replace instructor</button>
+     className="mt-3">Replace instructor</Button>
    </div>
    <div className="rounded-lg border p-3">
     <h4 className="font-semibold text-sm">Schedule changes</h4>
-    <label className="mt-2 block text-xs">Start <input type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}
-      className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="mt-2 block text-xs">End <input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)}
-      className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="mt-2 block text-xs">School bell schedule
-     <select value={schedule} onChange={e=>setSchedule(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+    <Field className="mt-2" label="Start"><Input type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></Field>
+    <Field className="mt-2" label="End"><Input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)}/></Field>
+    <Field className="mt-2" label="School bell schedule">
+     <Select value={schedule} onChange={e=>setSchedule(e.target.value)}>
       <option value="">No bell schedule</option>
       {section.scheduleOptions.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
-     </select>
-    </label>
+     </Select>
+    </Field>
     <div className="mt-3 rounded border bg-muted p-2 text-xs">
      <strong>Schedule impact preview:</strong> {section.students.length} active enrollments,
      {" "}{section.teachers.length} assigned instructors and
      {" "}{section.allocations.filter(a=>a.status==="held"||a.status==="committed").length} active capacity allocations.
      Calendar and attendance obligations should be reviewed before confirming.
     </div>
-    <button type="button" disabled={busy||!section.active} onClick={()=>void run(section.id,
+    <Button variant="outline" size="sm" disabled={busy||!section.active} onClick={()=>void run(section.id,
       ()=>updateSectionLifecycleSchedule({data:{sectionId:section.id,scheduleTemplateId:schedule||null,
         startsAt:start?new Date(start).toISOString():null,endsAt:end?new Date(end).toISOString():null,reason}}),
-      "Schedule updated.")} className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50">Save schedule</button>
+      "Schedule updated.")} className="mt-3">Save schedule</Button>
    </div>
    <div className="rounded-lg border p-3">
     <h4 className="font-semibold text-sm">Enrollment transition</h4>
-    <label className="mt-2 block text-xs">Enrolled student ID
-      <select value={enrollmentId} onChange={e=>setEnrollmentId(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+    <Field className="mt-2" label="Enrolled student ID">
+      <Select value={enrollmentId} onChange={e=>setEnrollmentId(e.target.value)}>
        <option value="">Choose enrollment</option>
        {section.students.map(e=><option key={e.id} value={e.id}>{e.studentProfileId}</option>)}
-      </select>
-    </label>
-    <label className="mt-2 block text-xs">Outcome
-     <select value={enrollmentStatus} onChange={e=>setEnrollmentStatus(e.target.value as "withdrawn"|"transferred")} className="mt-1 w-full rounded border bg-background p-2">
+      </Select>
+    </Field>
+    <Field className="mt-2" label="Outcome">
+     <Select value={enrollmentStatus} onChange={e=>setEnrollmentStatus(e.target.value as "withdrawn"|"transferred")}>
       <option value="withdrawn">Withdrawn</option><option value="transferred">Transferred</option>
-     </select>
-    </label>
-    <label className="mt-2 block text-xs">Transfer destination (same program and term)
-      <select value={destination} onChange={e=>setDestination(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+     </Select>
+    </Field>
+    <Field className="mt-2" label="Transfer destination (same program and term)">
+      <Select value={destination} onChange={e=>setDestination(e.target.value)}>
        <option value="">Choose destination</option>
        {allSections.filter(x=>x.id!==section.id&&x.active).map(x=><option key={x.id} value={x.id}>{x.title} · {x.code}</option>)}
-      </select>
-    </label>
-    <button type="button" disabled={busy||!enrollmentId||!destination} onClick={()=>void run(section.id,
+      </Select>
+    </Field>
+    <Button variant="outline" size="sm" disabled={busy||!enrollmentId||!destination} onClick={()=>void run(section.id,
       ()=>transferLifecycleEnrollment({data:{enrollmentId,destinationSectionId:destination,reason}}),"Student transferred atomically.")}
-      className="mt-2 rounded border px-3 py-2 text-xs disabled:opacity-50">Transfer student</button>
-    <button type="button" disabled={busy||!enrollmentId} onClick={()=>void run(section.id,
+      className="mt-2">Transfer student</Button>
+    <Button variant="outline" size="sm" disabled={busy||!enrollmentId} onClick={()=>void run(section.id,
       ()=>transitionLifecycleEnrollment({data:{enrollmentId,status:enrollmentStatus,reason}}),"Enrollment status updated.")}
-      className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50">Record transition</button>
+      className="mt-3">Record transition</Button>
    </div>
    <div className="rounded-lg border p-3">
     <h4 className="font-semibold text-sm">Waitlist and closure</h4>
-    <label className="mt-2 block text-xs">Student profile ID for waitlist
-     <input value={student} onChange={e=>setStudent(e.target.value)} placeholder="Student UUID"
-       className="mt-1 w-full rounded border bg-background p-2"/>
-    </label>
-    <button type="button" disabled={busy||!section.active||!student} onClick={()=>void run(section.id,
+    <Field className="mt-2" label="Student profile ID for waitlist">
+     <Input value={student} onChange={e=>setStudent(e.target.value)} placeholder="Student UUID"/>
+    </Field>
+    <Button variant="outline" size="sm" disabled={busy||!section.active||!student} onClick={()=>void run(section.id,
       ()=>queueLifecycleWaitlist({data:{sectionId:section.id,studentProfileId:student,reason}}),"Student placed on waitlist.")}
-      className="mt-2 rounded border px-3 py-2 text-xs disabled:opacity-50">Add to waitlist</button>
+      className="mt-2">Add to waitlist</Button>
     {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 rounded border p-2 text-xs">
      <span>{w.subjectId} · {w.status}</span>
-     {w.status!=="in_progress"&&<button disabled={busy} onClick={()=>void run(section.id,
+     {w.status!=="in_progress"&&<Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
        ()=>offerLifecycleWaitlistSeat({data:{actionId:w.id,expiresAt:new Date(Date.now()+3*86400000).toISOString()}}),
-       "A three-day waitlist offer was recorded.")} className="underline">Offer seat</button>}
-     <button disabled={busy} onClick={()=>void run(section.id,
-       ()=>promoteLifecycleWaitlist({data:{actionId:w.id}}),"Waitlisted student enrolled.")} className="underline">Promote</button><button disabled={busy} onClick={()=>void run(section.id,
-       ()=>resolveLifecycleWaitlist({data:{actionId:w.id,reason}}),"Waitlist item resolved.")} className="underline">Resolve</button>
+       "A three-day waitlist offer was recorded.")}>Offer seat</Button>}
+     <Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
+       ()=>promoteLifecycleWaitlist({data:{actionId:w.id}}),"Waitlisted student enrolled.")}>Promote</Button><Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
+       ()=>resolveLifecycleWaitlist({data:{actionId:w.id,reason}}),"Waitlist item resolved.")}>Resolve</Button>
     </div>)}
-    <button type="button" disabled={busy} onClick={()=>void run(section.id,
+    <Button variant={section.active?"destructive":"outline"} size="sm" disabled={busy} onClick={()=>void run(section.id,
      ()=>setSectionLifecycleState({data:{sectionId:section.id,active:!section.active,reason}}),
      section.active?"Section closed.":"Section reopened.")}
-     className="mt-4 block rounded border border-amber-500 px-3 py-2 text-xs disabled:opacity-50">
+     className="mt-4">
      {section.active?"Close section":"Reopen section"}
-    </button>
+    </Button>
    </div>
   </div>
  </article>;
 }
 
-function CapacityReplacement({section,reason,busy,run}:{section:Snapshot[number];reason:string;busy:boolean;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<MutationOutcome<unknown>>}){
+function CapacityReplacement({section,reason,busy,run}:{section:Snapshot[number];reason:string;busy:boolean;run:LifecycleRun}){
  const [reservationId,setReservationId]=useState("");
  const [offeringId,setOfferingId]=useState("");
  const [candidates,setCandidates]=useState<Awaited<ReturnType<typeof getCapacityCandidates>>>([]);
@@ -191,22 +205,22 @@ function CapacityReplacement({section,reason,busy,run}:{section:Snapshot[number]
  return <div className="mt-4 rounded-lg border p-3">
   <h4 className="text-sm font-semibold">Replace a committed network instructor</h4>
   <p className="mt-1 text-xs text-muted-foreground">Choose an existing committed allocation and a compatible instructor offering. The replacement and release happen together.</p>
-  <label className="mt-2 block text-xs">Existing allocation
-   <select className="mt-1 w-full rounded border bg-background p-2" value={reservationId} onChange={e=>setReservationId(e.target.value)}>
+  <Field className="mt-2" label="Existing allocation">
+   <Select value={reservationId} onChange={e=>setReservationId(e.target.value)}>
     <option value="">Select allocation</option>
     {reservations.map(r=><option key={r.id} value={r.id}>{r.offeringId}</option>)}
-   </select>
-  </label>
-  <label className="mt-2 block text-xs">Available replacement instructor
-   <select className="mt-1 w-full rounded border bg-background p-2" value={offeringId} onChange={e=>setOfferingId(e.target.value)}>
+   </Select>
+  </Field>
+  <Field className="mt-2" label="Available replacement instructor">
+   <Select value={offeringId} onChange={e=>setOfferingId(e.target.value)}>
     <option value="">Choose compatible capacity</option>
     {candidates.map(c=><option key={c.offeringId} value={c.offeringId}>{c.instructorName} · {c.remainingSeats} seats</option>)}
-   </select>
-  </label>
-  <button disabled={busy||!reservationId||!offeringId||reason.trim().length<5} type="button"
-    className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50" onClick={async()=>{
-     const result=await run(section.id,()=>swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}}),"Instructor replacement recorded.");
-     if(result.status==="saved"||result.status==="refresh-failed"){setReservationId("");setOfferingId("")}
-    }}>Commit replacement</button>
+   </Select>
+  </Field>
+  <Button variant="outline" size="sm" disabled={busy||!reservationId||!offeringId||reason.trim().length<5}
+    className="mt-3" onClick={()=>void run(section.id,
+     ()=>swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}}),
+     "Instructor replacement recorded.",()=>{setReservationId("");setOfferingId("");}
+    )}>Commit replacement</Button>
  </div>;
 }

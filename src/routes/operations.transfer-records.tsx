@@ -65,9 +65,7 @@ function TransferRecordsWorkspace({items}:{items:Items}){
      <Link to="/operations" className="rounded border px-3 py-2 text-sm">Operations</Link>
      <Link to="/admissions/transcripts" search={{query:""}} className="rounded border px-3 py-2 text-sm">Official transcripts</Link>
    </div>}>
-   {mutation.pending&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">Saving records handoff...</p>}
-   {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{mutation.notice}</p>}
-   {mutation.error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-4 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
+   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving records handoff..."/>
    <section className="mt-7 space-y-4">
     {items.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
       <h2 className="text-lg font-semibold">{item.studentName}</h2>
@@ -138,3 +136,4 @@ function TransferRecordsWorkspace({items}:{items:Items}){
    </section>
  </WorkspaceShell>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

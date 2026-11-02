@@ -65,9 +65,7 @@ function Publisher({data}:{data:Data}){
  return <WorkspaceShell eyebrow="CAN OS · School operations" title="Urgent family communications"
   subtitle="Publish verified family notices through in-app notifications, school email and opt-in SMS. Provider acceptance is not evidence of inbox or phone delivery."
   actions={<Link to="/operations" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
-  {mutation.pending&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">Saving family communication...</p>}
-  {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-4 text-sm">{mutation.notice}</p>}
-  {mutation.error&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
+  <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family communication..."/>
   <form onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="text-lg font-semibold">Compose a school notice</h2>
    <label className="block text-sm font-semibold">School Program
@@ -119,3 +117,4 @@ function Publisher({data}:{data:Data}){
   </section>
  </WorkspaceShell>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

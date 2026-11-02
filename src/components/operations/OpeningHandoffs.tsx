@@ -1,4 +1,10 @@
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -51,25 +57,22 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       if(result.status==="saved"){transferRequestId.current=null;setTransferConfirmed(false);}
     }}>
       <h4 className="font-semibold">Recover pending handoff</h4>
-      <label className="block text-sm">Replacement site operator
-        <select required disabled={!hydrated||busy} value={recipient} onChange={event=>{setRecipient(event.target.value);transferRequestId.current=null;}}
-          className="mt-1 block rounded border bg-background p-2">
+      <Field label="Replacement site operator" required>
+        <Select disabled={!hydrated||busy} value={recipient} onChange={event=>{setRecipient(event.target.value);transferRequestId.current=null;}}>
           <option value="">Select a replacement</option>
           {handoff.replacementOperators.map(operator=><option key={operator.personId} value={operator.personId}>
             {operator.firstName} {operator.lastName}</option>)}
-        </select>
-      </label>
-      <label className="block text-sm">Reason for recovery
-        <textarea required disabled={!hydrated||busy} minLength={10} maxLength={2000} value={reason}
-          onChange={event=>{setReason(event.target.value);transferRequestId.current=null;}}
-          className="mt-1 block w-full rounded border bg-background p-2"/>
-      </label>
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" disabled={!hydrated||busy} checked={transferConfirmed} onChange={event=>setTransferConfirmed(event.target.checked)}/>
+        </Select>
+      </Field>
+      <Field label="Reason for recovery" required description="Explain why a replacement operator must receive this handoff.">
+        <Textarea disabled={!hydrated||busy} minLength={10} maxLength={2000} value={reason}
+          onChange={event=>{setReason(event.target.value);transferRequestId.current=null;}}/>
+      </Field>
+      <Label className="flex items-start gap-2 leading-6">
+        <Checkbox disabled={!hydrated||busy} checked={transferConfirmed} onChange={event=>setTransferConfirmed(event.target.checked)}/>
         I confirm the previous recipient is no longer eligible and the replacement must independently acknowledge receipt.
-      </label>
-      <button type="submit" disabled={!hydrated||busy||!recipient||reason.trim().length<10||!transferConfirmed}
-        className="rounded border px-3 py-2 text-sm disabled:opacity-50">Transfer pending handoff</button>
+      </Label>
+      <Button type="submit" variant="outline" disabled={!hydrated||busy||!recipient||reason.trim().length<10||!transferConfirmed}>Transfer pending handoff</Button>
     </form>}
     {handoff.programId && handoff.siteId && <div className="mt-3 flex flex-wrap gap-3 text-sm">
       <Link to="/operations/launch/$programId" params={{ programId: handoff.programId }} className="underline">Review classes and staffing</Link>
@@ -83,20 +86,17 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
         {successMessage:"Opening handoff acknowledged.",commandErrorMessage:"Unable to acknowledge opening handoff."},
       );
     }}>
-      <label className="block text-sm">Acknowledgment note
-        <textarea required disabled={!hydrated||busy} minLength={10} maxLength={2000} value={note} onChange={event => setNote(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2"/>
-      </label>
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" disabled={!hydrated||busy} checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/>
+      <Field label="Acknowledgment note" required>
+        <Textarea disabled={!hydrated||busy} minLength={10} maxLength={2000} value={note} onChange={event => setNote(event.target.value)}/>
+      </Field>
+      <Label className="flex items-start gap-2 leading-6">
+        <Checkbox disabled={!hydrated||busy} checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/>
         I reviewed the opening record, school-year setup and classes, and received responsibility for daily operations.
-      </label>
-      <button type="submit" disabled={!hydrated||busy || !confirmed || note.trim().length < 10}
-        className="rounded border px-3 py-2 text-sm disabled:opacity-50">Acknowledge receipt</button>
+      </Label>
+      <Button type="submit" variant="outline" disabled={!hydrated||busy || !confirmed || note.trim().length < 10}>Acknowledge receipt</Button>
     </form> : handoff.status !== "resolved" && <p className="mt-3 text-sm text-muted-foreground">
       Only the named recipient with a current site operator grant can acknowledge this handoff.</p>}
-    {mutation.pending&&<p role="status" className="mt-3 text-sm">Saving opening handoff...</p>}
-    {mutation.error&&<p role="alert" className="mt-3 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
-    {mutation.notice&&<p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving opening handoff..."/>
   </article>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

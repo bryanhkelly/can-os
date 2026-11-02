@@ -11,10 +11,11 @@ import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { authorizeClass, classActor } from "./class-access.server";
-import { writeAudit, emitEvent } from "@/platform/mutation";
+import { writeAudit } from "@/platform/mutation";
 
 import { createPrivateUpload, verifyPrivateObject, resolveR2Config, signPrivateObjectUrl } from "@/platform/storage/r2";
 import { EventTypes } from "@/domain/event-types";
+import { persistCurriculumImportJob } from "./curriculum-import-job.server";
 const context=z.object({programId:z.string().uuid()}).strict();
 const incoming=context.extend({
  fileName:z.string().trim().min(1).max(150).regex(/\.(imscc|zip)$/i),
@@ -52,27 +53,17 @@ export const validateCommonCartridgeImport=createServerFn({method:"POST"})
   needsResourceReview:preview.resources.some(r=>r.files.length>0),
   supportedAction:"validation_only",
  };
- return db.transaction(async tx=>{
-  const [previous]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status})
-   .from(curriculumImportJobs).where(and(eq(curriculumImportJobs.organizationId,program.organizationId),
-    eq(curriculumImportJobs.format,preview.profile),eq(curriculumImportJobs.sha256,hash))).limit(1);
-  if(previous)return {importId:previous.id,status:previous.status,preview:report,previouslyValidated:true};
-  const [job]=await tx.insert(curriculumImportJobs).values({
-    organizationId:program.organizationId,format:preview.profile,formatVersion:"1.3",
-    sourceName:data.fileName,sha256:hash,status:"validated",
-    report,metadata:{programId:data.programId,submittedByPersonId:actor.actorPersonId},
-  }).returning({id:curriculumImportJobs.id});
-  if(!job)throw new Error("Unable to stage the Common Cartridge import.");
-  await writeAudit(tx,actor,{action:"curriculum.interop.cartridge.validate",
-    entityType:"curriculum_import_job",entityId:job.id,
-    scope:{organizationId:program.organizationId,programId:data.programId},
-    after:{format:preview.profile,sha256:hash,resourceCount:preview.resources.length,
-      noticeCount:preview.notices.length}});
-  await emitEvent(tx,{eventType:EventTypes.CurriculumCartridgeValidated,
-    aggregateType:"curriculum_import_job",aggregateId:job.id,
-    actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:data.programId});
-  return {importId:job.id,status:"validated",preview:report,previouslyValidated:false};
+ const result=await persistCurriculumImportJob({
+  actor,organizationId:program.organizationId,programId:data.programId,
+  format:preview.profile,formatVersion:"1.3",
+  sourceName:data.fileName,sha256:hash,status:"validated",report,
+  metadata:{programId:data.programId,submittedByPersonId:actor.actorPersonId},
+  auditAction:"curriculum.interop.cartridge.validate",
+  auditAfter:{format:preview.profile,sha256:hash,resourceCount:preview.resources.length,
+   noticeCount:preview.notices.length},
+  eventType:EventTypes.CurriculumCartridgeValidated,
  });
+ return {...result,preview:report};
 });
 
 export const listCommonCartridgeImports=createServerFn({method:"GET"})

@@ -451,8 +451,8 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("Enrollment review");
     expect(html).toContain("needs you");
     expect(html).toContain("School year: 2030-2031");
-    expect(html).toMatch(/<button disabled=""[^>]*>Accept<\/button>/);
-    expect(html).toMatch(/<button disabled=""[^>]*>Decline<\/button>/);
+    expect(html).toMatch(/<button\b[^>]*\bdisabled=""[^>]*>Accept<\/button>/);
+    expect(html).toMatch(/<button\b[^>]*\bdisabled=""[^>]*>Decline<\/button>/);
   });
 
   it("opens only the enrollment application linked from a document review notice",()=>{

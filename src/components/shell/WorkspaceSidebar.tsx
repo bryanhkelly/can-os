@@ -2,10 +2,11 @@ import { Link } from "@tanstack/react-router";
 import { Settings, Users } from "lucide-react";
 import { getWorkspaceHome, type WorkspaceNavigationItem } from "./workspace-navigation.registry";
 import { SidebarLinks } from "./WorkspaceSidebarLinks";
+import { getWorkspaceScopeLabel } from "./workspace-scope";
 
 export function WorkspaceSidebar({ member, sites, links, activePath }: {
-  member: { role: string; firstName: string; lastName: string };
-  sites: readonly { name: string }[];
+  member: { role: string; firstName: string; lastName: string; siteId: string | null };
+  sites: readonly { id: string; name: string }[];
   links: readonly WorkspaceNavigationItem[];
   activePath?: string;
 }) {
@@ -17,7 +18,7 @@ export function WorkspaceSidebar({ member, sites, links, activePath }: {
     <div className="p-4">
       <p className="text-xs uppercase tracking-widest text-muted-foreground">{member.role} workspace</p>
       <p className="mt-2 text-sm font-semibold">{member.firstName} {member.lastName}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{sites.map(site => site.name).join(", ")}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{getWorkspaceScopeLabel(member, sites)}</p>
     </div>
     <SidebarLinks links={links} activePath={activePath} />
     <div className="border-t p-4">

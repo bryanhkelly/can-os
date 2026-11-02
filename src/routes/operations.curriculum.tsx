@@ -43,9 +43,7 @@ function StudioView({data}:{data:{
   <nav aria-label="Curriculum program scope" className="flex flex-wrap gap-3">{data.programs.map(program=>
    <Link key={program.id} to="/operations/curriculum" search={{programId:program.id}} aria-current={studio?.programId===program.id?"page":undefined}
     className="rounded border px-3 py-2 text-sm">{program.name}</Link>)}</nav>
-  {mutation.pending&&<p role="status" className="rounded border p-3">Saving curriculum change...</p>}
-  {mutation.error&&<p role="alert" className="rounded border p-3">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
-  {mutation.notice&&<p role="status" className="rounded border p-3">{mutation.notice}</p>}
+  <MutationFeedback state={mutation} pendingMessage="Saving curriculum change..."/>
   {!studio&&<p>Select a program to verify your publisher authority and open its organization's curriculum.</p>}
   {!data.programs.length&&<p role="status">No curriculum publisher grants are available in this membership. An administrator must assign explicit institutional authority.</p>}
   {studio&&<>
@@ -98,3 +96,4 @@ function StudioView({data}:{data:{
   </>}
  </main>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

@@ -3,9 +3,9 @@
  *
  * Everything is written directly to Neon over the serverless HTTP driver so the
  * spec never depends on seed scripts or app internals beyond the auth token
- * helpers. Every row uses fresh UUIDs and a unique suffix per run, and
- * destroyGf1Fixture removes the whole graph in FK-safe order so the test is
- * repeatable against the same disposable database.
+ * helpers. Every row uses fresh UUIDs and a unique suffix per run. Teardown
+ * removes mutable fixture state while retaining immutable synthetic evidence
+ * and the identities it references.
  *
  * Column names were verified against src/db/schema/*. (organizations.ts,
  * academic-time.ts, academics.ts, identity.ts, access.ts, work.ts).
@@ -227,11 +227,11 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       [fixture.studentPersonId],
     );
 
-    // canViewAcademics=true is what lets the domain-event worker notify this guardian.
+    // Academic notifications require both the capability and a verified relationship.
     await sql.query(
       `insert into guardian_relationships (
          guardian_person_id, student_person_id, relationship_label, can_view_academics, metadata
-       ) values ($1, $2, 'parent', true, '{}'::jsonb)`,
+       ) values ($1, $2, 'parent', true, '{"verification":"verified","synthetic":true}'::jsonb)`,
       [fixture.guardianPersonId, fixture.studentPersonId],
     );
 
@@ -411,34 +411,40 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
 
     return fixture as Gf1Fixture;
   } catch (error) {
-    // Best-effort cleanup so a half-built fixture never blocks the next run.
-    await destroyGf1Fixture(sql, fixture).catch(() => undefined);
+    try {
+      await destroyGf1Fixture(sql, fixture);
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "GF1 fixture setup and cleanup both failed.",
+        { cause: cleanupError },
+      );
+    }
     throw error;
   }
 }
 
-/** Deletes the fixture graph in FK-safe order. Tolerates partially built fixtures. */
+/** Deletes mutable fixture state while preserving unresolved outbox context and immutable history. */
 export async function destroyGf1Fixture(
   sql: Sql,
   fixture: Partial<Gf1Fixture>,
 ): Promise<void> {
+  const aggregateIds = [fixture.submissionId, fixture.assessmentId]
+    .filter((id): id is string => Boolean(id));
+  const pendingRows = (await sql.query(
+    `select exists (
+       select 1 from domain_events
+       where aggregate_id = any($1::uuid[]) and status <> 'processed'
+     ) as has_unprocessed_events`,
+    [aggregateIds],
+  )) as Array<{ has_unprocessed_events: boolean }>;
+  const preserveDomainContext = pendingRows[0]?.has_unprocessed_events ?? false;
   const one = (text: string, id: string | undefined): [string, unknown[] | undefined] => [
     text,
     id ? [id] : undefined,
   ];
-  const steps: Array<[string, unknown[] | undefined]> = [
-    // Side-effect tables first (they hold plain UUID references or restrict FKs).
-    ...[fixture.studentPersonId, fixture.guardianPersonId, fixture.teacherPersonId, fixture.specialistPersonId].map(
-      (id) => one(`delete from notifications where recipient_person_id = $1`, id),
-    ),
-    ...[fixture.submissionId, fixture.assessmentId].map((id) =>
-      one(`delete from audit_events where resource_id = $1`, id),
-    ),
-    one(`delete from insights where section_id = $1`, fixture.sectionId),
-    ...[fixture.submissionId, fixture.assessmentId].map((id) =>
-      one(`delete from domain_events where aggregate_id = $1`, id),
-    ),
-    // Auth graph.
+  const authCleanup: Array<[string, unknown[] | undefined]> = [
+    // Remove usable access even when immutable domain history needs its context.
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_sessions where account_id = $1`, id),
     ),
@@ -449,6 +455,14 @@ export async function destroyGf1Fixture(
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_accounts where id = $1`, id),
     ),
+  ];
+  const fullCleanupSteps: Array<[string, unknown[] | undefined]> = [
+    // Side-effect tables first (they hold plain UUID references or restrict FKs).
+    ...[fixture.studentPersonId, fixture.guardianPersonId, fixture.teacherPersonId, fixture.specialistPersonId].map(
+      (id) => one(`delete from notifications where recipient_person_id = $1`, id),
+    ),
+    one(`delete from insights where section_id = $1`, fixture.sectionId),
+    ...authCleanup,
     // Academic graph, children before parents.
     one(`delete from submissions where id = $1`, fixture.submissionId),
     one(`delete from assessments where id = $1`, fixture.assessmentId),
@@ -471,16 +485,27 @@ export async function destroyGf1Fixture(
     ],
     one(`delete from student_profiles where id = $1`, fixture.studentProfileId),
     // Teaching-eligibility graph, children before parents.
-    one(`delete from qualification_verification_events where id = $1`, fixture.qualificationVerificationEventId),
-    one(`delete from qualification_claims where id = $1`, fixture.qualificationClaimId),
+    // Verification events are append-only; preserve their synthetic claim,
+    // definition, jurisdiction and teacher identity, but no usable account.
+    one(`delete from qualification_claims where id = $1`,
+      fixture.qualificationVerificationEventId ? undefined : fixture.qualificationClaimId),
     one(`delete from compliance_policy_applicability where id = $1`, fixture.policyApplicabilityId),
+    one(`delete from staffing_eligibility_evaluations where role_assignment_id = $1`, fixture.teacherRoleAssignmentId),
     one(`delete from compliance_policy_rules where id = $1`, fixture.policyRuleId),
     one(`delete from compliance_framework_versions where id = $1`, fixture.complianceFrameworkVersionId),
     one(`delete from compliance_frameworks where id = $1`, fixture.complianceFrameworkId),
-    one(`delete from qualification_definitions where id = $1`, fixture.qualificationDefinitionId),
+    one(`delete from qualification_definitions where id = $1`,
+      fixture.qualificationVerificationEventId ? undefined : fixture.qualificationDefinitionId),
     one(`delete from role_assignments where id = $1`, fixture.teacherRoleAssignmentId),
-    ...[fixture.teacherPersonId, fixture.studentPersonId, fixture.guardianPersonId, fixture.specialistPersonId].map(
-      (id) => one(`delete from people where id = $1`, id),
+    ...[fixture.qualificationVerificationEventId ? undefined : fixture.teacherPersonId,
+      fixture.studentPersonId, fixture.guardianPersonId, fixture.specialistPersonId].map(
+      (id) => one(
+        `delete from people p
+         where p.id = $1
+           and not exists (select 1 from audit_events where actor_person_id = p.id)
+           and not exists (select 1 from domain_events where actor_person_id = p.id)`,
+        id,
+      ),
     ),
     // Delivery hierarchy, children before parents.
     one(`delete from programs where id = $1`, fixture.programId),
@@ -488,8 +513,10 @@ export async function destroyGf1Fixture(
     ...[fixture.hostOrgId, fixture.canOrgId].map((id) =>
       one(`delete from organizations where id = $1`, id),
     ),
-    one(`delete from jurisdictions where id = $1`, fixture.jurisdictionId),
+    one(`delete from jurisdictions where id = $1`,
+      fixture.qualificationVerificationEventId ? undefined : fixture.jurisdictionId),
   ];
+  const steps = preserveDomainContext ? authCleanup : fullCleanupSteps;
 
   for (const [text, params] of steps) {
     if (!params) continue;

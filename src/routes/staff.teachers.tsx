@@ -2,9 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { useState } from "react";
 import { listTeachers } from "@/modules/profiles/directory.functions";
-import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
+import { EmptyState, WorkspaceShell } from "@/components/workspace";
 import { useDebouncedDirectorySearch } from "@/lib/use-debounced-directory-search";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { DirectoryTable } from "@/components/workspace/directory-table";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/staff/teachers")({ component: StaffTeachersPage });
 
@@ -19,39 +21,27 @@ function StaffTeachersPage() {
   return (
     <WorkspaceShell eyebrow="CAN OS · Staff" title="Teacher directory"
       subtitle="Teachers leading sections at your school sites, with current rosters.">
-        <label className="mt-8 block max-w-sm text-sm font-semibold">
-          Search by name
-          <input
-            className="mt-2 w-full rounded-lg border bg-background p-3"
+        <Field label="Search by name" className="mt-8 max-w-sm">
+          <Input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="First or last name"
           />
-        </label>
-        <QueryState loading={loading && "Loading teachers…"} error={error} onRetry={retry} isEmpty={teachers.length === 0}
-          empty={<EmptyState className="mt-8" title="No teachers matched your search at your school sites." />}>
-          <div className="mt-8 rounded-xl border bg-card">
-            <Table aria-label="Teacher directory" className="text-left">
-              <TableHeader>
-                <TableRow className="text-xs uppercase tracking-wider text-muted-foreground">
-                  <TableHead scope="col" className="px-5 py-3 font-semibold">Teacher</TableHead>
-                  <TableHead scope="col" className="px-5 py-3 font-semibold">Sections</TableHead>
-                  <TableHead scope="col" className="px-5 py-3 font-semibold">Students</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teachers.map((teacher) => (
-                  <TableRow key={teacher.personId}>
-                    <TableCell className="px-5 py-3 align-top font-semibold"><ProfilePhoto personId={teacher.personId} name={teacher.name}/><Link to="/profiles" search={{person:teacher.personId}} className="mt-2 inline-block underline">{teacher.name}</Link></TableCell>
-                    <TableCell className="px-5 py-3 align-top">{teacher.sections.join(", ")}</TableCell>
-                    <TableCell className="px-5 py-3 align-top">{teacher.studentCount}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </QueryState>
+        </Field>
+        <DirectoryTable label="Teacher directory" caption="Teachers and current section rosters at your authorized school sites."
+          rows={teachers} rowKey={teacher => teacher.personId}
+          loading={loading && "Loading teachers…"} error={error} onRetry={retry}
+          empty={<EmptyState className="mt-8" title="No teachers matched your search at your school sites." />}
+          columns={[
+            { id: "teacher", title: "Teacher", render: teacher => <>
+              <ProfilePhoto personId={teacher.personId} name={teacher.name}/>
+              <Link to="/profiles" search={{person:teacher.personId}}
+                className="mt-2 inline-block rounded font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{teacher.name}</Link>
+            </> },
+            { id: "sections", title: "Sections", render: teacher => teacher.sections.join(", ") },
+            { id: "students", title: "Students", render: teacher => teacher.studentCount },
+          ]}/>
     </WorkspaceShell>
   );
 }

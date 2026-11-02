@@ -3,6 +3,7 @@ import {
   addCalendarDays, calendarWeekday, dateKeyInTimezone, dateOnlyDayBoundsInTimezone,
   dateOnlyDayStartInTimezone, dateTimeInputInTimezone, dateTimeInputValue,
   formatDateOnly, formatTimestamp, isValidDateOnly, isValidTimeZone, localDayBoundsInTimezone,
+  todayInTimezone,
 } from "@/modules/calendar/timezone";
 
 describe("calendar timezone conversion", () => {
@@ -16,6 +17,16 @@ describe("calendar timezone conversion", () => {
   it("keeps Site-local deadlines on their calendar day across UTC midnight", () => {
     expect(dateKeyInTimezone("2027-01-15T01:00:00.000Z", "UTC")).toBe("2027-01-15");
     expect(dateKeyInTimezone("2027-01-15T01:00:00.000Z", "America/Los_Angeles")).toBe("2027-01-14");
+  });
+  it("uses the supplied instant and each Site timezone for policy dates", () => {
+    const now = new Date("2027-01-15T07:30:00.000Z");
+    expect(todayInTimezone("America/Los_Angeles", now)).toBe("2027-01-14");
+    expect(todayInTimezone("America/New_York", now)).toBe("2027-01-15");
+    expect(todayInTimezone("UTC", now)).toBe("2027-01-15");
+  });
+  it("rejects invalid policy timezones and invalid instants", () => {
+    expect(() => todayInTimezone("No/Such_Zone")).toThrow("Invalid site timezone");
+    expect(() => todayInTimezone("UTC", new Date(Number.NaN))).toThrow("Invalid timestamp");
   });
 
   it("uses daylight-saving offsets and rejects nonexistent local times", () => {

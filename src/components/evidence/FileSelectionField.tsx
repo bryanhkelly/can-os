@@ -1,4 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function FileSelectionField({ label, accept, file, onChange, disabled, required }: {
   label: string;
@@ -12,15 +15,15 @@ export function FileSelectionField({ label, accept, file, onChange, disabled, re
   const inputId = useId();
   const descriptionId = useId();
   useEffect(() => { if (!file && input.current) input.current.value = ""; }, [file]);
-  return <div className="text-sm"><label htmlFor={inputId}>{label}</label>
-    <input id={inputId} ref={input} type="file" accept={accept} disabled={disabled} required={required}
+  return <div className="text-sm"><Label htmlFor={inputId}>{label}</Label>
+    <Input id={inputId} ref={input} type="file" accept={accept} disabled={disabled} required={required}
       aria-describedby={file ? descriptionId : undefined}
-      className="mt-1 block w-full rounded border p-2"
+      className="mt-1"
       onChange={event => onChange(event.target.files?.[0] ?? null)} />
     {file && <span id={descriptionId} className="mt-1 block text-xs text-muted-foreground">
       Selected: {file.name}
-      <button type="button" disabled={disabled} className="ml-2 underline"
-        onClick={() => { if (input.current) input.current.value = ""; onChange(null); }}>Clear file</button>
+      <Button type="button" variant="ghost" size="sm" disabled={disabled} className="ml-2 underline"
+        onClick={() => { if (input.current) input.current.value = ""; onChange(null); }}>Clear file</Button>
     </span>}
   </div>;
 }

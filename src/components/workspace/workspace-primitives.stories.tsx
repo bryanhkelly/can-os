@@ -33,9 +33,9 @@ export const Metrics: Story = {
 
 export const InteractiveMetric: Story = {
   render: () => <div className="bg-background p-6">
-    <a href="#details" className="group block max-w-sm rounded-2xl focus-visible:outline-none">
-      <StatCard interactive label="Needs your attention" value="3" hint="Open the related items" />
-    </a>
+    <StatCard asChild className="max-w-sm" label="Needs your attention" value="3" hint="Open the related items">
+      <a href="#details" />
+    </StatCard>
   </div>,
 };
 

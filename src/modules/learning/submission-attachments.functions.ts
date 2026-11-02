@@ -1,12 +1,12 @@
 import { assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
 import { assertAssessmentActionable } from "@/domain/assessment-availability";
-import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { authorizeClass } from "./class-access.server";
-import type { Actor } from "@/modules/identity/actors.server";
+import { requireActor, type Actor } from "@/modules/identity/actors.server";
 import { writeAudit } from "@/platform/mutation";
 import { createPrivateUpload,signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
 import { DomainError } from "@/domain/errors";
@@ -58,9 +58,7 @@ async function assertUploadedLearningObject(
 
 /** Verified student actor; identity always comes from the server session. */
 async function studentActor() {
-  const context = await getCommandContext(getRequest());
-  assertCapability(context, "assignments:submit");
-  if (context.role !== "student" || !context.actorPersonId) throw new AuthorizationError("student assignment access");
+  const context = await requireActor(["student"], "assignments:submit");
   if (!context.scope.siteIds?.length) throw new AuthorizationError("student site membership");
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const [profile] = await db.select({ id: s.studentProfiles.id }).from(s.studentProfiles)
@@ -71,9 +69,8 @@ async function studentActor() {
 
 /** Verified guardian actor with the excuse-submission capability. */
 async function guardianActor() {
-  const context = await getCommandContext(getRequest());
-  assertCapability(context, "attendance.excuse.submit");
-  if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length) {
+  const context = await requireActor(["guardian"], "attendance.excuse.submit");
+  if (!context.scope.siteIds?.length) {
     throw new AuthorizationError("guardian attendance access");
   }
   return context;

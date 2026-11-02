@@ -168,9 +168,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     </nav></WorkspacePanel>}>
     <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
       <Link key={value} to="/classes" search={{ ...search, tab: value }} aria-current={tab === value ? "page" : undefined} className="capitalize">{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</Link>)}</DetailNavigation>
-    {mutation.pending && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">Saving class change...</p>}
-    {mutation.error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
-    {mutation.notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+    <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving class change..."/>
     {tab === "overview" && <div className="grid gap-5">
       {data.role !== "teacher" && <StudentNextStepsPanel nextSteps={nextSteps} search={search} />}
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
@@ -382,3 +380,4 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     </div>}
   </WorkspaceShell>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

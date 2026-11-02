@@ -30,6 +30,21 @@ describe("reusable workflow presentation", () => {
     expect(html.match(/role="alert"/g)).toHaveLength(1);
     expect(html).not.toContain('role="status"');
   });
+  it("offers a non-submit retry and retains confirmation while reconciliation is pending", () => {
+    const html = renderToStaticMarkup(<MutationFeedback state={{
+      ...idle, error: "Refresh failed", notice: "Saved", refreshFailed: true,
+      retryRefresh: async () => ({ status: "refreshed" }),
+    }} pendingMessage="Saving..."/>);
+    expect(html).toContain("Retry refresh");
+    expect(html).toContain('type="button"');
+    expect(html).toContain("Saved");
+    const pending = renderToStaticMarkup(<MutationFeedback state={{
+      ...idle, pending: true, notice: "Saved", refreshFailed: true,
+    }} pendingMessage="Saving..."/>);
+    expect(pending).toContain("Refreshing saved changes...");
+    expect(pending).toContain("Saved");
+    expect(pending).not.toContain("Retry refresh");
+  });
   it("announces successful commands and renders nothing when idle", () => {
     expect(renderToStaticMarkup(<MutationFeedback state={idle} pendingMessage="Saving..."/>)).toBe("");
     const html=renderToStaticMarkup(<MutationFeedback state={{...idle,notice:"Trip saved"}} pendingMessage="Saving..."/>);

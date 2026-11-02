@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -8,13 +8,13 @@ import {
   accessAccounts, accountPersonGrants, actions, assessments, enrollments, guardianRelationships,
   people, programs, sectionTeachers, sections, studentProfiles, submissions, terms,
 } from "@/db/schema";
-import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import {
   gradeResponseActionType, gradeResponseRequestedMessage, isGuardianGradeResponseAction,
 } from "@/domain/grade-response-policy";
 import { EventTypes } from "@/domain/event-types";
-import { getCommandContext } from "@/modules/identity/command-context.server";
+import { requireActor } from "@/modules/identity/actors.server";
 import { requireTeachingEligibility } from "@/modules/staffing/teaching-eligibility.server";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 
@@ -24,11 +24,7 @@ const requestInput = submissionInput.extend({
 }).strict();
 
 async function guardianActor() {
-  const actor = await getCommandContext(getRequest());
-  if (actor.role !== "guardian" || !actor.actorPersonId)
-    throw new AuthorizationError("authorized guardian");
-  assertCapability(actor, "student:related-read");
-  return actor;
+  return requireActor(["guardian"], "student:related-read");
 }
 
 async function visibleGradedSubmission(actor: Awaited<ReturnType<typeof guardianActor>>,

@@ -19,22 +19,24 @@ export function SiteProgramFields({
 }: SiteProgramFieldsProps) {
   const label = (name: string) => labelPrefix ? `${labelPrefix} ${name.toLowerCase()}` : name;
   return <>
-    <label className="text-sm">School
-      <select aria-label={label("School")} required={siteRequired} disabled={disabled}
+    <Label>School
+      <Select aria-label={label("School")} required={siteRequired} disabled={disabled}
         value={siteId} onChange={event => onChange(event.target.value, "")}
-        className="mt-1 block w-full rounded border bg-background p-2">
+        className="mt-1">
         {sitePlaceholder !== undefined && <option value="">{sitePlaceholder}</option>}
         {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
-      </select>
-    </label>
-    <label className="text-sm">Program
-      <select aria-label={label("Program")} required={programRequired} disabled={disabled}
+      </Select>
+    </Label>
+    <Label>Program
+      <Select aria-label={label("Program")} required={programRequired} disabled={disabled}
         value={programId} onChange={event => onChange(siteId, event.target.value)}
-        className="mt-1 block w-full rounded border bg-background p-2">
+        className="mt-1">
         <option value="">{programPlaceholder}</option>
         {programs.filter(program => !siteId || program.siteId === siteId)
           .map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
-      </select>
-    </label>
+      </Select>
+    </Label>
   </>;
 }
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";

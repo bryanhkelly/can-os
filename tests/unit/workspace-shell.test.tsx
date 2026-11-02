@@ -75,7 +75,7 @@ describe("persistent server-initialized workspace shell", () => {
     expect(html.match(/<a\b[^>]*href="\/student"[^>]*>/)?.[0]).toContain("focus-visible:ring-2");
     expect(html).toContain('aria-label="Account menu"');
     expect(html).toContain("Ask CAN");
-    expect(html.match(/<button[^>]*aria-label="Switch workspace"/g)).toHaveLength(1);
+    expect(html.match(/Switch workspace:/g)).toHaveLength(1);
     expect(html).not.toContain("Switcher mode");
     expect(html).not.toContain("Loading account");
     expect(html).not.toContain("/teacher/gradebook");

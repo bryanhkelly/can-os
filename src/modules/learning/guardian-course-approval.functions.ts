@@ -13,7 +13,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
-import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { todayInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
 const CONSENT_TYPE = "course_registration_add_decision";
@@ -112,7 +112,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     )) return null;
     const policy = await getSectionRegistrationPolicy(row.sectionId);
     if (!policy.guardianApprovalRequired) return null;
-    const today = dateKeyInTimezone(new Date().toISOString(),row.timezone);
+    const today = todayInTimezone(row.timezone);
     if (today > policy.addDropEndsOn) return null;
     return {
       id: row.id,
@@ -171,10 +171,11 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
       const [section] = await tx.select({
         id: sections.id, siteId: sections.siteId,
         programId: sections.programId, organizationId: programs.organizationId,
-        schoolYearId: terms.schoolYearId,
+        schoolYearId: terms.schoolYearId, timezone: siteTable.timezone,
       }).from(sections)
         .innerJoin(programs, eq(programs.id, sections.programId))
         .innerJoin(terms, eq(terms.id, sections.termId))
+        .innerJoin(siteTable, eq(siteTable.id, sections.siteId))
         .where(and(eq(sections.id, request.subjectId), eq(sections.active, true)))
         .limit(1);
       if (!section || section.siteId !== request.siteId ||
@@ -192,7 +193,7 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
       if (!membership) throw new AuthorizationError("active student program enrollment");
       const policy = await getSectionRegistrationPolicy(section.id, tx);
       if (!policy.guardianApprovalRequired) throw new Error("This section does not require guardian approval.");
-      if (new Date().toISOString().slice(0, 10) > policy.addDropEndsOn)
+      if (todayInTimezone(section.timezone) > policy.addDropEndsOn)
         throw new Error("The add/drop window has closed.");
       const [decision] = await tx.insert(consentRecords).values({
         subjectType: CONSENT_SUBJECT, subjectId: request.id,

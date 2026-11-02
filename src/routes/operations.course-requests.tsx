@@ -53,9 +53,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
         <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}
     >
-      {mutation.pending && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">Saving course decision...</p>}
-      {mutation.error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.refreshFailed ? "The command succeeded. " : "No change was completed. "}{mutation.error}</p>}
-      {mutation.notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving course decision..."/>
       <div className="mt-7 space-y-4">
         {visibleRequests.map(request => (
           <article key={request.id} className="rounded-xl border bg-card p-5">
@@ -105,3 +103,4 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
     </WorkspaceShell>
   );
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

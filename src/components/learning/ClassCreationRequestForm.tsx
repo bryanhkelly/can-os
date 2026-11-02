@@ -1,5 +1,11 @@
 import { useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   submitTeacherClassRequest,
@@ -24,6 +30,21 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
     requestId.current = null;
   }
 
+  function clearSavedDraft() {
+    requestId.current = null;
+    setRequestedClassTitle("");
+    setRequestedCourseOrSubject("");
+    setDesiredTerm("");
+    setSchedulePreference("");
+    setNotes("");
+  }
+
+  async function retryRefresh() {
+    const outcome = await mutation.retryRefresh();
+    if (outcome.status === "refreshed") clearSavedDraft();
+    return outcome;
+  }
+
   return (
     <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="class-request-title">
       <h2 id="class-request-title" className="font-serif text-2xl">Request a class</h2>
@@ -41,8 +62,7 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
           event.preventDefault();
           const id = requestId.current ?? crypto.randomUUID();
           requestId.current = id;
-          void mutation.run(async () => {
-            await submitTeacherClassRequest({ data: {
+          void mutation.run(() => submitTeacherClassRequest({ data: {
               requestId: id,
               programId,
               requestedClassTitle,
@@ -50,72 +70,64 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
               desiredTerm,
               schedulePreference,
               notes,
-            } });
-            requestId.current = null;
-            setRequestedClassTitle("");
-            setRequestedCourseOrSubject("");
-            setDesiredTerm("");
-            setSchedulePreference("");
-            setNotes("");
-          }, {
+            } }), {
             successMessage: "Class request sent to the registrar.",
             commandErrorMessage: "Unable to submit the class request.",
+          }).then(outcome => {
+            if (outcome.status === "saved") clearSavedDraft();
           });
         }}>
-          <label className="text-sm sm:col-span-2">
+          <fieldset disabled={busy} className="contents" aria-busy={mutation.pending}>
+          <Label className="sm:col-span-2">
             School program
-            <select required value={programId} onChange={event => {
+            <Select required value={programId} onChange={event => {
               resetRequestId();
               setProgramId(event.target.value);
-            }} className="mt-1 block w-full rounded border bg-background p-2">
+            }} className="mt-1">
               {options.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
-            </select>
-          </label>
-          <label className="text-sm">
+            </Select>
+          </Label>
+          <Label>
             Proposed class title
-            <input required minLength={2} maxLength={160} value={requestedClassTitle}
+            <Input required minLength={2} maxLength={160} value={requestedClassTitle}
               onChange={event => { resetRequestId(); setRequestedClassTitle(event.target.value); }}
-              className="mt-1 block w-full rounded border bg-background p-2"/>
-          </label>
-          <label className="text-sm">
+              className="mt-1"/>
+          </Label>
+          <Label>
             Course or subject
-            <input required minLength={2} maxLength={120} value={requestedCourseOrSubject}
+            <Input required minLength={2} maxLength={120} value={requestedCourseOrSubject}
               onChange={event => { resetRequestId(); setRequestedCourseOrSubject(event.target.value); }}
               placeholder="For example, Biology"
-              className="mt-1 block w-full rounded border bg-background p-2"/>
-          </label>
-          <label className="text-sm">
+              className="mt-1"/>
+          </Label>
+          <Label>
             Desired term
-            <input required minLength={2} maxLength={100} value={desiredTerm}
+            <Input required minLength={2} maxLength={100} value={desiredTerm}
               onChange={event => { resetRequestId(); setDesiredTerm(event.target.value); }}
               placeholder="For example, Fall 2026"
-              className="mt-1 block w-full rounded border bg-background p-2"/>
-          </label>
-          <label className="text-sm">
+              className="mt-1"/>
+          </Label>
+          <Label>
             Schedule preference
-            <input maxLength={500} value={schedulePreference}
+            <Input maxLength={500} value={schedulePreference}
               onChange={event => { resetRequestId(); setSchedulePreference(event.target.value); }}
               placeholder="Optional"
-              className="mt-1 block w-full rounded border bg-background p-2"/>
-          </label>
-          <label className="text-sm sm:col-span-2">
+              className="mt-1"/>
+          </Label>
+          <Label className="sm:col-span-2">
             Notes for the registrar
-            <textarea maxLength={1000} value={notes}
+            <Textarea maxLength={1000} value={notes}
               onChange={event => { resetRequestId(); setNotes(event.target.value); }}
-              rows={3} className="mt-1 block w-full rounded border bg-background p-2"/>
-          </label>
-          <button type="submit" disabled={busy || !programId}
-            className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+              rows={3} className="mt-1"/>
+          </Label>
+          <Button type="submit" disabled={busy || !programId}>
             Submit class request
-          </button>
+          </Button>
+          </fieldset>
         </form>
       )}
-      {mutation.pending && <p role="status" className="mt-3 text-sm">Submitting class request...</p>}
-      {mutation.error && <p role="alert" className="mt-3 text-sm">
-        {mutation.refreshFailed ? "The request was submitted, but its latest status could not be loaded. " : "No request was submitted. "}
-        {mutation.error}
-      </p>}
-      {mutation.notice && <p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
+      <MutationFeedback state={{ ...mutation, retryRefresh }}
+        className="mt-3" pendingMessage="Submitting class request..."/>
       {options.requests.length > 0 && (
         <section className="mt-6 border-t pt-4" aria-labelledby="class-request-history-title">
           <h3 id="class-request-history-title" className="font-semibold">Your class requests</h3>

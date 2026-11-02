@@ -45,7 +45,7 @@ function CurriculumMarketplacePage(){
 function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const mutation=useMutationFeedback(()=>router.invalidate());
- const busy=mutation.pending||mutation.refreshFailed,error=mutation.error,notice=mutation.notice;
+ const busy=mutation.pending||mutation.refreshFailed;
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
  const [adoptionReview,setAdoptionReview]=useState<string|null>(null);
  const [adoptionConfirmed,setAdoptionConfirmed]=useState<Record<string,boolean>>({});
@@ -83,8 +83,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   <h1 className="font-serif text-4xl">Curriculum Marketplace</h1>
   <p className="max-w-3xl text-sm text-muted-foreground">Install published curriculum packs into your organization's library, adopt releases for a school program and supplement classes without changing the publisher's immutable material.</p>
   <CurriculumProgramNavigation programs={data.programs} selectedProgramId={market?.program.id} canPublish={Boolean(market?.canPublish)} />
-  {error&&<p role="alert" className="rounded-lg border border-red-500 p-4 text-sm">{error}</p>}
-  {notice&&<p role="status" className="rounded-lg border p-4 text-sm">{notice}</p>}
+  <MutationFeedback state={mutation} pendingMessage="Saving curriculum change..."/>
   {!market&&<p className="rounded-lg border p-4">Select a program to browse packs under its verified school membership.</p>}
   {market&&<>
    {data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="School curriculum next actions">
@@ -366,3 +365,4 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   </>}
  </main>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

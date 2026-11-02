@@ -58,9 +58,7 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
   actions={<Link to="/operations" search={{siteId:undefined,programId:undefined,action:undefined}}
    className="rounded border px-3 py-2 text-sm">School operations</Link>}>
   {validationError&&<p role="alert" className="mt-5 rounded border p-4 text-sm">{validationError}</p>}
-  {mutation.pending&&<p role="status" className="mt-5 rounded border p-4 text-sm">Saving confidential review...</p>}
-  {mutation.notice&&<p role="status" className="mt-5 rounded border p-4 text-sm">{mutation.notice}</p>}
-  {mutation.error&&<p role="alert" className="mt-5 rounded border p-4 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
+  <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving confidential review..."/>
   {action&&<Link to="/operations/health-review" className="mt-4 inline-block text-sm underline">View entire confidential review queue</Link>}
   {action&&!visible.length&&<p role="status" className="mt-5 rounded border p-4 text-sm">This requested medical update is not available for review in your current school scope.</p>}
   {!items.length&&<p className="mt-5 rounded border p-4 text-sm">No pending family medical updates in your authorized schools.</p>}
@@ -116,3 +114,4 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
   </div>
  </WorkspaceShell>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

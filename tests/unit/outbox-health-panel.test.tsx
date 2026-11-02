@@ -44,12 +44,12 @@ function words(node: ReactNode): string {
   if (Array.isArray(node)) return node.map(words).join("");
   return isValidElement<ControlProps>(node) ? words(node.props.children) : "";
 }
-/** QueryState renders the retry control; invoke it with its props to reach the button. */
+/** QueryState delegates retry rendering to the shared Button component. */
 function findRetry() {
   const queryState = controls(render()).find((node) => typeof node.type === "function" && node.props.onRetry);
   if (!queryState) return undefined;
   const output = (queryState.type as (props: ControlProps) => ReactElement)(queryState.props);
-  return controls(output).find((node) => node.type === "button" && words(node.props.children).includes("Retry"));
+  return controls(output).find((node) => node.props.onClick && words(node.props.children).includes("Retry"));
 }
 function mount() {
   render();

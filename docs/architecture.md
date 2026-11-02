@@ -62,6 +62,25 @@ Site Today due dates and attendance-excuse dates display in the owning Site's
 timezone. The staff attendance date picker retains its viewer-local initial
 date; an explicitly selected roster date remains authoritative.
 
+Learning registration deadlines use `todayInTimezone` with the canonical Site
+timezone loaded from the Section's Site. Request, guardian-decision and
+registrar-review checks must not derive a Site policy date from UTC's calendar
+date or the viewer's browser timezone.
+
+### Learning command context and curriculum import jobs
+
+Learning server functions reuse `requireActor` for verified role, person and
+capability setup. Each owning command still checks its own Site/Program/Section
+scope, current enrollment, guardian relationship and resource-specific rules;
+the shared session boundary does not grant resource access.
+
+OneRoster and Common Cartridge validation share only the idempotent curriculum
+import-job transaction: lookup by Organization/format/content digest, create
+the importer-supplied report and status, then append the importer-specific audit
+record and DomainEvent transactionally. Format parsing, publisher authorization,
+digest construction, metadata, report shape and validation/reconciliation
+policies remain with each importer.
+
 ### Route search selections
 
 `src/lib/route-search.ts` shares Site/Program and group/session selection

@@ -1,6 +1,13 @@
 import { useEffect,useState } from "react";
 import { searchAdmissionsHouseholds } from "@/modules/enrollment/admissions-intake.functions";
 import { AdmissionsPageNavigation } from "./AdmissionsPageNavigation";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 type InquiryFormProps={
  children?:never;
  onSubmit:(event:import("react").FormEvent<HTMLFormElement>)=>void;
@@ -43,55 +50,54 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
  const studentKey=(student:InquiryFormProps["existingStudents"][number])=>
   `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
  return <>
-   <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={onSubmit}>
-    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required disabled={convertibleInterest} value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
+   <form className="mt-4" onSubmit={onSubmit} aria-busy={busy}>
+    <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
+    <Field className="sm:col-span-2" label="Program" required>
+     <Select disabled={convertibleInterest} value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-    </select></label>
-    <label className="text-sm sm:col-span-2">Student identity
-     <select className="mt-1 block w-full rounded border bg-background p-2" disabled={convertibleInterest} value={existingStudentKey}
+     </Select>
+    </Field>
+    <Field className="sm:col-span-2" label="Student identity"
+     description="Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.">
+     <Select disabled={convertibleInterest} value={existingStudentKey}
       onChange={e=>{setExistingStudentKey(e.target.value);setExistingApplicationId("");setCreateHouseholdConfirmed(false);}}>
       <option value="">Create a new student</option>
       {existingStudents.map(student=><option key={studentKey(student)} value={studentKey(student)}>
        {student.studentFirstName} {student.studentLastName} — guardian: {student.guardianFirstName} {student.guardianLastName}
        {!student.householdId?" (new household required)":""}
       </option>)}
-     </select>
-     <AdmissionsPageNavigation selection={selection} hasMore={existingStudentHasMore} kind="students"/>
-     <span className="mt-1 block text-xs text-muted-foreground">
-      Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.
-     </span>
-    </label>
-    {existingStudent&&!existingStudent.householdId&&<label className="text-sm sm:col-span-2">
-     <input type="checkbox" required checked={createHouseholdConfirmed} onChange={e=>setCreateHouseholdConfirmed(e.target.checked)}/>
+     </Select>
+    </Field>
+    <div className="sm:col-span-2"><AdmissionsPageNavigation selection={selection} hasMore={existingStudentHasMore} kind="students"/></div>
+    {existingStudent&&!existingStudent.householdId&&<Label className="flex items-start gap-2 sm:col-span-2">
+     <Checkbox required checked={createHouseholdConfirmed} onChange={e=>setCreateHouseholdConfirmed(e.target.checked)}/>
      {" "}I confirm creating the missing household for this existing student and managing guardian. Neither currently belongs to a household.
-    </label>}
+    </Label>}
     {!existingStudent&&<>
-    <label className="text-sm sm:col-span-2">Find a sibling household (optional)
-      <input className="mt-1 block w-full rounded border bg-background p-2" value={householdSearch} onChange={e=>{setHouseholdSearch(e.target.value);setExistingApplicationId("");}} placeholder="Search student name or application ID" />
-      {householdLoading&&<span role="status" className="block text-xs">Searching households…</span>}
-      {householdError&&<span role="alert" className="block text-xs">{householdError}</span>}
-      <select className="mt-1 block w-full rounded border bg-background p-2"
+    <Field className="sm:col-span-2" label="Find a sibling household (optional)" error={householdError}>
+      <Input type="search" value={householdSearch} onChange={e=>{setHouseholdSearch(e.target.value);setExistingApplicationId("");}} placeholder="Search student name or application ID" />
+    </Field>
+    {householdLoading&&<p role="status" className="text-xs sm:col-span-2">Searching households…</p>}
+    <Field className="sm:col-span-2" label="Household for this inquiry"
+      description="Only households with an independently verified managing guardian are offered for reuse. The receiving command rechecks the relationship and the guardian email before linking a sibling.">
+      <Select
         disabled={convertibleInterest||householdLoading} value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
         <option value="">Create new household</option>
         {householdMatches.map(r=>
           <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
-      </select>
-      <span className="mt-1 block text-xs text-muted-foreground">
-        Only households with an independently verified managing guardian
-        are offered for reuse. The receiving command rechecks the relationship
-        and the guardian email before linking a sibling.
-      </span>
-    </label>
-    <label className="text-sm">Student first name<input required value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Student last name<input required value={studentLastName} onChange={e=>setStudentLastName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Guardian first name<input required value={guardianFirstName} onChange={e=>setGuardianFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Guardian last name<input required value={guardianLastName} onChange={e=>setGuardianLastName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Guardian email<input required type="email" value={guardianEmail} onChange={e=>setGuardianEmail(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm">Entering grade<input value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
+      </Select>
+    </Field>
+    <Field label="Student first name" required><Input value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)}/></Field>
+    <Field label="Student last name" required><Input value={studentLastName} onChange={e=>setStudentLastName(e.target.value)}/></Field>
+    <Field label="Guardian first name" required><Input value={guardianFirstName} onChange={e=>setGuardianFirstName(e.target.value)}/></Field>
+    <Field label="Guardian last name" required><Input value={guardianLastName} onChange={e=>setGuardianLastName(e.target.value)}/></Field>
+    <Field label="Guardian email" required><Input type="email" value={guardianEmail} onChange={e=>setGuardianEmail(e.target.value)}/></Field>
+    <Field label="Entering grade"><Input value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)}/></Field>
     </>}
-    <label className="text-sm">Inquiry source<select value={source} disabled={convertibleInterest} onChange={e=>setSource(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></select></label>
-    <label className="text-sm sm:col-span-2">Notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded border bg-background p-2" rows={2}/></label>
-    <button type="submit" disabled={busy||!programId||(convertibleInterest&&!contactReviewed)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>
+    <Field label="Inquiry source"><Select value={source} disabled={convertibleInterest} onChange={e=>setSource(e.target.value)}><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></Select></Field>
+    <Field className="sm:col-span-2" label="Notes"><Textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2}/></Field>
+    <Button type="submit" disabled={busy||!programId||(convertibleInterest&&!contactReviewed)}>Create inquiry</Button>
+    </fieldset>
    </form>
  </>;
 }

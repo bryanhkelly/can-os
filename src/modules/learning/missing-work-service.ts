@@ -128,6 +128,7 @@ export async function markOverdueSubmissionsMissing(
       })
       .from(submissions)
       .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+      .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
       .where(
         and(
           eq(assessments.status, "published"),

@@ -102,9 +102,7 @@ function GroupsView({ data }: { data: Workspace }) {
       actions={<Link to={data.role === "teacher" ? "/teacher" : "/student"}
         className="rounded-lg border px-3 py-2 text-sm">Workspace home</Link>}
     >
-      {mutation.pending && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">Saving group change...</p>}
-      {mutation.notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
-      {mutation.error && <p role="alert" className="mt-4 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
+      <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving group change..."/>
       {data.role === "student" && data.hasEnrollmentGuardian === false &&
         <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">
           A linked guardian is required to request study group membership. Ask your school to verify your guardian relationship.
@@ -477,3 +475,4 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
       })}
   </div>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

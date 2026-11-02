@@ -40,12 +40,17 @@ describe("workspace design primitives", () => {
   it("keeps informational metrics still and gives linked metrics explicit hover and keyboard feedback", () => {
     const informational = renderToStaticMarkup(<StatCard label="Applications" value="18" />);
     expect(informational).not.toContain("hover:shadow-md");
-    expect(informational).not.toContain("group-focus-visible:ring-2");
+    expect(informational).not.toContain("focus-visible:ring-2");
 
-    const interactive = renderToStaticMarkup(<StatCard interactive label="Needs review" value="4" />);
+    const interactive = renderToStaticMarkup(<StatCard asChild label="Needs review" value="4"><a href="/review" /></StatCard>);
     expect(interactive).toContain("hover:shadow-md");
-    expect(interactive).toContain("group-hover:shadow-md");
-    expect(interactive).toContain("group-focus-visible:ring-2");
+    expect(interactive).toContain('href="/review"');
+    expect(interactive).toMatch(/^<a /);
+    expect(interactive).not.toContain("<div");
+    expect(interactive).toContain("focus-visible:ring-2");
+    const button = renderToStaticMarkup(<StatCard asChild label="Review" value="4"><button type="button" /></StatCard>);
+    expect(button).toMatch(/^<button /);
+    expect(button).toContain("Review");
   });
 
   it("retains the approved semantic foundation without decorative role hues", () => {

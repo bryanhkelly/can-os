@@ -36,9 +36,7 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
    <Link to="/operations/course-requests" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
    <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
   </div>}>
-  {mutation.pending&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">Saving course policy...</p>}
-  {mutation.error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.refreshFailed?"The command succeeded. ":"No change was completed. "}{mutation.error}</p>}
-  {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+  <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving course policy..."/>
   <div className="mt-8 space-y-4">
    {visibleRows.map(r=><CoursePolicyCard key={r.id} row={r}
      disabled={Boolean(saving)} save={policy=>save(r.id,policy)}/>)}
@@ -90,3 +88,4 @@ function CoursePolicyCard({row,save,disabled}:{
   </button>
  </article>;
 }
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ContextTray, EmptyState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { WorkspaceSession } from "@/modules/identity/workspace-session.server";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getWorkspaceScopeLabel } from "./workspace-scope";
 
 type AuthenticatedSession = Extract<WorkspaceSession, { authenticated: true }>;
 type WorkspaceGrant = AuthenticatedSession["grants"][number];
@@ -36,7 +40,7 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
     <div className="mb-5 rounded-2xl bg-muted/50 p-4">
       <p className="font-serif text-2xl font-semibold">{current?.firstName} {current?.lastName}</p>
       <p className="mt-1 text-sm capitalize text-muted-foreground">
-        {current?.role.replaceAll("_", " ")} · {session.sites.find(site => site.id === current?.siteId)?.name ?? "Authorized workspace"}
+        {current?.role.replaceAll("_", " ")} · {current ? getWorkspaceScopeLabel(current, session.sites) : "Workspace unavailable"}
       </p>
     </div>
     {session.demoAccountSwitching && <WorkspaceNotice className="mb-4">
@@ -45,24 +49,23 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
     {error && <WorkspaceNotice ref={errorRef} tone="danger" className="mb-4">
       No workspace was changed. {error}
     </WorkspaceNotice>}
-    <label htmlFor="workspace-switcher-search" className="mb-2 block text-sm font-medium">Search workspaces</label>
-    <input id="workspace-switcher-search" type="search" autoComplete="off" value={query}
+    <Label htmlFor="workspace-switcher-search" className="mb-2 block">Search workspaces</Label>
+    <Input id="workspace-switcher-search" type="search" autoComplete="off" value={query}
       onChange={event => setQuery(event.target.value)} placeholder="Search people, roles, or schools…"
-      className="mb-5 min-h-11 w-full rounded-xl border bg-background px-4 text-sm focus-visible:outline-2 focus-visible:outline-ring" />
+      className="mb-5 min-h-11 rounded-xl" />
     <div className="space-y-2" aria-busy={changing}>
       {grants.map(grant => {
         const active = grant.id === session.activeGrantId;
-        const site = session.sites.find(item => item.id === grant.siteId);
-        return <button key={grant.id} type="button" disabled={changing} aria-current={active ? "true" : undefined}
+        return <Button key={grant.id} type="button" variant="outline" disabled={changing} aria-current={active ? "true" : undefined}
           onClick={() => { if (active) close(); else onSwitch(grant.id); }}
-          className="flex min-h-20 w-full flex-col justify-center rounded-xl border bg-card px-4 py-3 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50">
+          className="min-h-20 w-full flex-col items-start gap-0 rounded-xl px-4 py-3 text-left">
           <span className="flex flex-wrap items-center gap-2 text-sm font-semibold capitalize">
             {grant.role.replaceAll("_", " ")}{active && <StatusBadge tone="success">Active</StatusBadge>}
           </span>
           <span className="mt-1 text-xs text-muted-foreground">
-            {grant.firstName} {grant.lastName}{site ? ` · ${site.name}` : ""}
+            {grant.firstName} {grant.lastName} · {getWorkspaceScopeLabel(grant, session.sites)}
           </span>
-        </button>;
+        </Button>;
       })}
     </div>
     {!grants.length && <EmptyState title="No workspaces match your search."

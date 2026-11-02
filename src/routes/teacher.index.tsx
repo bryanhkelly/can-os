@@ -79,10 +79,10 @@ function TeacherTodayPage() {
 
    {ready && <>
     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Today summary">
-     <Link to="/classes" className="group block rounded-2xl focus-visible:outline-none"><StatCard interactive label="Sections" value={data.sections.length} /></Link>
-     <Link to="/teacher/gradebook" className="group block rounded-2xl focus-visible:outline-none"><StatCard interactive label="Needs grading" value={data.ungraded.length} /></Link>
-     <Link to="/teacher/missing-work" className="group block rounded-2xl focus-visible:outline-none"><StatCard interactive label="Missing work" value={data.missingWork.length} /></Link>
-     <a href="#grade-follow-ups" className="group block rounded-2xl focus-visible:outline-none"><StatCard interactive label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length} /></a>
+     <StatCard asChild label="Sections" value={data.sections.length}><Link to="/classes" /></StatCard>
+     <StatCard asChild label="Needs grading" value={data.ungraded.length}><Link to="/teacher/gradebook" /></StatCard>
+     <StatCard asChild label="Missing work" value={data.missingWork.length}><Link to="/teacher/missing-work" /></StatCard>
+     <StatCard asChild label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length}><a href="#grade-follow-ups" /></StatCard>
     </div>
 
     <TeacherDaySchedule sections={data.sections} />

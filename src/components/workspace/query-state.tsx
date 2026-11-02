@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { EmptyState } from "./empty-state";
 import { WorkspaceNotice } from "./notice";
+import { Button } from "@/components/ui/button";
 
 export interface QueryStateProps {
   loading?: React.ReactNode;
@@ -24,10 +25,10 @@ function QueryState({ loading, error, isEmpty, empty, children, onRetry, retryin
   if (error) {
     return <WorkspaceNotice tone="danger" className="mt-8">
       <span>{error}</span>
-      {onRetry && <button type="button" onClick={onRetry} disabled={retrying}
-        className="ml-auto shrink-0 font-semibold underline underline-offset-4 disabled:opacity-50">
+      {onRetry && <Button type="button" variant="ghost" size="sm" onClick={onRetry} disabled={retrying}
+        className="ml-auto underline underline-offset-4">
         {retrying ? "Retrying…" : "Retry"}
-      </button>}
+      </Button>}
     </WorkspaceNotice>;
   }
   if (isEmpty) {

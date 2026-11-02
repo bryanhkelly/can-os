@@ -72,4 +72,65 @@ describe("mutation feedback", () => {
     });
     expect(command).toHaveBeenCalledTimes(1);
   });
+
+  it("retries only refresh, preserves confirmation, and unblocks after reconciliation", async () => {
+    const refresh = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    const command = vi.fn(async () => "saved");
+    const harness = createHarness(refresh);
+    await harness.run(command, { successMessage, commandErrorMessage });
+    expect(await harness.run.retryRefresh()).toEqual({ status: "refreshed" });
+    expect(command).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(harness.state).toEqual({ pending: false, error: "", notice: successMessage, refreshFailed: false });
+    expect(await harness.run(command, { successMessage, commandErrorMessage })).toEqual({ status: "saved", value: "saved" });
+  });
+
+  it("keeps the block and saved notice if reconciliation fails again", async () => {
+    const refresh = vi.fn(async () => { throw new Error("offline"); });
+    const harness = createHarness(refresh);
+    const command = vi.fn(async () => "saved");
+    await harness.run(command, { successMessage, commandErrorMessage, refreshErrorMessage: "Refresh unavailable." });
+    expect(await harness.run.retryRefresh()).toEqual({ status: "refresh-failed" });
+    expect(harness.state).toEqual({
+      pending: false, error: "Refresh unavailable.", notice: successMessage, refreshFailed: true,
+    });
+    expect(await harness.run(command, { successMessage, commandErrorMessage })).toEqual({ status: "refresh-required" });
+    expect(command).toHaveBeenCalledTimes(1);
+  });
+
+  it("prevents concurrent refreshes and commands during recovery", async () => {
+    let finish!: () => void;
+    const refresh = vi.fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const harness = createHarness(refresh);
+    const command = vi.fn(async () => "saved");
+    await harness.run(command, { successMessage, commandErrorMessage });
+    const recovery = harness.run.retryRefresh();
+    expect(harness.state).toEqual({ pending: true, error: "", notice: successMessage, refreshFailed: true });
+    expect(await harness.run.retryRefresh()).toEqual({ status: "duplicate" });
+    expect(await harness.run(command, { successMessage, commandErrorMessage })).toEqual({ status: "duplicate" });
+    finish();
+    expect(await recovery).toEqual({ status: "refreshed" });
+    expect(command).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the failed operation's refresh override rather than a different refresh", async () => {
+    const refresh = vi.fn(async () => undefined);
+    const override = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    const harness = createHarness(refresh);
+    await harness.run(async () => "saved", { successMessage, commandErrorMessage, refresh: override });
+    expect(await harness.run.retryRefresh()).toEqual({ status: "refreshed" });
+    expect(override).toHaveBeenCalledTimes(2);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh before any saved command needs recovery or after a command failure", async () => {
+    const refresh = vi.fn(async () => undefined);
+    const harness = createHarness(refresh);
+    expect(await harness.run.retryRefresh()).toEqual({ status: "not-required" });
+    await harness.run(async () => { throw new Error("denied"); }, { successMessage, commandErrorMessage });
+    expect(await harness.run.retryRefresh()).toEqual({ status: "not-required" });
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

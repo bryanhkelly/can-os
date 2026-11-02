@@ -88,6 +88,10 @@ export function dateKeyInTimezone(instant: Instant, timezone: string): string {
   return dateTimeInputValue(instant, timezone).slice(0, 10);
 }
 
+export function todayInTimezone(timezone: string, at: Date = new Date()): string {
+  return dateKeyInTimezone(at, timezone);
+}
+
 /** Absolute boundaries of the calendar date at a Site, not the server's UTC
  * date or the browser's timezone. Resolving both midnights separately handles
  * 23- and 25-hour days across daylight-saving transitions.

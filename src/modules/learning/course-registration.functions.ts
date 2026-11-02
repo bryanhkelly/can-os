@@ -8,10 +8,11 @@ import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNull,sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
-import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { todayInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
 async function studentProfileFor(actor: Actor) {
@@ -30,6 +31,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
   if (!process.env.DATABASE_URL || !programIds.length) return { connected: !!process.env.DATABASE_URL, viewerRole, sections: [], requests: [] };
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const studentId = viewerRole === "student" ? await studentProfileFor(actor) : null;
+  const activeProgramMembership=alias(s.enrollments,"course_registration_active_program");
   const [catalog, memberships, requests] = await Promise.all([
     db.select({ id:s.sections.id, title:s.sections.title, code:s.sections.code, metadata:s.sections.metadata,
       templateId:s.courseTemplates.id, subject:s.courseTemplates.subject, description:s.courseTemplates.description,
@@ -41,7 +43,20 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
       .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
       .where(and(inArray(s.sections.siteId,sites),inArray(s.sections.programId,programIds),eq(s.sections.active,true))),
     studentId ? db.select({ id:s.enrollments.id, sectionId:s.enrollments.sectionId, status:s.enrollments.status, metadata:s.enrollments.metadata })
-      .from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.kind,"section"),inArray(s.enrollments.programId,programIds))).orderBy(desc(s.enrollments.createdAt)) : Promise.resolve([]),
+      .from(s.enrollments)
+      .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+      .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+      .innerJoin(activeProgramMembership,and(
+        eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+        eq(activeProgramMembership.programId,s.sections.programId),
+        eq(activeProgramMembership.schoolYearId,s.terms.schoolYearId),
+        eq(activeProgramMembership.kind,"program"),
+        eq(activeProgramMembership.status,"active"),
+      ))
+      .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.kind,"section"),
+        eq(s.enrollments.programId,s.sections.programId),
+        eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+        inArray(s.enrollments.programId,programIds))).orderBy(desc(s.enrollments.createdAt)) : Promise.resolve([]),
     db.select({ id:s.actions.id, title:s.actions.title, status:s.actions.status, subjectId:s.actions.subjectId, metadata:s.actions.metadata })
       .from(s.actions).where(and(eq(s.actions.type,"course_registration_request"),inArray(s.actions.programId,programIds),
         viewerRole === "student" ? eq(s.actions.ownerPersonId,actor.actorPersonId) : inArray(s.actions.siteId,sites))),
@@ -99,7 +114,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
       if(!programMembership)throw new Error("Student must have an active enrollment in this school year and program");
       const policy=await getSectionRegistrationPolicy(section.id,tx);
-      const today=dateKeyInTimezone(new Date().toISOString(),section.timezone);
+      const today=todayInTimezone(section.timezone);
       if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
       if(data.operation==="withdraw" && today>policy.withdrawalEndsOn) throw new Error("Withdrawal window has closed.");
       if(data.operation==="add" && today>policy.addDropEndsOn) throw new Error("Registration window has closed.");
@@ -178,9 +193,11 @@ export const decideCourseChange = createServerFn({method:"POST"})
       if(data.approve)await lockAttendanceConfigurationAtSite(tx,siteId);
       if(data.approve){
         const [section]=await tx.select({id:s.sections.id,termId:s.sections.termId,title:s.sections.title,
-          schoolYearId:s.terms.schoolYearId,organizationId:s.programs.organizationId})
+          schoolYearId:s.terms.schoolYearId,organizationId:s.programs.organizationId,
+          timezone:s.sites.timezone})
           .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
           .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+          .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
           .where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),
             eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
         if(!section||section.schoolYearId!==schoolYearId||section.organizationId!==organizationId)
@@ -191,7 +208,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
           eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
         if(!activeProgram)throw new Error("Student program enrollment is no longer active");
         const policyAtApproval=await getSectionRegistrationPolicy(section.id,tx);
-        const today=new Date().toISOString().slice(0,10);
+        const today=todayInTimezone(section.timezone);
         if(operation==="add" && policyAtApproval.guardianApprovalRequired){
           const eligibleGuardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
             .from(s.guardianRelationships).where(guardianRelationshipPredicate({

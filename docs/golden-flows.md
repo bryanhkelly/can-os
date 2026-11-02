@@ -560,7 +560,7 @@ A Playwright golden-flow test covers GF1 end to end (assignment becomes missing 
 Prerequisites:
 
 - Run `npm ci` for the committed dependencies and `npx playwright install chromium` for the browser.
-- Point `TEST_DATABASE_URL` and `DATABASE_URL` at the same **disposable Neon branch** (never production). The test inserts and deletes its own synthetic rows, but it is not isolated against real data.
+- Point `TEST_DATABASE_URL` and `DATABASE_URL` at the same **disposable Neon branch** (never production). Teardown removes mutable fixture state after its outbox events resolve; while events remain unresolved, it revokes fixture access but retains the event context. Append-only audit, domain-event, and qualification evidence (and any identities they reference) remains on that branch; the test is not isolated against real data.
 - Set `CAN_TEST_DB_WRITES_ENABLED=true`, `APP_ENV=test`, `NODE_ENV=test`, and `CAN_APPLICATION_DB_HOST` to the distinct application database hostname used for the endpoint-identity check.
 
 Run:
