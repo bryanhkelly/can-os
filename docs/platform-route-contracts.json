@@ -521,9 +521,9 @@
       "route": "/operations/teacher-marketplace",
       "owner": "staffing",
       "verification": "pending",
-      "roleJourney": "registrar reviews CAN-managed demo teacher candidates after adopting curriculum",
-      "writeBoundary": "none (read-only preview; existing launch staffing handles assignments)",
-      "readBoundary": "getDemoTeacherMarketplace (verified registrar and isolated-demo environment)"
+      "roleJourney": "registrar selects CAN-managed teachers after adopting curriculum",
+      "writeBoundary": "staffing requests persist in canonical Actions; direct teacher assignment uses existing launch staffing authorization",
+      "readBoundary": "getTeacherMarketplace (authorized school, adopted curriculum, provider membership and candidate capacity)"
     },
     {
       "file": "src/routes/operations.curriculum-marketplace.tsx",
