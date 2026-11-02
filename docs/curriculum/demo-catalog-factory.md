@@ -179,8 +179,10 @@ confirmations. Draft content must pass normal publication and school
 adoption to become selectable. Importing does not create instructor
 permissions, class assignments or real qualifications.
 
-**Observed isolated-Neon state (read-only verification, 2026-11-02):**
-`demo-curriculum-validation-20261102` contains the CAN Demo Publisher,
-but no demo course templates, teacher provider, demo teachers or teacher
-staffing Actions yet. Generating manifests or merging this PR does not load
-the database.
+**Observed data state, November 2, 2026:** The isolated Neon validation
+branch contains 120 draft courses (15 with 20 lessons and 105 with one),
+30 sample teachers, 240 course capabilities, 30 availability windows,
+and 240 preview-only capacity offerings. No operational assignments or
+published demo curriculum were created. The records were loaded using
+branch-checked SQL, with seed-specific hashes; a subsequent importer
+run should reconcile those hashes before applying another draft.
