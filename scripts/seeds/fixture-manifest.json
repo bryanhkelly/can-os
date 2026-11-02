@@ -1159,6 +1159,18 @@
         "audit_events"
       ]
     },
+    "/operations/teacher-marketplace": {
+      "persona": "registrar",
+      "fixtureRequired": false,
+      "rationale": "Synthetic teacher selection is a read-only isolated-demo overlay gated by an environment flag and existing authorized curriculum adoption. General release seeds cannot grant synthetic instructor eligibility.",
+      "interactions": [
+        "select the authorized school after curriculum adoption",
+        "find CAN Demo Teaching Provider candidates by selected course",
+        "inspect unverified demo availability without assigning teaching authority",
+        "open canonical class staffing to complete independently authorized assignment"
+      ],
+      "downstreamRecords": []
+    },
     "/operations/curriculum-marketplace": {
       "persona": "registrar",
       "seeds": [
