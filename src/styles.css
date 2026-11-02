@@ -64,6 +64,8 @@
   --workspace-accent: var(--primary);
   --workspace-accent-soft: #eaf1ff;
   --workspace-accent-ink: #104aa9;
+  --student-day-background: #17365b;
+  --student-day-foreground: #ffffff;
 
   /* Neutral canvas and content surfaces */
   --background: #f6f8fb;
@@ -253,8 +255,12 @@
 
 /* Student Home: original CSS landscape; no external asset or layout shift. */
 .student-day-hero {
-  background: #17365b;
-  color: var(--color-white);
+  background: var(--student-day-background);
+  color: var(--student-day-foreground);
+}
+.student-day-hero[data-safety="true"] {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
 }
 .student-day-hero a {
   color: inherit;
