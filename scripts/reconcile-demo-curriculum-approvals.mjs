@@ -8,6 +8,11 @@ import { Pool } from "@neondatabase/serverless";
 const apply=process.argv.includes("--apply");
 if(!process.env.DATABASE_URL) throw Error("DATABASE_URL required");
 if(apply && (process.env.DEMO_CURRICULUM_ALLOW_WRITE!=="1" || !process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)) throw Error("Explicit write opt-in and confirmed database name required");
+if(apply){
+  const expectedHost=process.env.DEMO_CURRICULUM_EXPECTED_HOST;
+  if(!expectedHost)throw Error("Writes require DEMO_CURRICULUM_EXPECTED_HOST for the isolated Neon branch");
+  if(new URL(process.env.DATABASE_URL).hostname!==expectedHost)throw Error("Database host mismatch; refusing demo approval writes");
+}
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
