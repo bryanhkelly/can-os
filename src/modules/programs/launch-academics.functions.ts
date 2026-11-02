@@ -84,6 +84,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
   const years=program.siteId?await db.select({
    id:schoolYears.id,name:schoolYears.name,status:schoolYears.status,
    siteId:schoolYears.siteId,programId:schoolYears.programId,
+   startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,timezone:schoolYears.timezone,
   }).from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
    eq(schoolYears.organizationId,program.organizationId),
    or(isNull(schoolYears.programId),eq(schoolYears.programId,program.id)))):[];
@@ -93,7 +94,8 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
   }).from(terms).where(inArray(terms.schoolYearId,years.map(y=>y.id)))
    .orderBy(asc(terms.startsOn)):[];
   const scheduleOptions=years.length?await db.select({id:scheduleTemplates.id,name:scheduleTemplates.name,schoolYearId:scheduleTemplates.schoolYearId})
-   .from(scheduleTemplates).where(inArray(scheduleTemplates.schoolYearId,years.map(year=>year.id))):[];
+   .from(scheduleTemplates).where(and(inArray(scheduleTemplates.schoolYearId,years.map(year=>year.id)),
+    eq(scheduleTemplates.active,true),or(isNull(scheduleTemplates.programId),eq(scheduleTemplates.programId,program.id)))):[];
   const catalog=await listLaunchEligibleCourses(program);
   // Reuse the assignment service's authority rule. A church choosing CAN as
   // provider is NOT entitled to list CAN's organization-wide faculty; the
@@ -211,11 +213,12 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
 
    }
    {
-    const [template]=await tx.select({schoolYearId:scheduleTemplates.schoolYearId}).from(scheduleTemplates).where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
-    if(!template||template.schoolYearId!==term.schoolYearId)throw new Error("Schedule must belong to the selected school year");
+    const [template]=await tx.select({schoolYearId:scheduleTemplates.schoolYearId,active:scheduleTemplates.active,programId:scheduleTemplates.programId,siteId:scheduleTemplates.siteId}).from(scheduleTemplates).where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
+    if(!template||!template.active||template.schoolYearId!==term.schoolYearId||template.siteId!==program.siteId||
+      (template.programId!==null&&template.programId!==program.id))throw new Error("Choose an active schedule for this school and selected year");
     const periods=await tx.select({dayOfWeek:scheduleTemplatePeriods.dayOfWeek,startsAtLocal:scheduleTemplatePeriods.startsAtLocal,endsAtLocal:scheduleTemplatePeriods.endsAtLocal})
      .from(scheduleTemplatePeriods).where(and(eq(scheduleTemplatePeriods.scheduleTemplateId,data.scheduleTemplateId),eq(scheduleTemplatePeriods.type,"instruction")));
-    if(!periods.some(period=>period.dayOfWeek>=1&&period.dayOfWeek<=7&&period.startsAtLocal<period.endsAtLocal))
+    if(!periods.some(period=>period.dayOfWeek>=0&&period.dayOfWeek<=6&&period.startsAtLocal<period.endsAtLocal))
      throw new Error("Choose a schedule containing at least one valid instructional period");
    }
    const [created]=await tx.insert(sections).values({

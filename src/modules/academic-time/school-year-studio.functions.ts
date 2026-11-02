@@ -1,4 +1,5 @@
 import { launchOpeningDate } from "@/domain/launch-opening-date";
+import { defaultScheduleDayPattern, scheduleDayPattern } from "@/domain/schedule-day-pattern";
 import { db } from "@/db/client";
 import { academicCalendarDays,academicCalendars,gradeScales,gradingPeriods,organizations,programs,scheduleTemplatePeriods,scheduleTemplates,schoolYears,sites,terms } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -34,7 +35,7 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
    .from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
    .where(and(...(siteIds.length?[inArray(sites.id,siteIds)]:[]),inArray(sites.organizationId,orgIds))).orderBy(asc(sites.name)),
   db.select({id:schoolYears.id,name:schoolYears.name,key:schoolYears.key,status:schoolYears.status,siteId:schoolYears.siteId,
-   organizationId:schoolYears.organizationId,programId:schoolYears.programId,startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn})
+   organizationId:schoolYears.organizationId,programId:schoolYears.programId,startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,timezone:schoolYears.timezone})
    .from(schoolYears).where(and(...(siteIds.length?[inArray(schoolYears.siteId,siteIds)]:[]),inArray(schoolYears.organizationId,orgIds)))
    .orderBy(asc(schoolYears.startsOn)),
   db.select({id:gradeScales.id,name:gradeScales.name,organizationId:gradeScales.owningOrganizationId}).from(gradeScales)
@@ -110,10 +111,13 @@ export const addStudioCalendarDay = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({academicCalendarId:uuid,calendarDate:day,type:z.enum(["instructional","holiday","closure","special","makeup"]),title:z.string().max(160).optional(),instructionalMinutes:z.number().int().min(0).max(1440).optional()}).parse(v))
  .handler(async({data})=>({dayId:await setAcademicCalendarDay(await operator(),data)}));
 export const addStudioSchedule = createServerFn({method:"POST"})
- .validator((v:unknown)=>z.object({schoolYearId:uuid,programId:uuid.optional(),name:z.string().min(2).max(100),effectiveFrom:day}).parse(v))
- .handler(async({data})=>({scheduleId:await createScheduleTemplate(await operator(),{...data,periods:[1,2,3,4,5].map(dayOfWeek=>({
-  dayOfWeek,sequence:1,label:"Instruction",startsAtLocal:"08:30",endsAtLocal:"15:00",type:"instruction",
- }))})}));
+ .validator((v:unknown)=>z.object({schoolYearId:uuid,programId:uuid.optional(),name:z.string().trim().min(2).max(100),effectiveFrom:day,effectiveThrough:day.optional(),pattern:scheduleDayPattern.optional()}).parse(v))
+ .handler(async({data})=>{
+  const {pattern=defaultScheduleDayPattern,...identity}=data;
+  return {scheduleId:await createScheduleTemplate(await operator(),{...identity,periods:pattern.weekdays.map(dayOfWeek=>({
+   dayOfWeek,sequence:1,label:"Instruction",startsAtLocal:pattern.startsAtLocal,endsAtLocal:pattern.endsAtLocal,type:"instruction",
+  }))})};
+ });
 export const activateStudioYear = createServerFn({method:"POST"}).validator(id.parse)
  .handler(async({data})=>{await activateSchoolYear(await operator("academic_year.activate"),data.schoolYearId);return {ok:true}});
 

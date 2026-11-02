@@ -2,10 +2,13 @@ import { useState } from "react";
 import type { getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
 type Snapshot = Awaited<ReturnType<typeof getSchoolYearStudio>>;
 import { schoolYearStructure } from "@/domain/school-year-structure";
-import { addStudioTerm, addStudioGradingPeriod, prepareStudioYear, addStudioCalendar, addStudioCalendarDay, removeStudioCalendarDay, populateStudioInstructionalDays, addStudioSchedule, activateStudioYear } from "@/modules/academic-time/school-year-studio.functions";
+import { addStudioTerm, addStudioGradingPeriod, prepareStudioYear, addStudioCalendar, addStudioCalendarDay, removeStudioCalendarDay, populateStudioInstructionalDays, activateStudioYear } from "@/modules/academic-time/school-year-studio.functions";
+import { SchoolYearScheduleSetup } from "@/components/operations/SchoolYearScheduleSetup";
+import { useRouter } from "@tanstack/react-router";
 import { SchoolYearScheduleEditor } from "@/components/operations/SchoolYearScheduleEditor";
 
 export function SchoolYearCard({year:y,busy,run}:{year:Snapshot["years"][number],busy:boolean,run:(fn:()=>Promise<unknown>)=>Promise<void>}){
+ const router=useRouter();
  const [structure,setStructure]=useState<"full_year"|"semesters">("full_year");
  const proposedTerms=y.status==="draft"?schoolYearStructure(y.startsOn,y.endsOn,structure):[];
  const [termName,setTermName]=useState("Fall semester"),[termKey,setTermKey]=useState("fall");
@@ -85,7 +88,7 @@ export function SchoolYearCard({year:y,busy,run}:{year:Snapshot["years"][number]
      </div>
     </div>)}
     {y.schedules.map(schedule=><SchoolYearScheduleEditor key={schedule.id} schedule={schedule} run={run} busy={busy}/>)}
-    {!y.schedules.length&&<button disabled={busy} className="mt-3 rounded border px-3 py-2 text-sm" onClick={()=>run(()=>addStudioSchedule({data:{schoolYearId:y.id,...(y.programId?{programId:y.programId}:{}),name:"Standard instructional day",effectiveFrom:y.startsOn}}))}>Create weekday schedule</button>}
+    {!y.schedules.length&&<SchoolYearScheduleSetup schoolYearId={y.id} programId={y.programId??undefined} startsOn={y.startsOn} endsOn={y.endsOn} timezone={y.timezone} disabled={busy} changed={()=>router.invalidate()}/>}
    </section>
   </div>
  </article>;
