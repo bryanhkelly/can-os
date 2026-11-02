@@ -103,25 +103,30 @@ reservations, delivery arrangements, canonical Sections or `section_teachers`
 are created. The 15 class matches remain planning examples until a separate
 authorized school staffing flow explicitly provisions and assigns them.
 
-### Discovery screen
+### Teacher discovery in the standard marketplace
 
-The isolated demonstration screen is
+There is no demo application mode or separate demo-only teacher route.
+The regular school staffing entry point is
 `/operations/teacher-marketplace?programId=<school-program-uuid>`.
-It requires a signed-in school registrar authorized to view the selected
-program's curriculum and explicitly enabled isolated-demo environment flags:
+The same authenticated registrar and curricular adoption authorization
+applies to real and sample records. There are no runtime
+`CAN_DEMO_TEACHER_PREVIEW_ENABLED` or `CAN_DEMO_ISOLATED_ENV` switches.
 
-```
-CAN_DEMO_TEACHER_PREVIEW_ENABLED=true
-CAN_DEMO_ISOLATED_ENV=true
-```
+For adopted, entitled published courses, the service looks up actual teacher
+capabilities, current offerings, availability and provider memberships.
+Normal instructors belong to the school's academic provider organization.
+Synthetic instructors are discovered from the sample teaching-provider
+membership (`isSynthetic:true, demoProvider:true`), only for sample
+course templates. Each sample is visibly labeled, not treated as verified.
+A curriculum draft is not available for school teacher selection until
+its normal publication and adoption workflow is completed.
 
-Only adopted, entitled, published course versions are considered. Matching
-synthetic teachers are discovered through the actual course-capability and
-provider-membership links, rather than unrelated fixture JSON. Teachers are
-labeled Demo and not credential verified; the screen is read-only and links to
-the existing school/class staffing workflow. Ordinary production deployments
-must not enable these flags. The original 120-course draft/private pack cannot
-be adopted until the separate authorized demo-publication path is provided.
+The school administrator may request a candidate for a selected course or
+a particular existing Section. Requests use `teacher_staffing_request`
+Actions, not appointments. Eligibility, contract authority, availability,
+and real cross-school capacity still have to be validated through the
+existing canonical launch staffing / reservation services. Preview-only
+sample offerings are blocked from both reservations and replacements.
 
 ### Remaining product work (not claimed by this PR)
 
@@ -139,30 +144,24 @@ be adopted until the separate authorized demo-publication path is provided.
 
 ## November 2 — Post-setup CAN teacher selection
 
-School administrators complete school configuration and curriculum adoption
-before making staffing choices. A dedicated post-setup action in the academic
-launch workspace opens `/operations/teacher-marketplace?programId=<uuid>`.
-The market shows CAN-managed teachers mapped by course, with per-Section
-targeting when a class already exists. Teachers can serve multiple church
-schools only through independently verified scheduling, authorizations and
-shared-capacity reservations.
+Administrators configure schools and adopt curriculum first, then use
+the same CAN teacher marketplace to choose instructors. No special demo
+launch flag, UI pathway or alternative application tables are required.
 
-In isolated demos, the screen also displays the dedicated publisher's latest
-synthetic course drafts as **preview-only**. Draft courses and associated
-teacher matches are not adopted curricula and cannot be requested or assigned.
-Requests are enabled only for versions with active entitlement/adoption.
-The client validates and submits the chosen teacher and optional class to
-`requestDemoTeacherStaffing`. The server verifies the institutional program
-scope, exact adopted course release, current demo-provider membership,
-matching instructor capability, active preview offering, and class ownership
-before creating an idempotent program-scoped `teacher_staffing_request`
-Action with audit and domain-event evidence.
+`getTeacherMarketplace` lists real and explicitly labeled synthetic
+candidates matched to the selected authorized school, adopted curriculum
+and CAN provider affiliation. School-level selection may be narrowed to
+a specific already-created Section. `requestTeacherStaffing` verifies
+the provider relationship and records an idempotent, scoped CAN staffing
+Action with audit and event evidence. `listTeacherStaffingRequests`
+shows the current requests. None of this creates permission to teach,
+approved credentials, delivery arrangements or `section_teachers`.
+Direct assignments continue to use the independently authorized
+launch staffing workflow.
 
-An open request appears on the school screen, but **does not** issue a
-teacher credential, staffing role, delivery arrangement or `section_teachers`
-assignment. Existing CAN-authorized launch staffing is still the direct
-assignment/confirmation path. The CAN provider-facing review queue, real
-two-sided consent and capacity booking are separately outstanding.
+The dedicated synthetic generator, optional seeding command and guarded
+Neon loader are developer/data-operations utilities only. They are not
+required by application startup, school launch or instructor selection.
 
 ### One-command seed entry point
 
