@@ -80,16 +80,16 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
         </section>}
         {currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
 
-        <details className="mt-4 rounded-xl border bg-card p-4">
+        {currentProgram&&<details className="mt-4 rounded-xl border bg-card p-4">
           <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
           <p className="mt-2 text-sm text-muted-foreground">An authorized administrator can invite a school registrar to complete setup, or a website editor to prepare church-owned content. Choose the exact Site in the invitation workspace. Access starts only after secure email acceptance; institutional approval remains separate.</p>
           <nav aria-label="School launch staff invitations" className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
             <Link to="/admin" search={{siteId:schoolSelection.siteId,inviteRole:"registrar"}} className="underline">Invite a school setup lead</Link>
             <Link to="/admin" search={{siteId:schoolSelection.siteId,inviteRole:"site_website_editor"}} className="underline">Invite a church website editor</Link>
           </nav>
-        </details>
+        </details>}
 
-        {hasSchoolPreparation && <LaunchFamilyProgress
+        {hasSchoolPreparation && currentProgram && <LaunchFamilyProgress
           admissionsCounts={admissionsCounts}
           enrollmentCounts={enrollmentCounts}
           familyInvitations={familyInvitations}

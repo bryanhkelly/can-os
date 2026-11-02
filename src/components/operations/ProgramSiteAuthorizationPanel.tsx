@@ -82,7 +82,7 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     </p>
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
     {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {!status?<p className="mt-3 text-sm">Checking institutional authorization…</p>:
+    {!status?(error?<p className="mt-3 text-sm text-muted-foreground">Agreement status is unavailable. Ask your host registrar or CAN contact to review it, or refresh to try again. You can continue preparing the other school setup steps.</p>:<p role="status" className="mt-3 text-sm">Checking institutional authorization…</p>):
     status.authorization?<div className="mt-3 text-sm">
       <p><strong>Request v{status.authorization.version}:</strong> {status.authorization.status}
         {status.authorization.lapsed&&" — lapsed"}</p>
