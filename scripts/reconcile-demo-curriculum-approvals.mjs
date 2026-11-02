@@ -27,7 +27,7 @@ try {
     JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
     WHERE pv.pack_id=$1 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$1)`,[pack.rows[0].id]);
   const jurisdictions=await client.query("SELECT id FROM jurisdictions WHERE code IN ('US-TX','US-FL','US-AZ','US-WV','US-AR','US-IA','US-OK','US-WI')");
-  // Internal demo approvals must never overwrite real academic decisions.
+  // Never overwrite a real academic decision or reset an existing review decision.
   const conflicts=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
     WHERE a.academic_purpose='general_instruction'
       AND a.course_template_version_id=ANY($1::uuid[])
@@ -55,8 +55,7 @@ try {
         WHERE pv.pack_id=$2 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$2)) c
       CROSS JOIN (SELECT id FROM jurisdictions WHERE code IN ('US-TX','US-FL','US-AZ','US-WV','US-AR','US-IA','US-OK','US-WI')) j
       ON CONFLICT (course_template_version_id,jurisdiction_id,academic_purpose)
-      DO UPDATE SET status='in_review',authority_organization_id=EXCLUDED.authority_organization_id,
-      evidence=EXCLUDED.evidence,updated_at=now()`,[publisher.rows[0].id,pack.rows[0].id]);
+      DO NOTHING`,[publisher.rows[0].id,pack.rows[0].id]);
     await client.query("COMMIT");
     console.log(JSON.stringify({inReview:expected,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,scope:"internal_demo_only"},null,2));
   }
