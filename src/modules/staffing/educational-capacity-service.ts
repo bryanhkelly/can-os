@@ -846,6 +846,7 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
     const [replacement]=await tx.select({
       id:instructionalCapacityOfferings.id,personId:instructionalCapacityOfferings.personId,
       maxSeats:instructionalCapacityOfferings.maxSeats,status:instructionalCapacityOfferings.status,
+      metadata:instructionalCapacityOfferings.metadata,
       modality:instructionalCapacityOfferings.modality,
       organizationId:instructionalCapacityOfferings.organizationId,siteId:instructionalCapacityOfferings.siteId,
       programId:instructionalCapacityOfferings.programId,jurisdictionId:instructionalCapacityOfferings.jurisdictionId,
@@ -859,6 +860,7 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
         eq(instructorCapabilities.active,true),eq(instructorAvailabilityWindows.active,true)))
       .limit(1).for("update");
     if(!replacement||replacement.status!=="open")throw new Error("Replacement offering unavailable");
+    if(replacement.metadata?.previewOnly===true)throw new Error("Preview-only demo capacity cannot replace a real instructor");
     if(replacement.personId===old.oldPersonId)throw new Error("Replacement must be a different instructor");
     if(!scopedMatch(replacement,demand)||!modalityMatches(replacement.modality,demand.modality)||
       replacement.availableFrom>demand.startsAt||replacement.availableUntil<demand.endsAt)
