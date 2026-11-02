@@ -1,0 +1,1 @@
+ALTER TABLE "account_person_grants" DROP COLUMN "is_synthetic";

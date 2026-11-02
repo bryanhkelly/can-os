@@ -5,12 +5,14 @@
  * access_sessions, each bound to a synthetic person grant in an isolated fixture.
  */
 import { readFileSync } from "node:fs";
-import { expect,test,type Browser,type BrowserContext,type Page } from "@playwright/test";
+import { expect,test,type Page } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
-import { randomUUID, randomBytes } from "node:crypto";
-import { hashAccessSecret } from "../../src/domain/access-tokens";
-import { TEST_ACCESS_TOKEN_PEPPER } from "./env";
-import { accessSessionCookie,createGf1Fixture,destroyGf1Fixture,type Gf1Fixture,type Sql } from "./fixture";
+import { randomUUID } from "node:crypto";
+import { createGf1Fixture,destroyGf1Fixture,type Gf1Fixture,type Sql } from "./fixture";
+import { createAccessSession,withAuthenticatedPage } from "./helpers/authenticated-persona";
+import { createSyntheticPersonaGrant,createVerifiedAccessAccount } from "./helpers/canonical-fixture";
+import { expectAuditActionGroups } from "./helpers/evidence-assertions";
+import { expectProtectedPageDenied } from "./helpers/golden-flow-assertions";
 import { DATABASE_URL } from "./env";
 
 type Unit={
@@ -31,16 +33,6 @@ let fixture:Gf1Fixture|undefined;
 let extraAssessmentId:string|undefined;
 
 const dbRows=<T>(value:unknown)=>value as T[];
-async function signedIn(browser:Browser,secret:string){
- const context=await browser.newContext({baseURL:"http://localhost:3188"});
- // The existing fixture creates hashed server-side sessions with student or teacher
- // grants; only the opaque secret crosses into the corresponding browser.
- await context.addCookies([{
-  name:accessSessionCookie,value:secret,url:"http://localhost:3188",
-  path:"/",httpOnly:true,secure:true,sameSite:"Lax",
- }]);
- return {context,page:await context.newPage()};
-}
 async function installCurriculum(){
  if(!fixture)throw new Error("Missing isolated fixture");
  const f=fixture;
@@ -134,18 +126,13 @@ async function prepareSchoolMarketplace(){
   (person_id,organization_id,site_id,program_id,role_key,capabilities)
   VALUES($1,$2,$3,$4,'curriculum_adopter','["curriculum.adopt"]'::jsonb)
   RETURNING id`,[registrarPersonId,f.hostOrgId,f.siteId,f.programId]);
- const accountId=await one(`INSERT INTO access_accounts
-  (email_normalized,email_verified_at) VALUES($1,now()) RETURNING id`,
-  [`e2e-adopter-${suffix}@can-os.invalid`]);
- const grantId=await one(`INSERT INTO account_person_grants
-  (account_id,person_id,role,organization_id,site_id,active,is_synthetic)
-  VALUES($1,$2,'registrar',$3,$4,true,true) RETURNING id`,
-  [accountId,registrarPersonId,f.hostOrgId,f.siteId]);
- const registrarSecret=randomBytes(32).toString("base64url");
- await sql.query(`INSERT INTO access_sessions
-  (account_id,secret_hash,active_grant_id,expires_at)
-  VALUES($1,$2,$3,now()+interval '12 hours')`,
-  [accountId,hashAccessSecret(registrarSecret,TEST_ACCESS_TOKEN_PEPPER),grantId]);
+ const accountId=await createVerifiedAccessAccount(sql,`e2e-adopter-${suffix}@can-os.invalid`);
+ const grantId=await createSyntheticPersonaGrant(sql,{
+  accountId,personId:registrarPersonId,role:"registrar",organizationId:f.hostOrgId,siteId:f.siteId,
+ });
+ const registrarSecret=await createAccessSession(sql,{
+  accountId,activeGrantId:grantId,expiresAt:new Date(Date.now()+12*3600_000),
+ });
  adoptionBrowser={packId,packVersionId,registrarPersonId,accountId,grantId,
   roleAssignmentId,registrarSecret,packName};
 }
@@ -222,8 +209,7 @@ test.afterAll(async()=>{
 test("Algebra I: student lessons and submissions -> teacher guide and rubric grades -> student feedback",async({browser})=>{
  const f=fixture!;
  const a=adoptionBrowser!;
- const registrar=await signedIn(browser,a.registrarSecret);
- try{
+ await withAuthenticatedPage(browser,a.registrarSecret,async registrar=>{
   await test.step("school registrar installs and adopts a different publisher's public curriculum",async()=>{
    await registrar.page.goto(`/operations/curriculum-marketplace?programId=${f.programId}`);
    await expect(registrar.page.getByRole("heading",{name:"Curriculum Marketplace"})).toBeVisible();
@@ -249,9 +235,8 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
    await expect(registrar.page.getByRole("link",{name:"Curriculum Studio"})).toHaveCount(0);
    await expect(registrar.page.getByRole("heading",{name:"Import Common Cartridge"})).toHaveCount(0);
   });
- }finally{await registrar.context.close();}
- const student=await signedIn(browser,f.studentSecret);
- try{
+ },"http://localhost:3188");
+ await withAuthenticatedPage(browser,f.studentSecret,async student=>{
   await test.step("real enrolled student sees five published lessons and the 36-week planning boundary",async()=>{
    await student.page.goto(`/classes?section=${f.sectionId}`);
    await expect(student.page.getByText("Yearlong course roadmap")).toBeVisible();
@@ -284,33 +269,35 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
    }
   });
   await test.step("student receives no teacher-only answer guide",async()=>{
-   await student.page.goto(`/classes?section=${f.sectionId}&tab=teacher-guide`);
-   await expect(student.page.getByText("Teacher-only materials are unavailable")).toBeVisible();
+   await expectProtectedPageDenied(student.page,`/classes?section=${f.sectionId}&tab=teacher-guide`,{
+    denial:student.page.getByText("Teacher-only materials are unavailable"),
+    protectedContent:["Assessment answer guides"],
+   });
    await expect(student.page.getByRole("link",{name:"Teacher guide"})).toHaveCount(0);
   });
- }finally{await student.context.close();}
+ },"http://localhost:3188");
 
- const guardian=await signedIn(browser,f.guardianSecret);
- try {
+ await withAuthenticatedPage(browser,f.guardianSecret,async guardian=>{
   await test.step("authorized guardian can view the child class but not teacher answers",async()=>{
-   const response=await guardian.page.goto(`/classes?section=${f.sectionId}&student=${f.studentPersonId}&tab=teacher-guide`);
-   await expect(guardian.page.getByText("Teacher-only materials are unavailable")).toBeVisible();
-   expect((await response!.text())).not.toContain("Assessment answer guides");
+   await expectProtectedPageDenied(guardian.page,
+    `/classes?section=${f.sectionId}&student=${f.studentPersonId}&tab=teacher-guide`,{
+    denial:guardian.page.getByText("Teacher-only materials are unavailable"),
+    protectedContent:["Assessment answer guides"],
+   });
    await expect(guardian.page.getByRole("link",{name:"Teacher guide"})).toHaveCount(0);
   });
- }finally{await guardian.context.close();}
+ },"http://localhost:3188");
 
- const unrelated=await signedIn(browser,f.specialistSecret);
- try {
+ await withAuthenticatedPage(browser,f.specialistSecret,async unrelated=>{
   await test.step("unrelated specialist cannot load the Algebra I class or answer guide",async()=>{
-   const response=await unrelated.page.goto(`/classes?section=${f.sectionId}&tab=teacher-guide`);
-   await expect(unrelated.page.getByText("Sign in with an authorized student, parent or teacher account to open classes.")).toBeVisible();
-   expect((await response!.text())).not.toContain("Assessment answer guides");
+   await expectProtectedPageDenied(unrelated.page,`/classes?section=${f.sectionId}&tab=teacher-guide`,{
+    denial:unrelated.page.getByText("Sign in with an authorized student, parent or teacher account to open classes."),
+    protectedContent:["Assessment answer guides"],
+   });
   });
- }finally{await unrelated.context.close();}
+ },"http://localhost:3188");
 
- const teacher=await signedIn(browser,f.teacherSecret);
- try{
+ await withAuthenticatedPage(browser,f.teacherSecret,async teacher=>{
   await test.step("only the assigned teacher sees worked answers and interventions",async()=>{
    await teacher.page.goto(`/classes?section=${f.sectionId}&tab=teacher-guide`);
    await expect(teacher.page.getByText("Assessment answer guides")).toBeVisible();
@@ -324,10 +311,9 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
    await scoreInTeacherGradebook(teacher.page,extraAssessmentId!,[5,9,9,4],
     "Week 1 checkpoint feedback: explain the inequality boundary.");
   });
- }finally{await teacher.context.close();}
+ },"http://localhost:3188");
 
- const again=await signedIn(browser,f.studentSecret);
- try{
+ await withAuthenticatedPage(browser,f.studentSecret,async again=>{
   await test.step("student sees both posted grades and teacher feedback",async()=>{
    await again.page.goto(`/classes?section=${f.sectionId}`);
    await expect(again.page.getByText(/2 graded/)).toBeVisible();
@@ -337,12 +323,13 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
    await openStudentAssignment(again.page,extraAssessmentId!,unit.assessments[1]!.title);
    await expect(again.page.getByText(/Week 1 checkpoint feedback/)).toBeVisible();
    await expect(again.page.getByText(/27.*30/).first()).toBeVisible();
-   const audit=dbRows<{action:string}>(await sql.query(
-    `SELECT action FROM audit_events WHERE resource_id IN
-      (SELECT id FROM submissions WHERE assessment_id=ANY($1::uuid[]))
-      AND (action LIKE '%submit%' OR action LIKE '%grade%')`,[[f.assessmentId,extraAssessmentId!]]));
-   expect(audit.some(x=>x.action.includes("submit"))).toBe(true);
-   expect(audit.some(x=>x.action.includes("grade"))).toBe(true);
+   const firstSubmission=await latest(f.assessmentId);
+   const secondSubmission=await latest(extraAssessmentId!);
+   if(!firstSubmission||!secondSubmission)throw new Error("Missing graded submission evidence");
+   await expectAuditActionGroups(sql,{
+    resourceType:"submission",resourceIds:[firstSubmission.id,secondSubmission.id],
+    groups:[["assignment.submit","submission.submit"],["assignment.grade","submission.grade"]],
+   });
   });
- }finally{await again.context.close();}
+ },"http://localhost:3188");
 });

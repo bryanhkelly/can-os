@@ -3,7 +3,7 @@ command = "vite build"
 publish = "dist/client"
 
 [dev]
-command = "vite dev"
+command = "npm run dev"
 port = 3000
 
 # Baseline security headers. script-src/style-src allow 'unsafe-inline' because

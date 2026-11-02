@@ -3,11 +3,15 @@
  * Server-side composition only; not exported through a public route or called
  * from the demo UI until a real student session exists.
  */
-import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { localDayBoundsInTimezone } from "@/modules/calendar/timezone";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
+import { isCurrentCoursework } from "@/domain/student-today-coursework";
+import { isStudentAssessmentVisible } from "@/domain/assessment-availability";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
-  scheduledOccurrences, studentProfiles, submissions,
+  scheduledOccurrences, sites, studentProfiles, submissions, terms,
 } from "@/db/schema";
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
@@ -29,6 +33,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
 
   if (!student) throw new Error("Student not found");
 
+  const activeProgramMembership=alias(enrollments,"student_today_active_program");
   const activeSections = await db
     .select({
       sectionId: sections.id,
@@ -39,10 +44,20 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     })
     .from(enrollments)
     .innerJoin(sections, eq(enrollments.sectionId, sections.id))
+    .innerJoin(terms,eq(terms.id,sections.termId))
+    .innerJoin(activeProgramMembership,and(
+      eq(activeProgramMembership.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgramMembership.programId,sections.programId),
+      eq(activeProgramMembership.schoolYearId,terms.schoolYearId),
+      eq(activeProgramMembership.kind,"program"),
+      eq(activeProgramMembership.status,"active"),
+    ))
     .where(and(
       eq(enrollments.studentProfileId, studentProfileId),
       eq(enrollments.kind, "section"),
       eq(enrollments.status, "active"),
+      eq(enrollments.programId,sections.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(sections.active, true),
       ...(scope?[inArray(sections.siteId,scope.siteIds),inArray(sections.programId,scope.programIds)]:[]),
     ));
@@ -50,15 +65,25 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   const sectionIds = activeSections.map((row) => row.sectionId);
   const siteIds = [...new Set(activeSections.map((row) => row.siteId).filter((id): id is string => Boolean(id)))];
 
-  const startOfDay = new Date(at);
-  startOfDay.setUTCHours(0, 0, 0, 0);
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+  // Each enrolled Site owns its own local school day. One UTC range cannot
+  // represent a student who has classes at Sites in different timezones.
+  const siteTimezones = siteIds.length ? await db
+    .select({ siteId: sites.id, timezone: sites.timezone })
+    .from(sites).where(inArray(sites.id, siteIds)) : [];
+  const siteDays = siteTimezones.map(row => ({
+    siteId: row.siteId,
+    ...localDayBoundsInTimezone(at, row.timezone),
+  }));
+  const utcDay = localDayBoundsInTimezone(at, "UTC");
+  // Legacy summary fields represent the first enrolled Site. Individual event
+  // and coursework filtering always uses the appropriate Site's actual day.
+  const { start: startOfDay, end: endOfDay } = siteDays[0] ?? utcDay;
+  const sectionDayStart = new Map(activeSections.map(section => [
+    section.sectionId,
+    siteDays.find(day => day.siteId === section.siteId)?.start ?? startOfDay,
+  ] as const));
 
-  // Site calendar is the source of truth for operations/formation;
-  // a separate timezone-aware day boundary resolver will be required for
-  // local-day fidelity before live release.
-  const events = siteIds.length ? await db
+  const events = siteDays.length ? await db
     .select({
       id: calendarEvents.id,
       title: calendarEvents.title,
@@ -77,10 +102,13 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       eq(calendarEvents.scheduledOccurrenceId, scheduledOccurrences.id),
     )
     .where(and(
-      inArray(scheduledOccurrences.siteId, siteIds),
+      or(...siteDays.map(day => and(
+        eq(scheduledOccurrences.siteId, day.siteId),
+        gte(scheduledOccurrences.startsAt, day.start),
+        lt(scheduledOccurrences.startsAt, day.end),
+      ))),
       ...(scope?[or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,scope.programIds))]:[]),
-      gte(scheduledOccurrences.startsAt, startOfDay),
-      lt(scheduledOccurrences.startsAt, endOfDay),
+      ne(calendarEvents.type, "extended_learning_session"), // keep draft camp plans out of Student Today
       or(
         ...[
           ...sectionIds.map(id => eq(scheduledOccurrences.sectionId, id)),
@@ -93,10 +121,12 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   const coursework = sectionIds.length ? await db
     .select({
       submissionId: submissions.id,
+      attemptNumber: submissions.attemptNumber,
       assessmentId: assessments.id,
       assessmentTitle: assessments.title,
       instructions: assessments.instructions,
       dueAt: assessments.dueAt,
+      availableAt: assessments.availableAt,
       status: submissions.status,
       timeliness: submissions.timeliness,
       score: submissions.score,
@@ -106,19 +136,33 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       sectionId: assessments.sectionId,
       submittedAt: submissions.submittedAt,
     })
-    .from(submissions)
-    .innerJoin(assessments, eq(submissions.assessmentId, assessments.id))
-    .where(and(
+    .from(assessments)
+    .leftJoin(submissions, and(
+      eq(submissions.assessmentId, assessments.id),
       eq(submissions.studentProfileId, studentProfileId),
+    ))
+    .where(and(
       inArray(assessments.sectionId, sectionIds),
       eq(assessments.status, "published"),
-      or(
-        eq(submissions.timeliness, "missing"),
-        gte(assessments.dueAt, startOfDay),
-        gte(submissions.gradedAt, startOfDay),
-      ),
+      // Apply recency after selecting the latest attempt. Filtering attempts
+      // here could resurrect an older missing/graded attempt when a newer
+      // revision has already been submitted.
+
     ))
     .orderBy(asc(assessments.dueAt)) : [];
+
+  // A returned assessment may have several attempts. Student Today shows only
+  // the latest attempt; older feedback remains available in assignment history.
+  const latestCoursework = new Map<string, (typeof coursework)[number]>();
+  for (const row of coursework) {
+    const previous = latestCoursework.get(row.assessmentId);
+    if (!previous || (row.attemptNumber ?? 0) > (previous.attemptNumber ?? 0)) {
+      latestCoursework.set(row.assessmentId, row);
+    }
+  }
+  const currentCoursework = [...latestCoursework.values()].filter(row =>
+    isStudentAssessmentVisible({ status: "published", availableAt: row.availableAt }, at) &&
+    isCurrentCoursework(row, sectionDayStart.get(row.sectionId) ?? startOfDay));
 
   const openActions = await db
     .select({
@@ -146,9 +190,9 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     dayEndUtc: endOfDay,
     sections: activeSections,
     events,
-    coursework,
+    coursework: currentCoursework,
     openActions,
-    recoveryCandidates: coursework.filter(row =>
+    recoveryCandidates: currentCoursework.filter(row =>
       row.timeliness === "missing" ||
       (row.score !== null && row.pointsPossible !== null &&
        Number(row.pointsPossible) > 0 &&

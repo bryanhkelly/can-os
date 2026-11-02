@@ -11,6 +11,7 @@ import {
   listTranscriptIssuanceCandidates,
 } from "@/modules/learning/report-cards.functions";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
+import { summarizeRecordedTranscriptCredits } from "@/domain/recorded-credit-summary";
 
 const state = vi.hoisted(() => ({
   context: null as {
@@ -126,15 +127,13 @@ integration("GF25 report card and transcript", () => {
       sectionId: section!.id,
       personId: teacher!.id,
     });
-    await db.insert(s.enrollments).values([profile!, finalizationProfile!].map(studentProfile => ({
-      studentProfileId: studentProfile.id,
-      kind: "section" as const,
-      status: "active" as const,
-      organizationId: host!.id,
-      programId: program!.id,
-      sectionId: section!.id,
-      schoolYearId: academicTime.schoolYear.id,
-    })));
+    await db.insert(s.enrollments).values([profile!, finalizationProfile!].flatMap(studentProfile =>
+      (["program", "section"] as const).map(kind => ({
+        studentProfileId: studentProfile.id, kind, status: "active" as const,
+        organizationId: host!.id, programId: program!.id,
+        sectionId: kind === "section" ? section!.id : null,
+        schoolYearId: academicTime.schoolYear.id,
+      }))));
     const [assessment] = await db.insert(s.assessments).values({
       sectionId: section!.id,
       title: "Quarter assessment",
@@ -203,10 +202,24 @@ integration("GF25 report card and transcript", () => {
       role: "teacher",
       capabilities: new Set(["assignments:grade"]),
     };
-    await expect(finalizeSectionGrades({ data: {
-      sectionId: section!.id,
-      gradingPeriodId: academicTime.gradingPeriod.id,
-    } })).resolves.toEqual({ finalized: 1, skipped: 1 });
+    // A stale Section record must not finalize a withdrawn Program learner.
+    await db.update(s.enrollments).set({status:"withdrawn"}).where(and(
+      eq(s.enrollments.studentProfileId,finalizationProfile!.id),
+      eq(s.enrollments.kind,"program"),
+    ));
+    await expect(finalizeSectionGrades({data:{
+      sectionId:section!.id,gradingPeriodId:academicTime.gradingPeriod.id,
+    }})).resolves.toEqual({finalized:0,skipped:1});
+    await db.update(s.enrollments).set({status:"active"}).where(and(
+      eq(s.enrollments.studentProfileId,finalizationProfile!.id),
+      eq(s.enrollments.kind,"program"),
+    ));
+    const concurrentFinalizations = await Promise.all([0,1].map(()=>
+      finalizeSectionGrades({data:{
+        sectionId:section!.id,gradingPeriodId:academicTime.gradingPeriod.id,
+      }})));
+    expect(concurrentFinalizations.map(result=>result.finalized).sort()).toEqual([0,1]);
+    expect(concurrentFinalizations.map(result=>result.skipped).sort()).toEqual([1,2]);
     await expect(finalizeSectionGrades({ data: {
       sectionId: section!.id,
       gradingPeriodId: academicTime.gradingPeriod.id,
@@ -243,6 +256,20 @@ integration("GF25 report card and transcript", () => {
       role: "registrar",
       capabilities: new Set(["enrollment:manage"]),
     };
+    // A host registrar can read the school's own student records, but cannot
+    // impersonate the independently named CAN credit issuer.
+    state.context = {
+      ...state.context,
+      scope: { ...scope, organizationIds: [host!.id] },
+    };
+    await expect(issueTranscript({
+      data: { studentPersonId: student!.id, purpose: "Unauthorized external issuer" },
+    })).rejects.toThrow("verified credit-issuer organization grant");
+    const unauthorizedIssuances = await db.select({id:s.transcriptIssuances.id})
+      .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.studentProfileId,profile!.id));
+    expect(unauthorizedIssuances).toHaveLength(0);
+    state.context = { ...state.context, scope };
+
     const { issuanceId } = await issueTranscript({
       data: { studentPersonId: student!.id, purpose: "Official transcript" },
     });
@@ -292,6 +319,106 @@ integration("GF25 report card and transcript", () => {
     };
     await expect(getStudentTranscript({ data: { studentPersonId: student!.id } }))
       .resolves.toMatchObject({ rows: [expect.objectContaining({ letterGrade: "B" })] });
+
+    // A transcript is an academic record even when course credit units have
+    // not been configured. Add a finalized course with unknown credits to
+    // the SAME student, program, school and issuing institution.
+    const [uncreditedSection] = await db.insert(s.sections).values({
+      programId: program!.id,
+      siteId: site!.id,
+      courseTemplateVersionId: version!.id,
+      termId: academicTime.term.id,
+      code: `GF25-NOCREDIT-${suffix}`,
+      title: "Course With Credits Pending",
+      metadata: {},
+    }).returning();
+    await db.insert(s.enrollments).values({
+      studentProfileId: profile!.id,
+      kind: "section",
+      status: "active",
+      organizationId: host!.id,
+      programId: program!.id,
+      sectionId: uncreditedSection!.id,
+      schoolYearId: academicTime.schoolYear.id,
+    });
+    await db.insert(s.sectionGrades).values({
+      sectionId: uncreditedSection!.id,
+      studentProfileId: profile!.id,
+      gradingPeriodId: academicTime.gradingPeriod.id,
+      termId: academicTime.term.id,
+      status: "finalized",
+      score: "87",
+      percentage: "87",
+      letterGrade: "B",
+      gradeScaleId: academicTime.gradeScale.id,
+      finalizedByPersonId: teacher!.id,
+      finalizedAt: new Date(),
+    });
+    state.context = {
+      ...state.context,
+      actorPersonId: student!.id,
+      role: "student",
+      capabilities: new Set(["student:read"]),
+    };
+    const academicHistory = await getStudentTranscript({ data: {} });
+    const creditReview = summarizeRecordedTranscriptCredits(academicHistory.rows);
+    expect(creditReview.byIssuer).toEqual([
+      expect.objectContaining({
+        issuerId: issuer!.id,
+        issuerName: issuer!.name,
+        earnedUnits: 1, attemptedUnits: 1,
+        incompleteEntries: 1, conflictingEntries: 0,
+        subjects: [expect.objectContaining({
+          subject: "Science", earnedUnits: 1, attemptedUnits: 1,
+          incompleteEntries: 1,
+        })],
+      }),
+    ]);
+    expect(creditReview.graduationStatus).toBe("not_evaluated");
+    expect(creditReview.diplomaAuthorized).toBe(false);
+    expect(academicHistory.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({sectionId: section!.id, subject: "Science", terminalPeriod:true}),
+      expect.objectContaining({sectionId: uncreditedSection!.id, subject: "Science", terminalPeriod:true}),
+    ]));
+    expect(academicHistory.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sectionId: section!.id, creditsEarned: 1 }),
+      expect.objectContaining({
+        sectionId: uncreditedSection!.id,
+        sectionTitle: "Course With Credits Pending",
+        letterGrade: "B",
+        creditConfigured: false,
+        creditsAttempted: null,
+        creditsEarned: null,
+      }),
+    ]));
+    state.context = {
+      ...state.context,
+      actorPersonId: registrar!.id,
+      role: "registrar",
+      capabilities: new Set(["enrollment:manage"]),
+    };
+    const withUnknownCredit = await issueTranscript({
+      data: { studentPersonId: student!.id, purpose: "Transcript with unrecorded credits" },
+    });
+    const [issuedWithUnknown] = await db.select().from(s.transcriptIssuances)
+      .where(eq(s.transcriptIssuances.id, withUnknownCredit.issuanceId));
+    expect(issuedWithUnknown!.issuingOrganizationId).toBe(issuer!.id);
+    expect(issuedWithUnknown!.snapshot.unrecordedCreditRows).toBe(1);
+    expect(issuedWithUnknown!.snapshot.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sectionId: uncreditedSection!.id,
+        creditsAttempted: null,
+        creditsEarned: null,
+        letterGrade: "B",
+      }),
+    ]));
+    // The earlier issued transcript is still the immutable original snapshot.
+    const [originalSnapshot] = await db.select().from(s.transcriptIssuances)
+      .where(eq(s.transcriptIssuances.id, issuanceId));
+    expect(originalSnapshot!.snapshot.rows).toHaveLength(1);
+    expect(originalSnapshot!.snapshot.rows).toEqual([
+      expect.objectContaining({ creditsEarned: 1, letterGrade: "A" }),
+    ]);
 
     const corrections = await db.select().from(s.auditEvents).where(and(
       eq(s.auditEvents.resourceType, "section_grade"),

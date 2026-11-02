@@ -23,6 +23,7 @@ export const assignmentMissingSubscriptionPolicy: SubscriptionEventPolicy<Assign
 
   load: (tx: PolicyTx, event: DomainEventRecord) =>
     assignmentMissingPolicy.load(tx, event),
+  organizationId: context => context.organizationId,
 
   subjects(context) {
     return [

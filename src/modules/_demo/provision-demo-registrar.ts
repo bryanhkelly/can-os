@@ -4,10 +4,11 @@ import {
   accessAccounts, accountPersonGrants, memberships, organizations, people,
   programs, roleAssignments, sites,
 } from "@/db/schema";
-import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
-import { listDemoSourceGrants } from "@/modules/identity/demo-facilitator.server";
+import { isLocalDemoProvisioningEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { listDemoSourceGrants } from "@/modules/identity/session-grants.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 export const demoRegistrar = {
   personId: "f7000000-0000-4000-8000-000000000001",
   accountId: "f7000000-0000-4000-8000-000000000002",
@@ -15,7 +16,7 @@ export const demoRegistrar = {
   roleAssignmentId: "f7000000-0000-4000-8000-000000000005",
   organizationId: "f1000000-0000-4000-8000-000000000002",
   siteId: "f1000000-0000-4000-8000-000000000003",
-  email: "alex.registrar@can-os.invalid",
+  email: "alex.registrar@valorschool.demo",
 } as const;
 
 export const demoRegistrarInstitutionalCapabilities = [
@@ -29,7 +30,6 @@ export const demoRegistrarInstitutionalCapabilities = [
 type DemoEnvironment = {
   NODE_ENV?: string;
   CAN_DEMO_FIXED_ACCESS_ENABLED?: string;
-  CAN_DEMO_WRITES_ENABLED?: string;
 };
 
 /** Explicit operator bootstrap, never called by login or an application request. */
@@ -42,8 +42,8 @@ async function provisionScopedRegistrar(
   fixture: { personId: string; accountId: string; grantId: string; roleAssignmentId: string;
     organizationId: string; siteId: string; email: string },
 ) {
-  if (!isLocalDemoAccessEnabled(env) || env.CAN_DEMO_WRITES_ENABLED !== "true") {
-    throw new Error("Registrar provisioning requires local/test demo access and synthetic writes enabled");
+  if (!isLocalDemoProvisioningEnabled(env)) {
+    throw new Error("Registrar provisioning requires local/test mode and CAN_DEMO_FIXED_ACCESS_ENABLED=true");
   }
   const isAdmin = fixture.accountId === LOCAL_DEMO_ADMIN.accountId;
   return database.transaction(async tx => {
@@ -54,7 +54,7 @@ async function provisionScopedRegistrar(
     const sitePrograms = await tx.select().from(programs).where(eq(programs.siteId, fixture.siteId));
     if (organization?.metadata.synthetic !== true || site?.metadata.synthetic !== true ||
       site.organizationId !== fixture.organizationId ||
-      sitePrograms.some(program => program.organizationId !== fixture.organizationId || program.metadata.synthetic !== true)) {
+      sitePrograms.some(program => program.organizationId !== fixture.organizationId)) {
       throw new Error("Registrar provisioning requires the existing isolated synthetic demo school and site");
     }
 
@@ -81,18 +81,25 @@ async function provisionScopedRegistrar(
     if (accountRows.length) changes.push("account");
     const [account] = await tx.select().from(accessAccounts)
       .where(eq(accessAccounts.id, fixture.accountId)).for("update");
-    if (!account || account.emailNormalized !== fixture.email || account.disabled) {
+    if (account?.emailNormalized === fixture.email.replace("@valorschool.demo", "@can-os.invalid")) {
+      await tx.update(accessAccounts).set({ emailNormalized: fixture.email, updatedAt: new Date() })
+        .where(eq(accessAccounts.id, fixture.accountId));
+      changes.push("account_email");
+    }
+    const [currentAccount] = await tx.select().from(accessAccounts)
+      .where(eq(accessAccounts.id, fixture.accountId)).for("update");
+    if (!currentAccount || currentAccount.emailNormalized !== fixture.email || currentAccount.disabled) {
       throw new Error("Demo registrar account conflicts with an existing or disabled account");
     }
     const grantRows = await tx.insert(accountPersonGrants).values({
       id: fixture.grantId, accountId: fixture.accountId, personId: fixture.personId,
-      role: "registrar", organizationId: fixture.organizationId, siteId: fixture.siteId, isSynthetic: true,
+      role: "registrar", organizationId: fixture.organizationId, siteId: fixture.siteId,
     }).onConflictDoNothing().returning({ id: accountPersonGrants.id });
     if (grantRows.length) changes.push("access_grant");
     const accountGrants = await tx.select().from(accountPersonGrants)
       .where(eq(accountPersonGrants.accountId, fixture.accountId)).for("update");
-    if ((!isAdmin && accountGrants.length !== 1) || !accountGrants.some(grant =>
-      grant.id === fixture.grantId && grant.active && grant.isSynthetic &&
+    if ((!isAdmin && accountGrants.filter(grant => grant.active).length !== 1) || !accountGrants.some(grant =>
+      grant.id === fixture.grantId && grant.active &&
       grant.role === "registrar" && grant.personId === fixture.personId &&
       grant.organizationId === fixture.organizationId && grant.siteId === fixture.siteId)) {
       throw new Error("Demo registrar access grants conflict; no existing authority will be replaced");
@@ -140,7 +147,7 @@ async function provisionScopedRegistrar(
         context: { method: "operator_bootstrap", synthetic: true },
       });
       await emitEvent(tx, {
-        eventType: "DemoRegistrarProvisioned", aggregateType: "person", aggregateId: fixture.personId,
+        eventType: EventTypes.DemoRegistrarProvisioned, aggregateType: "person", aggregateId: fixture.personId,
         ...scope, payload: { changes, roleAssignmentId: role.id, synthetic: true },
       });
     }
@@ -152,39 +159,71 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
   return database.transaction(async tx => {
     const registrar = await provisionDemoRegistrar(tx, env);
     const admin = await provisionScopedRegistrar(tx, env, LOCAL_DEMO_ADMIN);
+    const changedAccounts: string[] = [];
+    const sourceFixtures = [
+      { suffix: "1", email: "jordan.student@valorschool.demo", role: "student", personId: "f1000000-0000-4000-8000-000000000005" },
+      { suffix: "2", email: "riley.teacher@valorschool.demo", role: "teacher", personId: "f1000000-0000-4000-8000-000000000006" },
+      { suffix: "3", email: "casey.specialist@valorschool.demo", role: "specialist", personId: "f4100000-0000-4000-8000-000000000003" },
+      { suffix: "4", email: "morgan.guardian@valorschool.demo", role: "guardian", personId: "f3000000-0000-4000-8000-000000000007" },
+    ];
+    for (const fixture of sourceFixtures) {
+      const accountId = `fa000000-0000-4000-8000-${fixture.suffix.padStart(12, "0")}`;
+      const [account] = await tx.select().from(accessAccounts)
+        .where(eq(accessAccounts.id, accountId)).for("update");
+      if (!account) continue;
+      if (account.disabled || ![fixture.email, fixture.email.replace("@valorschool.demo", "@can-os.invalid")].includes(account.emailNormalized)) {
+        throw new Error("Legacy demo source account conflicts with the approved identity");
+      }
+      const [person] = await tx.select().from(people)
+        .where(eq(people.id, fixture.personId)).for("update");
+      const grants = await tx.select().from(accountPersonGrants)
+        .where(eq(accountPersonGrants.accountId, accountId)).for("update");
+      if (!person?.active || person.metadata.synthetic !== true || !grants.some(grant =>
+        grant.id === `fb000000-0000-4000-8000-${fixture.suffix.padStart(12, "0")}` &&
+        grant.active && grant.personId === fixture.personId && grant.role === fixture.role &&
+        grant.organizationId === LOCAL_DEMO_ADMIN.organizationId && grant.siteId === LOCAL_DEMO_ADMIN.siteId)) {
+        throw new Error("Legacy demo source membership is inactive or conflicts with the approved tenant");
+      }
+      if (account.emailNormalized === fixture.email) continue;
+      const conflicts = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
+        .where(eq(accessAccounts.emailNormalized, fixture.email));
+      if (conflicts.length) throw new Error("Demo source address belongs to another account");
+      await tx.update(accessAccounts).set({ emailNormalized: fixture.email, updatedAt: new Date() })
+        .where(eq(accessAccounts.id, accountId));
+      changedAccounts.push(accountId);
+    }
     const sources = await listDemoSourceGrants(tx);
     const expectedEmails = LOCAL_DEMO_ACCOUNTS.filter(account => account.email !== LOCAL_DEMO_ADMIN.email);
     if (sources.length !== expectedEmails.length || expectedEmails.some(account =>
       !sources.some(source => source.email === account.email))) {
-      throw new Error("Every approved demo user must have exactly one active synthetic school grant before enabling the admin");
+      throw new Error("Every approved demo user must have exactly one active school grant before enabling the admin");
     }
-    const desiredGrants = [{
-      id: LOCAL_DEMO_ADMIN.facilitatorGrantId, personId: LOCAL_DEMO_ADMIN.personId, role: "demo_facilitator",
-    }];
     const changedGrants: string[] = [];
-    for (const desired of desiredGrants) {
-      const inserted = await tx.insert(accountPersonGrants).values({
-        ...desired, accountId: LOCAL_DEMO_ADMIN.accountId,
-        organizationId: LOCAL_DEMO_ADMIN.organizationId, siteId: LOCAL_DEMO_ADMIN.siteId, isSynthetic: true,
-      }).onConflictDoNothing().returning({ id: accountPersonGrants.id });
-      const [grant] = await tx.select().from(accountPersonGrants).where(eq(accountPersonGrants.id, desired.id));
-      if (!grant || grant.accountId !== LOCAL_DEMO_ADMIN.accountId || grant.personId !== desired.personId ||
-        grant.role !== desired.role || !grant.active || !grant.isSynthetic ||
-        grant.organizationId !== LOCAL_DEMO_ADMIN.organizationId || grant.siteId !== LOCAL_DEMO_ADMIN.siteId) {
-        throw new Error("Existing demo facilitator grant conflicts; revoked authority will not be reactivated");
-      }
-      if (inserted.length) changedGrants.push(grant.id);
-    }
-    // Retire the initial mirrored-grant representation without reviving revoked access.
-    for (const [index, account] of expectedEmails.entries()) {
-      const id = `f7100000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`;
-      const [legacy] = await tx.select().from(accountPersonGrants).where(eq(accountPersonGrants.id, id)).for("update");
+    const legacyGrants = [
+      {
+        id: LOCAL_DEMO_ADMIN.facilitatorGrantId,
+        personId: LOCAL_DEMO_ADMIN.personId,
+        role: "demo_facilitator",
+      },
+      ...expectedEmails.map((account, index) => {
+        const source = sources.find(grant => grant.email === account.email);
+        if (!source) throw new Error("Demo source membership is unavailable");
+        return {
+          id: `f7100000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`,
+          personId: source.personId,
+          role: source.role,
+        };
+      }),
+    ];
+    for (const expected of legacyGrants) {
+      const [legacy] = await tx.select().from(accountPersonGrants)
+        .where(eq(accountPersonGrants.id, expected.id)).for("update");
       if (!legacy) continue;
-      const source = sources.find(grant => grant.email === account.email)!;
-      if (legacy.accountId !== LOCAL_DEMO_ADMIN.accountId || legacy.personId !== source.personId ||
-        legacy.role !== source.role || !legacy.isSynthetic ||
-        legacy.organizationId !== LOCAL_DEMO_ADMIN.organizationId || legacy.siteId !== LOCAL_DEMO_ADMIN.siteId) {
-        throw new Error("Legacy demo grant conflicts with synthetic scope");
+      if (legacy.accountId !== LOCAL_DEMO_ADMIN.accountId || legacy.personId !== expected.personId ||
+        legacy.role !== expected.role ||
+        legacy.organizationId !== LOCAL_DEMO_ADMIN.organizationId ||
+        legacy.siteId !== LOCAL_DEMO_ADMIN.siteId) {
+        throw new Error("Legacy demo account grant conflicts with the expected tenant scope");
       }
       if (legacy.active) {
         await tx.update(accountPersonGrants).set({ active: false, updatedAt: new Date() })
@@ -192,19 +231,19 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
         changedGrants.push(legacy.id);
       }
     }
-    if (changedGrants.length) {
+    if (changedGrants.length || changedAccounts.length) {
       const scope = { organizationId: LOCAL_DEMO_ADMIN.organizationId, siteId: LOCAL_DEMO_ADMIN.siteId };
       await writeAudit(tx, {
-        actorPersonId: null, action: "demo.facilitator.provision", resourceType: "account",
-        resourceId: LOCAL_DEMO_ADMIN.accountId, scope, after: { grantIds: changedGrants },
-        context: { method: "operator_bootstrap", synthetic: true },
+        actorPersonId: null, action: "demo.account.switching.provision", resourceType: "account",
+        resourceId: LOCAL_DEMO_ADMIN.accountId, scope, after: { grantIds: changedGrants, accountIds: changedAccounts },
+        context: { method: "operator_bootstrap", retiredLegacyGrantIds: changedGrants, normalizedAccountIds: changedAccounts },
       });
       await emitEvent(tx, {
-        eventType: "DemoFacilitatorProvisioned", aggregateType: "account",
+        eventType: EventTypes.DemoFacilitatorProvisioned, aggregateType: "account",
         aggregateId: LOCAL_DEMO_ADMIN.accountId, ...scope,
-        payload: { grantIds: changedGrants, synthetic: true },
+        payload: { retiredLegacyGrantIds: changedGrants, normalizedAccountIds: changedAccounts },
       });
     }
-    return { registrar, admin, changedGrants };
+    return { registrar, admin, changedGrants, changedAccounts };
   });
 }

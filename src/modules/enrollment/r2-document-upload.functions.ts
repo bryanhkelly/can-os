@@ -1,8 +1,8 @@
 import { db } from "@/db/client";
 import { applications,documents,journeyRequirements,journeys } from "@/db/schema";
-import { assertR2DemoEnabled } from "@/domain/r2-document-access";
+import {assertR2DemoEnabled,enrollmentDocumentStorageVerified} from "@/domain/r2-document-access";
 import { EventTypes } from "@/domain/event-types";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -18,13 +18,12 @@ async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upl
  const app=await authorizeEnrollmentApplication(context,applicationId);
  if(mode==="upload"&&["withdrawn","declined"].includes(app.stage))
   throw new Error("This application is closed to enrollment document changes");
- if(mode==="upload"&&app.metadata.synthetic===true){
+ if(mode==="upload"&&isDemoTenantOrganization(app.organizationId)){
   assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
-  assertSyntheticMutation(context.role);
  }else if(mode==="upload"&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
   throw new Error("Live enrollment document uploads are not enabled for this deployment");
  }
- return {...context,actorPersonId:context.actorPersonId};
+ return {...context,actorPersonId:context.actorPersonId,organizationId:app.organizationId};
 }
 async function requirementScope(applicationId:string,requirementId:string,allowClosed=false){
  const [app]=await db.select({id:applications.id}).from(applications).where(eq(applications.id,applicationId)).limit(1);
@@ -101,12 +100,12 @@ export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
 export const getEnrollmentDocumentDownload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),documentId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
-  await uploadsEnabled(data.applicationId,"download");
+  const {organizationId}=await uploadsEnabled(data.applicationId,"download");
   await requirementScope(data.applicationId,data.requirementId,true);
   const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
    .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
   if(!record||record.metadata.applicationId!==data.applicationId||record.metadata.isCurrent===false||
-    (record.metadata.storageVerified!==true&&record.metadata.synthetic!==true))throw new Error("Document not found within the current verified enrollment requirement");
+    !enrollmentDocumentStorageVerified(record.metadata,organizationId))throw new Error("Document not found within the current verified enrollment requirement");
   const expectedPrefix="enrollment/"+data.applicationId+"/"+data.requirementId+"/";
   if(!record.storageKey.startsWith(expectedPrefix))throw new Error("Document storage scope mismatch");
   return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60),expiresInSeconds:60};

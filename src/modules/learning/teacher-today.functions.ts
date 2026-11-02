@@ -1,21 +1,29 @@
+import { latestSubmissionCondition } from "./latest-submission.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { accessibleClasses } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
+import { readFirstClassrooms } from "./first-classroom.server";
+import type { FirstClassroom } from "@/domain/first-classroom";
+import { projectTeacherSections } from "@/domain/teacher-classroom-projection";
 
 async function assertTeacher() {
  const context = await getCommandContext(getRequest());
  if (context.role !== "teacher" || !context.actorPersonId) throw new AuthorizationError("teacher identity");
  assertCapability(context, "assignments:grade");
- if (!context.scope.siteIds?.length) throw new AuthorizationError("teacher site membership");
+ if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length)
+  throw new AuthorizationError("named teaching assignment scope");
  return context;
 }
 
 const EMPTY_TODAY = {
  connected: false,
  teacher: { firstName: "" },
- sections: [] as { id: string; title: string; studentCount: number }[],
+ sections: [] as { id: string; title: string; studentCount: number | null; classroom: FirstClassroom | null }[],
  ungraded: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; submittedAt: string | null }[],
  missingWork: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string }[],
  notices: [] as { id: string; title: string; body: string | null; status: string; createdAt: string }[],
@@ -34,37 +42,36 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  const [teacher] = await db.select({ firstName: s.people.legalFirstName })
   .from(s.people).where(eq(s.people.id, context.actorPersonId!)).limit(1);
 
- const assigned = await db.select({ sectionId: s.sections.id, title: s.sections.title })
-  .from(s.sectionTeachers)
-  .innerJoin(s.sections, and(
-   eq(s.sections.id, s.sectionTeachers.sectionId),
-   inArray(s.sections.siteId, context.scope.siteIds!),
-  ))
-  .where(eq(s.sectionTeachers.personId, context.actorPersonId!));
+ // Use exactly the teaching scope accepted by the actual classroom.
+ // Institution-owned CAN teachers need their delegated Section even when
+ // they do not possess a church Site or Program-wide grant.
+ const classDirectory=await accessibleClasses(context as Actor);
+ const assigned=classDirectory.map(row=>({sectionId:row.id,title:row.title}));
  const sectionIds = [...new Set(assigned.map(row => row.sectionId))];
  if (!sectionIds.length) {
   return { ...EMPTY_TODAY, connected: true, teacher: { firstName: teacher?.firstName ?? "" } };
  }
 
- const counts = await db.select({
-  sectionId: s.enrollments.sectionId,
-  studentCount: sql<number>`count(*)::int`,
- }).from(s.enrollments)
-  .where(and(
-   eq(s.enrollments.kind, "section"),
-   eq(s.enrollments.status, "active"),
-   inArray(s.enrollments.sectionId, sectionIds),
-  ))
-  .groupBy(s.enrollments.sectionId);
- const countBySection = new Map(counts.map(row => [row.sectionId, Number(row.studentCount)]));
- const sections = assigned.map(row => ({
-  id: row.sectionId,
-  title: row.title,
-  studentCount: countBySection.get(row.sectionId) ?? 0,
- }));
+ const activeProgram=alias(s.enrollments,"teacher_today_active_program");
+ const liveSectionMembership=and(
+   eq(s.enrollments.kind,"section"),
+   eq(s.enrollments.status,"active"),
+   eq(s.sections.active,true),
+   eq(s.enrollments.programId,s.sections.programId),
+   eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+   inArray(s.enrollments.sectionId,sectionIds),
+ );
+ const classrooms = await readFirstClassrooms(sectionIds);
+ const sections = projectTeacherSections(assigned, classrooms);
 
  // submission_status has no "late" value; late work arrives as status "submitted"
  // with timeliness "late", so the queue keys on ungraded submitted attempts.
+ // A historical submission must not remain in the live daily grading queue
+ // after its student leaves this Section or their same-year Program. Historical
+ // grades remain in the academic record; current teacher work follows the
+ // same enrollment boundary as the roster and missing-work queue.
+ const submittedSection=alias(s.enrollments,"teacher_today_submitted_section");
+ const submittedProgram=alias(s.enrollments,"teacher_today_submitted_program");
  const ungradedRows = await db.select({
   sectionId: s.sections.id,
   assessmentId: s.submissions.assessmentId,
@@ -77,10 +84,29 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  }).from(s.submissions)
   .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
   .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(submittedSection,and(
+    eq(submittedSection.sectionId,s.sections.id),
+    eq(submittedSection.studentProfileId,s.submissions.studentProfileId),
+    eq(submittedSection.programId,s.sections.programId),
+    eq(submittedSection.schoolYearId,s.terms.schoolYearId),
+    eq(submittedSection.kind,"section"),eq(submittedSection.status,"active"),
+  ))
+  .innerJoin(submittedProgram,and(
+    eq(submittedProgram.studentProfileId,s.submissions.studentProfileId),
+    eq(submittedProgram.programId,s.sections.programId),
+    eq(submittedProgram.schoolYearId,s.terms.schoolYearId),
+    eq(submittedProgram.kind,"program"),eq(submittedProgram.status,"active"),
+  ))
   .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.submissions.studentProfileId))
   .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
   .where(and(
    inArray(s.assessments.sectionId, sectionIds),
+   eq(s.sections.active, true),
+   // Closing submissions does not finish the teacher's grading obligation.
+   // Existing accepted work remains reviewable in the canonical gradebook.
+   inArray(s.assessments.status, ["published", "closed"]),
+   latestSubmissionCondition(db),
    eq(s.submissions.status, "submitted"),
    isNull(s.submissions.gradedAt),
    isNull(s.submissions.score),
@@ -110,6 +136,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
   .where(and(
    inArray(s.assessments.sectionId, sectionIds),
+   eq(s.sections.active, true),
    inArray(s.assessments.status, ["published", "closed"]),
    lt(s.assessments.dueAt, now),
   ));
@@ -120,13 +147,17 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   firstName: s.people.legalFirstName,
   lastName: s.people.legalLastName,
  }).from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(activeProgram,and(
+    eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+    eq(activeProgram.programId,s.sections.programId),
+    eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+    eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+  ))
   .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
   .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
-  .where(and(
-   eq(s.enrollments.kind, "section"),
-   eq(s.enrollments.status, "active"),
-   inArray(s.enrollments.sectionId, sectionIds),
-  )) : [];
+  .where(liveSectionMembership) : [];
 
  const attempts = due.length ? await db.select({
   assessmentId: s.submissions.assessmentId,

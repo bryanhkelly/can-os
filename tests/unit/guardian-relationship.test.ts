@@ -34,6 +34,7 @@ describe("guardian relationship predicates", () => {
   it.each([
     ["enrollment", guardianRelationships.canManageEnrollment],
     ["attendance-excuse", guardianRelationships.canSubmitAttendanceExcuse],
+    ["pickup", guardianRelationships.canManagePickup],
   ] as const)("requires the configured %s permission", (access, column) => {
     const query = dialect.sqlToQuery(guardianRelationshipPredicate({
       guardianPersonId: "guardian-1",

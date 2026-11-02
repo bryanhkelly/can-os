@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   assessments,
   guardianRelationships,
@@ -10,6 +10,7 @@ import {
   submissions,
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import type {
   DomainEventRecord,
   NotificationPlan,
@@ -74,12 +75,9 @@ export const assignmentMissingPolicy: NotificationPolicy<AssignmentMissingContex
     const guardians = await tx
       .select({ personId: guardianRelationships.guardianPersonId })
       .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.studentPersonId, record.studentPersonId),
-          eq(guardianRelationships.canViewAcademics, true),
-        ),
-      );
+      .where(guardianRelationshipPredicate({
+        studentPersonId:record.studentPersonId,access:"academic",
+      }));
 
     const teachers = await tx
       .select({ personId: sectionTeachers.personId })

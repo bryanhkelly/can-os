@@ -21,6 +21,7 @@ type CommandContext,
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
 import {
+cancelProjection,
 publishProjection,
 rescheduleProjection,
 } from "@/platform/calendar/projection";
@@ -128,7 +129,9 @@ async function assertEnrollmentEligibility(
     .where(
       and(
         eq(enrollments.studentProfileId, input.studentProfileId),
+        eq(enrollments.kind, "program"),
         eq(enrollments.status, "active"),
+        eq(programs.status, "active"),
         eq(programs.siteId, input.siteId),
         inArray(programs.id, input.programIds),
       ),
@@ -513,6 +516,106 @@ export async function rescheduleConferenceBooking(
       scope: { siteId: current.siteId },
       before: { slotId: current.oldSlotId },
       after: { slotId: nextSlot.id },
+    });
+  });
+}
+
+/**
+ * Cancel an active booking and free its slot. The booking guardian cancels
+ * with the same "conference.book" capability used to book; the owning teacher
+ * cancels with "conference.manage". Cancelling an already-cancelled booking
+ * is an idempotent no-op so retries and double-clicks stay safe; completing a
+ * cancelled booking is unchanged. Deferred reminder delivery is a documented
+ * schema limitation, so cancellation only stops the slot and calendar
+ * projection (see the TODO on the reminders platform).
+ */
+export async function cancelConferenceBooking(
+  context: CommandContext,
+  input: {
+    bookingId: string;
+    reason?: string;
+  },
+): Promise<void> {
+  if (!context.actorPersonId) throw new Error("Actor identity is required");
+  const actorPersonId = context.actorPersonId;
+
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({
+        bookingId: conferenceBookings.id,
+        status: conferenceBookings.status,
+        studentProfileId: conferenceBookings.studentProfileId,
+        guardianPersonId: conferenceBookings.guardianPersonId,
+        slotId: conferenceSlots.id,
+        teacherPersonId: conferenceSeries.teacherPersonId,
+        siteId: conferenceSeries.siteId,
+      })
+      .from(conferenceBookings)
+      .innerJoin(
+        conferenceSlots,
+        eq(conferenceSlots.id, conferenceBookings.conferenceSlotId),
+      )
+      .innerJoin(
+        conferenceSeries,
+        eq(conferenceSeries.id, conferenceSlots.conferenceSeriesId),
+      )
+      .where(eq(conferenceBookings.id, input.bookingId))
+      .for("update")
+      .limit(1);
+
+    if (!current) throw new Error("Conference booking not found");
+    assertSiteScope(context, current.siteId);
+
+    if (actorPersonId === current.guardianPersonId) {
+      assertCapability(context, "conference.book");
+    } else if (actorPersonId === current.teacherPersonId) {
+      assertCapability(context, "conference.manage");
+    } else {
+      throw new AuthorizationError("conference booking owner");
+    }
+
+    if (current.status === "cancelled") return;
+    if (current.status !== "booked") {
+      throw new Error("Only a booked conference can be cancelled");
+    }
+
+    await tx
+      .update(conferenceBookings)
+      .set({
+        status: "cancelled",
+        cancelledAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(conferenceBookings.id, current.bookingId));
+
+    await cancelProjection(tx, {
+      sourceType: "conference_booking",
+      sourceId: current.bookingId,
+      reason: input.reason,
+    });
+
+    await releaseClaimedSlot(tx, current.slotId);
+
+    await emitEvent(tx, {
+      eventType: EventTypes.ConferenceCancelled,
+      aggregateType: "conference_booking",
+      aggregateId: current.bookingId,
+      actorPersonId,
+      siteId: current.siteId,
+      payload: {
+        studentProfileId: current.studentProfileId,
+        slotId: current.slotId,
+        cancelledBy: actorPersonId === current.guardianPersonId ? "guardian" : "teacher",
+      },
+    });
+
+    await writeAudit(tx, context, {
+      action: "conference.cancel",
+      entityType: "conference_booking",
+      entityId: current.bookingId,
+      scope: { siteId: current.siteId },
+      before: { status: current.status, slotId: current.slotId },
+      after: { status: "cancelled" },
     });
   });
 }

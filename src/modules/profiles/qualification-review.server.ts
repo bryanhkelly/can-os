@@ -3,8 +3,10 @@ import { documents,memberships,qualificationClaims,qualificationVerificationEven
 import { AuthorizationError,type CommandContext } from "@/domain/command-context";
 import { credentialStatusFromDecision,decideCredentialReview,type VerificationDecision } from "@/domain/credential-workflow";
 import { reviewerCanVerify } from "@/domain/reviewer-authorization";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { desc,eq } from "drizzle-orm";
+import { and,desc,eq } from "drizzle-orm";
+import { EventTypes } from "@/domain/event-types";
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Database-backed authorization: caller scope alone is never sufficient. */
@@ -12,8 +14,10 @@ type Reader = Pick<typeof db,"select">;
 export async function assertScopedQualificationReviewer(context: CommandContext, subjectPersonId: string, executor: Reader = db) {
   if (!context.actorPersonId || context.actorPersonId === subjectPersonId || !context.capabilities.has("profiles.credentials.verify"))
     throw new AuthorizationError("independent credential reviewer");
-  const actorRoles = await executor.select().from(roleAssignments).where(eq(roleAssignments.personId, context.actorPersonId));
-  const subjectRoles = await executor.select().from(roleAssignments).where(eq(roleAssignments.personId, subjectPersonId));
+  const actorRoles = await executor.select().from(roleAssignments).where(and(
+    eq(roleAssignments.personId, context.actorPersonId),activeRoleAssignmentPredicate()));
+  const subjectRoles = await executor.select().from(roleAssignments).where(and(
+    eq(roleAssignments.personId, subjectPersonId),activeRoleAssignmentPredicate()));
   const actorMemberships = await executor.select().from(memberships).where(eq(memberships.personId, context.actorPersonId));
   const subjectMemberships = await executor.select().from(memberships).where(eq(memberships.personId, subjectPersonId));
   const authorized=reviewerCanVerify({context,subjectPersonId,actorRoles,subjectRoles,actorMemberships,subjectMemberships});
@@ -57,7 +61,7 @@ export async function reviewQualification(
      evidenceDocumentId:evidenceId,reason:input.reason??null,
    }).returning({id:qualificationVerificationEvents.id});
    if(!event) throw new Error("Verification event insertion failed");
-   await emitEvent(tx,{eventType:"QualificationVerificationDecided",aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
+   await emitEvent(tx,{eventType:EventTypes.QualificationVerificationDecided,aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
    await writeAudit(tx,context,{action:"qualification.verification.decided",entityType:"QualificationClaim",entityId:claim.id,before:{status:current},after:{status:decision.status,verificationEventId:event.id}});
    return {claimId:claim.id,verificationEventId:event.id,status:decision.status};
  };

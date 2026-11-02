@@ -1,11 +1,15 @@
+import { EmptyState, WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
+import { attachmentAccept, attachmentMimeForFileName } from "@/modules/learning/attachment-mimes";
+import { GuardianPickupPanel } from "@/components/operations/GuardianPickupPanel";
 
-const excuseAttachmentAccept = ".pdf,.png,.jpg,.jpeg";
-const excuseMimes: Record<string, string> = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", md: "text/markdown" };
-const excuseAttachmentMime = (name: string) => excuseMimes[name.split(".").pop()?.toLowerCase() ?? ""] ?? null;
+// Shared with the server-side excuse attachment validation (attachment-mimes).
+const excuseAttachmentAccept = attachmentAccept;
+const excuseAttachmentMime = attachmentMimeForFileName;
+const formatStatus=(status:string)=>status.replaceAll("_"," ").replace(/^\w/,letter=>letter.toUpperCase());
 
 export const Route = createFileRoute("/guardian/attendance")({
  validateSearch:(search:Record<string,unknown>):{student?:string;attendance?:string}=>({
@@ -20,6 +24,7 @@ type Absence = Awaited<ReturnType<typeof listGuardianEffectiveAbsences>>["absenc
 function GuardianAttendancePage() {
   const {student,attendance}=Route.useSearch();
   const [absences, setAbsences] = useState<Absence[]>([]);
+  const requestVersion = useRef(0);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -29,33 +34,48 @@ function GuardianAttendancePage() {
   const [excuseFiles, setExcuseFiles] = useState<Record<string, File | null>>({});
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError("");
     try {
       const result = await listGuardianEffectiveAbsences({data:{studentPersonId:student}});
+      if (version !== requestVersion.current) return;
       setAbsences(result.absences);
       const excusedIds = result.absences.filter(absence => absence.excuse).map(absence => absence.attendanceEventId);
       if (excusedIds.length) {
-        const counts = await listExcuseAttachmentCounts({ data: { attendanceEventIds: excusedIds } });
-        setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
+        // Counts are optional decoration: a document-service problem must never
+        // conceal attendance cases or prevent a family from submitting an excuse.
+        try {
+          const counts = await listExcuseAttachmentCounts({ data: { attendanceEventIds: excusedIds } });
+          if (version === requestVersion.current) setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
+        } catch {
+          if (version === requestVersion.current) setDocCounts({});
+        }
       } else {
-        setDocCounts({});
+        if (version === requestVersion.current) setDocCounts({});
       }
     } catch {
-      setAbsences([]);
-      setError("Sign in with an authorized guardian account to review attendance.");
+      if (version === requestVersion.current) {
+        setAbsences([]);
+        setError("Sign in with an authorized guardian account to review attendance.");
+      }
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, [student]);
 
   useEffect(() => {
+    // Clear drafts when switching children to avoid cross-child form state.
+    setReasons({});
+    setExcuseFiles({});
+    setNotice("");
     void load();
   }, [load]);
 
   const submit = async (absence: Absence) => {
     setBusy(absence.attendanceEventId);
     setNotice("");
+    setError("");
     try {
       await submitEffectiveAttendanceExcuse({
         data: { attendanceEventId: absence.attendanceEventId, reason: reasons[absence.attendanceEventId] ?? "" },
@@ -63,7 +83,7 @@ function GuardianAttendancePage() {
       setNotice(`Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`);
       await load();
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Unable to submit excuse");
+      setError(cause instanceof Error ? cause.message : "Unable to submit excuse");
     } finally {
       setBusy("");
     }
@@ -74,9 +94,10 @@ function GuardianAttendancePage() {
     if (!file) return;
     setBusy(`${absence.attendanceEventId}:attach`);
     setNotice("");
+    setError("");
     try {
       const contentType = excuseAttachmentMime(file.name);
-      if (!contentType) throw new Error("Unsupported file type. Use PDF, DOCX, TXT, PNG, JPG or MD.");
+      if (!contentType) throw new Error("Unsupported file type. Use PDF, PNG or JPG.");
       if (file.size < 16 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 16 bytes to 10 MB");
       const upload = await createExcuseAttachmentUpload({
         data: { attendanceEventId: absence.attendanceEventId, fileName: file.name, contentType, sizeBytes: file.size },
@@ -88,7 +109,7 @@ function GuardianAttendancePage() {
       setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: null }));
       setDocCounts(current => ({ ...current, [absence.attendanceEventId]: (current[absence.attendanceEventId] ?? 0) + 1 }));
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Unable to attach document");
+      setError(cause instanceof Error ? cause.message : "Unable to attach document");
     } finally {
       setBusy("");
     }
@@ -97,25 +118,21 @@ function GuardianAttendancePage() {
   const needsExcuse = absences.filter(absence => !absence.excuse &&
     (absence.status === "absent" || absence.status === "tardy"));
 
-  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Attendance</p>
-      <h1 className="mt-2 font-serif text-4xl">Attendance & excuses</h1>
-      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-        Review recent absences for your students and submit an excuse for the school to review.{student?" Showing the selected child.":""}
-      </p>
+  return <WorkspaceShell width="wide" eyebrow="CAN OS · Family" title="Attendance & excuses"
+    subtitle={`Review recent attendance cases and submit explanations for authorized school review. Submitted excuses do not automatically change attendance.${student?" Showing the selected child.":""}`}
+    breadcrumbs={<><Link to="/guardian" search={{student}} className="underline focus-visible:outline-2">Family home</Link><span>/</span><span>Attendance</span></>}>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
       {!loading && !error && <>
-        {attendance&&<Link to="/guardian/attendance" search={{student}} className="mt-4 inline-block text-sm underline">View all attendance for this child</Link>}
+        {attendance&&<Link to="/guardian/attendance" search={{student}} className="mt-4 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">View all attendance for this child</Link>}
         {attendance&&!absences.some(item=>item.relatedAttendanceEventIds.includes(attendance))&&<p role="alert" className="mt-4 rounded-xl border p-4">This attendance record is unavailable in the current view.</p>}
-        <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Attendance summary">
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent attendance cases</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs an excuse</p><p className="mt-1 text-2xl font-semibold">{needsExcuse.length}</p></div>
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Excuses submitted</p><p className="mt-1 text-2xl font-semibold">{absences.filter(absence => absence.excuse).length}</p></div>
+        <div className="mt-6 grid gap-3 min-[480px]:grid-cols-3" aria-label="Attendance summary">
+          <StatCard label="Recent attendance cases" value={absences.length}/>
+          <StatCard label="Needs an excuse" value={needsExcuse.length} className={needsExcuse.length>0?"border-warning/50":undefined}/>
+          <StatCard label="Excuses submitted" value={absences.filter(absence => absence.excuse).length}/>
         </div>
-        {absences.length === 0 && <p className="mt-8 text-sm">No recent absence or tardy cases were found for your students.</p>}
+        {absences.length === 0 && <EmptyState className="mt-8 bg-card" title="No recent absence or tardy cases were found for your students."/>}
         {absences.length > 0 && <div className="mt-8 grid gap-4">
           {absences.filter(item=>!attendance||item.relatedAttendanceEventIds.includes(attendance)).map(absence => <section key={absence.attendanceEventId} className="rounded-xl border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -123,9 +140,12 @@ function GuardianAttendancePage() {
                 <h2 className="text-lg font-semibold">{absence.studentName}</h2>
                 <p className="text-xs text-muted-foreground">{new Date(absence.expectedAt).toLocaleDateString()}</p>
               </div>
-              <span className="rounded-full border px-3 py-1 text-xs capitalize">
-                {absence.excuse ? `Excuse ${absence.excuse.status}` : absence.status}
-              </span>
+              <StatusBadge tone={
+                absence.status==="present"||absence.excuse?.status==="approved"?"success":
+                absence.excuse?.status==="rejected"?"danger":
+                absence.excuse?"info":
+                absence.status==="absent"||absence.status==="tardy"?"attention":"neutral"
+              }>{absence.excuse ? `Excuse ${formatStatus(absence.excuse.status)}` : formatStatus(absence.status)}</StatusBadge>
             </div>
             {absence.status === "present" && <p className="mt-3 text-xs text-muted-foreground">The school corrected this attendance case to present. No excuse is required.</p>}
             {absence.historicalExcuses.length > 0 && <div className="mt-3 space-y-2" aria-label="Earlier excuse history">
@@ -140,24 +160,29 @@ function GuardianAttendancePage() {
               <p className="rounded-lg bg-muted p-3 text-sm">Your excuse: {absence.excuse.reason}</p>
               <p className="mt-2 text-xs text-muted-foreground">{docCounts[absence.attendanceEventId] ?? 0} document(s) attached</p>
               {absence.excuse.status === "approved" && <p className="mt-2 text-sm">Approved — this day now counts as excused.</p>}
-              {absence.excuse.status === "rejected" && <p className="mt-2 text-sm">Rejected by the school.{absence.excuse.reviewNote ? ` Note: ${absence.excuse.reviewNote}` : ""}</p>}
+              {absence.excuse.status === "rejected" && <div className="mt-2 rounded-lg border p-3 text-sm">
+                <p className="font-semibold">The school rejected this excuse.</p>
+                {absence.excuse.reviewNote && <p className="mt-2 whitespace-pre-wrap">School note: {absence.excuse.reviewNote}</p>}
+                <p className="mt-2 text-muted-foreground">Review the reason with your school if this attendance mark still needs to be corrected. This reviewed excuse cannot be submitted again from this page.</p>
+                <Link to="/messages" className="mt-3 inline-block font-semibold underline">Contact the school in Family inbox</Link>
+              </div>}
               {absence.excuse.status === "submitted" && <div className="mt-2">
                 <p className="text-sm text-muted-foreground">Waiting for the school to review.</p>
                 <label className="mt-3 block text-sm font-semibold">
-                  Supporting document <span className="font-normal text-muted-foreground">(optional · PDF, DOCX, TXT, PNG, JPG or MD · up to 10 MB)</span>
+                  Supporting document <span className="font-normal text-muted-foreground">(optional · PDF, PNG or JPG · up to 10 MB)</span>
                   <input
                     key={`${absence.attendanceEventId}:${docCounts[absence.attendanceEventId] ?? 0}`}
                     type="file"
                     accept={excuseAttachmentAccept}
                     disabled={busy !== ""}
-                    className="mt-2 w-full rounded-lg border bg-background p-2 text-xs"
+                    className="mt-2 w-full rounded-lg border bg-background p-2 text-xs focus-visible:outline-2 focus-visible:outline-offset-2"
                     onChange={event => setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: event.target.files?.[0] ?? null }))}
                   />
                 </label>
                 <button
                   type="button"
                   disabled={busy !== "" || !excuseFiles[absence.attendanceEventId]}
-                  className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  className="mt-2 inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50"
                   onClick={() => attachDocument(absence)}
                 >Attach document</button>
               </div>}
@@ -166,7 +191,7 @@ function GuardianAttendancePage() {
               <label className="block text-sm font-semibold">
                 Excuse reason
                 <textarea
-                  className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+                  className="mt-2 w-full rounded-lg border bg-background p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   rows={3}
                   value={reasons[absence.attendanceEventId] ?? ""}
                   onChange={event => setReasons(current => ({ ...current, [absence.attendanceEventId]: event.target.value }))}
@@ -176,13 +201,13 @@ function GuardianAttendancePage() {
               <button
                 type="button"
                 disabled={busy !== ""}
-                className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                className="mt-3 inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50"
                 onClick={() => submit(absence)}
               >Submit excuse</button>
             </div>}
           </section>)}
         </div>}
       </>}
-    </div>
-  </main>;
+      <GuardianPickupPanel studentPersonId={student} />
+  </WorkspaceShell>;
 }

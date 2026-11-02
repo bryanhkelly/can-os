@@ -11,8 +11,8 @@ export interface StatCardProps {
 
 function StatCard({ label, value, hint, className }: StatCardProps) {
   return (
-    <div className={cn("rounded-xl border bg-card p-5", className)}>
-      <p className="font-serif text-3xl">{value}</p>
+    <div className={cn("rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-shadow hover:shadow-md", className)}>
+      <p className="font-serif text-3xl font-semibold tracking-tight">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{label}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>

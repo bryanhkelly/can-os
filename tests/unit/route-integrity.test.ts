@@ -78,6 +78,38 @@ describe("route tree freshness", () => {
   });
 });
 
+describe("parent route renderability", () => {
+  it("every route with children renders <Outlet/> or is a pure redirect/server-handler route", () => {
+    const tree = readFileSync(join(repoRoot, "src", "routeTree.gen.ts"), "utf8");
+    // "./routes/operations" -> "operations" for each generated route import.
+    const fileByImport = new Map<string, string>();
+    for (const match of tree.matchAll(/import \{ Route as (\w+)RouteImport \} from '\.\/routes\/([^']+)'/g)) {
+      fileByImport.set(match[1], match[2]);
+    }
+    // The generated tree marks parents via `<Name>Route._addFileChildren(`.
+    const parentsWithChildren = new Set(
+      [...tree.matchAll(/(\w+)Route\._addFileChildren\(/g)].map((match) => match[1]),
+    );
+    const offenders: string[] = [];
+    for (const name of parentsWithChildren) {
+      const base = fileByImport.get(name);
+      if (!base || base === "__root" || base.endsWith(".index")) continue;
+      const file = routeFiles.find((f) => f.replace(/\.(tsx|ts)$/, "") === base);
+      if (!file) continue;
+      const source = readFileSync(join(routesDir, file), "utf8");
+      const rendersOutlet = /\bOutlet\b/.test(source);
+      const isServerHandler = /server:\s*\{\s*handlers:/.test(source);
+      const isPureRedirect = /redirect\(/.test(source) && !/component\s*:/.test(source);
+      if (!rendersOutlet && !isServerHandler && !isPureRedirect) {
+        offenders.push(
+          `src/routes/${file} has child routes in routeTree.gen.ts but never renders <Outlet/>, so its children can never render`,
+        );
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("navigation link targets", () => {
   it("resolves literal and templated links, redirects, and generated navigation URLs across the application",()=>{
     const broken:string[]=[];

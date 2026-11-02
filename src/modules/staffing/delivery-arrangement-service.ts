@@ -40,8 +40,12 @@ export async function createDeliveryArrangement(
 
   return db.transaction(async tx => {
     const [section] = await tx
-      .select({ id: sections.id, programId: sections.programId, siteId: sections.siteId })
+      .select({
+        id: sections.id, programId: sections.programId, siteId: sections.siteId,
+        providerId: programs.academicProviderOrganizationId,
+      })
       .from(sections)
+      .innerJoin(programs, eq(programs.id, sections.programId))
       .where(eq(sections.id, input.sectionId))
       .limit(1);
     if (!section) throw new Error("Section not found");
@@ -50,6 +54,9 @@ export async function createDeliveryArrangement(
     assertProgramScope(context, section.programId);
     assertSiteScope(context, section.siteId);
     if (!section.siteId) throw new Error("Teaching assignment requires a school site");
+    if (input.academicProviderOrganizationId !== section.providerId) {
+      throw new Error("Delivery arrangement provider must match the Program's current academic provider");
+    }
     await lockAttendanceConfigurationAtSite(tx, section.siteId);
 
     let instructorPersonId = input.instructorPersonId ?? null;
@@ -166,8 +173,12 @@ export async function activateDeliveryArrangement(
     if (!lookup) throw new Error("Delivery arrangement not found");
 
     const [section] = await tx
-      .select({ programId: sections.programId, siteId: sections.siteId })
+      .select({
+        programId: sections.programId, siteId: sections.siteId,
+        providerId: programs.academicProviderOrganizationId,
+      })
       .from(sections)
+      .innerJoin(programs, eq(programs.id, sections.programId))
       .where(eq(sections.id, lookup.sectionId))
       .limit(1);
     if (!section) throw new Error("Section not found");
@@ -183,6 +194,7 @@ export async function activateDeliveryArrangement(
       .select({
         id: deliveryArrangements.id,
         sectionId: deliveryArrangements.sectionId,
+        academicProviderOrganizationId: deliveryArrangements.academicProviderOrganizationId,
         instructorPersonId: deliveryArrangements.instructorPersonId,
         capacityReservationId: deliveryArrangements.capacityReservationId,
         status: deliveryArrangements.status,
@@ -192,6 +204,9 @@ export async function activateDeliveryArrangement(
       .limit(1).for("update");
     if (!arrangement) throw new Error("Delivery arrangement not found");
     if (arrangement.status === "completed") throw new Error("Completed delivery arrangements cannot be activated");
+    if (arrangement.academicProviderOrganizationId !== section.providerId) {
+      throw new Error("Delivery arrangement provider no longer matches the Program's current academic provider");
+    }
 
     if (arrangement.capacityReservationId) {
       const [reservation] = await tx
@@ -270,9 +285,12 @@ export async function getActiveDeliveryArrangement(
       effectiveThrough: deliveryArrangements.effectiveThrough,
     })
     .from(deliveryArrangements)
+    .innerJoin(sections, eq(sections.id, deliveryArrangements.sectionId))
+    .innerJoin(programs, eq(programs.id, sections.programId))
     .where(and(
       eq(deliveryArrangements.sectionId, sectionId),
       eq(deliveryArrangements.status, "active"),
+      eq(deliveryArrangements.academicProviderOrganizationId, programs.academicProviderOrganizationId),
       or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, at)),
       or(isNull(deliveryArrangements.effectiveThrough), gt(deliveryArrangements.effectiveThrough, at)),
     ))

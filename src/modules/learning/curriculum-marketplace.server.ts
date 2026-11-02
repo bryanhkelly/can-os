@@ -7,11 +7,13 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
+import { recommendCourseOption } from "@/domain/first-classroom";
 import { schoolCourseOutline } from "@/domain/school-course-outline";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const publishCapability = "curriculum.publish";
 export const adoptionCapability = "curriculum.adopt";
@@ -97,6 +99,12 @@ export async function readMarketplace(actor: Actor, programId: string) {
   packs:packs.map(pack=>({
    ...pack,courses:items.filter(item=>item.packVersionId===pack.versionId).map(({curriculum,...course})=>({
     ...course,preview:schoolCourseOutline(curriculum),
+    recommendation:recommendCourseOption({
+     origin:"adopted",published:true,
+     licenseActive:entitlements.some(item=>item.packId===pack.id&&item.status==="active"),
+     adoptionActive:adoptions.some(item=>item.packId===pack.id&&item.packVersionId===pack.versionId&&item.status==="active"),
+     curriculum,
+    }),
    })),
    entitlement:entitlements.find(e=>e.packId===pack.id)?.status??null,
    adoption:adoptions.find(a=>a.packId===pack.id)
@@ -136,13 +144,18 @@ export async function installPack(actor: Actor, input:{programId:string;packId:s
   await writeAudit(tx,actor,{action:"curriculum.marketplace.install",entityType:"curriculum_entitlement",
    entityId:row.id,scope:{organizationId:program.organizationId,programId:program.id},
    after:{packId:pack.id,licenseCode:pack.licenseCode}});
-  await emitEvent(tx,{eventType:"CurriculumPackInstalled",aggregateType:"curriculum_entitlement",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumPackInstalled,aggregateType:"curriculum_entitlement",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:program.id});
   return {entitlementId:row.id,installed:true};
  });
 }
 
 export async function adoptPack(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
+ // Enforce the same compatibility policy at the domain entry point, not just
+ // the HTTP handler: internal callers must never bypass the annual rollout.
+ if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
+    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+  throw new AuthorizationError("New curriculum adoption requires verified school-year licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
   const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
@@ -167,7 +180,7 @@ export async function adoptPack(actor: Actor,input:{programId:string;packId:stri
   await writeAudit(tx,actor,{action:"curriculum.marketplace.adopt",entityType:"curriculum_adoption",
    entityId:row.id,scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
    after:{packId:input.packId,versionId:release.id}});
-  await emitEvent(tx,{eventType:"CurriculumPackAdopted",aggregateType:"curriculum_adoption",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumPackAdopted,aggregateType:"curriculum_adoption",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
    siteId:program.siteId,programId:program.id});
   return {adoptionId:row.id,adopted:true};
@@ -179,6 +192,12 @@ export async function addCurriculumSupplement(actor:Actor,input:{
  scope:"program"|"site"|"section";title:string;kind:"link"|"video"|"pdf"|"image"|"audio"|"document";
  url:string;
 }){
+ // A historical program-wide adoption must never grant new supplement rights
+ // after annual licensing is enabled. A year-scoped Section/entitlement
+ // resolver must be integrated before reopening this command.
+ if(process.env.CAN_ANNUAL_ADOPTIONS_ENABLED==="true" ||
+    process.env.CAN_DISABLE_LEGACY_CURRICULUM_ADOPTIONS==="true")
+  throw new AuthorizationError("Curriculum supplements require verified annual adoption and Section licensing");
  return db.transaction(async tx=>{
   const program=await authorizedProgram(actor,input.programId,tx);
   if(input.scope==="site" && !program.siteId)throw new Error("Site supplement requires a site.");
@@ -225,7 +244,7 @@ export async function addCurriculumSupplement(actor:Actor,input:{
   await writeAudit(tx,actor,{action:"curriculum.supplement.add",entityType:"curriculum_overlay",
     entityId:row.id,scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,sectionId:input.sectionId??null},
     after:{courseVersionId:input.courseVersionId,resourceId:resource.id,lessonId:input.lessonId??null,kind:input.kind,title:input.title,scope:input.scope}});
-  await emitEvent(tx,{eventType:"CurriculumSupplementAdded",aggregateType:"curriculum_overlay",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumSupplementAdded,aggregateType:"curriculum_overlay",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
    programId:program.id,siteId:program.siteId});
   return {supplementId:row.id};

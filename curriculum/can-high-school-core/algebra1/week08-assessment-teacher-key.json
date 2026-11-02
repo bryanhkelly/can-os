@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u02",
+      "reviewStatus": "draft",
+      "teacherOverview": "Mastery threshold proposal: 24/30 (80%) with no zero-scored domain/rate item; requires institutional approval. Reteach weak strands and reassess with alternate numbers. Do not expose keys to students.",
+      "lessons": [],
+      "assessments": [
+        {
+          "assessmentKey": "algebra1-u02-w08-formative",
+          "workedAnswers": [
+            {
+              "prompt": "1",
+              "answer": "No: input 1 has two outputs, 4 and 6."
+            },
+            {
+              "prompt": "2",
+              "answer": "f(−2)=4−6=−2."
+            },
+            {
+              "prompt": "3",
+              "answer": "n∈{0,1,…,15}; maximum $120."
+            },
+            {
+              "prompt": "4",
+              "answer": "(26−10)/(6−2)=4 miles/hour."
+            }
+          ]
+        },
+        {
+          "assessmentKey": "algebra1-u02-w08-mastery",
+          "workedAnswers": [
+            {
+              "prompt": "1",
+              "answer": "Yes: each input has exactly one output; shared output 3 is permitted."
+            },
+            {
+              "prompt": "2",
+              "answer": "2(9)−(−3)=21."
+            },
+            {
+              "prompt": "3",
+              "answer": "All real x except 6, where denominator zero."
+            },
+            {
+              "prompt": "4",
+              "answer": "(10−2)/2=4 and (22−10)/3=4, constant."
+            },
+            {
+              "prompt": "5",
+              "answer": "0≤t≤15 minutes; V(7)=60−28=32 liters."
+            },
+            {
+              "prompt": "6",
+              "answer": "A nonlinear example x² has rate 1 over [0,1] and 3 over [1,2]; endpoint averages differ, so an interval average does not specify each subinterval."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

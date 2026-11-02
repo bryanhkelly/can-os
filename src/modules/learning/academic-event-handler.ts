@@ -1,12 +1,17 @@
 import { db } from "@/db/client";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { currentSectionStudentIds } from "./current-section-enrollment.server";
+import { requireTeachingEligibility } from "@/modules/staffing/teaching-eligibility.server";
+import { AuthorizationError } from "@/domain/command-context";
 import {
 assessments,
 domainEvents,
 guardianRelationships,
 people,
 sectionTeachers,
+sections,
 studentProfiles,
+terms,
 submissions
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
@@ -20,12 +25,15 @@ import { and,eq } from "drizzle-orm";
  * event processed.
  */
 
-async function loadSubmissionContext(tx: any, submissionId: string) {
+async function loadSubmissionContext(tx: any, submissionId: string, includeTeacherRecipients = false) {
   const [record] = await tx
     .select({
       submissionId: submissions.id,
       assessmentTitle: assessments.title,
       sectionId: assessments.sectionId,
+      programId: sections.programId,
+      schoolYearId: terms.schoolYearId,
+      studentProfileId: submissions.studentProfileId,
       studentPersonId: studentProfiles.personId,
       studentPreferredName: people.preferredName,
       studentLegalFirstName: people.legalFirstName,
@@ -34,12 +42,24 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
     })
     .from(submissions)
     .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+    .innerJoin(sections, eq(sections.id, assessments.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
     .where(eq(submissions.id, submissionId))
     .limit(1);
 
   if (!record) return null;
+
+  // The event may be processed after a transfer or withdrawal. Do not emit
+  // a new child-specific notice from stale Section-only membership.
+  const enrolled = await currentSectionStudentIds(tx, {
+    id: record.sectionId, programId: record.programId, schoolYearId: record.schoolYearId,
+  }, record.studentProfileId);
+  if (!enrolled.includes(record.studentProfileId)) return {
+    ...record, activeEnrollment: false, guardianPersonIds: [] as string[],
+    teacherPersonIds: [] as string[], studentName: record.studentPreferredName ?? record.studentLegalFirstName,
+  };
 
   const [guardians, teachers] = await Promise.all([
     tx
@@ -48,17 +68,32 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
       .where(guardianRelationshipPredicate({
         studentPersonId: record.studentPersonId, access: "academic",
       })),
-    tx
+    includeTeacherRecipients ? tx
       .select({ personId: sectionTeachers.personId })
       .from(sectionTeachers)
-      .where(eq(sectionTeachers.sectionId, record.sectionId)),
+      .where(and(eq(sectionTeachers.sectionId, record.sectionId), eq(sectionTeachers.role, "teacher"))) : Promise.resolve([]),
   ]);
+
+  // Historic, assistant, revoked or unqualified assignments are not an
+  // entitlement to receive a child-specific late-work notification.
+  const eligibleTeacherIds: string[] = [];
+  for (const teacher of teachers) {
+    try {
+      await requireTeachingEligibility(record.sectionId, teacher.personId, tx, {
+        horizon: "current", requireAssignment: true,
+      });
+      eligibleTeacherIds.push(teacher.personId);
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
+    }
+  }
 
   return {
     ...record,
+    activeEnrollment: true,
     studentName: record.studentPreferredName ?? record.studentLegalFirstName,
     guardianPersonIds: guardians.map((row: { personId: string }) => row.personId),
-    teacherPersonIds: teachers.map((row: { personId: string }) => row.personId),
+    teacherPersonIds: eligibleTeacherIds,
   };
 }
 
@@ -73,8 +108,9 @@ export async function handleSubmissionReceivedEvent(eventId: string): Promise<vo
     if (!event || event.status === "processed") return;
     if (event.eventType !== EventTypes.SubmissionReceived) return;
 
-    const context = await loadSubmissionContext(tx, event.aggregateId);
+    const context = await loadSubmissionContext(tx, event.aggregateId, true);
     if (!context) throw new Error("Missing submission context for SubmissionReceived");
+    if (!context.activeEnrollment) return;
 
     const payload = event.payload as Record<string, unknown>;
     const timeliness =
@@ -115,6 +151,7 @@ export async function handleGradePostedEvent(eventId: string): Promise<void> {
 
     const context = await loadSubmissionContext(tx, event.aggregateId);
     if (!context) throw new Error("Missing submission context for GradePosted");
+    if (!context.activeEnrollment) return;
 
     const recipients = new Set<string>([
       String(context.studentPersonId),

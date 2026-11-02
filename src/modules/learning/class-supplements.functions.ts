@@ -8,6 +8,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { authorizeClass, classActor } from "./class-access.server";
 
+import { EventTypes } from "@/domain/event-types";
 const httpsUrl=z.string().url().max(2048).refine(value=>{
  try { const u=new URL(value); return u.protocol==="https:"&&!u.username&&!u.password; }
  catch { return false; }
@@ -57,7 +58,7 @@ export const addClassSupplement = createServerFn({method:"POST"})
        after:{resourceId:resource.id,lessonId:data.lessonId??null,kind:data.kind,
          publisherCourseVersionUnchanged:section.versionId},
      });
-     await emitEvent(tx,{eventType:"CurriculumSupplementAdded",aggregateType:"curriculum_overlay",
+     await emitEvent(tx,{eventType:EventTypes.CurriculumSupplementAdded,aggregateType:"curriculum_overlay",
        aggregateId:supplement.id,actorPersonId:actor.actorPersonId,
        programId:section.programId,siteId:section.siteId,
        payload:{sectionId:section.id,source:"teacher_supplement"}});
@@ -113,7 +114,7 @@ export const manageClassSupplement=createServerFn({method:"POST"})
     scope:{organizationId:program.organizationId,programId:section.programId,sectionId:section.id},
     before,after:{status:data.action==="retire"?"retired":"active",resourceId,
       publisherCourseVersionUnchanged:section.versionId}});
-   await emitEvent(tx,{eventType:"CurriculumSupplementChanged",aggregateType:"curriculum_overlay",
+   await emitEvent(tx,{eventType:EventTypes.CurriculumSupplementChanged,aggregateType:"curriculum_overlay",
     aggregateId:supplement.id,actorPersonId:actor.actorPersonId,programId:section.programId,
     siteId:section.siteId,payload:{sectionId:section.id,action:data.action}});
    return {saved:true};

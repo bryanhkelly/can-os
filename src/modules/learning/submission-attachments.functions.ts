@@ -1,49 +1,34 @@
+import { assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
+import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { authorizeClass } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { writeAudit } from "@/platform/mutation";
 import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  MAX_ATTACHMENT_BYTES,
+  validateAttachmentUpload,
+} from "./attachment-mimes";
 
 /**
  * Assignment-submission and attendance-excuse attachments on the existing R2 +
  * documents infrastructure. Domain authorization and key policy stay here;
  * signing and bounded object verification are shared storage infrastructure.
+ * The extension/MIME allowlist lives in attachment-mimes so the client file
+ * pickers and this server validation cannot drift apart.
  */
-
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-
-const attachmentMimeByExtension: Record<string, string> = {
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-};
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const learningKeyPattern = /^learning\/(assignment|excuse)\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
-
-function validateAttachmentUpload(fileName: string, contentType: string, sizeBytes: number): void {
-  if (fileName.length < 1 || fileName.length > 150 || /[\\/\x00-\x1f]/.test(fileName)) {
-    throw new Error("Invalid file name");
-  }
-  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (!attachmentMimeByExtension[extension]) {
-    throw new Error("Only verified PDF, PNG and JPEG attachments are supported");
-  }
-  if (attachmentMimeByExtension[extension] !== contentType) {
-    throw new Error("File content type does not match its extension");
-  }
-  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 16 || sizeBytes > MAX_ATTACHMENT_BYTES) {
-    throw new Error("Attachments must be 16 bytes to 10 MB");
-  }
-}
 
 function newAttachmentKey(kind: "assignment" | "excuse", scopeId: string): string {
   if (!uuidPattern.test(scopeId)) throw new Error("Invalid attachment scope");
@@ -97,14 +82,23 @@ type DbSchema = typeof import("@/db/schema");
 type Tx = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Published synthetic assessment at a scoped site where the student is actively enrolled. */
-async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, siteIds: string[], programIds: string[]) {
-  const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
+async function requireEnrolledAssessment(
+  tx: Tx, s: DbSchema, assessmentId: string, studentId: string, actor: Actor,
+  allowClosedForRead=false,
+) {
+  const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, status: s.assessments.status, availableAt: s.assessments.availableAt, closesAt: s.assessments.closesAt, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"), inArray(s.sections.siteId, siteIds),inArray(s.sections.programId,programIds))).limit(1);
+    .where(and(eq(s.assessments.id, assessmentId),
+      allowClosedForRead?inArray(s.assessments.status,["published","closed"])
+        :eq(s.assessments.status,"published"),
+      inArray(s.sections.siteId,actor.scope.siteIds??[]),
+      inArray(s.sections.programId,actor.scope.programIds??[]))).limit(1);
   if (!assessment) throw new AuthorizationError("published assessment in authorized school and program");
-  const [enrollment] = await tx.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
-    eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
-  if (!enrollment) throw new Error("Student is not enrolled");
+  // Preserve the same active Program, Section and school year boundary for
+  // all learning files, including short-lived download URL issuance.
+  const enrollment=await authorizeClass(actor,assessment.sectionId,undefined,tx);
+  if(enrollment.studentProfileId!==studentId)throw new AuthorizationError("current student learning scope");
+  if (!allowClosedForRead) assertAssessmentActionable(assessment);
   return assessment;
 }
 
@@ -141,7 +135,7 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
     const key = newAttachmentKey("assignment", data.assessmentId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context as Actor);
       const [document] = await tx.insert(s.documents).values({
         subjectType: "assessment",
         subjectId: assessment.id,
@@ -178,7 +172,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
     const { context, studentId, studentPersonId } = await studentActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context as Actor);
       // Serialize with draft/submit writes for this student+assessment.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
       const [document] = await tx.select({ id: s.documents.id,storageKey:s.documents.storageKey,mimeType:s.documents.mimeType,metadata:s.documents.metadata,verifiedAt:s.documents.verifiedAt,expiresAt:s.documents.expiresAt }).from(s.documents).where(and(
@@ -201,6 +195,8 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
       const [latest] = await tx.select().from(s.submissions)
         .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
         .orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
+      if (!latest || latest.status === "assigned")
+        assertAssessmentAttemptAllowed(assessment.metadata, latest?.attemptNumber ?? 1);
       const mergeAttachments = (response: Record<string, unknown>): { response: Record<string, unknown>; already: boolean } => {
         const existing = Array.isArray(response.attachments)
           ? (response.attachments as unknown[]).filter((item): item is string => typeof item === "string")
@@ -209,16 +205,16 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         return { response: { ...response, attachments: [...existing, document.id] }, already: false };
       };
       if (latest) {
-        // Submitted attempts still accept attachments: the submit flow overwrites
-        // response text wholesale, so the UI attaches right after submitting.
-        if (latest.status !== "assigned" && latest.status !== "submitted") {
-          throw new Error("This attempt can no longer accept attachments");
-        }
         const merged = mergeAttachments(latest.response);
+        // A retry for an already attached file is harmless; new evidence must
+        // be attached while the attempt is still a draft.
         if (merged.already) return { submissionId: latest.id, attached: true, alreadyAttached: true };
+        if (latest.status !== "assigned") {
+          throw new Error("Submitted attempts cannot accept new attachments");
+        }
         const [updated] = await tx.update(s.submissions)
           .set({ response: merged.response, updatedAt: new Date() })
-          .where(and(eq(s.submissions.id, latest.id), inArray(s.submissions.status, ["assigned", "submitted"])))
+          .where(and(eq(s.submissions.id, latest.id), eq(s.submissions.status, "assigned")))
           .returning({ id: s.submissions.id });
         if (!updated) throw new Error("Assignment changed in another tab; refresh before attaching");
         await writeAudit(tx, {
@@ -250,21 +246,27 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
     });
   });
 
-/** Attached file names on the student's current (latest) attempt. */
+/** Verified file names on the student's exact attempt; defaults to latest. */
 export const listSubmissionAttachments = createServerFn({ method: "GET" })
-  .validator((value: unknown) => z.object({ assessmentId: z.string().min(1) }).parse(value))
+  .validator((value: unknown) => z.object({ assessmentId: z.string().min(1), attemptNumber: z.number().int().positive().optional() }).parse(value))
   .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
     const { context, studentId, studentPersonId } = await studentActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [assessment] = await db.select({ id: s.assessments.id, sectionId: s.assessments.sectionId })
       .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
       .where(and(eq(s.assessments.id, data.assessmentId), inArray(s.sections.siteId, context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
     if (!assessment) return { attachments: [] };
-    const [enrollment] = await db.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
-      eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
-    if (!enrollment) return { attachments: [] };
+    try {
+      const enrollment=await authorizeClass(context as Actor,assessment.sectionId);
+      if(enrollment.studentProfileId!==studentId)return {attachments:[]};
+    } catch(error) {
+      if(error instanceof AuthorizationError)return {attachments:[]};
+      throw error;
+    }
     const [latest] = await db.select({ response: s.submissions.response }).from(s.submissions)
-      .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
+      .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId),
+        data.attemptNumber === undefined ? undefined : eq(s.submissions.attemptNumber, data.attemptNumber)))
       .orderBy(desc(s.submissions.attemptNumber)).limit(1);
     const ids = latest && Array.isArray(latest.response.attachments)
       ? (latest.response.attachments as unknown[]).filter((item): item is string => typeof item === "string" && uuidPattern.test(item))
@@ -407,23 +409,25 @@ export const listExcuseAttachmentCounts = createServerFn({ method: "GET" })
     return { counts: [...latest.entries()].map(([attendanceEventId, count]) => ({ attendanceEventId, count })) };
   });
 
-/** Return a short-lived private URL only for a verified file linked to this student's latest attempt. */
+/** Short-lived private URL for a verified file on this student's exact attempt. */
 export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({
-  assessmentId:z.string().uuid(),documentId:z.string().uuid()
+  assessmentId:z.string().uuid(),documentId:z.string().uuid(),
+  attemptNumber:z.number().int().positive().optional()
  }).parse(value))
  .handler(async({data})=>{
   const {context,studentId,studentPersonId}=await studentActor();
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
   const assessment=await requireEnrolledAssessment(tx,s,data.assessmentId,studentId,
-    context.scope.siteIds??[],context.scope.programIds??[]);
+    context as Actor,true);
   const [latest]=await tx.select({response:s.submissions.response})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
-    eq(s.submissions.studentProfileId,studentId)))
+    eq(s.submissions.studentProfileId,studentId),
+    data.attemptNumber === undefined ? undefined : eq(s.submissions.attemptNumber,data.attemptNumber)))
    .orderBy(desc(s.submissions.attemptNumber)).limit(1);
   const ids=Array.isArray(latest?.response.attachments)?latest.response.attachments:[];
-  if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to latest student submission");
+  if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to selected student submission");
   const [document]=await tx.select({
    storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
    mimeType:s.documents.mimeType
@@ -438,14 +442,77 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
   });
  });
 
-/** Only the uploading guardian can fetch a verified file on a current child's excuse. */
+/** Verified staff reviewer (teacher on the section, or registrar) for excuse documents. */
+async function excuseReviewActor() {
+  const context = await getCommandContext(getRequest());
+  assertCapability(context, "attendance.excuse.review");
+  if (!["teacher", "registrar"].includes(context.role) || !context.actorPersonId ||
+    !context.scope.siteIds?.length || !context.scope.programIds?.length ||
+    !context.scope.organizationIds?.length) {
+    throw new AuthorizationError("attendance excuse review grant");
+  }
+  return context;
+}
+
+/**
+ * The uploading guardian can fetch a verified file on a current child's
+ * excuse; staff with attendance.excuse.review authority over the excuse's
+ * site/program (teachers additionally need the section assignment) can fetch
+ * it for review. Reviewer downloads are audited.
+ */
 export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({
   attendanceEventId:z.string().uuid(),documentId:z.string().uuid()
  }).parse(value))
  .handler(async({data})=>{
-  const context=await guardianActor();
+  const session=await getCommandContext(getRequest());
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  if(session.role!=="guardian"){
+  const context=await excuseReviewActor();
+  return db.transaction(async tx=>{
+  const [event]=await tx.select({
+   siteId:s.attendanceEvents.siteId,programId:s.attendanceEvents.programId,
+   sectionId:s.attendanceEvents.sectionId,
+  }).from(s.attendanceEvents).where(eq(s.attendanceEvents.id,data.attendanceEventId)).limit(1);
+  if(!event||!event.siteId||!context.scope.siteIds!.includes(event.siteId)||
+    !context.scope.programIds!.includes(event.programId))
+    throw new AuthorizationError("excuse review site and program scope");
+  const [host]=await tx.select({organizationId:s.programs.organizationId}).from(s.programs)
+    .where(eq(s.programs.id,event.programId)).limit(1);
+  if(!host||!context.scope.organizationIds!.includes(host.organizationId))
+    throw new AuthorizationError("excuse review organization scope");
+  if(context.role==="teacher"){
+   const [assignment]=event.sectionId?await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers)
+    .where(and(eq(s.sectionTeachers.sectionId,event.sectionId),
+     eq(s.sectionTeachers.personId,context.actorPersonId!))).limit(1):[];
+   if(!assignment)throw new AuthorizationError("teacher excuse section assignment");
+  }
+  const excuses=await tx.select({documentIds:s.attendanceExcuses.documentIds})
+    .from(s.attendanceExcuses)
+    .where(eq(s.attendanceExcuses.attendanceEventId,data.attendanceEventId));
+  if(!excuses.some(excuse=>excuse.documentIds.includes(data.documentId)))
+    throw new AuthorizationError("document not attached to an excuse for this attendance record");
+  const [document]=await tx.select({
+   storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt
+  }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
+    verifiedPrivateDocumentPredicate({
+     subjectType:"attendance_event",subjectId:data.attendanceEventId,category:"attendance_excuse",
+    }))).limit(1);
+  if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
+    throw new AuthorizationError("verified excuse document scope");
+  await writeAudit(tx, {
+    actorPersonId: context.actorPersonId,
+    action: "attendance.excuse.document.review_download",
+    resourceType: "document",
+    resourceId: data.documentId,
+    scope: { siteId: event.siteId, programId: event.programId },
+    after: { attendanceEventId: data.attendanceEventId },
+    context: { accountId: context.accountId, sessionId: context.sessionId },
+  });
+  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  });
+  }
+  const context=await guardianActor();
   return db.transaction(async tx=>{
   await requireGuardianEvent(tx,s,data.attendanceEventId,context.actorPersonId!,
     context.scope.programIds??[]);

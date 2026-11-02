@@ -15,7 +15,8 @@ describe("canonical workspace navigation",()=>{
  });
  it("does not expose another role's navigation destinations",()=>{
   const paths=(role:string)=>workspaceLinks[role].map(item=>item.path);
-  expect(paths("student")).toContain("/student/assignments");
+  expect(paths("student")).toContain("/student/courses");
+  expect(paths("student")).toContain("/student/my-school");
   expect(paths("student")).not.toContain("/admissions");
   expect(paths("guardian")).toContain("/guardian/academics");
   expect(paths("guardian")).not.toContain("/student/assignments");
@@ -25,18 +26,20 @@ describe("canonical workspace navigation",()=>{
   expect(paths("student")).not.toContain("/admin");
   expect(paths("guardian")).not.toContain("/admin");
   expect(paths("specialist")).toContain("/coach");
-  expect(paths("specialist")).toContain("/support");
+  expect(paths("specialist")).not.toContain("/teacher/gradebook");
   expect(paths("counselor")).toContain("/counselor");
-  expect(paths("counselor")).toContain("/support");
+  expect(paths("counselor")).not.toContain("/admin");
   expect(paths("counselor")).not.toContain("/teacher/gradebook");
-  expect(paths("student")).toContain("/student/study-groups");
+  expect(paths("student")).toContain("/student/my-school");
  });
  it("marks only the selected destination and preserves its concrete route",async()=>{
-  const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/study-groups"})});
+  const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/my-school"})});
   const router=createRouter({routeTree:root,history:createMemoryHistory({initialEntries:["/"]})});
   await router.load();
   const markup=renderToStaticMarkup(createElement(RouterProvider,{router}));
-  expect(markup).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/student\/study-groups"/);
+  const selected=markup.match(/<a[^>]*aria-current="page"[^>]*>/)?.[0];
+  expect(selected).toContain('href="/student/my-school"');
+  expect(selected).toContain("focus-visible:ring-2");
   expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
   expect(markup).not.toContain('href="/counselor"');
  });

@@ -1,14 +1,22 @@
-import { createServerFn } from "@tanstack/react-start";
+import { assertSchoolDayPreparation } from "@/domain/onsite-day-preparation";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  attendanceEvents, attendanceExcuses, enrollments, guardianRelationships,
-  people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
+  attendanceEvents, attendanceExcuses, documents, enrollments, guardianRelationships,
+  accountPersonGrants, accessAccounts, people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
+import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "@/modules/operations/site-local-delegation.server";
+import { activeFacilitatorSectionIds, requireCurrentSectionFacilitator } from "@/modules/operations/site-section-facilitators.server";
+import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
@@ -24,10 +32,20 @@ const occurrence = (date: string) => date + ":site-day";
 async function staff(capability: string) {
   setResponseHeader("Cache-Control", "private, no-store");
   const actor = await getCommandContext(getRequest());
-  assertCapability(actor, capability);
-  if (!actor.actorPersonId || !["registrar", "teacher"].includes(actor.role) ||
-      !actor.scope.programIds?.length || !actor.scope.siteIds?.length ||
-      !actor.scope.organizationIds?.length)
+  if (isOnsiteAttendanceRole(actor.role)) {
+    // Onsite staff may ONLY read expected rosters and record attendance;
+    // guardian excuse review and academic/registrar actions remain barred.
+    if (capability !== "attendance.write")
+      throw new AuthorizationError("onsite staff cannot review attendance excuses");
+    assertOnsiteAttendanceScope(actor);
+  } else {
+    assertCapability(actor, capability);
+    if (!["registrar", "teacher"].includes(actor.role))
+      throw new AuthorizationError("verified attendance staff role");
+  }
+  if (!actor.actorPersonId || !actor.scope.organizationIds?.length ||
+      (isOnsiteAttendanceRole(actor.role) &&
+       (!actor.scope.programIds?.length || !actor.scope.siteIds?.length)))
     throw new AuthorizationError("verified attendance staff grant");
   return actor;
 }
@@ -61,36 +79,99 @@ function siteDayStart(date: string, timeZone: string): Date {
   return new Date(instant);
 }
 
-async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, selectedId?: string) {
-  const rows = await db.select({
+async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string, preparation=false) {
+  // The inner join on sites guarantees a non-null site for every row.
+  const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
+    academicProviderOrganizationId:programs.academicProviderOrganizationId,
     siteId: programs.siteId, deliveryModel: programs.deliveryModel,
     timezone: sites.timezone,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
     .where(and(
-      inArray(programs.id, actor.scope.programIds!),
       inArray(programs.organizationId, actor.scope.organizationIds!),
-      inArray(programs.siteId, actor.scope.siteIds!),
+      preparation?inArray(programs.status,["launching","ready","active"]):eq(programs.status,"active"),
+      ...(actor.scope.programIds!==undefined?[inArray(programs.id,actor.scope.programIds)]:[]),
+      ...(actor.scope.siteIds!==undefined?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
+      ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
+      ...(siteId ? [eq(programs.siteId, siteId)] : []),
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
-    ));
-  return rows.filter(p => p.deliveryModel.onsite === true);
+    ))).filter((row): row is Omit<typeof row, "siteId"> & { siteId: string } =>
+      row.siteId !== null);
+  const onsite = rows.filter(p => p.deliveryModel.onsite === true);
+  // An independently hosted CAN school has explicit director and named
+  // Section facilitator appointments, NOT a site_staff-wide roster role.
+  // A generic staff grant must never reveal the church's children or enable
+  // the attendance command, including an offline mutation replay.
+  if(actor.role==="site_staff"){
+    const permitted=[];
+    for(const program of onsite){
+      if(!await requiresIndependentChurchLocalDelegation(db,program.id))
+        permitted.push(program);
+    }
+    return permitted;
+  }
+  // Verified role/site membership alone no longer exposes the whole church's
+  // pupil roster. Named director/facilitator delegation is Program-scoped.
+  if (actor.role !== "site_leader" && actor.role !== "room_facilitator")
+    return onsite;
+  const delegated = [];
+  for (const program of onsite) {
+    try {
+      if (actor.role === "site_leader") {
+        await requireCurrentSiteLocalDelegate(db, actor, program.id, "site_director");
+      } else if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
+        const sections = await activeFacilitatorSectionIds(db, actor, program.id);
+        if (!sections.length) continue;
+      }
+      delegated.push(program);
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
+    }
+  }
+  return delegated;
 }
 
 /** One server-authorized program/student/date entitlement, used for reads and writes. */
-async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
-  date: string, programId?: string, studentId?: string) {
-  const programsAtSite = await scopedOnsitePrograms(actor, programId);
+async function resolveExpectedRoster(actor: AccessContext,
+  date: string, programId?: string, studentId?: string, siteId?: string, preparation=false) {
+  const programsAtSite = await scopedOnsitePrograms(actor, programId, siteId, preparation);
   const expectedIds = new Map<string, Set<string>>();
   const coverage = await loadExpectedAttendanceCoverage(programsAtSite, [], new Date(), 1,
     { date, studentIds: expectedIds });
-  const activePrograms = programsAtSite.filter(p => siteDate(new Date(), p.timezone) >= date);
+  const activePrograms = programsAtSite.filter(p => preparation || siteDate(new Date(), p.timezone) >= date);
 
   // A registrar can manage a program roster. A teacher can only mark a
   // student in an active section they are actually assigned to teach.
   const permittedIds = activePrograms.map(p => p.id);
-  if (!permittedIds.length) return { roster: [], coverage, programsAtSite };
+  if (!permittedIds.length) return { roster: [], sectionMemberships: [], unplacedStudents: [], coverage, programsAtSite };
 
-  const programRoster = actor.role === "registrar" ? await db.select({
+  // A child is expected at an independently church-hosted CAN school
+  // only after placement in a real instructional Section. A Program-only
+  // admission is not a safe, supervised classroom placement.
+  const independentPrograms=new Set<string>();
+  for(const program of activePrograms){
+    if(await requiresIndependentChurchLocalDelegation(db,program.id))
+      independentPrograms.add(program.id);
+  }
+  // A facilitator may read ONLY children currently assigned to a Section
+  // with an effective named appointment—not the entire Program roster.
+  const sectionFilter = new Set<string>();
+  if (actor.role === "room_facilitator") {
+    for (const program of activePrograms) {
+      if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
+        for (const id of await activeFacilitatorSectionIds(db, actor, program.id))
+          sectionFilter.add(id);
+      } else {
+        // Existing non-independent sites continue using established staff grants.
+        const rows = await db.select({ id: sections.id }).from(sections)
+          .where(and(eq(sections.programId, program.id),
+            eq(sections.siteId, program.siteId), eq(sections.active, true)));
+        for (const row of rows) sectionFilter.add(row.id);
+      }
+    }
+  }
+  const programRoster = (actor.role === "registrar" ||
+    actor.role === "site_leader" || actor.role === "site_staff") ? await db.select({
     studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
@@ -101,32 +182,65 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
       inArray(enrollments.programId, permittedIds),
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : []))) : [];
 
+  // A stale Section enrollment does not establish physical attendance
+  // eligibility after its Program enrollment or school year is withdrawn.
+  const activeProgramEnrollment=alias(enrollments,"onsite_current_program_enrollment");
   const sectionsAtSite = await db.select({
     studentProfileId: enrollments.studentProfileId, programId: sections.programId,
     siteId: sections.siteId, sectionId: sections.id, sectionTitle: sections.title,
+    sectionStartsAt:sections.startsAt,sectionEndsAt:sections.endsAt,
+    membershipStartsAt:enrollments.startedAt,membershipEndsAt:enrollments.endedAt,
+    programStartsAt:activeProgramEnrollment.startedAt,
+    programEndsAt:activeProgramEnrollment.endedAt,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
   }).from(enrollments)
     .innerJoin(sections, eq(sections.id, enrollments.sectionId))
     .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(activeProgramEnrollment,and(
+      eq(activeProgramEnrollment.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgramEnrollment.programId,sections.programId),
+      eq(activeProgramEnrollment.schoolYearId,terms.schoolYearId),
+      eq(activeProgramEnrollment.kind,"program"),
+      eq(activeProgramEnrollment.status,"active"),
+    ))
     .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
-    .innerJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
+    .leftJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
     .where(and(eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
+      eq(enrollments.programId,sections.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(sections.active, true), eq(schoolYears.status, "active"),
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
+      lte(terms.startsOn,date),gte(terms.endsOn,date),
+      ...(siteId?[eq(sections.siteId,siteId),eq(schoolYears.siteId,siteId)]:[]),
       inArray(sections.programId, permittedIds),
-      inArray(sections.siteId, actor.scope.siteIds!),
+      ...(actor.scope.siteIds!==undefined?[inArray(sections.siteId,actor.scope.siteIds)]:[]),
+      ...(actor.role === "room_facilitator" ? [inArray(sections.id, [...sectionFilter])] : []),
       ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
         []),
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : [])));
+  // Keep effective Section and Section-membership dates distinct from the
+  // Program enrollment's own effective window. All dates use the school zone.
+  const effectiveSections=sectionsAtSite.filter(row=>{
+    const timeZone=activePrograms.find(program=>program.id===row.programId)?.timezone??"UTC";
+    return (!row.sectionStartsAt||siteDate(row.sectionStartsAt,timeZone)<=date) &&
+      (!row.sectionEndsAt||siteDate(row.sectionEndsAt,timeZone)>=date) &&
+      (!row.membershipStartsAt||siteDate(row.membershipStartsAt,timeZone)<=date) &&
+      (!row.membershipEndsAt||siteDate(row.membershipEndsAt,timeZone)>date) &&
+      (!row.programStartsAt||siteDate(row.programStartsAt,timeZone)<=date) &&
+      (!row.programEndsAt||siteDate(row.programEndsAt,timeZone)>date);
+  });
   const byKey = new Map<string, {
     studentProfileId: string; programId: string; studentName: string;
     sectionTitle: string | null; siteId: string; sectionId: string | null;
   }>();
   for (const row of programRoster) {
-    if (!row.programId || !expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
+    // Keep planning and enrollment lists separate from the live school's
+    // physical attendance roster until this child has a real Section.
+    if (!row.programId || independentPrograms.has(row.programId) ||
+        !expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
     const host = activePrograms.find(p => p.id === row.programId)!;
     byKey.set(row.programId + ":" + row.studentProfileId, {
       studentProfileId: row.studentProfileId, programId: row.programId,
@@ -134,7 +248,7 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
       sectionTitle: null, siteId: host.siteId!, sectionId: null,
     });
   }
-  for (const row of sectionsAtSite) {
+  for (const row of effectiveSections) {
     if (!expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
     const host = activePrograms.find(p => p.id === row.programId);
     if (!host || host.siteId !== row.siteId) continue;
@@ -147,8 +261,159 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
       siteId: row.siteId!, sectionId: old?.sectionId ?? row.sectionId,
     });
   }
-  return { roster: [...byKey.values()], coverage, programsAtSite };
+  const memberships=new Map<string,{studentProfileId:string;studentName:string;programId:string;sectionId:string;sectionTitle:string}>();
+  for(const row of effectiveSections){
+    if(!expectedIds.get(row.programId)?.has(row.studentProfileId))continue;
+    const host=activePrograms.find(program=>program.id===row.programId);
+    if(!host||host.siteId!==row.siteId)continue;
+    memberships.set(row.programId+":"+row.sectionId+":"+row.studentProfileId,{
+      studentProfileId:row.studentProfileId,studentName:row.preferredName??row.firstName+" "+row.lastName,
+      programId:row.programId,sectionId:row.sectionId,sectionTitle:row.sectionTitle,
+    });
+  }
+  const unplacedStudents=preparation?[...new Map(programRoster.filter(row=>row.programId&&
+    independentPrograms.has(row.programId)&&expectedIds.get(row.programId)?.has(row.studentProfileId)&&
+    !byKey.has(row.programId+":"+row.studentProfileId)).map(row=>[row.programId+":"+row.studentProfileId,{
+      studentProfileId:row.studentProfileId,programId:row.programId!,
+      studentName:row.preferredName??row.firstName+" "+row.lastName,
+    }])).values()]:[];
+  return { roster: [...byKey.values()], sectionMemberships:[...memberships.values()], unplacedStudents, coverage, programsAtSite };
 }
+
+/** Localized date and verified site identity for room facilitators. */
+export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
+  .handler(async () => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const actor = await getCommandContext(getRequest());
+    assertOnsiteAttendanceScope(actor);
+    const [site] = await db.select({
+      id: sites.id, name: sites.name, timezone: sites.timezone,
+      organizationId: sites.organizationId,
+    }).from(sites).where(eq(sites.id, actor.grantSiteId!)).limit(1);
+    if (!site || !actor.scope.organizationIds?.includes(site.organizationId))
+      throw new AuthorizationError("site day organization and site match");
+    return {
+      siteId: site.id, siteName: site.name, timeZone: site.timezone,
+      date: siteDate(new Date(), site.timezone),
+      canPrepareSchoolDays:actor.role==="site_leader"&&!actor.sessionAccountId,
+      preparationThrough:siteDate(new Date(Date.now()+30*86400_000),site.timezone),
+      note: "Staff-recorded onsite attendance. Online activity does not establish physical presence or departure.",
+    };
+  });
+
+/** Internal projection for callers that already authorized this actor and Site. */
+export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:AccessContext,data:{
+  date:string;programId?:string;siteId?:string;
+})=>{
+  const { roster, coverage, programsAtSite } = await resolveExpectedRoster(actor,
+    data.date, data.programId, undefined, data.siteId);
+  const rosterIds = [...new Set(roster.map(r => r.studentProfileId))];
+  const events = rosterIds.length ? await db.select({
+    id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+    programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
+    status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
+  }).from(attendanceEvents).where(and(
+    inArray(attendanceEvents.programId, programsAtSite.map(p => p.id)),
+    inArray(attendanceEvents.studentProfileId, rosterIds),
+    eq(attendanceEvents.occurrenceKey, occurrence(data.date)))) : [];
+  const effective = new Map(effectiveAttendanceEvents(events)
+    .map(e => [e.programId + ":" + e.studentProfileId, e]));
+  return {
+    date: data.date,
+    programs: programsAtSite.map(p => ({
+      id: p.id, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
+      expectedDays: coverage.get(p.id)?.expectedDays ?? 0,
+      missingCalendarDates: coverage.get(p.id)?.daysWithoutCalendarConfiguration ?? 0,
+    })),
+    students: roster.map(r => {
+      const record = effective.get(r.programId + ":" + r.studentProfileId);
+      return {
+        studentProfileId: r.studentProfileId, programId: r.programId,
+        programName: programsAtSite.find(p => p.id === r.programId)!.name,
+        studentName: r.studentName, sectionTitle: r.sectionTitle,
+        sectionId: r.sectionId,
+        occurrenceKey: occurrence(data.date),
+        attendanceEventId: record?.id ?? null,
+        status: record?.status ?? "unmarked",
+      };
+    }).sort((a, b) => a.studentName.localeCompare(b.studentName) ||
+      a.programName.localeCompare(b.programName)),
+  };
+});
+
+/** Same canonical enrollment/calendar resolver as today's roster. No attendance
+ * events are read or projected as observations for a preparation date. */
+/** Read-only student-specific future day. This does not load attendance events. */
+export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(actor:AccessContext,data:{
+  date:string;programId:string;siteId:string;studentProfileId:string;
+})=>{
+  if(actor.role!=="registrar" || !actor.actorPersonId || actor.sessionAccountId)
+    throw new AuthorizationError("verified registrar future first-day preparation");
+  assertCapability(actor,"enrollment.activate");
+  if(!actor.scope.organizationIds?.length ||
+    !actor.scope.siteIds?.includes(data.siteId) ||
+    !actor.scope.programIds?.includes(data.programId))
+    throw new AuthorizationError("original registrar Site and Program grant");
+  if(!dateField.safeParse(data.date).success || !uuid.safeParse(data.studentProfileId).success ||
+    !uuid.safeParse(data.programId).success || !uuid.safeParse(data.siteId).success)
+    throw new AuthorizationError("valid scoped school-day preparation identifiers");
+  const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
+    timezone:sites.timezone}).from(sites).where(eq(sites.id,data.siteId)).limit(1);
+  if(!site || !actor.scope.organizationIds.includes(site.organizationId) ||
+    (actor.grantSiteId && actor.grantSiteId!==site.id))
+    throw new AuthorizationError("original registrar organization and Site");
+  const today=siteDate(new Date(),site.timezone);
+  if(data.date<today)throw new AuthorizationError("future first-day date cannot be in the past");
+  const {roster,sectionMemberships,unplacedStudents,coverage,programsAtSite}=
+    await resolveExpectedRoster(actor,data.date,data.programId,data.studentProfileId,data.siteId,true);
+  const program=programsAtSite.find(row=>row.id===data.programId &&
+    row.siteId===data.siteId && row.organizationId===site.organizationId);
+  if(!program)throw new AuthorizationError("active onsite registrar Program");
+  const matched=roster.find(row=>row.studentProfileId===data.studentProfileId &&
+    row.programId===data.programId);
+  // A Section assignment is not proof that a currently authorized CAN teacher exists.
+  const qualifiedTeachers=matched?.sectionId?await db.select({personId:sectionTeachers.personId})
+    .from(sectionTeachers)
+    .innerJoin(people,eq(people.id,sectionTeachers.personId))
+    .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.personId,sectionTeachers.personId),
+      eq(accountPersonGrants.role,"teacher"),
+      eq(accountPersonGrants.organizationId,program.academicProviderOrganizationId),
+      eq(accountPersonGrants.active,true)))
+    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+    .where(and(eq(sectionTeachers.sectionId,matched.sectionId),
+      eq(sectionTeachers.role,"teacher"),eq(people.active,true),
+      eq(accessAccounts.disabled,false),isNotNull(accessAccounts.emailVerifiedAt)))
+    .limit(1):[];
+  return {qualifiedTeacherAssigned:qualifiedTeachers.length>0,
+    date:data.date,program:{id:program.id,name:program.name,
+      configuration:coverage.get(program.id)?.configuration??"not_onsite",
+      expectedDays:coverage.get(program.id)?.expectedDays??0,
+      missingCalendarDates:coverage.get(program.id)?.daysWithoutCalendarConfiguration??0},
+    student:matched?{studentProfileId:matched.studentProfileId,programId:matched.programId,
+      studentName:matched.studentName,sectionId:matched.sectionId,
+      sectionTitle:matched.sectionTitle,status:"unmarked" as const}:null,
+    sectionMemberships:sectionMemberships.filter(row=>row.studentProfileId===data.studentProfileId &&
+      row.programId===data.programId),
+    unplaced:unplacedStudents.some(row=>row.studentProfileId===data.studentProfileId &&
+      row.programId===data.programId),
+  };
+});
+
+export const loadExpectedSchoolDayPreparation=createServerOnlyFn(async(actor:AccessContext,data:{date:string})=>{
+  const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,timezone:sites.timezone,name:sites.name})
+    .from(sites).where(eq(sites.id,actor.grantSiteId!)).limit(1);
+  if(!site)throw new AuthorizationError("original school preparation Site");
+  assertSchoolDayPreparation(actor,site,data.date);
+  const {roster,sectionMemberships,unplacedStudents,coverage,programsAtSite}=await resolveExpectedRoster(actor,data.date,undefined,undefined,site.id,true);
+  return {site,date:data.date,
+    programs:programsAtSite.map(program=>({id:program.id,name:program.name,
+      configuration:coverage.get(program.id)?.configuration??"not_onsite",
+      expectedDays:coverage.get(program.id)?.expectedDays??0,
+      missingCalendarDates:coverage.get(program.id)?.daysWithoutCalendarConfiguration??0})),
+    students:roster.map(row=>({studentProfileId:row.studentProfileId,studentName:row.studentName,programId:row.programId})),
+    sectionMemberships,unplacedStudents,
+  };
+});
 
 export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
@@ -156,39 +421,31 @@ export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await staff("attendance.write");
-    const { roster, coverage, programsAtSite } = await resolveExpectedRoster(actor,
-      data.date, data.programId);
-    const rosterIds = [...new Set(roster.map(r => r.studentProfileId))];
-    const events = rosterIds.length ? await db.select({
-      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
-      programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
-      status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
-    }).from(attendanceEvents).where(and(
-      inArray(attendanceEvents.programId, programsAtSite.map(p => p.id)),
-      inArray(attendanceEvents.studentProfileId, rosterIds),
-      eq(attendanceEvents.occurrenceKey, occurrence(data.date)))) : [];
-    const effective = new Map(effectiveAttendanceEvents(events)
-      .map(e => [e.programId + ":" + e.studentProfileId, e]));
-    return {
-      date: data.date,
-      programs: programsAtSite.map(p => ({
-        id: p.id, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
-        expectedDays: coverage.get(p.id)?.expectedDays ?? 0,
-        missingCalendarDates: coverage.get(p.id)?.daysWithoutCalendarConfiguration ?? 0,
-      })),
-      students: roster.map(r => {
-        const record = effective.get(r.programId + ":" + r.studentProfileId);
-        return {
-          studentProfileId: r.studentProfileId, programId: r.programId,
-          programName: programsAtSite.find(p => p.id === r.programId)!.name,
-          studentName: r.studentName, sectionTitle: r.sectionTitle,
-          occurrenceKey: occurrence(data.date),
-          attendanceEventId: record?.id ?? null,
-          status: record?.status ?? "unmarked",
-        };
-      }).sort((a, b) => a.studentName.localeCompare(b.studentName) ||
-        a.programName.localeCompare(b.programName)),
-    };
+    return loadExpectedOnsiteRosterForActor(actor, data);
+  });
+
+/**
+ * Local-operator opening projection: for each onsite Program this staff
+ * member is already scoped to see, whether an independently hosted
+ * church/CAN school is currently authorized to operate. Only the
+ * configuration status and non-sensitive blocker categories are returned —
+ * never evidence documents, verifier identity or CAN review internals.
+ * Programs without an independent church/CAN identity produce no entry.
+ */
+export const getSiteDayOpeningStatuses = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const actor = await staff("attendance.write");
+    const programsAtSite = await scopedOnsitePrograms(actor);
+    const statuses = [];
+    for (const program of programsAtSite) {
+      try {
+        statuses.push(await readLocalSchoolOpeningStatus(actor, program.id));
+      } catch (error) {
+        if (!(error instanceof AuthorizationError)) throw error;
+        // Not an independently hosted church/CAN school: no opening gate applies.
+      }
+    }
+    return { statuses };
   });
 
 export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
@@ -218,6 +475,14 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
         replay.programId !== data.programId || replay.occurrenceKey !== occurrence(data.date) ||
         replay.status !== data.status)
         throw new Error("Attendance mutation ID was already used for different input");
+      if (isOnsiteAttendanceRole(actor.role)) {
+        assertOnsiteAttendanceScope(actor, program.siteId);
+        if (actor.role === "room_facilitator" &&
+            await requiresIndependentChurchLocalDelegation(db, program.id)) {
+          if (!replay.sectionId) throw new AuthorizationError("replay requires a named Section");
+          await requireCurrentSectionFacilitator(db, actor, program.id, replay.sectionId);
+        }
+      }
       if (actor.role === "teacher") {
         if (!replay.sectionId) throw new AuthorizationError("teacher attendance replay section");
         const [assignment] = await db.select({ id: sectionTeachers.id })
@@ -229,6 +494,18 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
       return { attendanceEventId: replay.id };
     }
 
+    if (isOnsiteAttendanceRole(actor.role)) {
+      assertOnsiteAttendanceScope(actor, program.siteId);
+      // Permit bounded staff-attested corrections for a missed onsite day;
+      // never permit unrestricted backdating or future attendance.
+      const earliest = siteDate(new Date(Date.now() - 30 * 86400_000), program.timezone);
+      if (data.date < earliest || data.date > siteDate(new Date(), program.timezone))
+        throw new AuthorizationError("onsite staff attendance limited to recent school-local days");
+      if (data.expectedPreviousEventId === undefined)
+        throw new AuthorizationError("onsite correction requires prior-record acknowledgement");
+      if (data.expectedPreviousEventId && (data.note?.trim().length ?? 0) < 10)
+        throw new Error("Explain any onsite attendance correction (10 characters minimum)");
+    }
     const { roster } = await resolveExpectedRoster(actor, data.date, data.programId,
       data.studentProfileId);
     const eligible = roster.find(r => r.programId === data.programId &&
@@ -265,8 +542,11 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
       lastName: people.legalLastName,
     }).from(guardianRelationships)
       .innerJoin(people, eq(people.id, guardianRelationships.studentPersonId))
-      .where(and(eq(guardianRelationships.guardianPersonId, actor.actorPersonId!),
-        eq(guardianRelationships.canViewAcademics, true),
+      .where(and(
+        guardianRelationshipPredicate({
+          guardianPersonId: actor.actorPersonId!,
+          access: "academic",
+        }),
         ...(data.studentPersonId ?
           [eq(guardianRelationships.studentPersonId, data.studentPersonId)] : [])));
     if (!relationships.length) return { absences: [] };
@@ -368,9 +648,11 @@ export const submitEffectiveAttendanceExcuse = createServerFn({ method: "POST" }
       .from(studentProfiles).where(eq(studentProfiles.id, record.studentProfileId)).limit(1);
     const [relation] = profile ? await db.select({ id: guardianRelationships.id })
       .from(guardianRelationships).where(and(
-        eq(guardianRelationships.guardianPersonId, actor.actorPersonId!),
-        eq(guardianRelationships.studentPersonId, profile.personId),
-        eq(guardianRelationships.canViewAcademics, true),
+        guardianRelationshipPredicate({
+          guardianPersonId: actor.actorPersonId!,
+          studentPersonId: profile.personId,
+          access: "academic",
+        }),
         eq(guardianRelationships.canSubmitAttendanceExcuse, true))).limit(1) : [];
     if (!relation) throw new AuthorizationError("guardian cannot excuse this student");
 
@@ -402,6 +684,7 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
     const base = db.select({
       excuseId: attendanceExcuses.id,
       attendanceEventId: attendanceExcuses.attendanceEventId,
+      documentIds: attendanceExcuses.documentIds,
       studentProfileId: attendanceEvents.studentProfileId,
       programId: attendanceEvents.programId,
       occurrenceKey: attendanceEvents.occurrenceKey,
@@ -443,6 +726,14 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
     ));
     const effective = new Map(effectiveAttendanceEvents(events).map(r =>
       [[r.studentProfileId, r.programId, r.occurrenceKey].join(":"), r]));
+    // Only verified documents are surfaced to reviewers; the download itself
+    // re-checks scope, verification and object-key policy server-side.
+    const attachmentIds = [...new Set(rows.flatMap(r => r.documentIds))];
+    const attachmentRows = attachmentIds.length ? await db.select({
+      id: documents.id, fileName: documents.fileName,
+    }).from(documents).where(and(
+      inArray(documents.id, attachmentIds), isNotNull(documents.verifiedAt))) : [];
+    const attachmentNameById = new Map(attachmentRows.map(row => [row.id, row.fileName]));
     return { excuses: rows.map(r => {
       const current = effective.get([r.studentProfileId, r.programId, r.occurrenceKey].join(":"));
       return {
@@ -451,6 +742,9 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
         studentName: r.preferredName ?? r.legalFirstName + " " + r.legalLastName,
         expectedAt: r.expectedAt.toISOString(), eventStatus: current?.status ?? r.eventStatus,
         reason: r.reason, submittedAt: r.submittedAt.toISOString(),
+        attachments: r.documentIds
+          .filter(id => attachmentNameById.has(id))
+          .map(id => ({ documentId: id, fileName: attachmentNameById.get(id)! })),
         canReview: current?.id === r.attendanceEventId &&
           (current?.status === "absent" || current?.status === "tardy"),
         canClose: actor.role === "registrar" && !!current && current.id !== r.attendanceEventId,

@@ -1,8 +1,11 @@
+import { readCurriculumDeliveryAccess, requireCurriculumDeliveryAccess } from "./curriculum-delivery-access.server";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "@/domain/class-assessment-evidence";
 import { z } from "zod";
+import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { readClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { AuthorizationError } from "@/domain/command-context";
@@ -30,9 +33,10 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     // The publisher's accepted course version defines the full learning sequence.
     // A new week is ordinary publisher content, not a per-class adoption.
-    const content=section.contentStatus==="published"?readClassContent(section.curriculum):null;
+    const curriculumAccess=await readCurriculumDeliveryAccess(db,section);
+    const content=curriculumAccess.available?readClassContent(section.curriculum):null;
     // School and teacher additions are separate supplements and assignments.
-    const teacherGuides=actor.role==="teacher"&&section.contentStatus==="published"
+    const teacherGuides=actor.role==="teacher"&&curriculumAccess.available
       ?readClassTeacherGuides(section.curriculum):null;
     if(teacherGuides && (teacherGuides.courseCode!==section.courseCode ||
        teacherGuides.units.some(unit=>!content?.modules.some(module=>module.id===unit.unitId &&
@@ -68,11 +72,20 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       )).orderBy(desc(s.submissions.attemptNumber))
       :[];
     const assessmentEvidence=buildClassAssessmentEvidence(assessmentRows,attemptRows);
+    const activeProgramMembership=alias(s.enrollments,"workspace_active_program_enrollment");
     const roster = actor.role === "teacher" ? await db.select({ profileId: s.studentProfiles.id, personId: s.people.id,
       firstName: s.people.legalFirstName, lastName: s.people.legalLastName, preferredName: s.people.preferredName })
       .from(s.enrollments).innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
       .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
-      .where(and(eq(s.enrollments.sectionId, section.id), eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active")))
+      .innerJoin(activeProgramMembership,and(
+        eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+        eq(activeProgramMembership.programId,section.programId),
+        eq(activeProgramMembership.schoolYearId,section.schoolYearId),
+        eq(activeProgramMembership.kind,"program"),eq(activeProgramMembership.status,"active"),
+      ))
+      .where(and(eq(s.enrollments.sectionId, section.id), eq(s.enrollments.kind, "section"),
+        eq(s.enrollments.status, "active"),eq(s.enrollments.programId,section.programId),
+        eq(s.enrollments.schoolYearId,section.schoolYearId)))
       .orderBy(s.people.legalLastName) : [];
     const rosterProgress = roster.length ? await db.select({ profileId: s.lessonProgress.studentProfileId, lessonId: s.lessonProgress.lessonId })
       .from(s.lessonProgress).where(and(eq(s.lessonProgress.sectionId, section.id),
@@ -108,15 +121,17 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       item.siteId ? item.siteId===section.siteId : true,
     ).map(item=>({id:item.id,title:item.title,kind:item.kind,
       url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
+      resourceId:item.resourceId,
       lessonId:item.lessonId,
       source:item.metadata?.source==="teacher_supplement"?"teacher" as const:"organization" as const,
       canManage:actor.role==="teacher"&&item.metadata?.source==="teacher_supplement"&&
         item.createdByPersonId===actor.actorPersonId}));
     // Pack-level resources are only visible when the program has an active adoption
     // AND the owning organization has an active entitlement. Bindings are read-only.
-    const publisherRows=await db.select({
+    const publisherRows=curriculumAccess.available?await db.select({
       id:s.curriculumResources.id,title:s.curriculumResources.title,
       kind:s.curriculumResources.kind,url:s.curriculumResources.url,
+      resourceId:s.curriculumResources.id,
       lessonId:s.curriculumResourceBindings.lessonId,
     }).from(s.curriculumAdoptions)
       .innerJoin(s.curriculumEntitlements,and(
@@ -130,9 +145,9 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       .where(and(eq(s.curriculumAdoptions.programId,section.programId),
         eq(s.curriculumAdoptions.status,"active"),
         or(eq(s.curriculumResourceBindings.courseTemplateVersionId,section.versionId),
-           isNull(s.curriculumResourceBindings.courseTemplateVersionId))));
+           isNull(s.curriculumResourceBindings.courseTemplateVersionId)))):[];
     const allSupplements=[...publisherRows.map(row=>({...row,source:"publisher" as const,canManage:false})),...supplements];
-    const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
+    const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.filter(isLearnerFacingInstruction).map(lesson => lesson.id)) ?? []);
     // Only the assigned teacher receives aggregate, student-reported completion counts.
     // No student identities, grades or mastery in this planning view.
     const completionGroups=new Map<string,Set<string>>();
@@ -146,9 +161,9 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       ?[...completionGroups].map(([lessonId,students])=>({lessonId,studentCount:students.size})):[];
     return {
       lessonCompletionCounts,
-      role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
+      role: actor.role, section: { id: section.id, programId: section.programId, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
-      studentPersonId, content, teacherGuides, supplements:allSupplements,
+      studentPersonId, content, teacherGuides, curriculumAccess, supplements:allSupplements,
       assessmentEvidence, assessmentEvidenceSummary:summarizeClassAssessmentEvidence(assessmentEvidence),
       teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),
@@ -174,9 +189,11 @@ export const setLessonCompletion = createServerFn({ method: "POST" })
       if (!studentProfileId || section.contentStatus !== "published" || section.versionId !== data.versionId) {
         throw new Error("This published course version is no longer available. Reload your class.");
       }
+      if (data.completed) await requireCurriculumDeliveryAccess(tx,section);
       const content=readClassContent(section.curriculum);
-      if (!content?.modules.some(module => module.lessons.some(lesson => lesson.id === data.lessonId)))
-        throw new Error("Lesson unavailable in this published section release.");
+      const lesson=content?.modules.flatMap(module=>module.lessons).find(lesson=>lesson.id===data.lessonId);
+      if (!lesson || (data.completed && !isLearnerFacingInstruction(lesson)))
+        throw new Error("Instructional lesson unavailable in this published section release.");
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"lesson:"+section.id+":"+studentProfileId+":"+data.lessonId}))`);
       const [existing] = await tx.select().from(s.lessonProgress).where(and(
         eq(s.lessonProgress.sectionId, section.id), eq(s.lessonProgress.studentProfileId, studentProfileId),
@@ -208,10 +225,11 @@ export const getClassResourceDownload = createServerFn({ method: "POST" })
     const actor = await classActor();
     const { section } = await authorizeClass(actor, data.sectionId, data.studentPersonId);
     if (section.contentStatus !== "published") throw new AuthorizationError("published class resource");
+    const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+    await requireCurriculumDeliveryAccess(db,section);
     const content = readClassContent(section.curriculum);
     const resource = content && classResources(content).find(item => item.id === data.resourceId);
     if (!resource?.documentId) throw new AuthorizationError("configured private class resource");
-    const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [document] = await db.select({ key: s.documents.storageKey }).from(s.documents).where(and(
       eq(s.documents.id, resource.documentId),
       verifiedPrivateDocumentPredicate({

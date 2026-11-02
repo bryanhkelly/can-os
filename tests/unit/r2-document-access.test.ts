@@ -1,7 +1,14 @@
 import {describe,it,expect} from "vitest";
-import {assertR2DemoEnabled,assertR2DocumentGrant} from "@/domain/r2-document-access";
+import {assertR2DemoEnabled,assertR2DocumentGrant,enrollmentDocumentStorageVerified} from "@/domain/r2-document-access";
 const member=(role:string,organizationIds:string[]=[])=>({role,actorPersonId:"person",organizationIds});
 describe("R2 fail-closed document access policy",()=>{
+ it("accepts legacy fixture objects only in Valor, never from a metadata bit alone",()=>{
+  const valor="f1000000-0000-4000-8000-000000000002";
+  expect(enrollmentDocumentStorageVerified({synthetic:true},valor)).toBe(true);
+  expect(enrollmentDocumentStorageVerified({synthetic:true},"ordinary-school")).toBe(false);
+  expect(enrollmentDocumentStorageVerified({},valor)).toBe(false);
+  expect(enrollmentDocumentStorageVerified({storageVerified:true},"ordinary-school")).toBe(true);
+ });
  it.each([undefined,"","false","TRUE","1"])("denies R2 when flag is %s",flag=>{
   expect(()=>assertR2DemoEnabled(flag)).toThrow("disabled");
  });

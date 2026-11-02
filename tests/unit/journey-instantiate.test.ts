@@ -28,6 +28,13 @@ describe("materializeJourneyRequirements", () => {
     ).toEqual([]);
   });
 
+  it("retains evidence instructions from the Journey definition", () => {
+    expect(materializeJourneyRequirements("journey", {
+      requirements: [{ key: "safety", title: "Safety evidence", blocking: true,
+        evidenceInstructions: "Upload the current safety plan." }],
+    })[0]?.metadata).toEqual({ evidenceInstructions: "Upload the current safety plan." });
+  });
+
   it("materializes rows with blocking default and owner-derived status", () => {
     expect(
       materializeJourneyRequirements("journey", {

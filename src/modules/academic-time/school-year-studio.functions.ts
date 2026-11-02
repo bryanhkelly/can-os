@@ -1,3 +1,4 @@
+import { launchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
 import { academicCalendarDays,academicCalendars,gradeScales,gradingPeriods,organizations,programs,scheduleTemplatePeriods,scheduleTemplates,schoolYears,sites,terms } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -6,10 +7,11 @@ import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
+import { ensureStandardGradeScale } from "./standard-grade-scale.server";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay } from "./school-year-service";
+import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay,prepareSchoolYearBasics,populateSchoolYearInstructionalDays } from "./school-year-service";
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -65,37 +67,18 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
   return {...y,terms:termRows.map(t=>({...t,periods:periods.filter(p=>p.termId===t.id)})),
    calendars:calendarRows.map(cal=>({...cal,days:dayRows.filter(d=>d.academicCalendarId===cal.id)})),schedules:scheduleRows.map(s=>({...s,periods:schedulePeriods.filter(p=>p.scheduleTemplateId===s.id)}))};
  }));
- const programRows = actor.scope.programIds?.length ? await db.select({id:programs.id,name:programs.name,siteId:programs.siteId,organizationId:programs.organizationId})
+ const programRows = actor.scope.programIds?.length ? await db.select({id:programs.id,name:programs.name,siteId:programs.siteId,organizationId:programs.organizationId,metadata:programs.metadata})
   .from(programs).where(inArray(programs.id,actor.scope.programIds)) : [];
- return {sites:siteRows,years,gradeScales:scaleRows,programs:programRows};
+ return {sites:siteRows,years,gradeScales:scaleRows,programs:programRows.map(({metadata,...program})=>{
+  const targetOpeningDate=launchOpeningDate(metadata);
+  return {...program,...(targetOpeningDate?{targetOpeningDate}:{})};
+ })};
 });
-export const createStudioGradeScale=createServerFn({method:"POST"})
- .validator((v:unknown)=>z.object({organizationId:uuid,name:z.string().trim().min(2).max(80)}).parse(v))
- .handler(async({data})=>{
-  const actor=await operator();
-  if(!actor.scope.organizationIds?.includes(data.organizationId))
-   throw new AuthorizationError("grading scale organization");
-  return db.transaction(async tx=>{
-   const [existing]=await tx.select({id:gradeScales.id}).from(gradeScales)
-    .where(and(eq(gradeScales.owningOrganizationId,data.organizationId),
-     eq(gradeScales.name,data.name),eq(gradeScales.version,1))).limit(1);
-   if(existing)return {gradeScaleId:existing.id};
-   const [scale]=await tx.insert(gradeScales).values({
-    owningOrganizationId:data.organizationId,name:data.name,version:1,active:true,
-    configuration:{entries:[
-     {label:"A",minPercent:90,maxPercent:100,gpaPoints:4,passing:true},
-     {label:"B",minPercent:80,maxPercent:89.99,gpaPoints:3,passing:true},
-     {label:"C",minPercent:70,maxPercent:79.99,gpaPoints:2,passing:true},
-     {label:"D",minPercent:60,maxPercent:69.99,gpaPoints:1,passing:true},
-     {label:"F",minPercent:0,maxPercent:59.99,gpaPoints:0,passing:false},
-    ]},
-   }).returning({id:gradeScales.id});
-   await writeAudit(tx,actor,{
-    action:"grade_scale.create",entityType:"grade_scale",entityId:scale!.id,
-    scope:{organizationId:data.organizationId},after:{name:data.name,version:1}});
-   return {gradeScaleId:scale!.id};
-  });
- });
+export const createStudioGradeScale = createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({organizationId:uuid,name:z.string().trim().min(2).max(80)}).strict().parse(v))
+ .handler(async({data})=>({
+   gradeScaleId:await ensureStandardGradeScale(await operator(),data),
+ }));
 export const createStudioYear = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({siteId:uuid,programId:uuid.optional(),gradeScaleId:uuid,
   key:z.string().min(2).max(40),name:z.string().min(3).max(100),startsOn:day,endsOn:day}).parse(v))
@@ -112,6 +95,12 @@ export const createStudioYear = createServerFn({method:"POST"})
 export const addStudioTerm = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({schoolYearId:uuid,key:z.string().min(1),name:z.string().min(2),sequence:z.number().int().positive(),startsOn:day,endsOn:day}).parse(v))
  .handler(async({data})=>({termId:await createTerm(await operator(),data)}));
+export const prepareStudioYear = createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({schoolYearId:uuid,structure:z.enum(["full_year","semesters"]),
+  instructionalDays:z.object({weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7),
+   instructionalMinutes:z.number().int().min(1).max(1440)}).strict().optional(),
+ }).strict().parse(v))
+ .handler(async({data})=>prepareSchoolYearBasics(await operator(),data));
 export const addStudioGradingPeriod = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({termId:uuid,key:z.string().min(1),name:z.string().min(2),sequence:z.number().int().positive(),startsOn:day,endsOn:day}).parse(v))
  .handler(async({data})=>({periodId:await createGradingPeriod(await operator(),data)}));
@@ -149,7 +138,7 @@ export const removeStudioCalendarDay=createServerFn({method:"POST"})
    await lockAttendanceConfigurationAtSite(tx,record.siteId);
    await tx.delete(academicCalendarDays).where(eq(academicCalendarDays.id,record.id));
    await emitEvent(tx,{
-    eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
+    eventType:EventTypes.AcademicCalendarChanged,aggregateType:"academic_calendar",
     aggregateId:record.calendarId,actorPersonId:actor.actorPersonId,
     payload:{calendarDate:record.date,operation:"delete",siteId:record.siteId},
    });
@@ -219,51 +208,4 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
   academicCalendarId:uuid,weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7),
   instructionalMinutes:z.number().int().min(1).max(1440),
  }).parse(v))
- .handler(async({data})=>{
-  const actor=await operator();
-  return db.transaction(async tx=>{
-   const [calendar]=await tx.select({
-    id:academicCalendars.id,startsOn:schoolYears.startsOn,
-    endsOn:schoolYears.endsOn,programId:schoolYears.programId,
-    siteId:schoolYears.siteId,organizationId:schoolYears.organizationId,
-   }).from(academicCalendars)
-    .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
-    .where(eq(academicCalendars.id,data.academicCalendarId)).limit(1);
-   if(!calendar||!actor.scope.organizationIds?.includes(calendar.organizationId)||
-    (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(calendar.siteId))||
-    (calendar.programId&&!actor.scope.programIds?.includes(calendar.programId)))
-    throw new AuthorizationError("calendar generation scope");
-   await lockAttendanceConfigurationAtSite(tx,calendar.siteId);
-   const weekdays=new Set(data.weekdays);
-   const start=new Date(calendar.startsOn+"T00:00:00.000Z");
-   const end=new Date(calendar.endsOn+"T00:00:00.000Z");
-   const rows:{academicCalendarId:string;calendarDate:string;
-    type:"instructional";instructionalMinutes:number}[]=[];
-   for(let at=start.getTime();at<=end.getTime();at+=86400000){
-    const instant=new Date(at);
-    if(!weekdays.has(instant.getUTCDay()))continue;
-    rows.push({academicCalendarId:calendar.id,
-     calendarDate:instant.toISOString().slice(0,10),
-     type:"instructional",instructionalMinutes:data.instructionalMinutes});
-   }
-   if(rows.length){
-    // Existing holiday and closure rows always win.
-    await tx.insert(academicCalendarDays).values(rows).onConflictDoNothing();
-   }
-   await emitEvent(tx,{
-    eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
-    aggregateId:calendar.id,actorPersonId:actor.actorPersonId,
-    payload:{operation:"populate",weekdays:data.weekdays,scheduledDays:rows.length,
-     siteId:calendar.siteId},
-   });
-   await writeAudit(tx,actor,{
-    action:"academic_calendar.populate",
-    entityType:"academic_calendar",entityId:calendar.id,
-    scope:{organizationId:calendar.organizationId,siteId:calendar.siteId,
-     programId:calendar.programId},
-    after:{weekdays:data.weekdays,instructionalMinutes:data.instructionalMinutes,
-     scheduledDays:rows.length},
-   });
-   return {processedDays:rows.length};
-  });
- });
+ .handler(async({data})=>populateSchoolYearInstructionalDays(await operator(),data));

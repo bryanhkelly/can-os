@@ -185,6 +185,44 @@
         "domainEvents:TranscriptIssued"
       ]
     },
+    "/admissions/graduation": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "load issuer-approved graduation requirement versions",
+        "audit an issued transcript against credit requirements",
+        "record a graduation decision and issue an approved diploma"
+      ],
+      "downstreamRecords": [
+        "graduation_requirement_sets",
+        "graduation_decisions",
+        "diploma_issuances",
+        "audit_events"
+      ]
+    },
+    "/admissions/credential-delivery": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "render and download an issued transcript or diploma PDF",
+        "send an issued credential to a designated recipient",
+        "review delivery receipts and provider acceptance status"
+      ],
+      "downstreamRecords": [
+        "academic_credential_deliveries",
+        "audit_events"
+      ]
+    },
     "/admissions/capacity": {
       "persona": "registrar",
       "seeds": [
@@ -628,6 +666,21 @@
         "conference_slot_registrations"
       ]
     },
+    "/student/my-school": {
+      "persona": "student",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1
+      },
+      "interactions": [
+        "view school announcements and upcoming local events",
+        "navigate to the school calendar, classes and study groups"
+      ],
+      "downstreamRecords": []
+    },
     "/student/notifications": {
       "fixtureRequired": false,
       "persona": "authenticated",
@@ -744,11 +797,15 @@
       },
       "interactions": [
         "grade submission with rubric",
-        "create assessment"
+        "create assessment",
+        "finalize section grades for a grading period",
+        "correct a finalized grade with a recorded reason"
       ],
       "downstreamRecords": [
         "submissions (graded)",
-        "domainEvents:GradePosted"
+        "domainEvents:GradePosted",
+        "sectionGrades (finalized)",
+        "auditEvents:report_card.section_grade.finalize"
       ]
     },
     "/teacher/missing-work": {
@@ -1126,6 +1183,389 @@
         "curriculum_overlays",
         "audit_events",
         "domain_events"
+      ]
+    },
+    "/network": {
+      "persona": "network_admin",
+      "fixtureRequired": false,
+      "rationale": "HQ network membership is not automatically seeded into the student demo; the authorized empty-state is supported, while a separate isolated network grant and end-to-end browser acceptance remain required.",
+      "interactions": [
+        "authorized denomination HQ administrator lists its directly owned locations",
+        "HQ creates a new location without student enrollment access",
+        "school registrar and unrelated HQ cannot create a denomination location"
+      ],
+      "downstreamRecords": [
+        "sites",
+        "domainEvents:SiteCreated",
+        "auditEvents:network.site.create"
+      ]
+    },
+    "/network-steward": {
+      "persona": "can_network_steward",
+      "fixtureRequired": false,
+      "rationale": "Steward onboarding needs independently verified contract/authority documents and bootstrap grant; synthetic fixture and browser acceptance remain pending.",
+      "interactions": [
+        "review externally verified agreement evidence",
+        "record effective term",
+        "authorize HQ officer with independently verified email-specific authority"
+      ],
+      "downstreamRecords": [
+        "network_agreements",
+        "account_person_grants",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/account/sessions": {
+      "persona": "authenticated account holder",
+      "seeds": [],
+      "recordCounts": {
+        "access_sessions": 1
+      },
+      "interactions": [
+        "list usable sessions only for the authenticated account, without exposing credentials or fabricated devices",
+        "revoke one owned session while other account sessions remain usable",
+        "sign out everywhere and verify current cookie clearing and revocation on the next authenticated request",
+        "deny cross-account revocation and indistinguishable unknown IDs"
+      ],
+      "downstreamRecords": [
+        "access_sessions",
+        "audit_events"
+      ]
+    },
+    "/enrichment": {
+      "persona": "public visitor",
+      "fixtureRequired": false,
+      "rationale": "Enrichment catalog depends on approved, publishable extended Program/Season and permission snapshots introduced in pending isolated migrations 0032-0034. Do not seed fictional approved offerings or imply live enrollment. A real synthetic catalog/browser fixture is required after schema convergence.",
+      "interactions": [
+        "review only publishable extended offerings and their approved windows",
+        "confirm no unapproved, draft, stale or closed offerings appear",
+        "open the guardian enrollment journey without revealing student information"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/enrichment": {
+      "persona": "guardian",
+      "fixtureRequired": false,
+      "rationale": "Guardian enrollment needs independently verified household/child relationship, published Season and session-package permission/seat state. The pending 0032-0034 schema has not been migrated on the isolated FullFlow Neon branch, and no authenticated connected browser fixture verifies these transitions.",
+      "interactions": [
+        "select only children whose enrollment relationship is verified",
+        "review a published offer and accept the current permission version",
+        "register or waitlist within capacity and verify canonical activity registration and audit",
+        "deny unauthorized child and stale or unpublished offerings"
+      ],
+      "downstreamRecords": [
+        "activity_registrations",
+        "consent_records",
+        "audit_events"
+      ]
+    },
+    "/site/day": {
+      "persona": "site_leader, site_staff or room_facilitator",
+      "fixtureRequired": false,
+      "rationale": "Staff-specific original-site grants, active year, expected roster, delivery-arrangement coverage and current attendance corrections require a connected authenticated onsite-day fixture. Existing generic school seeds are not evidence of supervised-day readiness, release or safeguarding.",
+      "interactions": [
+        "resolve only the original granted site and its local expected roster",
+        "record arrival, absence and attendance corrections with reason",
+        "review instructional staffing duty acknowledgment and day-attendance reconciliation",
+        "deny unrelated site, unscheduled child, academic grade and child release authority"
+      ],
+      "downstreamRecords": [
+        "attendance_events",
+        "actions",
+        "audit_events"
+      ]
+    },
+    "/safeguarding": {
+      "persona": "onsite reporter or actively assigned safeguarding responder",
+      "fixtureRequired": false,
+      "rationale": "Restricted safeguarding intake requires a reviewed site policy, canonical jurisdiction, named responder roster, scoped grants and isolated synthetic records. No migration or connected browser/database acceptance is complete, so generic school seeds must not imply operational or legal readiness.",
+      "interactions": [
+        "submit an idempotent onsite concern and receive only the reporter acknowledgment and safety-instruction projection",
+        "route urgent concerns to named primary, deputy and CAN fallback responders with assignment-restricted access",
+        "record evidence and independent external-report attestations without inferring emergency dispatch or guardian notification"
+      ],
+      "downstreamRecords": [
+        "incidents",
+        "safeguarding_concerns",
+        "safeguarding_case_assignments",
+        "incident_evidence",
+        "safeguarding_external_reports",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/family/join": {
+      "persona": "public",
+      "seeds": [
+        "public-family-admissions-v1.sql"
+      ],
+      "recordCounts": {
+        "public_family_start_requests": 1,
+        "site_publications": 1,
+        "program_publications": 1
+      },
+      "interactions": [
+        "redeem the documented synthetic single-use email token for a published Site and active Program",
+        "replay the same token and verify single-use denial",
+        "deny expired and unknown tokens with an indistinguishable authorization error"
+      ],
+      "downstreamRecords": [
+        "access_accounts",
+        "people",
+        "account_person_grants",
+        "access_sessions",
+        "domainEvents:PublicFamilyStartVerified",
+        "auditEvents:family.public_start.verify"
+      ]
+    },
+    "/guardian/apply": {
+      "persona": "guardian",
+      "seeds": [
+        "public-family-admissions-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "applications": 1,
+        "households": 1
+      },
+      "interactions": [
+        "submit a canonical family application as a verified-email guardian in scope",
+        "retry the same requestId and receive the same application idempotently",
+        "resume the pending application from the guardian workspace"
+      ],
+      "downstreamRecords": [
+        "applications",
+        "journeys",
+        "student_profiles",
+        "people",
+        "guardian_relationships",
+        "domain_events",
+        "audit_events"
+      ]
+    },
+    "/site-website": {
+      "persona": "site_website_editor",
+      "seeds": [
+        "site-website-editor-v1.sql"
+      ],
+      "recordCounts": {
+        "site_publications": 1,
+        "site_local_content_versions": 1,
+        "role_assignments": 1,
+        "memberships": 1
+      },
+      "interactions": [
+        "preview the public-safe Site draft with approved program listings",
+        "publish church-owned local content as a new revision",
+        "restore a previously published revision",
+        "deny an account without a matching Site website editor role assignment"
+      ],
+      "downstreamRecords": [
+        "site_local_content_versions",
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/sites/$siteId/publish": {
+      "persona": "authorized site registrar",
+      "fixtureRequired": false,
+      "rationale": "Public site publication needs an authorized original Site grant and canonical site/program publication rows from pending migrations 0035-0036. Public DNS/hostname routing is not yet deployed. Synthetic publishing and browser approval flows remain unverified.",
+      "interactions": [
+        "reserve a unique public slug without making a Site public",
+        "publish only reviewed, non-misleading program marketing after explicit approval",
+        "unpublish and confirm unauthenticated public catalog becomes unavailable",
+        "deny cross-site publisher, stale revision and claims of school being already operational"
+      ],
+      "downstreamRecords": [
+        "site_publications",
+        "program_publications",
+        "audit_events"
+      ]
+    },
+    "/guardian/experiences": {
+      "persona": "guardian",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1,
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "book a teacher office-hour slot",
+        "reschedule an appointment",
+        "cancel an appointment"
+      ],
+      "downstreamRecords": [
+        "conference_bookings",
+        "audit_events",
+        "domainEvents:ConferenceBooked",
+        "domainEvents:ConferenceCancelled"
+      ]
+    },
+    "/api/family-alert-delivery": {
+      "persona": "authenticated scheduled-job caller",
+      "fixtureRequired": false,
+      "rationale": "Protected transport worker route requires a live job secret, scheduled invocation and queued email/SMS provider receipts. Existing static seeds do not establish provider acceptance or guardian delivery.",
+      "interactions": [
+        "reject an unauthenticated or invalid job secret",
+        "process due authorized family notifications while preserving per-recipient delivery receipts and retries"
+      ],
+      "downstreamRecords": [
+        "notification_outbound_deliveries",
+        "audit_events"
+      ]
+    },
+    "/guardian/enrollment-changes": {
+      "persona": "verified guardian",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1,
+        "enrollments": 1
+      },
+      "interactions": [
+        "request a school transfer or withdrawal for an authorized enrolled child",
+        "authorize destination-bound records release and follow the original school Action"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "consent_records",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/guardian/health": {
+      "persona": "verified guardian",
+      "seeds": [
+        "synthetic-profiles-compliance.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "review only related children's recorded health requirements",
+        "submit an emergency contact or health instruction update for restricted review"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/family-alerts": {
+      "persona": "verified registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "publish a scoped urgent school-family notice",
+        "inspect provider acceptance, suppression and failed-delivery retries"
+      ],
+      "downstreamRecords": [
+        "notifications",
+        "notification_outbound_deliveries",
+        "domain_events"
+      ]
+    },
+    "/operations/health-review": {
+      "persona": "restricted school medical reviewer",
+      "fixtureRequired": false,
+      "rationale": "Medical review requires separately authorized clinical/school-review membership and a genuine pending guardian health-change Action. General fixture seeds cannot prove restricted document access or independent medical review.",
+      "interactions": [
+        "approve or reject the exact pending guardian health update",
+        "deny unrelated school and unauthorized registrar access"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/transfer-records": {
+      "persona": "authorized institutional records registrar",
+      "fixtureRequired": false,
+      "rationale": "An official handoff requires a completed original transfer, verified guardian destination release, issued transcript and independently evidenced external delivery. Existing synthetic fixtures do not create these prerequisites.",
+      "interactions": [
+        "review only institutionally authorized destination handoffs",
+        "attest an actually completed secure transfer against an official issuance and delivery receipt"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "transcript_issuances",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/admissions/invite-families": {
+      "persona": "registrar",
+      "seeds": [
+        "public-family-admissions-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1
+      },
+      "interactions": [
+        "select an authorized receiving-school Program",
+        "queue a verified-email family invitation batch",
+        "review recipient status and retry failed delivery"
+      ],
+      "downstreamRecords": [
+        "communication_threads",
+        "domain_events",
+        "public_family_start_requests"
+      ]
+    },
+    "/enrichment-review": {
+      "fixtureRequired": false,
+      "persona": "can_network_steward",
+      "rationale": "Independent restricted safety-evidence review requires genuine separate submitter and CAN reviewer credentials; no synthetic document can establish approval. The empty review queue must render without fabricated approvals.",
+      "interactions": [
+        "open the independent reviewer workspace",
+        "observe an empty review queue when no genuine current seasons are awaiting review"
+      ],
+      "downstreamRecords": []
+    },
+    "/church/apply": {
+      "fixtureRequired": false,
+      "persona": "public church representative",
+      "rationale": "Public church application entry does not require existing CAN organization, site, staff grant or synthetic records. CAN review/verification and authenticated setup happen after submission.",
+      "interactions": [
+        "submit a new church onboarding request without pre-existing CAN identifiers",
+        "check the neutral request acknowledgement without privileged access"
+      ],
+      "downstreamRecords": [
+        "church_onboarding_requests"
+      ]
+    },
+    "/admissions/my-credentials": {
+      "persona": "verified academic credential recipient",
+      "seeds": [
+        "synthetic-credential-inbox-denial.sql"
+      ],
+      "recordCounts": {
+        "academic_credential_release_authorizations": 1,
+        "transcript_issuances": 1
+      },
+      "interactions": [
+        "authenticated synthetic recipient sees no releases because synthetic grant is ineligible",
+        "attempted direct download as synthetic recipient is denied by server identity and grant checks",
+        "real verified recipient flow must be separately tested in authenticated staging"
+      ],
+      "downstreamRecords": [
+        "audit_events"
       ]
     }
   }

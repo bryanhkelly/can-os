@@ -1,15 +1,105 @@
 # CAN OS — current implementation snapshot
 
+## FullFlow review fixes (November 1, 2026)
+
+Local source fixes preserve the existing tenant redesign and migration history:
+
+- Explicit bootstrap normalizes all four recognized legacy source-account
+  addresses transactionally, checks canonical identity and active grants, and
+  refuses collisions/revocations. Programs created through ordinary Valor
+  workflows no longer block bootstrap merely for lacking fixture metadata.
+- School-alert email requires verified account email; verified SMS consent
+  remains independent of email ownership.
+- Outbound workers claim only immediately processable work, renew owned leases
+  before transport and fence all result/error updates by the lease timestamp.
+  Email/SMS requests have a 20-second timeout. Provider acceptance followed by
+  timeout remains ambiguous; this does not certify exactly-once delivery.
+- Quiet-hour deferral uses actual timezone minute boundaries across DST and
+  does not carry seconds past the configured end.
+- Admissions uses scoped exact-ID detail/options, deterministic 40-row pages,
+  server-side stage filtering and whole-scope application/requirement totals.
+- Executed locally: **423 unit files / 2,504 tests passed**, typecheck and build
+  passed, and route inventory **107/107, 0 issues**. Connected database
+  concurrency/provisioning and authenticated browser
+  acceptance remain **unverified**. These fixes did not mutate a database.
+
+## FullFlow local tenant-identity redesign
+
+**Evidence scope:** FullFlow HEAD `8f3aca2e` plus the current uncommitted local
+changes. This addendum supersedes the synthetic-grant/write-gate architecture
+descriptions in older pinned sections below, not their outstanding acceptance
+requirements.
+
+- Valor uses canonical Organization/Site identity and normal server-authorized
+  product commands. The current grant schema has no `is_synthetic`; new
+  migration `0060_tenant_demo_access.sql` drops only that column and retains
+  historical SQL/snapshots.
+- Restricted demo-admin switching uses canonical accounts/grants, preserving
+  effective identity and session ownership. Delegated-session denials at
+  independent-identity boundaries, existing inactivity limits and transactional
+  audit/domain-event semantics remain in place.
+- External notification email/SMS is suppressed by canonical source tenant.
+  R2 demo/live upload deployment switches remain separate; legacy fixture
+  storage evidence is accepted only in the canonical demo tenant.
+- Executed locally: `npm test` **419 files / 2,460 tests passed**;
+  `npm run typecheck` passed; `npm run build` passed; changed-file ESLint
+  **0 errors / 38 warnings**; route contracts **107/107, 0 issues**;
+  mutation hygiene passed; fixture declarations **90/90, STATIC_ONLY**.
+- **Database follow-up (November 1, 2026, explicitly user-authorized):**
+  renamed only Neon branch `br-proud-pine-arfju8h2` to `FullFlow`, matching Git,
+  and applied migration 0060 through the guarded wrapper. Database identity,
+  column absence and 61-row migration/hash ledger were verified; postflight is
+  **UP_TO_DATE**, with no pending migrations. Production remains the unchanged
+  default branch. Migration guard fixes account for PostgreSQL's truncated
+  constraint names and Windows command launchers; **27 targeted tests passed**.
+- **Unverified:** identity provisioning, connected workflow integration and
+  authenticated browser acceptance. Historical DDL provenance remains unresolved.
+  No production data mutation, commit, push or main merge was performed.
+
 **Baseline reviewed:** `main` at `80f6c66` (2026-10-18), plus the academic Action and mutation-evidence follow-ups included with this snapshot. The prior academic/conference authorization follow-up was pushed in `75a83be`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
 
 **Repository cleanup review:** based on `main` at `6be1a57` (2026-10-18), plus the cleanup changes on `chore/repository-stabilization-20261018`. This refresh covers unused-source tracing, the route inventory, local checks and a read-only audit of the locally configured Neon connection, not a full product acceptance review. Earlier integration results remain historical evidence.
 
 **Latest database evidence:** production reconciliation completed at **2026-10-19 06:40:10 UTC**, against committed migration source at `f013878`. See the rollout section below; it supersedes the historical drift findings, not the outstanding product acceptance gates.
 
+## FullFlow review addendum (2026-10-28)
+
+**Baseline reviewed:** local FullFlow HEAD `94a194c`. The results below are local/static evidence recorded for the broad GoldenFlow review. **No live Neon integration, no production migration, and no real authenticated browser run were executed in this environment.** Earlier dated sections below remain historical evidence with their own counts.
+
+Local validation at this snapshot:
+
+- `npm test -- --reporter=dot`: **219 files / 1284 tests** passed.
+- `npm run typecheck`: **0 diagnostics**.
+- `npm run build`: passed, with one pre-existing ineffective-dynamic-import warning; the first run hit an environmental `ENOTEMPTY` cleanup error and a clean retry passed.
+- `node scripts/check-route-fixture-coverage.mjs`: **75/75** fixture declarations, 0 unseeded; explicitly **STATIC_ONLY** (static manifest/file checks, not SQL execution or browser acceptance).
+- `node scripts/check-mutation-hygiene.mjs`: passed.
+- `node scripts/check-platform-route-contracts.mjs --check`: **86/86 routes, 0 issues**.
+- `npm run db:generate`: no schema changes; clean tree after restoring `drizzle/meta/0045_snapshot.json` parity and adding a parity guard. The migration review gate is re-baselined through journal 0046, and Drizzle tip snapshot parity is guarded.
+
+Patches included at this snapshot:
+
+- The Admissions workflow now runs the authenticated browser journey after isolated integration, with Playwright install and failure artifacts. Admissions CI still needs its isolated database secrets/vars before live acceptance.
+- The GF1 runbook continues to list fail-closed environment requirements; that text was not weakened.
+- Stale unit tests and submission-review fixtures were aligned with canonical staffing eligibility.
+- GF-B onsite/church-hosted typecheck diagnostics and the remaining nine non-GF-B diagnostics were closed without runtime authorization changes.
+- The declared seed chain (`student-s1-s4`, `identity-demo-accounts`, `new-experiences-v1`, `valor-curriculum-marketplace`) was made executable against the current schema and validated locally in disposable PGlite by the coder; **no committed CI seed executor exists yet**.
+- `section_teachers` assignment reads now filter `role='teacher'` in coverage, placement, and `requireAssignment` paths.
+- GF1/GF2 browser specs and fixtures were aligned with the current UI and now include program+section enrollments, the teacher eligibility/delivery stack, the first lesson, and executable guardian permissions; unit import-time `DATABASE_URL` failures are mocked narrowly. The specs are repaired and wired but were **not live-run** here.
+
+Remaining acceptance gaps (explicit; unchanged by this addendum):
+
+- FullFlow A continuous six-stage Neon + issued-session browser journey remains unexecuted.
+- Golden Flow B remains HOLD; safeguarding intake and custody/pickup workflows are missing product surface, not just tests.
+- Launch Studio/site-director real-session browser proof remains missing.
+- Most scenarios beyond GF1/GF2/curriculum slices lack dedicated workflows and browser/reload proof.
+- GF-A3 human-approved action is unimplemented.
+- `valor-algebra1-week01-upgrade.sql` (orphan/non-manifest fixture with stale identities) has been removed; it was never executable and is no longer in the tree.
+- No CI seed executor currently applies the manifest seed chain.
+
 ## Integrated source baseline
 
 - The main branch includes the development changes associated with Phases 1, 2 and 3. Phase 1 PR #120 is marked merged by GitHub. The Phase 2 and Phase 3 implementation work was integrated via commits on `main`; PRs #121 and #122 were closed without GitHub reporting them as merged. Do not use those original PR states as instructions for future branching.
-- `src/routes/` contains **66** TypeScript/TSX route source files, matching `docs/platform-route-contracts.json`. The registrar transcript route is owned by Learning, which supplies its canonical read and issuance commands. **Every route's verification, role journey, read boundary and write boundary remains `pending`.** Recording ownership is not acceptance. The separate fixture-coverage checker reports 59 route declarations; neither inventory is browser acceptance.
+- `src/routes/` currently passes **86/86** route contracts via `node scripts/check-platform-route-contracts.mjs --check`, with **75/75** static fixture declarations via `scripts/check-route-fixture-coverage.mjs` (see the 2026-10-28 FullFlow review addendum below; earlier dated entries record their own historical counts). The registrar transcript route is owned by Learning, which supplies its canonical read and issuance commands. **Every route's verification, role journey, read boundary and write boundary remains `pending`.** Recording ownership is not acceptance, and the fixture-coverage checker is static declaration, not browser acceptance.
 - Workspace entry uses server session grants (`src/routes/index.tsx`, `src/components/shell/WorkspaceNavigation.tsx`). Module-level authorization still requires code and negative-access tests.
 - Existing student/teacher group routes now call canonical creation, consent, posting, moderation, session, RSVP and attendance commands. The old combined `study-groups.functions.ts` mutation module was retired; retained read projections in `study-group-queries.functions.ts` preserve existing page shapes. Isolated integration tests cover interest groups, consent, duplicate reports, moderation, RSVP-independent attendance, and session reschedule/cancellation.
 - Admissions offer commands are present under `src/modules/enrollment/admissions-offer-service.ts` and related server functions; some paths still use `assertRecordWriteAllowed` or synthetic-prefixed compatibility names. Do not misreport them as uniformly provenance-neutral or production accepted.
@@ -37,6 +127,8 @@
 `CAN_DEMO_WRITES_ENABLED` is fail-closed in `src/modules/_demo/demo-write-gate.ts` (`=== "true"`). The flag is not an authorization policy.
 
 ## Verification and release status
+
+**Latest evidence:** the FullFlow review addendum (2026-10-28) above supersedes the counts and results in the dated entries below; those entries record their own historical snapshots.
 
 - Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **29 files / 43 tests** using the protected isolated Neon runner. These are working-tree results, including concurrent calendar/transcript work, not a claim that every change belongs to this follow-up. Coverage includes academic Action denial/concurrency, school-year calendar-day audit history, program orientation audit, launch site/teacher evidence and duplicate assignment idempotency.
 - `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally after the current evidence changes.

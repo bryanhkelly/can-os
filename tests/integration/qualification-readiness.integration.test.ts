@@ -128,6 +128,17 @@ integration("qualification evidence in launch readiness", () => {
           effectiveFrom: periodEnd, updatedAt: new Date("2030-02-01"),
         }).returning());
         expect((await getActiveDeliveryArrangement(section.id, tx, now))?.id).toBe(arrangement.id);
+        const staleProvider = first(await tx.insert(s.organizations).values({
+          type: "can_network", name: "Stale Provider", slug: `stale-provider-${suffix}`,
+        }).returning());
+        await tx.update(s.deliveryArrangements)
+          .set({ academicProviderOrganizationId: staleProvider.id })
+          .where(eq(s.deliveryArrangements.id, arrangement.id));
+        expect(await getActiveDeliveryArrangement(section.id, tx, now)).toBeNull();
+        await tx.update(s.deliveryArrangements)
+          .set({ academicProviderOrganizationId: org.id })
+          .where(eq(s.deliveryArrangements.id, arrangement.id));
+        expect((await getActiveDeliveryArrangement(section.id, tx, now))?.id).toBe(arrangement.id);
         expect((await getActiveDeliveryArrangement(section.id, tx, periodEnd))?.id).toBe(futureArrangement.id);
         await tx.update(s.deliveryArrangements).set({ effectiveFrom: null, effectiveThrough: now })
           .where(eq(s.deliveryArrangements.id, futureArrangement.id));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/timezone";
+import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue, localDayBoundsInTimezone } from "@/modules/calendar/timezone";
 
 describe("calendar timezone conversion", () => {
   it("round-trips event wall time in a non-browser timezone", () => {
@@ -23,5 +23,28 @@ describe("calendar timezone conversion", () => {
       .toThrow("valid date and time");
     expect(() => dateTimeInputInTimezone("2027-01-15T09:30", "No/Such_Zone"))
       .toThrow();
+  });
+});
+
+describe("school-local daily boundaries", () => {
+  it("includes the local evening that belongs to the next UTC day", () => {
+    const { start, end } = localDayBoundsInTimezone(new Date("2027-01-16T06:30:00Z"), "America/Los_Angeles");
+    expect(start.toISOString()).toBe("2027-01-15T08:00:00.000Z");
+    expect(end.toISOString()).toBe("2027-01-16T08:00:00.000Z");
+  });
+  it("handles the 23-hour spring and 25-hour autumn school day", () => {
+    const spring = localDayBoundsInTimezone(new Date("2027-03-14T18:00:00Z"), "America/Los_Angeles");
+    expect(spring.start.toISOString()).toBe("2027-03-14T08:00:00.000Z");
+    expect(spring.end.toISOString()).toBe("2027-03-15T07:00:00.000Z");
+    const autumn = localDayBoundsInTimezone(new Date("2027-11-07T18:00:00Z"), "America/Los_Angeles");
+    expect(autumn.start.toISOString()).toBe("2027-11-07T07:00:00.000Z");
+    expect(autumn.end.toISOString()).toBe("2027-11-08T08:00:00.000Z");
+  });
+  it("keeps independent school days for Sites in different timezones", () => {
+    const at = new Date("2027-01-15T05:00:00Z");
+    const pacific = localDayBoundsInTimezone(at, "America/Los_Angeles");
+    const eastern = localDayBoundsInTimezone(at, "America/New_York");
+    expect(pacific.start.toISOString()).toBe("2027-01-14T08:00:00.000Z");
+    expect(eastern.start.toISOString()).toBe("2027-01-15T05:00:00.000Z");
   });
 });

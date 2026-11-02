@@ -15,7 +15,7 @@ vi.mock("@/db/client", () => ({
   },
 }));
 
-const env = { NODE_ENV: "test", CAN_DEMO_FIXED_ACCESS_ENABLED: "true", CAN_DEMO_WRITES_ENABLED: "true" };
+const env = { NODE_ENV: "test", CAN_DEMO_FIXED_ACCESS_ENABLED: "true" };
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("local demo school registrar", () => {
@@ -40,7 +40,6 @@ integration("local demo school registrar", () => {
           return row?.count;
         };
         await expect(provisionDemoRegistrar(tx, { ...env, NODE_ENV: "production" })).rejects.toThrow("requires local/test");
-        await expect(provisionDemoRegistrar(tx, { ...env, CAN_DEMO_WRITES_ENABLED: "false" })).rejects.toThrow("synthetic writes");
         await expect(provisionDemoRegistrar(tx, { ...env, CAN_DEMO_FIXED_ACCESS_ENABLED: "false" })).rejects.toThrow("requires local/test");
 
         await provisionDemoRegistrar(tx, env);
@@ -60,7 +59,7 @@ integration("local demo school registrar", () => {
         vi.stubEnv("NODE_ENV", "test");
         vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "true");
         vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "demo-registrar-integration-pepper-not-a-real-secret");
-        const login = await redeemLocalDemoAccess(fixture.email, "CANOS-LOCAL-TEST");
+        const login = await redeemLocalDemoAccess(fixture.email, "000000");
         expect(login.role).toBe("registrar");
         const context = await getCommandContext(new Request("http://localhost", {
           headers: { cookie: login.setCookie.split(";")[0]! },
@@ -76,18 +75,20 @@ integration("local demo school registrar", () => {
           expect(await hasInstitutionalProgramCapability(actor, { ...scope, organizationId: crypto.randomUUID() }, capability, tx)).toBe(false);
           expect(await hasInstitutionalProgramCapability(actor, { ...scope, id: crypto.randomUUID() }, capability, tx)).toBe(false);
         }
-        await expect(redeemLocalDemoAccess(fixture.email, "wrong-code")).rejects.toThrow("Invalid local demo credentials");
+        await expect(redeemLocalDemoAccess(fixture.email, "wrong-code")).rejects.toThrow("Invalid demo credentials");
         vi.stubEnv("NODE_ENV", "production");
-        await expect(redeemLocalDemoAccess(fixture.email, "CANOS-LOCAL-TEST")).rejects.toThrow("Invalid local demo credentials");
+        vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", "false");
+        vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "false");
+        expect((await redeemLocalDemoAccess(fixture.email, "000000")).role).toBe("registrar");
         vi.stubEnv("NODE_ENV", "test");
 
         await tx.update(s.accountPersonGrants).set({ active: false }).where(eq(s.accountPersonGrants.id, fixture.grantId));
         await expect(provisionDemoRegistrar(tx, env)).rejects.toThrow("access grants conflict");
-        await expect(redeemLocalDemoAccess(fixture.email, "CANOS-LOCAL-TEST")).rejects.toThrow("Invalid local demo credentials");
+        await expect(redeemLocalDemoAccess(fixture.email, "000000")).rejects.toThrow("Invalid demo credentials");
         await tx.update(s.accountPersonGrants).set({ active: true }).where(eq(s.accountPersonGrants.id, fixture.grantId));
-        await tx.update(s.people).set({ metadata: { synthetic: false } }).where(eq(s.people.id, fixture.personId));
-        await expect(provisionDemoRegistrar(tx, env)).rejects.toThrow("not synthetic");
-        await tx.update(s.people).set({ metadata: { synthetic: true } }).where(eq(s.people.id, fixture.personId));
+        await tx.update(s.people).set({ active: false }).where(eq(s.people.id, fixture.personId));
+        await expect(redeemLocalDemoAccess(fixture.email, "000000")).rejects.toThrow("Invalid demo credentials");
+        await tx.update(s.people).set({ active: true }).where(eq(s.people.id, fixture.personId));
         await tx.update(s.sites).set({ metadata: { synthetic: false } }).where(eq(s.sites.id, fixture.siteId));
         await expect(provisionDemoRegistrar(tx, env)).rejects.toThrow("isolated synthetic");
         await tx.update(s.sites).set({ metadata: { synthetic: true } }).where(eq(s.sites.id, fixture.siteId));
@@ -116,16 +117,15 @@ integration("local demo school registrar", () => {
     expect(checked).toBe(true);
   }, 120_000);
 
-  it("allows the separate admin to switch only approved synthetic identities and retains attribution", async () => {
+  it("switches only active tenant identities, preserves session ownership, and rolls audit failures back", async () => {
     const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
-    const rollback = new Error("rollback-demo-facilitator");
+    const rollback = new Error("rollback-demo-account-switching");
     let checked = false;
     try {
       await database.transaction(async tx => {
         state.tx = tx;
         vi.stubEnv("NODE_ENV", "test");
         vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "true");
-        vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "true");
         vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "demo-facilitator-integration-pepper-not-a-real-secret");
         await tx.insert(s.organizations).values({
           id: fixture.organizationId, type: "christian_school", name: "Synthetic demo school",
@@ -141,23 +141,26 @@ integration("local demo school registrar", () => {
           const [existing] = await tx.select().from(s.accessAccounts).where(eq(s.accessAccounts.emailNormalized, account.email));
           if (existing) continue;
           const [person] = await tx.insert(s.people).values({
-            legalFirstName: account.role, legalLastName: "Synthetic", metadata: { synthetic: true },
+            id: account.personId, legalFirstName: account.role, legalLastName: "Synthetic", metadata: { synthetic: true },
           }).returning();
-          const [created] = await tx.insert(s.accessAccounts).values({ emailNormalized: account.email }).returning();
+          const [created] = await tx.insert(s.accessAccounts).values({
+            id: account.accountId, emailNormalized: account.email,
+          }).returning();
           if (!person || !created) throw new Error("Missing source account fixture");
           await tx.insert(s.accountPersonGrants).values({
+            id: account.accountId.replace(/^fa/, "fb"),
             personId: person.id, accountId: created.id, role: account.role.toLowerCase(),
-            organizationId: fixture.organizationId, siteId: fixture.siteId, isSynthetic: true,
+            organizationId: fixture.organizationId, siteId: fixture.siteId,
           });
         }
         const provisioned = await provisionDemoSchoolAccess(tx, env);
-        expect(provisioned.changedGrants).toHaveLength(1);
-        const { listDemoSourceGrants: sourceGrants } = await import("@/modules/identity/demo-facilitator.server");
+        expect(provisioned.changedGrants).toEqual([]);
+        const { listDemoSourceGrants: sourceGrants } = await import("@/modules/identity/session-grants.server");
         const legacySource = (await sourceGrants(tx)).find(source => source.role === "student")!;
         const legacyId = "f7100000-0000-4000-8000-000000000010";
         await tx.insert(s.accountPersonGrants).values({
           id: legacyId, accountId: LOCAL_DEMO_ADMIN.accountId, personId: legacySource.personId,
-          role: legacySource.role, organizationId: fixture.organizationId, siteId: fixture.siteId, isSynthetic: true,
+          role: legacySource.role, organizationId: fixture.organizationId, siteId: fixture.siteId,
         });
         expect((await provisionDemoSchoolAccess(tx, env)).changedGrants).toEqual([legacyId]);
         const [retired] = await tx.select().from(s.accountPersonGrants).where(eq(s.accountPersonGrants.id, legacyId));
@@ -165,30 +168,31 @@ integration("local demo school registrar", () => {
         expect(await provisionDemoSchoolAccess(tx, env)).toMatchObject({
           registrar: { changes: [] }, admin: { changes: [] }, changedGrants: [],
         });
-        const { redeemLocalDemoAccess, selectAccessGrant } = await import("@/modules/identity/passwordless-access.server");
+        const { redeemDemoAccess, selectAccessGrant, revokeAccessSession } = await import("@/modules/identity/passwordless-access.server");
         const { getCommandContext } = await import("@/modules/identity/command-context.server");
         const { readWorkspaceSession } = await import("@/modules/identity/workspace-session.server");
-        const { listDemoFacilitatorGrants, listDemoSourceGrants } = await import("@/modules/identity/demo-facilitator.server");
-        const login = await redeemLocalDemoAccess(LOCAL_DEMO_ADMIN.email, "CANOS-LOCAL-TEST");
+        const { listDemoSourceGrants } = await import("@/modules/identity/session-grants.server");
+        const login = await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000");
         const request = new Request("http://localhost/access/session", {
           headers: { cookie: login.setCookie.split(";")[0]! },
         });
         const admin = await getCommandContext(request);
         expect(admin.actorPersonId).toBe(LOCAL_DEMO_ADMIN.personId);
         expect(admin.accountId).toBe(LOCAL_DEMO_ADMIN.accountId);
+        expect(admin.sessionAccountId).toBe(LOCAL_DEMO_ADMIN.accountId);
         expect(admin.capabilities.has("admin.manage")).toBe(true);
         const session = await readWorkspaceSession(request);
-        expect(session).toMatchObject({ authenticated: true, demoFacilitator: true });
-        if (!session.authenticated) throw new Error("Expected facilitator session");
+        expect(session).toMatchObject({ authenticated: true, demoAccountSwitching: true });
+        if (!session.authenticated) throw new Error("Expected demo account switching session");
         expect(session.grants).toHaveLength(6);
         expect(session.grants.some(grant => grant.role === "demo_facilitator")).toBe(false);
         expect(session.grants.some(grant => "metadata" in grant)).toBe(false);
         for (const grant of session.grants) {
-          await selectAccessGrant(admin.sessionId, admin.accountId, grant.id);
+          await selectAccessGrant(admin.sessionId, admin.sessionAccountId!, grant.id);
           const context = await getCommandContext(request);
           expect(context).toMatchObject({
-            actorPersonId: grant.personId, accountId: LOCAL_DEMO_ADMIN.accountId, role: grant.role,
-            demoFacilitator: { accountId: LOCAL_DEMO_ADMIN.accountId, personId: LOCAL_DEMO_ADMIN.personId },
+            actorPersonId: grant.personId, accountId: grant.accountId,
+            sessionAccountId: LOCAL_DEMO_ADMIN.accountId, role: grant.role,
           });
           if (grant.role === "student" || grant.role === "guardian") {
             expect(context.capabilities.has("admin.manage")).toBe(false);
@@ -196,7 +200,7 @@ integration("local demo school registrar", () => {
           }
         }
         const student = session.grants.find(grant => grant.role === "student")!;
-        await selectAccessGrant(admin.sessionId, admin.accountId, student.id);
+        await selectAccessGrant(admin.sessionId, admin.sessionAccountId!, student.id);
         const studentContext = await getCommandContext(request);
         await mutation.writeAudit(tx, studentContext, {
           action: "demo.test.attribution", entityType: "person", entityId: student.personId,
@@ -205,35 +209,72 @@ integration("local demo school registrar", () => {
           eq(s.auditEvents.action, "demo.test.attribution"), eq(s.auditEvents.resourceId, student.personId),
         ));
         expect(evidence).toMatchObject({ actorPersonId: student.personId, context: {
-          demoFacilitator: { accountId: LOCAL_DEMO_ADMIN.accountId, personId: LOCAL_DEMO_ADMIN.personId },
+          accountId: student.accountId, sessionAccountId: LOCAL_DEMO_ADMIN.accountId,
         } });
-        await expect(selectAccessGrant(admin.sessionId, admin.accountId, crypto.randomUUID())).rejects.toThrow("Demo user unavailable");
+        await expect(selectAccessGrant(admin.sessionId, admin.sessionAccountId!, crypto.randomUUID()))
+          .rejects.toThrow("active membership");
         const sources = await listDemoSourceGrants(tx);
         const sourceStudent = sources.find(source => source.role === "student")!;
         await tx.update(s.accessAccounts).set({ disabled: true }).where(eq(s.accessAccounts.id, sourceStudent.accountId));
         await expect(getCommandContext(request)).rejects.toThrow("active membership");
-        await expect(selectAccessGrant(admin.sessionId, admin.accountId, student.id)).rejects.toThrow("Demo user unavailable");
+        await expect(selectAccessGrant(admin.sessionId, admin.sessionAccountId!, student.id))
+          .rejects.toThrow("active membership");
         await tx.update(s.accessAccounts).set({ disabled: false }).where(eq(s.accessAccounts.id, sourceStudent.accountId));
-        await tx.update(s.accountPersonGrants).set({ isSynthetic: false }).where(eq(s.accountPersonGrants.id, sourceStudent.id));
-        expect((await listDemoFacilitatorGrants(tx)).some(grant => grant.id === student.id)).toBe(false);
-        await tx.update(s.accountPersonGrants).set({ isSynthetic: true }).where(eq(s.accountPersonGrants.id, sourceStudent.id));
-        const studentLogin = await redeemLocalDemoAccess(sourceStudent.email, "CANOS-LOCAL-TEST");
+        await tx.update(s.accountPersonGrants).set({ active: false }).where(eq(s.accountPersonGrants.id, sourceStudent.id));
+        expect((await listDemoSourceGrants(tx)).some(grant => grant.id === student.id)).toBe(false);
+        await expect(getCommandContext(request)).rejects.toThrow("active membership");
+        await expect(selectAccessGrant(admin.sessionId, admin.sessionAccountId!, student.id))
+          .rejects.toThrow("active membership");
+        await tx.update(s.accountPersonGrants).set({ active: true }).where(eq(s.accountPersonGrants.id, sourceStudent.id));
+
+        const failingAudit = vi.spyOn(await import("@/modules/identity/session-security-audit.server"), "recordSessionSecurityEvent")
+          .mockRejectedValueOnce(new Error("audit unavailable"));
+        await expect(selectAccessGrant(admin.sessionId, admin.sessionAccountId!, LOCAL_DEMO_ADMIN.grantId))
+          .rejects.toThrow("audit unavailable");
+        failingAudit.mockRestore();
+        const [afterFailedSwitch] = await tx.select({ activeGrantId: s.accessSessions.activeGrantId })
+          .from(s.accessSessions).where(eq(s.accessSessions.id, admin.sessionId));
+        expect(afterFailedSwitch?.activeGrantId).toBe(student.id);
+
+        await tx.update(s.accountPersonGrants).set({ active: false })
+          .where(eq(s.accountPersonGrants.id, LOCAL_DEMO_ADMIN.grantId));
+        await expect(getCommandContext(request)).rejects.toThrow("active demo administrator membership");
+        await expect(selectAccessGrant(admin.sessionId, admin.sessionAccountId!, student.id))
+          .rejects.toThrow("active demo administrator membership");
+        await expect(provisionDemoSchoolAccess(tx, env)).rejects.toThrow("access grants conflict");
+        await tx.update(s.accountPersonGrants).set({ active: true })
+          .where(eq(s.accountPersonGrants.id, LOCAL_DEMO_ADMIN.grantId));
+
+        const studentLogin = await redeemDemoAccess(sourceStudent.email, "000000");
         const ownStudent = await getCommandContext(new Request("http://localhost", {
           headers: { cookie: studentLogin.setCookie.split(";")[0]! },
         }));
-        expect(ownStudent.demoFacilitator).toBeUndefined();
+        expect(ownStudent.sessionAccountId).toBeUndefined();
         await expect(selectAccessGrant(ownStudent.sessionId, ownStudent.accountId, LOCAL_DEMO_ADMIN.grantId))
-          .rejects.toThrow("Membership unavailable");
+          .rejects.toThrow("active membership");
+
         vi.stubEnv("NODE_ENV", "production");
-        await expect(getCommandContext(request)).rejects.toThrow("local demo facilitator access");
+        vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", "false");
+        vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "false");
+        const publicLogin = await redeemDemoAccess(sourceStudent.email, "000000");
+        expect(publicLogin.role).toBe("student");
+        expect((await getCommandContext(request)).accountId).toBe(sourceStudent.accountId);
         vi.stubEnv("NODE_ENV", "test");
-        vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "false");
-        await expect(getCommandContext(request)).rejects.toThrow("local demo facilitator access");
-        vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "true");
-        await tx.update(s.accountPersonGrants).set({ active: false })
-          .where(eq(s.accountPersonGrants.id, LOCAL_DEMO_ADMIN.facilitatorGrantId));
-        await expect(getCommandContext(request)).rejects.toThrow("active synthetic facilitator grant");
-        await expect(provisionDemoSchoolAccess(tx, env)).rejects.toThrow("revoked authority");
+        const switched = await getCommandContext(request);
+        expect(switched.accountId).toBe(sourceStudent.accountId);
+        expect(switched.sessionAccountId).toBe(LOCAL_DEMO_ADMIN.accountId);
+        const cookie = await revokeAccessSession(switched.sessionId, switched.sessionAccountId!);
+        expect(cookie).toContain("Max-Age=0");
+        const [revokedSession] = await tx.select().from(s.accessSessions)
+          .where(eq(s.accessSessions.id, switched.sessionId));
+        expect(revokedSession?.revokedAt).toBeInstanceOf(Date);
+        const [logoutAudit] = await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.action, "identity.session.revoked"),
+          eq(s.auditEvents.resourceId, LOCAL_DEMO_ADMIN.accountId),
+        ));
+        expect(logoutAudit).toMatchObject({ context: {
+          accountId: sourceStudent.accountId, sessionAccountId: LOCAL_DEMO_ADMIN.accountId,
+        } });
         checked = true;
         throw rollback;
       });

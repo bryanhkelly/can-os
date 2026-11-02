@@ -1,0 +1,67 @@
+/** Church onboarding authority evidence is never a self-attestation. */
+export type ChurchAuthorityMethod = "signed_authority" | "denominational_confirmation" | "independent_church_confirmation";
+export const CHURCH_AUTHORITY_METHODS: readonly ChurchAuthorityMethod[] = [
+  "signed_authority", "denominational_confirmation", "independent_church_confirmation",
+];
+export const CHURCH_EVIDENCE_VALID_DAYS = 90;
+
+export function validateChurchEvidenceReference(reference: string, method: string): string {
+  const trimmed = reference.trim();
+  if (!CHURCH_AUTHORITY_METHODS.includes(method as ChurchAuthorityMethod) ||
+      trimmed.length < 8 || trimmed.length > 500 ||
+      /[\u0000-\u001f\u007f]/.test(trimmed) ||
+      /^(?:javascript|data|file|blob):/i.test(trimmed)) {
+    throw new Error("A valid independent authority evidence reference and method are required");
+  }
+  // A URL is a pointer, not proof of authority. Reject external records.
+  if (/^vault:[a-z0-9][a-z0-9/_-]{6,}$/i.test(trimmed)) return trimmed;
+  if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) {
+    let parsed: URL;
+    try { parsed = new URL(trimmed); }
+    catch { throw new Error("Invalid evidence URL"); }
+    if (parsed.protocol !== "https:" || !parsed.hostname.includes(".") ||
+        parsed.username || parsed.password)
+      throw new Error("Evidence URLs must use HTTPS without embedded credentials");
+    // A web link is not inspected bytes and must never be an approval credential.
+    throw new Error("External HTTPS links cannot establish independently inspected evidence");
+  }
+  // Bare strings and unknown URI schemes cannot be dereferenced or audited.
+  // Only a canonical internal vault reference is accepted by this syntax check.
+  throw new Error("Use an approved internal vault reference");
+}
+
+export function evidenceExpiresAt(verifiedAt: Date): Date {
+  return new Date(verifiedAt.getTime() + CHURCH_EVIDENCE_VALID_DAYS * 86400000);
+}
+
+export function currentChurchAuthorityEvidence(
+  evidence: {
+    category: string;
+    verifiedAt: Date | null;
+    verifiedByPersonId: string | null;
+    expiresAt: Date | null;
+    metadata: Record<string, unknown>;
+  } | null | undefined,
+  request: {
+    id: string;
+    churchSlug: string;
+    contactEmail: string;
+    verifiedByPersonId: string | null;
+  },
+  approverPersonId: string | null,
+  now = new Date(),
+): boolean {
+  return Boolean(evidence &&
+    evidence.category === "church_onboarding_authority" &&
+    evidence.verifiedAt && evidence.verifiedAt <= now &&
+    evidence.verifiedByPersonId && evidence.verifiedByPersonId === request.verifiedByPersonId &&
+    evidence.verifiedByPersonId !== approverPersonId &&
+    evidence.expiresAt && evidence.expiresAt > now &&
+    evidence.metadata.provenance === "can_steward_independently_reviewed" &&
+    evidence.metadata.screeningStatus === "passed" &&
+    evidence.metadata.privateObjectVerified === true &&
+    evidence.metadata.revokedAt == null &&
+    evidence.metadata.churchRequestId === request.id &&
+    evidence.metadata.churchSlug === request.churchSlug &&
+    evidence.metadata.authorizedEmailNormalized === request.contactEmail);
+}

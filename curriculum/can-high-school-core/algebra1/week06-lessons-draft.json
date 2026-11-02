@@ -1,0 +1,335 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u02",
+  "week": 6,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "title": "Tables, graphs and multiple representations",
+  "lessons": [
+    {
+      "id": "u02-w06-d01",
+      "title": "Week 6 · Day 1 · Plot ordered pairs and read coordinates",
+      "body": "UNIT 2 • WEEK 6 • DAY 1\nObjective: Plot and interpret ordered pairs with signed axes and meaningful units.\nPrerequisites: Week 5 functions and domains, signed coordinate values, Unit 1 expression evaluation.\nRead the representation (5 min)\nExamine this question: Identify the quadrant containing (4,−2). State what each variable or axis represents before calculating.\n\nConcept and modeled reasoning (12 min)\nAn ordered pair (x,y) gives horizontal displacement x then vertical displacement y. For (−3,2), move three units left and two up: Quadrant II. The point (0,−4) lies on the vertical axis, not in a quadrant. If x is weeks and y is pages read, (3,18) means 18 pages at week 3.\n\nTarget: Plot and interpret ordered pairs with signed axes and meaningful units. Explain each plotted or tabulated value with substitution and units where applicable.\n\nGuided representation work (12 min)\n1. Identify the quadrant containing (4,−2). Draw or tabulate your reasoning and compare with a partner.\n2. Does (−5,0) lie in a quadrant? Draw or tabulate your reasoning and compare with a partner.\n\nIndependent evidence (16 min)\n1. Locate (−2,−6) and identify its quadrant. Provide calculations and an interpretation.\n2. A graph uses x for hours and y for dollars earned. Interpret (5,60). Provide calculations and an interpretation.\n3. Which point is on the y-axis: (0,7) or (7,0)? Provide calculations and an interpretation.\n\nExit evidence (5 min)\nInterpret (−1,4) and identify its quadrant. Show a check against the original representation.\n\nHomework and reflection (5 min)\nConstruct an original two-row input/output table or coordinate diagram illustrating: Plot and interpret ordered pairs with signed axes and meaningful units. Explain the choice of input domain and identify a possible plotting or substitution mistake.\nAccessibility and differentiation: offer a tactile Cartesian grid, large-print axes, labeled coordinates, screen-reader-friendly ordered-pair lists and verbal descriptions. Permit an oral or typed explanation instead of handwriting when required by an accommodation. Extend by comparing discrete and continuous domains.",
+      "resources": [],
+      "learningTargets": [
+        "Plot and interpret ordered pairs with signed axes and meaningful units.",
+        "I can justify that a point or table row matches a function rule."
+      ],
+      "standards": [
+        "F-IF.4",
+        "F-IF.5"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w06-d01-a1",
+          "kind": "launch",
+          "title": "Read the representation",
+          "instructions": "Examine this question: Identify the quadrant containing (4,−2). State what each variable or axis represents before calculating.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d01-a2",
+          "kind": "instruction",
+          "title": "Concept and modeled reasoning",
+          "instructions": "An ordered pair (x,y) gives horizontal displacement x then vertical displacement y. For (−3,2), move three units left and two up: Quadrant II. The point (0,−4) lies on the vertical axis, not in a quadrant. If x is weeks and y is pages read, (3,18) means 18 pages at week 3.\n\nTarget: Plot and interpret ordered pairs with signed axes and meaningful units. Explain each plotted or tabulated value with substitution and units where applicable.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d01-a3",
+          "kind": "guided_practice",
+          "title": "Guided representation work",
+          "instructions": "1. Identify the quadrant containing (4,−2). Draw or tabulate your reasoning and compare with a partner.\n2. Does (−5,0) lie in a quadrant? Draw or tabulate your reasoning and compare with a partner.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d01-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. Locate (−2,−6) and identify its quadrant. Provide calculations and an interpretation.\n2. A graph uses x for hours and y for dollars earned. Interpret (5,60). Provide calculations and an interpretation.\n3. Which point is on the y-axis: (0,7) or (7,0)? Provide calculations and an interpretation.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d01-a5",
+          "kind": "exit_ticket",
+          "title": "Exit evidence",
+          "instructions": "Interpret (−1,4) and identify its quadrant. Show a check against the original representation.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w06-d01-a6",
+          "kind": "reflection",
+          "title": "Homework and reflection",
+          "instructions": "Construct an original two-row input/output table or coordinate diagram illustrating: Plot and interpret ordered pairs with signed axes and meaningful units. Explain the choice of input domain and identify a possible plotting or substitution mistake.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w06-d02",
+      "title": "Week 6 · Day 2 · Build a function table from a rule",
+      "body": "UNIT 2 • WEEK 6 • DAY 2\nObjective: Generate input-output tables and explain how each row follows a function rule.\nPrerequisites: Week 5 functions and domains, signed coordinate values, Unit 1 expression evaluation.\nRead the representation (5 min)\nExamine this question: For g(x)=3x−1, evaluate at x=0 and x=2. State what each variable or axis represents before calculating.\n\nConcept and modeled reasoning (12 min)\nFor f(x)=2x+3 and x=−2,0,2, the outputs are −1,3,7. The table contains (−2,−1),(0,3),(2,7). To check the second row, f(0)=2(0)+3=3. Equal input steps of 2 yield equal output steps of 4 for this linear rule.\n\nTarget: Generate input-output tables and explain how each row follows a function rule. Explain each plotted or tabulated value with substitution and units where applicable.\n\nGuided representation work (12 min)\n1. For g(x)=3x−1, evaluate at x=0 and x=2. Draw or tabulate your reasoning and compare with a partner.\n2. For h(x)=10−2x, evaluate at x=−1 and x=3. Draw or tabulate your reasoning and compare with a partner.\n\nIndependent evidence (16 min)\n1. For f(x)=4x+1, give outputs at x=−1,0,2. Provide calculations and an interpretation.\n2. For p(t)=t², give outputs at t=−2,0,3. Provide calculations and an interpretation.\n3. Explain why x=−2 and x=2 can share the output 4 in p(x)=x². Provide calculations and an interpretation.\n\nExit evidence (5 min)\nFor q(x)=5−3x, give q(−1) and q(2). Show a check against the original representation.\n\nHomework and reflection (5 min)\nConstruct an original two-row input/output table or coordinate diagram illustrating: Generate input-output tables and explain how each row follows a function rule. Explain the choice of input domain and identify a possible plotting or substitution mistake.\nAccessibility and differentiation: offer a tactile Cartesian grid, large-print axes, labeled coordinates, screen-reader-friendly ordered-pair lists and verbal descriptions. Permit an oral or typed explanation instead of handwriting when required by an accommodation. Extend by comparing discrete and continuous domains.",
+      "resources": [],
+      "learningTargets": [
+        "Generate input-output tables and explain how each row follows a function rule.",
+        "I can justify that a point or table row matches a function rule."
+      ],
+      "standards": [
+        "F-IF.4",
+        "F-IF.5"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w06-d02-a1",
+          "kind": "launch",
+          "title": "Read the representation",
+          "instructions": "Examine this question: For g(x)=3x−1, evaluate at x=0 and x=2. State what each variable or axis represents before calculating.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d02-a2",
+          "kind": "instruction",
+          "title": "Concept and modeled reasoning",
+          "instructions": "For f(x)=2x+3 and x=−2,0,2, the outputs are −1,3,7. The table contains (−2,−1),(0,3),(2,7). To check the second row, f(0)=2(0)+3=3. Equal input steps of 2 yield equal output steps of 4 for this linear rule.\n\nTarget: Generate input-output tables and explain how each row follows a function rule. Explain each plotted or tabulated value with substitution and units where applicable.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d02-a3",
+          "kind": "guided_practice",
+          "title": "Guided representation work",
+          "instructions": "1. For g(x)=3x−1, evaluate at x=0 and x=2. Draw or tabulate your reasoning and compare with a partner.\n2. For h(x)=10−2x, evaluate at x=−1 and x=3. Draw or tabulate your reasoning and compare with a partner.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d02-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. For f(x)=4x+1, give outputs at x=−1,0,2. Provide calculations and an interpretation.\n2. For p(t)=t², give outputs at t=−2,0,3. Provide calculations and an interpretation.\n3. Explain why x=−2 and x=2 can share the output 4 in p(x)=x². Provide calculations and an interpretation.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d02-a5",
+          "kind": "exit_ticket",
+          "title": "Exit evidence",
+          "instructions": "For q(x)=5−3x, give q(−1) and q(2). Show a check against the original representation.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w06-d02-a6",
+          "kind": "reflection",
+          "title": "Homework and reflection",
+          "instructions": "Construct an original two-row input/output table or coordinate diagram illustrating: Generate input-output tables and explain how each row follows a function rule. Explain the choice of input domain and identify a possible plotting or substitution mistake.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w06-d03",
+      "title": "Week 6 · Day 3 · Connect a table to a coordinate graph",
+      "body": "UNIT 2 • WEEK 6 • DAY 3\nObjective: Plot table rows as points and identify an intercept and a constant rate of change.\nPrerequisites: Week 5 functions and domains, signed coordinate values, Unit 1 expression evaluation.\nRead the representation (5 min)\nExamine this question: For y=3x−2, list points at x=0 and x=2. State what each variable or axis represents before calculating.\n\nConcept and modeled reasoning (12 min)\nFor y=2x+1, the rows x=−1,0,1,2 produce y=−1,1,3,5. Plot (−1,−1),(0,1),(1,3),(2,5) and connect because the rule permits all real x. The graph crosses the y-axis at (0,1); each one-unit x increase adds 2 to y.\n\nTarget: Plot table rows as points and identify an intercept and a constant rate of change. Explain each plotted or tabulated value with substitution and units where applicable.\n\nGuided representation work (12 min)\n1. For y=3x−2, list points at x=0 and x=2. Draw or tabulate your reasoning and compare with a partner.\n2. What is the y-intercept of y=−x+6? Draw or tabulate your reasoning and compare with a partner.\n\nIndependent evidence (16 min)\n1. Find three points on y=x+4 for x=−2,0,2. Provide calculations and an interpretation.\n2. For y=−2x+3, find the y-intercept and one other point. Provide calculations and an interpretation.\n3. Why should a graph of discrete tickets sold use isolated points rather than a continuous line? Provide calculations and an interpretation.\n\nExit evidence (5 min)\nGive two points on y=4x−1 at x=0 and x=1. Show a check against the original representation.\n\nHomework and reflection (5 min)\nConstruct an original two-row input/output table or coordinate diagram illustrating: Plot table rows as points and identify an intercept and a constant rate of change. Explain the choice of input domain and identify a possible plotting or substitution mistake.\nAccessibility and differentiation: offer a tactile Cartesian grid, large-print axes, labeled coordinates, screen-reader-friendly ordered-pair lists and verbal descriptions. Permit an oral or typed explanation instead of handwriting when required by an accommodation. Extend by comparing discrete and continuous domains.",
+      "resources": [],
+      "learningTargets": [
+        "Plot table rows as points and identify an intercept and a constant rate of change.",
+        "I can justify that a point or table row matches a function rule."
+      ],
+      "standards": [
+        "F-IF.4",
+        "F-IF.5"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w06-d03-a1",
+          "kind": "launch",
+          "title": "Read the representation",
+          "instructions": "Examine this question: For y=3x−2, list points at x=0 and x=2. State what each variable or axis represents before calculating.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d03-a2",
+          "kind": "instruction",
+          "title": "Concept and modeled reasoning",
+          "instructions": "For y=2x+1, the rows x=−1,0,1,2 produce y=−1,1,3,5. Plot (−1,−1),(0,1),(1,3),(2,5) and connect because the rule permits all real x. The graph crosses the y-axis at (0,1); each one-unit x increase adds 2 to y.\n\nTarget: Plot table rows as points and identify an intercept and a constant rate of change. Explain each plotted or tabulated value with substitution and units where applicable.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d03-a3",
+          "kind": "guided_practice",
+          "title": "Guided representation work",
+          "instructions": "1. For y=3x−2, list points at x=0 and x=2. Draw or tabulate your reasoning and compare with a partner.\n2. What is the y-intercept of y=−x+6? Draw or tabulate your reasoning and compare with a partner.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d03-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. Find three points on y=x+4 for x=−2,0,2. Provide calculations and an interpretation.\n2. For y=−2x+3, find the y-intercept and one other point. Provide calculations and an interpretation.\n3. Why should a graph of discrete tickets sold use isolated points rather than a continuous line? Provide calculations and an interpretation.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d03-a5",
+          "kind": "exit_ticket",
+          "title": "Exit evidence",
+          "instructions": "Give two points on y=4x−1 at x=0 and x=1. Show a check against the original representation.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w06-d03-a6",
+          "kind": "reflection",
+          "title": "Homework and reflection",
+          "instructions": "Construct an original two-row input/output table or coordinate diagram illustrating: Plot table rows as points and identify an intercept and a constant rate of change. Explain the choice of input domain and identify a possible plotting or substitution mistake.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w06-d04",
+      "title": "Week 6 · Day 4 · Interpret domain and range across representations",
+      "body": "UNIT 2 • WEEK 6 • DAY 4\nObjective: Distinguish domain from range in tables, graphs and real-world function descriptions.\nPrerequisites: Week 5 functions and domains, signed coordinate values, Unit 1 expression evaluation.\nRead the representation (5 min)\nExamine this question: For {(−2,4),(0,4),(2,9)}, state domain and range. State what each variable or axis represents before calculating.\n\nConcept and modeled reasoning (12 min)\nA table of a function has rows (1,5),(2,7),(3,9). Domain is {1,2,3}; range is {5,7,9}. For a ride that costs C(n)=4n with n∈{0,1,2,3}, the range is {$0,$4,$8,$12}. Domain lists permitted inputs; range lists attained outputs, not every possible real number.\n\nTarget: Distinguish domain from range in tables, graphs and real-world function descriptions. Explain each plotted or tabulated value with substitution and units where applicable.\n\nGuided representation work (12 min)\n1. For {(−2,4),(0,4),(2,9)}, state domain and range. Draw or tabulate your reasoning and compare with a partner.\n2. For f(x)=x+2 with x∈{0,1,3}, give the range. Draw or tabulate your reasoning and compare with a partner.\n\nIndependent evidence (16 min)\n1. For {(1,8),(2,6),(4,8)}, find domain and range. Provide calculations and an interpretation.\n2. For g(t)=3t with t∈{0,2,5}, find range. Provide calculations and an interpretation.\n3. Explain why the range of y=x² over real x cannot contain −1. Provide calculations and an interpretation.\n\nExit evidence (5 min)\nFor f(x)=x²−1 and x∈{−2,0,2}, give domain and range. Show a check against the original representation.\n\nHomework and reflection (5 min)\nConstruct an original two-row input/output table or coordinate diagram illustrating: Distinguish domain from range in tables, graphs and real-world function descriptions. Explain the choice of input domain and identify a possible plotting or substitution mistake.\nAccessibility and differentiation: offer a tactile Cartesian grid, large-print axes, labeled coordinates, screen-reader-friendly ordered-pair lists and verbal descriptions. Permit an oral or typed explanation instead of handwriting when required by an accommodation. Extend by comparing discrete and continuous domains.",
+      "resources": [],
+      "learningTargets": [
+        "Distinguish domain from range in tables, graphs and real-world function descriptions.",
+        "I can justify that a point or table row matches a function rule."
+      ],
+      "standards": [
+        "F-IF.4",
+        "F-IF.5"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w06-d04-a1",
+          "kind": "launch",
+          "title": "Read the representation",
+          "instructions": "Examine this question: For {(−2,4),(0,4),(2,9)}, state domain and range. State what each variable or axis represents before calculating.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d04-a2",
+          "kind": "instruction",
+          "title": "Concept and modeled reasoning",
+          "instructions": "A table of a function has rows (1,5),(2,7),(3,9). Domain is {1,2,3}; range is {5,7,9}. For a ride that costs C(n)=4n with n∈{0,1,2,3}, the range is {$0,$4,$8,$12}. Domain lists permitted inputs; range lists attained outputs, not every possible real number.\n\nTarget: Distinguish domain from range in tables, graphs and real-world function descriptions. Explain each plotted or tabulated value with substitution and units where applicable.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d04-a3",
+          "kind": "guided_practice",
+          "title": "Guided representation work",
+          "instructions": "1. For {(−2,4),(0,4),(2,9)}, state domain and range. Draw or tabulate your reasoning and compare with a partner.\n2. For f(x)=x+2 with x∈{0,1,3}, give the range. Draw or tabulate your reasoning and compare with a partner.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d04-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. For {(1,8),(2,6),(4,8)}, find domain and range. Provide calculations and an interpretation.\n2. For g(t)=3t with t∈{0,2,5}, find range. Provide calculations and an interpretation.\n3. Explain why the range of y=x² over real x cannot contain −1. Provide calculations and an interpretation.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d04-a5",
+          "kind": "exit_ticket",
+          "title": "Exit evidence",
+          "instructions": "For f(x)=x²−1 and x∈{−2,0,2}, give domain and range. Show a check against the original representation.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w06-d04-a6",
+          "kind": "reflection",
+          "title": "Homework and reflection",
+          "instructions": "Construct an original two-row input/output table or coordinate diagram illustrating: Distinguish domain from range in tables, graphs and real-world function descriptions. Explain the choice of input domain and identify a possible plotting or substitution mistake.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w06-d05",
+      "title": "Week 6 · Day 5 · Compare verbal, table and graph evidence",
+      "body": "UNIT 2 • WEEK 6 • DAY 5\nObjective: Determine whether two representations describe the same function and justify discrepancies.\nPrerequisites: Week 5 functions and domains, signed coordinate values, Unit 1 expression evaluation.\nRead the representation (5 min)\nExamine this question: A rule y=3x+2 gives (0,2),(1,5). Does table {(0,2),(1,6)} match? State what each variable or axis represents before calculating.\n\nConcept and modeled reasoning (12 min)\nA gym costs $10 to join and $5 per visit. The rule C(v)=10+5v gives (0,10),(1,15),(2,20). A table claiming (2,25) is inconsistent because 10+5(2)=20. A graph should start at 10 on the vertical axis and increase $5 for each additional visit, using whole-number visit inputs.\n\nTarget: Determine whether two representations describe the same function and justify discrepancies. Explain each plotted or tabulated value with substitution and units where applicable.\n\nGuided representation work (12 min)\n1. A rule y=3x+2 gives (0,2),(1,5). Does table {(0,2),(1,6)} match? Draw or tabulate your reasoning and compare with a partner.\n2. A savings account starts at $20 and adds $4 weekly. Write the rule. Draw or tabulate your reasoning and compare with a partner.\n\nIndependent evidence (16 min)\n1. For y=2x−3, does (4,5) lie on its graph? Provide calculations and an interpretation.\n2. For y=−x+7, does (3,5) lie on its graph? Provide calculations and an interpretation.\n3. A club charges $8 fixed and $6 per shirt. Give two correct table rows. Provide calculations and an interpretation.\n4. Describe a graph error if a fixed $8 fee is plotted as the point (0,0). Provide calculations and an interpretation.\n\nExit evidence (5 min)\nA rule f(x)=3x+1 and a table row (2,8) disagree. Identify the correction. Show a check against the original representation.\n\nHomework and reflection (5 min)\nConstruct an original two-row input/output table or coordinate diagram illustrating: Determine whether two representations describe the same function and justify discrepancies. Explain the choice of input domain and identify a possible plotting or substitution mistake.\nAccessibility and differentiation: offer a tactile Cartesian grid, large-print axes, labeled coordinates, screen-reader-friendly ordered-pair lists and verbal descriptions. Permit an oral or typed explanation instead of handwriting when required by an accommodation. Extend by comparing discrete and continuous domains.",
+      "resources": [],
+      "learningTargets": [
+        "Determine whether two representations describe the same function and justify discrepancies.",
+        "I can justify that a point or table row matches a function rule."
+      ],
+      "standards": [
+        "F-IF.4",
+        "F-IF.5"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w06-d05-a1",
+          "kind": "launch",
+          "title": "Read the representation",
+          "instructions": "Examine this question: A rule y=3x+2 gives (0,2),(1,5). Does table {(0,2),(1,6)} match? State what each variable or axis represents before calculating.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d05-a2",
+          "kind": "instruction",
+          "title": "Concept and modeled reasoning",
+          "instructions": "A gym costs $10 to join and $5 per visit. The rule C(v)=10+5v gives (0,10),(1,15),(2,20). A table claiming (2,25) is inconsistent because 10+5(2)=20. A graph should start at 10 on the vertical axis and increase $5 for each additional visit, using whole-number visit inputs.\n\nTarget: Determine whether two representations describe the same function and justify discrepancies. Explain each plotted or tabulated value with substitution and units where applicable.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d05-a3",
+          "kind": "guided_practice",
+          "title": "Guided representation work",
+          "instructions": "1. A rule y=3x+2 gives (0,2),(1,5). Does table {(0,2),(1,6)} match? Draw or tabulate your reasoning and compare with a partner.\n2. A savings account starts at $20 and adds $4 weekly. Write the rule. Draw or tabulate your reasoning and compare with a partner.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d05-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. For y=2x−3, does (4,5) lie on its graph? Provide calculations and an interpretation.\n2. For y=−x+7, does (3,5) lie on its graph? Provide calculations and an interpretation.\n3. A club charges $8 fixed and $6 per shirt. Give two correct table rows. Provide calculations and an interpretation.\n4. Describe a graph error if a fixed $8 fee is plotted as the point (0,0). Provide calculations and an interpretation.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w06-d05-a5",
+          "kind": "exit_ticket",
+          "title": "Exit evidence",
+          "instructions": "A rule f(x)=3x+1 and a table row (2,8) disagree. Identify the correction. Show a check against the original representation.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w06-d05-a6",
+          "kind": "reflection",
+          "title": "Homework and reflection",
+          "instructions": "Construct an original two-row input/output table or coordinate diagram illustrating: Determine whether two representations describe the same function and justify discrepancies. Explain the choice of input domain and identify a possible plotting or substitution mistake.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    }
+  ]
+}

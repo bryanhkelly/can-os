@@ -4,17 +4,19 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  documents, jurisdictions, people, programs, qualificationClaims, qualificationDefinitions,
+  accessAccounts, accountPersonGrants, documents, jurisdictions, people, programs, qualificationClaims, qualificationDefinitions,
   qualificationVerificationEvents, roleAssignments,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { emitEvent } from "@/platform/mutation";
 import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 import { assertScopedQualificationReviewer, reviewQualification } from "./qualification-review.server";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 const selection = z.object({ personId: uuid.optional(), programId: uuid.optional() });
 const keyPattern = /^qualifications\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i;
@@ -34,12 +36,40 @@ const upload = z.object({
   "Qualification expiry must follow issuance");
 
 type Reader = Pick<typeof db, "select">;
+const siteCredentialRoles=["room_facilitator","site_leader","site_staff"];
+async function ownSiteStaff(actor:Actor,executor:Reader=db){
+  if(!actor.actorPersonId || !actor.grantSiteId || !actor.grantId ||
+     !siteCredentialRoles.includes(actor.role) || actor.sessionAccountId)
+    throw new AuthorizationError("verified original onsite staff credential owner");
+  assertCapability(actor,"profiles.credentials.submit");
+  const [grant]=await executor.select({id:accountPersonGrants.id})
+    .from(accountPersonGrants)
+    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+    .where(and(
+      eq(accountPersonGrants.id,actor.grantId),
+      eq(accountPersonGrants.accountId,actor.accountId),
+      eq(accountPersonGrants.personId,actor.actorPersonId),
+      eq(accountPersonGrants.role,actor.role),
+      eq(accountPersonGrants.siteId,actor.grantSiteId),
+      inArray(accountPersonGrants.organizationId,actor.scope.organizationIds??[]),
+      eq(accountPersonGrants.active,true),
+      eq(accessAccounts.disabled,false),eq(people.active,true),
+      sql`${accessAccounts.emailVerifiedAt} is not null`,
+    )).limit(1);
+  if(!grant)throw new AuthorizationError("current verified onsite staff credential identity");
+}
+async function ownCredentialSubject(actor:Actor,tx:Reader=db){
+  if(actor.role==="teacher")return ownTeacher(actor,tx);
+  return ownSiteStaff(actor,tx);
+}
 async function ownTeacher(actor: Actor, executor: Reader = db) {
   assertCapability(actor, "profiles.credentials.submit");
   const [role] = await executor.select({ id: roleAssignments.id }).from(roleAssignments)
     .innerJoin(people, eq(people.id, roleAssignments.personId))
     .where(and(eq(roleAssignments.personId, actor.actorPersonId), eq(people.active, true),
       eq(roleAssignments.roleKey, "teacher"),
+      activeRoleAssignmentPredicate(),
       inArray(roleAssignments.organizationId, actor.scope.organizationIds ?? []),
       or(isNull(roleAssignments.siteId), inArray(roleAssignments.siteId, actor.scope.siteIds ?? [])),
       or(isNull(roleAssignments.programId), inArray(roleAssignments.programId, actor.scope.programIds ?? [])),
@@ -49,8 +79,9 @@ async function ownTeacher(actor: Actor, executor: Reader = db) {
 
 async function authorizedSubject(actor: Actor, input: z.infer<typeof selection>, executor: Reader = db) {
   const personId = input.personId ?? actor.actorPersonId;
-  if (personId === actor.actorPersonId && actor.role === "teacher") {
-    await ownTeacher(actor, executor);
+  if (personId === actor.actorPersonId &&
+      (actor.role === "teacher" || siteCredentialRoles.includes(actor.role))) {
+    await ownCredentialSubject(actor, executor);
     return { personId, canSubmit: true };
   }
   if (actor.role !== "registrar" || !input.programId ||
@@ -61,7 +92,8 @@ async function authorizedSubject(actor: Actor, input: z.infer<typeof selection>,
     !program.siteId || !actor.scope.siteIds?.includes(program.siteId)) throw new AuthorizationError("credential review scope");
   const [teacher] = await executor.select({ id: roleAssignments.id }).from(roleAssignments)
     .innerJoin(people, eq(people.id, roleAssignments.personId))
-    .where(and(eq(roleAssignments.personId, personId), eq(roleAssignments.roleKey, "teacher"), eq(people.active, true),
+    .where(and(eq(roleAssignments.personId, personId), inArray(roleAssignments.roleKey,["teacher","room_facilitator","site_leader","site_staff"]), eq(people.active, true),
+      activeRoleAssignmentPredicate(),
       inArray(roleAssignments.organizationId, [program.organizationId, program.academicProviderOrganizationId]),
       or(isNull(roleAssignments.siteId), eq(roleAssignments.siteId, program.siteId)),
       or(isNull(roleAssignments.programId), eq(roleAssignments.programId, program.id)))).limit(1);
@@ -70,10 +102,13 @@ async function authorizedSubject(actor: Actor, input: z.infer<typeof selection>,
   return { personId, canSubmit: false };
 }
 
-async function catalogEntry(data: z.infer<typeof upload>, executor: Reader = db) {
+async function catalogEntry(data: z.infer<typeof upload>, executor: Reader = db, actor?:Actor) {
   const [definition] = await executor.select().from(qualificationDefinitions)
     .where(eq(qualificationDefinitions.id, data.definitionId)).limit(1);
   if (!definition) throw new Error("Qualification catalog entry is unavailable");
+  if(actor && siteCredentialRoles.includes(actor.role) &&
+     !["onsite_child_safety_screening","onsite_safeguarding_training"].includes(definition.key))
+    throw new AuthorizationError("onsite personnel may submit only safety-screening and safeguarding-training credentials");
   if (Object.keys(definition.attributesSchema).length) throw new Error("This qualification requires a specialized submission form");
   if (data.jurisdictionId) {
     const [jurisdiction] = await executor.select({ id: jurisdictions.id }).from(jurisdictions)
@@ -87,7 +122,7 @@ export const getQualifications = createServerFn({ method: "GET" })
   .validator((value: unknown) => selection.parse(value ?? {}))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    const actor = await requireActor(["teacher", "registrar"]);
+    const actor = await requireActor(["teacher", "registrar","room_facilitator","site_leader","site_staff"]);
     const { personId, canSubmit } = await authorizedSubject(actor, data);
     const claims = await db.select({
       id: qualificationClaims.id, title: qualificationDefinitions.title,
@@ -104,7 +139,11 @@ export const getQualifications = createServerFn({ method: "GET" })
     }).from(qualificationVerificationEvents).where(inArray(qualificationVerificationEvents.claimId, displayed.map(claim => claim.id)))
       .orderBy(desc(qualificationVerificationEvents.sequence)) : [];
     const catalog = canSubmit ? await db.select({ id: qualificationDefinitions.id, title: qualificationDefinitions.title })
-      .from(qualificationDefinitions).where(sql`${qualificationDefinitions.attributesSchema} = '{}'::jsonb`)
+      .from(qualificationDefinitions).where(and(
+        sql`${qualificationDefinitions.attributesSchema} = '{}'::jsonb`,
+        siteCredentialRoles.includes(actor.role) ?
+          inArray(qualificationDefinitions.key,["onsite_child_safety_screening","onsite_safeguarding_training"]) : undefined,
+      ))
       .orderBy(asc(qualificationDefinitions.title)) : [];
     const jurisdictionOptions = canSubmit ? await db.select({ id: jurisdictions.id, code: jurisdictions.code, name: jurisdictions.name })
       .from(jurisdictions).orderBy(asc(jurisdictions.name)) : [];
@@ -127,10 +166,10 @@ export const getQualifications = createServerFn({ method: "GET" })
 export const beginQualificationUpload = createServerFn({ method: "POST" })
   .validator((value: unknown) => upload.parse(value))
   .handler(async ({ data }) => {
-    const actor = await requireActor(["teacher"], "profiles.credentials.submit");
-    await ownTeacher(actor);
+    const actor = await requireActor(["teacher","room_facilitator","site_leader","site_staff"], "profiles.credentials.submit");
+    await ownCredentialSubject(actor);
     assertUploadsEnabled();
-    await catalogEntry(data);
+    await catalogEntry(data,db,actor);
     const key = `qualifications/${actor.actorPersonId}/${crypto.randomUUID()}`;
     return { key, uploadHeaders: { "Content-Type": data.mimeType, "If-None-Match": "*" },
       uploadUrl: createPrivateUploadUrl({ key, keyPattern, contentType: data.mimeType,
@@ -141,13 +180,13 @@ export const beginQualificationUpload = createServerFn({ method: "POST" })
 export const finishQualificationUpload = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ key: z.string().regex(keyPattern), claim: upload }).parse(value))
   .handler(async ({ data }) => {
-    const actor = await requireActor(["teacher"], "profiles.credentials.submit");
-    await ownTeacher(actor);
+    const actor = await requireActor(["teacher","room_facilitator","site_leader","site_staff"], "profiles.credentials.submit");
+    await ownCredentialSubject(actor);
     assertUploadsEnabled();
     if (!data.key.startsWith(`qualifications/${actor.actorPersonId}/`)) throw new AuthorizationError("own qualification evidence");
     return db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"qualification-upload:" + data.key}))`);
-      await ownTeacher(actor, tx);
+      await ownCredentialSubject(actor, tx);
       const claimId = uuid.parse(data.key.split("/")[2]);
       const [existing] = await tx.select().from(qualificationClaims).where(eq(qualificationClaims.id, claimId)).limit(1);
       if (existing) {
@@ -161,7 +200,7 @@ export const finishQualificationUpload = createServerFn({ method: "POST" })
           document.metadata.size !== data.claim.size) throw new Error("This upload was already submitted with different qualification details");
         return { claimId, created: false };
       }
-      await catalogEntry(data.claim, tx);
+      await catalogEntry(data.claim,tx,actor);
       await verifyPrivateObject({ key: data.key, keyPattern, expectedSize: data.claim.size,
         expectedContentType: data.claim.mimeType, verifySignature: matchesEnrollmentDocumentSignature });
       await tx.insert(qualificationClaims).values({ id: claimId, personId: actor.actorPersonId,
@@ -175,7 +214,7 @@ export const finishQualificationUpload = createServerFn({ method: "POST" })
         verifiedAt: new Date(), metadata: { size: data.claim.size, claimId },
       }).returning({ id: documents.id });
       if (!document) throw new Error("Failed to save qualification evidence");
-      await emitEvent(tx, { eventType: "QualificationClaimCreated", aggregateType: "QualificationClaim",
+      await emitEvent(tx, { eventType: EventTypes.QualificationClaimCreated, aggregateType: "QualificationClaim",
         aggregateId: claimId, actorPersonId: actor.actorPersonId, payload: { definitionId: data.claim.definitionId, documentId: document.id } });
       await recordAudit(tx, actor, { action: "qualification.claim_created", resourceType: "QualificationClaim",
         resourceId: claimId, after: { definitionId: data.claim.definitionId, documentId: document.id } });
@@ -204,7 +243,7 @@ export const getQualificationEvidence = createServerFn({ method: "POST" })
   .validator((value: unknown) => selection.extend({ claimId: uuid }).parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    const actor = await requireActor(["teacher", "registrar"]);
+    const actor = await requireActor(["teacher", "registrar","room_facilitator","site_leader","site_staff"]);
     return db.transaction(async tx => {
       const { personId } = await authorizedSubject(actor, data, tx);
       const [claim] = await tx.select({ personId: qualificationClaims.personId }).from(qualificationClaims)

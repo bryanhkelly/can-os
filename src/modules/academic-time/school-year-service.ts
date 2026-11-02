@@ -8,6 +8,7 @@ programs,
 scheduleTemplatePeriods,
 scheduleTemplates,
 schoolYears,
+sites,
 terms,
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -20,7 +21,13 @@ type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { and,eq } from "drizzle-orm";
+import { and,eq,isNull,sql } from "drizzle-orm";
+import { schoolYearStructure } from "@/domain/school-year-structure";
+
+type AcademicTimeTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+function withAcademicTimeTransaction<T>(run: (tx: AcademicTimeTransaction) => Promise<T>, tx?: AcademicTimeTransaction): Promise<T> {
+  return tx ? run(tx) : db.transaction(run);
+}
 
 function assertDateRange(startsOn: string, endsOn: string, label: string) {
   if (startsOn > endsOn) {
@@ -58,6 +65,11 @@ export async function createSchoolYear(
   assertDateRange(input.startsOn, input.endsOn, "SchoolYear");
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"school-year:" + input.organizationId + ":" + input.siteId + ":" + (input.programId ?? "site-wide") + ":" + input.key}))`);
+    const [site] = await tx.select({organizationId:sites.organizationId}).from(sites)
+      .where(eq(sites.id,input.siteId)).for("share").limit(1);
+    if (!site || site.organizationId !== input.organizationId)
+      throw new Error("Site must belong to SchoolYear organization");
     const [gradeScale] = await tx
       .select({ id: gradeScales.id, organizationId:gradeScales.owningOrganizationId,
         active:gradeScales.active })
@@ -71,15 +83,30 @@ export async function createSchoolYear(
 
     if (input.programId) {
       const [program] = await tx
-        .select({ organizationId: programs.organizationId })
+        .select({ organizationId: programs.organizationId, siteId:programs.siteId })
         .from(programs)
         .where(eq(programs.id, input.programId))
+        .for("share")
         .limit(1);
 
       if (!program) throw new Error("Program not found");
       if (program.organizationId !== input.organizationId) {
         throw new Error("Program must belong to SchoolYear organization");
       }
+      if (program.siteId !== input.siteId) throw new Error("Program must belong to SchoolYear Site");
+    }
+
+    const [existing] = await tx.select().from(schoolYears).where(and(
+      eq(schoolYears.organizationId,input.organizationId),eq(schoolYears.siteId,input.siteId),
+      input.programId ? eq(schoolYears.programId,input.programId) : isNull(schoolYears.programId),
+      eq(schoolYears.key,input.key),
+    )).limit(1);
+    if (existing) {
+      if (existing.name !== input.name || existing.startsOn !== input.startsOn ||
+          existing.endsOn !== input.endsOn || existing.gradeScaleId !== input.gradeScaleId ||
+          existing.timezone !== input.timezone)
+        throw new Error("This school-year key already has different settings. Review the existing year instead of creating another.");
+      return existing.id;
     }
 
     const [year] = await tx
@@ -143,11 +170,12 @@ export async function createTerm(
     startsOn: string;
     endsOn: string;
   },
+  transaction?: AcademicTimeTransaction,
 ): Promise<string> {
   assertCapability(context, "academic_year.manage");
   assertDateRange(input.startsOn, input.endsOn, "Term");
 
-  return db.transaction(async (tx) => {
+  return withAcademicTimeTransaction(async (tx) => {
     const [year] = await tx
       .select()
       .from(schoolYears)
@@ -197,11 +225,11 @@ export async function createTerm(
       action: "term.create", entityType: "term", entityId: term.id, scope, after: { ...input },
     });
     await emitEvent(tx, {
-      eventType: "TermCreated", aggregateType: "term", aggregateId: term.id,
+      eventType: EventTypes.TermCreated, aggregateType: "term", aggregateId: term.id,
       actorPersonId: context.actorPersonId, ...scope, payload: { schoolYearId: year.id },
     });
     return term.id;
-  });
+  }, transaction);
 }
 
 export async function createGradingPeriod(
@@ -216,11 +244,12 @@ export async function createGradingPeriod(
     gradePostingOpensAt?: Date;
     gradePostingClosesAt?: Date;
   },
+  transaction?: AcademicTimeTransaction,
 ): Promise<string> {
   assertCapability(context, "academic_year.manage");
   assertDateRange(input.startsOn, input.endsOn, "GradingPeriod");
 
-  return db.transaction(async (tx) => {
+  return withAcademicTimeTransaction(async (tx) => {
     const [record] = await tx
       .select({
         termId: terms.id,
@@ -273,11 +302,11 @@ export async function createGradingPeriod(
       },
     });
     await emitEvent(tx, {
-      eventType: "GradingPeriodCreated", aggregateType: "grading_period", aggregateId: period.id,
+      eventType: EventTypes.GradingPeriodCreated, aggregateType: "grading_period", aggregateId: period.id,
       actorPersonId: context.actorPersonId, ...scope, payload: { termId: input.termId },
     });
     return period.id;
-  });
+  }, transaction);
 }
 
 export async function createAcademicCalendar(
@@ -286,10 +315,11 @@ export async function createAcademicCalendar(
     schoolYearId: string;
     name: string;
   },
+  transaction?: AcademicTimeTransaction,
 ): Promise<string> {
   assertCapability(context, "academic_year.manage");
 
-  return db.transaction(async (tx) => {
+  return withAcademicTimeTransaction(async (tx) => {
     const [year] = await tx
       .select()
       .from(schoolYears)
@@ -329,7 +359,7 @@ export async function createAcademicCalendar(
         siteId: year.siteId }, after: { version: 1, active: true },
     });
     return calendar.id;
-  });
+  }, transaction);
 }
 
 export async function setAcademicCalendarDay(
@@ -559,6 +589,109 @@ export async function createScheduleTemplate(
 
     return template.id;
   });
+}
+
+/** Prepare real draft records through their canonical commands. Locking the
+ * year makes retries reuse its terms, periods and calendar without overwrites. */
+export async function prepareSchoolYearBasics(
+  context: CommandContext,
+  input: {schoolYearId: string; structure: "full_year" | "semesters";
+    instructionalDays?: {weekdays:number[];instructionalMinutes:number}},
+) {
+  assertCapability(context, "academic_year.manage");
+  return db.transaction(async tx => {
+    const [scoped] = await tx.select().from(schoolYears)
+      .where(eq(schoolYears.id, input.schoolYearId)).limit(1);
+    if (!scoped) throw new Error("SchoolYear not found");
+    assertOrganizationScope(context, scoped.organizationId);
+    assertSiteScope(context, scoped.siteId);
+    assertProgramScope(context, scoped.programId);
+    // Use the same Site-before-row lock order as activation and attendance.
+    await lockAttendanceConfigurationAtSite(tx, scoped.siteId);
+    const [year] = await tx.select().from(schoolYears)
+      .where(eq(schoolYears.id, input.schoolYearId)).for("update").limit(1);
+    if (!year || year.siteId !== scoped.siteId) throw new Error("School year changed; refresh before preparing it");
+    assertOrganizationScope(context, year.organizationId);
+    assertSiteScope(context, year.siteId);
+    assertProgramScope(context, year.programId);
+    if (year.status !== "draft") throw new Error("Recommended setup is only available for a draft school year");
+    const planned = schoolYearStructure(year.startsOn, year.endsOn, input.structure);
+    let yearTerms = await tx.select({id:terms.id,name:terms.name,startsOn:terms.startsOn,endsOn:terms.endsOn})
+      .from(terms).where(eq(terms.schoolYearId, year.id));
+    const existingStructure = yearTerms.length > 0;
+    if (!existingStructure) {
+      yearTerms = [];
+      for (const term of planned) {
+        const termId = await createTerm(context, {...term, schoolYearId: year.id}, tx);
+        yearTerms.push({id:termId,name:term.name,startsOn:term.startsOn,endsOn:term.endsOn});
+      }
+    }
+    for (const term of yearTerms) {
+      const [period] = await tx.select({id: gradingPeriods.id}).from(gradingPeriods)
+        .where(eq(gradingPeriods.termId, term.id)).limit(1);
+      if (!period) await createGradingPeriod(context, {
+        termId:term.id,key:"term-grading",name:term.name,sequence:1,
+        startsOn:term.startsOn,endsOn:term.endsOn,
+      }, tx);
+    }
+    const [calendar] = await tx.select({id: academicCalendars.id}).from(academicCalendars)
+      .where(and(eq(academicCalendars.schoolYearId, year.id), eq(academicCalendars.active, true))).limit(1);
+    const calendarId = calendar?.id ?? await createAcademicCalendar(context, {
+      schoolYearId:year.id,name:"Instructional calendar",
+    }, tx);
+    if (input.instructionalDays) await populateSchoolYearInstructionalDays(context, {
+      academicCalendarId:calendarId,...input.instructionalDays,
+    }, tx);
+    return {schoolYearId:year.id,calendarId,existingStructure};
+  });
+}
+
+/** The ordinary calendar generator is shared by launch preparation and the
+ * detailed editor. Existing holidays, closures and scheduled days always win. */
+export async function populateSchoolYearInstructionalDays(
+  context:CommandContext,
+  input:{academicCalendarId:string;weekdays:number[];instructionalMinutes:number},
+  transaction?:AcademicTimeTransaction,
+) {
+  assertCapability(context,"academic_year.manage");
+  if (!input.weekdays.length || input.weekdays.some(day=>!Number.isInteger(day)||day<0||day>6) ||
+      !Number.isInteger(input.instructionalMinutes)||input.instructionalMinutes<1||input.instructionalMinutes>1440)
+    throw new Error("Review instructional weekdays and minutes per day");
+  return withAcademicTimeTransaction(async tx=>{
+    const [calendar]=await tx.select({
+      id:academicCalendars.id,startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
+      programId:schoolYears.programId,siteId:schoolYears.siteId,organizationId:schoolYears.organizationId,
+    }).from(academicCalendars).innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
+      .where(eq(academicCalendars.id,input.academicCalendarId)).limit(1);
+    if(!calendar)throw new Error("Academic calendar not found");
+    assertOrganizationScope(context,calendar.organizationId);
+    assertSiteScope(context,calendar.siteId);
+    assertProgramScope(context,calendar.programId);
+    await lockAttendanceConfigurationAtSite(tx,calendar.siteId);
+    const weekdays=new Set(input.weekdays);
+    const rows:{academicCalendarId:string;calendarDate:string;type:"instructional";instructionalMinutes:number}[]=[];
+    const end=Date.parse(calendar.endsOn+"T00:00:00Z");
+    for(let at=Date.parse(calendar.startsOn+"T00:00:00Z");at<=end;at+=86400000){
+      const instant=new Date(at);
+      if(weekdays.has(instant.getUTCDay()))rows.push({academicCalendarId:calendar.id,
+        calendarDate:instant.toISOString().slice(0,10),type:"instructional",instructionalMinutes:input.instructionalMinutes});
+    }
+    const created=rows.length ? await tx.insert(academicCalendarDays).values(rows)
+      .onConflictDoNothing().returning({id:academicCalendarDays.id}) : [];
+    if(created.length){
+      await emitEvent(tx,{
+        eventType:EventTypes.AcademicCalendarChanged,aggregateType:"academic_calendar",aggregateId:calendar.id,
+        actorPersonId:context.actorPersonId,payload:{operation:"populate",weekdays:input.weekdays,
+          scheduledDays:created.length,siteId:calendar.siteId},
+      });
+      await writeAudit(tx,context,{
+        action:"academic_calendar.populate",entityType:"academic_calendar",entityId:calendar.id,
+        scope:{organizationId:calendar.organizationId,siteId:calendar.siteId,programId:calendar.programId},
+        after:{weekdays:input.weekdays,instructionalMinutes:input.instructionalMinutes,scheduledDays:created.length},
+      });
+    }
+    return {processedDays:rows.length,createdDays:created.length};
+  },transaction);
 }
 
 export async function activateSchoolYear(

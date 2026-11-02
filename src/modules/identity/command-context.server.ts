@@ -1,11 +1,11 @@
-import {and,eq,gt,isNull,inArray} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,not} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
-import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
-import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
-import {listDemoFacilitatorGrants} from "./demo-facilitator.server";
+import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
+import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
+import {readSessionGrants} from "./session-grants.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -21,29 +21,22 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  const digest=hashAccessSecret(value,pepper);
  const now=new Date();
  const [session]=await db.select({
-  id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId
+  id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
+  email:accessAccounts.emailNormalized,
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
-   eq(accessAccounts.disabled,false)))
+   gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false)))
   .limit(1);
  if(!session) throw new AuthorizationError("authenticated session");
- const grants=session.accountId===LOCAL_DEMO_ADMIN.accountId?await listDemoFacilitatorGrants(db):await db.select({
-  id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
-  role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
-  siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
- }).from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,session.accountId),eq(accountPersonGrants.active,true)));
- const selected=grants.find(grant=>grant.id===session.activeGrantId);
+ const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
+ const activeGrant=grants.find(grant=>grant.id===session.activeGrantId);
+ if(!activeGrant)throw new AuthorizationError("active membership");
  const context=resolveAccessContext({
-  accountId:session.accountId===LOCAL_DEMO_ADMIN.accountId&&selected?selected.accountId:session.accountId,
+  accountId:activeGrant.accountId,
   sessionId:session.id,activeGrantId:session.activeGrantId,
  },grants);
- if(session.accountId===LOCAL_DEMO_ADMIN.accountId){
-  context.demoFacilitator={
-   accountId:LOCAL_DEMO_ADMIN.accountId,personId:LOCAL_DEMO_ADMIN.personId,sourceAccountId:context.accountId,
-  };
-  context.accountId=session.accountId;
- }
+ if(demoAccountSwitching)context.sessionAccountId=session.accountId;
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];
@@ -60,6 +53,52 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  if(organizations.length){
   const permitted=await db.select({id:programs.id,siteId:programs.siteId}).from(programs).where(inArray(programs.organizationId,organizations));
   context.scope.programIds=authorizedProgramIds(permitted,organizations,grantSites);
+ }
+ // A CAN teacher can serve a church-owned class only through their own
+ // assigned Section AND a current independently verified institutional
+ // academic agreement. Preserve original Organization/Site/Program scope:
+ // never turn institution membership into a host-wide grant.
+ if(context.role==="teacher"&&context.actorPersonId&&organizations.length&&
+    context.grantSiteId===null){
+  // A school-specific CAN teacher grant does not silently extend to an
+  // unrelated church Site. Cross-institution assignment requires original
+  // CAN organization-wide membership, plus the named Section assignment
+  // and current independently approved agreement below.
+  const assignments=await db.select({
+    sectionId:sections.id,programId:sections.programId,
+  }).from(sectionTeachers)
+    .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
+    .innerJoin(programs,eq(programs.id,sections.programId))
+    .where(and(programTeacherDelegationPredicate({
+      personId:sectionTeachers.personId,
+      providerOrganizationId:programs.academicProviderOrganizationId,
+      programId:sections.programId,siteId:sections.siteId,
+    }),eq(sectionTeachers.personId,context.actorPersonId),
+      eq(sections.active,true),
+      inArray(programs.academicProviderOrganizationId,organizations),
+      not(inArray(programs.organizationId,organizations))));
+  if(assignments.length){
+   const {requireInstitutionalAcademicProgramAuthority}=await import(
+     "@/modules/programs/program-site-authorization.server");
+   const authorizedPrograms=new Set<string>();
+   const deniedPrograms=new Set<string>();
+   for(const assignment of assignments){
+    if(authorizedPrograms.has(assignment.programId)||deniedPrograms.has(assignment.programId))continue;
+    try{
+     await requireInstitutionalAcademicProgramAuthority(db,context,assignment.programId,[
+       "academic_instruction","curriculum",
+     ]);
+     authorizedPrograms.add(assignment.programId);
+    }catch(error){
+     if(!(error instanceof AuthorizationError))throw error;
+     deniedPrograms.add(assignment.programId);
+    }
+   }
+   context.scope.sectionIds=[
+    ...new Set([...(context.scope.sectionIds??[]),
+      ...assignments.filter(row=>authorizedPrograms.has(row.programId)).map(row=>row.sectionId)]),
+   ];
+  }
  }
  return context;
 }

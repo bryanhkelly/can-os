@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { subscriptionDeliveries, subscriptions } from "@/db/schema";
 import { beginSmsVerification, confirmSmsVerification, revokeSmsConsent, updateQuietHours, getNotificationPreferences } from "@/platform/subscriptions/preferences";
+import { writeAudit } from "@/platform/mutation";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -153,19 +154,28 @@ export const updateWatchOptions = createServerFn({ method: "POST" })
   }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    const result = await db.update(subscriptions).set({
-      channel: data.channel,
-      reminderPolicy: data.remindAfterHours === null ? {} : {
-        remindAfterHours: data.remindAfterHours,
-        ...(data.repeatEveryHours === null ? {} : { repeatEveryHours: data.repeatEveryHours }),
-        maxReminders: data.maxReminders,
-      },
-      updatedAt: new Date(),
-    }).where(and(eq(subscriptions.id, data.subscriptionId),
-      eq(subscriptions.subscriberPersonId, context.actorPersonId),
-      eq(subscriptions.status, "active")))
-      .returning({ id: subscriptions.id });
-    if (!result.length) throw new AuthorizationError("active watch");
+    const reminderPolicy = data.remindAfterHours === null ? {} : {
+      remindAfterHours: data.remindAfterHours,
+      ...(data.repeatEveryHours === null ? {} : { repeatEveryHours: data.repeatEveryHours }),
+      maxReminders: data.maxReminders,
+    };
+    await db.transaction(async (tx) => {
+      const result = await tx.update(subscriptions).set({
+        channel: data.channel,
+        reminderPolicy,
+        updatedAt: new Date(),
+      }).where(and(eq(subscriptions.id, data.subscriptionId),
+        eq(subscriptions.subscriberPersonId, context.actorPersonId),
+        eq(subscriptions.status, "active")))
+        .returning({ id: subscriptions.id });
+      if (!result.length) throw new AuthorizationError("active watch");
+      await writeAudit(tx, context, {
+        action: "subscription.options_updated",
+        entityType: "subscription",
+        entityId: data.subscriptionId,
+        after: { channel: data.channel, reminderPolicy },
+      });
+    });
     return { ok: true };
   });
 
@@ -197,7 +207,7 @@ export const requestMySmsVerification = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ phone: z.string().regex(/^\+[1-9]\d{7,14}$/) }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    await beginSmsVerification(context.actorPersonId, data.phone);
+    await beginSmsVerification(context.actorPersonId, data.phone, context.scope.organizationIds ?? []);
     return { ok: true };
   });
 
@@ -209,7 +219,7 @@ export const verifyMySmsConsent = createServerFn({ method: "POST" })
   }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    await confirmSmsVerification(context.actorPersonId, data.phone, data.code);
+    await confirmSmsVerification(context.actorPersonId, data.phone, data.code, context.scope.organizationIds ?? []);
     return { ok: true };
   });
 

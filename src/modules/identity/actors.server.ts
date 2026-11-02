@@ -4,7 +4,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit,type MutationTx } from "@/platform/mutation";
 import { getRequest } from "@tanstack/react-start/server";
 
-export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "specialist" | "counselor";
+export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "specialist" | "counselor" | "room_facilitator" | "site_leader" | "site_staff" | "safeguarding_responder" | "safeguarding_lead";
 
 export type Actor = AccessContext & { actorPersonId: string };
 
@@ -72,7 +72,7 @@ export async function recordAudit(
       accountId: actor.accountId,
       sessionId: actor.sessionId,
       role: actor.role,
-      ...(actor.demoFacilitator ? { demoFacilitator: actor.demoFacilitator } : {}),
+      ...(actor.sessionAccountId ? { sessionAccountId: actor.sessionAccountId } : {}),
       ...(actor.requestId ? { requestId: actor.requestId } : {}),
     },
   });

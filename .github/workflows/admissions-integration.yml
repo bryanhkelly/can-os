@@ -27,6 +27,7 @@ jobs:
       CAN_TEST_DB_WRITES_ENABLED: "true"
       TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
+      CAN_ADMISSIONS_TEST_BRANCH_ID: ${{ vars.CAN_ADMISSIONS_TEST_BRANCH_ID }}
       CAN_DEMO_WRITES_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
@@ -45,16 +46,33 @@ jobs:
             echo "::error::Configure CAN_APPLICATION_DB_HOST as a nonsecret environment variable identifying the production database host."
             exit 1
           fi
+          if [ -z "$CAN_ADMISSIONS_TEST_BRANCH_ID" ]; then
+            echo "::error::Configure CAN_ADMISSIONS_TEST_BRANCH_ID in the integration-test environment with the approved nonproduction Neon branch ID."
+            exit 1
+          fi
       - name: Install dependencies
         run: npm ci
       - name: Verify disposable database endpoint before any writes
         run: npm run test:integration:admissions -- --preflight
+      - name: Verify Postgres-attested Neon project and nonproduction branch
+        run: node scripts/verify-admissions-neon-branch.mjs
       - name: Apply committed schema migrations to disposable Neon branch
         env:
           DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
         run: npm run db:migrate
       - name: Run isolated admissions acceptance
         run: npm run test:integration:admissions
+      - name: Install Chromium for authenticated browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Run authenticated admissions browser acceptance
+        run: npm run test:e2e:admissions
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admissions-browser-failure
+          path: test-results/
+          if-no-files-found: ignore
       - name: Publish release acceptance result
         if: always()
         shell: bash

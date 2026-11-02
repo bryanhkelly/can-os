@@ -13,7 +13,7 @@ describe("authenticated academic journey fixtures", () => {
   const guardianPersonId="f3000000-0000-4000-8000-000000000007";
   const memberships=await db.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId})
    .from(accountPersonGrants).innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
-   .where(and(eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,true),eq(accessAccounts.disabled,false)));
+   .where(and(eq(accountPersonGrants.active,true),eq(accountPersonGrants.organizationId,"f1000000-0000-4000-8000-000000000002"),eq(accessAccounts.disabled,false)));
   for(const [role,personId] of [["student",studentPersonId],["teacher",teacherPersonId],["guardian",guardianPersonId]])
    expect(memberships.some(m=>m.role===role&&m.personId===personId),`Missing active ${role} demo membership`).toBe(true);
   const guardians=await db.select().from(guardianRelationships).where(and(

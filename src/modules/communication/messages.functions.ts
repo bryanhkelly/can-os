@@ -6,7 +6,8 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,asc,desc,eq,inArray } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 /**
@@ -72,6 +73,26 @@ async function listAllowedThreadContacts(
   };
 
   if (role === "guardian") {
+    // Application ownership gives the verified parent a school admissions
+    // contact even before a student has an active class or guardian record.
+    const admissionsContacts = await db.select({
+      personId:s.accountPersonGrants.personId, schoolName:s.programs.name,
+    }).from(s.applications)
+      .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+      .innerJoin(s.accountPersonGrants,and(
+        eq(s.accountPersonGrants.organizationId,s.programs.organizationId),
+        or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,s.programs.siteId)),
+        eq(s.accountPersonGrants.role,"registrar"),eq(s.accountPersonGrants.active,true),
+        ))
+      .innerJoin(s.accessAccounts,and(eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
+        eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt)))
+      .innerJoin(s.people,and(eq(s.people.id,s.accountPersonGrants.personId),eq(s.people.active,true)))
+      .where(and(eq(s.applications.submittedByPersonId,actorPersonId),
+        inArray(s.programs.siteId,siteIds),inArray(s.programs.id,programIds)))
+      .limit(100);
+    for(const contact of admissionsContacts)
+      add(contact.personId,"admissions for "+contact.schoolName);
+
     const studentRows = await db
       .select({ studentPersonId: s.guardianRelationships.studentPersonId })
       .from(s.guardianRelationships)
@@ -81,12 +102,40 @@ async function listAllowedThreadContacts(
       .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
       .where(and(
         guardianRelationshipPredicate({ guardianPersonId: actorPersonId, access: "academic" }),
+        // A stray active Section seat after Program withdrawal is not a
+        // basis for showing the child's people in the family contact picker.
+        eq(s.enrollments.kind,"program"),
         eq(s.enrollments.status,"active"),
         inArray(s.programs.siteId,siteIds),
         inArray(s.programs.id,programIds),
       ));
     const studentIds = [...new Set(studentRows.map(row=>row.studentPersonId))];
     if (studentIds.length) {
+      // A parent's school contact must survive the handoff from admissions
+      // to active enrollment, even when the registrar created the application.
+      const schoolContacts = await db.select({
+        personId:s.accountPersonGrants.personId,schoolName:s.programs.name,
+      }).from(s.enrollments)
+        .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+        .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+        .innerJoin(s.accountPersonGrants,and(
+          eq(s.accountPersonGrants.organizationId,s.programs.organizationId),
+          or(isNull(s.accountPersonGrants.siteId),eq(s.accountPersonGrants.siteId,s.programs.siteId)),
+          eq(s.accountPersonGrants.role,"registrar"),eq(s.accountPersonGrants.active,true),
+          ))
+        .innerJoin(s.accessAccounts,and(
+          eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
+          eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt),
+        ))
+        .innerJoin(s.people,and(eq(s.people.id,s.accountPersonGrants.personId),eq(s.people.active,true)))
+        .where(and(
+          inArray(s.studentProfiles.personId,studentIds),
+          eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+          inArray(s.programs.siteId,siteIds),inArray(s.programs.id,programIds),
+        )).limit(100);
+      for(const contact of schoolContacts)
+        add(contact.personId,"school office for "+contact.schoolName);
+      const programSeat = alias(s.enrollments, "guardian_contact_program_enrollment");
       const teacherRows = await db
         .select({
           personId: s.sectionTeachers.personId,
@@ -98,6 +147,13 @@ async function listAllowedThreadContacts(
           eq(s.studentProfiles.id, s.enrollments.studentProfileId),
         )
         .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+        .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+        .innerJoin(programSeat,and(
+          eq(programSeat.studentProfileId,s.enrollments.studentProfileId),
+          eq(programSeat.kind,"program"),eq(programSeat.status,"active"),
+          eq(programSeat.programId,s.sections.programId),
+          eq(programSeat.schoolYearId,s.terms.schoolYearId),
+        ))
         .innerJoin(
           s.sectionTeachers,
           eq(s.sectionTeachers.sectionId, s.sections.id),
@@ -105,7 +161,12 @@ async function listAllowedThreadContacts(
         .where(
           and(
             inArray(s.studentProfiles.personId, studentIds),
+            eq(s.enrollments.kind, "section"),
             eq(s.enrollments.status, "active"),
+            eq(s.enrollments.programId,s.sections.programId),
+            eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+            eq(s.sections.active,true),
+            eq(s.sectionTeachers.role,"teacher"),
             inArray(s.sections.siteId,siteIds),
             inArray(s.sections.programId,programIds),
           ),

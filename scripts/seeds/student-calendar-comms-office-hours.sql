@@ -3,8 +3,12 @@ INSERT INTO people(id,legal_first_name,legal_last_name,preferred_name,metadata)
 VALUES('f3000000-0000-4000-8000-000000000007','Morgan','Example','Morgan','{"synthetic":true,"fixture":"student-calendar-comms-office-hours","role":"guardian"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 
-INSERT INTO guardian_relationships(id,guardian_person_id,student_person_id,relationship_label,can_view_academics)
-VALUES('f3000000-0000-4000-8000-000000000008','f3000000-0000-4000-8000-000000000007','f1000000-0000-4000-8000-000000000005','parent',true)
+-- can_manage_enrollment plus verified metadata let Morgan execute the
+-- manifest's declared /guardian/admission-offers interactions; unverified
+-- relationships stay locked out of enrollment management.
+INSERT INTO guardian_relationships(id,guardian_person_id,student_person_id,relationship_label,can_view_academics,can_manage_enrollment,metadata)
+VALUES('f3000000-0000-4000-8000-000000000008','f3000000-0000-4000-8000-000000000007','f1000000-0000-4000-8000-000000000005','parent',true,true,
+'{"synthetic":true,"fixture":"student-calendar-comms-office-hours","verification":"verified"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 -- Fully synthetic release fixtures. Idempotent and isolated by fixed IDs.
 INSERT INTO notifications(id,recipient_person_id,type,status,title,body,resource_type,resource_id)

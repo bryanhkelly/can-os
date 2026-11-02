@@ -3,11 +3,17 @@ import * as s from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import type { CommandContext } from "@/domain/command-context";
 import { isPassingGrade } from "@/domain/grade-scale-policy";
+import { requireAccessibleFirstLesson } from "@/domain/first-class-lesson";
+import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
+import { canAddStudentToSection } from "@/domain/section-registration-window";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray,sql } from "drizzle-orm";
 
+import { EventTypes } from "@/domain/event-types";
 export type EnrollmentTransaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type SectionPlacementInput={
  studentProfileId:string;sectionId:string;actor:CommandContext;source:string;
@@ -19,25 +25,42 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  // Staff and self-service registration share one site configuration lock.
  // Acquire BEFORE section FOR UPDATE to avoid inversion with staff attendance.
  const [sectionSite]=await tx.select({siteId:s.sections.siteId,
-  programId:s.sections.programId}).from(s.sections)
+  programId:s.sections.programId,organizationId:s.programs.organizationId})
+  .from(s.sections).innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
   .where(eq(s.sections.id,sectionId)).limit(1);
- if(!sectionSite || !actor.scope.programIds?.includes(sectionSite.programId) ||
-  (sectionSite.siteId!==null && !actor.scope.siteIds?.includes(sectionSite.siteId)))
+ if(!sectionSite || !actor.scope.organizationIds?.includes(sectionSite.organizationId) ||
+  (actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(sectionSite.programId)) ||
+  (actor.scope.siteIds!==undefined&&
+   (!sectionSite.siteId||!actor.scope.siteIds.includes(sectionSite.siteId))))
   throw new Error("Section outside authorized school and program scope");
  // Site-less online sections have no onsite attendance configuration to coordinate.
  if(sectionSite.siteId)await lockAttendanceConfigurationAtSite(tx,sectionSite.siteId);
  const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,
-  organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId})
+  organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId,
+  schoolYearTimezone:s.schoolYears.timezone,
+  curriculumStatus:s.courseTemplateVersions.status,
+  curriculum:s.courseTemplateVersions.curriculum})
   .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.terms.schoolYearId))
+  .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
   .where(and(eq(s.sections.id,sectionId),eq(s.sections.active,true)))
   .limit(1).for("update");
  if(!section)throw new Error("Section not active");
- if(!actor.scope.programIds?.includes(section.programId)||
-  !actor.scope.organizationIds?.includes(section.organizationId)||
-  (actor.scope.siteIds?.length&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
+ if(section.curriculumStatus!=="published")
+  throw new Error("Publish the instructional course version before placing students in this class");
+ requireAccessibleFirstLesson(section.curriculum);
+ // Active roster membership must land in a real, staffed instructional class,
+ // not a Section shell whose assigned teacher has no current school access.
+ const staffed=await verifiedTeacherSectionIds([sectionId],tx);
+ if(!staffed.has(sectionId))
+  throw new Error("Assign an active teacher with verified school access, qualifications and delivery coverage for the instructional term before placing a student in this class");
+ await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","curriculum","school_of_record"]);
+ if(!actor.scope.organizationIds?.includes(section.organizationId)||
+  (actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(section.programId))||
+  (actor.scope.siteIds!==undefined&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
   throw new Error("Section outside authorized scope");
  const lock="section-allocation:"+sectionId;
  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lock}))`);
@@ -53,13 +76,24 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
    eq(s.enrollments.status,"active"))).limit(1);
  if(already)return {enrollmentId:already.id,created:false};
  const policy=await getSectionRegistrationPolicy(sectionId,tx);
- const today=new Date().toISOString().slice(0,10);
+ const now=new Date();
+ // This Section is locked FOR UPDATE. Resolve the Site timezone separately
+ // instead of left-joining a nullable Site into PostgreSQL's locked query.
+ const [siteClock]=section.siteId?await tx.select({timezone:s.sites.timezone})
+  .from(s.sites).where(eq(s.sites.id,section.siteId)).limit(1):[];
+ if(section.siteId&&!siteClock)throw new Error("Section host Site missing");
+ const timezone=siteClock?.timezone??section.schoolYearTimezone;
+ const today=dateKeyInTimezone(now.toISOString(),timezone);
  if(today>policy.addDropEndsOn)throw new Error("Add/drop deadline has passed");
  const [rosterCount]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
   .where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active")));
  const total=rosterCount?.total??0;
- if(total>=policy.enrollmentCapacity)throw new Error("Section is full");
+ if(!canAddStudentToSection({
+  addDropEndsOn:policy.addDropEndsOn,
+  enrollmentCapacity:policy.enrollmentCapacity,
+  occupiedSeats:total,timezone,now,
+ }))throw new Error("Section is full");
  const current=await tx.select({id:s.enrollments.id,termId:s.sections.termId,
   code:s.sections.code,metadata:s.sections.metadata,template:s.sections.courseTemplateVersionId,
   sectionId:s.sections.id})
@@ -116,7 +150,8 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   const guardian=await tx.select({personId:s.guardianRelationships.guardianPersonId})
    .from(s.guardianRelationships).where(and(
     eq(s.guardianRelationships.studentPersonId,student.personId),
-    eq(s.guardianRelationships.canViewAcademics,true)));
+    eq(s.guardianRelationships.canViewAcademics,true),
+    sql`${s.guardianRelationships.metadata}->>'verification' = 'verified'`));
   const recipients=[...new Set([student.personId,...guardian.map(g=>g.personId)])];
   if(recipients.length)await notifyMany(tx, recipients.map(recipientPersonId=>({
    recipientPersonId,type:"course_placement",status:"unread" as const,
@@ -124,7 +159,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
    resourceType:"section",resourceId:sectionId,
   })));
  }
- await emitEvent(tx, {eventType:"SectionEnrollmentActivated",
+ await emitEvent(tx, {eventType:EventTypes.SectionEnrollmentActivated,
   aggregateType:"enrollment",aggregateId:enrolled.id,actorPersonId:actor.actorPersonId,
   payload:{studentProfileId,sectionId,programId:section.programId,
    applicationId:input.applicationId??null,requestId:input.requestId??null}});

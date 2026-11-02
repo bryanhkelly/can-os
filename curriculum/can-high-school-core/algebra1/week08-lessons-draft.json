@@ -1,0 +1,340 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u02",
+  "week": 8,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "title": "Functions unit review and transfer",
+  "lessons": [
+    {
+      "id": "u02-w08-d01",
+      "title": "Week 8 · Day 1 · Reconcile function definitions across representations",
+      "body": "CAN Algebra I | Unit 2 | Week 8 Day 1\nObjective: Reconcile function definitions across representations. Standards F-IF.1, F-IF.4, F-IF.6. Prerequisites: Weeks 5–7 function definitions, notation, graphs, domain, range and rate.\n\nRetrieve and diagnose (5 min)\nBefore calculating, identify the function concept and a potential error: Classify {(−2,5),(0,5),(2,5)}.\n\nWorked concept and model (12 min)\nA relation is a function only if each input maps to exactly one output. A table (1,3),(2,3),(1,4) fails because input 1 maps to 3 and 4; a graph fails the vertical-line test at x=1. Shared output 3 does not cause failure.\nLearning objective: Reconcile function definitions across representations. Check the worked conclusion against the original function definition and context.\n\nDiscuss and justify (12 min)\n1. Classify {(−2,5),(0,5),(2,5)}. Explain the choice of representation and justify your result.\n2. Classify {(3,1),(3,2),(4,1)}. Explain the choice of representation and justify your result.\n\nIndependent evidence (16 min)\n1. Give domain and range of {(1,2),(2,2),(4,6)}. Show calculations, constraints and a verification step.\n2. Find f(−3) if f(x)=2x+5. Show calculations, constraints and a verification step.\n3. Explain why (2,3),(3,3) can belong to a function. Show calculations, constraints and a verification step.\n\nExit ticket (5 min)\nIs {(0,0),(1,1),(0,2)} a function? Why? Include a written reason or a valid numerical check.\n\nHomework and correction (5 min)\nCreate a different numerical example of reconcile function definitions across representations, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.\n\nAccessibility and differentiation: provide large-print input/output tables, text alternatives to plotted graphs, an annotated numerator/denominator organizer, oral response with transcription when permitted, and extra processing time under individual plans. For extension, construct a counterexample to an overgeneralization.",
+      "resources": [],
+      "learningTargets": [
+        "Reconcile function definitions across representations",
+        "I can justify and check a function conclusion in more than one representation."
+      ],
+      "standards": [
+        "F-IF.1",
+        "F-IF.4",
+        "F-IF.6"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w08-d01-a1",
+          "kind": "launch",
+          "title": "Retrieve and diagnose",
+          "instructions": "Before calculating, identify the function concept and a potential error: Classify {(−2,5),(0,5),(2,5)}.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d01-a2",
+          "kind": "instruction",
+          "title": "Worked concept and model",
+          "instructions": "A relation is a function only if each input maps to exactly one output. A table (1,3),(2,3),(1,4) fails because input 1 maps to 3 and 4; a graph fails the vertical-line test at x=1. Shared output 3 does not cause failure.\nLearning objective: Reconcile function definitions across representations. Check the worked conclusion against the original function definition and context.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d01-a3",
+          "kind": "guided_practice",
+          "title": "Discuss and justify",
+          "instructions": "1. Classify {(−2,5),(0,5),(2,5)}. Explain the choice of representation and justify your result.\n2. Classify {(3,1),(3,2),(4,1)}. Explain the choice of representation and justify your result.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d01-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. Give domain and range of {(1,2),(2,2),(4,6)}. Show calculations, constraints and a verification step.\n2. Find f(−3) if f(x)=2x+5. Show calculations, constraints and a verification step.\n3. Explain why (2,3),(3,3) can belong to a function. Show calculations, constraints and a verification step.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d01-a5",
+          "kind": "exit_ticket",
+          "title": "Exit ticket",
+          "instructions": "Is {(0,0),(1,1),(0,2)} a function? Why? Include a written reason or a valid numerical check.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w08-d01-a6",
+          "kind": "reflection",
+          "title": "Homework and correction",
+          "instructions": "Create a different numerical example of reconcile function definitions across representations, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w08-d02",
+      "title": "Week 8 · Day 2 · Evaluate functions and solve for an input",
+      "body": "CAN Algebra I | Unit 2 | Week 8 Day 2\nObjective: Evaluate functions and solve for an input. Standards F-IF.1, F-IF.4, F-IF.6. Prerequisites: Weeks 5–7 function definitions, notation, graphs, domain, range and rate.\n\nRetrieve and diagnose (5 min)\nBefore calculating, identify the function concept and a potential error: For g(x)=3x+2, find g(−2).\n\nWorked concept and model (12 min)\nFunction evaluation substitutes an input; solving f(x)=k asks which input gives output k. For f(x)=4x−7, f(3)=5; to find f(x)=9 solve 4x−7=9, so x=4. Distinguish f(4)=9 from the incorrect interpretation 4f=9.\nLearning objective: Evaluate functions and solve for an input. Check the worked conclusion against the original function definition and context.\n\nDiscuss and justify (12 min)\n1. For g(x)=3x+2, find g(−2). Explain the choice of representation and justify your result.\n2. Solve g(x)=17 for g(x)=3x+2. Explain the choice of representation and justify your result.\n\nIndependent evidence (16 min)\n1. For h(t)=t²−4t, find h(−1). Show calculations, constraints and a verification step.\n2. For p(x)=2x−8, solve p(x)=0. Show calculations, constraints and a verification step.\n3. Explain why f(2) is not the product f×2. Show calculations, constraints and a verification step.\n\nExit ticket (5 min)\nIf q(x)=5−2x, solve q(x)=−7. Include a written reason or a valid numerical check.\n\nHomework and correction (5 min)\nCreate a different numerical example of evaluate functions and solve for an input, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.\n\nAccessibility and differentiation: provide large-print input/output tables, text alternatives to plotted graphs, an annotated numerator/denominator organizer, oral response with transcription when permitted, and extra processing time under individual plans. For extension, construct a counterexample to an overgeneralization.",
+      "resources": [],
+      "learningTargets": [
+        "Evaluate functions and solve for an input",
+        "I can justify and check a function conclusion in more than one representation."
+      ],
+      "standards": [
+        "F-IF.1",
+        "F-IF.4",
+        "F-IF.6"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w08-d02-a1",
+          "kind": "launch",
+          "title": "Retrieve and diagnose",
+          "instructions": "Before calculating, identify the function concept and a potential error: For g(x)=3x+2, find g(−2).",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d02-a2",
+          "kind": "instruction",
+          "title": "Worked concept and model",
+          "instructions": "Function evaluation substitutes an input; solving f(x)=k asks which input gives output k. For f(x)=4x−7, f(3)=5; to find f(x)=9 solve 4x−7=9, so x=4. Distinguish f(4)=9 from the incorrect interpretation 4f=9.\nLearning objective: Evaluate functions and solve for an input. Check the worked conclusion against the original function definition and context.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d02-a3",
+          "kind": "guided_practice",
+          "title": "Discuss and justify",
+          "instructions": "1. For g(x)=3x+2, find g(−2). Explain the choice of representation and justify your result.\n2. Solve g(x)=17 for g(x)=3x+2. Explain the choice of representation and justify your result.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d02-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. For h(t)=t²−4t, find h(−1). Show calculations, constraints and a verification step.\n2. For p(x)=2x−8, solve p(x)=0. Show calculations, constraints and a verification step.\n3. Explain why f(2) is not the product f×2. Show calculations, constraints and a verification step.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d02-a5",
+          "kind": "exit_ticket",
+          "title": "Exit ticket",
+          "instructions": "If q(x)=5−2x, solve q(x)=−7. Include a written reason or a valid numerical check.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w08-d02-a6",
+          "kind": "reflection",
+          "title": "Homework and correction",
+          "instructions": "Create a different numerical example of evaluate functions and solve for an input, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w08-d03",
+      "title": "Week 8 · Day 3 · Constrain domains and ranges",
+      "body": "CAN Algebra I | Unit 2 | Week 8 Day 3\nObjective: Constrain domains and ranges. Standards F-IF.1, F-IF.4, F-IF.6. Prerequisites: Weeks 5–7 function definitions, notation, graphs, domain, range and rate.\n\nRetrieve and diagnose (5 min)\nBefore calculating, identify the function concept and a potential error: Find real domain of g(x)=6/(x+5).\n\nWorked concept and model (12 min)\nA rental company charges $18 per bike for up to 10 bikes: C(n)=18n, domain {0,1,…,10}, range {$0,$18,…,$180}. For f(x)=1/(x−2), the real domain excludes 2; context can restrict a formula more than algebra alone.\nLearning objective: Constrain domains and ranges. Check the worked conclusion against the original function definition and context.\n\nDiscuss and justify (12 min)\n1. Find real domain of g(x)=6/(x+5). Explain the choice of representation and justify your result.\n2. For 0≤t≤4 and V(t)=20−5t, give range. Explain the choice of representation and justify your result.\n\nIndependent evidence (16 min)\n1. A hall seats 25 people at $8 each. State domain and maximum revenue. Show calculations, constraints and a verification step.\n2. State real domain of √(x−3). Show calculations, constraints and a verification step.\n3. For x∈{−1,0,1}, find range of x²+2. Show calculations, constraints and a verification step.\n\nExit ticket (5 min)\nA car park has 40 spaces, $6 per car. Give revenue domain and range endpoints. Include a written reason or a valid numerical check.\n\nHomework and correction (5 min)\nCreate a different numerical example of constrain domains and ranges, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.\n\nAccessibility and differentiation: provide large-print input/output tables, text alternatives to plotted graphs, an annotated numerator/denominator organizer, oral response with transcription when permitted, and extra processing time under individual plans. For extension, construct a counterexample to an overgeneralization.",
+      "resources": [],
+      "learningTargets": [
+        "Constrain domains and ranges",
+        "I can justify and check a function conclusion in more than one representation."
+      ],
+      "standards": [
+        "F-IF.1",
+        "F-IF.4",
+        "F-IF.6"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w08-d03-a1",
+          "kind": "launch",
+          "title": "Retrieve and diagnose",
+          "instructions": "Before calculating, identify the function concept and a potential error: Find real domain of g(x)=6/(x+5).",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d03-a2",
+          "kind": "instruction",
+          "title": "Worked concept and model",
+          "instructions": "A rental company charges $18 per bike for up to 10 bikes: C(n)=18n, domain {0,1,…,10}, range {$0,$18,…,$180}. For f(x)=1/(x−2), the real domain excludes 2; context can restrict a formula more than algebra alone.\nLearning objective: Constrain domains and ranges. Check the worked conclusion against the original function definition and context.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d03-a3",
+          "kind": "guided_practice",
+          "title": "Discuss and justify",
+          "instructions": "1. Find real domain of g(x)=6/(x+5). Explain the choice of representation and justify your result.\n2. For 0≤t≤4 and V(t)=20−5t, give range. Explain the choice of representation and justify your result.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d03-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. A hall seats 25 people at $8 each. State domain and maximum revenue. Show calculations, constraints and a verification step.\n2. State real domain of √(x−3). Show calculations, constraints and a verification step.\n3. For x∈{−1,0,1}, find range of x²+2. Show calculations, constraints and a verification step.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d03-a5",
+          "kind": "exit_ticket",
+          "title": "Exit ticket",
+          "instructions": "A car park has 40 spaces, $6 per car. Give revenue domain and range endpoints. Include a written reason or a valid numerical check.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w08-d03-a6",
+          "kind": "reflection",
+          "title": "Homework and correction",
+          "instructions": "Create a different numerical example of constrain domains and ranges, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w08-d04",
+      "title": "Week 8 · Day 4 · Synthesize rate evidence and model critique",
+      "body": "CAN Algebra I | Unit 2 | Week 8 Day 4\nObjective: Synthesize rate evidence and model critique. Standards F-IF.1, F-IF.4, F-IF.6. Prerequisites: Weeks 5–7 function definitions, notation, graphs, domain, range and rate.\n\nRetrieve and diagnose (5 min)\nBefore calculating, identify the function concept and a potential error: For f(x)=3x+4, find rate over [1,4].\n\nWorked concept and model (12 min)\nA table (0,12),(2,20),(5,35) has average rate (20−12)/2=4 over [0,2], and (35−20)/3=5 over [2,5]. Its changing rate does not support a single exact linear rule. The overall average rate (35−12)/5=4.6 is an endpoint summary, not a constant weekly change.\nLearning objective: Synthesize rate evidence and model critique. Check the worked conclusion against the original function definition and context.\n\nDiscuss and justify (12 min)\n1. For f(x)=3x+4, find rate over [1,4]. Explain the choice of representation and justify your result.\n2. For g(x)=x², compare rates on [0,2] and [2,4]. Explain the choice of representation and justify your result.\n\nIndependent evidence (16 min)\n1. Table (0,5),(3,14),(6,23): constant rate? Show calculations, constraints and a verification step.\n2. Table (0,5),(2,13),(5,19): constant rate? Show calculations, constraints and a verification step.\n3. Explain why extrapolation beyond observed data is uncertain. Show calculations, constraints and a verification step.\n\nExit ticket (5 min)\nA tank falls from 70 L at t=2 to 46 L at t=8. Average rate? Include a written reason or a valid numerical check.\n\nHomework and correction (5 min)\nCreate a different numerical example of synthesize rate evidence and model critique, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.\n\nAccessibility and differentiation: provide large-print input/output tables, text alternatives to plotted graphs, an annotated numerator/denominator organizer, oral response with transcription when permitted, and extra processing time under individual plans. For extension, construct a counterexample to an overgeneralization.",
+      "resources": [],
+      "learningTargets": [
+        "Synthesize rate evidence and model critique",
+        "I can justify and check a function conclusion in more than one representation."
+      ],
+      "standards": [
+        "F-IF.1",
+        "F-IF.4",
+        "F-IF.6"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w08-d04-a1",
+          "kind": "launch",
+          "title": "Retrieve and diagnose",
+          "instructions": "Before calculating, identify the function concept and a potential error: For f(x)=3x+4, find rate over [1,4].",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d04-a2",
+          "kind": "instruction",
+          "title": "Worked concept and model",
+          "instructions": "A table (0,12),(2,20),(5,35) has average rate (20−12)/2=4 over [0,2], and (35−20)/3=5 over [2,5]. Its changing rate does not support a single exact linear rule. The overall average rate (35−12)/5=4.6 is an endpoint summary, not a constant weekly change.\nLearning objective: Synthesize rate evidence and model critique. Check the worked conclusion against the original function definition and context.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d04-a3",
+          "kind": "guided_practice",
+          "title": "Discuss and justify",
+          "instructions": "1. For f(x)=3x+4, find rate over [1,4]. Explain the choice of representation and justify your result.\n2. For g(x)=x², compare rates on [0,2] and [2,4]. Explain the choice of representation and justify your result.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d04-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. Table (0,5),(3,14),(6,23): constant rate? Show calculations, constraints and a verification step.\n2. Table (0,5),(2,13),(5,19): constant rate? Show calculations, constraints and a verification step.\n3. Explain why extrapolation beyond observed data is uncertain. Show calculations, constraints and a verification step.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d04-a5",
+          "kind": "exit_ticket",
+          "title": "Exit ticket",
+          "instructions": "A tank falls from 70 L at t=2 to 46 L at t=8. Average rate? Include a written reason or a valid numerical check.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w08-d04-a6",
+          "kind": "reflection",
+          "title": "Homework and correction",
+          "instructions": "Create a different numerical example of synthesize rate evidence and model critique, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u02-w08-d05",
+      "title": "Week 8 · Day 5 · Independent unit transfer and correction",
+      "body": "CAN Algebra I | Unit 2 | Week 8 Day 5\nObjective: Independent unit transfer and correction. Standards F-IF.1, F-IF.4, F-IF.6. Prerequisites: Weeks 5–7 function definitions, notation, graphs, domain, range and rate.\n\nRetrieve and diagnose (5 min)\nBefore calculating, identify the function concept and a potential error: For f(x)=2x+9, find f(4) and rate.\n\nWorked concept and model (12 min)\nA mobile clinic charges $25 to start and $12 per visit. C(v)=25+12v for integer visits v from 0 to 8. C(3)=61 dollars. A table entry (3,73) is incorrect; 25+12(3)=61. The average rate is $12 per visit and the range is $25,$37,…,$121. A correction should identify the mistaken substitution and verify a new row.\nLearning objective: Independent unit transfer and correction. Check the worked conclusion against the original function definition and context.\n\nDiscuss and justify (12 min)\n1. For f(x)=2x+9, find f(4) and rate. Explain the choice of representation and justify your result.\n2. Does {(1,4),(2,4),(3,5)} define a function? Explain the choice of representation and justify your result.\n\nIndependent evidence (16 min)\n1. For h(x)=3x−2, evaluate h(−2). Show calculations, constraints and a verification step.\n2. For g(x)=x², average rate over [1,3]? Show calculations, constraints and a verification step.\n3. A shuttle holds 12 riders and charges $7 each. State feasible domain and R(5). Show calculations, constraints and a verification step.\n4. Correct a claim that {(1,2),(1,3)} is a function. Show calculations, constraints and a verification step.\n\nExit ticket (5 min)\nExplain one difference between domain and range in a real-world function. Include a written reason or a valid numerical check.\n\nHomework and correction (5 min)\nCreate a different numerical example of independent unit transfer and correction, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.\n\nAccessibility and differentiation: provide large-print input/output tables, text alternatives to plotted graphs, an annotated numerator/denominator organizer, oral response with transcription when permitted, and extra processing time under individual plans. For extension, construct a counterexample to an overgeneralization.",
+      "resources": [],
+      "learningTargets": [
+        "Independent unit transfer and correction",
+        "I can justify and check a function conclusion in more than one representation."
+      ],
+      "standards": [
+        "F-IF.1",
+        "F-IF.4",
+        "F-IF.6"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u02-w08-d05-a1",
+          "kind": "launch",
+          "title": "Retrieve and diagnose",
+          "instructions": "Before calculating, identify the function concept and a potential error: For f(x)=2x+9, find f(4) and rate.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d05-a2",
+          "kind": "instruction",
+          "title": "Worked concept and model",
+          "instructions": "A mobile clinic charges $25 to start and $12 per visit. C(v)=25+12v for integer visits v from 0 to 8. C(3)=61 dollars. A table entry (3,73) is incorrect; 25+12(3)=61. The average rate is $12 per visit and the range is $25,$37,…,$121. A correction should identify the mistaken substitution and verify a new row.\nLearning objective: Independent unit transfer and correction. Check the worked conclusion against the original function definition and context.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d05-a3",
+          "kind": "guided_practice",
+          "title": "Discuss and justify",
+          "instructions": "1. For f(x)=2x+9, find f(4) and rate. Explain the choice of representation and justify your result.\n2. Does {(1,4),(2,4),(3,5)} define a function? Explain the choice of representation and justify your result.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d05-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. For h(x)=3x−2, evaluate h(−2). Show calculations, constraints and a verification step.\n2. For g(x)=x², average rate over [1,3]? Show calculations, constraints and a verification step.\n3. A shuttle holds 12 riders and charges $7 each. State feasible domain and R(5). Show calculations, constraints and a verification step.\n4. Correct a claim that {(1,2),(1,3)} is a function. Show calculations, constraints and a verification step.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u02-w08-d05-a5",
+          "kind": "exit_ticket",
+          "title": "Exit ticket",
+          "instructions": "Explain one difference between domain and range in a real-world function. Include a written reason or a valid numerical check.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u02-w08-d05-a6",
+          "kind": "reflection",
+          "title": "Homework and correction",
+          "instructions": "Create a different numerical example of independent unit transfer and correction, work it independently, and explain one misconception that would produce a wrong answer. Revisit the exit ticket using teacher feedback without viewing protected answers.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    }
+  ]
+}

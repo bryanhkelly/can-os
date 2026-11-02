@@ -1,14 +1,20 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach,describe,expect,it,vi } from "vitest";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
-import { closeStaleAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
+import { closeStaleAttendanceExcuse, listGuardianEffectiveAbsences } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
 const state=vi.hoisted(()=>({
  actor:{role:"registrar",actorPersonId:"registrar",capabilities:new Set(["attendance.excuse.review"]),
   scope:{siteIds:["site"],programIds:["program"],organizationIds:["organization"]}},
- close:vi.fn(),
+ close:vi.fn(),rows:[] as unknown[][],
 }));
-vi.mock("@/db/client",()=>({db:{}}));
+vi.mock("@/db/client",()=>({db:{select:()=>{
+ const rows=state.rows.shift()??[];
+ const query:Record<string,unknown>={};
+ for(const method of ["from","innerJoin","where"])query[method]=()=>query;
+ query.then=(resolve:(value:unknown)=>unknown)=>Promise.resolve(rows).then(resolve);
+ return query;
+}}}));
 vi.mock("@/modules/attendance/attendance-service",()=>({
  closeObsoleteAttendanceExcuse:state.close,recordAttendanceRevision:vi.fn(),
  submitAttendanceExcuse:vi.fn(),reviewAttendanceExcuse:vi.fn(),
@@ -16,6 +22,7 @@ vi.mock("@/modules/attendance/attendance-service",()=>({
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>state.actor}));
 vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost"),setResponseHeader:vi.fn()}));
 vi.mock("@tanstack/react-start",()=>({
+ createServerOnlyFn:(callback:unknown)=>callback,
  createServerFn:()=>({
   parse:(input:unknown)=>input,
   validator(parse:(input:unknown)=>unknown){this.parse=parse;return this;},
@@ -33,6 +40,14 @@ describe("obsolete attendance excuse closure boundary",()=>{
   state.actor.role="registrar";
   state.actor.capabilities=new Set(["attendance.excuse.review"]);
   state.close.mockResolvedValue({excuseId:input.excuseId});
+ });
+ it("loads the verified guardian's absence view without a missing relationship-policy function",async()=>{
+  state.actor.role="guardian";
+  state.actor.capabilities=new Set(["attendance.excuse.submit"]);
+  state.rows=[[{studentPersonId:"student",firstName:"Jordan",lastName:"Learner",preferredName:null}],
+    [{id:"profile",personId:"student"}],[]];
+  await expect(listGuardianEffectiveAbsences({data:{}})).resolves.toEqual({absences:[]});
+  expect(state.rows).toHaveLength(0);
  });
  it("requires a bounded guardian-visible reason and explicit confirmation in the real form",()=>{
   const html=renderToStaticMarkup(<ObsoleteExcuseClosure excuse={{excuseId:input.excuseId,

@@ -1,0 +1,77 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u02",
+  "week": 7,
+  "readiness": "teacher_review_required",
+  "visibility": "publisher_draft",
+  "assessments": [
+    {
+      "key": "algebra1-u02-w07-formative",
+      "title": "Week 7 average-rate formative reasoning",
+      "pointsPossible": 20,
+      "status": "draft",
+      "formative": true,
+      "instructions": "Independently show a complete difference quotient, units and interpretation for each 5-point item. 1: A runner travels 3 miles at 20 minutes and 9 miles at 80 minutes. Find average speed in miles/hour. 2: For f(x)=x², calculate average rate from x=1 to x=4. 3: A tank falls from 80 L at minute 2 to 56 L at minute 8. Interpret average rate. 4: A table is (0,4),(2,8),(5,23). Compare average rates on intervals [0,2] and [2,5] and explain if constant.",
+      "rubricCriteria": [
+        {
+          "id": "speed",
+          "label": "Two-point speed and unit conversion",
+          "maxPoints": 5,
+          "description": "Correct signed quotient, conversion and contextual units."
+        },
+        {
+          "id": "nonlinear",
+          "label": "Nonlinear interval rate",
+          "maxPoints": 5,
+          "description": "Correct evaluation at endpoints and quotient."
+        },
+        {
+          "id": "decrease",
+          "label": "Negative rate interpretation",
+          "maxPoints": 5,
+          "description": "Correct signed rate and interpretive sentence."
+        },
+        {
+          "id": "compare",
+          "label": "Interval comparison",
+          "maxPoints": 5,
+          "description": "Correct distinct interval calculations and conclusion."
+        }
+      ]
+    },
+    {
+      "key": "algebra1-u02-w07-mastery",
+      "title": "Week 7 transfer and cumulative rate checkpoint",
+      "pointsPossible": 20,
+      "status": "draft",
+      "formative": false,
+      "instructions": "Work independently. 1 (5): Compute average rate from (1,12) to (5,36) with units if x is weeks and y is dollars. 2 (5): For g(x)=x²+1 find average rate on [2,5]. 3 (5): A battery falls from 90% to 54% in 6 hours; give the average change in percentage points/hour. 4 (5): Explain using two intervals whether h(t)=4t+10 has constant rate and identify its initial value.",
+      "rubricCriteria": [
+        {
+          "id": "points",
+          "label": "Ordered-pair rate and units",
+          "maxPoints": 5,
+          "description": "Appropriate quotient and units."
+        },
+        {
+          "id": "quadratic",
+          "label": "Nonlinear evaluation",
+          "maxPoints": 5,
+          "description": "Correct endpoint values and average change."
+        },
+        {
+          "id": "battery",
+          "label": "Signed change with interpretation",
+          "maxPoints": 5,
+          "description": "Correct negative rate and percentage-point units."
+        },
+        {
+          "id": "linear",
+          "label": "Linear rate comparison and initial value",
+          "maxPoints": 5,
+          "description": "Two interval calculations, constant-rate claim and initial value."
+        }
+      ]
+    }
+  ]
+}

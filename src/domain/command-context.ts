@@ -10,7 +10,8 @@ export type CommandContext = {
   capabilities: ReadonlySet<string>;
   scope: AuthorizationScope;
   requestId?: string;
-  demoFacilitator?: { accountId: string; personId: string; sourceAccountId: string };
+  /** Set only by verified demo-admin delegation; never grants domain authority. */
+  sessionAccountId?: string;
 };
 
 export class AuthorizationError extends Error {

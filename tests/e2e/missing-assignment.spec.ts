@@ -8,21 +8,19 @@
  * (secret hashed with CAN_ACCESS_TOKEN_PEPPER) injected as the session cookie —
  * there is no app backdoor.
  */
-import {
-  expect,
-  test,
-  type Browser,
-  type BrowserContext,
-  type Page,
-} from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 import {
-  accessSessionCookie,
   createGf1Fixture,
   destroyGf1Fixture,
   type Gf1Fixture,
   type Sql,
 } from "./fixture";
+import { withAuthenticatedPage } from "./helpers/authenticated-persona";
+import {
+  expectAuditActionGroups,
+  expectNotification,
+} from "./helpers/evidence-assertions";
 import { DATABASE_URL, TEST_JOB_SECRET, baseURL } from "./env";
 
 let sql: Sql;
@@ -42,32 +40,6 @@ async function getSubmission(): Promise<SubmissionRow> {
   const row = rows[0];
   if (!row) throw new Error("Fixture submission row is missing");
   return row;
-}
-
-/** Signs in a browser context by injecting the app session cookie. */
-async function signIn(context: BrowserContext, secret: string): Promise<void> {
-  // __Host- cookie: must be Secure, Path=/, and set without a Domain attribute.
-  // Chromium accepts Secure cookies on http://localhost (a trustworthy origin).
-  await context.addCookies([
-    {
-      name: accessSessionCookie,
-      value: secret,
-      url: baseURL,
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-    },
-  ]);
-}
-
-async function newSignedInPage(
-  browser: Browser,
-  secret: string,
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL });
-  await signIn(context, secret);
-  return { context, page: await context.newPage() };
 }
 
 test.beforeAll(async () => {
@@ -112,23 +84,14 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
   await test.step("guardian is notified about the missing assignment", async () => {
     // The AssignmentBecameMissing domain-event handler notifies the student,
     // guardians with canViewAcademics, and section teachers.
-    await expect
-      .poll(
-        async () => {
-          const rows = (await sql.query(
-            `select id from notifications
-             where recipient_person_id = $1 and type = 'missing_assignment' and resource_id = $2`,
-            [fixture.guardianPersonId, fixture.submissionId],
-          )) as Array<{ id: string }>;
-          return rows.length;
-        },
-        { timeout: 15_000 },
-      )
-      .toBeGreaterThanOrEqual(1);
+    await expectNotification(sql, {
+      recipientPersonId: fixture.guardianPersonId,
+      type: "missing_assignment",
+      resourceId: fixture.submissionId,
+    });
   });
 
-  const guardian = await newSignedInPage(browser, fixture.guardianSecret);
-  try {
+  await withAuthenticatedPage(browser, fixture.guardianSecret, async guardian => {
     await test.step("guardian sees the same missing assignment in academic progress", async () => {
       await guardian.page.goto("/guardian/academics");
       await expect(
@@ -137,12 +100,9 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
       await expect(guardian.page.getByText(fixture.assessmentTitle)).toBeVisible();
       await expect(guardian.page.getByText(/missing/i)).toBeVisible();
     });
-  } finally {
-    await guardian.context.close();
-  }
+  });
 
-  const specialist = await newSignedInPage(browser, fixture.specialistSecret);
-  try {
+  await withAuthenticatedPage(browser, fixture.specialistSecret, async specialist => {
     await test.step("specialist caseload receives the intervention insight", async () => {
       await specialist.page.goto("/coach");
       await expect(
@@ -153,12 +113,9 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
       ).toBeVisible();
       await expect(specialist.page.getByText(/1 insight/)).toBeVisible();
     });
-  } finally {
-    await specialist.context.close();
-  }
+  });
 
-  const teacher = await newSignedInPage(browser, fixture.teacherSecret);
-  try {
+  await withAuthenticatedPage(browser, fixture.teacherSecret, async teacher => {
     await test.step("teacher sees the missing work in the queue", async () => {
       await teacher.page.goto("/teacher/missing-work");
       await expect(
@@ -168,55 +125,43 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
         teacher.page.getByRole("heading", { name: fixture.assessmentTitle }),
       ).toBeVisible();
     });
-  } finally {
-    await teacher.context.close();
-  }
+  });
 
-  const student = await newSignedInPage(browser, fixture.studentSecret);
-  try {
+  await withAuthenticatedPage(browser, fixture.studentSecret, async student => {
     await test.step("student submits the assignment late via the UI", async () => {
       await student.page.goto("/student/assignments");
       await expect(
-        student.page.getByRole("heading", { name: "Your learning work." }),
+        student.page.getByRole("heading", { name: "Your assignments" }),
       ).toBeVisible();
 
       await student.page
-        .getByRole("button", { name: fixture.assessmentTitle })
+        .getByRole("link", { name: fixture.assessmentTitle })
         .click();
       await student.page
         .getByPlaceholder("Write your response…")
         .fill("Here is my late submission for the problem set.");
-      await student.page.getByRole("button", { name: "Submit work" }).click();
+      await student.page.getByRole("button", { name: "Submit assignment" }).click();
 
       await expect(
-        student.page.getByText("Your work has been submitted to Neon."),
-      ).toBeVisible();
-      await expect(
-        student.page.getByText(
-          "Submitted successfully. Your teacher can review your work.",
-        ),
+        student.page.getByText("Your assignment has been submitted."),
       ).toBeVisible();
 
       const after = await getSubmission();
       expect(after.status).toBe("submitted");
       expect(after.timeliness).toBe("late");
     });
-  } finally {
-    await student.context.close();
-  }
+  });
 
   await test.step("teacher grades the late submission in the real gradebook UI", async () => {
-    const teacherGradebook = await newSignedInPage(browser, fixture.teacherSecret);
-    try {
-      await teacherGradebook.page.goto("/teacher/gradebook");
+    await withAuthenticatedPage(browser, fixture.teacherSecret, async teacherGradebook => {
+      // Deep-link straight into the grading panel for this student and
+      // assessment, the same pattern the Algebra I classroom flow uses.
+      await teacherGradebook.page.goto(
+        `/teacher/gradebook?section=${fixture.sectionId}&assessment=${fixture.assessmentId}&student=${fixture.studentProfileId}`,
+      );
       await expect(
-        teacherGradebook.page.getByRole("heading", { name: "Gradebook" }),
+        teacherGradebook.page.getByRole("heading", { name: new RegExp(fixture.assessmentTitle) }),
       ).toBeVisible();
-
-      const studentRow = teacherGradebook.page.getByRole("row", {
-        name: new RegExp(`Jordan Student-${fixture.suffix}`),
-      });
-      await studentRow.getByRole("button", { name: /Open grading/ }).click();
       await teacherGradebook.page.getByLabel(/Score/).fill("88");
       await teacherGradebook.page
         .getByLabel("Feedback comment")
@@ -229,9 +174,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
       const graded = await getSubmission();
       expect(graded.timeliness).toBe("late");
       expect(Number(graded.score)).toBe(88);
-    } finally {
-      await teacherGradebook.context.close();
-    }
+    });
   });
 
   await test.step("grade event is processed into a guardian notification", async () => {
@@ -240,48 +183,38 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     });
     expect(response.ok()).toBe(true);
 
-    await expect
-      .poll(async () => {
-        const rows = (await sql.query(
-          `select id from notifications
-           where recipient_person_id = $1 and type = 'grade_posted' and resource_id = $2`,
-          [fixture.guardianPersonId, fixture.submissionId],
-        )) as Array<{ id: string }>;
-        return rows.length;
-      })
-      .toBeGreaterThanOrEqual(1);
+    await expectNotification(sql, {
+      recipientPersonId: fixture.guardianPersonId,
+      type: "grade_posted",
+      resourceId: fixture.submissionId,
+    });
   });
 
   await test.step("submit and grade wrote immutable audit events", async () => {
-    const rows = (await sql.query(
-      `select action from audit_events
-       where resource_type = 'submission' and resource_id = $1
-         and action in ('assignment.submit', 'assignment.grade', 'submission.submit', 'submission.grade')`,
-      [fixture.submissionId],
-    )) as Array<{ action: string }>;
-    const actions = new Set(rows.map((row) => row.action));
-    expect(actions.has("submission.submit") || actions.has("assignment.submit")).toBe(true);
-    expect(actions.has("submission.grade") || actions.has("assignment.grade")).toBe(true);
+    await expectAuditActionGroups(sql, {
+      resourceType: "submission",
+      resourceIds: [fixture.submissionId],
+      groups: [
+        ["assignment.submit", "submission.submit"],
+        ["assignment.grade", "submission.grade"],
+      ],
+    });
   });
 
-  const guardianAgain = await newSignedInPage(browser, fixture.guardianSecret);
-  try {
+  await withAuthenticatedPage(browser, fixture.guardianSecret, async guardianAgain => {
     await test.step("guardian sees the posted grade and feedback from canonical data", async () => {
       await guardianAgain.page.goto("/guardian/academics");
       const card = guardianAgain.page.getByRole("heading", { name: fixture.assessmentTitle }).locator("..").locator("..");
       await expect(card.getByText(/Grade:\s*88\s*\/\s*100/)).toBeVisible();
       await expect(card.getByText(/Good recovery/)).toBeVisible();
     });
-  } finally {
-    await guardianAgain.context.close();
-  }
+  });
 
-  const studentAgain = await newSignedInPage(browser, fixture.studentSecret);
-  try {
+  await withAuthenticatedPage(browser, fixture.studentSecret, async studentAgain => {
     await test.step("student sees the posted grade and feedback", async () => {
       await studentAgain.page.goto("/student/assignments");
       await studentAgain.page
-        .getByRole("button", { name: fixture.assessmentTitle })
+        .getByRole("link", { name: fixture.assessmentTitle })
         .click();
       await expect(
         studentAgain.page.getByText(/Score:\s*88/),
@@ -290,7 +223,5 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
         studentAgain.page.getByText(/Good recovery/),
       ).toBeVisible();
     });
-  } finally {
-    await studentAgain.context.close();
-  }
+  });
 });

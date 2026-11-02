@@ -101,7 +101,6 @@ export const programs = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "restrict" }),
     creditIssuingOrganizationId: uuid("credit_issuing_organization_id")
-      .notNull()
       .references(() => organizations.id, { onDelete: "restrict" }),
     accreditationAuthorityOrganizationId: uuid(
       "accreditation_authority_organization_id",

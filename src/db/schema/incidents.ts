@@ -145,9 +145,17 @@ export const incidentEvidence = pgTable(
     addedByPersonId: uuid("added_by_person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
+    idempotencyKey: text("idempotency_key"),
     createdAt: createdAt(),
   },
-  (table) => [index("incident_evidence_incident_idx").on(table.incidentId)],
+  (table) => [
+    index("incident_evidence_incident_idx").on(table.incidentId),
+    uniqueIndex("incident_evidence_actor_idempotency_uq").on(
+      table.incidentId,
+      table.addedByPersonId,
+      table.idempotencyKey,
+    ),
+  ],
 );
 
 export const incidentAmendments = pgTable(

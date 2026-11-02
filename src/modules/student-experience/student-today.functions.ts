@@ -6,6 +6,7 @@ import { studentProfiles } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { getStudentToday } from "./student-today.server";
+import { readFirstClassrooms } from "@/modules/learning/first-classroom.server";
 
 /** Do not accept a student ID from the browser. The session defines the learner. */
 export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async () => {
@@ -22,6 +23,8 @@ export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async
   const [membership] = await db.select({ id: enrollments.id }).from(enrollments)
     .innerJoin(programs, eq(programs.id, enrollments.programId))
     .where(and(eq(enrollments.studentProfileId, profile.id),
+      // A surviving Section record does not reauthorize a withdrawn Program.
+      eq(enrollments.kind,"program"),
       eq(enrollments.status, "active"),
       inArray(enrollments.programId,context.scope.programIds??[]),
       inArray(programs.siteId, context.scope.siteIds))).limit(1);
@@ -32,6 +35,7 @@ export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async
   });
   return {
     ...snapshot,
+    firstWeek: await readFirstClassrooms(snapshot.sections.map(section => section.sectionId)),
     coursework: snapshot.coursework.map(({ feedback, response, ...item }) => item),
     recoveryCandidates: snapshot.recoveryCandidates.map(({ feedback, response, ...item }) => item),
   };

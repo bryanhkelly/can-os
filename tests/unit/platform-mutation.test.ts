@@ -110,6 +110,23 @@ describe("writeAudit", () => {
     });
   });
 
+  it("attributes authenticated generic mutations without letting caller extras spoof verified identity", async () => {
+    const { tx, calls } = makeFakeTx();
+    await writeAudit(tx, {
+      ...context, accountId: "account-1", sessionId: "session-1",
+      grantId: "grant-1", role: "teacher",
+    }, {
+      action: "classroom.assignment.grade", entityType: "submission",
+      entityId: "submission-1",
+      contextExtras: { accountId: "spoofed", sessionId: "spoofed",
+        grantId: "spoofed", role: "registrar", requestId: "spoofed", legitimate: true },
+    });
+    expect(calls[0]?.values).toMatchObject({
+      actorPersonId: "person-1",
+      context: { accountId: "account-1", sessionId: "session-1",
+        grantId: "grant-1", role: "teacher", requestId: "req-1", legitimate: true },
+    });
+  });
   it("defaults scope to {}, before/after to null and requestId to null", async () => {
     const { tx, calls } = makeFakeTx();
     await writeAudit(
@@ -127,6 +144,17 @@ describe("writeAudit", () => {
       after: null,
       context: { requestId: null },
     });
+  });
+  it("preserves a verified delegated session owner and rejects fabricated ownership",async()=>{
+    const {tx,calls}=makeFakeTx();
+    const change={action:"enrollment.apply",entityType:"application",entityId:"app",
+      contextExtras:{sessionAccountId:"spoofed"}};
+    await writeAudit(tx,{...context,sessionAccountId:"admin-owner"},change);
+    expect(calls[0]?.values).toMatchObject({context:{sessionAccountId:"admin-owner"}});
+    await writeAudit(tx,context,change);
+    expect(calls[1]?.values).toMatchObject({context:{requestId:"req-1"}});
+    expect((calls[1]?.values as {context:Record<string,unknown>}).context)
+      .not.toHaveProperty("sessionAccountId");
   });
 });
 

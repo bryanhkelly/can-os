@@ -5,7 +5,7 @@ import { actorSiteIds,recordAudit,requireActor,type ActorRole } from "@/modules/
 import { emitEvent } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,asc,eq,gte,inArray,isNull,lt,ne,notExists,or } from "drizzle-orm";
+import { and,asc,eq,gt,gte,inArray,isNull,lt,ne,notExists,or } from "drizzle-orm";
 import { z } from "zod";
 import { reviseCalendarEventForActor } from "./calendar-events.server";
 import { visibleStudyGroupCalendarEventIds } from "./group-calendar-visibility.server";
@@ -47,12 +47,8 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
   if (actor.role === "teacher") {
-    const rows = await db
-      .select({ sectionId: schema.sectionTeachers.sectionId })
-      .from(schema.sectionTeachers)
-      .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
-      .where(and(eq(schema.sectionTeachers.personId, actor.actorPersonId), inArray(schema.sections.siteId, sites), inArray(schema.sections.programId, actor.scope.programIds ?? [])));
-    return rows.map((row) => row.sectionId);
+    const { accessibleClasses } = await import("@/modules/learning/class-access.server");
+    return (await accessibleClasses(actor)).map(section=>section.id);
   }
   if (actor.role === "guardian") {
     const rows = await db
@@ -79,21 +75,12 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
   return [];
 }
 
-export const getCalendarMonth = createServerFn({ method: "GET" })
-  .validator((value: unknown) =>
-    z.object({
-      year: z.number().int().min(2000).max(2100),
-      month: z.number().int().min(1).max(12),
-    }).parse(value))
-  .handler(async ({ data }) => {
-    const actor = await requireActor(allRoles);
+async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>>, rangeStart: Date, rangeEnd: Date) {
     setResponseHeader("Cache-Control", "private, no-store");
     const viewerRole = actor.role as ActorRole;
-    if (!process.env.DATABASE_URL) return { connected: false, viewerRole, items: [] as CalendarFeedItem[] };
+    if (!process.env.DATABASE_URL) return { connected: false, viewerRole, items: [] as CalendarFeedItem[], truncated:false };
     const sites = actorSiteIds(actor);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-    const rangeStart = new Date(Date.UTC(data.year, data.month - 1, 1));
-    const rangeEnd = new Date(Date.UTC(data.year, data.month, 1));
 
     const sectionIds = await visibleSectionIds(db, schema, actor, sites);
     const visibleStudyGroupEventIds = await visibleStudyGroupCalendarEventIds(
@@ -125,7 +112,8 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         eq(schema.calendarEvents.scheduledOccurrenceId, schema.scheduledOccurrences.id),
       )
       .where(and(
-        gte(schema.scheduledOccurrences.startsAt, rangeStart),
+        or(gte(schema.scheduledOccurrences.startsAt, rangeStart),
+          gt(schema.scheduledOccurrences.endsAt, rangeStart)),
         lt(schema.scheduledOccurrences.startsAt, rangeEnd),
         or(
           and(inArray(schema.scheduledOccurrences.siteId, sites),
@@ -147,8 +135,8 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         ),
       ))
       .orderBy(asc(schema.scheduledOccurrences.startsAt))
-      .limit(200);
-    const calendarEvents = events.map(({ calendar_events: event, scheduled_occurrences: occurrence }) => ({
+      .limit(201);
+    const calendarEvents = events.slice(0,200).map(({ calendar_events: event, scheduled_occurrences: occurrence }) => ({
       ...event,
       startsAt: occurrence.startsAt,
       endsAt: occurrence.endsAt,
@@ -208,6 +196,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       };
     });
 
+    let deadlinesTruncated = false;
     if (sectionIds.length) {
       const dueRows = await db
         .select({
@@ -226,8 +215,9 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
           lt(schema.assessments.dueAt, rangeEnd),
         ))
         .orderBy(asc(schema.assessments.dueAt))
-        .limit(200);
-      for (const row of dueRows) {
+        .limit(201);
+      deadlinesTruncated = dueRows.length > 200;
+      for (const row of dueRows.slice(0, 200)) {
         if (!row.dueAt) continue;
         items.push({
           id: `assessment:${row.id}`,
@@ -246,8 +236,33 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
     }
 
     items.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-    return { connected: true, viewerRole, items };
-  });
+    return { connected: true, viewerRole, items, truncated:events.length>200 || deadlinesTruncated };
+  }
+
+export const getCalendarMonth = createServerFn({ method: "GET" })
+  .validator((value: unknown) =>
+    z.object({
+      year: z.number().int().min(2000).max(2100),
+      month: z.number().int().min(1).max(12),
+    }).parse(value))
+  .handler(async ({ data }) => readCalendarWindow(
+    await requireActor(allRoles),
+    new Date(Date.UTC(data.year, data.month - 1, 1)),
+    new Date(Date.UTC(data.year, data.month, 1)),
+  ));
+
+/** Bounded daily windows share the canonical month visibility policy. */
+export const getCalendarRange = createServerFn({ method:"GET" })
+  .validator((value:unknown)=>z.object({
+    startsAt:z.string().datetime({offset:true}),
+    endsAt:z.string().datetime({offset:true}),
+  }).strict().refine(input=>{
+    const duration=Date.parse(input.endsAt)-Date.parse(input.startsAt);
+    return duration>0 && duration<=3*24*60*60*1000;
+  },{message:"Calendar range must be positive and at most three days"}).parse(value))
+  .handler(async({data})=>readCalendarWindow(
+    await requireActor(allRoles),new Date(data.startsAt),new Date(data.endsAt),
+  ));
 
 export const createPersonalEvent = createServerFn({ method: "POST" })
   .validator((value: unknown) =>

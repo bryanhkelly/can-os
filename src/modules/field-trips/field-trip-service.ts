@@ -762,7 +762,7 @@ export async function getFieldTripSafetyPacket(
     assertProgramScope(context, chaperone.programId);
 
     const participantRows = await tx
-      .select({
+      .selectDistinct({
         participantId: fieldTripParticipants.id,
         studentProfileId: fieldTripParticipants.studentProfileId,
         studentPersonId: studentProfiles.personId,
@@ -779,11 +779,33 @@ export async function getFieldTripSafetyPacket(
         eq(studentProfiles.id, fieldTripParticipants.studentProfileId),
       )
       .innerJoin(people, eq(people.id, studentProfiles.personId))
+      .innerJoin(consentRecords,and(
+        eq(consentRecords.id,fieldTripParticipants.consentRecordId),
+        eq(consentRecords.subjectType,"field_trip_participant"),
+        eq(consentRecords.subjectId,fieldTripParticipants.id),
+        eq(consentRecords.consentType,"field_trip_permission"),
+        isNull(consentRecords.revokedAt),
+      ))
+      .innerJoin(guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:consentRecords.signerPersonId,
+        studentPersonId:studentProfiles.personId,access:"enrollment",
+      }))
+      .innerJoin(enrollments,and(
+        eq(enrollments.studentProfileId,studentProfiles.id),
+        eq(enrollments.kind,"program"),
+        eq(enrollments.status,"active"),
+      ))
+      .innerJoin(programs,and(
+        eq(programs.id,enrollments.programId),
+        eq(programs.siteId,chaperone.siteId),
+      ))
       .leftJoin(
         healthProfiles,
         eq(healthProfiles.studentProfileId, fieldTripParticipants.studentProfileId),
       )
-      .where(eq(fieldTripParticipants.fieldTripId, fieldTripId));
+      .where(and(eq(fieldTripParticipants.fieldTripId, fieldTripId),
+        eq(fieldTripParticipants.status,"permission_complete"),
+        chaperone.programId?eq(enrollments.programId,chaperone.programId):undefined));
 
     const students = [];
     for (const row of participantRows) {
@@ -880,14 +902,52 @@ export async function recordFieldTripAttendance(
     if (existing) return existing.id;
 
     const [trip] = await tx
-      .select({ siteId: fieldTrips.siteId, programId: fieldTrips.programId })
+      .select({ siteId: fieldTrips.siteId, programId: fieldTrips.programId, status:fieldTrips.status })
       .from(fieldTrips)
       .where(eq(fieldTrips.id, input.fieldTripId))
+      .for("update")
       .limit(1);
 
     if (!trip) throw new Error("Field Trip not found");
     assertSiteScope(context, trip.siteId);
     assertProgramScope(context, trip.programId);
+
+    // The compatibility writer must never bypass parent consent or enrollment
+    // for boarding and return records.
+    if(input.status==="boarded"||input.status==="returned"){
+      if(trip.status!=="approved")throw new Error("The field trip is not approved");
+      const [participantLock]=await tx.select({id:fieldTripParticipants.id})
+       .from(fieldTripParticipants).where(and(
+        eq(fieldTripParticipants.fieldTripId,input.fieldTripId),
+        eq(fieldTripParticipants.studentProfileId,input.studentProfileId),
+       )).for("update").limit(1);
+      if(!participantLock)throw new AuthorizationError("current trip invitation");
+      const [permission]=await tx.select({id:fieldTripParticipants.id})
+       .from(fieldTripParticipants)
+       .innerJoin(studentProfiles,eq(studentProfiles.id,fieldTripParticipants.studentProfileId))
+       .innerJoin(consentRecords,and(
+        eq(consentRecords.id,fieldTripParticipants.consentRecordId),
+        eq(consentRecords.subjectType,"field_trip_participant"),
+        eq(consentRecords.subjectId,fieldTripParticipants.id),
+        eq(consentRecords.consentType,"field_trip_permission"),
+        isNull(consentRecords.revokedAt),
+       ))
+       .innerJoin(guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:consentRecords.signerPersonId,
+        studentPersonId:studentProfiles.personId,access:"enrollment",
+       }))
+       .where(and(eq(fieldTripParticipants.fieldTripId,input.fieldTripId),
+         eq(fieldTripParticipants.studentProfileId,input.studentProfileId),
+         eq(fieldTripParticipants.status,"permission_complete"))).limit(1);
+      if(!permission)throw new AuthorizationError("current verified field trip guardian permission");
+      const [enrolled]=await tx.select({id:enrollments.id})
+       .from(enrollments).innerJoin(programs,eq(programs.id,enrollments.programId))
+       .where(and(eq(enrollments.studentProfileId,input.studentProfileId),
+        eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
+        eq(programs.siteId,trip.siteId),
+        trip.programId?eq(enrollments.programId,trip.programId):undefined)).limit(1);
+      if(!enrolled)throw new AuthorizationError("current field trip school enrollment");
+    }
 
     const [record] = await tx
       .insert(fieldTripAttendance)

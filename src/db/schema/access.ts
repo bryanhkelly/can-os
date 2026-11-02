@@ -21,7 +21,6 @@ export const accountPersonGrants = pgTable("account_person_grants", {
  organizationId: uuid("organization_id"),
  siteId: uuid("site_id"),
  active: boolean("active").notNull().default(true),
- isSynthetic: boolean("is_synthetic").notNull().default(false),
  createdAt: createdAt(),
  updatedAt: updatedAt(),
 }, t => [index("account_person_grants_account_idx").on(t.accountId),index("account_person_grants_person_idx").on(t.personId)]);
@@ -36,6 +35,18 @@ export const accessChallenges = pgTable("access_challenges", {
  attempts: integer("attempts").notNull().default(0),
  createdAt: createdAt(),
 }, t => [uniqueIndex("access_challenges_hash_uq").on(t.tokenHash),index("access_challenges_account_idx").on(t.accountId)]);
+
+/**
+ * Shared global safety buckets (sign-in request, verification and church application), not per-user or per-IP.
+ * Postgres upserts the count atomically; no untrusted proxy headers are used.
+ * This is a coarse emergency admission limit until trusted-edge rate limiting
+ * can be configured. Fixed-size table: no unbounded attempt log.
+ */
+export const authRequestRateLimits = pgTable("auth_request_rate_limits", {
+ route: text("route").primaryKey(),
+ windowStartedAt: timestamp("window_started_at", {withTimezone:true}).notNull().defaultNow(),
+ requestCount: integer("request_count").notNull().default(0),
+});
 
 /** Independent of OTP provider; hash opaque session secret and revoke server-side. */
 export const accessSessions = pgTable("access_sessions", {

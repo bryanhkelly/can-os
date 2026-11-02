@@ -56,11 +56,46 @@ beforeEach(() => {
 });
 
 describe("Journey completion transactions", () => {
+  it("allows scoped school-owned program requirement completion", async () => {
+    select.mockReturnValueOnce(query([{ ...current, participantType: "program" }]))
+      .mockReturnValueOnce(query([]));
+    await expect(completeJourneyRequirement(context, "requirement", [{ fact: "confirmed" }], {
+      allowedCurrentStatuses: ["needs_you"],
+    })).resolves.toBe("ready");
+  });
+
+  it("rejects program opening completion without an owner-specific workflow", async () => {
+    select.mockReturnValueOnce(query([{ ...current, participantType: "program" }]));
+    await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("owner-specific workflow");
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("cannot waive a configured enrollment signature through generic completion", async () => {
     select.mockReturnValueOnce(query([{ ...current, metadata: { enrollmentForm: {} } }]));
     await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
     expect(update).not.toHaveBeenCalled();
   });
+  it("rejects generic completion for explicitly reviewed evidence", async () => {
+    select.mockReturnValueOnce(query([{ ...current, metadata: { evidenceReviewRequired: true } }]));
+    await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
+    expect(update).not.toHaveBeenCalled();
+  });
+  it("rejects generic completion when registrar notes are already recorded", async () => {
+    select.mockReturnValueOnce(query([{ ...current, evidence: [{ kind: "registrar_note", text: "Pending review" }] }]));
+    await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
+    expect(update).not.toHaveBeenCalled();
+  });
+  it.each(["needs_can", "waiting_third_party"] as const)(
+    "does not let a school-owned launch completion take over a %s requirement",
+    async requirementStatus => {
+      select.mockReturnValueOnce(query([{ ...current, requirementStatus }]));
+      await expect(completeJourneyRequirement(context, "requirement", [], {
+        allowedCurrentStatuses: ["needs_you"],
+      })).rejects.toThrow("current owner's workflow");
+      expect(update).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+    },
+  );
   it("locks the Journey and writes events and audit for both transitions", async () => {
     const locked = query([current]);
     select.mockReturnValueOnce(locked).mockReturnValueOnce(query([]));
@@ -72,6 +107,15 @@ describe("Journey completion transactions", () => {
       action: "journey.ready",
       before: { status: "in_progress" },
       after: { status: "ready" },
+    }));
+  });
+
+  it("preserves existing evidence when recording school-owned completion", async () => {
+    select.mockReturnValueOnce(query([{ ...current, evidence: [{ kind: "previous", fact: "recorded" }] }]))
+      .mockReturnValueOnce(query([]));
+    await completeJourneyRequirement(context, "requirement", [{ fact: "school_confirmed" }]);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      evidence: [{ kind: "previous", fact: "recorded" }, { fact: "school_confirmed" }],
     }));
   });
 
@@ -94,6 +138,14 @@ describe("Journey completion transactions", () => {
     await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("Journey");
     expect(update).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("allows an idempotent retry after reviewed evidence is already complete", async () => {
+    select.mockReturnValueOnce(query([{ ...current, journeyStatus: "ready", requirementStatus: "complete",
+      metadata: { evidenceReviewRequired: true }, evidence: [{ kind: "document_review", status: "accepted" }] }]))
+      .mockReturnValueOnce(query([]));
+    await expect(completeJourneyRequirement(context, "requirement")).resolves.toBe("ready");
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("does not duplicate completion events on a ready retry", async () => {

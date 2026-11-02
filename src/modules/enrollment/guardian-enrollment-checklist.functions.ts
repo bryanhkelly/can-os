@@ -8,6 +8,7 @@ import { requireActor } from "@/modules/identity/actors.server";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 import { enrollmentFormState } from "@/domain/enrollment-form";
 import { enrollmentFormRevision } from "./enrollment-form.server";
+import { enrollmentDocumentStorageVerified } from "@/domain/r2-document-access";
 
 export const getGuardianEnrollmentChecklist = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ applicationId: z.string().uuid() }).strict().parse(input))
@@ -46,7 +47,7 @@ export const getGuardianEnrollmentChecklist = createServerFn({ method: "GET" })
               current: file.metadata.isCurrent !== false,
               reviewStatus: typeof file.metadata.reviewStatus === "string" ? file.metadata.reviewStatus : "received",
               canDownload: file.metadata.isCurrent !== false &&
-                (file.metadata.storageVerified === true || file.metadata.synthetic === true),
+                enrollmentDocumentStorageVerified(file.metadata,application.organizationId),
             })),
         };
       }),

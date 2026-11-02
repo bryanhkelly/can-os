@@ -4,8 +4,6 @@ import {
   calendarEventParticipants,
   calendarEvents,
   scheduledOccurrences,
-  sectionTeachers,
-  sections,
 } from "@/db/schema";
 import { emitEvent, notifyMany } from "@/platform/mutation";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -86,17 +84,8 @@ async function authorizeRevision(
 
   // Teachers manage only events of sections they currently teach.
   if (!event.sectionId) throw new AuthorizationError("section event teaching assignment");
-  const [assignment] = await tx
-    .select({ id: sectionTeachers.id })
-    .from(sectionTeachers)
-    .innerJoin(sections, eq(sections.id, sectionTeachers.sectionId))
-    .where(and(
-      eq(sectionTeachers.sectionId, event.sectionId),
-      eq(sectionTeachers.personId, actor.actorPersonId),
-      eq(sections.active, true),
-    ))
-    .limit(1);
-  if (!assignment) throw new AuthorizationError("section event teaching assignment");
+  const { authorizeClass } = await import("@/modules/learning/class-access.server");
+  await authorizeClass(actor,event.sectionId,undefined,tx);
 }
 
 async function notifyPersonParticipants(

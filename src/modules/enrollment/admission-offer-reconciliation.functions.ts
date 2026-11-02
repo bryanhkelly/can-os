@@ -6,7 +6,7 @@ import { db } from "@/db/client";
 import { admissionOffers } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { expireSyntheticAdmissionOffers } from "@/modules/enrollment/admissions-offer-service";
+import { expireAdmissionOffersCommand } from "@/modules/enrollment/admissions-offer-service";
 
 /**
  * Reconcile elapsed offers on demand using the canonical pool-locked service.
@@ -30,7 +30,7 @@ export const reconcileExpiredAdmissionOffers = createServerFn({ method: "POST" }
       ));
     let expired = 0;
     for (const schoolYearId of new Set(overdue.map(row => row.schoolYearId))) {
-      expired += await expireSyntheticAdmissionOffers(actor, {
+      expired += await expireAdmissionOffersCommand(actor, {
         programId: data.programId, schoolYearId,
       });
     }

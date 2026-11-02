@@ -7,6 +7,7 @@ import { recordAudit } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
 type ProgramScope = { id: string; organizationId: string; siteId: string | null };
 export const catalogStewardCapability = "profiles.catalog.create";
@@ -45,7 +46,7 @@ export async function createQualificationDefinition(actor: Actor, input: {
         schemaVersion: 1, reason: input.reason, sharedCatalog: true, confirmed: true },
     });
     await emitEvent(tx, {
-      eventType: "QualificationDefinitionCreated", aggregateType: "qualification_definition",
+      eventType: EventTypes.QualificationDefinitionCreated, aggregateType: "qualification_definition",
       aggregateId: created.id, actorPersonId: actor.actorPersonId, ...scope,
       payload: { key: input.key, title: input.title, kind: input.kind, schemaVersion: 1 },
     });

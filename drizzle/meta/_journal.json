@@ -197,6 +197,237 @@
       "when": 1792614293956,
       "tag": "0027_big_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792647000000,
+      "tag": "0028_site_affiliation_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792650000000,
+      "tag": "0029_network_agreements",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792653600000,
+      "tag": "0030_anonymous_auth_request_budget",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792700000000,
+      "tag": "0031_learning_activity_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792704000000,
+      "tag": "0032_extended_program_offerings",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792710000000,
+      "tag": "0033_extended_season_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792713600000,
+      "tag": "0034_enrichment_packages",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792717200000,
+      "tag": "0035_site_publications",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792720800000,
+      "tag": "0036_program_publications",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792724400000,
+      "tag": "0037_public_admissions_interests",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792728000000,
+      "tag": "0038_public_interest_conversion",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792731600000,
+      "tag": "0039_program_site_authorizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792735200000,
+      "tag": "0040_site_local_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792738800000,
+      "tag": "0041_pending_guardian_access_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792742400000,
+      "tag": "0042_public_family_start_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792746000000,
+      "tag": "0043_student_access_consents",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792749600000,
+      "tag": "0044_school_configuration_operating_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792753200000,
+      "tag": "0045_onsite_safety_qualification_definitions",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793154285012,
+      "tag": "0046_conference_booking_cancellation",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793225613547,
+      "tag": "0047_ancient_may_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793298762009,
+      "tag": "0048_many_wasp",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793400000000,
+      "tag": "0049_field_trip_decline",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793403600000,
+      "tag": "0050_notification_outbound_deliveries",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793407200000,
+      "tag": "0051_church_onboarding_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793410800000,
+      "tag": "0052_family_recruitment_relationship",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1793414400000,
+      "tag": "0053_institutional_graduation_closeout",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1793418000000,
+      "tag": "0054_academic_credential_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1793421600000,
+      "tag": "0055_academic_credential_release_authorizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1793490658029,
+      "tag": "0056_steep_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793520000000,
+      "tag": "0057_curriculum_annual_adoptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793523600000,
+      "tag": "0058_finance_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793527200000,
+      "tag": "0059_church_evidence_statuses",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793572899262,
+      "tag": "0060_tenant_demo_access",
+      "breakpoints": true
     }
   ]
 }

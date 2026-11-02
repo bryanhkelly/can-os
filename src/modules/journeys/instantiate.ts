@@ -19,6 +19,10 @@ export type JourneyRequirementDefinition = {
   /** Owner persona label; only "can" and "third_party" change the initial status. */
   owner?: string;
   enrollmentForm?: EnrollmentForm;
+  /** Instructions for evidence required by this canonical Journey requirement. */
+  evidenceInstructions?: string;
+  /** Requires an authorized review workflow rather than school self-attestation. */
+  evidenceReviewRequired?: boolean;
 };
 
 export type JourneyDefinitionConfiguration = {
@@ -49,7 +53,7 @@ export function materializeJourneyRequirements(
   title: string;
   blocking: boolean;
   status: InitialRequirementStatus;
-  metadata?: { enrollmentForm: EnrollmentForm };
+  metadata?: { enrollmentForm?: EnrollmentForm; evidenceInstructions?: string; evidenceReviewRequired?: boolean };
 }> {
   return (configuration.requirements ?? []).map((requirement) => ({
     journeyId,
@@ -57,8 +61,12 @@ export function materializeJourneyRequirements(
     title: requirement.title,
     blocking: requirement.blocking ?? false,
     status: initialRequirementStatus(requirement.owner),
-    ...(requirement.enrollmentForm === undefined ? {} :
-      { metadata: { enrollmentForm: enrollmentFormSchema.parse(requirement.enrollmentForm) } }),
+    ...((requirement.enrollmentForm === undefined && !requirement.evidenceInstructions?.trim() && !requirement.evidenceReviewRequired) ? {} :
+      { metadata: {
+        ...(requirement.enrollmentForm === undefined ? {} : { enrollmentForm: enrollmentFormSchema.parse(requirement.enrollmentForm) }),
+        ...(requirement.evidenceInstructions?.trim() ? { evidenceInstructions: requirement.evidenceInstructions.trim() } : {}),
+        ...(requirement.evidenceReviewRequired ? { evidenceReviewRequired: true } : {}),
+      } }),
   }));
 }
 

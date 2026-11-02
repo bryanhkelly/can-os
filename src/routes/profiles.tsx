@@ -55,6 +55,6 @@ export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPe
       </li>)}</ul>
       {!profile.sections.length&&<p className="text-sm text-muted-foreground">No active class relationships are recorded in this membership.</p>}
     </WorkspacePanel>
-    {profile.isSelf&&profile.viewerRole==="teacher"&&<Qualifications/>}
+    {profile.isSelf&&["teacher","room_facilitator","site_leader","site_staff"].includes(profile.viewerRole)&&<Qualifications/>}
   </WorkspaceShell>;
 }

@@ -1,0 +1,344 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u01",
+  "week": 3,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "scope": "Original CAN-authored structured classroom draft, requires qualified mathematics educator review and controlled publisher adoption.",
+  "title": "Week 3 · Linear problem solving and constraints",
+  "plannedInstructionalDays": 5,
+  "authoredDays": 5,
+  "suggestedMinutesPerDay": 55,
+  "lessons": [
+    {
+      "id": "u01-w03-d01",
+      "title": "Week 3 · Day 1 · Translate a story into a linear model",
+      "body": "CAN ALGEBRA I · UNIT 1 · WEEK 3 · DAY 1\nLearning objective: Define quantities, units, and fixed versus per-item costs before writing an equation.\nPrerequisites: interpreting variables, signed-number arithmetic, equivalent equations, and inequality signs.\n\nLAUNCH AND NOTICE (5 minutes)\nRead this context and decide what the unknown counts: A club spends $30 for setup and $8 for each shirt. Its bill is $94. Write an equation and find the number of shirts. Before calculating, label the variable and units and predict whether an equality or boundary is needed.\n\nWORKED EXPLANATION (12 minutes)\nA field trip charges a $45 booking fee plus $12 per student and costs $165. Let s be students. 45+12s=165; subtract 45 to obtain 12s=120, so s=10. Check: 45 dollars + 12 dollars/student × 10 students = 165 dollars.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.\n\nGUIDED REASONING WITH A PARTNER (12 minutes)\n1. A club spends $30 for setup and $8 for each shirt. Its bill is $94. Write an equation and find the number of shirts. Explain each equivalent transformation and test a proposed result against the original story.\n2. A museum charges $5 per ticket and a $20 group fee. The group pays $75. How many tickets? Explain each equivalent transformation and test a proposed result against the original story.\n\nINDEPENDENT EVIDENCE (16 minutes)\n1. A food drive has 27 donated cans and adds 9 per team. At 108 cans, how many teams? Show mathematical reasoning, not just a number.\n2. A maker club spends $18 on supplies and $7 per participant. Its total is $81. Find the participant count. Show mathematical reasoning, not just a number.\n3. Explain why 12s+45=165 uses addition, not multiplication, for the $45 fee. Show mathematical reasoning, not just a number.\n\nINDIVIDUAL EXIT EVIDENCE (5 minutes)\nA workshop charges $14 per participant plus $26 fixed. Total $110. Find participants and check. Show an original-statement check and state whether your answer is feasible.\n\nPRACTICE AND REFLECTION (5 minutes)\nFor homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Define quantities, units, and fixed versus per-item costs before writing an equation. Identify one common error you would now avoid.\n\nAccessible alternatives: read the word problem aloud; present a two-column quantities/units table; use manipulatives or a large-print number line and allow oral explanations transcribed by an instructor. Mathematical reasoning standards are unchanged.",
+      "resources": [],
+      "learningTargets": [
+        "I can define quantities, units, and fixed versus per-item costs before writing an equation.",
+        "I can explain feasible real-world solutions with correctly labeled quantities and a substitution check."
+      ],
+      "standards": [
+        "N-Q.1",
+        "A-CED.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w03-d01-a1",
+          "kind": "launch",
+          "title": "Launch and notice",
+          "instructions": "Read this context and decide what the unknown counts: A club spends $30 for setup and $8 for each shirt. Its bill is $94. Write an equation and find the number of shirts. Before calculating, label the variable and units and predict whether an equality or boundary is needed.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d01-a2",
+          "kind": "instruction",
+          "title": "Worked explanation",
+          "instructions": "A field trip charges a $45 booking fee plus $12 per student and costs $165. Let s be students. 45+12s=165; subtract 45 to obtain 12s=120, so s=10. Check: 45 dollars + 12 dollars/student × 10 students = 165 dollars.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d01-a3",
+          "kind": "guided_practice",
+          "title": "Guided reasoning with a partner",
+          "instructions": "1. A club spends $30 for setup and $8 for each shirt. Its bill is $94. Write an equation and find the number of shirts. Explain each equivalent transformation and test a proposed result against the original story.\n2. A museum charges $5 per ticket and a $20 group fee. The group pays $75. How many tickets? Explain each equivalent transformation and test a proposed result against the original story.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d01-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. A food drive has 27 donated cans and adds 9 per team. At 108 cans, how many teams? Show mathematical reasoning, not just a number.\n2. A maker club spends $18 on supplies and $7 per participant. Its total is $81. Find the participant count. Show mathematical reasoning, not just a number.\n3. Explain why 12s+45=165 uses addition, not multiplication, for the $45 fee. Show mathematical reasoning, not just a number.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d01-a5",
+          "kind": "exit_ticket",
+          "title": "Individual exit evidence",
+          "instructions": "A workshop charges $14 per participant plus $26 fixed. Total $110. Find participants and check. Show an original-statement check and state whether your answer is feasible.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u01-w03-d01-a6",
+          "kind": "reflection",
+          "title": "Practice and reflection",
+          "instructions": "For homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Define quantities, units, and fixed versus per-item costs before writing an equation. Identify one common error you would now avoid.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u01-w03-d02",
+      "title": "Week 3 · Day 2 · Model at-most budgets with inequalities",
+      "body": "CAN ALGEBRA I · UNIT 1 · WEEK 3 · DAY 2\nLearning objective: Write and solve at-most constraints while distinguishing real-number bounds from feasible counts.\nPrerequisites: interpreting variables, signed-number arithmetic, equivalent equations, and inequality signs.\n\nLAUNCH AND NOTICE (5 minutes)\nRead this context and decide what the unknown counts: A group has at most $70; supplies cost $10 plus $6 per student. Maximum students? Before calculating, label the variable and units and predict whether an equality or boundary is needed.\n\nWORKED EXPLANATION (12 minutes)\nA family budgets at most $98 for $16 registration and $9 per lesson. 16+9l≤98, so 9l≤82 and l≤82/9≈9.11. Because l counts whole lessons, the maximum is 9. Check 16+9×9=$97≤$98; 10 would cost $106.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.\n\nGUIDED REASONING WITH A PARTNER (12 minutes)\n1. A group has at most $70; supplies cost $10 plus $6 per student. Maximum students? Explain each equivalent transformation and test a proposed result against the original story.\n2. A parking pass costs $7 plus $4 per hour. Maximum whole hours for a $26 budget? Explain each equivalent transformation and test a proposed result against the original story.\n\nINDEPENDENT EVIDENCE (16 minutes)\n1. With a $145 budget, a $25 entry fee and $12 per person, find maximum persons. Show mathematical reasoning, not just a number.\n2. A school has $83 for a $17 delivery fee and $5 per notebook. Find maximum notebooks. Show mathematical reasoning, not just a number.\n3. A club has $50 for $8 setup and $6 per kit. Is 7 kits feasible? Show mathematical reasoning, not just a number.\n\nINDIVIDUAL EXIT EVIDENCE (5 minutes)\nA family has $60 for a $15 fee plus $8 per class. Find maximum whole classes. Show an original-statement check and state whether your answer is feasible.\n\nPRACTICE AND REFLECTION (5 minutes)\nFor homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Write and solve at-most constraints while distinguishing real-number bounds from feasible counts. Identify one common error you would now avoid.\n\nAccessible alternatives: read the word problem aloud; present a two-column quantities/units table; use manipulatives or a large-print number line and allow oral explanations transcribed by an instructor. Mathematical reasoning standards are unchanged.",
+      "resources": [],
+      "learningTargets": [
+        "I can write and solve at-most constraints while distinguishing real-number bounds from feasible counts.",
+        "I can explain feasible real-world solutions with correctly labeled quantities and a substitution check."
+      ],
+      "standards": [
+        "N-Q.1",
+        "A-CED.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w03-d02-a1",
+          "kind": "launch",
+          "title": "Launch and notice",
+          "instructions": "Read this context and decide what the unknown counts: A group has at most $70; supplies cost $10 plus $6 per student. Maximum students? Before calculating, label the variable and units and predict whether an equality or boundary is needed.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d02-a2",
+          "kind": "instruction",
+          "title": "Worked explanation",
+          "instructions": "A family budgets at most $98 for $16 registration and $9 per lesson. 16+9l≤98, so 9l≤82 and l≤82/9≈9.11. Because l counts whole lessons, the maximum is 9. Check 16+9×9=$97≤$98; 10 would cost $106.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d02-a3",
+          "kind": "guided_practice",
+          "title": "Guided reasoning with a partner",
+          "instructions": "1. A group has at most $70; supplies cost $10 plus $6 per student. Maximum students? Explain each equivalent transformation and test a proposed result against the original story.\n2. A parking pass costs $7 plus $4 per hour. Maximum whole hours for a $26 budget? Explain each equivalent transformation and test a proposed result against the original story.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d02-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. With a $145 budget, a $25 entry fee and $12 per person, find maximum persons. Show mathematical reasoning, not just a number.\n2. A school has $83 for a $17 delivery fee and $5 per notebook. Find maximum notebooks. Show mathematical reasoning, not just a number.\n3. A club has $50 for $8 setup and $6 per kit. Is 7 kits feasible? Show mathematical reasoning, not just a number.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d02-a5",
+          "kind": "exit_ticket",
+          "title": "Individual exit evidence",
+          "instructions": "A family has $60 for a $15 fee plus $8 per class. Find maximum whole classes. Show an original-statement check and state whether your answer is feasible.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u01-w03-d02-a6",
+          "kind": "reflection",
+          "title": "Practice and reflection",
+          "instructions": "For homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Write and solve at-most constraints while distinguishing real-number bounds from feasible counts. Identify one common error you would now avoid.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u01-w03-d03",
+      "title": "Week 3 · Day 3 · Model at-least capacity and minimum groups",
+      "body": "CAN ALGEBRA I · UNIT 1 · WEEK 3 · DAY 3\nLearning objective: Explain why minimum capacity constraints require rounding upward to whole groups.\nPrerequisites: interpreting variables, signed-number arithmetic, equivalent equations, and inequality signs.\n\nLAUNCH AND NOTICE (5 minutes)\nRead this context and decide what the unknown counts: A van holds 8 riders. Minimum vans for 35 riders? Before calculating, label the variable and units and predict whether an equality or boundary is needed.\n\nWORKED EXPLANATION (12 minutes)\nA bus holds 18 students. To seat 53 students with no standing, 18b≥53; b≥53/18≈2.94. The minimum integer b is 3. Two buses hold 36, insufficient; three hold 54.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.\n\nGUIDED REASONING WITH A PARTNER (12 minutes)\n1. A van holds 8 riders. Minimum vans for 35 riders? Explain each equivalent transformation and test a proposed result against the original story.\n2. One mentor serves at most 6 students. How many mentors for 30 students? Explain each equivalent transformation and test a proposed result against the original story.\n\nINDEPENDENT EVIDENCE (16 minutes)\n1. A classroom seats 24 students. Minimum rooms for 73 students? Show mathematical reasoning, not just a number.\n2. A box holds 12 books. Minimum boxes for 49 books? Show mathematical reasoning, not just a number.\n3. Why is rounding 49/12 down to 4 incorrect? Show mathematical reasoning, not just a number.\n\nINDIVIDUAL EXIT EVIDENCE (5 minutes)\nEach volunteer can check in 7 families. Minimum volunteers for 31 families? Show an original-statement check and state whether your answer is feasible.\n\nPRACTICE AND REFLECTION (5 minutes)\nFor homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Explain why minimum capacity constraints require rounding upward to whole groups. Identify one common error you would now avoid.\n\nAccessible alternatives: read the word problem aloud; present a two-column quantities/units table; use manipulatives or a large-print number line and allow oral explanations transcribed by an instructor. Mathematical reasoning standards are unchanged.",
+      "resources": [],
+      "learningTargets": [
+        "I can explain why minimum capacity constraints require rounding upward to whole groups.",
+        "I can explain feasible real-world solutions with correctly labeled quantities and a substitution check."
+      ],
+      "standards": [
+        "N-Q.1",
+        "A-CED.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w03-d03-a1",
+          "kind": "launch",
+          "title": "Launch and notice",
+          "instructions": "Read this context and decide what the unknown counts: A van holds 8 riders. Minimum vans for 35 riders? Before calculating, label the variable and units and predict whether an equality or boundary is needed.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d03-a2",
+          "kind": "instruction",
+          "title": "Worked explanation",
+          "instructions": "A bus holds 18 students. To seat 53 students with no standing, 18b≥53; b≥53/18≈2.94. The minimum integer b is 3. Two buses hold 36, insufficient; three hold 54.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d03-a3",
+          "kind": "guided_practice",
+          "title": "Guided reasoning with a partner",
+          "instructions": "1. A van holds 8 riders. Minimum vans for 35 riders? Explain each equivalent transformation and test a proposed result against the original story.\n2. One mentor serves at most 6 students. How many mentors for 30 students? Explain each equivalent transformation and test a proposed result against the original story.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d03-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. A classroom seats 24 students. Minimum rooms for 73 students? Show mathematical reasoning, not just a number.\n2. A box holds 12 books. Minimum boxes for 49 books? Show mathematical reasoning, not just a number.\n3. Why is rounding 49/12 down to 4 incorrect? Show mathematical reasoning, not just a number.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d03-a5",
+          "kind": "exit_ticket",
+          "title": "Individual exit evidence",
+          "instructions": "Each volunteer can check in 7 families. Minimum volunteers for 31 families? Show an original-statement check and state whether your answer is feasible.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u01-w03-d03-a6",
+          "kind": "reflection",
+          "title": "Practice and reflection",
+          "instructions": "For homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Explain why minimum capacity constraints require rounding upward to whole groups. Identify one common error you would now avoid.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u01-w03-d04",
+      "title": "Week 3 · Day 4 · Compare two linear pricing plans",
+      "body": "CAN ALGEBRA I · UNIT 1 · WEEK 3 · DAY 4\nLearning objective: Set two cost expressions equal, solve the break-even point, and interpret intervals.\nPrerequisites: interpreting variables, signed-number arithmetic, equivalent equations, and inequality signs.\n\nLAUNCH AND NOTICE (5 minutes)\nRead this context and decide what the unknown counts: Compare 15+6n and 27+4n. Find the break-even n. Before calculating, label the variable and units and predict whether an equality or boundary is needed.\n\nWORKED EXPLANATION (12 minutes)\nPlan A costs 20+5v dollars for v visits; Plan B costs 8+8v dollars. Equal cost means 20+5v=8+8v; 12=3v, v=4 visits. At 4 visits both cost $40. At 2 visits A costs $30 and B costs $24; at 6 visits A costs $50 and B costs $56.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.\n\nGUIDED REASONING WITH A PARTNER (12 minutes)\n1. Compare 15+6n and 27+4n. Find the break-even n. Explain each equivalent transformation and test a proposed result against the original story.\n2. Which is cheaper at n=2, 15+6n or 27+4n? Explain each equivalent transformation and test a proposed result against the original story.\n\nINDEPENDENT EVIDENCE (16 minutes)\n1. Find the break-even number for 10+9v and 30+5v. Show mathematical reasoning, not just a number.\n2. Which of those plans is cheaper at v=3? Show mathematical reasoning, not just a number.\n3. Explain which plan is cheaper at v=8 and why. Show mathematical reasoning, not just a number.\n\nINDIVIDUAL EXIT EVIDENCE (5 minutes)\nA service costs 12+3h or 4+5h. Find equal-cost hours. Show an original-statement check and state whether your answer is feasible.\n\nPRACTICE AND REFLECTION (5 minutes)\nFor homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Set two cost expressions equal, solve the break-even point, and interpret intervals. Identify one common error you would now avoid.\n\nAccessible alternatives: read the word problem aloud; present a two-column quantities/units table; use manipulatives or a large-print number line and allow oral explanations transcribed by an instructor. Mathematical reasoning standards are unchanged.",
+      "resources": [],
+      "learningTargets": [
+        "I can set two cost expressions equal, solve the break-even point, and interpret intervals.",
+        "I can explain feasible real-world solutions with correctly labeled quantities and a substitution check."
+      ],
+      "standards": [
+        "N-Q.1",
+        "A-CED.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w03-d04-a1",
+          "kind": "launch",
+          "title": "Launch and notice",
+          "instructions": "Read this context and decide what the unknown counts: Compare 15+6n and 27+4n. Find the break-even n. Before calculating, label the variable and units and predict whether an equality or boundary is needed.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d04-a2",
+          "kind": "instruction",
+          "title": "Worked explanation",
+          "instructions": "Plan A costs 20+5v dollars for v visits; Plan B costs 8+8v dollars. Equal cost means 20+5v=8+8v; 12=3v, v=4 visits. At 4 visits both cost $40. At 2 visits A costs $30 and B costs $24; at 6 visits A costs $50 and B costs $56.\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d04-a3",
+          "kind": "guided_practice",
+          "title": "Guided reasoning with a partner",
+          "instructions": "1. Compare 15+6n and 27+4n. Find the break-even n. Explain each equivalent transformation and test a proposed result against the original story.\n2. Which is cheaper at n=2, 15+6n or 27+4n? Explain each equivalent transformation and test a proposed result against the original story.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d04-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. Find the break-even number for 10+9v and 30+5v. Show mathematical reasoning, not just a number.\n2. Which of those plans is cheaper at v=3? Show mathematical reasoning, not just a number.\n3. Explain which plan is cheaper at v=8 and why. Show mathematical reasoning, not just a number.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d04-a5",
+          "kind": "exit_ticket",
+          "title": "Individual exit evidence",
+          "instructions": "A service costs 12+3h or 4+5h. Find equal-cost hours. Show an original-statement check and state whether your answer is feasible.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u01-w03-d04-a6",
+          "kind": "reflection",
+          "title": "Practice and reflection",
+          "instructions": "For homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Set two cost expressions equal, solve the break-even point, and interpret intervals. Identify one common error you would now avoid.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    },
+    {
+      "id": "u01-w03-d05",
+      "title": "Week 3 · Day 5 · Critique and revise contextual models",
+      "body": "CAN ALGEBRA I · UNIT 1 · WEEK 3 · DAY 5\nLearning objective: Select equation or inequality, justify domain, check by substitution, and revise a flawed model.\nPrerequisites: interpreting variables, signed-number arithmetic, equivalent equations, and inequality signs.\n\nLAUNCH AND NOTICE (5 minutes)\nRead this context and decide what the unknown counts: A group has at most $68 and pays $20 plus $9 per pass. A learner says 6 passes. Diagnose. Before calculating, label the variable and units and predict whether an equality or boundary is needed.\n\nWORKED EXPLANATION (12 minutes)\nA team needs to move at least 40 boxes. Each trip holds 9 boxes. A student solves 9t=40 and reports 4.44 trips. The context instead requires 9t≥40 and whole t. Thus t≥40/9 and at least 5 trips. Check: 4 trips move 36 (<40), 5 trips move 45 (≥40).\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.\n\nGUIDED REASONING WITH A PARTNER (12 minutes)\n1. A group has at most $68 and pays $20 plus $9 per pass. A learner says 6 passes. Diagnose. Explain each equivalent transformation and test a proposed result against the original story.\n2. A bus seats 22. A student reports 2 buses for 49 students. Revise. Explain each equivalent transformation and test a proposed result against the original story.\n\nINDEPENDENT EVIDENCE (16 minutes)\n1. A meal budget is $100, delivery $16 and $7 per meal. Maximum meals? Show mathematical reasoning, not just a number.\n2. At least 74 students need seating in rows of 11. Minimum rows? Show mathematical reasoning, not just a number.\n3. For 28+6x=76, name units if x is the number of kits and interpret x. Show mathematical reasoning, not just a number.\n\nINDIVIDUAL EXIT EVIDENCE (5 minutes)\nA club needs at least 65 seats. Each table seats 8. What is the minimum tables? Show an original-statement check and state whether your answer is feasible.\n\nPRACTICE AND REFLECTION (5 minutes)\nFor homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Select equation or inequality, justify domain, check by substitution, and revise a flawed model. Identify one common error you would now avoid.\n\nAccessible alternatives: read the word problem aloud; present a two-column quantities/units table; use manipulatives or a large-print number line and allow oral explanations transcribed by an instructor. Mathematical reasoning standards are unchanged.",
+      "resources": [],
+      "learningTargets": [
+        "I can select equation or inequality, justify domain, check by substitution, and revise a flawed model.",
+        "I can explain feasible real-world solutions with correctly labeled quantities and a substitution check."
+      ],
+      "standards": [
+        "N-Q.1",
+        "A-CED.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w03-d05-a1",
+          "kind": "launch",
+          "title": "Launch and notice",
+          "instructions": "Read this context and decide what the unknown counts: A group has at most $68 and pays $20 plus $9 per pass. A learner says 6 passes. Diagnose. Before calculating, label the variable and units and predict whether an equality or boundary is needed.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d05-a2",
+          "kind": "instruction",
+          "title": "Worked explanation",
+          "instructions": "A team needs to move at least 40 boxes. Each trip holds 9 boxes. A student solves 9t=40 and reports 4.44 trips. The context instead requires 9t≥40 and whole t. Thus t≥40/9 and at least 5 trips. Check: 4 trips move 36 (<40), 5 trips move 45 (≥40).\n\nThe model is valid only after each term's units and the permissible values of the unknown are identified. Verify any proposed result in the original constraint.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d05-a3",
+          "kind": "guided_practice",
+          "title": "Guided reasoning with a partner",
+          "instructions": "1. A group has at most $68 and pays $20 plus $9 per pass. A learner says 6 passes. Diagnose. Explain each equivalent transformation and test a proposed result against the original story.\n2. A bus seats 22. A student reports 2 buses for 49 students. Revise. Explain each equivalent transformation and test a proposed result against the original story.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d05-a4",
+          "kind": "independent_practice",
+          "title": "Independent evidence",
+          "instructions": "1. A meal budget is $100, delivery $16 and $7 per meal. Maximum meals? Show mathematical reasoning, not just a number.\n2. At least 74 students need seating in rows of 11. Minimum rows? Show mathematical reasoning, not just a number.\n3. For 28+6x=76, name units if x is the number of kits and interpret x. Show mathematical reasoning, not just a number.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w03-d05-a5",
+          "kind": "exit_ticket",
+          "title": "Individual exit evidence",
+          "instructions": "A club needs at least 65 seats. Each table seats 8. What is the minimum tables? Show an original-statement check and state whether your answer is feasible.",
+          "estimatedMinutes": 5,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u01-w03-d05-a6",
+          "kind": "reflection",
+          "title": "Practice and reflection",
+          "instructions": "For homework, rewrite the worked example as a situation with a different real-world quantity, then solve and check the new equation or inequality. Reflect: Select equation or inequality, justify domain, check by substitution, and revise a flawed model. Identify one common error you would now avoid.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        }
+      ]
+    }
+  ]
+}

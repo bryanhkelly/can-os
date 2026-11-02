@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u01",
+      "reviewStatus": "draft",
+      "teacherOverview": "Check equations, units, model assumptions, integer domains, and original-statement substitution. Differentiate through quantities/units tables, oral reasoning and high-contrast representations.",
+      "lessons": [
+        {
+          "lessonId": "u01-w03-d01",
+          "preparation": "Day 1: prepare a quantities-and-units table, accessible expression cards and an example for translate a story into a linear model. Confirm prerequisites before independent work.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: A club spends $30 for setup and $8 for each shirt. Its bill is $94. Write an equation and find the number of shirts.",
+              "answer": "30+8s=94, so 8s=64 and s=8 shirts."
+            },
+            {
+              "prompt": "Guided 2: A museum charges $5 per ticket and a $20 group fee. The group pays $75. How many tickets?",
+              "answer": "20+5t=75, so t=11 tickets."
+            },
+            {
+              "prompt": "Independent 1: A food drive has 27 donated cans and adds 9 per team. At 108 cans, how many teams?",
+              "answer": "27+9t=108, t=9 teams."
+            },
+            {
+              "prompt": "Independent 2: A maker club spends $18 on supplies and $7 per participant. Its total is $81. Find the participant count.",
+              "answer": "18+7p=81, p=9 participants."
+            },
+            {
+              "prompt": "Independent 3: Explain why 12s+45=165 uses addition, not multiplication, for the $45 fee.",
+              "answer": "The booking fee is paid once, independent of s; only the per-student cost is multiplied."
+            },
+            {
+              "prompt": "Exit: A workshop charges $14 per participant plus $26 fixed. Total $110. Find participants and check.",
+              "answer": "26+14p=110, p=6; 26+84=110 dollars."
+            }
+          ],
+          "misconceptions": [
+            "Confusing a one-time fixed amount with a per-item multiplier leads to an invalid expression.",
+            "Applying an algebraically correct real-number answer without checking the real-world domain gives an infeasible decision."
+          ],
+          "interventions": [
+            "Highlight every quantity and its units; build the expression from a two-column fixed/per-item table before symbolizing.",
+            "Use a worked parallel problem and ask the learner to substitute into the original story, then revise their solution."
+          ],
+          "extensions": [
+            "Design a new translate a story into a linear model scenario that has a boundary case, solve it and defend the domain restriction."
+          ]
+        },
+        {
+          "lessonId": "u01-w03-d02",
+          "preparation": "Day 2: prepare a quantities-and-units table, accessible expression cards and an example for model at-most budgets with inequalities. Confirm prerequisites before independent work.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: A group has at most $70; supplies cost $10 plus $6 per student. Maximum students?",
+              "answer": "10+6s≤70, s≤10; maximum 10 students."
+            },
+            {
+              "prompt": "Guided 2: A parking pass costs $7 plus $4 per hour. Maximum whole hours for a $26 budget?",
+              "answer": "7+4h≤26; h≤4.75; maximum 4 hours."
+            },
+            {
+              "prompt": "Independent 1: With a $145 budget, a $25 entry fee and $12 per person, find maximum persons.",
+              "answer": "25+12p≤145; p≤10; maximum 10."
+            },
+            {
+              "prompt": "Independent 2: A school has $83 for a $17 delivery fee and $5 per notebook. Find maximum notebooks.",
+              "answer": "17+5n≤83; n≤13.2; maximum 13."
+            },
+            {
+              "prompt": "Independent 3: A club has $50 for $8 setup and $6 per kit. Is 7 kits feasible?",
+              "answer": "8+6×7=$50, yes, exactly within budget."
+            },
+            {
+              "prompt": "Exit: A family has $60 for a $15 fee plus $8 per class. Find maximum whole classes.",
+              "answer": "15+8c≤60; c≤45/8=5.625; maximum 5."
+            }
+          ],
+          "misconceptions": [
+            "Confusing a one-time fixed amount with a per-item multiplier leads to an invalid expression.",
+            "Applying an algebraically correct real-number answer without checking the real-world domain gives an infeasible decision."
+          ],
+          "interventions": [
+            "Highlight every quantity and its units; build the expression from a two-column fixed/per-item table before symbolizing.",
+            "Use a worked parallel problem and ask the learner to substitute into the original story, then revise their solution."
+          ],
+          "extensions": [
+            "Design a new model at-most budgets with inequalities scenario that has a boundary case, solve it and defend the domain restriction."
+          ]
+        },
+        {
+          "lessonId": "u01-w03-d03",
+          "preparation": "Day 3: prepare a quantities-and-units table, accessible expression cards and an example for model at-least capacity and minimum groups. Confirm prerequisites before independent work.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: A van holds 8 riders. Minimum vans for 35 riders?",
+              "answer": "8v≥35; v≥4.375, so 5 vans."
+            },
+            {
+              "prompt": "Guided 2: One mentor serves at most 6 students. How many mentors for 30 students?",
+              "answer": "6m≥30; m≥5, so 5 mentors."
+            },
+            {
+              "prompt": "Independent 1: A classroom seats 24 students. Minimum rooms for 73 students?",
+              "answer": "24r≥73, r≥73/24, so 4 rooms."
+            },
+            {
+              "prompt": "Independent 2: A box holds 12 books. Minimum boxes for 49 books?",
+              "answer": "12b≥49, b≥49/12, so 5 boxes."
+            },
+            {
+              "prompt": "Independent 3: Why is rounding 49/12 down to 4 incorrect?",
+              "answer": "Four boxes hold 48, leaving one book unpacked."
+            },
+            {
+              "prompt": "Exit: Each volunteer can check in 7 families. Minimum volunteers for 31 families?",
+              "answer": "7v≥31, so v≥31/7 and minimum 5."
+            }
+          ],
+          "misconceptions": [
+            "Confusing a one-time fixed amount with a per-item multiplier leads to an invalid expression.",
+            "Applying an algebraically correct real-number answer without checking the real-world domain gives an infeasible decision."
+          ],
+          "interventions": [
+            "Highlight every quantity and its units; build the expression from a two-column fixed/per-item table before symbolizing.",
+            "Use a worked parallel problem and ask the learner to substitute into the original story, then revise their solution."
+          ],
+          "extensions": [
+            "Design a new model at-least capacity and minimum groups scenario that has a boundary case, solve it and defend the domain restriction."
+          ]
+        },
+        {
+          "lessonId": "u01-w03-d04",
+          "preparation": "Day 4: prepare a quantities-and-units table, accessible expression cards and an example for compare two linear pricing plans. Confirm prerequisites before independent work.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Compare 15+6n and 27+4n. Find the break-even n.",
+              "answer": "15+6n=27+4n ⇒2n=12 ⇒n=6; both $51."
+            },
+            {
+              "prompt": "Guided 2: Which is cheaper at n=2, 15+6n or 27+4n?",
+              "answer": "First $27; second $35. The first is cheaper."
+            },
+            {
+              "prompt": "Independent 1: Find the break-even number for 10+9v and 30+5v.",
+              "answer": "10+9v=30+5v ⇒4v=20 ⇒v=5; both $55."
+            },
+            {
+              "prompt": "Independent 2: Which of those plans is cheaper at v=3?",
+              "answer": "10+27=$37 versus 30+15=$45; first plan."
+            },
+            {
+              "prompt": "Independent 3: Explain which plan is cheaper at v=8 and why.",
+              "answer": "First $82; second $70; second, because its per-visit rate is lower."
+            },
+            {
+              "prompt": "Exit: A service costs 12+3h or 4+5h. Find equal-cost hours.",
+              "answer": "12+3h=4+5h ⇒8=2h ⇒h=4; both $24."
+            }
+          ],
+          "misconceptions": [
+            "Confusing a one-time fixed amount with a per-item multiplier leads to an invalid expression.",
+            "Applying an algebraically correct real-number answer without checking the real-world domain gives an infeasible decision."
+          ],
+          "interventions": [
+            "Highlight every quantity and its units; build the expression from a two-column fixed/per-item table before symbolizing.",
+            "Use a worked parallel problem and ask the learner to substitute into the original story, then revise their solution."
+          ],
+          "extensions": [
+            "Design a new compare two linear pricing plans scenario that has a boundary case, solve it and defend the domain restriction."
+          ]
+        },
+        {
+          "lessonId": "u01-w03-d05",
+          "preparation": "Day 5: prepare a quantities-and-units table, accessible expression cards and an example for critique and revise contextual models. Confirm prerequisites before independent work.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: A group has at most $68 and pays $20 plus $9 per pass. A learner says 6 passes. Diagnose.",
+              "answer": "20+9p≤68; p≤48/9≈5.33; maximum 5, as six would cost $74."
+            },
+            {
+              "prompt": "Guided 2: A bus seats 22. A student reports 2 buses for 49 students. Revise.",
+              "answer": "22b≥49; b≥49/22>2, so 3 buses."
+            },
+            {
+              "prompt": "Independent 1: A meal budget is $100, delivery $16 and $7 per meal. Maximum meals?",
+              "answer": "16+7m≤100; m≤12, so 12 meals."
+            },
+            {
+              "prompt": "Independent 2: At least 74 students need seating in rows of 11. Minimum rows?",
+              "answer": "11r≥74; r≥74/11≈6.73, so 7 rows."
+            },
+            {
+              "prompt": "Independent 3: For 28+6x=76, name units if x is the number of kits and interpret x.",
+              "answer": "x=8 kits; fixed $28 plus $6 per kit costs $76."
+            },
+            {
+              "prompt": "Exit: A club needs at least 65 seats. Each table seats 8. What is the minimum tables?",
+              "answer": "8t≥65, so minimum 9 tables; 8 seat only 64."
+            }
+          ],
+          "misconceptions": [
+            "Confusing a one-time fixed amount with a per-item multiplier leads to an invalid expression.",
+            "Applying an algebraically correct real-number answer without checking the real-world domain gives an infeasible decision."
+          ],
+          "interventions": [
+            "Highlight every quantity and its units; build the expression from a two-column fixed/per-item table before symbolizing.",
+            "Use a worked parallel problem and ask the learner to substitute into the original story, then revise their solution."
+          ],
+          "extensions": [
+            "Design a new critique and revise contextual models scenario that has a boundary case, solve it and defend the domain restriction."
+          ]
+        }
+      ],
+      "assessments": []
+    }
+  ]
+}

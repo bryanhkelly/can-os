@@ -1,12 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
+import { ExcuseAttachments } from "@/components/operations/ExcuseAttachments";
 import {
   listExpectedOnsiteRoster, markExpectedOnsiteAttendance,
   listExpectedPendingExcuses, reviewCurrentAttendanceExcuse,
 } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
-export const Route = createFileRoute("/staff/attendance")({ component: StaffAttendancePage });
+export const Route = createFileRoute("/staff/attendance")({
+  validateSearch: (search: Record<string, unknown>): { programId?: string } => ({
+    programId: typeof search.programId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.programId)
+      ? search.programId : undefined,
+  }),
+  component: StaffAttendancePage,
+});
 
 type RosterStudent = Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["students"][number];
 type PendingExcuse = Awaited<ReturnType<typeof listExpectedPendingExcuses>>["excuses"][number];
@@ -37,11 +46,13 @@ function todayLocal(): string {
 }
 
 function StaffAttendancePage() {
+  const { programId } = Route.useSearch();
   const [date, setDate] = useState(todayLocal);
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [programs, setPrograms] = useState<Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["programs"]>([]);
   const [legacyCount, setLegacyCount] = useState(0);
   const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
+  const [excusesWarning, setExcusesWarning] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [correctionNotes,setCorrectionNotes]=useState<Record<string,string>>({});
   const [queued,setQueued]=useState<OfflineMark[]>([]);
@@ -96,12 +107,14 @@ function StaffAttendancePage() {
     setError("");
     try {
       const [roster, pending] = await Promise.all([
-        listExpectedOnsiteRoster({ data: { date: targetDate } }),
-        listExpectedPendingExcuses(),
+        listExpectedOnsiteRoster({ data: { date: targetDate, programId } }),
+        listExpectedPendingExcuses().catch(() => null),
       ]);
       setStudents(roster.students);
       setPrograms(roster.programs);
-      setExcuses(pending.excuses);
+      setExcuses(pending?.excuses ?? []);
+      setExcusesWarning(pending ? "" :
+        "Pending excuse review is unavailable. You can still mark the scheduled attendance roster.");
     } catch {
       setStudents([]);
       setPrograms([]);
@@ -110,20 +123,22 @@ function StaffAttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [programId]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const [roster, pending] = await Promise.all([
-          listExpectedOnsiteRoster({ data: { date } }),
-          listExpectedPendingExcuses(),
+          listExpectedOnsiteRoster({ data: { date, programId } }),
+          listExpectedPendingExcuses().catch(() => null),
         ]);
         if (!active) return;
         setStudents(roster.students);
         setPrograms(roster.programs);
-        setExcuses(pending.excuses);
+        setExcuses(pending?.excuses ?? []);
+        setExcusesWarning(pending ? "" :
+          "Pending excuse review is unavailable. You can still mark the scheduled attendance roster.");
         setError("");
       } catch {
         if (!active) return;
@@ -136,7 +151,7 @@ function StaffAttendancePage() {
       }
     })();
     return () => { active = false; };
-  }, [date]);
+  }, [date, programId]);
 
   const mark = async (student: RosterStudent, status: (typeof statusOptions)[number]) => {
     const change:OfflineMark={studentProfileId:student.studentProfileId,programId:student.programId,date,status,
@@ -204,6 +219,12 @@ function StaffAttendancePage() {
         Mark students expected onsite at your school and review guardian-submitted excuses.
         Approved excuses correct the attendance record without erasing history.
       </p>
+      {programId && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
+        Showing the expected onsite roster for the selected Program. Pending guardian excuses
+        still cover all students in your authorized review queue.
+        <Link to="/staff/attendance" className="ml-2 font-semibold underline">Show all permitted Programs</Link>
+      </div>}
+      <WorkflowIntro eyebrow="School day · Attendance" title="A reliable record of who is here." description="Mark observed attendance, review excuses and reconcile changes without replacing the underlying history. Offline entries remain pending until synchronized." />
       <label className="mt-8 block max-w-sm text-sm font-semibold">
         Attendance date
         <input
@@ -214,6 +235,7 @@ function StaffAttendancePage() {
         />
       </label>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      {excusesWarning && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{excusesWarning}</p>}
       {conflicts.length>0&&<div className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">
         <strong>Attendance conflicts require review</strong>
         <p className="mt-1">A newer school record exists for {conflicts.length} offline
@@ -295,6 +317,8 @@ function StaffAttendancePage() {
               <span className="rounded-full border px-3 py-1 text-xs">Submitted</span>
             </div>
             <p className="mt-3 rounded-lg bg-muted p-3 text-sm">{excuse.reason}</p>
+            <ExcuseAttachments attendanceEventId={excuse.attendanceEventId}
+              attachments={excuse.attachments} disabled={busy !== ""} />
             {!excuse.canReview && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-400">Attendance was subsequently corrected. This earlier excuse cannot change the current mark. A registrar can close it with a reason.</p>}
             {excuse.canClose && excuse.currentAttendanceEventId &&
               <ObsoleteExcuseClosure excuse={excuse} onSaved={() => load(date)} />}
