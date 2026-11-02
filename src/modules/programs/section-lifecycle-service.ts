@@ -86,7 +86,7 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
       .from(sectionCapacityDemands).where(inArray(sectionCapacityDemands.sectionId,ids)):[],
   ]);
   return rows.map(row=>({
-    id:row.id,title:row.title,code:row.code,active:row.active,
+    id:row.id,title:row.title,code:row.code,active:row.active,programId:row.programId,termId:row.termId,
     startsAt:row.startsAt?.toISOString()??null,endsAt:row.endsAt?.toISOString()??null,
     scheduleTemplateId:row.scheduleTemplateId,
     scheduleOptions:schedules.filter(s=>s.schoolYearId===yearByTerm.get(row.termId))

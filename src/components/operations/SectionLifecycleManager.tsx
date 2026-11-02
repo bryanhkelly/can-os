@@ -69,6 +69,9 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
  const [schedule,setSchedule]=useState(section.scheduleTemplateId??"");
  const [enrollmentId,setEnrollmentId]=useState("");
  const [destination,setDestination]=useState("");
+ const destinations=allSections.filter(candidate=>candidate.id!==section.id&&candidate.active&&
+   candidate.programId===section.programId&&candidate.termId===section.termId);
+ const selectedDestination=destinations.some(candidate=>candidate.id===destination)?destination:"";
  const [enrollmentStatus,setEnrollmentStatus]=useState<"withdrawn"|"transferred">("withdrawn");
  return <article className="rounded-xl border bg-card p-5">
   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -135,13 +138,14 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
      </select>
     </label>
     <label className="mt-2 block text-xs">Transfer destination (same program and term)
-      <select value={destination} onChange={e=>setDestination(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+      <select value={selectedDestination} onChange={e=>setDestination(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
        <option value="">Choose destination</option>
-       {allSections.filter(x=>x.id!==section.id&&x.active).map(x=><option key={x.id} value={x.id}>{x.title} · {x.code}</option>)}
+       {destinations.map(x=><option key={x.id} value={x.id}>{x.title} · {x.code}</option>)}
       </select>
     </label>
-    <button type="button" disabled={busy||!enrollmentId||!destination} onClick={()=>void run(section.id,
-      ()=>transferLifecycleEnrollment({data:{enrollmentId,destinationSectionId:destination,reason}}),"Student transferred atomically.")}
+    {!destinations.length&&<p className="mt-2 text-xs text-muted-foreground">No other active section is available in this program and term.</p>}
+    <button type="button" disabled={busy||!enrollmentId||!selectedDestination} onClick={()=>void run(section.id,
+      ()=>transferLifecycleEnrollment({data:{enrollmentId,destinationSectionId:selectedDestination,reason}}),"Student transferred atomically.")}
       className="mt-2 rounded border px-3 py-2 text-xs disabled:opacity-50">Transfer student</button>
     <button type="button" disabled={busy||!enrollmentId} onClick={()=>void run(section.id,
       ()=>transitionLifecycleEnrollment({data:{enrollmentId,status:enrollmentStatus,reason}}),"Enrollment status updated.")}
