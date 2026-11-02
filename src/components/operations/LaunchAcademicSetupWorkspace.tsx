@@ -21,7 +21,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatCard } from "@/components/workspace/stat-card";
 
-export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
+export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>> & {demoTeacherMarketplaceEnabled?:boolean};
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const router=useRouter();
  const [termId,setTermId]=useState(data.terms.find(term=>data.scheduleOptions.some(schedule=>schedule.schoolYearId===term.schoolYearId))?.id??data.terms[0]?.id??"");
