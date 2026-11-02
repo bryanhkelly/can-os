@@ -1159,6 +1159,21 @@
         "audit_events"
       ]
     },
+    "/operations/can-teacher-requests": {
+      "persona": "registrar",
+      "fixtureRequired": false,
+      "rationale": "Provider-scoped staffing requests use existing Actions created by school registrars; no separate demo fixtures or staffing state are introduced.",
+      "interactions": [
+        "CAN provider registrar sees only requests from programs where the registrar has academic provider organization scope",
+        "start staffing review while leaving the request open and school authorization unchanged",
+        "decline a staffing request with an auditable reason"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
     "/operations/teacher-marketplace": {
       "persona": "registrar",
       "fixtureRequired": false,
