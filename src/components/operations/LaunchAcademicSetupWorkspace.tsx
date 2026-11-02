@@ -116,7 +116,11 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   {!data.teachingStaff.length&&<section aria-label="Instructor staffing handoff" className="mt-4 rounded-xl border bg-card p-5 text-sm">
    <h3 className="font-semibold">Get your instructor assigned</h3>
    <p className="mt-2">Request an instructor for {data.program.name} from your CAN academic staffing administrator. Include the planned course and term. A local website or registrar invitation does not appoint a CAN teacher.</p>
-   <button type="button" disabled={busy} onClick={()=>void run(async()=>{},"Instructor choices refreshed from current staffing records.")} className="mt-3 rounded border px-3 py-2">Refresh instructor choices</button>
+   {data.demoTeacherMarketplaceEnabled&&<Link to="/operations/teacher-marketplace"
+     search={{programId:data.program.id}} className="mt-3 inline-block rounded-lg border px-3 py-2 font-medium underline">
+     Browse CAN demo teachers for your selected curriculum
+   </Link>}
+   <button type="button" disabled={busy} onClick={()=>void router.invalidate()} className="mt-3 rounded border px-3 py-2">Refresh instructor choices</button>
   </section>}
   <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="teacher-class-requests">
    <h2 id="teacher-class-requests" className="font-serif text-2xl">Teacher class requests</h2>
