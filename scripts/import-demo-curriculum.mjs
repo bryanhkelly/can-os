@@ -85,7 +85,7 @@ try {
     // A pack's own content hash changes only when a new draft is created.
     // Re-running an identical manifest is a no-op.
     if (plan.create || plan.update || existing.rowCount === 0 || existing.rows[0]?.metadata?.sourceHash !== hash) {
-      const pv=await client.query("SELECT COALESCE(MAX(CASE WHEN version ~ '^[0-9]+
+      const pv=await client.query("SELECT (COALESCE(MAX(CASE WHEN version ~ '^[0-9]+$' THEN version::int END),0)+1)::text AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
       const packVersionId=randomUUID();
       await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({sourceHash:hash})]);
       let position=0;
