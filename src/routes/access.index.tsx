@@ -3,7 +3,7 @@ import {useState} from "react";
 import { accessFormErrors } from "@/domain/access-navigation";
 import {LOCAL_DEMO_ACCOUNTS} from "@/domain/local-demo-access";
 export const Route=createFileRoute("/access/")({
- validateSearch:(search:Record<string,unknown>)=>({error:typeof search.error==="string"&&Object.hasOwn(accessFormErrors,search.error)?search.error as keyof typeof accessFormErrors:undefined}),
+ validateSearch:(search:Record<string,unknown>):{error?:keyof typeof accessFormErrors}=>({error:typeof search.error==="string"&&Object.hasOwn(accessFormErrors,search.error)?search.error as keyof typeof accessFormErrors:undefined}),
  component:AccessPage,
 });
 function AccessPage(){

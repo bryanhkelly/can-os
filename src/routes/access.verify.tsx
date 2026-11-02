@@ -37,7 +37,7 @@ export const Route=createFileRoute("/access/verify")({
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
     if(nativeForm)return new Response(null,{status:303,headers:{
-     Location:accessLandingPath(result.role,"launchSiteId" in result?result.launchSiteId:undefined),
+     Location:accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined),
      "Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer",
     }});
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
