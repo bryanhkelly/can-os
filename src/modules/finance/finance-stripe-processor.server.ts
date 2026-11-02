@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FinanceProcessor } from "./finance-service";
 import type { ProviderEvent } from "./finance-domain";
+import { requestStripeJson } from "./finance-stripe-request.server";
 
 /** Stripe PaymentIntents REST adapter. Requires server-side keys and raw signed webhooks. */
 export class StripeFinanceProcessor implements FinanceProcessor {
@@ -18,7 +19,7 @@ export class StripeFinanceProcessor implements FinanceProcessor {
       "metadata[obligationId]": input.obligationId,
       "automatic_payment_methods[enabled]": "true",
     });
-    const response = await fetch("https://api.stripe.com/v1/payment_intents", {
+    const result = await requestStripeJson("https://api.stripe.com/v1/payment_intents", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + this.secretKey,
@@ -26,9 +27,7 @@ export class StripeFinanceProcessor implements FinanceProcessor {
         "Idempotency-Key": input.idempotencyKey,
       },
       body,
-    });
-    if (!response.ok) throw new Error("Stripe intent request failed");
-    const result: unknown = await response.json();
+    }, "Stripe intent request failed");
     const intentId = (result as { id?: unknown } | null)?.id;
     const clientSecret = (result as { client_secret?: unknown } | null)?.client_secret;
     if (typeof intentId !== "string" || !intentId.startsWith("pi_")) throw new Error("Invalid Stripe intent response");

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FinanceProcessor } from "./finance-service";
 import type { ProviderEvent } from "./finance-domain";
+import { requestStripeJson } from "./finance-stripe-request.server";
 
 /** Verify Stripe's signed raw webhook and resolve non-PaymentIntent object references
  * against the Stripe API before journal insertion. Never trust browser-supplied IDs. */
@@ -40,22 +41,18 @@ export async function resolveStripeMoneyEvent(
   const chargeId = payload.type === "refund.updated" ? object.charge : object.charge;
   if (typeof chargeId !== "string" || !chargeId.startsWith("ch_"))
     throw new Error("Missing Stripe charge reference");
-  const response = await fetch("https://api.stripe.com/v1/charges/" + encodeURIComponent(chargeId), {
+  const charge = await requestStripeJson("https://api.stripe.com/v1/charges/" + encodeURIComponent(chargeId), {
     headers: { Authorization: "Bearer " + secretKey },
-  });
-  if (!response.ok) throw new Error("Unable to reconcile Stripe charge");
-  const charge = await response.json() as {
+  }, "Unable to reconcile Stripe charge") as {
     payment_intent?: unknown; currency?: unknown; metadata?: { obligationId?: unknown };
   };
   if (typeof charge.payment_intent !== "string" || !charge.payment_intent.startsWith("pi_"))
     throw new Error("Unlinked Stripe charge");
   // Fetch the canonical PaymentIntent rather than relying on mutable charge metadata.
-  const intentResponse = await fetch("https://api.stripe.com/v1/payment_intents/" +
+  const intent = await requestStripeJson("https://api.stripe.com/v1/payment_intents/" +
     encodeURIComponent(charge.payment_intent), {
     headers: { Authorization: "Bearer " + secretKey },
-  });
-  if (!intentResponse.ok) throw new Error("Unable to reconcile Stripe intent");
-  const intent = await intentResponse.json() as {
+  }, "Unable to reconcile Stripe intent") as {
     id?: unknown; currency?: unknown; metadata?: { obligationId?: unknown };
   };
   const obligationId = intent.metadata?.obligationId;
