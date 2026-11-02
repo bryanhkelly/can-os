@@ -2,11 +2,11 @@ import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
 const files = [
-  "src\\components\\learning\\ClassCreationRequestForm.tsx",
-  "src\\components\\workspace\\site-program-fields.tsx",
-  "src\\components\\workspace\\local-datetime-field.tsx",
-  "src\\components\\evidence\\FileSelectionField.tsx",
-  "src\\components\\shell\\WorkspaceContextSwitcher.tsx",
+  "src/components/learning/ClassCreationRequestForm.tsx",
+  "src/components/workspace/site-program-fields.tsx",
+  "src/components/workspace/local-datetime-field.tsx",
+  "src/components/evidence/FileSelectionField.tsx",
+  "src/components/shell/WorkspaceContextSwitcher.tsx",
 ];
 describe("migrated workflow control reuse", () => {
   const eslint = new ESLint();

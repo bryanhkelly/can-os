@@ -1,8 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { safeLoader } from "@/lib/safe-loader";
 import { AuthorizationError } from "@/domain/command-context";
 
 describe("safeLoader", () => {
+  it("keeps driver secrets out of default logs and public responses", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const failure = Object.assign(new Error("postgres://private-password@host/private student-name"), {
+        query: "SELECT private student data", parameters: ["secret-token"],
+      });
+      const outcome = await safeLoader(async () => { throw failure; })();
+      expect(log).toHaveBeenCalledExactlyOnceWith("Loader failed", { kind: "unexpected", retryable: false });
+      const output = JSON.stringify({ outcome, logs: log.mock.calls });
+      for (const secret of ["private-password", "student-name", "secret-token", "SELECT"]) {
+        expect(output).not.toContain(secret);
+      }
+    } finally { log.mockRestore(); }
+  });
   it("wraps a successful load as { ok: true, data }", async () => {
     const loader = safeLoader(async () => ({ value: 42 }));
     const outcome = await loader();

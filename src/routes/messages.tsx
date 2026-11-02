@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { normalizeClientError } from "@/lib/client-error";
 import {
   getThread,
   listMyThreads,
@@ -50,6 +51,17 @@ function MessagesPage() {
   const [composeBody, setComposeBody] = useState("");
   const [composing, setComposing] = useState(false);
   const [composeError, setComposeError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [canRetry, setCanRetry] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [loadingContacts, setLoadingContacts] = useState(true);
+
+  function retryLoading() {
+    setLoading(true); setError(""); setCanRetry(false); setNeedsSignIn(false);
+    setLoadingContacts(true); setContactError("");
+    setReloadKey(value => value + 1);
+  }
 
   useEffect(() => {
     let active = true;
@@ -59,9 +71,12 @@ function MessagesPage() {
         setThreads(result.threads);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (active) {
-          setError("Sign in to view messages.");
+          const failure = normalizeClientError(cause, "Messages are temporarily unavailable. Please try again.");
+          setNeedsSignIn(failure.kind === "authentication");
+          setCanRetry(failure.kind !== "authentication" && failure.kind !== "authorization");
+          setError(failure.kind === "authentication" ? "Sign in to view messages." : failure.message);
           setLoading(false);
         }
       });
@@ -69,11 +84,17 @@ function MessagesPage() {
       .then((result) => {
         if (active) setContacts(result.contacts);
       })
-      .catch(() => {});
+      .catch((cause: unknown) => {
+        if (active) {
+          setContacts([]);
+          setContactError(normalizeClientError(cause, "Contacts could not load. Please try again.").message);
+        }
+      })
+      .finally(() => { if (active) setLoadingContacts(false); });
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const openThread = (threadId: string) => {
     void navigate({ search: { thread: threadId } });
@@ -154,6 +175,8 @@ function MessagesPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Messages</p>
           <h1 className="mt-2 font-serif text-4xl">Messages</h1>
           <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>
+          {needsSignIn && <Link to="/access" className="mt-4 inline-block underline">Sign in or request access →</Link>}
+          {canRetry && <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={retryLoading}>Retry loading messages</button>}
         </div>
       </main>
     );
@@ -182,7 +205,12 @@ function MessagesPage() {
         {composeOpen && (
           <section className="mt-6 rounded-xl border bg-card p-5" aria-label="New message">
             <h2 className="text-lg font-semibold">New message</h2>
-            {contacts.length === 0 ? (
+            {loadingContacts ? <p role="status" className="mt-3 text-sm">Loading contacts…</p> : contactError ? (
+              <div className="mt-3 text-sm">
+                <p role="alert">{contactError}</p>
+                <button type="button" className="mt-2 underline" onClick={retryLoading}>Retry loading contacts</button>
+              </div>
+            ) : contacts.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">
                 No one is available to message yet. Contacts appear here through your
                 student, class, and guardian relationships.

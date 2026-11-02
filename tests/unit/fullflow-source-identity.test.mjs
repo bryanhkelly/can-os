@@ -20,4 +20,9 @@ describe("FullFlow browser checkout provenance before fixture writes",()=>{
       {sourceSha:"not-a-sha",githubRefName:"FullFlow"},
     ]) expect(()=>assertFullFlowCheckout(input)).toThrow(/refused|requires/);
   });
+  it.each(["main", "FullFlow"])("rejects dirty %s source despite a matching commit identity", branch => {
+    expect(() => assertFullFlowCheckout({ sourceSha: sha, localBranch: branch, dirty: true })).toThrow(/working-tree changes/);
+    expect(() => assertFullFlowCheckout({ sourceSha: sha, githubSha: sha, githubRefName: branch,
+      githubRefType: "branch", dirty: true })).toThrow(/working-tree changes/);
+  });
 });
