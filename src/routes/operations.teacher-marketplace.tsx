@@ -7,6 +7,7 @@ import { getCurriculumAdopterPrograms } from "@/modules/learning/curriculum-mark
 import { getTeacherMarketplace } from "@/modules/staffing/teacher-marketplace.functions";
 import { listTeacherStaffingRequests, requestTeacherStaffing } from "@/modules/staffing/teacher-staffing-requests.functions";
 import { Button } from "@/components/ui/button";
+import { assignLaunchTeacher } from "@/modules/programs/launch-academics.functions";
 
 export const Route = createFileRoute("/operations/teacher-marketplace")({
   validateSearch: (search: Record<string, unknown>) => uuidProgramSelectionSchema.parse(search),
@@ -45,6 +46,22 @@ function TeacherMarketplacePage() {
         "CAN staffing request recorded. Teacher assignment is not yet authorized.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The teacher request could not be saved.");
+    } finally { setSubmitting(null); }
+  }
+  async function assignTeacher(courseVersionId: string, teacherPersonId: string) {
+    if (!market || submitting || !targetSection[courseVersionId]) return;
+    setError(""); setNotice("");
+    setSubmitting(`assign:${courseVersionId}:${teacherPersonId}`);
+    try {
+      await assignLaunchTeacher({ data: {
+        programId: market.program.id,
+        sectionId: targetSection[courseVersionId],
+        teacherPersonId,
+      } });
+      await router.invalidate();
+      setNotice("CAN-authorized teacher assignment saved to the selected class.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The instructor could not be assigned to this class.");
     } finally { setSubmitting(null); }
   }
   const search = query.trim().toLowerCase();
@@ -138,6 +155,11 @@ function TeacherMarketplacePage() {
                     : submitting === `${course.versionId}:${teacher.personId}`
                       ? "Submitting…" : "Request CAN staffing review"}
                 </Button>
+                {sectionId && !teacher.isSynthetic && <Button type="button" size="sm"
+                  disabled={submitting !== null}
+                  onClick={() => void assignTeacher(course.versionId, teacher.personId)}>
+                  {submitting === `assign:${course.versionId}:${teacher.personId}` ? "Assigning…" : "Assign authorized teacher"}
+                </Button>}
               </div>;
             })()}
           </article>)}
