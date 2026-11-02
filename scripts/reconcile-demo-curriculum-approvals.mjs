@@ -27,6 +27,15 @@ try {
     JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
     WHERE pv.pack_id=$1 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$1)`,[pack.rows[0].id]);
   const jurisdictions=await client.query("SELECT id FROM jurisdictions");
+  // Internal demo approvals must never overwrite real academic decisions.
+  const conflicts=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
+    WHERE a.academic_purpose='general_instruction'
+      AND a.course_template_version_id=ANY($1::uuid[])
+      AND a.jurisdiction_id=ANY($2::uuid[])
+      AND (a.evidence->>'scope' IS DISTINCT FROM 'internal_demo_only'
+        OR a.authority_organization_id IS DISTINCT FROM $3::uuid)`,
+    [courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id),publisher.rows[0].id]);
+  if(conflicts.rows[0].n>0)throw Error("Refusing to overwrite non-demo curriculum jurisdiction approvals");
   if(courses.rowCount!==120)throw Error("Expected exactly 120 demo course versions before approval");
   if(jurisdictions.rowCount===0)throw Error("No jurisdictions configured");
   const expected=courses.rowCount*jurisdictions.rowCount;
