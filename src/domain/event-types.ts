@@ -63,6 +63,8 @@ export const EventTypes = {
   SectionCreationRequested: "SectionCreationRequested",
   SectionCreationRequestDeclined: "SectionCreationRequestDeclined",
   SectionCreationRequestFulfilled: "SectionCreationRequestFulfilled",
+  TeacherStaffingRequestReviewed: "TeacherStaffingRequestReviewed",
+  TeacherStaffingRequestDeclined: "TeacherStaffingRequestDeclined",
   ProgramLaunchStarted: "ProgramLaunchStarted",
   CalendarEventCreated: "CalendarEventCreated",
   CalendarEventUpdated: "CalendarEventUpdated",
