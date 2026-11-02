@@ -60,6 +60,8 @@ const startLaunchInput = z.object({
   creditMode: z.enum(["credit_bearing", "non_credit"]).optional(),
   siteId: uuid.optional(),
   targetOpeningDate: z.string().refine(isLaunchOpeningDate, "Choose a valid target opening date").optional(),
+}).refine(input=>!input.deliveryModel.onsite||Boolean(input.siteId),{
+  message:"Choose a school location for onsite learning.",path:["siteId"],
 });
 
 async function registrarContext(capability: string) {

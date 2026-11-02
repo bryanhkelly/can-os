@@ -5,7 +5,7 @@ deliveryArrangements,
 enrollments,
 instructionalCapacityOfferings,
 instructionalCapacityReservations,
-programs,roleAssignments,
+programs,roleAssignments,people,studentProfiles,
 scheduleTemplates,
 sectionCapacityDemands,
 sections,
@@ -21,6 +21,8 @@ import { assignLaunchInstructor } from "@/modules/staffing/launch-staffing.serve
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
 import { EventTypes, type EventType } from "@/domain/event-types";
+import { personDisplayName } from "@/domain/person-name";
+import { waitlistStudentVisibility } from "./section-waitlist-search.server";
 type LifecycleContext = CommandContext & { actorPersonId: string };
 async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, sectionId: string) {
   // Acquire the attendance configuration lock BEFORE row FOR UPDATE. The
@@ -58,6 +60,7 @@ async function journal(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], 
 }
 export async function sectionLifecycleSnapshot(context: LifecycleContext, programId: string) {
   assertCapability(context, "program.launch.start");
+  assertCapability(context, "enrollment:manage");
   assertProgramScope(context, programId);
   const [program] = await db.select().from(programs).where(eq(programs.id,programId)).limit(1);
   if (!program || !context.scope.organizationIds?.includes(program.organizationId) ||
@@ -76,10 +79,16 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
   const [staff, students, waits, allocations, demands]=await Promise.all([
     ids.length?db.select({sectionId:sectionTeachers.sectionId,personId:sectionTeachers.personId})
       .from(sectionTeachers).where(inArray(sectionTeachers.sectionId,ids)):[],
-    ids.length?db.select({sectionId:enrollments.sectionId,id:enrollments.id,studentProfileId:enrollments.studentProfileId,status:enrollments.status})
-      .from(enrollments).where(and(inArray(enrollments.sectionId,ids),eq(enrollments.kind,"section"),eq(enrollments.status,"active"))):[],
-    ids.length?db.select({id:actions.id,sectionId:actions.sectionId,subjectId:actions.subjectId,status:actions.status,metadata:actions.metadata})
-      .from(actions).where(and(eq(actions.type,"section_waitlist"),inArray(actions.sectionId,ids),inArray(actions.status,["open","waiting","in_progress"]))):[],
+    ids.length?db.select({sectionId:enrollments.sectionId,id:enrollments.id,studentProfileId:enrollments.studentProfileId,status:enrollments.status,
+      legalFirstName:people.legalFirstName,legalLastName:people.legalLastName,preferredName:people.preferredName,
+      studentNumber:studentProfiles.studentNumber,gradeLevel:studentProfiles.gradeLevel})
+      .from(enrollments).innerJoin(studentProfiles,eq(studentProfiles.id,enrollments.studentProfileId))
+      .innerJoin(people,eq(people.id,studentProfiles.personId)).where(and(inArray(enrollments.sectionId,ids),eq(enrollments.kind,"section"),eq(enrollments.status,"active"))):[],
+    ids.length?db.select({id:actions.id,sectionId:actions.sectionId,subjectId:actions.subjectId,status:actions.status,metadata:actions.metadata,
+      legalFirstName:people.legalFirstName,legalLastName:people.legalLastName,preferredName:people.preferredName,
+      studentNumber:studentProfiles.studentNumber,gradeLevel:studentProfiles.gradeLevel})
+      .from(actions).leftJoin(studentProfiles,eq(studentProfiles.id,actions.subjectId))
+      .leftJoin(people,eq(people.id,studentProfiles.personId)).where(and(eq(actions.type,"section_waitlist"),inArray(actions.sectionId,ids),inArray(actions.status,["open","waiting","in_progress"]))):[],
     ids.length?db.select({sectionId:instructionalCapacityReservations.sectionId,id:instructionalCapacityReservations.id,status:instructionalCapacityReservations.status,offeringId:instructionalCapacityReservations.offeringId})
       .from(instructionalCapacityReservations).where(inArray(instructionalCapacityReservations.sectionId,ids)):[],
     ids.length?db.select({id:sectionCapacityDemands.id,sectionId:sectionCapacityDemands.sectionId})
@@ -92,8 +101,10 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
     scheduleOptions:schedules.filter(s=>s.schoolYearId===yearByTerm.get(row.termId))
       .map(s=>({id:s.scheduleId,name:s.name})),
     teachers:staff.filter(t=>t.sectionId===row.id),
-    students:students.filter(e=>e.sectionId===row.id),
-    waitlist:waits.filter(w=>w.sectionId===row.id),
+    students:students.filter(e=>e.sectionId===row.id).map(({legalFirstName,legalLastName,preferredName,...e})=>
+      ({...e,name:personDisplayName({legalFirstName,legalLastName,preferredName},"Student record unavailable")})),
+    waitlist:waits.filter(w=>w.sectionId===row.id).map(({legalFirstName,legalLastName,preferredName,...w})=>
+      ({...w,name:personDisplayName({legalFirstName,legalLastName,preferredName},"Student record unavailable")})),
     allocations:allocations.filter(a=>a.sectionId===row.id),
     demandId:demands.find(d=>d.sectionId===row.id)?.id??null,
   }));
@@ -206,14 +217,18 @@ export async function changeSectionEnrollment(context: LifecycleContext,input:{e
 }
 export async function addSectionWaitlist(context: LifecycleContext,input:{sectionId:string;studentProfileId:string;reason:string}) {
   assertCapability(context,"program.launch.start");
+  assertCapability(context,"enrollment:manage");
   await db.transaction(async tx=>{
     const section=await authorizedSection(tx,context,input.sectionId);
     if(!section.active)throw new Error("Section is closed");
     const [year]=await tx.select({schoolYearId:terms.schoolYearId}).from(terms)
       .where(eq(terms.id,section.termId)).limit(1);
     if(!year)throw new Error("Academic term not found");
-    const [eligible]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
-      eq(enrollments.studentProfileId,input.studentProfileId),
+    const [eligible]=await tx.select({id:enrollments.id}).from(enrollments)
+      .innerJoin(studentProfiles,eq(studentProfiles.id,enrollments.studentProfileId))
+      .innerJoin(people,eq(people.id,studentProfiles.personId)).where(and(
+      eq(enrollments.studentProfileId,input.studentProfileId),eq(enrollments.organizationId,section.organizationId),
+      eq(people.active,true),waitlistStudentVisibility(tx,context,section.programId,year.schoolYearId),
       eq(enrollments.programId,section.programId),eq(enrollments.schoolYearId,year.schoolYearId),
       eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
     if(!eligible)throw new Error("Student must be enrolled in this program and school year");

@@ -95,7 +95,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    setCreated(null);
+    if(created)return;
+    if(onsite&&!siteId){setError("Choose or save a school location before continuing with onsite learning.");return;}
     try {
       const submission = await launchMutation.submit({
         data: {
@@ -179,9 +180,11 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>
         <div className="mt-8 grid gap-6">
-          {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
           <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
+          <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
+           {extendedPlanning?<ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId}/>:<p role="status" className="mt-3 text-sm">Additional program planning is temporarily unavailable. You can continue setting up your school.</p>}
+          </details>
         </div>
     </WorkspaceShell>
   );

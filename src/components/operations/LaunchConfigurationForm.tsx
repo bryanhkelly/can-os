@@ -17,9 +17,9 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
 }) {
  const {options}=hostAndProvider;
  return <>
+          <LaunchCreatedHandoff created={created} />
           <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
             <summary className="cursor-pointer text-lg font-semibold">Launch a school · School Basics</summary>
-            <LaunchCreatedHandoff created={created} />
             <LaunchSchoolModelPicker {...modelPresets} />
             <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
               <LaunchProgramIdentityFields {...identity} />
@@ -31,13 +31,14 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
               <button
                 type="submit"
                 className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                disabled={busy || !options.organizations.length}
+                disabled={busy || Boolean(created) || !options.organizations.length || (delivery.onsite && !hostAndProvider.siteId)}
               >
-                Start launch
+                {busy ? "Saving your school…" : created ? "School saved" : "Save school and continue"}
               </button>
+              {delivery.onsite&&!hostAndProvider.siteId&&<p role="status" className="text-sm text-muted-foreground">Choose or save a school location above before continuing with onsite learning.</p>}
               {!options.organizations.length && (
                 <p className="text-xs text-muted-foreground">
-                  No organizations are in scope for this registrar grant.
+                  Your account does not yet have access to set up a school. Ask your CAN contact to confirm your school setup invitation.
                 </p>
               )}
             </form>

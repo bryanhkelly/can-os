@@ -44,3 +44,13 @@ Run `npm run typecheck` and `npm run build`, then validate end-to-end against a 
 - School-timezone-aware schedule editing, cross-course conflict detection, automatic family offer acceptance/decline, and comprehensive enrollment prereq/credit policy reconciliation are not yet complete.
 - The existing migration-history snapshots predate the latest schema migration; reconcile generated Drizzle snapshots and validate against a disposable Neon branch before deploying.
 - Do not enable the feature for real student data until privacy, authorization and end-to-end operation are verified.
+
+## Registrar selection and recovery
+
+Lifecycle student selection uses display names, grades and student numbers instead of requiring profile UUIDs. Waitlist search is limited to 25 results with a refinement notice, and requires at least two literal search characters. The server checks the target Section's organization, Site, Program and Section scope before reading candidates. Candidates must have active Program enrollment in the Section's school year; existing class enrollments and unresolved waitlist Actions are excluded. Section-restricted grants additionally require an active enrollment in a permitted Section. The add command rechecks Program/year membership and the same student visibility restriction inside its existing audited transaction.
+
+Student search distinguishes unavailable results from no matching eligible students and supports retry. Changing a search clears its previous selection; late responses are ignored. Successful additions clear the search after the canonical refresh. Lifecycle loading can be retried, and stale enrollment selections cannot enable transfer or exit commands after refresh.
+
+The public church application confirmation displays the submitted church, proposed Site and contact email, explains independent review and invitation sequencing, and links to CAN Academy's existing contact form for corrections or follow-up. Review timing is explicitly variable; no service-level deadline, email delivery or approval is inferred from submission. The public response continues to conceal duplicate/application status and does not expose internal request identifiers.
+
+Authenticated browser and disposable-database acceptance for these changes remains required.

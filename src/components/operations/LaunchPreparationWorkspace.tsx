@@ -33,7 +33,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
   const recordedOutreachMinutes=firstInvitationTime!==undefined&&Number.isFinite(launchStart)&&firstInvitationTime>=launchStart
     ? Math.floor((firstInvitationTime-launchStart)/60000):null;
   return <>
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5">
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<details aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Setup timing and saved milestones</summary>
           <h2 className="font-serif text-xl">Recorded launch start</h2>
           <p className="mt-2 text-sm">Program creation: <time dateTime={currentLaunch.createdAt}>{new Date(currentLaunch.createdAt).toLocaleString()}</time>.</p>
           {firstInvitationTime!==undefined&&<p className="mt-2 text-sm">First saved invitation batch: <time dateTime={new Date(firstInvitationTime).toISOString()}>{new Date(firstInvitationTime).toLocaleString()}</time>.</p>}
@@ -42,9 +42,9 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           {firstInvitationTime!==undefined&&recordedOutreachMinutes===null&&<p role="alert" className="mt-2 text-sm">Saved invitation timestamp cannot be reconciled with Program creation; no elapsed time is reported.</p>}
           {currentLaunch.journey?.status==="ready"&&<p className="mt-2 text-sm">Independent review of opening is the next institutional handoff; journey readiness is not an opening timestamp.</p>}
           <p className="mt-2 text-xs text-muted-foreground">This timestamp is from the saved Program, not a browser stopwatch. No completion duration is claimed until a separately persisted completion or opening event is available. CAN review, hosting and third-party response time cannot be counted as school-controlled setup time without independently timestamped events.</p>
-        </section>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section aria-label="Persisted launch journey" className="mt-5 rounded-xl border bg-card p-5">
-          <h2 className="font-serif text-2xl">Your school's recorded launch path</h2>
+        </details>}
+        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<details aria-label="Persisted launch journey" className="mt-5 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved setup and opening status</summary>
+          <h2 className="mt-3 font-serif text-2xl">Your school's recorded launch path</h2>
           <p className="mt-2 text-sm text-muted-foreground">This view reads the saved Program, launch requirements and invitation records. Pending review is never treated as approval. Academic year, Section, website publication and safeguarding status must be verified in their authoritative workspaces.</p>
           <ol className="mt-4 grid gap-3 md:grid-cols-2">
             <li className="rounded-lg border p-3 text-sm"><strong className="block">1. School Program · Recorded</strong>{currentLaunch.name} · {currentLaunch.status}<p className="mt-1 text-xs">Owner: host registrar · Program and Site are saved; this does not authorize opening.</p></li>
@@ -54,7 +54,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
             <li className="rounded-lg border p-3 text-sm"><strong className="block">5. Families · {familyInvitations?.batches.some(batch=>batch.programId===currentLaunch.id&&(!currentLaunch.siteId||batch.siteId===currentLaunch.siteId))?"Invitation batches recorded":"No confirmed invitation batch"}</strong><p className="mt-1 text-xs">Owner: authorized outreach operator; provider acceptance is not inbox delivery, and family interest is not enrollment.</p><a href="#invite-families" className="mt-2 inline-block underline">Resume family outreach</a></li>
             <li className="rounded-lg border p-3 text-sm"><strong className="block">6. School opening · {currentLaunch.status==="active"?"Active Program":"Not opened"}</strong><p className="mt-1 text-xs">Owner: institutional opening authority and named receiving operator. First student scheduled is not inferred from enrollment counts.</p></li>
           </ol>
-        </section>}
+        </details>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<nav aria-label="School preparation steps" className="mt-4 flex flex-wrap gap-4 rounded-xl border bg-card p-4 text-sm font-semibold">
           <a href="#launch-services" className="underline">1. CAN services</a>
           <a href="#launch-academic-year" className="underline">2. Academic year</a>
@@ -62,7 +62,10 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           <a href="#launch-website" className="underline">4. School website</a>
           <a href="#invite-families" className="underline">5. Invite families</a>
         </nav>}
-        {currentSchoolStatus!=="active"&&<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>}
+        {currentSchoolStatus!=="active"&&(currentLaunch?<details className="mt-4 rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Opening requirements and CAN review</summary>
+          <p className="mt-2 text-sm text-muted-foreground">Keep preparing your school while these requirements are reviewed. Completing setup does not authorize opening.</p>
+          <OneHourSchoolLaunch key={currentLaunch.id} launches={launches} selectedProgramId={currentLaunch.id} selectedSiteId={currentLaunch.siteId??undefined}/>
+        </details>:<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>)}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
           <ProgramSiteAuthorizationPanel key={currentLaunch.id} programId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
