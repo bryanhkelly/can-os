@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   actions, courseTemplates, courseTemplateVersions, instructorCapabilities,
-  instructionalCapacityOfferings, memberships, organizations, people, programs, sections,
+  instructionalCapacityOfferings, instructorAvailabilityWindows, memberships, organizations, people, programs, sections,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -83,6 +83,7 @@ export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
         }).from(sections).where(and(
           eq(sections.id, data.sectionId),
           eq(sections.programId, data.programId),
+          eq(sections.siteId, school.siteId),
           eq(sections.courseTemplateVersionId, data.courseVersionId),
           eq(sections.active, true),
         )).limit(1);
@@ -100,11 +101,14 @@ export const requestDemoTeacherStaffing = createServerFn({ method: "POST" })
         .innerJoin(instructionalCapacityOfferings,
           and(eq(instructionalCapacityOfferings.personId, people.id),
             eq(instructionalCapacityOfferings.capabilityId, instructorCapabilities.id)))
+        .innerJoin(instructorAvailabilityWindows,
+          eq(instructorAvailabilityWindows.id, instructionalCapacityOfferings.availabilityWindowId))
         .where(and(
           eq(courseTemplateVersions.id, data.courseVersionId),
           eq(people.id, data.teacherPersonId),
           eq(people.active, true),
           eq(instructorCapabilities.active, true),
+          eq(instructorAvailabilityWindows.active, true),
           eq(instructionalCapacityOfferings.status, "open"),
           eq(organizations.slug, "can-demo-teaching-provider"),
           sql`${organizations.metadata}->>'demoProvider' = 'true'`,
