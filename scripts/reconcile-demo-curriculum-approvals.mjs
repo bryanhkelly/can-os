@@ -26,7 +26,7 @@ try {
     FROM curriculum_pack_items i
     JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
     WHERE pv.pack_id=$1 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$1)`,[pack.rows[0].id]);
-  const jurisdictions=await client.query("SELECT id FROM jurisdictions");
+  const jurisdictions=await client.query("SELECT id FROM jurisdictions WHERE code IN ('TX','FL','AZ','WV','AR','IA','OK','WI')");
   // Internal demo approvals must never overwrite real academic decisions.
   const conflicts=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
     WHERE a.academic_purpose='general_instruction'
@@ -37,7 +37,7 @@ try {
     [courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id),publisher.rows[0].id]);
   if(conflicts.rows[0].n>0)throw Error("Refusing to overwrite non-demo curriculum jurisdiction approvals");
   if(courses.rowCount!==120)throw Error("Expected exactly 120 demo course versions before approval");
-  if(jurisdictions.rowCount===0)throw Error("No jurisdictions configured");
+  if(jurisdictions.rowCount!==8)throw Error("Expected eight explicitly scoped demo jurisdictions");
   const expected=courses.rowCount*jurisdictions.rowCount;
   const existing=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
     WHERE a.academic_purpose='general_instruction'
@@ -53,7 +53,7 @@ try {
       FROM (SELECT DISTINCT i.course_template_version_id AS id FROM curriculum_pack_items i
         JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
         WHERE pv.pack_id=$2 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$2)) c
-      CROSS JOIN jurisdictions j
+      CROSS JOIN (SELECT id FROM jurisdictions WHERE code IN ('TX','FL','AZ','WV','AR','IA','OK','WI')) j
       ON CONFLICT (course_template_version_id,jurisdiction_id,academic_purpose)
       DO UPDATE SET status='approved',authority_organization_id=EXCLUDED.authority_organization_id,
       evidence=EXCLUDED.evidence,updated_at=now()`,[publisher.rows[0].id,pack.rows[0].id]);
