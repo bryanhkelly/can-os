@@ -3,6 +3,8 @@ import {useRouter} from "@tanstack/react-router";
 import {beginEnrollmentDocumentUpload,finishEnrollmentDocumentUpload,getEnrollmentDocumentDownload,getEnrollmentDocumentUploadAvailability} from "@/modules/enrollment/r2-document-upload.functions";
 import {getFamilyReadiness,setFamilyRequirement,addRequirementReviewNote,reviewRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
 import {RegistrarEnrollmentFormReview} from "@/components/enrollment/EnrollmentForm";
+import {PrivateUploadCompletion,validateUploadFile,type PrivateUpload} from "@/platform/storage/private-upload";
+import {normalizeClientError} from "@/lib/client-error";
 
 export type ReadinessApplication=Awaited<ReturnType<typeof getFamilyReadiness>>[number];
 
@@ -14,7 +16,9 @@ export function ApplicationReadinessPanel({application:a}:{application:Readiness
  useEffect(()=>setInteractive(true),[]);
  const busy=interactive?pending:"hydrating";
  const [files,setFiles]=useState<Record<string,File|null>>({});
- const pendingUploads=useRef(new Map<string,{file:File;key:string}>());
+ const pendingUploads=useRef(new Map<string,PrivateUploadCompletion<PrivateUpload>>());
+ const uploadAbort=useRef<AbortController|null>(null);
+ useEffect(()=>()=>uploadAbort.current?.abort(),[]);
  const [uploadModes,setUploadModes]=useState({live:false,demo:false});
  useEffect(()=>{void getEnrollmentDocumentUploadAvailability().then(setUploadModes)
   .catch(cause=>setError(cause instanceof Error?cause.message:"Unable to load document upload availability"));},[]);
@@ -22,19 +26,19 @@ export function ApplicationReadinessPanel({application:a}:{application:Readiness
  async function update(applicationId:string,requirementId:string,complete:boolean){
   setBusy(requirementId);setError("");
   try{await setFamilyRequirement({data:{applicationId,requirementId,complete}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Requirement update failed");}
+  catch(e){setError(normalizeClientError(e,{fallback:"Requirement update failed."}).message);}
   finally{setBusy(null);}
  }
  async function addNote(applicationId:string,requirementId:string){
   setBusy(requirementId);setError("");
   try{await addRequirementReviewNote({data:{applicationId,requirementId,note:notes[requirementId]??""}});setNotes(previous=>({...previous,[requirementId]:""}));await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Review note failed");}
+  catch(e){setError(normalizeClientError(e,{fallback:"Review note failed."}).message);}
   finally{setBusy(null);}
  }
  async function review(applicationId:string,requirementId:string,status:"requested"|"received"|"accepted"|"rejected"){
   setBusy(requirementId);setError("");
   try{await reviewRequirementDocument({data:{applicationId,requirementId,status,reason:notes[requirementId]??"",documentId:reviewFiles[requirementId]||undefined}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Document review failed");}
+  catch(e){setError(normalizeClientError(e,{fallback:"Document review failed."}).message);}
   finally{setBusy(null);}
  }
  async function openDocument(applicationId:string,requirementId:string,documentId:string){
@@ -42,27 +46,26 @@ export function ApplicationReadinessPanel({application:a}:{application:Readiness
   try{
    const result=await getEnrollmentDocumentDownload({data:{applicationId,requirementId,documentId}});
    window.open(result.downloadUrl,"_blank","noopener,noreferrer");
-  }catch(e){setError(e instanceof Error?e.message:"Unable to open document");}
+  }catch(e){setError(normalizeClientError(e,{fallback:"Unable to open document."}).message);}
   finally{setBusy(null);}
  }
  async function upload(applicationId:string,requirementId:string){
   const file=files[requirementId];if(!file)return;
+  const controller=new AbortController();uploadAbort.current=controller;
   setBusy(requirementId);setError("");
   try{
+   validateUploadFile(file,file.type);
    const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
-   const previous=pendingUploads.current.get(requirementId);
-   let key=previous?.file===file?previous.key:undefined;
-   if(!key){
-    const upload=await beginEnrollmentDocumentUpload({data:request});
-    const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":file.type},body:file});
-    if(!response.ok)throw new Error("Cloudflare R2 upload failed ("+response.status+")");
-    key=upload.key;pendingUploads.current.set(requirementId,{file,key});
-   }
-   await finishEnrollmentDocumentUpload({data:{...request,key}});
+   let completion=pendingUploads.current.get(requirementId);
+   if(!completion){completion=new PrivateUploadCompletion<PrivateUpload>();pendingUploads.current.set(requirementId,completion);}
+   await completion.run(file,
+    ()=>beginEnrollmentDocumentUpload({data:request}),
+    upload=>finishEnrollmentDocumentUpload({data:{...request,key:upload.objectKey}}),
+    controller.signal);
    pendingUploads.current.delete(requirementId);
    setFiles(previous=>({...previous,[requirementId]:null}));await router.invalidate();
-  }catch(e){setError(e instanceof Error?e.message:"Document upload failed");}
-  finally{setBusy(null);}
+  }catch(e){setError(normalizeClientError(e,{fallback:"Document upload failed."}).message);}
+  finally{if(uploadAbort.current===controller)uploadAbort.current=null;setBusy(null);}
  }
  return <div>
   {error&&<p role="alert" className="mt-3 rounded-xl border border-red-400 p-3 text-sm">{error}</p>}
@@ -93,4 +96,3 @@ export function ApplicationReadinessPanel({application:a}:{application:Readiness
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
  </div>;
 }
-

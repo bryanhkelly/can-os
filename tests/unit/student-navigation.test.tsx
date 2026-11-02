@@ -61,6 +61,8 @@ describe("Student Today summary navigation", () => {
     expect(html).toMatch(/<a href="\/student\/courses"[^>]*><p[^>]*>Classes<\/p>/);
     expect(html).toMatch(/<a href="\/student\/assignments"[^>]*><p[^>]*>Upcoming assignments<\/p>/);
     expect(html).toMatch(/<a href="\/student\/assignments\?filter=missing"[^>]*><p[^>]*>Missing work<\/p>/);
+    expect(html).toContain('href="/student/experiences"');
+    expect(html).toContain("School &amp; community");
   });
 
   it("opens assessment actions in the assignment and other actions individually", () => {
@@ -76,6 +78,76 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain('href="/student/assignments?assessment=returned"');
     expect(html).toContain('href="/student/experiences?action=help"');
     expect(html).not.toContain('href="/student/experiences?action=revision"');
+  });
+
+  it("surfaces the first missing assignment as the student's next action", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [], events: [], openActions: [], recoveryCandidates: [],
+      coursework: [{
+        assessmentId: "essay", assessmentTitle: "English essay", instructions: "Revise your draft.",
+        dueAt: null, status: "assigned", timeliness: "missing",
+      }],
+    }} />);
+    expect(html).toContain("Start here");
+    expect(html).toContain("Missing work");
+    expect(html).toContain('href="/student/assignments?assessment=essay"');
+  });
+
+  it("shows a calm empty state when there are no urgent items", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [], coursework: [], events: [], openActions: [], recoveryCandidates: [],
+    }} />);
+    expect(html).toContain("No urgent items right now.");
+  });
+
+  it("formats schedule event times in the event's canonical timezone", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [{
+        sectionId: "section",
+        sectionTitle: "Pacific class",
+        siteId: "site",
+        siteTimezone: "America/Los_Angeles",
+        schoolYearTimezone: "UTC",
+        programId: "program",
+        schoolYearId: "year",
+      }],
+      coursework: [{
+        submissionId: "submission",
+        assessmentId: "assessment",
+        assessmentTitle: "Pacific assignment",
+        instructions: null,
+        dueAt: "2027-01-15T07:30:00.000Z",
+        status: "assigned",
+        timeliness: "on_time",
+        score: null,
+        pointsPossible: "100",
+        sectionId: "section",
+        submittedAt: null,
+      }],
+      openActions: [], recoveryCandidates: [],
+      events: [{
+        id: "event",
+        title: "Pacific session",
+        description: null,
+        type: "instruction",
+        startsAt: "2027-01-15T07:30:00.000Z",
+        endsAt: "2027-01-15T08:30:00.000Z",
+        timezone: "America/Los_Angeles",
+        cancelled: true,
+        siteId: "site",
+        sectionId: null,
+        sourceType: "school",
+      }],
+    }} />);
+    expect(html).toContain("Due Jan 14, 2027, 11:30 PM · America/Los_Angeles");
+    expect(html).toContain("Jan 14, 2027, 11:30 PM · America/Los_Angeles");
+    expect(html).toContain("Cancelled");
   });
 });
 

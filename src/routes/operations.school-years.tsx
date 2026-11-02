@@ -7,6 +7,7 @@ import {
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 export const Route=createFileRoute("/operations/school-years")({
  loader:safeLoader(()=>getSchoolYearStudio(),{authMessage:"Sign in as an authorized academic registrar."}),
  component:SchoolYearStudio
@@ -28,19 +29,22 @@ function Studio({data}:{data:Snapshot}){
  const [name,setName]=useState("2027–2028 School Year");
  const [key,setKey]=useState("2027-28");
  const [start,setStart]=useState("2027-08-16"),[end,setEnd]=useState("2028-06-09");
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useMutationFeedback();
+ const busy=mutation.disabled;
  async function run(operation:()=>Promise<unknown>){
-  setBusy(true);setError("");setNotice("");
-  try{await operation();await router.invalidate();setNotice("Saved to school records.");}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save");}finally{setBusy(false);}
+  await mutation.run(operation,{
+   fallback:"Unable to save school-year changes.",
+   success:"Saved to school records.",
+   refresh:()=>router.invalidate(),
+  });
  }
  const scopedPrograms=data.programs.filter(p=>p.siteId===siteId);
  const site=data.sites.find(s=>s.id===siteId);
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="School-year studio"
   subtitle="Configure site-owned school years, terms, grading periods and academic calendars. Activation requires readiness checks."
   actions={<Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
-  {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
-  {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+  {mutation.error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Create a school year</h2>
    <div className="mt-4 grid gap-3 sm:grid-cols-2">

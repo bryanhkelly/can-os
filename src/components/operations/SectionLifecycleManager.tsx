@@ -1,6 +1,8 @@
 import { getCapacityCandidates, swapCommittedInstructor } from "@/modules/staffing/educational-capacity.functions";
 import {useEffect,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
+import {ValidationError} from "@/domain/errors";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
  transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist,offerLifecycleWaitlistSeat
@@ -25,15 +27,18 @@ export function SectionLifecycleWorkspace({programId,staff}:{programId:string;st
 export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Snapshot;staff:{personId:string;first:string;last:string}[];onChanged:()=>Promise<void>}){
  const router=useRouter();
  const [reason,setReason]=useState("");
- const [busy,setBusy]=useState("");
- const [error,setError]=useState("");
- const [message,setMessage]=useState("");
- async function run(id:string,operation:()=>Promise<unknown>,success:string){
-  if(reason.trim().length<5){setError("Provide an explanation (at least 5 characters) for the operational record.");return;}
-  setBusy(id);setError("");setMessage("");
-  try{await operation();await onChanged();await router.invalidate();setMessage(success);setReason("");}
-  catch(e){setError(e instanceof Error?e.message:"Lifecycle change failed");}
-  finally{setBusy("");}
+ const mutation=useMutationFeedback();
+ const busy=mutation.disabled;
+ async function run(_id:string,operation:()=>Promise<unknown>,success:string){
+  const outcome=await mutation.run(async()=>{
+   if(reason.trim().length<5)throw new ValidationError("Provide an explanation (at least 5 characters) for the operational record.");
+   return operation();
+  },{
+   fallback:"Lifecycle change failed.",
+   success,
+   refresh:async()=>{await onChanged();await router.invalidate();},
+  });
+  if(outcome.status==="saved"||outcome.status==="refresh-failed")setReason("");
  }
  return <section className="mt-9 space-y-4" aria-label="Operational lifecycle">
   <h2 className="font-serif text-2xl">School operations · lifecycle management</h2>
@@ -43,8 +48,8 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
     placeholder="Document the decision and any necessary student/teacher follow-up"
     className="mt-1 block w-full rounded border bg-background p-2"/>
   </label>
-  {error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{error}</p>}
-  {message&&<p role="status" className="rounded border p-3 text-sm">{message}</p>}
+  {mutation.error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="rounded border p-3 text-sm">{mutation.notice}</p>}
   {sections.map(section=><LifecycleSection key={section.id} section={section} staff={staff}
    busy={Boolean(busy)} reason={reason} allSections={sections} run={run} onChanged={onChanged}/>)}
  </section>;
@@ -172,8 +177,7 @@ function CapacityReplacement({section,reason,onChanged}:{section:Snapshot[number
  const [reservationId,setReservationId]=useState("");
  const [offeringId,setOfferingId]=useState("");
  const [candidates,setCandidates]=useState<Awaited<ReturnType<typeof getCapacityCandidates>>>([]);
- const [error,setError]=useState("");
- const [busy,setBusy]=useState(false);
+ const mutation=useMutationFeedback();
  useEffect(()=>{
   let alive=true;
   if(!section.demandId)return;
@@ -197,13 +201,15 @@ function CapacityReplacement({section,reason,onChanged}:{section:Snapshot[number
     {candidates.map(c=><option key={c.offeringId} value={c.offeringId}>{c.instructorName} · {c.remainingSeats} seats</option>)}
    </select>
   </label>
-  <button disabled={busy||!reservationId||!offeringId||reason.trim().length<5} type="button"
+  <button disabled={mutation.disabled||!reservationId||!offeringId||reason.trim().length<5} type="button"
     className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50" onClick={async()=>{
-     setBusy(true);setError("");
-     try{await swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}});await onChanged();setReservationId("");setOfferingId("")}
-     catch(e){setError(e instanceof Error?e.message:"Unable to replace instructor")}
-     finally{setBusy(false)}
+     const outcome=await mutation.run(
+      ()=>swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}}),
+      {fallback:"Unable to replace instructor.",success:"Instructor replacement committed.",refresh:onChanged},
+     );
+     if(outcome.status==="saved"||outcome.status==="refresh-failed"){setReservationId("");setOfferingId("")}
     }}>Commit replacement</button>
-  {error&&<p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+  {mutation.error&&<p role="alert" className="mt-2 text-xs text-red-600">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="mt-2 text-xs">{mutation.notice}</p>}
  </div>;
 }

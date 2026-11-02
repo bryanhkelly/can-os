@@ -81,13 +81,17 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
   const sectionIds = await activeSectionIds(s, student.studentProfileId, siteIds,context.scope.programIds??[]);
   let missingCount = 0;
   let nextDueAt: string | null = null;
+  let nextDueTimezone: string | null = null;
   if (sectionIds.length) {
    const published = await db.select({
     assessmentId: s.assessments.id,
     dueAt: s.assessments.dueAt,
+    timezone: s.sites.timezone,
     submissionId: s.submissions.id,
     submissionStatus: s.submissions.status,
    }).from(s.assessments)
+    .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
+    .innerJoin(s.sites, eq(s.sites.id, s.sections.siteId))
     .leftJoin(s.submissions, and(
      eq(s.submissions.assessmentId, s.assessments.id),
      eq(s.submissions.studentProfileId, student.studentProfileId),
@@ -106,7 +110,10 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     if (!row.dueAt) continue;
     if (row.dueAt.getTime() < now.getTime() && unsubmitted) missingCount += 1;
     if (row.dueAt.getTime() >= now.getTime() && unsubmitted) {
-     if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) nextDueAt = row.dueAt.toISOString();
+     if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) {
+      nextDueAt = row.dueAt.toISOString();
+      nextDueTimezone = row.timezone;
+     }
     }
    }
   }
@@ -141,6 +148,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    missingCount,
    unexcusedAbsences,
    nextDueAt,
+   nextDueTimezone,
    status: sectionIds.length === 0 ? "awaiting_courses" as const : missingCount > 0 || unexcusedAbsences > 0 ? "needs_attention" as const : "on_track" as const,
   };
  }));
@@ -169,12 +177,15 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
 
  const openActions = await db.select({
   id: s.actions.id,
+  siteId: s.actions.siteId,
   type: s.actions.type,
   title: s.actions.title,
   description: s.actions.description,
   priority: s.actions.priority,
   dueAt: s.actions.dueAt,
+  timezone: s.sites.timezone,
  }).from(s.actions)
+  .leftJoin(s.sites, eq(s.sites.id, s.actions.siteId))
   .where(and(
    eq(s.actions.ownerPersonId, actor),
    inArray(s.actions.status, ["open", "in_progress"]),
@@ -184,7 +195,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
 
  const students = await guardianStudents(s, actor, siteIds,context.scope.programIds??[]);
  const excuseWindow = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
- const excuseItems: { id: string; title: string; childName: string; studentPersonId: string; expectedAt: string }[] = [];
+ const excuseItems: { id: string; title: string; childName: string; studentPersonId: string; expectedAt: string; timezone: string }[] = [];
  for (const student of students) {
   const rows = await db.select({
    id: s.attendanceEvents.id,
@@ -194,8 +205,10 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    recordedAt: s.attendanceEvents.recordedAt,
    status: s.attendanceEvents.status,
    expectedAt: s.attendanceEvents.expectedAt,
+   timezone: s.sites.timezone,
    excuseId: s.attendanceExcuses.id,
   }).from(s.attendanceEvents)
+   .innerJoin(s.sites, eq(s.sites.id, s.attendanceEvents.siteId))
    .leftJoin(s.attendanceExcuses, eq(s.attendanceExcuses.attendanceEventId, s.attendanceEvents.id))
    .where(and(
     eq(s.attendanceEvents.studentProfileId, student.studentProfileId),
@@ -204,14 +217,16 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
     gte(s.attendanceEvents.expectedAt, excuseWindow),
    ))
    .orderBy(desc(s.attendanceEvents.expectedAt));
-  for (const row of effectiveAttendanceEvents(rows).filter(row=>row.status==="absent").slice(0,10)) {
-   if (!row.excuseId) {
-    excuseItems.push({
+   const timezonesByEvent = new Map(rows.map(row => [row.id, row.timezone]));
+   for (const row of effectiveAttendanceEvents(rows).filter(row=>row.status==="absent").slice(0,10)) {
+    if (!row.excuseId) {
+     excuseItems.push({
      id: row.id,
      title: "Absence needs an excuse",
      childName: student.firstName ?? student.legalFirstName,
      studentPersonId: student.studentPersonId,
      expectedAt: row.expectedAt.toISOString(),
+     timezone: timezonesByEvent.get(row.id) ?? "UTC",
     });
    }
   }
@@ -235,6 +250,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   href: `/guardian?action=${encodeURIComponent(row.id)}`,
   priority:row.priority,
   dueAt:row.dueAt?.toISOString()??null,
+  timezone:row.timezone ?? "UTC",
   createdAt: row.dueAt?.toISOString() ?? "",
  }));
  const absenceItems = excuseItems.map(row => ({
@@ -242,7 +258,10 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   kind: "excuse" as const,
   type: "attendance_excuse",
   title: `${row.childName}: ${row.title}`,
-  detail: `Absence on ${new Date(row.expectedAt).toLocaleDateString()} has no excuse yet.`,
+  detail: `Absence on ${new Intl.DateTimeFormat("en-US", {
+   dateStyle: "medium", timeZone: row.timezone,
+  }).format(new Date(row.expectedAt))} has no excuse yet.`,
+  timezone: row.timezone,
   href: `/guardian/attendance?student=${encodeURIComponent(row.studentPersonId)}&attendance=${encodeURIComponent(row.id)}`,
   createdAt: row.expectedAt,
  }));

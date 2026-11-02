@@ -3,6 +3,8 @@ import { processSubscriptionReminders, processQueuedSubscriptionDeliveries, proc
 import { expireOutstandingSectionOffers } from "@/modules/programs/section-lifecycle-service";
 import { processPendingDomainEvents } from "./domain-event-worker";
 
+const MAX_SCHEDULED_DOMAIN_EVENTS = 500;
+
 /**
  * Periodic maintenance for the transactional outbox. GF1 depends on this running:
  * overdue submissions are marked missing (emitting AssignmentBecameMissing) and
@@ -20,7 +22,7 @@ export async function runScheduledJobs(): Promise<{
   expiredSectionOffers: number;
 }> {
   const missing = await markOverdueSubmissionsMissing();
-  const processed = await processPendingDomainEvents();
+  const processed = await processPendingDomainEvents(MAX_SCHEDULED_DOMAIN_EVENTS);
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();
   const deliveries = await processQueuedSubscriptionDeliveries();

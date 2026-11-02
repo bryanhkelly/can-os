@@ -449,6 +449,10 @@ The student Support page uses the same destinations for support-action titles
 and Review links: assessment-backed actions open the exact assignment, while
 support requests and other follow-ups open their selected saved-action detail.
 These links do not grant access to private staff referral or service records.
+Submitting a general student help request sends an in-app notification to one
+active counselor at the student's site. The counselor's caseload timeline
+shows the request under the student's scoped support history; the notification
+does not include the student's message.
 
 My classes uses `/student/courses` with actively enrolled sections only.
 `section` selects the class and `tab=overview|classwork|grades` selects its

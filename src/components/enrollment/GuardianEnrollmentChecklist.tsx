@@ -4,6 +4,8 @@ import { getGuardianEnrollmentChecklist } from "@/modules/enrollment/guardian-en
 import { beginEnrollmentDocumentUpload, finishEnrollmentDocumentUpload, getEnrollmentDocumentDownload,
   getEnrollmentDocumentUploadAvailability } from "@/modules/enrollment/r2-document-upload.functions";
 import { GuardianEnrollmentForm } from "./EnrollmentForm";
+import { PrivateUploadCompletion, validateUploadFile, type PrivateUpload } from "@/platform/storage/private-upload";
+import { normalizeClientError } from "@/lib/client-error";
 
 type Checklist = Awaited<ReturnType<typeof getGuardianEnrollmentChecklist>>;
 type Availability = Awaited<ReturnType<typeof getEnrollmentDocumentUploadAvailability>>;
@@ -16,7 +18,8 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
   const [busy, setBusy] = useState<string | null>(null);
   const [files, setFiles] = useState<Record<string, File | null>>({});
   const [notice, setNotice] = useState("");
-  const pending = useRef(new Map<string, { file: File; key: string }>());
+  const pending = useRef(new Map<string, PrivateUploadCompletion<PrivateUpload>>());
+  const uploadAbort = useRef<AbortController | null>(null);
   useEffect(() => {
     let current = true;
     setData(null); setError("");
@@ -30,37 +33,43 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
     });
     return () => { current = false; };
   }, [applicationId, attempt]);
+  useEffect(() => () => uploadAbort.current?.abort(), []);
 
   async function upload(requirementId: string) {
     const file = files[requirementId];
     if (!file) { setError("Choose a PDF, JPEG or PNG file first."); return; }
+    const controller = new AbortController();
+    uploadAbort.current = controller;
     setBusy(requirementId); setError(""); setNotice("");
     try {
+      validateUploadFile(file, file.type);
       const request = { applicationId, requirementId, fileName: file.name, mimeType: file.type, size: file.size };
-      const previous = pending.current.get(requirementId);
-      let key = previous?.file === file ? previous.key : undefined;
-      if (!key) {
-        const upload = await beginEnrollmentDocumentUpload({ data: request });
-        const response = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-        if (!response.ok) throw new Error(`Document upload failed (${response.status}). Please retry.`);
-        key = upload.key;
-        pending.current.set(requirementId, { file, key });
+      let completion = pending.current.get(requirementId);
+      if (!completion) {
+        completion = new PrivateUploadCompletion<PrivateUpload>();
+        pending.current.set(requirementId, completion);
       }
-      await finishEnrollmentDocumentUpload({ data: { ...request, key } });
+      await completion.run(file,
+        () => beginEnrollmentDocumentUpload({ data: request }),
+        upload => finishEnrollmentDocumentUpload({ data: { ...request, key: upload.objectKey } }),
+        controller.signal);
       pending.current.delete(requirementId);
       setFiles(current => ({ ...current, [requirementId]: null }));
       setNotice("Document received. Admissions must review it before this requirement is complete.");
       setAttempt(value => value + 1);
       await router.invalidate();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to upload enrollment document"); }
-    finally { setBusy(null); }
+    } catch (cause) { setError(normalizeClientError(cause, { fallback: "Unable to upload enrollment document." }).message); }
+    finally {
+      if (uploadAbort.current === controller) uploadAbort.current = null;
+      setBusy(null);
+    }
   }
   async function openDocument(requirementId: string, documentId: string) {
     setBusy(requirementId); setError("");
     try {
       const { downloadUrl } = await getEnrollmentDocumentDownload({ data: { applicationId, requirementId, documentId } });
       window.open(downloadUrl, "_blank", "noopener,noreferrer");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open enrollment document"); }
+    } catch (cause) { setError(normalizeClientError(cause, { fallback: "Unable to open enrollment document." }).message); }
     finally { setBusy(null); }
   }
   return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">

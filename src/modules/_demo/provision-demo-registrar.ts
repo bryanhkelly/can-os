@@ -4,7 +4,7 @@ import {
   accessAccounts, accountPersonGrants, memberships, organizations, people,
   programs, roleAssignments, sites,
 } from "@/db/schema";
-import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { isLocalDemoProvisioningEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 export const demoRegistrar = {
@@ -40,8 +40,8 @@ async function provisionScopedRegistrar(
   fixture: { personId: string; accountId: string; grantId: string; roleAssignmentId: string;
     organizationId: string; siteId: string; email: string },
 ) {
-  if (!isLocalDemoAccessEnabled(env)) {
-    throw new Error("Registrar provisioning requires local/test demo access");
+  if (!isLocalDemoProvisioningEnabled(env)) {
+    throw new Error("Registrar provisioning requires local/test mode and CAN_DEMO_FIXED_ACCESS_ENABLED=true");
   }
   const isAdmin = fixture.accountId === LOCAL_DEMO_ADMIN.accountId;
   return database.transaction(async tx => {
@@ -152,8 +152,8 @@ async function provisionScopedRegistrar(
 }
 
 export async function provisionDemoSchoolAccess(database: Pick<Database, "transaction">, env: DemoEnvironment) {
-  if (!isLocalDemoAccessEnabled(env)) {
-    throw new Error("Registrar provisioning requires local/test demo access");
+  if (!isLocalDemoProvisioningEnabled(env)) {
+    throw new Error("Registrar provisioning requires local/test mode and CAN_DEMO_FIXED_ACCESS_ENABLED=true");
   }
   return database.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('can-os:demo-registrar'))`);

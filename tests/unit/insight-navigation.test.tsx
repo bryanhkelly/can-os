@@ -108,7 +108,7 @@ describe("insight record navigation",()=>{
     vi.mocked(acceptInsight).mockRejectedValueOnce(new Error("Already handled"));
     await state.accept!();
     const html=render();
-    expect(html).toContain("Already handled");
+    expect(html).toContain("Unable to accept insight.");
     expect(html).not.toContain("Open created Action");
   });
   it("reports unavailable selected insights without showing another record",async()=>{

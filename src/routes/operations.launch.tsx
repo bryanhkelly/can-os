@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
+import { ValidationError } from "@/domain/errors";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   activateLaunch,
   completeLaunchRequirement,
@@ -74,8 +76,9 @@ function LaunchWizardPage() {
     authError: string;
   } = Route.useLoaderData();
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback();
+  const busy = mutation.disabled;
+  const [interactive, setInteractive] = useState(false);
   const [created, setCreated] = useState<{ programId: string; journeyId: string } | null>(null);
   const [openingRecipients,setOpeningRecipients]=useState<Record<string,string>>({});
   const [opened,setOpened]=useState<{siteId:string|null;name:string}|null>(null);
@@ -111,62 +114,66 @@ function LaunchWizardPage() {
   const [orientationStart,setOrientationStart]=useState("");
   const [orientationEnd,setOrientationEnd]=useState("");
   const [orientationTitle,setOrientationTitle]=useState("Student and family orientation");
+  useEffect(() => setInteractive(true), []);
   async function addOrientation(programId:string){
-    setBusy(true);setError("");
-    try {
-      if(!orientationStart||!orientationEnd)throw new Error("Choose orientation start and end times");
-      await scheduleLaunchOrientation({data:{programId,title:orientationTitle,
+    const outcome = await mutation.run(async () => {
+      if(!orientationStart||!orientationEnd)throw new ValidationError("Choose orientation start and end times");
+      return scheduleLaunchOrientation({data:{programId,title:orientationTitle,
         startsAt:new Date(orientationStart).toISOString(),
         endsAt:new Date(orientationEnd).toISOString(),timezone:"America/Los_Angeles"}});
-      setOrientationFor("");await router.invalidate();
-    } catch(e){setError(e instanceof Error?e.message:"Unable to schedule orientation");}
-    finally{setBusy(false);}
+    }, {
+      fallback:"Unable to schedule orientation.",
+      success:"Orientation scheduled.",
+      refresh:()=>router.invalidate(),
+    });
+    if(outcome.status==="saved"||outcome.status==="refresh-failed")setOrientationFor("");
   }
   async function addSite(){
     if(!hostOrganizationId)return;
-    setBusy(true);setError("");
-    try{
-      const site=await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
+    const outcome = await mutation.run(()=>createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
         slug:newSiteSlug,timezone:newSiteTimezone,address:{
           ...(newSiteLine1.trim()?{line1:newSiteLine1.trim()}:{}),
           ...(newSiteCity.trim()?{city:newSiteCity.trim()}:{}),
           ...(newSiteRegion.trim()?{region:newSiteRegion.trim()}:{}),
           ...(newSitePostalCode.trim()?{postalCode:newSitePostalCode.trim()}:{}),
           ...(newSiteCountry.trim()?{country:newSiteCountry.trim()}:{}),
-        }}});
-      setSiteId(site.siteId);
-      await router.invalidate();setNewSiteName("");setNewSiteSlug("");setNewSiteLine1("");
+        }}}), {
+      fallback:"Unable to create site.",
+      success:"Site created.",
+      refresh:()=>router.invalidate(),
+    });
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+      setSiteId(outcome.value.siteId);
+      setNewSiteName("");setNewSiteSlug("");setNewSiteLine1("");
       setNewSiteCity("");setNewSiteRegion("");setNewSitePostalCode("");
-    }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
-    finally{setBusy(false);}
+    }
   }
 
   async function addOrganization(){
     if(!hostOrganizationId)return;
-    setBusy(true);setError("");
-    try{
-      const organization=await createLaunchOrganization({data:{
+    const outcome = await mutation.run(()=>createLaunchOrganization({data:{
         parentOrganizationId:hostOrganizationId,
         type:newOrganizationType as (typeof organizationTypes)[number][0],
         name:newOrganizationName,
         legalName:newOrganizationLegalName,
         slug:newOrganizationSlug,
-      }});
+      }}), {
+      fallback:"Unable to create Organization profile.",
+      success:"Organization profile created.",
+    });
+    if(outcome.status==="saved"){
+      const organization=outcome.value;
       setCreatedOrganization({id:organization.organizationId,name:organization.name});
       setNewOrganizationName("");setNewOrganizationLegalName("");setNewOrganizationSlug("");
-    }catch(e){setError(e instanceof Error?e.message:"Unable to create Organization profile");}
-    finally{setBusy(false);}
+    }
   }
 
   const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true);
-    setError("");
     setCreated(null);
-    try {
-      const result = await startLaunch({
+    const outcome = await mutation.run(()=>startLaunch({
         data: {
           name,
           slug,
@@ -186,41 +193,39 @@ function LaunchWizardPage() {
           creditIssuingOrganizationId,
           ...(siteId ? { siteId } : {}),
         },
-      });
-      setCreated(result);
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to start launch");
-    } finally {
-      setBusy(false);
+      }), {
+      fallback:"Unable to start launch.",
+      success:"Program launch started.",
+      refresh:()=>router.invalidate(),
+    });
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+      setCreated(outcome.value);
     }
   }
 
   async function completeRequirement(journeyRequirementId: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await completeLaunchRequirement({ data: { journeyRequirementId } });
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to complete requirement");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.run(
+      () => completeLaunchRequirement({ data: { journeyRequirementId } }),
+      {
+        fallback:"Unable to complete requirement.",
+        success:"Launch requirement completed.",
+        refresh:()=>router.invalidate(),
+      },
+    );
   }
 
   async function activate(programId: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await activateLaunch({ data: { programId,recipientPersonId:openingRecipients[programId]||undefined } });
+    const outcome=await mutation.run(
+      () => activateLaunch({ data: { programId,recipientPersonId:openingRecipients[programId]||undefined } }),
+      {
+        fallback:"Unable to activate program.",
+        success:"Program activated.",
+        refresh:()=>router.invalidate(),
+      },
+    );
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
       const launch=launches?.launches.find(item=>item.id===programId);
       if(launch)setOpened({siteId:launch.siteId,name:launch.name});
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to activate program");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -248,8 +253,11 @@ function LaunchWizardPage() {
       subtitle="Launch programs on an Organization → Site → Program foundation, with recorded readiness and explicit blocking requirements."
       breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Connected workflows</Link>}>
-        {error && (
-          <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>
+        {mutation.error && (
+          <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{mutation.error}</p>
+        )}
+        {mutation.notice && (
+          <p role="status" className="mt-4 rounded-lg border p-3">{mutation.notice}</p>
         )}
         {opened&&<p role="status" className="mt-4 rounded-lg border p-4 text-sm">
           {opened.name} is active. {opened.siteId?<Link to="/sites/$siteId" params={{siteId:opened.siteId}}
@@ -267,6 +275,7 @@ function LaunchWizardPage() {
               </p>
             )}
             <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
+              <fieldset disabled={!interactive || busy} className="space-y-5">
               <fieldset>
                 <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   Program
@@ -437,7 +446,7 @@ function LaunchWizardPage() {
               <button
                 type="submit"
                 className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                disabled={busy || !options.organizations.length || !!createdOrganization}
+                disabled={!interactive || busy || !options.organizations.length || !!createdOrganization}
               >
                 Start launch
               </button>
@@ -446,6 +455,7 @@ function LaunchWizardPage() {
                   No organizations are in scope for this registrar grant.
                 </p>
               )}
+              </fieldset>
             </form>
           </details>
 
@@ -488,7 +498,7 @@ function LaunchWizardPage() {
                             <button
                               type="button"
                               className="rounded border px-3 py-1 text-xs disabled:opacity-50"
-                              disabled={busy}
+                              disabled={!interactive || busy}
                               onClick={() => completeRequirement(requirement.id)}
                             >
                               Complete
@@ -501,14 +511,14 @@ function LaunchWizardPage() {
                       )}
                     </ul>
                     <div className="mt-4 rounded-lg border p-3">
-                      <button type="button" onClick={()=>setOrientationFor(orientationFor===launch.id?"":launch.id)}
+                      <button type="button" disabled={!interactive || busy} onClick={()=>setOrientationFor(orientationFor===launch.id?"":launch.id)}
                         className="text-xs font-semibold underline">Schedule family orientation</button>
                       {orientationFor===launch.id && <div className="mt-3 grid gap-2">
                         <label className="text-xs">Title<input className={inputClass} value={orientationTitle} onChange={e=>setOrientationTitle(e.target.value)}/></label>
                         <label className="text-xs">Start<input type="datetime-local" className={inputClass} value={orientationStart} onChange={e=>setOrientationStart(e.target.value)}/></label>
                         <label className="text-xs">End<input type="datetime-local" className={inputClass} value={orientationEnd} onChange={e=>setOrientationEnd(e.target.value)}/></label>
                         <p className="text-xs text-muted-foreground">Times are entered in your local browser timezone and saved with an explicit offset.</p>
-                        <button type="button" disabled={busy||!orientationStart||!orientationEnd}
+                        <button type="button" disabled={!interactive || busy||!orientationStart||!orientationEnd}
                           onClick={()=>addOrientation(launch.id)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Save orientation</button>
                       </div>}
                     </div>
@@ -516,6 +526,7 @@ function LaunchWizardPage() {
                       {launch.siteId&&<label className="mb-3 block text-sm">Receiving site operator (required)
                         <select aria-label={"Receiving site operator for "+launch.name} value={openingRecipients[launch.id]??""}
                           onChange={event=>setOpeningRecipients(current=>({...current,[launch.id]:event.target.value}))}
+                          disabled={!interactive || busy}
                           className={selectClass}>
                           <option value="">Select the named receiving operator</option>
                           {launch.openingOperators.map(operator=><option key={operator.personId} value={operator.personId}>
@@ -528,7 +539,7 @@ function LaunchWizardPage() {
                       <button
                         type="button"
                         className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                        disabled={busy || !activatable || Boolean(launch.siteId&&!openingRecipients[launch.id])}
+                        disabled={!interactive || busy || !activatable || Boolean(launch.siteId&&!openingRecipients[launch.id])}
                         onClick={() => activate(launch.id)}
                       >
                         Activate

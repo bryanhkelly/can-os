@@ -7,6 +7,8 @@ import {createSubmissionAttachmentUpload,attachDocumentToSubmission,listSubmissi
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell,StatusBadge} from "@/components/workspace";
+import {attachmentContentType,PrivateUploadCompletion,validateUploadFile,type PrivateUpload} from "@/platform/storage/private-upload";
+import {normalizeClientError} from "@/lib/client-error";
 
 const loadAssignments=()=>getAssignments();
 export const Route=createFileRoute("/student/assignments")({
@@ -20,13 +22,6 @@ export const Route=createFileRoute("/student/assignments")({
 });
 
 const attachmentAccept=".pdf,.png,.jpg,.jpeg";
-const attachmentMimes:Record<string,string>={
- pdf:"application/pdf",
- png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",
-};
-function attachmentMime(name:string){
- return attachmentMimes[name.split(".").pop()?.toLowerCase()??""]??null;
-}
 function formatDate(value:string|null){
  return value?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"No due date";
 }
@@ -44,10 +39,16 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
  const [error,setError]=useState("");
+ const [interactive,setInteractive]=useState(false);
  const [draftStatus,setDraftStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const [pendingFiles,setPendingFiles]=useState<File[]>([]);
+ const [responseSavedForAttachmentRetry,setResponseSavedForAttachmentRetry]=useState(false);
  const [attachments,setAttachments]=useState<{documentId:string;fileName:string}[]>([]);
  const saveGeneration=useRef(0);
+ const pendingUploads=useRef(new Map<File,PrivateUploadCompletion<PrivateUpload & {documentId:string}>>());
+ const uploadAbort=useRef<AbortController|null>(null);
+ useEffect(()=>setInteractive(true),[]);
+ useEffect(()=>()=>uploadAbort.current?.abort(),[]);
  const items=assignments.filter(item=>(!section||item.sectionId===section)&&(
   filter==="all"||
   (filter==="todo"&&(!item.status||item.status==="assigned"||item.status==="returned"))||
@@ -83,36 +84,48 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   return()=>{clearTimeout(task);saveGeneration.current++};
  },[chosen?.assessmentId,chosen?.status,chosen?.responseText,editable,busy,draft]);
  async function submit(){
-  if(!chosen||!editable||draft.trim().length<3)return;
+  if(!chosen||(!editable&&!responseSavedForAttachmentRetry)||(editable&&draft.trim().length<3))return;
   saveGeneration.current++;
+  const controller=new AbortController();uploadAbort.current=controller;
   setBusy(true);setError("");setNotice("");
   try{
-   await saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}});
-   // The submission endpoint writes response text; files are attached after it.
+   if(!responseSavedForAttachmentRetry){
+    await saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}});
+    setResponseSavedForAttachmentRetry(true);
+   }
    const failures:string[]=[];
+   const remainingFiles:File[]=[];
    for(const file of pendingFiles){
     try{
-     const contentType=attachmentMime(file.name);
-     if(!contentType||file.size<16||file.size>10*1024*1024)
-      throw new Error("Unsupported file type or size");
-     const upload=await createSubmissionAttachmentUpload({data:{
-      assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size
-     }});
-     const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":contentType},body:file});
-     if(!response.ok)throw new Error("Storage upload failed");
-     await attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
-    }catch{failures.push(file.name);}
+     const contentType=attachmentContentType(file.name);
+     validateUploadFile(file,contentType);
+     let completion=pendingUploads.current.get(file);
+     if(!completion){completion=new PrivateUploadCompletion<PrivateUpload & {documentId:string}>();pendingUploads.current.set(file,completion);}
+     await completion.run(file,
+      ()=>createSubmissionAttachmentUpload({data:{
+       assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size
+      }}),
+      upload=>attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}}),
+      controller.signal);
+     pendingUploads.current.delete(file);
+    }catch(cause){
+     remainingFiles.push(file);
+     failures.push(file.name+": "+normalizeClientError(cause,{fallback:"Unable to upload attachment."}).message);
+    }
    }
-   setPendingFiles([]);
+   setPendingFiles(remainingFiles);
    const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
    setAttachments(updatedFiles.attachments);
    await router.invalidate();
-   setNotice(failures.length
-    ?"Your response was submitted, but attachments need attention: "+failures.join(", ")
-    :"Your assignment has been submitted.");
+   if(failures.length){
+    setNotice("Your response was submitted, but attachments need attention: "+failures.join(", "));
+   }else{
+    setNotice("Your assignment has been submitted.");
+    setResponseSavedForAttachmentRetry(false);
+   }
   }catch(cause){
-   setError(cause instanceof Error?cause.message:"Unable to submit assignment");
-  }finally{setBusy(false);}
+   setError(normalizeClientError(cause,{fallback:"Unable to submit assignment."}).message);
+  }finally{if(uploadAbort.current===controller)uploadAbort.current=null;setBusy(false);}
  }
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
   subtitle="Read instructions, save your response, submit work and follow through on feedback."
@@ -178,7 +191,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
         window.location.assign(result.downloadUrl);
        }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open attachment")}
       }}>{file.fileName}</button>)}</div>}
-     {editable?<div className="mt-6">
+     {editable?<fieldset disabled={!interactive} className="mt-6">
       <label className="text-sm font-semibold">Your response
        <textarea rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
@@ -194,7 +207,12 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        </>
       <button type="button" disabled={busy||draft.trim().length<3} onClick={submit}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit assignment</button>
-     </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
+     </fieldset>:responseSavedForAttachmentRetry&&pendingFiles.length>0?<fieldset disabled={!interactive||busy} className="mt-6 rounded-lg border p-4">
+      <p className="text-sm">Your response is submitted. The following attachments still need to finish:</p>
+      <p className="mt-2 text-xs text-muted-foreground">{pendingFiles.map(file=>file.name).join(", ")}</p>
+      <button type="button" disabled={busy} onClick={submit}
+       className="mt-3 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Retry attachments</button>
+     </fieldset>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
     </article>}
    </section>
   </div>

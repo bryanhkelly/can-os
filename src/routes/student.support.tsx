@@ -35,7 +35,7 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
    await requestQuickWinHelp({data:{message}});
    setMessage("");
    await router.invalidate();
-   setNotice("Your support request has been recorded.");
+   setNotice("Your support request was sent to your school's counselor.");
   }catch(cause){
    setError(cause instanceof Error?cause.message:"Unable to request support");
   }finally{setBusy(false);}
@@ -49,6 +49,7 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
   {notice&&<p role="status" className="mt-4 rounded border p-3 text-sm">{notice}</p>}
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-semibold">Ask your school for help</h2>
+   <p className="mt-2 text-sm text-muted-foreground">An active counselor at your site will be notified and can read your request. Please don't include private counseling or clinical details.</p>
    <label className="mt-3 block text-sm">What do you need help with?
     <textarea value={message} onChange={event=>setMessage(event.target.value)}
       rows={4} maxLength={1000} className="mt-2 w-full rounded border bg-background p-3"

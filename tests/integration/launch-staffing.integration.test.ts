@@ -28,7 +28,12 @@ vi.mock("@/db/client", () => ({
   get db() { if (!state.tx) throw new Error("Launch tests must stay in the rollback transaction"); return state.tx; },
 }));
 vi.mock("@/platform/storage/r2", () => ({
-  createPrivateUploadUrl: vi.fn(() => "https://private.example/upload"),
+  createPrivateUpload: vi.fn((options: { key: string; contentType: string; preventOverwrite?: boolean }) => ({
+    objectKey: options.key,
+    uploadUrl: "https://private.example/upload",
+    uploadHeaders: { "Content-Type": options.contentType, ...(options.preventOverwrite ? { "If-None-Match": "*" } : {}) },
+    expiresAt: new Date(Date.now() + 180_000).toISOString(),
+  })),
   verifyPrivateObject: vi.fn(),
   signPrivateObjectUrl: vi.fn(() => "https://private.example/evidence"),
 }));
@@ -237,12 +242,12 @@ integration("registrar staffing to launch handoff", () => {
           const started = await credentials.beginQualificationUpload({ data: claimData });
           expect(started.uploadUrl).toBe("https://private.example/upload");
           expect(started.uploadHeaders).toEqual({"Content-Type":"application/pdf","If-None-Match":"*"});
-          const submitted = await credentials.finishQualificationUpload({ data: { key: started.key, claim: claimData } });
+          const submitted = await credentials.finishQualificationUpload({ data: { key: started.objectKey, claim: claimData } });
           expect(submitted.created).toBe(true);
-          expect(await credentials.finishQualificationUpload({ data: { key: started.key, claim: claimData } }))
+          expect(await credentials.finishQualificationUpload({ data: { key: started.objectKey, claim: claimData } }))
             .toEqual({ claimId: submitted.claimId, created: false });
           await expect(credentials.finishQualificationUpload({ data: {
-            key: started.key, claim: { ...claimData, issuerName: "Changed on retry" },
+            key: started.objectKey, claim: { ...claimData, issuerName: "Changed on retry" },
           } })).rejects.toThrow("different qualification details");
           const own = await credentials.getQualifications({ data: {} });
           expect(own.canSubmit).toBe(true);
@@ -285,10 +290,10 @@ integration("registrar staffing to launch handoff", () => {
         await expect(credentials.beginQualificationUpload({data:{...invalidUpload,expiresAt:"2000-01-01T00:00:00Z"}})).rejects.toThrow("expired");
         const failedUpload=await credentials.beginQualificationUpload({data:invalidUpload});
         vi.mocked(storage.verifyPrivateObject).mockRejectedValueOnce(new Error("Synthetic storage verification failure"));
-        await expect(credentials.finishQualificationUpload({data:{key:failedUpload.key,claim:invalidUpload}}))
+        await expect(credentials.finishQualificationUpload({data:{key:failedUpload.objectKey,claim:invalidUpload}}))
           .rejects.toThrow("storage verification failure");
-        expect(await tx.select().from(s.qualificationClaims).where(eq(s.qualificationClaims.id,failedUpload.key.split("/")[2]!))).toEqual([]);
-        expect(await tx.select().from(s.documents).where(eq(s.documents.storageKey,failedUpload.key))).toEqual([]);
+        expect(await tx.select().from(s.qualificationClaims).where(eq(s.qualificationClaims.id,failedUpload.objectKey.split("/")[2]!))).toEqual([]);
+        expect(await tx.select().from(s.documents).where(eq(s.documents.storageKey,failedUpload.objectKey))).toEqual([]);
         await expect(credentials.finishQualificationUpload({data:{
           key:`qualifications/${outsider.id}/${crypto.randomUUID()}`,claim:invalidUpload}})).rejects.toThrow("own qualification");
         await expect(credentials.getQualificationEvidence({data:{claimId:crypto.randomUUID()}})).rejects.toThrow("claim owner");
@@ -296,7 +301,7 @@ integration("registrar staffing to launch handoff", () => {
         const rejectedUpload=await (async()=>{
           act("teacher",teacher.id);
           const started=await credentials.beginQualificationUpload({data:invalidUpload});
-          const submitted=await credentials.finishQualificationUpload({data:{key:started.key,claim:invalidUpload}});
+          const submitted=await credentials.finishQualificationUpload({data:{key:started.objectKey,claim:invalidUpload}});
           state.actor=registrarActor;
           return submitted;
         })();
@@ -634,7 +639,7 @@ integration("registrar staffing to launch handoff", () => {
         expect(storage.verifyPrivateObject).toHaveBeenCalledWith(expect.objectContaining({
           keyPattern: expect.any(RegExp), expectedSize: 128, expectedContentType: "application/pdf", verifySignature: expect.any(Function),
         }));
-        expect(storage.createPrivateUploadUrl).toHaveBeenCalledWith(expect.objectContaining({preventOverwrite:true}));
+        expect(storage.createPrivateUpload).toHaveBeenCalledWith(expect.objectContaining({preventOverwrite:true}));
         expect(storage.signPrivateObjectUrl).toHaveBeenCalledWith(expect.objectContaining({ method: "GET", expiresSeconds: 60 }));
         const evidenceAudits=await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.actorPersonId,registrar.id),
           eq(s.auditEvents.action,"qualification.evidence_read")));

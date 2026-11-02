@@ -3,11 +3,12 @@
  * Server-side composition only; not exported through a public route or called
  * from the demo UI until a real student session exists.
  */
-import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, ne, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
+import { dateKeyInTimezone, dayBoundsInTimezone } from "@/modules/calendar/timezone";
 import {
-  actions, assessments, calendarEvents, enrollments, people, sections,
-  scheduledOccurrences, studentProfiles, submissions,
+  actions, assessments, calendarEventParticipants, calendarEvents, enrollments,
+  people, sections, scheduledOccurrences, schoolYears, sites, studentProfiles, submissions,
 } from "@/db/schema";
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
@@ -34,11 +35,15 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       sectionId: sections.id,
       sectionTitle: sections.title,
       siteId: sections.siteId,
+      siteTimezone: sites.timezone,
+      schoolYearTimezone: schoolYears.timezone,
       programId: sections.programId,
       schoolYearId: enrollments.schoolYearId,
     })
     .from(enrollments)
     .innerJoin(sections, eq(enrollments.sectionId, sections.id))
+    .leftJoin(sites, eq(sections.siteId, sites.id))
+    .leftJoin(schoolYears, eq(enrollments.schoolYearId, schoolYears.id))
     .where(and(
       eq(enrollments.studentProfileId, studentProfileId),
       eq(enrollments.kind, "section"),
@@ -54,11 +59,66 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   startOfDay.setUTCHours(0, 0, 0, 0);
   const endOfDay = new Date(startOfDay);
   endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
-
-  // Site calendar is the source of truth for operations/formation;
-  // a separate timezone-aware day boundary resolver will be required for
-  // local-day fidelity before live release.
-  const events = siteIds.length ? await db
+  const dayRanges = new Map<string, {
+    siteId: string | null;
+    timezone: string;
+    sectionIds: string[];
+    start: Date;
+    end: Date;
+  }>();
+  for (const section of activeSections) {
+    const timezone = section.siteTimezone ?? section.schoolYearTimezone ?? "UTC";
+    const key = `${section.siteId ?? "no-site"}:${timezone}`;
+    let range = dayRanges.get(key);
+    if (!range) {
+      const bounds = dayBoundsInTimezone(at, timezone);
+      range = { siteId: section.siteId, timezone, sectionIds: [], ...bounds };
+      dayRanges.set(key, range);
+    }
+    range.sectionIds.push(section.sectionId);
+  }
+  const programIds = [...new Set(activeSections.map(section => section.programId))];
+  const explicitParticipants = db.select({ id: calendarEventParticipants.id })
+    .from(calendarEventParticipants)
+    .where(eq(calendarEventParticipants.calendarEventId, calendarEvents.id));
+  const participantEventIds = db.select({ id: calendarEventParticipants.calendarEventId })
+    .from(calendarEventParticipants)
+    .where(and(
+      eq(calendarEventParticipants.participantType, "person"),
+      eq(calendarEventParticipants.participantId, student.personId),
+    ));
+  const eventVisibility = or(
+    sectionIds.length ? and(
+      inArray(scheduledOccurrences.sectionId, sectionIds),
+      or(isNull(scheduledOccurrences.siteId), inArray(scheduledOccurrences.siteId, siteIds)),
+      or(isNull(scheduledOccurrences.programId), inArray(scheduledOccurrences.programId, programIds)),
+      ne(calendarEvents.type, "study_group"),
+      notExists(explicitParticipants),
+    ) : undefined,
+    siteIds.length ? and(
+      isNull(scheduledOccurrences.sectionId),
+      inArray(scheduledOccurrences.siteId, siteIds),
+      or(isNull(scheduledOccurrences.programId), inArray(scheduledOccurrences.programId, programIds)),
+      ne(calendarEvents.type, "personal"),
+      ne(calendarEvents.type, "study_group"),
+      notExists(explicitParticipants),
+    ) : undefined,
+    programIds.length ? and(
+      isNull(scheduledOccurrences.sectionId),
+      isNull(scheduledOccurrences.siteId),
+      inArray(scheduledOccurrences.programId, programIds),
+      ne(calendarEvents.type, "personal"),
+      ne(calendarEvents.type, "study_group"),
+      notExists(explicitParticipants),
+    ) : undefined,
+    and(
+      ne(calendarEvents.type, "study_group"),
+      inArray(calendarEvents.id, participantEventIds),
+    ),
+  );
+  const eventCandidateStart = new Date(at.getTime() - 36 * 60 * 60 * 1000);
+  const eventCandidateEnd = new Date(at.getTime() + 36 * 60 * 60 * 1000);
+  const eventRows = eventVisibility ? await db
     .select({
       id: calendarEvents.id,
       title: calendarEvents.title,
@@ -67,6 +127,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       startsAt: scheduledOccurrences.startsAt,
       endsAt: scheduledOccurrences.endsAt,
       timezone: scheduledOccurrences.timezone,
+      metadata: calendarEvents.metadata,
       siteId: scheduledOccurrences.siteId,
       sectionId: scheduledOccurrences.sectionId,
       sourceType: calendarEvents.sourceType,
@@ -77,18 +138,28 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       eq(calendarEvents.scheduledOccurrenceId, scheduledOccurrences.id),
     )
     .where(and(
-      inArray(scheduledOccurrences.siteId, siteIds),
+      eventVisibility,
       ...(scope?[or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,scope.programIds))]:[]),
-      gte(scheduledOccurrences.startsAt, startOfDay),
-      lt(scheduledOccurrences.startsAt, endOfDay),
-      or(
-        ...[
-          ...sectionIds.map(id => eq(scheduledOccurrences.sectionId, id)),
-          isNull(scheduledOccurrences.sectionId),
-        ],
-      ),
+      gte(scheduledOccurrences.startsAt, eventCandidateStart),
+      lt(scheduledOccurrences.startsAt, eventCandidateEnd),
     ))
     .orderBy(asc(scheduledOccurrences.startsAt)) : [];
+  const events = eventRows.filter(event =>
+    dateKeyInTimezone(at.toISOString(), event.timezone) ===
+    dateKeyInTimezone(event.startsAt.toISOString(), event.timezone),
+  ).map(event => ({
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    type: event.type,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    timezone: event.timezone,
+    siteId: event.siteId,
+    sectionId: event.sectionId,
+    sourceType: event.sourceType,
+    cancelled: event.metadata.cancelled === true,
+  }));
 
   const coursework = sectionIds.length ? await db
     .select({
@@ -114,8 +185,13 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       eq(assessments.status, "published"),
       or(
         eq(submissions.timeliness, "missing"),
-        gte(assessments.dueAt, startOfDay),
-        gte(submissions.gradedAt, startOfDay),
+        ...[...dayRanges.values()].map(range => and(
+          inArray(assessments.sectionId, range.sectionIds),
+          or(
+            gte(assessments.dueAt, range.start),
+            gte(submissions.gradedAt, range.start),
+          ),
+        )),
       ),
     ))
     .orderBy(asc(assessments.dueAt)) : [];

@@ -70,11 +70,35 @@ describe("authorized notification destinations",()=>{
     notification("application","application","enrollment_document_rejected");
     expect((await getNotifications())[0]?.href).toBeNull();
   });
+  it("opens a watched submission for the exact child and class when academic access remains active",async()=>{
+    notification("submission","submission","watch_alert");
+    state.rows.submissions=[{
+      id:"submission",assessmentId:"assessment",studentProfileId:"profile",
+      studentPersonId:"child",sectionId:"english",
+    }];
+    state.rows.guardian_relationships=[{studentPersonId:"child"}];
+    expect((await getNotifications())[0]?.href)
+      .toBe("/guardian/academics?student=child&section=english&assessment=assessment");
+  });
+  it("does not link a watched submission after guardian academic access is revoked",async()=>{
+    notification("submission","submission","watch_alert");
+    state.rows.submissions=[{
+      id:"submission",assessmentId:"assessment",studentProfileId:"profile",
+      studentPersonId:"child",sectionId:"english",
+    }];
+    state.rows.guardian_relationships=[];
+    expect((await getNotifications())[0]?.href).toBeNull();
+  });
   it("preserves the assigned operations action",async()=>{
     state.role="registrar";
     notification("action","assigned","operations_action_assigned");
     state.rows.actions=[{id:"assigned",siteId:"school",programId:"program"}];
     expect((await getNotifications())[0]?.href).toBe("/operations?action=assigned");
+  });
+  it("opens the counselor workspace for a student help request",async()=>{
+    state.role="counselor";
+    notification("action","help-request","student_help_request");
+    expect((await getNotifications())[0]?.href).toBe("/counselor");
   });
   it("opens the exact permission action",async()=>{
     notification("action","consent","study_group_consent_requested");

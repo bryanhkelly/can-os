@@ -7,17 +7,19 @@ import { DEMO_ACCOUNT_DOMAIN, isDemoAccountEmail, LOCAL_DEMO_ADMIN } from "@/dom
 
 type GrantReader = Pick<Database, "select">;
 
+const grantSelection = {
+  id: accountPersonGrants.id, accountId: accountPersonGrants.accountId,
+  personId: accountPersonGrants.personId, role: accountPersonGrants.role,
+  organizationId: accountPersonGrants.organizationId, siteId: accountPersonGrants.siteId,
+  active: accountPersonGrants.active, firstName: people.legalFirstName, lastName: people.legalLastName,
+  email: accessAccounts.emailNormalized,
+};
+
 /** Demo delegation requires the fixed admin identity's current, ordinary membership. */
 export async function readSessionGrants(accountId: string, email: string, reader: GrantReader = db) {
   const demoAccount = isDemoAccountEmail(email);
   const adminAccount = accountId === LOCAL_DEMO_ADMIN.accountId && email === LOCAL_DEMO_ADMIN.email;
-  const ownGrants = await reader.select({
-    id: accountPersonGrants.id, accountId: accountPersonGrants.accountId,
-    personId: accountPersonGrants.personId, role: accountPersonGrants.role,
-    organizationId: accountPersonGrants.organizationId, siteId: accountPersonGrants.siteId,
-    active: accountPersonGrants.active, firstName: people.legalFirstName, lastName: people.legalLastName,
-    email: accessAccounts.emailNormalized,
-  }).from(accountPersonGrants)
+  const ownGrants = await reader.select(grantSelection).from(accountPersonGrants)
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
     .where(and(
@@ -32,13 +34,7 @@ export async function readSessionGrants(accountId: string, email: string, reader
     grant.personId === LOCAL_DEMO_ADMIN.personId && grant.role === "registrar")) {
     throw new AuthorizationError("active demo administrator membership");
   }
-  const grants = await reader.select({
-    id: accountPersonGrants.id, accountId: accountPersonGrants.accountId,
-    personId: accountPersonGrants.personId, role: accountPersonGrants.role,
-    organizationId: accountPersonGrants.organizationId, siteId: accountPersonGrants.siteId,
-    active: accountPersonGrants.active, firstName: people.legalFirstName, lastName: people.legalLastName,
-    email: accessAccounts.emailNormalized,
-  }).from(accountPersonGrants)
+  const grants = await reader.select(grantSelection).from(accountPersonGrants)
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
     .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
     .where(and(

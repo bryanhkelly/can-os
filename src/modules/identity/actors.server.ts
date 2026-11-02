@@ -1,5 +1,6 @@
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
+import { AuthenticationRequiredError } from "@/domain/errors";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit,type MutationTx } from "@/platform/mutation";
 import { getRequest } from "@tanstack/react-start/server";
@@ -17,7 +18,7 @@ export async function requireActor(
   capability?: string,
 ): Promise<Actor> {
   const context = await getCommandContext(getRequest());
-  if (!context.actorPersonId) throw new AuthorizationError("authenticated person");
+  if (!context.actorPersonId) throw new AuthenticationRequiredError();
   if (!roles.includes(context.role as ActorRole)) {
     throw new AuthorizationError(`role: ${roles.join(" or ")}`);
   }

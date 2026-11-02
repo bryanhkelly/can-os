@@ -4,6 +4,7 @@ import { getCourseRegistration, requestCourseChange, decideCourseChange } from "
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, EmptyState } from "@/components/workspace";
 
 const loadCourseRegistration=async(section?:string)=>{
@@ -43,7 +44,6 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  }
  const active=sections.filter(s=>s.enrollmentStatus==="active");
  const credits=active.reduce((n,s)=>n+s.credits,0);
- const today=new Date().toISOString().slice(0,10);
  return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
   <nav className="flex flex-wrap items-center gap-4">
    {role==="student"&&<Link to="/student/courses" className="text-xs font-semibold underline">My classes</Link>}
@@ -68,6 +68,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
   {section&&<Link to="/student/courses" search={{view:"catalog"}} className="mt-3 inline-block text-sm underline">View full course catalog</Link>}
   {section&&!visibleSections.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This course is unavailable in your current workspace.</p>}
   <div className="mt-4 space-y-3">{visibleSections.map(s=>{
+   const today=dateKeyInTimezone(new Date().toISOString(),s.timezone);
    const enrolled=s.enrollmentStatus==="active";
    const pending=requests.find(r=>r.sectionId===s.id&&["open","in_progress","waiting"].includes(r.status));
    return <article key={s.id} className="rounded-2xl border border-border bg-card p-5 sm:p-6">

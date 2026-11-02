@@ -1,4 +1,5 @@
 import { defineLifecycle } from "@/platform/lifecycle";
+import { AuthenticationRequiredError } from "./errors";
 
 /** Side-effect-free state transition rules for credential review.
  * Persistence layer must independently authenticate reviewer, verify scope and
@@ -51,7 +52,7 @@ export function decideCredentialReview(
   now: Date,
   note?: string,
 ): CredentialReviewResult {
-  if (!actorPersonId) throw new Error("Authenticated reviewer required");
+  if (!actorPersonId) throw new AuthenticationRequiredError();
   if (decision !== "submit" && actorPersonId === record.subjectPersonId) throw new Error("Independent reviewer required");
   if (record.expiry && record.expiry <= now && decision === "approve") throw new Error("Expired credentials cannot be verified");
   if (!credentialLifecycle.can(record.status, decision)) throw new Error(`Invalid credential transition: ${record.status} → ${decision}`);

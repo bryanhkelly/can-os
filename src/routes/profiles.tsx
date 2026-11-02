@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { getPersonProfile, beginProfilePhotoUpload, finishProfilePhotoUpload } from "@/modules/profiles/person-profile.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
@@ -7,6 +7,8 @@ import { Qualifications } from "@/components/profiles/Qualifications";
 import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { photoMimeTypes, PrivateUploadCompletion, validateUploadFile, type PrivateUpload } from "@/platform/storage/private-upload";
+import { normalizeClientError } from "@/lib/client-error";
 
 export const Route=createFileRoute("/profiles")({
   validateSearch:(search:Record<string,unknown>)=>z.object({person:z.string().uuid().optional()}).parse(search),
@@ -23,19 +25,23 @@ function ProfilePage(){
 export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPersonProfile>>}){
   const [file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const [revision,setRevision]=useState(0);
+  const completion=useRef(new PrivateUploadCompletion<PrivateUpload>());
+  const uploadAbort=useRef<AbortController|null>(null);
+  useEffect(()=>()=>uploadAbort.current?.abort(),[]);
   async function save(){
     if(!file)return;
+    const controller=new AbortController();uploadAbort.current=controller;
     setBusy(true);setError("");setNotice("");
     try{
-      if(file.type!=="image/jpeg"&&file.type!=="image/png")throw new Error("Choose a JPEG or PNG photo.");
+      validateUploadFile(file,file.type,photoMimeTypes,2*1024*1024);
       const data={fileName:file.name,mimeType:file.type,size:file.size};
-      const upload=await beginProfilePhotoUpload({data});
-      const response=await fetch(upload.uploadUrl,{method:"PUT",body:file,headers:{"Content-Type":file.type}});
-      if(!response.ok)throw new Error("Photo upload failed. Your existing photo was not changed.");
-      await finishProfilePhotoUpload({data:{...data,key:upload.key}});
+      await completion.current.run(file,
+        ()=>beginProfilePhotoUpload({data}),
+        upload=>finishProfilePhotoUpload({data:{...data,key:upload.objectKey}}),
+        controller.signal);
       setRevision(value=>value+1);setFile(null);setNotice("Profile photo saved.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to save profile photo.");}
-    finally{setBusy(false);}
+    }catch(cause){setError(normalizeClientError(cause,{fallback:"Unable to save profile photo."}).message);}
+    finally{if(uploadAbort.current===controller)uploadAbort.current=null;setBusy(false);}
   }
   return <WorkspaceShell eyebrow="CAN OS · People" title={profile.name} subtitle={profile.kind} width="standard"
     actions={<ProfilePhoto personId={profile.personId} name={profile.name} revision={revision}/>}>

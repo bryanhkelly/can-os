@@ -4,6 +4,7 @@ import {listCoursePolicies,updateCoursePolicy} from "@/modules/learning/registra
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 export const Route=createFileRoute("/operations/course-policies")({
  loader:safeLoader(()=>listCoursePolicies(),{authMessage:"Sign in as the authorized registrar."}),
  component:CoursePoliciesPage,
@@ -18,13 +19,13 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  const router=useRouter();
  const selection=Route.useSearch();
  const visibleRows=rows.filter(row=>(!selection.siteId||row.siteId===selection.siteId)&&(!selection.programId||row.programId===selection.programId));
- const [error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState("");
+ const mutation=useMutationFeedback();
  async function save(sectionId:string,policy:(typeof rows)[number]["policy"]){
-  setError("");setNotice("");setSaving(sectionId);
-  try{await updateCoursePolicy({data:{sectionId,policy}});await router.invalidate();
-   setNotice("Course policy saved and active for subsequent registration decisions.");}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save course policy");}
-  finally{setSaving("");}
+  await mutation.run(()=>updateCoursePolicy({data:{sectionId,policy}}),{
+   fallback:"Unable to save course policy",
+   success:"Course policy saved and active for subsequent registration decisions.",
+   refresh:()=>router.invalidate(),
+  });
  }
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Course registration policies"
   subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
@@ -32,11 +33,11 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
    <Link to="/operations/course-requests" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
    <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
   </div>}>
-  {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
-  {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+  {mutation.error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
   <div className="mt-8 space-y-4">
    {visibleRows.map(r=><CoursePolicyCard key={r.id} row={r}
-     disabled={Boolean(saving)} save={policy=>save(r.id,policy)}/>)}
+     disabled={mutation.disabled} save={policy=>save(r.id,policy)}/>)}
    {!visibleRows.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">
     No sections are available. Provision courses in the School Launch workspace first.
    </p>}

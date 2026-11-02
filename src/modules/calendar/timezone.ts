@@ -72,6 +72,31 @@ export function dateKeyInTimezone(instant: string, timezone: string): string {
   return dateTimeInputValue(instant, timezone).slice(0, 10);
 }
 
+function dateBoundaryInTimezone(dateKey: string, timezone: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  let low = Date.UTC(year!, month! - 1, day!) - 36 * 60 * 60 * 1000;
+  let high = Date.UTC(year!, month! - 1, day!) + 36 * 60 * 60 * 1000;
+
+  while (low < high) {
+    const midpoint = Math.floor((low + high) / 2);
+    const midpointKey = dateKeyInTimezone(new Date(midpoint).toISOString(), timezone);
+    if (midpointKey >= dateKey) high = midpoint;
+    else low = midpoint + 1;
+  }
+
+  return new Date(low);
+}
+
+export function dayBoundsInTimezone(instant: Date, timezone: string): { start: Date; end: Date } {
+  const dateKey = dateKeyInTimezone(instant.toISOString(), timezone);
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const nextDateKey = new Date(Date.UTC(year!, month! - 1, day! + 1)).toISOString().slice(0, 10);
+  return {
+    start: dateBoundaryInTimezone(dateKey, timezone),
+    end: dateBoundaryInTimezone(nextDateKey, timezone),
+  };
+}
+
 export function isValidTimeZone(timezone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone });

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { WorkspaceShell } from "@/components/workspace";
 import {
   approveCanonicalFieldTrip, inviteCanonicalFieldTripStudent,
@@ -35,9 +36,8 @@ function FieldTripOperations() {
 
 function FieldTripOperationsView({ data }: { data: Data }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback();
+  const busy = mutation.disabled;
   const [siteId, setSiteId] = useState(data.sites[0]?.id ?? "");
   const [programId, setProgramId] = useState("");
   const [title, setTitle] = useState("");
@@ -51,17 +51,11 @@ function FieldTripOperationsView({ data }: { data: Data }) {
   const [candidate, setCandidate] = useState<Record<string, string>>({});
 
   async function run(work: () => Promise<unknown>, message: string) {
-    if (busy) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await work();
-      await router.invalidate();
-      setNotice(message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save field trip change.");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.run(work, {
+      fallback: "Unable to save field trip change.",
+      success: message,
+      refresh: () => router.invalidate(),
+    });
   }
 
   return (
@@ -71,8 +65,8 @@ function FieldTripOperationsView({ data }: { data: Data }) {
         <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
         <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}>
-      {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {mutation.notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
       <section className="mt-7 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">Propose a field trip</h2>
         <p className="mt-2 text-sm text-muted-foreground">

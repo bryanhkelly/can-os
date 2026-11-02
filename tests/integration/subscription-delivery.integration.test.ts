@@ -559,6 +559,7 @@ integration("GF-A2 durable subscriptions", () => {
         eventType: "AssignmentBecameMissing",
         aggregateType: "submission",
         aggregateId: crypto.randomUUID(),
+        payload: { sectionId: crypto.randomUUID() },
       })
       .returning();
 
@@ -611,6 +612,7 @@ integration("GF-A2 durable subscriptions", () => {
     expect(escalation).toBeDefined();
     expect(escalation!.type).toBe("outbox_event_failed");
     expect(escalation!.status).toBe("open");
+    expect(escalation!.sectionId).toBeNull();
   });
 
   it("reclaims expired processing leases and reports outbox health", async () => {

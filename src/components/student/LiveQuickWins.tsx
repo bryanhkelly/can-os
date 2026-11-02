@@ -36,7 +36,7 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
     try {
       await requestQuickWinHelp({ data: { message } });
       setMessage("");
-      setSaved("Help request saved .");
+      setSaved("Help request sent to your school's counselor.");
       await router.invalidate();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not save"); }
     finally { setBusy(false); }
@@ -74,7 +74,7 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
       <p className="mt-4 text-xs text-muted-foreground">{outstanding.length} saved action{outstanding.length===1?"":"s"} need attention</p>}
     <div className="mt-7 border-t border-border pt-5">
       <h3 className="font-semibold">Ask for help · saved request</h3>
-      <p className="mt-2 text-xs text-muted-foreground">Create a support request linked to your account.</p>
+      <p className="mt-2 text-xs text-muted-foreground">An active counselor at your site will be notified and can read your request. Please don't include private counseling or clinical details.</p>
       <textarea rows={3} maxLength={1000} value={message} onChange={event=>setMessage(event.target.value)} placeholder="I need help with…" className="mt-3 w-full rounded-xl border border-border bg-background p-3 text-sm"/>
       <button disabled={busy || !connected || message.trim().length<3} onClick={requestHelp} className="mt-2 rounded-lg bg-foreground px-5 py-3 text-xs font-semibold text-background disabled:opacity-40">Save help request</button>
     </div>

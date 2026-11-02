@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { PrivateUploadCompletion, validateUploadFile, type PrivateUpload } from "@/platform/storage/private-upload";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   beginQualificationUpload, decideQualification, finishQualificationUpload,
   getQualificationEvidence, getQualifications,
@@ -32,8 +34,8 @@ export function Qualifications({ personId, programId, onChanged }: Selection & {
     {!snapshot && !error && <p role="status" className="mt-3 text-sm">Loading qualification records...</p>}
     {snapshot && <QualificationRecords key={`${personId ?? "self"}:${revision}`} snapshot={snapshot}
       selection={{ personId, programId }} changed={async () => {
-        setRevision(value => value + 1);
         await onChanged?.();
+        setRevision(value => value + 1);
       }} />}
   </section>;
 }
@@ -41,16 +43,18 @@ export function Qualifications({ personId, programId, onChanged }: Selection & {
 export function QualificationRecords({ snapshot, selection, changed }: {
   snapshot: Snapshot; selection: Selection; changed: () => Promise<void>;
 }) {
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback();
+  const busy = mutation.disabled;
   async function run(operation: () => Promise<unknown>, message: string) {
-    setBusy(true); setError(""); setNotice("");
-    try { await operation(); await changed(); setNotice(message); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update qualification records."); }
-    finally { setBusy(false); }
+    await mutation.run(operation, {
+      fallback: "Unable to update qualification records.",
+      success: message,
+      refresh: changed,
+    });
   }
   return <div className="mt-4 space-y-4">
-    {error && <p role="alert" className="text-sm">{error}</p>}
-    {notice && <p role="status" className="text-sm">{notice}</p>}
+    {mutation.error && <p role="alert" className="text-sm">{mutation.error}</p>}
+    {mutation.notice && <p role="status" className="text-sm">{mutation.notice}</p>}
     {snapshot.canSubmit && <SubmissionForm catalog={snapshot.catalog} jurisdictions={snapshot.jurisdictions}
       uploadsEnabled={snapshot.uploadsEnabled}
       busy={busy} submit={(operation) => run(operation, "Evidence submitted for independent review.")} />}
@@ -70,30 +74,35 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }
   const [issuerName, setIssuerName] = useState(""), [jurisdictionId, setJurisdictionId] = useState("");
   const [issuedAt, setIssuedAt] = useState(""), [expiresAt, setExpiresAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [pending, setPending] = useState<{ key: string; claim: NonNullable<Parameters<typeof beginQualificationUpload>[0]>["data"] } | null>(null);
+  const [pendingClaim, setPendingClaim] = useState<NonNullable<Parameters<typeof beginQualificationUpload>[0]>["data"] | null>(null);
+  const completion = useRef(new PrivateUploadCompletion<PrivateUpload>());
+  const uploadAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => uploadAbort.current?.abort(), []);
   async function upload() {
-    if (pending) {
-      await finishQualificationUpload({ data: pending });
-      setPending(null); setFile(null);
-      return;
-    }
     if (!file) throw new Error("Choose evidence before submitting.");
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type) || file.size < 16 || file.size > 10 * 1024 * 1024) {
-      throw new Error("Choose a PDF, JPEG or PNG between 16 bytes and 10 MB.");
-    }
-    const mimeType = file.type === "application/pdf" ? "application/pdf" : file.type === "image/jpeg" ? "image/jpeg" : "image/png";
-    const claim = { definitionId, issuerName, ...(jurisdictionId ? { jurisdictionId } : {}),
+    const mimeType = file.type;
+    validateUploadFile(file, mimeType);
+    const claim = pendingClaim ?? { definitionId, issuerName, ...(jurisdictionId ? { jurisdictionId } : {}),
       ...(issuedAt ? { issuedAt: new Date(issuedAt).toISOString() } : {}),
       ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
       fileName: file.name, mimeType, size: file.size };
-    const upload = await beginQualificationUpload({ data: claim });
-    const response = await fetch(upload.uploadUrl, { method: "PUT", body: file, headers: upload.uploadHeaders });
-    if (!response.ok) throw new Error("Evidence upload failed; no qualification claim was submitted.");
-    const submission = { key: upload.key, claim };
-    setPending(submission);
-    await finishQualificationUpload({ data: submission });
-    setPending(null); setFile(null);
+    const controller = new AbortController();
+    uploadAbort.current = controller;
+    try {
+      await completion.current.run(file,
+        () => beginQualificationUpload({ data: claim }),
+        upload => finishQualificationUpload({ data: { key: upload.objectKey, claim } }),
+        controller.signal);
+      setPendingClaim(null);
+      setFile(null);
+    } catch (cause) {
+      if (completion.current.hasPendingCompletion) setPendingClaim(claim);
+      throw cause;
+    } finally {
+      if (uploadAbort.current === controller) uploadAbort.current = null;
+    }
   }
+  const pending = pendingClaim !== null;
   return <form className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2" onSubmit={event => {
     event.preventDefault(); void submit(upload);
   }}>

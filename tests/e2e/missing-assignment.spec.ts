@@ -52,8 +52,7 @@ async function signIn(context: BrowserContext, secret: string): Promise<void> {
     {
       name: accessSessionCookie,
       value: secret,
-      url: baseURL,
-      path: "/",
+      url: baseURL.replace(/^http:/, "https:"),
       httpOnly: true,
       secure: true,
       sameSite: "Lax",
@@ -177,24 +176,19 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await test.step("student submits the assignment late via the UI", async () => {
       await student.page.goto("/student/assignments");
       await expect(
-        student.page.getByRole("heading", { name: "Your learning work." }),
+        student.page.getByRole("heading", { name: "Your assignments" }),
       ).toBeVisible();
 
       await student.page
-        .getByRole("button", { name: fixture.assessmentTitle })
+        .getByRole("link", { name: new RegExp(fixture.assessmentTitle) })
         .click();
       await student.page
         .getByPlaceholder("Write your response…")
         .fill("Here is my late submission for the problem set.");
-      await student.page.getByRole("button", { name: "Submit work" }).click();
+      await student.page.getByRole("button", { name: "Submit assignment" }).click();
 
       await expect(
-        student.page.getByText("Your work has been submitted to Neon."),
-      ).toBeVisible();
-      await expect(
-        student.page.getByText(
-          "Submitted successfully. Your teacher can review your work.",
-        ),
+        student.page.getByRole("status").filter({ hasText: "Your assignment has been submitted." }),
       ).toBeVisible();
 
       const after = await getSubmission();
@@ -268,9 +262,9 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
   try {
     await test.step("guardian sees the posted grade and feedback from canonical data", async () => {
       await guardianAgain.page.goto("/guardian/academics");
-      const card = guardianAgain.page.getByRole("heading", { name: fixture.assessmentTitle }).locator("..").locator("..");
-      await expect(card.getByText(/Grade:\s*88\s*\/\s*100/)).toBeVisible();
-      await expect(card.getByText(/Good recovery/)).toBeVisible();
+      await expect(guardianAgain.page.getByRole("heading", { name: fixture.assessmentTitle })).toBeVisible();
+      await expect(guardianAgain.page.getByText(/Grade:\s*88\.00\s*\/\s*100\.00/)).toBeVisible();
+      await expect(guardianAgain.page.getByText(/Good recovery/)).toBeVisible();
     });
   } finally {
     await guardianAgain.context.close();
@@ -281,7 +275,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await test.step("student sees the posted grade and feedback", async () => {
       await studentAgain.page.goto("/student/assignments");
       await studentAgain.page
-        .getByRole("button", { name: fixture.assessmentTitle })
+        .getByRole("link", { name: new RegExp(fixture.assessmentTitle) })
         .click();
       await expect(
         studentAgain.page.getByText(/Score:\s*88/),

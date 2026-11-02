@@ -17,6 +17,7 @@ export type SessionPrincipal = {
 };
 export type AccessContext = CommandContext & {
  accountId: string;
+ /** Session owner differs from the effective account only for demo admin delegation. */
  sessionAccountId?: string;
  sessionId: string;
  grantId: string;

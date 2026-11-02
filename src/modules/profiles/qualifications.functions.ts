@@ -12,7 +12,7 @@ import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
-import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 import { assertScopedQualificationReviewer, reviewQualification } from "./qualification-review.server";
 
 const uuid = z.string().uuid();
@@ -132,10 +132,9 @@ export const beginQualificationUpload = createServerFn({ method: "POST" })
     assertUploadsEnabled();
     await catalogEntry(data);
     const key = `qualifications/${actor.actorPersonId}/${crypto.randomUUID()}`;
-    return { key, uploadHeaders: { "Content-Type": data.mimeType, "If-None-Match": "*" },
-      uploadUrl: createPrivateUploadUrl({ key, keyPattern, contentType: data.mimeType,
+    return createPrivateUpload({ key, keyPattern, contentType: data.mimeType,
         contentLength: data.size, minContentLength: 16, maxContentLength: 10 * 1024 * 1024,
-        expiresSeconds: 180, preventOverwrite: true }) };
+        expiresSeconds: 180, preventOverwrite: true });
   });
 
 export const finishQualificationUpload = createServerFn({ method: "POST" })

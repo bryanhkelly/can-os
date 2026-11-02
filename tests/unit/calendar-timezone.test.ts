@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/timezone";
+import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue, dayBoundsInTimezone } from "@/modules/calendar/timezone";
 
 describe("calendar timezone conversion", () => {
   it("round-trips event wall time in a non-browser timezone", () => {
@@ -16,6 +16,15 @@ describe("calendar timezone conversion", () => {
       .toThrow("does not exist");
     expect(dateTimeInputInTimezone("2027-11-07T01:30", "America/Los_Angeles"))
       .toBe("2027-11-07T08:30:00.000Z");
+  });
+
+  it("finds the site's local-day bounds across daylight-saving changes", () => {
+    const { start, end } = dayBoundsInTimezone(
+      new Date("2026-11-02T04:35:00.000Z"),
+      "America/Los_Angeles",
+    );
+    expect(start.toISOString()).toBe("2026-11-01T07:00:00.000Z");
+    expect(end.toISOString()).toBe("2026-11-02T08:00:00.000Z");
   });
 
   it("rejects invalid date/time input and timezone names", () => {

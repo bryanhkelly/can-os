@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
 import { FamilyHomeView } from "@/routes/guardian.index";
+import { Route as GuardianAttendance } from "@/routes/guardian.attendance";
 import { Student360View } from "@/routes/staff.students.$personId";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import { WorkspaceShell } from "@/components/workspace";
@@ -26,6 +27,12 @@ vi.mock("@/modules/learning/course-registration.functions", () => ({
 }));
 vi.mock("@/modules/student-experience/assignments.functions", () => ({ getAssignments: vi.fn() }));
 vi.mock("@/modules/family/family-home.functions", () => ({ getFamilyHome: vi.fn(), getGuardianNeedsYou: vi.fn() }));
+vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
+  listGuardianEffectiveAbsences: vi.fn(), submitEffectiveAttendanceExcuse: vi.fn(),
+}));
+vi.mock("@/modules/learning/submission-attachments.functions", () => ({
+  createExcuseAttachmentUpload: vi.fn(), attachDocumentToExcuse: vi.fn(), listExcuseAttachmentCounts: vi.fn(),
+}));
 vi.mock("@/modules/profiles/directory.functions", () => ({ getStudent360: vi.fn() }));
 
 const section = {
@@ -121,14 +128,44 @@ describe("family and student profiles", () => {
   it("shows concrete reasons and preserves each child's person ID in every academic link", () => {
     const children: ComponentProps<typeof FamilyHomeView>["children"] = [{
       studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
-      sectionCount: 2, awaitingSections: false, missingCount: 3, unexcusedAbsences: 0, nextDueAt: null, status: "needs_attention",
+      sectionCount: 2, awaitingSections: false, missingCount: 3, unexcusedAbsences: 0,
+      nextDueAt: "2026-10-01T02:00:00.000Z", nextDueTimezone: "America/Los_Angeles", status: "needs_attention",
     }];
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""/>);
     expect(html).toContain("3 assignment(s) need follow-through.");
+    expect(html).toContain("Sep 30, 2026");
     expect(html).toContain('href="/guardian/academics?student=child-person"');
     expect(html).toContain('href="/guardian/attendance?student=child-person"');
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
     expect(html).not.toContain("student=child-profile");
+  });
+  it("distinguishes a family's first next step from informational updates", () => {
+    const needs: ComponentProps<typeof FamilyHomeView>["needs"] = [
+      {
+        id: "excuse-1", kind: "excuse", type: "attendance_excuse", title: "Jordan: Absence needs an excuse",
+        detail: "Absence on Jan 1 has no excuse yet.", href: "/guardian/attendance?student=child-person&attendance=absence-1",
+        createdAt: "2030-01-01",
+      },
+      {
+        id: "notice-1", kind: "notification", type: "school_notice", title: "School update",
+        detail: "A new update is available.", href: "/notifications?notification=notice-1", createdAt: "2030-01-02",
+      },
+    ];
+    const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={needs} loading={false} error=""/>);
+    expect(html).toContain("Excuse needed");
+    expect(html).toContain("New information");
+    expect(html).toContain("border-l-4");
+    expect(html).toContain('href="/guardian/attendance?student=child-person&amp;attendance=absence-1"');
+  });
+  it("keeps the guardian attendance page in the shared family workspace shell", () => {
+    state.search = { student: "child-person", attendance: "absence-1" };
+    const Page = GuardianAttendance.options.component;
+    if (typeof Page !== "function") throw new Error("Missing attendance page component");
+    const html = renderToStaticMarkup(<Page/>);
+    expect(html).toContain("<main");
+    expect(html).toContain("Attendance &amp; excuses");
+    expect(html).toContain("Loading attendance");
+    expect(html).toContain('href="/guardian"');
   });
   const profile: ComponentProps<typeof Student360View>["profile"] = {
     viewerRole: "registrar",

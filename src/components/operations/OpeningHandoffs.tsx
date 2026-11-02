@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import type { getSiteToday } from "@/modules/operations/site-today.functions";
 import { acknowledgeLaunchHandoff,transferLaunchHandoff } from "@/modules/programs/opening-handoff.functions";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 
 type Handoff = Awaited<ReturnType<typeof getSiteToday>>["openingHandoffs"][number];
 
@@ -18,14 +19,16 @@ export function OpeningHandoffs({ handoffs }: { handoffs: Handoff[] }) {
 
 function HandoffCard({ handoff }: { handoff: Handoff }) {
   const router = useRouter();
+  const [interactive, setInteractive] = useState(false);
   const [note, setNote] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback();
+  const busy = mutation.disabled;
   const [recipient,setRecipient]=useState("");
   const [reason,setReason]=useState("");
   const [transferConfirmed,setTransferConfirmed]=useState(false);
-  const [transferRequestId,setTransferRequestId]=useState<string|null>(null);
+  const transferRequestId=useRef<string|null>(null);
+  useEffect(() => setInteractive(true), []);
   return <article className="rounded-lg border p-4">
     <h3 className="font-semibold">{handoff.title}</h3>
     <p className="mt-2 text-sm">Receiving operator: {handoff.firstName} {handoff.lastName}</p>
@@ -38,18 +41,22 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
     {handoff.status==="open"&&!handoff.recipientEligible&&<p role="alert" className="mt-3 text-sm">
       The named recipient is no longer eligible. An explicitly granted opening-handoff manager must select a replacement.</p>}
     {handoff.replacementOperators.length>0&&<form className="mt-4 space-y-3" onSubmit={async event=>{
-      event.preventDefault();setBusy(true);setError("");
-      const requestId=transferRequestId??crypto.randomUUID();setTransferRequestId(requestId);
-      try{
-        await transferLaunchHandoff({data:{actionId:handoff.id,expectedRevision:handoff.revision,
-          requestId,recipientPersonId:recipient,reason,confirmed:true}});
-        await router.invalidate();setTransferRequestId(null);setTransferConfirmed(false);
-      }catch(failure){setError(failure instanceof Error?failure.message:"Unable to transfer opening handoff");}
-      finally{setBusy(false);}
+      event.preventDefault();
+      const requestId=transferRequestId.current??crypto.randomUUID();transferRequestId.current=requestId;
+      const outcome=await mutation.run(()=>transferLaunchHandoff({data:{actionId:handoff.id,expectedRevision:handoff.revision,
+        requestId,recipientPersonId:recipient,reason,confirmed:true}}),{
+        fallback:"Unable to transfer opening handoff.",
+        success:"Opening handoff transferred.",
+        refresh:()=>router.invalidate(),
+      });
+      if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+        transferRequestId.current=null;setTransferConfirmed(false);
+      }
     }}>
+      <fieldset disabled={!interactive || busy} className="space-y-3">
       <h4 className="font-semibold">Recover pending handoff</h4>
       <label className="block text-sm">Replacement site operator
-        <select required value={recipient} onChange={event=>{setRecipient(event.target.value);setTransferRequestId(null);}}
+        <select required value={recipient} onChange={event=>{setRecipient(event.target.value);transferRequestId.current=null;}}
           className="mt-1 block rounded border bg-background p-2">
           <option value="">Select a replacement</option>
           {handoff.replacementOperators.map(operator=><option key={operator.personId} value={operator.personId}>
@@ -58,7 +65,7 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       </label>
       <label className="block text-sm">Reason for recovery
         <textarea required minLength={10} maxLength={2000} value={reason}
-          onChange={event=>{setReason(event.target.value);setTransferRequestId(null);}}
+          onChange={event=>{setReason(event.target.value);transferRequestId.current=null;}}
           className="mt-1 block w-full rounded border bg-background p-2"/>
       </label>
       <label className="flex items-start gap-2 text-sm">
@@ -67,6 +74,7 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       </label>
       <button type="submit" disabled={busy||!recipient||reason.trim().length<10||!transferConfirmed}
         className="rounded border px-3 py-2 text-sm disabled:opacity-50">Transfer pending handoff</button>
+      </fieldset>
     </form>}
     {handoff.programId && handoff.siteId && <div className="mt-3 flex flex-wrap gap-3 text-sm">
       <Link to="/operations/launch/$programId" params={{ programId: handoff.programId }} className="underline">Review classes and staffing</Link>
@@ -74,14 +82,17 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       <Link to="/operations" search={{ siteId: handoff.siteId, programId: handoff.programId }} className="underline">Program operations</Link>
     </div>}
     {handoff.canAcknowledge ? <form className="mt-4 space-y-3" onSubmit={async event => {
-      event.preventDefault(); setBusy(true); setError("");
-      try {
-        await acknowledgeLaunchHandoff({ data: { actionId: handoff.id, note, confirmed: true } });
-        await router.invalidate();
-      } catch (failure) {
-        setError(failure instanceof Error ? failure.message : "Unable to acknowledge opening handoff");
-      } finally { setBusy(false); }
+      event.preventDefault();
+      await mutation.run(
+        () => acknowledgeLaunchHandoff({ data: { actionId: handoff.id, note, confirmed: true } }),
+        {
+          fallback:"Unable to acknowledge opening handoff.",
+          success:"Opening handoff acknowledged.",
+          refresh:()=>router.invalidate(),
+        },
+      );
     }}>
+      <fieldset disabled={!interactive || busy} className="space-y-3">
       <label className="block text-sm">Acknowledgment note
         <textarea required minLength={10} maxLength={2000} value={note} onChange={event => setNote(event.target.value)}
           className="mt-1 block w-full rounded border bg-background p-2"/>
@@ -92,8 +103,10 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       </label>
       <button type="submit" disabled={busy || !confirmed || note.trim().length < 10}
         className="rounded border px-3 py-2 text-sm disabled:opacity-50">Acknowledge receipt</button>
+      </fieldset>
     </form> : handoff.status !== "resolved" && <p className="mt-3 text-sm text-muted-foreground">
       Only the named recipient with a current site operator grant can acknowledge this handoff.</p>}
-    {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
+    {mutation.error && <p role="alert" className="mt-3 text-sm">{mutation.error}</p>}
+    {mutation.notice && <p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
   </article>;
 }

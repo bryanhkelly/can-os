@@ -1,8 +1,8 @@
 import { getLiveOperationsCommandCenter } from "@/modules/operations/command-center.functions";
-import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction} from "@/modules/operations/action-workspace.functions";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
 export const Route=createFileRoute("/operations")({
  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;action?:string}=>({
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
@@ -32,25 +32,26 @@ function OperationsPage(){
   void router.navigate({href:"/operations"+(query.size?"?"+query.toString():"")});
  };
  const router=useRouter();
- const [busy,setBusy]=useState<string|null>(null);
- const [error,setError]=useState("");
+ const mutation=useMutationFeedback();
  if(authError||!data||!health)return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
   <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{authError||"Operations data is unavailable."}</p>
  </main>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
-  setBusy(id);setError("");
-  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim()){setBusy(null);return;}await updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
-  finally{setBusy(null);}
+  const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;
+  if(status==="resolved"&&!resolutionNote?.trim())return;
+  await mutation.run(
+   ()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}}),
+   {fallback:"Unable to update action.",success:"Action updated.",refresh:()=>router.invalidate()},
+  );
  }
 
  async function assignAction(id:string,ownerPersonId:string|null,priority:"normal"|"high"|"urgent"){
-  setBusy(id);setError("");
-  try{await assignOperationsAction({data:{id,ownerPersonId,priority}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Unable to assign action");}
-  finally{setBusy(null);}
+  await mutation.run(
+   ()=>assignOperationsAction({data:{id,ownerPersonId,priority}}),
+   {fallback:"Unable to assign action.",success:"Action assigned.",refresh:()=>router.invalidate()},
+  );
  }
 
  return <main className="mx-auto max-w-6xl px-5 py-10">
@@ -72,7 +73,8 @@ function OperationsPage(){
    </label>
   </div>
   <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
-  {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
+  {mutation.error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="mt-4 rounded-lg border p-3">{mutation.notice}</p>}
   {commandCenter&&<section className="mt-7 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Live school operations</h2>
     <div className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -105,13 +107,13 @@ function OperationsPage(){
  <p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
  <p className="mt-2 text-xs">{i.dueAt?`${i.urgency==="overdue"?"Overdue · ":i.urgency==="due_soon"?"Due within 24 hours · ":"Due · "}${new Date(i.dueAt).toLocaleString()}`:"No due date"} · {i.ownerName?`Assigned to ${i.ownerName}`:i.ownerPersonId?"Assigned owner is not in the current staff directory":"Unassigned"}</p>
  <div className="mt-3 flex flex-wrap gap-3">{i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><label className="flex items-center gap-2 text-xs">Assigned to
- <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={busy!==null} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
+ <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={mutation.disabled} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
  <option value="">Unassigned</option>
  {data.assignees.filter(person=>person.siteId===i.siteId).map(person=><option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.role}</option>)}
  </select></label>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={mutation.disabled} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={mutation.disabled} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={mutation.disabled} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
  </>}</div></article>)}
   {!data.items.length&&<p className="rounded-xl border p-5 text-sm">No actions currently require attention.</p>}
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>

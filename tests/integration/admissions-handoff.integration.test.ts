@@ -9,7 +9,11 @@ const state=vi.hoisted(()=>({tx:undefined as Transaction|undefined,actor:undefin
  verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
 vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
  const original=await importOriginal<typeof import("@/modules/enrollment/r2-documents.server")>();
- return {...original,verifyDocumentObject:state.verify,signR2Object:state.sign,r2Config:vi.fn(()=>({}))};
+ return {...original,verifyDocumentObject:state.verify,signR2Object:state.sign,r2Config:vi.fn(()=>({})),
+  createEnrollmentUpload:vi.fn((objectKey:string,contentType:string)=>({
+   objectKey,uploadUrl:state.sign(),uploadHeaders:{"Content-Type":contentType},
+   expiresAt:new Date(Date.now()+180_000).toISOString(),
+  }))};
 });
 vi.mock("@/platform/mutation",async importOriginal=>{
  const original=await importOriginal<typeof import("@/platform/mutation")>();
@@ -321,16 +325,16 @@ integration("cross-persona admissions through active classes",()=>{
     vi.stubEnv("CAN_R2_LIVE_UPLOADS_ENABLED","true");
     const firstUpload=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
     state.verify.mockRejectedValueOnce(new Error("Object size or signature mismatch"));
-    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}})).rejects.toThrow("signature mismatch");
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.objectKey}})).rejects.toThrow("signature mismatch");
     expect(await tx.select().from(s.documents).where(eq(s.documents.subjectId,requirement.id))).toEqual([]);
     state.failDocumentEvent=true;
-    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}})).rejects.toThrow("outbox failure");
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.objectKey}})).rejects.toThrow("outbox failure");
     state.failDocumentEvent=false;
     expect(await tx.select().from(s.documents).where(eq(s.documents.subjectId,requirement.id))).toEqual([]);
-    const recorded=await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}});
+    const recorded=await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.objectKey}});
     documentId=recorded.documentId;
-    expect(await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}})).toEqual({...recorded,created:false});
-    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key,fileName:"changed.pdf"}}))
+    expect(await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.objectKey}})).toEqual({...recorded,created:false});
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.objectKey,fileName:"changed.pdf"}}))
      .rejects.toThrow("different input");
     expect(await readDocumentRequirement())
      .toMatchObject({reviewStatus:"received",correctionReason:null,documents:[{id:documentId,current:true,canDownload:true}]});
@@ -345,7 +349,7 @@ integration("cross-persona admissions through active classes",()=>{
     expect((await getNotifications()).filter(row=>row.title==="Enrollment document needs correction")).toHaveLength(1);
     expect(await documentFlow.getEnrollmentDocumentDownload({data:{...scope,documentId}})).toMatchObject({expiresInSeconds:60});
     const replacement=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
-    const replaced=await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:replacement.key}});
+    const replaced=await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:replacement.objectKey}});
     expect((await readDocumentRequirement()).documents).toEqual(expect.arrayContaining([
      expect.objectContaining({id:documentId,current:false,canDownload:false}),
      expect.objectContaining({id:replaced.documentId,current:true,reviewStatus:"received"}),
@@ -363,7 +367,7 @@ integration("cross-persona admissions through active classes",()=>{
       .where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
     });
     const lateUpload=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
-    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:lateUpload.key}})).rejects.toThrow("current managing guardian");
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:lateUpload.objectKey}})).rejects.toThrow("current managing guardian");
     expect(await getGuardianAdmissionOffers({data:{}})).toEqual([]);
     await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("current managing guardian");
     expect((await getNotifications()).find(row=>row.title==="Enrollment document needs correction")?.href).toBeNull();

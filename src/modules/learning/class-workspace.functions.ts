@@ -56,7 +56,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
     return {
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
-        subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
+        subject: section.subject, timezone: section.timezone, versionId: section.versionId, contentStatus: section.contentStatus },
       studentPersonId, content,
       teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),

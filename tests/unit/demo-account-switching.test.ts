@@ -122,9 +122,10 @@ describe("admin-controlled demo account switching", () => {
     await expect(getCommandContext(request)).rejects.toThrow("active demo administrator membership");
     state.rows = [[session], [adminGrant], [adminGrant]];
     await expect(getCommandContext(request)).rejects.toThrow("active membership");
+    vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "false");
-    state.rows = [[session]];
-    await expect(getCommandContext(request)).rejects.toThrow("enabled demo-school access");
+    state.rows = [[session], [adminGrant], [adminGrant, studentGrant], []];
+    expect((await getCommandContext(request)).accountId).toBe(studentGrant.accountId);
   });
 
   it("switches the admin-owned session and audits both controlling and effective identities", async () => {

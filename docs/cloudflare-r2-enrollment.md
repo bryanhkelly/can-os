@@ -10,11 +10,58 @@ CAN OS stores document bytes in a private Cloudflare R2 bucket and metadata in t
 | `CAN_R2_BUCKET` | Private bucket name |
 | `CAN_R2_ACCESS_KEY_ID` | Bucket-restricted key |
 | `CAN_R2_SECRET_ACCESS_KEY` | Secret for signing object-specific URLs |
+| `CAN_R2_DEMO_ACCOUNT_ID`, `CAN_R2_DEMO_BUCKET` | Separately configured account and isolated private bucket for demo-tenant enrollment documents |
+| `CAN_R2_DEMO_ACCESS_KEY_ID`, `CAN_R2_DEMO_SECRET_ACCESS_KEY` | Credentials restricted to the isolated demo enrollment bucket; no fallback to live credentials |
 | `CAN_R2_DEMO_UPLOADS_ENABLED=true` | Enables document uploads on explicitly synthetic enrollment records only |
 | `CAN_R2_LIVE_UPLOADS_ENABLED=true` | Explicitly enables authenticated live enrollment document uploads |
 | `CAN_R2_QUALIFICATION_UPLOADS_ENABLED=true` | Separately enables authenticated teacher qualification evidence uploads after operational review |
 
 **All upload switches default to false.** Demo uploads also require the separate `CAN_DEMO_WRITES_ENABLED` gate. They must never be used as replacements for role and resource authorization. Use a token with access restricted to one private bucket, never put credentials in `VITE_` variables, and restrict CORS to approved application origins and the exact upload headers/methods. CORS does not confer authorization.
+
+## Shared upload contract
+
+All upload endpoints (assignment, attendance, profile photo, enrollment and
+qualification evidence) use `createPrivateUpload` in
+[`src/platform/storage/r2.ts`](../src/platform/storage/r2.ts). It returns one
+`PrivateUpload` contract containing the `objectKey`, `uploadUrl`,
+`uploadHeaders` and `expiresAt`; callers must use those headers unchanged.
+Conditional creation adds `If-None-Match: *` to both the signature and the
+returned headers in the same factory.
+
+Every browser upload uses `PrivateUploadCompletion`, `uploadPrivateFile` and
+the shared file-validation primitives in
+[`src/platform/storage/private-upload.ts`](../src/platform/storage/private-upload.ts).
+The transport performs only the PUT, omits application credentials, supports
+AbortSignal cancellation, and reports HTTP and network/CORS failures
+consistently. Completion sessions retain a confirmed stored object when its
+domain finish command fails, so a retry repeats only the authorized finish
+command and never uploads that object again. Failed/ambiguous PUTs are not
+automatically retried; a lost conditional-PUT response must not trigger an
+overwrite or make an HTTP 412 look successful.
+
+Domain begin/finish commands still own capability/resource/scope/relationship
+authorization, allowed formats/size, key policy, storage namespace, deployment
+gates, verification, persistence, audit and events. A successful PUT alone
+never confirms a business submission. The common transport does not introduce
+a second document lifecycle or relax the existing gates.
+
+Bucket CORS must allow PUT with both `Content-Type` and `If-None-Match` for
+approved application origins to support all upload policies. Verify the actual
+live or demo bucket before enabling uploads with
+`npm run check:r2-cors -- https://<approved-origin> live` (or `demo`). The
+check performs only an OPTIONS preflight and fails unless that bucket allows
+the origin, PUT, and both signed upload headers. It does not create an object,
+modify bucket configuration, or bypass a rejected preflight.
+
+The shared-contract refactor was validated locally on 2026-11-01 with typecheck,
+production build, the route inventory checker, 72 focused unit tests, and six
+isolated integration tests across class participation, admissions and staffing.
+After the refactor, Playwright again passed actual profile-photo, assignment
+and guardian attendance uploads through their UI, including reload and verified
+Document persistence. The three synthetic R2 objects were removed and their
+absence checked; disposable fixture access was retired. Enrollment/qualification
+live UI acceptance and the conditional-upload CORS blocker described below
+remain separate from this code validation.
 
 ## Enrollment workflow
 
@@ -88,6 +135,45 @@ The qualification upload gate must remain disabled until live-bucket
 conditional-write/CORS, privacy, quarantine, retention and abandoned-object
 cleanup gates are accepted. No automatic deletion of abandoned bytes is claimed.
 
-This implementation has **not** been validated against a live R2 bucket. Before enabling live uploads, complete a security/privacy review including anti-malware scanning/quarantine, actual bucket CORS and least-privilege credentials, object expiration/deletion of abandoned uploads, retention/legal holds and records export, access revocation, denial tests across former guardians and schools, audit delivery, and a controlled rollback procedure. Restrict supported MIME types to the currently server-verifiable PDF/JPEG/PNG formats; other office document formats must not be enabled merely by changing the browser file picker.
+The local live-bucket checks below do **not** certify production document workflows. Before enabling live uploads, complete a security/privacy review including anti-malware scanning/quarantine, actual bucket CORS and least-privilege credentials, object expiration/deletion of abandoned uploads, retention/legal holds and records export, access revocation, denial tests across former guardians and schools, audit delivery, and a controlled rollback procedure. Restrict supported MIME types to the currently server-verifiable PDF/JPEG/PNG formats; other office document formats must not be enabled merely by changing the browser file picker.
 
 Production school document access remains a deployment decision; passing source review or setting the upload switch does not mean these operational gates were completed.
+
+## Local upload verification - 2026-11-01
+
+Executed against HEAD `2d356260` with pre-existing local worktree changes.
+These results describe that local configuration, not a deployed release.
+
+- Chromium/Playwright UI tests passed for a student profile PNG upload and image
+  rendering after reload, assignment PDF submission with a storage-verified
+  document association after reload, and a guardian PDF attendance attachment
+  after a staff-recorded absence and guardian excuse. These tests used authentic
+  synthetic sessions and the separately guarded disposable database, not the
+  running application's database. All three R2 test objects were deleted and
+  their absence verified; fixture accounts/grants/sessions were disabled or
+  revoked, preserving append-only test evidence.
+- Eleven browser-to-R2 combinations passed: PDF/PNG/JPEG under assignment,
+  attendance and live enrollment key shapes, plus PNG/JPEG under profile keys.
+  Checks included signed PUT, server HEAD/size/MIME/bounded-signature validation,
+  byte-for-byte signed GET and unsigned S3 endpoint denial. The eleven temporary
+  objects were deleted and their absence verified. Testing an enrollment key
+  shape is not acceptance of the gated enrollment UI/command workflow.
+- Disposable database integration modes `class-participation`, `admissions-offers`
+  and `launch-staffing` passed: six files / six tests. Their storage operations
+  are mocked; these results complement, not replace, live-bucket browser checks.
+- Focused R2 unit tests returned 32 passed / one failed across four files. The
+  existing session-boundary fixture lacks the email now read by the locally
+  modified identity resolver; it fails in `isDemoAccountEmail` before its
+  successful-session assertion. No authorization fallback was introduced.
+- Qualification browser uploads remain **blocked**: preflights requesting
+  `content-type,if-none-match` returned HTTP 403, although `content-type` alone
+  returned 204. The bucket must actually allow both headers before conditional
+  browser uploads can be accepted. Qualification overwrite prevention was not
+  live-tested while that preflight remained blocked.
+- Enrollment live/demo and qualification upload gates remained disabled.
+  Isolated demo enrollment credentials were absent. They were not aliased to the
+  live bucket and no deployment gates were bypassed. End-to-end enrollment and
+  qualification uploads therefore remain **unverified** in this configuration.
+- The temporary wildcard-origin CORS setting is development configuration, not
+  production acceptance. Restrict origins and complete the operational gates
+  above before enabling school document workflows.

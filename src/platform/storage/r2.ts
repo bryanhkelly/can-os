@@ -1,4 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
+import type { PrivateUpload } from "./private-upload";
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const hmac = (key: Buffer | string, value: string) => createHmac("sha256", key).update(value).digest();
@@ -91,6 +92,22 @@ export function createPrivateUploadUrl({ key, keyPattern, contentType, contentLe
     throw new Error("Invalid R2 signing request");
   }
   return signPrivateObjectUrl({ method: "PUT", key, keyPattern, contentType, expiresSeconds, preventOverwrite, namespace });
+}
+
+export function createPrivateUpload(options: CreatePrivateUploadUrlOptions): PrivateUpload {
+  const expiresSeconds = options.expiresSeconds ?? 180;
+  if (!Number.isInteger(expiresSeconds) || expiresSeconds < 1 || expiresSeconds > 900) {
+    throw new Error("Invalid R2 signing request");
+  }
+  const expiresAt = new Date(Date.now() + expiresSeconds * 1000).toISOString();
+  const uploadHeaders: Record<string, string> = { "Content-Type": options.contentType };
+  if (options.preventOverwrite) uploadHeaders["If-None-Match"] = "*";
+  return {
+    objectKey: options.key,
+    uploadUrl: createPrivateUploadUrl({ ...options, expiresSeconds }),
+    uploadHeaders,
+    expiresAt,
+  };
 }
 
 export interface VerifyPrivateObjectOptions {

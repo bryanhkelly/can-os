@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import type { CommandContext } from "@/domain/command-context";
+import { AuthenticationRequiredError } from "@/domain/errors";
 import { isPassingGrade } from "@/domain/grade-scale-policy";
 import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
@@ -15,7 +16,7 @@ export type SectionPlacementInput={
 };
 export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:SectionPlacementInput){
  const {studentProfileId,sectionId,actor}=input;
- if(!actor.actorPersonId)throw new Error("Authenticated actor required");
+ if(!actor.actorPersonId)throw new AuthenticationRequiredError();
  // Staff and self-service registration share one site configuration lock.
  // Acquire BEFORE section FOR UPDATE to avoid inversion with staff attendance.
  const [sectionSite]=await tx.select({siteId:s.sections.siteId,

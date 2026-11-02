@@ -2,10 +2,11 @@ import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
+import {AuthenticationRequiredError} from "@/domain/errors";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
 import {
- isDemoAccountEmail,isLocalDemoAccessEnabled,isPublicDemoAccessEnabled,
+ isDemoAccountEmail,
 } from "@/domain/local-demo-access";
 import {readSessionGrants} from "./session-grants.server";
 
@@ -17,9 +18,9 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  const cookie=request.headers.get("cookie")??"";
  const entry=cookie.split(";").map(x=>x.trim()).find(x=>x.startsWith(accessSessionCookie+"="));
  const value=entry?.slice(accessSessionCookie.length+1);
- if(!value || !/^[A-Za-z0-9_-]{40,}$/.test(value)) throw new AuthorizationError("authenticated session");
+ if(!value || !/^[A-Za-z0-9_-]{40,}$/.test(value)) throw new AuthenticationRequiredError();
  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
- if(!pepper) throw new AuthorizationError("authenticated session");
+ if(!pepper) throw new Error("CAN_ACCESS_TOKEN_PEPPER is not configured");
  const digest=hashAccessSecret(value,pepper);
  const now=new Date();
  const [session]=await db.select({
@@ -31,11 +32,8 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
    eq(accessAccounts.disabled,false)))
   .limit(1);
- if(!session) throw new AuthorizationError("authenticated session");
+ if(!session) throw new AuthenticationRequiredError();
  const publicDemoAccount=isDemoAccountEmail(session.email);
- if(publicDemoAccount&&!isPublicDemoAccessEnabled(process.env)&&!isLocalDemoAccessEnabled(process.env)){
-  throw new AuthorizationError("enabled demo-school access");
- }
  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
  const selected=grants.find(grant=>grant.id===session.activeGrantId);
  if(!selected)throw new AuthorizationError("active membership");

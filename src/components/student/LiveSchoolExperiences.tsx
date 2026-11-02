@@ -29,18 +29,18 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
   finally{setBusy(false);}
  }
  const format=(stamp:string,tz="America/Los_Angeles")=>new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZone:tz}).format(new Date(stamp));
- return <section className="mx-auto mt-8 max-w-6xl px-4 sm:px-8">
+ return <section aria-labelledby="school-community-heading" className="mx-auto mt-8 max-w-6xl px-4 sm:px-8">
   <div className="rounded-2xl border-2 border-foreground/15 bg-card p-5 sm:p-7">
    <div className="flex flex-wrap justify-between gap-3">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">School experiences</p><h2 className="mt-2 font-serif text-3xl">School calendar & communication</h2><p className="mt-2 text-sm text-muted-foreground">Your school calendar, announcements and teacher office hours.</p></div>
-    <span className="h-fit rounded-full border border-border px-3 py-2 text-xs font-semibold">{data.connected?"Neon connected":"Neon unavailable"}</span>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Student life</p><h2 id="school-community-heading" className="mt-2 font-serif text-3xl">School & community</h2><p className="mt-2 text-sm text-muted-foreground">School calendar updates, announcements and teacher office hours.</p></div>
    </div>
+   {!data.connected&&<p role="status" className="mt-4 rounded-lg border p-3 text-sm text-muted-foreground">We couldn’t load current school information. Please try again later.</p>}
    {message&&<p role="status" className="mt-4 rounded-lg border border-emerald-300 p-3 text-sm">{message}</p>}
    {error&&<p role="alert" className="mt-4 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}
    <div className="mt-7 grid gap-7 lg:grid-cols-3">
     <div className="space-y-3">
-     <h3 className="font-semibold">Site calendar exceptions</h3>
-     <p className="text-xs text-muted-foreground">Schedule changes are managed in the school calendar.</p>
+     <h3 className="font-semibold">School calendar updates</h3>
+     <p className="text-xs text-muted-foreground">Check dates and schedule changes from your school.</p>
      {data.events.map(event=><div key={event.id} className="rounded-xl border border-border p-4">
       <p className="text-sm font-semibold"><Link to="/calendar" search={{date:dateKeyInTimezone(event.startsAt,event.timezone),event:event.id}} className="hover:underline">{event.title}</Link></p>
       <p className="mt-1 text-xs text-muted-foreground">{format(event.startsAt,event.timezone)}</p>
@@ -51,7 +51,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
     </div>
     <div className="space-y-3">
      <h3 className="font-semibold">Announcements</h3>
-     <p className="text-xs text-muted-foreground">Acknowledge Site and network communications.</p>
+     <p className="text-xs text-muted-foreground">Read and acknowledge updates from your school.</p>
      {data.notices.map(notice=><div key={notice.id} className="rounded-xl border border-border p-4">
       <p className="text-sm font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline">{notice.title}</Link></p>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{notice.body}</p>

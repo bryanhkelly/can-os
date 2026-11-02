@@ -77,7 +77,8 @@ integration("demo tenant identity", () => {
         const { getCommandContext } = await import("@/modules/identity/command-context.server");
         const { hasInstitutionalProgramCapability } = await import("@/modules/identity/institutional-capability.server");
         vi.stubEnv("NODE_ENV", "test");
-        vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "true");
+        vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "false");
+        vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", "false");
         vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "demo-registrar-integration-pepper-not-a-real-secret");
         const login = await redeemDemoAccess(fixture.email, "000000");
         expect(login.role).toBe("registrar");
@@ -98,7 +99,7 @@ integration("demo tenant identity", () => {
         }
         await expect(redeemDemoAccess(fixture.email, "wrong-code")).rejects.toThrow("Invalid demo credentials");
         vi.stubEnv("NODE_ENV", "production");
-        await expect(redeemDemoAccess(fixture.email, "000000")).rejects.toThrow("Invalid demo credentials");
+        expect((await redeemDemoAccess(fixture.email, "000000")).role).toBe("registrar");
         vi.stubEnv("NODE_ENV", "test");
 
         await tx.update(s.accountPersonGrants).set({ active: false }).where(eq(s.accountPersonGrants.id, fixture.grantId));
@@ -117,6 +118,7 @@ integration("demo tenant identity", () => {
         expect(unchanged?.capabilities).toEqual([]);
         expect((await provisionDemoRegistrar(tx, env)).changes).toEqual(["institutional_capabilities"]);
         expect((await provisionDemoRegistrar(tx, env)).changes).toEqual([]);
+        vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "true");
         checked = true;
         throw rollback;
       });
@@ -300,6 +302,21 @@ integration("demo tenant identity", () => {
         expect(effectiveStudent.capabilities.has("admin.manage")).toBe(false);
         const switchedWorkspace = await readWorkspaceSession(adminRequest);
         expect(switchedWorkspace.authenticated && switchedWorkspace.demoAccountSwitching).toBe(true);
+        await tx.update(s.accessAccounts).set({ disabled: true })
+          .where(eq(s.accessAccounts.id, student.accountId));
+        await expect(getCommandContext(adminRequest)).rejects.toThrow("active membership");
+        await tx.update(s.accessAccounts).set({ disabled: false })
+          .where(eq(s.accessAccounts.id, student.accountId));
+        await tx.update(s.accountPersonGrants).set({ active: false })
+          .where(eq(s.accountPersonGrants.id, LOCAL_DEMO_ADMIN.grantId));
+        await expect(getCommandContext(adminRequest)).rejects.toThrow("active demo administrator membership");
+        await tx.update(s.accountPersonGrants).set({ active: true })
+          .where(eq(s.accountPersonGrants.id, LOCAL_DEMO_ADMIN.grantId));
+        const failedAudit = vi.spyOn(mutation, "writeAudit").mockRejectedValueOnce(new Error("switch audit unavailable"));
+        await expect(selectAccessGrant(admin.sessionId, admin.accountId, LOCAL_DEMO_ADMIN.grantId))
+          .rejects.toThrow("switch audit unavailable");
+        failedAudit.mockRestore();
+        expect((await getCommandContext(adminRequest)).grantId).toBe(student.id);
         await selectAccessGrant(admin.sessionId, effectiveStudent.sessionAccountId!, LOCAL_DEMO_ADMIN.grantId);
         expect((await getCommandContext(adminRequest)).actorPersonId).toBe(LOCAL_DEMO_ADMIN.personId);
 
@@ -314,8 +331,15 @@ integration("demo tenant identity", () => {
           .where(eq(s.accessSessions.id, studentContext.sessionId));
         await expect(getCommandContext(studentRequest)).rejects.toThrow("active membership");
 
+        vi.stubEnv("NODE_ENV", "production");
         vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", "false");
-        await expect(getCommandContext(adminRequest)).rejects.toThrow("enabled demo-school access");
+        expect((await getCommandContext(adminRequest)).accountId).toBe(LOCAL_DEMO_ADMIN.accountId);
+        vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", "true");
+        await selectAccessGrant(admin.sessionId, admin.accountId, student.id);
+        const { revokeAccessSession } = await import("@/modules/identity/passwordless-access.server");
+        const switched = await getCommandContext(adminRequest);
+        await revokeAccessSession(switched.sessionId, switched.sessionAccountId!);
+        await expect(getCommandContext(adminRequest)).rejects.toThrow("authenticated session");
         checked = true;
         throw rollback;
       });

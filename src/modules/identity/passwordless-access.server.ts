@@ -3,7 +3,7 @@ import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,peop
 import { roleCapabilities } from "@/domain/access-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
 import {
- isDemoAccountEmail,isDemoSchoolGrant,isLocalDemoAccessEnabled,isPublicDemoAccessEnabled,
+ isDemoAccountEmail,isDemoSchoolGrant,
  LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ADMIN,
 } from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
@@ -97,14 +97,12 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
-/** Local/test-only sign-in for the seeded synthetic demo accounts. */
+/** Shared-code sign-in for tenant-scoped demo accounts. */
 export async function redeemDemoAccess(
  rawEmail:string,
  code:string,
 ):Promise<{setCookie:string;accountId:string;role:string}> {
- const localAccess=isLocalDemoAccessEnabled(process.env);
- const publicAccess=isPublicDemoAccessEnabled(process.env);
- if((!localAccess&&!publicAccess) || code!==LOCAL_DEMO_ACCESS_CODE) {
+ if(code!==LOCAL_DEMO_ACCESS_CODE) {
   throw new Error("Invalid demo credentials");
  }
  const email=normalizeAccessEmail(rawEmail);
@@ -167,8 +165,6 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const [account]=await tx.select({email:accessAccounts.emailNormalized}).from(accessAccounts)
    .where(and(eq(accessAccounts.id,accountId),eq(accessAccounts.disabled,false))).limit(1);
   if(!account)throw new AuthorizationError("authenticated account");
-  if(isDemoAccountEmail(account.email)&&!isLocalDemoAccessEnabled(process.env)&&!isPublicDemoAccessEnabled(process.env))
-   throw new AuthorizationError("enabled demo-school access");
   const {grants,demoAccountSwitching}=await readSessionGrants(accountId,account.email,tx);
   const grant=grants.find(candidate=>candidate.id===grantId);
   if(!grant)throw new AuthorizationError("active membership");

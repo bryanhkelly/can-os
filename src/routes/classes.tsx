@@ -7,6 +7,7 @@ import { publishClassAnnouncement } from "@/modules/learning/class-communication
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 
 const tabs = ["overview", "lessons", "files", "syllabus", "announcements", "people"] as const;
 const searchSchema = z.object({
@@ -44,9 +45,8 @@ function ClassesPage() {
 type Workspace = Awaited<ReturnType<typeof getClassWorkspace>>;
 export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Workspace; tab?: (typeof tabs)[number]; lessonId?: string }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback();
+  const busy = mutation.disabled;
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const announcementId = useRef<string | null>(null);
@@ -55,10 +55,11 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const lesson = lessons.find(item => item.id === lessonId);
   const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
   async function run(command: () => Promise<unknown>, success: string) {
-    setBusy(true); setError(""); setNotice("");
-    try { await command(); await router.invalidate(); setNotice(success); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to complete this class operation."); }
-    finally { setBusy(false); }
+    await mutation.run(command, {
+      fallback: "Unable to complete this class operation.",
+      success,
+      refresh: () => router.invalidate(),
+    });
   }
   async function download(resourceId: string) {
     await run(async () => {
@@ -86,8 +87,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     </nav></WorkspacePanel>}>
     <DetailNavigation label="Class sections">{tabs.filter(value => value !== "people" || data.role === "teacher").map(value =>
       <Link key={value} to="/classes" search={{ ...search, tab: value }} aria-current={tab === value ? "page" : undefined} className="capitalize">{value === "people" ? "Roster" : value}</Link>)}</DetailNavigation>
-    {error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{notice}</p>}
+    {mutation.error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{mutation.error}</p>}
+    {mutation.notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
     {tab === "overview" && <div className="grid gap-5">
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
       <WorkspacePanel title="Learning progress" description="Student-reported lesson completion is not a grade, mastery score or attendance record.">
@@ -142,7 +143,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           <button disabled={busy || title.trim().length < 3 || !body.trim()} className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">{busy ? "Publishing..." : "Publish announcement"}</button>
         </form>
       </WorkspacePanel>}
-      {data.announcements.slice().reverse().map(item => <WorkspacePanel key={item.id} title={item.title} description={new Date(item.createdAt).toLocaleString()}>
+      {data.announcements.slice().reverse().map(item => <WorkspacePanel key={item.id} title={item.title} description={new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium", timeStyle: "short", timeZone: data.section.timezone,
+      }).format(new Date(item.createdAt))}>
         <p className="whitespace-pre-wrap text-sm leading-7">{item.body}</p>
       </WorkspacePanel>)}
       {!data.announcements.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">No class announcements yet.</p>}

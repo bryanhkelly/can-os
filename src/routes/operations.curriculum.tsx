@@ -5,6 +5,7 @@ import { CurriculumEditor } from "@/components/learning/CurriculumEditor";
 import { createAuthoredCourse, getCurriculumPrograms, getCurriculumStudio, startCurriculumDraft } from "@/modules/learning/curriculum-authoring.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 
 export const Route=createFileRoute("/operations/curriculum")({
  validateSearch:(search:Record<string,unknown>)=>z.object({programId:z.string().uuid().optional()}).parse(search),
@@ -24,7 +25,8 @@ function StudioView({data}:{data:{
  programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;studio:Awaited<ReturnType<typeof getCurriculumStudio>>|null;
 }}){
  const router=useRouter();
- const [error,setError]=useState(""),[busy,setBusy]=useState(false);
+ const mutation=useMutationFeedback();
+ const busy=mutation.disabled;
  const [code,setCode]=useState(""),[title,setTitle]=useState(""),[subject,setSubject]=useState("");
  const requestId=useRef<string|null>(null);
  const draftRequests=useRef(new Map<string,string>());
@@ -36,19 +38,23 @@ function StudioView({data}:{data:{
   <nav aria-label="Curriculum program scope" className="flex flex-wrap gap-3">{data.programs.map(program=>
    <Link key={program.id} to="/operations/curriculum" search={{programId:program.id}} aria-current={studio?.programId===program.id?"page":undefined}
     className="rounded border px-3 py-2 text-sm">{program.name}</Link>)}</nav>
-  {error&&<p role="alert" className="rounded border p-3">{error}</p>}
+  {mutation.error&&<p role="alert" className="rounded border p-3">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="rounded border p-3">{mutation.notice}</p>}
   {!studio&&<p>Select a program to verify your publisher authority and open its organization's curriculum.</p>}
   {!data.programs.length&&<p role="status">No curriculum publisher grants are available in this membership. An administrator must assign explicit institutional authority.</p>}
   {studio&&<>
    <Link to="/operations/launch/$programId" params={{programId:studio.programId}} className="inline-block text-sm underline">Use published releases in section setup</Link>
    <form className="space-y-3 rounded border p-4" onSubmit={async event=>{
-    event.preventDefault();setBusy(true);setError("");
+    event.preventDefault();
     requestId.current??=crypto.randomUUID();
-    try{
-     await createAuthoredCourse({data:{programId:studio.programId,code,title,subject,requestId:requestId.current}});
-     requestId.current=null;setCode("");setTitle("");setSubject("");await router.invalidate();
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to create course");}
-    finally{setBusy(false);}
+    await mutation.run(async()=>{
+     await createAuthoredCourse({data:{programId:studio.programId,code,title,subject,requestId:requestId.current!}});
+     requestId.current=null;setCode("");setTitle("");setSubject("");
+    },{
+     fallback:"Unable to create course.",
+     success:"Course created.",
+     refresh:()=>router.invalidate(),
+    });
    }}>
     <h2 className="text-lg font-semibold">Create course</h2>
     <label className="block text-sm">Course code<input required minLength={2} maxLength={32} pattern="[A-Za-z0-9_-]+"
@@ -63,14 +69,17 @@ function StudioView({data}:{data:{
     <h2 className="text-xl font-semibold">{course.code} · {course.title}</h2><p className="text-sm">{course.subject}</p>
     {!course.releases.some(release=>release.status==="draft")&&<button disabled={busy}
      className="mt-3 rounded border px-3 py-2 text-sm" onClick={async()=>{
-      setBusy(true);setError("");
       const source=course.releases.find(release=>release.status==="published");
       const key=course.id+":"+(source?.id??"empty");
       const id=draftRequests.current.get(key)??crypto.randomUUID();draftRequests.current.set(key,id);
-      try{await startCurriculumDraft({data:{programId:studio.programId,courseId:course.id,sourceVersionId:source?.id,requestId:id}});
-       await router.invalidate();
-      }catch(cause){setError(cause instanceof Error?cause.message:"Unable to create draft");}
-      finally{setBusy(false);}
+      await mutation.run(
+       ()=>startCurriculumDraft({data:{programId:studio.programId,courseId:course.id,sourceVersionId:source?.id,requestId:id}}),
+       {
+        fallback:"Unable to create draft.",
+        success:"Curriculum draft created.",
+        refresh:()=>router.invalidate(),
+       },
+      );
      }}>Create next draft{course.releases.length?" from latest release":""}</button>}
     {course.releases.map(release=><details key={release.id} open={release.status==="draft"} className="mt-4 border-t pt-3">
      <summary>Version {release.version} · {release.status}{release.publishedAt?" · "+new Date(release.publishedAt).toLocaleDateString():""}</summary>

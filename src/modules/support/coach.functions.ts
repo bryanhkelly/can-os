@@ -266,7 +266,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
     const { db, s } = await context();
     await resolveStudentScope(db,s,actor,data.studentProfileId);
 
-    const [referralRows, outreachRows, insightRows] = await Promise.all([
+    const [referralRows, outreachRows, insightRows, helpRequestRows] = await Promise.all([
       db.select({
         actionId: s.actions.id,
         referralId: s.supportReferrals.id,
@@ -319,6 +319,22 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
         inArray(s.insights.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.insights.createdAt)),
+      db.select({
+        id: s.actions.id,
+        title: s.actions.title,
+        description: s.actions.description,
+        status: s.actions.status,
+        createdAt: s.actions.createdAt,
+      })
+        .from(s.actions)
+        .where(and(
+        eq(s.actions.type, "student_support_request"),
+        eq(s.actions.subjectType, "student_profile"),
+        eq(s.actions.subjectId, data.studentProfileId),
+        inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
+        ))
+        .orderBy(desc(s.actions.createdAt)),
     ]);
 
     const referralIds = referralRows.map((row: { referralId: string }) => row.referralId);
@@ -341,7 +357,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
     }
 
     type TimelineEntry = {
-      kind: "referral" | "coach_outreach" | "insight";
+      kind: "referral" | "coach_outreach" | "insight" | "student_help_request";
       occurredAt: string;
       id: string;
       title: string;
@@ -375,6 +391,14 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
         id: row.id,
         title: row.title,
         detail: row.summary,
+        status: row.status,
+      })),
+      ...helpRequestRows.map((row: any): TimelineEntry => ({
+        kind: "student_help_request",
+        occurredAt: row.createdAt.toISOString(),
+        id: row.id,
+        title: row.title,
+        detail: row.description ?? "",
         status: row.status,
       })),
     ];

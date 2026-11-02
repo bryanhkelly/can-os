@@ -8,6 +8,7 @@ import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycl
 import {Qualifications} from "@/components/profiles/Qualifications";
 import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
 import {TeacherPolicyRevisions} from "@/components/profiles/TeacherPolicyRevisions";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
 export const Route=createFileRoute("/operations/launch/$programId")({
  loader:({params})=>safeLoader(()=>getLaunchAcademicSetup({data:{programId:params.programId}}),
   {authMessage:"Sign in with a registrar grant for this program."})(),
@@ -28,18 +29,20 @@ function Setup({data}:{data:Snapshot}){
  const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
  const [policyConfirmed,setPolicyConfirmed]=useState(false);
  const [reviewTeacherId,setReviewTeacherId]=useState("");
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useMutationFeedback();
+ const busy=mutation.disabled;
  async function run(operation:()=>Promise<unknown>,message:string){
-  setBusy(true);setError("");setNotice("");
-  try{await operation();await router.invalidate();setNotice(message);}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
-  finally{setBusy(false);}
+  await mutation.run(operation,{
+   fallback:"Unable to save launch setup.",
+   success:message,
+   refresh:()=>router.invalidate(),
+  });
  }
  return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
   subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
   actions={<Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="rounded-lg border px-3 py-2 text-sm">Launch checklist →</Link>}>
-  {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
-  {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+  {mutation.error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    {[
     ["School years",data.years.length],

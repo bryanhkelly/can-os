@@ -1,7 +1,7 @@
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors.server";
-import { emitEvent } from "@/platform/mutation";
+import { emitEvent, notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray } from "drizzle-orm";
@@ -79,15 +79,32 @@ export const requestQuickWinHelp = createServerFn({ method: "POST" })
         .from(s.enrollments).innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
         .where(and(eq(s.enrollments.studentProfileId, profile.id), eq(s.enrollments.status, "active"), inArray(s.programs.siteId, sites), inArray(s.enrollments.programId, actor.scope.programIds ?? []))).limit(1);
       if (!enrollment) throw new AuthorizationError("active program enrollment");
+      const siteId = enrollment.siteId;
+      if (!siteId) throw new AuthorizationError("student program site");
+      const [counselor] = await tx.select({ personId: s.accountPersonGrants.personId }).from(s.accountPersonGrants)
+        .where(and(
+          eq(s.accountPersonGrants.role, "counselor"),
+          eq(s.accountPersonGrants.siteId, siteId),
+          eq(s.accountPersonGrants.active, true),
+        )).orderBy(s.accountPersonGrants.createdAt).limit(1);
+      if (!counselor) throw new Error("No active counselor is available at this site");
       const [result] = await tx.insert(s.actions).values({
         type: "student_support_request", title: "Student asked for help",
         description: data.message, ownerPersonId: actor.actorPersonId,
-        organizationId: enrollment.organizationId, siteId: enrollment.siteId, programId: enrollment.programId,
+        organizationId: enrollment.organizationId, siteId, programId: enrollment.programId,
         subjectType: "student_profile", subjectId: profile.id,
         status: "open", priority: "normal",
         metadata: { kind: "message", source: "Student support" },
       }).returning({ id: s.actions.id });
       if (!result) throw new Error("Help request could not be saved");
+      await notify(tx, {
+        recipientPersonId: counselor.personId,
+        type: "student_help_request",
+        title: "Student requested help",
+        body: "A student at your site has requested support.",
+        resourceType: "action",
+        resourceId: result.id,
+      });
       await emitEvent(tx,{eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId:profile.id,source:"student_support_request"}});
       await recordAudit(tx, actor, { action: "support_request.create", resourceType: "action", resourceId: result.id, after: { kind: "message" } });
       return { id: result.id };

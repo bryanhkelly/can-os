@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { decideCourseChange } from "@/modules/learning/course-registration.functions";
 import { listRegistrarCourseRequests } from "@/modules/learning/registrar-course-requests.functions";
 
@@ -28,23 +28,17 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
   const visibleRequests=requests.filter(request=>
     (!selection.siteId||request.siteId===selection.siteId)&&
     (!selection.programId||request.programId===selection.programId));
-  const [busyId, setBusyId] = useState("");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback();
 
   async function decide(requestId: string, approve: boolean) {
-    setBusyId(requestId);
-    setError("");
-    setNotice("");
-    try {
-      await decideCourseChange({ data: { requestId, approve } });
-      await router.invalidate();
-      setNotice(approve ? "Enrollment change approved and recorded." : "Course request declined.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to complete registration decision.");
-    } finally {
-      setBusyId("");
-    }
+    await mutation.run(
+      () => decideCourseChange({ data: { requestId, approve } }),
+      {
+        fallback: "Unable to complete registration decision.",
+        success: approve ? "Enrollment change approved and recorded." : "Course request declined.",
+        refresh: () => router.invalidate(),
+      },
+    );
   }
 
   return (
@@ -60,8 +54,8 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
         <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}
     >
-      {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {mutation.notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
       <div className="mt-7 space-y-4">
         {visibleRequests.map(request => (
           <article key={request.id} className="rounded-xl border bg-card p-5">
@@ -90,12 +84,12 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
               <p className="mt-3 text-sm text-amber-700">The registration deadline has passed.</p>
             )}
             <div className="mt-4 flex gap-3">
-              <button type="button" disabled={!!busyId}
+              <button type="button" disabled={mutation.disabled}
                 onClick={() => void decide(request.id, false)}
                 className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
                 Decline
               </button>
-              <button type="button" disabled={!!busyId || !request.canApprove}
+              <button type="button" disabled={mutation.disabled || !request.canApprove}
                 onClick={() => void decide(request.id, true)}
                 className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
                 Approve change

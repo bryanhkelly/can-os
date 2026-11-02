@@ -4,10 +4,12 @@ import { alias } from "drizzle-orm/pg-core";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
+import { AuthenticationRequiredError } from "@/domain/errors";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import {z} from "zod";
 async function notificationActor(){
  const context=await getCommandContext(getRequest());
- if(!context.actorPersonId)throw new Error("Authenticated person required");
+ if(!context.actorPersonId)throw new AuthenticationRequiredError();
  return context;
 }
 export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
@@ -117,21 +119,33 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const submissionIds=rows.filter(n=>n.resourceType==="submission"&&n.resourceId).map(n=>n.resourceId as string);
  const studentProfiles=await db.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,personId));
  const studentIds=studentProfiles.map(p=>p.id);
- const submissions=submissionIds.length&&studentIds.length?
-  await db.select({id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId})
+ const submissions=submissionIds.length&&(context.role==="student"||context.role==="guardian")?
+  await db.select({
+   id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId,
+   studentPersonId:s.studentProfiles.personId,sectionId:s.sections.id,
+  })
    .from(s.submissions)
    .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .innerJoin(s.enrollments,and(eq(s.enrollments.sectionId,s.sections.id),
     eq(s.enrollments.studentProfileId,s.submissions.studentProfileId),
+    eq(s.enrollments.kind,"section"),
     eq(s.enrollments.status,"active")))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
    .where(and(inArray(s.submissions.id,submissionIds),
-    inArray(s.submissions.studentProfileId,studentIds),
     inArray(s.sections.siteId,context.scope.siteIds??[]),
     inArray(s.sections.programId,context.scope.programIds??[]))):[];
+ const guardianSubmissionPeople=submissions.length&&context.role==="guardian"?await db.select({
+  studentPersonId:s.guardianRelationships.studentPersonId,
+ }).from(s.guardianRelationships).where(guardianRelationshipPredicate({
+  guardianPersonId:personId,
+  studentPersonIds:submissions.map(row=>row.studentPersonId),
+  access:"academic",
+ })): [];
+ const academicallyAuthorizedChildren=new Set(guardianSubmissionPeople.map(row=>row.studentPersonId));
  const referralRows=studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata})
   .from(s.actions).where(and(eq(s.actions.type,"support_referral"),eq(s.actions.subjectType,"student_profile"),inArray(s.actions.subjectId,studentIds),inArray(s.actions.siteId,context.scope.siteIds??[]),inArray(s.actions.programId,context.scope.programIds??[]))):[];
- const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
+ const bySubmission=new Map(submissions.map(x=>[x.id,x]));
  const referralIds=new Set(referralRows.map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
  const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds),inArray(s.actions.siteId,context.scope.siteIds??[]),inArray(s.actions.programId,context.scope.programIds??[]))):[];
@@ -158,7 +172,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   date:n.createdAt.toISOString(),href:n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
-   (context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:null):
+   (context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!.assessmentId)}`:
+    context.role==="guardian"&&academicallyAuthorizedChildren.has(bySubmission.get(n.resourceId)!.studentPersonId)?
+     `/guardian/academics?student=${encodeURIComponent(bySubmission.get(n.resourceId)!.studentPersonId)}&section=${encodeURIComponent(bySubmission.get(n.resourceId)!.sectionId)}&assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!.assessmentId)}`:null):
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
@@ -170,6 +186,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
    n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="student_help_request"&&context.role==="counselor"?"/counselor":
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });

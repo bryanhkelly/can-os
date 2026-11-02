@@ -37,17 +37,9 @@ export function isDemoTenantOrganization(organizationId: string | null): boolean
   return organizationId === LOCAL_DEMO_ADMIN.organizationId;
 }
 
-export function isLocalDemoAccessEnabled(
+export function isLocalDemoProvisioningEnabled(
   env: { NODE_ENV?: string; CAN_DEMO_FIXED_ACCESS_ENABLED?: string },
 ): boolean {
-  return (
-    (env.NODE_ENV === "development" || env.NODE_ENV === "test") &&
-    env.CAN_DEMO_FIXED_ACCESS_ENABLED === "true"
-  );
-}
-
-export function isPublicDemoAccessEnabled(
-  env: { CAN_DEMO_PUBLIC_ACCESS_ENABLED?: string },
-): boolean {
-  return env.CAN_DEMO_PUBLIC_ACCESS_ENABLED === "true";
+  return (env.NODE_ENV === "development" || env.NODE_ENV === "test") &&
+    env.CAN_DEMO_FIXED_ACCESS_ENABLED === "true";
 }

@@ -19,16 +19,17 @@ identify the account/persona and effective role—not a real-world facilitator.
 
 ## Current access controls
 
-- Public redemption requires `CAN_DEMO_PUBLIC_ACCESS_ENABLED=true`; it is
-  disabled by default. Requests are restricted to active grants at the
-  configured Valor School organization and site and supported product roles.
-- Local/test redemption requires `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and
-  `NODE_ENV=development` or `test`.
+- Demo sign-in and account switching work locally and on Netlify production
+  without demo-access flags. The shared accounts are intentionally public,
+  limited to active grants at the configured Valor School organization and
+  site and supported product roles, and must never contain authentic records.
+  The connected database must already contain those accounts and grants;
+  `CAN_ACCESS_TOKEN_PEPPER` must be configured to issue sessions.
 - Email-link requests for `@valorschool.demo` are suppressed. The personas
   receive no email links or individual passwords.
 - Ordinary membership selection is limited to the authenticated account.
-  The fixed demo admin account is the only exception: while demo access is
-  enabled, its active canonical registrar membership authorizes selection of
+  The fixed demo admin account is the only exception: its active canonical
+  registrar membership authorizes selection of
   active, supported memberships belonging to enabled `@valorschool.demo`
   accounts with active people at the configured Valor organization and site.
   Every request rechecks that admin membership and the selected membership.
@@ -36,12 +37,14 @@ identify the account/persona and effective role—not a real-world facilitator.
   and relationship checks use only the selected membership. Switching writes
   an immutable audit with the admin actor, effective account/person and session.
   A full page navigation clears the previous workspace's mounted state/caches.
+  The selector remains disabled until client handlers are ready.
   Sign-out revokes the admin-owned session, including while viewing another account.
 - Demo-school notification email, SMS verification, and subscription SMS/email
   delivery are suppressed using the source organization scope. Other external
   integrations still require an explicit tenant-safety review.
-- The provisioning command is an explicit operator action. It does not run at
-  login or during normal application requests:
+- The provisioning command is an explicit operator action and still requires
+  `CAN_DEMO_FIXED_ACCESS_ENABLED=true`. It does not run at login or during
+  normal application requests:
 
   ```powershell
   $env:NODE_ENV = "development"
@@ -86,7 +89,7 @@ an existing identity from submitted email/name fields: the existing owner signs
 in normally and can opt into applicant membership for an open school.
 
 A new Valor School family instead uses a new `@valorschool.demo` email and
-`000000`; no email is sent. The domain, code, enabled environment and selected
+`000000`; no email is sent. The domain, code and selected
 school are checked on the server. That account can return through `/access`
 with the same code. Authentic email addresses cannot register into Valor, and
 Valor addresses cannot acquire an applicant membership in another tenant.

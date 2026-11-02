@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { activateLaunch } from "@/modules/programs/launch.functions";
 import { reconcileExpiredAdmissionOffers } from "@/modules/enrollment/admission-offer-reconciliation.functions";
 import { getWorkflowIntegration } from "@/modules/operations/workflow-integration.functions";
@@ -22,29 +22,23 @@ function Metric({label,value}:{label:string;value:number|string}) {
 function ConnectedWorkflowsPage() {
   const {data,error} = Route.useLoaderData();
   const router = useRouter();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback();
   async function activate(programId: string) {
-    setBusy(programId);
-    setNotice("");
-    try {
-      await activateLaunch({ data: { programId } });
-      await router.invalidate();
-      setNotice("Program activated after canonical readiness validation.");
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Program activation could not be completed.");
-    } finally { setBusy(null); }
+    await mutation.run(() => activateLaunch({ data: { programId } }), {
+      fallback: "Program activation could not be completed.",
+      success: "Program activated after canonical readiness validation.",
+      refresh: () => router.invalidate(),
+    });
   }
   async function reconcile(programId: string) {
-    setBusy("offers:" + programId);
-    setNotice("");
-    try {
-      const result = await reconcileExpiredAdmissionOffers({ data: { programId } });
-      await router.invalidate();
-      setNotice(result.expired + " elapsed offer(s) reconciled.");
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Could not reconcile elapsed offers.");
-    } finally { setBusy(null); }
+    await mutation.run(
+      () => reconcileExpiredAdmissionOffers({ data: { programId } }),
+      {
+        fallback: "Could not reconcile elapsed offers.",
+        success: result => `${result.expired} elapsed offer(s) reconciled.`,
+        refresh: () => router.invalidate(),
+      },
+    );
   }
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
     <div className="mx-auto max-w-6xl">
@@ -57,7 +51,8 @@ function ConnectedWorkflowsPage() {
         comes from the canonical domain records; use the linked workspaces to act.
       </p>
       {error && <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">{error}</p>}
-      {notice && <p role="status" className="mt-6 rounded-lg border p-4 text-sm">{notice}</p>}
+      {mutation.notice && <p role="status" className="mt-6 rounded-lg border p-4 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">{mutation.error}</p>}
       {data && data.programs.length === 0 && <p className="mt-6 rounded-lg border p-4 text-sm">
         No programs are accessible to your active registrar grant.
       </p>}
@@ -77,10 +72,10 @@ function ConnectedWorkflowsPage() {
                 Open program setup
               </Link>
               {program.status !== "active" && program.launch.journeyStatus === "ready" &&
-                <button type="button" disabled={busy !== null}
+                <button type="button" disabled={mutation.disabled}
                   onClick={() => void activate(program.id)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-                  {busy === program.id ? "Activating…" : "Activate through canonical validation"}
+                  {mutation.pending ? "Working…" : "Activate through canonical validation"}
                 </button>}
             </div>
           </div>
@@ -118,8 +113,8 @@ function ConnectedWorkflowsPage() {
               {program.enrollment.expiredOffersAwaitingReconciliation > 0 && <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span className="text-xs text-muted-foreground">{program.enrollment.expiredOffersAwaitingReconciliation} elapsed offer(s) awaiting reconciliation.</span>
                 <button type="button" className="rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-                  disabled={busy !== null} onClick={() => void reconcile(program.id)}>
-                  {busy === "offers:" + program.id ? "Reconciling…" : "Expire elapsed offers"}
+                  disabled={mutation.disabled} onClick={() => void reconcile(program.id)}>
+                  {mutation.pending ? "Working…" : "Expire elapsed offers"}
                 </button>
               </div>}
             </section>

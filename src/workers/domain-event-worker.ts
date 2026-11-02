@@ -11,7 +11,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, domainEvents } from "@/db/schema";
+import { actions, domainEvents, organizations, programs, sections, sites } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
 import { handleAcademicInterventionEvent } from "@/modules/learning/missing-assignment-event-handler";
 import {
@@ -179,16 +179,32 @@ async function markFailed(eventId: string, error: unknown): Promise<void> {
       // Action. This is an infrastructure signal, not a business mutation,
       // so it deliberately does not emit a domain event of its own.
       const scope = event.payload as Record<string, unknown>;
+      const organizationId = typeof scope.organizationId === "string"
+        ? (await tx.select({ id: organizations.id }).from(organizations)
+          .where(eq(organizations.id, scope.organizationId)).limit(1))[0]?.id ?? null
+        : null;
+      const siteId = typeof scope.siteId === "string"
+        ? (await tx.select({ id: sites.id }).from(sites)
+          .where(eq(sites.id, scope.siteId)).limit(1))[0]?.id ?? null
+        : null;
+      const programId = typeof scope.programId === "string"
+        ? (await tx.select({ id: programs.id }).from(programs)
+          .where(eq(programs.id, scope.programId)).limit(1))[0]?.id ?? null
+        : null;
+      const sectionId = typeof scope.sectionId === "string"
+        ? (await tx.select({ id: sections.id }).from(sections)
+          .where(eq(sections.id, scope.sectionId)).limit(1))[0]?.id ?? null
+        : null;
       await tx.insert(actions).values({
         type: "outbox_event_failed",
         status: "open",
         priority: "high",
         title: `Domain event ${event.eventType} failed after ${attempts} attempts`,
         description: message,
-        organizationId: typeof scope.organizationId === "string" ? scope.organizationId : null,
-        siteId: typeof scope.siteId === "string" ? scope.siteId : null,
-        programId: typeof scope.programId === "string" ? scope.programId : null,
-        sectionId: typeof scope.sectionId === "string" ? scope.sectionId : null,
+        organizationId,
+        siteId,
+        programId,
+        sectionId,
         subjectType: "domain_event",
         subjectId: event.id,
       });

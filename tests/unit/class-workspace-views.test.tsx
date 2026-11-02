@@ -31,7 +31,7 @@ vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionM
 
 const workspace: ComponentProps<typeof ClassWorkspace>["data"] = {
   role: "student", section: { id: "english", title: "English", code: "ENG", description: "Read and revise.",
-    subject: "English", versionId: "published-version", contentStatus: "published" },
+    subject: "English", timezone: "America/Los_Angeles", versionId: "published-version", contentStatus: "published" },
   studentPersonId: "child", teachers: [{ personId: "teacher", name: "Taylor Teacher" }],
   content: classContentSchema.parse({
     version: 1, syllabus: "<script>unsafe()</script>",
@@ -103,6 +103,8 @@ describe("published class workspace", () => {
       const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, role }} tab="announcements"/>);
       expect(html).toContain("Bring your notes.");
       expect(html.includes("Publish announcement")).toBe(role === "teacher");
+      expect(html).toContain("Oct 1, 2026");
+      expect(html).toContain("5:00 AM");
     }
   });
 });

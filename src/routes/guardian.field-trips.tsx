@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { WorkspaceShell } from "@/components/workspace";
 import {
   listGuardianFieldTripPermissions, signGuardianFieldTripPermission,
@@ -27,22 +28,15 @@ function GuardianTrips() {
 function TripPermissions({ items }: { items: Trip[] }) {
   const router = useRouter();
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
-  const [busy, setBusy] = useState("");
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback();
   async function sign(participantId: string) {
-    setBusy(participantId); setNotice(""); setError("");
-    try {
-      await signGuardianFieldTripPermission({
+    await mutation.run(() => signGuardianFieldTripPermission({
         data: { participantId, acknowledged: true },
+      }), {
+        fallback: "Could not sign permission.",
+        success: "Your field trip permission was recorded.",
+        refresh: () => router.invalidate(),
       });
-      await router.invalidate();
-      setNotice("Your field trip permission was recorded.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign permission.");
-    } finally {
-      setBusy("");
-    }
   }
   const money = (cents: number) => new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD",
@@ -54,8 +48,8 @@ function TripPermissions({ items }: { items: Trip[] }) {
       subtitle="Review published school permission language and respond to invitations for your children. Permission and fees are separate steps."
       actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
     >
-      {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {mutation.notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
       <div className="mt-7 space-y-4">
         {items.map(item => <article key={item.participantId} className="rounded-xl border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.studentName}</p>
@@ -93,7 +87,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
                           <span>I am authorized to provide permission for {item.studentName},
                             and I have read and agree to the school's statement above.</span>
                         </label>
-                        <button type="button" disabled={!!busy || !acknowledged[item.participantId]}
+                        <button type="button" disabled={mutation.disabled || !acknowledged[item.participantId]}
                           className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                           onClick={() => void sign(item.participantId)}>Sign permission</button>
                       </>}

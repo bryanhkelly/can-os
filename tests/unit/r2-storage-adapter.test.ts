@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
-import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 
 const key = "learning/assignment/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222";
 const keyPattern = /^learning\/assignment\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/;
@@ -37,6 +37,17 @@ function verify() {
 }
 
 describe("shared private object storage", () => {
+  it.each([false, true])("returns exactly the required signed browser headers (conditional=%s)", preventOverwrite => {
+    const upload = createPrivateUpload({ key, keyPattern, contentType: "application/pdf", preventOverwrite });
+    const signed = new URL(upload.uploadUrl).searchParams.get("X-Amz-SignedHeaders")?.split(";");
+    expect(upload.uploadHeaders).toEqual({
+      "Content-Type": "application/pdf", ...(preventOverwrite ? { "If-None-Match": "*" } : {}),
+    });
+    expect(upload.objectKey).toBe(key);
+    expect(Date.parse(upload.expiresAt)).toBeGreaterThan(Date.now());
+    expect(upload).not.toHaveProperty("key");
+    expect(signed).toEqual([...Object.keys(upload.uploadHeaders).map(header => header.toLowerCase()), "host"].sort());
+  });
   it("binds create-only upload headers into the signature without changing existing clients", () => {
     const regular = new URL(createPrivateUploadUrl({ key, keyPattern, contentType:"application/pdf" }));
     const immutable = new URL(createPrivateUploadUrl({ key, keyPattern, contentType:"application/pdf",preventOverwrite:true }));
@@ -49,6 +60,7 @@ describe("shared private object storage", () => {
     expect(new URL(signPrivateObjectUrl({ method: "GET", key, keyPattern })).pathname).toContain(key);
     for (const expiresSeconds of [0, 901, NaN, Infinity, 1.5]) {
       expect(() => signPrivateObjectUrl({ method: "GET", key, keyPattern, expiresSeconds })).toThrow();
+      expect(() => createPrivateUpload({ key, keyPattern, contentType: "application/pdf", expiresSeconds })).toThrow();
     }
     expect(() => signPrivateObjectUrl({ method: "GET", key: "enrollment/other", keyPattern })).toThrow();
   });

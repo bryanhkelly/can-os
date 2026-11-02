@@ -4,7 +4,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
-import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload,signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
@@ -50,8 +50,8 @@ function newAttachmentKey(kind: "assignment" | "excuse", scopeId: string): strin
   return `learning/${kind}/${scopeId}/${randomUUID()}`;
 }
 
-function signLearningObject(method: "PUT" | "HEAD" | "GET", key: string, contentType?: string, expires = 180): string {
-  return signPrivateObjectUrl({ method, key, keyPattern: learningKeyPattern, contentType, expiresSeconds: expires });
+function signLearningObject(key: string, expires = 180): string {
+  return signPrivateObjectUrl({ method: "GET", key, keyPattern: learningKeyPattern, expiresSeconds: expires });
 }
 
 /** Confirm that the private object was actually uploaded before linking it to a student record. */
@@ -164,7 +164,11 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
         after: { assessmentId: assessment.id, storageProvider: "cloudflare_r2" },
         context: { accountId: context.accountId, sessionId: context.sessionId },
       });
-      return { documentId: document.id, key, uploadUrl: signLearningObject("PUT", key, data.contentType, 180), expiresInSeconds: 180 };
+      return { documentId: document.id, ...createPrivateUpload({
+        key, keyPattern: learningKeyPattern, contentType: data.contentType,
+        contentLength: data.sizeBytes, minContentLength: 16, maxContentLength: MAX_ATTACHMENT_BYTES,
+        expiresSeconds: 180,
+      }) };
     });
   });
 
@@ -319,7 +323,11 @@ export const createExcuseAttachmentUpload = createServerFn({ method: "POST" })
         after: { attendanceEventId: data.attendanceEventId, storageProvider: "cloudflare_r2" },
         context: { accountId: context.accountId, sessionId: context.sessionId },
       });
-      return { documentId: document.id, key, uploadUrl: signLearningObject("PUT", key, data.contentType, 180), expiresInSeconds: 180 };
+      return { documentId: document.id, ...createPrivateUpload({
+        key, keyPattern: learningKeyPattern, contentType: data.contentType,
+        contentLength: data.sizeBytes, minContentLength: 16, maxContentLength: MAX_ATTACHMENT_BYTES,
+        expiresSeconds: 180,
+      }) };
     });
   });
 
@@ -434,7 +442,7 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
    }))).limit(1);
   if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
     throw new AuthorizationError("verified attachment scope");
-  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  return {downloadUrl:signLearningObject(document.storageKey,60),expiresInSeconds:60};
   });
  });
 
@@ -464,6 +472,6 @@ export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
     }))).limit(1);
   if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
     throw new AuthorizationError("verified excuse document scope");
-  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  return {downloadUrl:signLearningObject(document.storageKey,60),expiresInSeconds:60};
   });
  });

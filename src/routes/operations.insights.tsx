@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { acceptInsight, dismissInsight, listInsights,listInsightScopeOptions } from "@/modules/operations/insights.functions";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 
 export const Route = createFileRoute("/operations/insights")({
  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;insight?:string}=>({
@@ -40,20 +41,20 @@ function InsightsPage() {
  const [status, setStatus] = useState<StatusFilter>("open");
  const [insights, setInsights] = useState<Insight[]>([]);
  const [loading, setLoading] = useState(true);
- const [busy, setBusy] = useState("");
  const [error, setError] = useState("");
- const [notice, setNotice] = useState("");
+ const mutation = useMutationFeedback();
  const [createdActionId,setCreatedActionId]=useState("");
 
- const load = useCallback(async (filter: StatusFilter) => {
+ const load = useCallback(async (filter: StatusFilter, propagateFailure = false) => {
   setLoading(true);
   setError("");
   try {
    const result = await listInsights({ data: { status: filter,siteId:selection.siteId,programId:selection.programId,insightId:selection.insight } });
    setInsights(result.insights);
-  } catch {
+  } catch (cause) {
    setInsights([]);
    setError("Sign in with an authorized staff account to review insights.");
+   if(propagateFailure)throw cause;
   } finally {
    setLoading(false);
   }
@@ -61,41 +62,35 @@ function InsightsPage() {
 
  useEffect(()=>{let active=true;void listInsightScopeOptions().then(rows=>{if(active)setScopes(rows)}).catch(()=>{});return()=>{active=false};},[]);
  useEffect(() => {
-  setCreatedActionId("");setNotice("");
+  setCreatedActionId("");
   void load(status);
  }, [status, load]);
 
  const accept = async (insight: Insight) => {
-  setBusy(insight.id);
-  setNotice("");
   setCreatedActionId("");
-  try {
-   const result=await acceptInsight({ data: { insightId: insight.id } });
-   setCreatedActionId(result.actionId);
-   setNotice(`Action created from "${insight.title}".`);
-   await load(status);
-  } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Unable to accept insight");
-  } finally {
-   setBusy("");
-  }
+  const outcome=await mutation.run(
+   ()=>acceptInsight({ data: { insightId: insight.id } }),
+   {
+    fallback:"Unable to accept insight.",
+    success:`Action created from "${insight.title}".`,
+    refresh:()=>load(status,true),
+   },
+  );
+  if(outcome.status==="saved"||outcome.status==="refresh-failed")setCreatedActionId(outcome.value.actionId);
  };
 
  const dismiss = async (insight: Insight) => {
   const reason = window.prompt("Why is this insight being dismissed? (5-500 characters)");
   if (reason === null) return;
-  setBusy(insight.id);
-  setNotice("");
   setCreatedActionId("");
-  try {
-   await dismissInsight({ data: { insightId: insight.id, reason } });
-   setNotice(`Dismissed "${insight.title}".`);
-   await load(status);
-  } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Unable to dismiss insight");
-  } finally {
-   setBusy("");
-  }
+  await mutation.run(
+   ()=>dismissInsight({ data: { insightId: insight.id, reason } }),
+   {
+    fallback:"Unable to dismiss insight.",
+    success:`Dismissed "${insight.title}".`,
+    refresh:()=>load(status,true),
+   },
+  );
  };
 
  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
@@ -121,10 +116,11 @@ function InsightsPage() {
      </select>
     </label>
    </div>
-   {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}{createdActionId&&<>
+   {mutation.notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{mutation.notice}{createdActionId&&<>
     {" "}<Link to="/actions/$actionId" params={{actionId:createdActionId}} className="font-semibold underline">Open created Action</Link>
    </>}</p>}
    {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
+   {mutation.error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{mutation.error}</p>}
    {!error && <>
     {selection.insight?<Link to="/operations/insights" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-6 inline-block text-sm underline">All insights</Link>:<div className="mt-6 flex gap-2" role="tablist" aria-label="Insight status filter">
      {tabs.map(tab => <button
@@ -171,8 +167,8 @@ function InsightsPage() {
        </ul>
       </div>}
       {insight.status === "open" && <div className="mt-4 flex flex-wrap gap-3">
-       <button type="button" className="rounded border px-3 py-1 text-xs font-bold disabled:opacity-50" disabled={busy !== ""} onClick={() => accept(insight)}>Accept &amp; create Action</button>
-       <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy !== ""} onClick={() => dismiss(insight)}>Dismiss</button>
+       <button type="button" className="rounded border px-3 py-1 text-xs font-bold disabled:opacity-50" disabled={mutation.disabled} onClick={() => accept(insight)}>Accept &amp; create Action</button>
+       <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={mutation.disabled} onClick={() => dismiss(insight)}>Dismiss</button>
       </div>}
      </article>)}
     </div>}

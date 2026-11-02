@@ -41,12 +41,13 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
  children:Child[];needs:NeedItem[];loading:boolean;error:string;action?:string;
 }){
  const prioritized=prioritizeFamilyNeeds(needs,Date.now());
+ const visibleNeeds=prioritized.filter(item=>!action||item.kind==="action"&&item.id===action);
  return <WorkspaceShell
   width="wide"
   eyebrow="CAN OS · Family"
   title="Family home"
   subtitle="Everything that needs your attention across your children, in one place."
-  actions={<Link to="/messages" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Family inbox</Link>}
+  actions={<Link to="/messages" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">Family inbox</Link>}
  >
   <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
    <div className="mt-7 grid gap-3 sm:grid-cols-3">
@@ -56,34 +57,45 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
    </div>
    <section aria-label="Needs you" className="mt-10">
     <div className="flex items-baseline justify-between gap-3">
-     <h2 className="text-lg font-semibold">Needs you</h2>
+     <div>
+      <h2 className="font-serif text-3xl">Needs you</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Actions and updates across your family.</p>
+     </div>
      {needs.length > 0 && <span className="rounded-full border px-3 py-1 text-xs">{needs.length} open</span>}
     </div>
-    {needs.length === 0 && <EmptyState className="mt-4 bg-card" title="You are all caught up. Nothing needs your attention right now." />}
-    {needs.length > 0 && <div className="mt-4 grid gap-3">
-     {prioritized.filter(item=>!action||item.kind==="action"&&item.id===action).map(item => {
-      const Container=action?"article":Link;
-      return <Container key={`${item.kind}-${item.id}`} to={item.href} href={action?undefined:item.href} className="block rounded-xl border bg-card p-5 transition-colors hover:bg-muted">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    {!visibleNeeds.length && !action && <EmptyState className="mt-4 bg-card" title="You are all caught up. Nothing needs your attention right now." />}
+    {visibleNeeds.length > 0 && <div className="mt-4 grid gap-3">
+     {visibleNeeds.map((item,index) => {
+      const label=item.kind==="excuse"?"Excuse needed":item.kind==="action"?"Action":"New information";
+      const tone=item.kind==="excuse"?"attention":"neutral";
+      const card=<div className="flex flex-wrap items-start justify-between gap-3">
        <div>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p>
         <p className="mt-1 font-semibold">{item.title}</p>
         {item.detail && <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>}
-        {"dueAt" in item&&item.dueAt&&<p className="mt-2 text-xs text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()}</p>}
+        {"dueAt" in item&&item.dueAt&&<p className="mt-2 text-xs text-muted-foreground">Due {new Intl.DateTimeFormat("en-US", {
+         dateStyle: "medium", timeZone: item.timezone ?? "UTC",
+        }).format(new Date(item.dueAt))}</p>}
        </div>
-       <span className="rounded-full border px-3 py-1 text-xs">
-        {item.kind === "excuse" ? "Submit excuse" : item.kind === "action" ? (action?"Selected action":"Review action") : "View"}
-       </span>
-      </div>
-     </Container>;})}
+       <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge tone={tone}>{label}</StatusBadge>
+        <span className="rounded-full border px-3 py-1 text-xs">{item.kind === "excuse" ? "Submit excuse" : item.kind === "action" ? (action?"Selected action":"Review action") : "View"}</span>
+       </div>
+      </div>;
+      const className=`block rounded-xl border bg-card p-5 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 ${index===0?"border-l-4 border-l-foreground":""}`;
+      return action
+       ? <article key={`${item.kind}-${item.id}`} className={className}>{card}</article>
+       : <Link key={`${item.kind}-${item.id}`} to={item.href} className={className}>{card}</Link>;
+     })}
     </div>}
     {action&&<Link to="/guardian" className="mt-4 inline-block text-sm underline">View all family needs</Link>}
     {action&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
    </section>
 
    <section aria-label="Your children" className="mt-12">
-    <h2 className="text-lg font-semibold">Your children</h2>
-    {children.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No students are connected to your account yet.</p>}
+    <h2 className="font-serif text-3xl">Your children</h2>
+    <p className="mt-1 text-sm text-muted-foreground">Open a child’s academic, attendance, or report-card view.</p>
+    {children.length === 0 && <EmptyState className="mt-4 bg-card" title="No students are connected to your account yet." />}
     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
      {children.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -98,10 +110,12 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
         {child.status === "awaiting_courses" ? "Enrolled · awaiting classes" : child.status === "on_track" ? "On track" : "Needs attention"}
        </StatusBadge>
       </div>
-      <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+      <dl className="mt-4 grid grid-cols-1 gap-2 text-center min-[420px]:grid-cols-3">
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Missing</Link></dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline">Absences</Link></dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
-       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium", timeZone: child.nextDueTimezone ?? "UTC",
+       }).format(new Date(child.nextDueAt)) : "—"}</dd></div>
       </dl>
       <p className="mt-4 text-sm text-muted-foreground">{child.awaitingSections?"Your school is arranging class placement.":child.missingCount>0?`${child.missingCount} assignment(s) need follow-through.`:child.unexcusedAbsences>0?"An absence needs your review.":"No missing work or unexcused absences in this summary."}</p>
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
@@ -115,7 +129,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
    </section>
 
    <section aria-label="Family shortcuts" className="mt-12">
-    <h2 className="text-lg font-semibold">Family</h2>
+    <h2 className="font-serif text-3xl">Family</h2>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
      <Link to="/ask" className="rounded-full border px-4 py-2 hover:bg-muted">Ask CAN</Link>
      <Link to="/guardian/group-permissions" className="rounded-full border px-4 py-2 hover:bg-muted">Study group permissions</Link>

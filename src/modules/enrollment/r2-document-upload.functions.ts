@@ -1,5 +1,6 @@
 import { db } from "@/db/client";
 import { applications,documents,journeyRequirements,journeys } from "@/db/schema";
+import { AuthenticationRequiredError } from "@/domain/errors";
 import { assertDemoTenantStorageEnabled } from "@/domain/r2-document-access";
 import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 import { EventTypes } from "@/domain/event-types";
@@ -9,11 +10,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,sql } from "drizzle-orm";
 import { z } from "zod";
-import { newDocumentKey,r2Config,signR2Object,validateDocumentUpload,verifyDocumentObject } from "./r2-documents.server";
+import { createEnrollmentUpload,newDocumentKey,r2Config,signR2Object,validateDocumentUpload,verifyDocumentObject } from "./r2-documents.server";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upload"){
  const context=await getCommandContext(getRequest());
- if(!context.actorPersonId)throw new Error("Authenticated person required");
+ if(!context.actorPersonId)throw new AuthenticationRequiredError();
  const app=await authorizeEnrollmentApplication(context,applicationId);
  if(mode==="upload"&&["withdrawn","declined"].includes(app.stage))
   throw new Error("This application is closed to enrollment document changes");
@@ -42,7 +43,7 @@ export const beginEnrollmentDocumentUpload=createServerFn({method:"POST"})
   const actor=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   await requirementScope(data.applicationId,data.requirementId);
   const key=newDocumentKey(data.applicationId,data.requirementId);
-  return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180,actor.demoTenant?"demo":"live"),expiresInSeconds:180};
+  return createEnrollmentUpload(key,data.mimeType,data.size,actor.demoTenant?"demo":"live");
  });
 export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),key:z.string().regex(/^enrollment\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
@@ -109,7 +110,7 @@ export const getEnrollmentDocumentDownload=createServerFn({method:"POST"})
     record.metadata.storageVerified!==true)throw new Error("Document not found within the current verified enrollment requirement");
   const expectedPrefix="enrollment/"+data.applicationId+"/"+data.requirementId+"/";
   if(!record.storageKey.startsWith(expectedPrefix))throw new Error("Document storage scope mismatch");
-  return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60,actor.demoTenant?"demo":"live"),expiresInSeconds:60};
+  return {downloadUrl:signR2Object(record.storageKey,60,actor.demoTenant?"demo":"live"),expiresInSeconds:60};
  });
 
 /** Deployment switches only; never exposes R2 credentials. */

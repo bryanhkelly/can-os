@@ -16,10 +16,12 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
   const query = transaction ?? db;
   const [section] = await query.select({
     id: s.sections.id, title: s.sections.title, code: s.sections.code, siteId: s.sections.siteId,
+    timezone: s.sites.timezone,
     programId: s.sections.programId, versionId: s.sections.courseTemplateVersionId,
     curriculum: s.courseTemplateVersions.curriculum, contentStatus: s.courseTemplateVersions.status,
     description: s.courseTemplates.description, subject: s.courseTemplates.subject,
   }).from(s.sections)
+    .innerJoin(s.sites, eq(s.sites.id, s.sections.siteId))
     .innerJoin(s.courseTemplateVersions, eq(s.courseTemplateVersions.id, s.sections.courseTemplateVersionId))
     .innerJoin(s.courseTemplates, eq(s.courseTemplates.id, s.courseTemplateVersions.courseTemplateId))
     .where(and(eq(s.sections.id, sectionId), eq(s.sections.active, true))).limit(1);

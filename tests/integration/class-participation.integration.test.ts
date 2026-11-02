@@ -27,7 +27,10 @@ vi.mock("@/db/client", () => ({
 }));
 vi.mock("@/platform/storage/r2", () => ({
   signPrivateObjectUrl: vi.fn(() => "https://private.example/signed"),
-  createPrivateUploadUrl: vi.fn(() => "https://private.example/upload"),
+  createPrivateUpload: vi.fn((options: { key: string; contentType: string }) => ({
+    objectKey: options.key, uploadUrl: "https://private.example/upload",
+    uploadHeaders: { "Content-Type": options.contentType }, expiresAt: new Date(Date.now() + 180_000).toISOString(),
+  })),
   verifyPrivateObject: vi.fn(),
 }));
 
@@ -303,21 +306,22 @@ integration("class participation cross-workspace flow", () => {
       const photoInput = { fileName: "portrait.png", mimeType: "image/png" as const, size: 128 };
       expect(() => profiles.beginProfilePhotoUpload({ data: { ...photoInput, size: 2 * 1024 * 1024 + 1 } })).toThrow();
       const upload = await profiles.beginProfilePhotoUpload({ data: photoInput });
-      expect(upload.key).toMatch(new RegExp(`^profiles/${student.id}/`));
+      expect(upload.objectKey).toMatch(new RegExp(`^profiles/${student.id}/`));
       const storage = await import("@/platform/storage/r2");
-      expect(storage.createPrivateUploadUrl).toHaveBeenCalledWith(expect.objectContaining({
-        key: upload.key, contentType: "image/png", contentLength: 128, maxContentLength: 2 * 1024 * 1024, expiresSeconds: 180,
+      expect(upload.uploadHeaders).toEqual({ "Content-Type": "image/png" });
+      expect(storage.createPrivateUpload).toHaveBeenCalledWith(expect.objectContaining({
+        key: upload.objectKey, contentType: "image/png", contentLength: 128, maxContentLength: 2 * 1024 * 1024, expiresSeconds: 180,
       }));
       await expect(profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: `profiles/${teacher.id}/${crypto.randomUUID()}` } }))
         .rejects.toThrow(/own profile/);
       vi.mocked(storage.verifyPrivateObject).mockRejectedValueOnce(new Error("Photo signature mismatch"));
-      await expect(profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: upload.key } })).rejects.toThrow(/signature mismatch/);
-      expect(await tx.select().from(s.documents).where(eq(s.documents.storageKey, upload.key))).toHaveLength(0);
-      const savedPhoto = await profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: upload.key } });
+      await expect(profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: upload.objectKey } })).rejects.toThrow(/signature mismatch/);
+      expect(await tx.select().from(s.documents).where(eq(s.documents.storageKey, upload.objectKey))).toHaveLength(0);
+      const savedPhoto = await profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: upload.objectKey } });
       expect(storage.verifyPrivateObject).toHaveBeenCalledWith(expect.objectContaining({
-        key: upload.key, expectedContentType: "image/png", expectedSize: 128, verifySignature: expect.any(Function),
+        key: upload.objectKey, expectedContentType: "image/png", expectedSize: 128, verifySignature: expect.any(Function),
       }));
-      expect((await profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: upload.key } })).documentId).toBe(savedPhoto.documentId);
+      expect((await profiles.finishProfilePhotoUpload({ data: { ...photoInput, key: upload.objectKey } })).documentId).toBe(savedPhoto.documentId);
       expect(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId, savedPhoto.documentId),
         eq(s.auditEvents.action, "profile.photo_changed")))).toHaveLength(1);
       expect((await profiles.getProfilePhoto({ data: {} })).url).toBe("https://private.example/signed");

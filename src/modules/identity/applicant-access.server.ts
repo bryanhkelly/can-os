@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, auditEvents, people } from "@/db/schema";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { EventTypes } from "@/domain/event-types";
-import { isDemoAccountEmail, isDemoTenantOrganization, isLocalDemoAccessEnabled, isPublicDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE } from "@/domain/local-demo-access";
+import { isDemoAccountEmail, isDemoTenantOrganization, LOCAL_DEMO_ACCESS_CODE } from "@/domain/local-demo-access";
 import { publicIntakeProgram } from "@/modules/enrollment/public-intake.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { redeemDemoAccess, requestOneTimeAccess } from "./passwordless-access.server";
@@ -24,7 +24,6 @@ export async function registerApplicant(
   const program = await publicIntakeProgram(input.programId);
   if (demo) {
     if (!isDemoTenantOrganization(program.organizationId) ||
-      (!isLocalDemoAccessEnabled(process.env) && !isPublicDemoAccessEnabled(process.env)) ||
       input.code !== LOCAL_DEMO_ACCESS_CODE) throw new Error("Demo applicant access is unavailable or the code is invalid");
   } else {
     if (email.endsWith(".demo") || email.endsWith(".invalid") || isDemoTenantOrganization(program.organizationId))

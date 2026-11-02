@@ -15,6 +15,17 @@ vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
 vi.mock("@/modules/communication/notification-center.functions", () => ({ readNotification: vi.fn() }));
 
 describe("School Experiences calendar status display", () => {
+  const data = {
+    connected: true as const, viewerRole: "student" as const, notices: [], slots: [], bookings: [],
+    events: [],
+  };
+
+  it("uses family-facing language without exposing infrastructure status", () => {
+    const html = renderToStaticMarkup(<LiveSchoolExperiences data={data}/>);
+    expect(html).toContain("School &amp; community");
+    expect(html).not.toContain("Neon");
+  });
+
   it("labels cancelled events distinctly from scheduled events", () => {
     const html = renderToStaticMarkup(<LiveSchoolExperiences data={{
       connected: true, viewerRole: "student", notices: [], slots: [], bookings: [],
@@ -27,5 +38,11 @@ describe("School Experiences calendar status display", () => {
     expect(html).toMatch(/Upcoming assembly[\s\S]*?>Scheduled<\/p>/);
     expect(html.match(/>Cancelled<\/p>/g)).toHaveLength(1);
     expect(html.match(/>Scheduled<\/p>/g)).toHaveLength(1);
+  });
+
+  it("explains unavailable information in plain language", () => {
+    const html = renderToStaticMarkup(<LiveSchoolExperiences data={{ ...data, connected: false }}/>);
+    expect(html).toContain("We couldn’t load current school information.");
+    expect(html).not.toContain("Neon unavailable");
   });
 });

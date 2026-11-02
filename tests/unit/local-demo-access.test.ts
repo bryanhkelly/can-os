@@ -1,16 +1,16 @@
 import {describe,it,expect} from "vitest";
 import {
- isDemoAccountEmail,isDemoSchoolGrant,isLocalDemoAccessEnabled,isPublicDemoAccessEnabled,
+ isDemoAccountEmail,isDemoSchoolGrant,isLocalDemoProvisioningEnabled,
  LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
 } from "@/domain/local-demo-access";
 
 describe("synthetic demo access",()=>{
- it("allows the fixed code only with explicit opt-in in development or test",()=>{
-  expect(isLocalDemoAccessEnabled({NODE_ENV:"development",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(true);
-  expect(isLocalDemoAccessEnabled({NODE_ENV:"test",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(true);
-  expect(isLocalDemoAccessEnabled({NODE_ENV:"production",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(false);
-  expect(isLocalDemoAccessEnabled({NODE_ENV:"development"})).toBe(false);
-  expect(isLocalDemoAccessEnabled({NODE_ENV:"test",CAN_DEMO_FIXED_ACCESS_ENABLED:"false"})).toBe(false);
+ it("keeps local demo provisioning behind its explicit flag",()=>{
+  expect(isLocalDemoProvisioningEnabled({NODE_ENV:"development",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(true);
+  expect(isLocalDemoProvisioningEnabled({NODE_ENV:"test",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(true);
+  expect(isLocalDemoProvisioningEnabled({NODE_ENV:"development",CAN_DEMO_FIXED_ACCESS_ENABLED:"false"})).toBe(false);
+  expect(isLocalDemoProvisioningEnabled({NODE_ENV:"test"})).toBe(false);
+  expect(isLocalDemoProvisioningEnabled({NODE_ENV:"production",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(false);
  });
 
  it("only lists the seeded synthetic demo accounts",()=>{
@@ -25,9 +25,7 @@ describe("synthetic demo access",()=>{
   ]);
  });
 
- it("requires explicit public enablement and derives eligibility from the demo school grant",()=>{
-  expect(isPublicDemoAccessEnabled({CAN_DEMO_PUBLIC_ACCESS_ENABLED:"true"})).toBe(true);
-  expect(isPublicDemoAccessEnabled({CAN_DEMO_PUBLIC_ACCESS_ENABLED:"false"})).toBe(false);
+ it("derives eligibility from the demo school grant",()=>{
   expect(isDemoAccountEmail("teacher@valorschool.demo")).toBe(true);
   expect(isDemoAccountEmail("teacher@example.com")).toBe(false);
   expect(isDemoSchoolGrant({

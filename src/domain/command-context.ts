@@ -1,3 +1,5 @@
+import { ClientSafeError } from "./errors";
+
 export type AuthorizationScope = {
   organizationIds?: string[];
   siteIds?: string[];
@@ -12,9 +14,10 @@ export type CommandContext = {
   requestId?: string;
 };
 
-export class AuthorizationError extends Error {
+export class AuthorizationError extends ClientSafeError {
   constructor(capability: string) {
-    super(`Missing required capability or scope: ${capability}`);
+    super("FORBIDDEN", "You do not have permission to access this information.",
+      `Missing required capability or scope: ${capability}`);
     this.name = "AuthorizationError";
   }
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { WorkspaceShell } from "@/components/workspace";
 import { getCanonicalGroupWorkspace } from "@/modules/study-groups/canonical-workspace.functions";
 import {
@@ -47,9 +48,8 @@ function localTime(iso: string) {
 function GroupsView({ data }: { data: Workspace }) {
   const router = useRouter();
   const {group:requestedGroup}=Route.useSearch();
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback();
+  const busy = mutation.disabled;
   const [sectionId, setSectionId] = useState(data.sections[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -65,17 +65,11 @@ function GroupsView({ data }: { data: Workspace }) {
   const [reportReason, setReportReason] = useState("");
 
   async function run(work: () => Promise<unknown>, message: string) {
-    if (busy) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await work();
-      await router.invalidate();
-      setNotice(message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save group change.");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.run(work, {
+      fallback: "Unable to save group change.",
+      success: message,
+      refresh: () => router.invalidate(),
+    });
   }
 
   return (
@@ -86,8 +80,8 @@ function GroupsView({ data }: { data: Workspace }) {
       actions={<Link to={data.role === "teacher" ? "/teacher" : "/student"}
         className="rounded-lg border px-3 py-2 text-sm">Workspace home</Link>}
     >
-      {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
-      {error && <p role="alert" className="mt-4 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {mutation.notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{mutation.notice}</p>}
+      {mutation.error && <p role="alert" className="mt-4 rounded-lg border border-red-500 p-3 text-sm">{mutation.error}</p>}
       {requestedGroup&&<Link to="/groups" className="mt-4 inline-block text-sm underline">View all study groups</Link>}
       {requestedGroup&&!data.groups.some(group=>group.id===requestedGroup)&&<p role="alert" className="mt-4 rounded-lg border p-4 text-sm">This group is unavailable in your current workspace.</p>}
       {data.role === "teacher" && <section className="mt-8 rounded-xl border bg-card p-5">

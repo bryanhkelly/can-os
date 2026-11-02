@@ -21,15 +21,17 @@ describe("defineLifecycle", () => {
     const lifecycle = defineLifecycle(config);
     expect(() => lifecycle.apply("published", "publish")).toThrow(LifecycleError);
     expect(() => lifecycle.apply("archived", "archive")).toThrow(
-      /archived.*archive|archive.*archived/,
+      "This item changed. Refresh and try again.",
     );
     try {
       lifecycle.apply("published", "publish");
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(LifecycleError);
-      expect((error as Error).message).toContain("published");
-      expect((error as Error).message).toContain("publish");
+      expect((error as LifecycleError).code).toBe("CONFLICT");
+      expect((error as LifecycleError).message).toBe("This item changed. Refresh and try again.");
+      expect((error as LifecycleError).diagnosticMessage).toContain("published");
+      expect((error as LifecycleError).diagnosticMessage).toContain("publish");
     }
   });
 

@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { resolveR2Config, signPrivateObjectUrl, type R2Namespace } from "@/platform/storage/r2";
+import { createPrivateUpload, resolveR2Config, signPrivateObjectUrl, type R2Namespace } from "@/platform/storage/r2";
 
 const documentKeyPattern = /^enrollment\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
 
 export const r2Config = resolveR2Config;
+
+export function createEnrollmentUpload(key: string, contentType: string, size: number, namespace: R2Namespace) {
+  return createPrivateUpload({
+    key, keyPattern: documentKeyPattern, contentType, contentLength: size,
+    minContentLength: 16, maxContentLength: 10 * 1024 * 1024, expiresSeconds: 180, namespace,
+  });
+}
 
 export function newDocumentKey(applicationId: string, requirementId: string): string {
   if (!/^[0-9a-f-]{36}$/i.test(applicationId) || !/^[0-9a-f-]{36}$/i.test(requirementId)) {
@@ -12,15 +19,9 @@ export function newDocumentKey(applicationId: string, requirementId: string): st
   return `enrollment/${applicationId}/${requirementId}/${randomUUID()}`;
 }
 
-export function signR2Object(
-  method: "PUT" | "HEAD" | "GET",
-  key: string,
-  contentType?: string,
-  expires = 180,
-  namespace: R2Namespace = "live",
-): string {
+export function signR2Object(key: string, expires = 180, namespace: R2Namespace = "live"): string {
   return signPrivateObjectUrl({
-    method, key, keyPattern: documentKeyPattern, contentType,
+    method: "GET", key, keyPattern: documentKeyPattern,
     expiresSeconds: expires, namespace,
   });
 }

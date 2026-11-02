@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { createQualificationCatalogEntry } from "@/modules/profiles/qualification-catalog.functions";
 
 export function QualificationCatalog({ programId, canAuthor, changed }: {
@@ -6,17 +7,18 @@ export function QualificationCatalog({ programId, canAuthor, changed }: {
 }) {
   const [key, setKey] = useState(""), [title, setTitle] = useState(""), [kind, setKind] = useState("");
   const [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback();
   async function save() {
-    setBusy(true); setError(""); setNotice("");
-    try {
-      const result = await createQualificationCatalogEntry({ data: { programId, key, title, kind, reason, confirmed: true } });
-      await changed();
-      setNotice(result.created ? "Shared qualification definition added. Select it in the program policy when appropriate." :
-        "An identical definition already exists. No catalog entry or requirement was changed.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to create qualification catalog entry.");
-    } finally { setBusy(false); }
+    await mutation.run(
+      () => createQualificationCatalogEntry({ data: { programId, key, title, kind, reason, confirmed: true } }),
+      {
+        fallback: "Unable to create qualification catalog entry.",
+        success: result => result.created
+          ? "Shared qualification definition added. Select it in the program policy when appropriate."
+          : "An identical definition already exists. No catalog entry or requirement was changed.",
+        refresh: changed,
+      },
+    );
   }
   return <section className="mt-7 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Shared qualification catalog</h2>
@@ -45,12 +47,12 @@ export function QualificationCatalog({ programId, canAuthor, changed }: {
         onChange={event => setConfirmed(event.target.checked)} />
         I checked existing entries and confirm this shared definition. Existing claims and published requirements will not change.
       </label>
-      <button type="submit" disabled={busy || !confirmed || !key.trim() || !title.trim() || !kind.trim() || reason.trim().length < 10}
+      <button type="submit" disabled={mutation.disabled || !confirmed || !key.trim() || !title.trim() || !kind.trim() || reason.trim().length < 10}
         className="justify-self-start rounded border px-3 py-2 text-sm disabled:opacity-50">
-        {busy ? "Saving definition..." : "Add shared definition"}
+        {mutation.pending ? "Saving definition..." : "Add shared definition"}
       </button>
     </form>}
-    {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-3 text-sm">{notice}</p>}
+    {mutation.error && <p role="alert" className="mt-3 text-sm">{mutation.error}</p>}
+    {mutation.notice && <p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
   </section>;
 }

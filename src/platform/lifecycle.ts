@@ -1,9 +1,12 @@
-export class LifecycleError extends Error {
+import { ConflictError } from "@/domain/errors";
+
+export class LifecycleError extends ConflictError {
   constructor(
     public readonly state: string,
     public readonly action: string,
   ) {
-    super(`Invalid lifecycle transition: cannot "${action}" from state "${state}"`);
+    super("This item changed. Refresh and try again.",
+      `Invalid lifecycle transition: cannot "${action}" from state "${state}"`);
     this.name = "LifecycleError";
   }
 }

@@ -10,6 +10,7 @@ import {decideCanonicalGroupMembership} from "@/modules/study-groups/canonical-m
 import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
 const loadFacilitatorStudyGroups=async()=>{
  const {enabled,writesEnabled,membershipEnabled,creationEnabled,moderationEnabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,writesEnabled,membershipEnabled,creationEnabled,moderationEnabled,queue:[],reports:[],groups:[],scopes:[]};
@@ -40,19 +41,35 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
  const [siteId,setSiteId]=useState(""),[programId,setProgramId]=useState("");
  const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
  const sitePrograms=scopes.filter(scope=>scope.siteId===siteId);
- const [error,setError]=useState(""),[busy,setBusy]=useState(false);
+ const mutation=useMutationFeedback();
+ const busy=mutation.disabled;
  const [groupId,setGroupId]=useState(search.group&&visibleGroups.length?search.group:""),[sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");
  const [attendance,setAttendance]=useState<Array<{personId:string;rsvp:string|null;attended:boolean|null}>>([]),[attendanceSession,setAttendanceSession]=useState("");
- async function run(operation:()=>Promise<unknown>){
-  setBusy(true);setError("");
-  try{await operation();await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save study group change");}
-  finally{setBusy(false);}
+ async function run(operation:()=>Promise<unknown>,success="Study group change saved."){
+  await mutation.run(operation,{
+   fallback:"Unable to save study group change.",
+   success,
+   refresh:()=>router.invalidate(),
+  });
+ }
+ async function recordAttendance(personId:string,attended:boolean){
+  await mutation.run(
+   ()=>recordStudyGroupAttendance({data:{sessionId:attendanceSession,studentPersonId:personId,attended}}),
+   {
+    fallback:"Unable to record study group attendance.",
+    success:"Attendance recorded.",
+    refresh:async()=>{
+     setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}));
+     await router.invalidate();
+    },
+   },
+  );
  }
  return <main className="mx-auto max-w-5xl space-y-6 px-6 py-10">
   <header><h1 className="font-serif text-4xl">Facilitate study groups</h1><p className="mt-2 text-muted-foreground">Review requests and moderate groups you facilitate.</p></header>
   {!enabled?<p role="status">Study groups are currently unavailable.</p>:<>
-  {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
+  {mutation.error&&<p role="alert" className="rounded-lg border p-3">{mutation.error}</p>}
+  {mutation.notice&&<p role="status" className="rounded-lg border p-3">{mutation.notice}</p>}
   {search.group&&<Link to="/teacher/study-groups" search={{}} className="inline-block text-sm underline">All facilitated study groups</Link>}
   {search.group&&!visibleGroups.length&&<p role="alert" className="rounded-lg border p-3">This study group is unavailable in your current facilitator workspace.</p>}
   {search.session&&!visibleGroups.some(group=>group.sessions.some(session=>session.id===search.session))&&<p role="alert" className="rounded-lg border p-3">This session is unavailable in the selected study group.</p>}
@@ -73,12 +90,18 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
       {group.sessions.map(session=><div key={session.id} aria-current={search.session===session.id?"true":undefined} className={"flex flex-wrap items-center gap-2 text-sm"+(search.session===session.id?" rounded border-2 border-primary p-3":"")}><span><Link to="/teacher/study-groups" search={{group:group.id,session:session.id}} className="underline">{session.title}</Link> · {new Date(session.startsAt).toLocaleString()}{session.cancelled?" · Cancelled":""}</span>
        {!session.cancelled&&<><button disabled={busy||!writesEnabled} className="rounded border px-2 py-1" onClick={()=>run(()=>reviseStudyGroupSession({data:{sessionId:session.id,action:"cancel"}}))}>Cancel</button>
        <button disabled={busy||!writesEnabled} className="rounded border px-2 py-1" onClick={()=>{const start=window.prompt("New start (ISO)",session.startsAt),end=window.prompt("New end (ISO)",session.endsAt);if(start&&end)void run(()=>reviseStudyGroupSession({data:{sessionId:session.id,action:"reschedule",startsAt:start,endsAt:end}}))}}>Reschedule</button>
-       <button disabled={busy} className="rounded border px-2 py-1" onClick={async()=>{try{setAttendance(await listStudyGroupAttendance({data:{sessionId:session.id}}));setAttendanceSession(session.id)}catch(e){setError(e instanceof Error?e.message:"Attendance unavailable")}}}>Attendance</button></>}
+       <button disabled={busy} className="rounded border px-2 py-1" onClick={async()=>{
+        const outcome=await mutation.run(()=>listStudyGroupAttendance({data:{sessionId:session.id}}),{
+         fallback:"Attendance unavailable.",
+         success:"Attendance loaded.",
+        });
+        if(outcome.status==="saved"){setAttendance(outcome.value);setAttendanceSession(session.id);}
+       }}>Attendance</button></>}
       </div>)}
     </div>)}
     {attendanceSession&&<div className="space-y-2"><h3 className="font-semibold">Attendance</h3>{attendance.map(person=><div key={person.personId} className="flex gap-2 text-xs"><span>{person.personId.slice(0,8)} · {person.rsvp??"No RSVP"} · {person.attended===null?"Unrecorded":person.attended?"Present":"Absent"}</span>
-    <button disabled={busy||!writesEnabled} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,studentPersonId:person.personId,attended:true}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Present</button>
-    <button disabled={busy||!writesEnabled} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,studentPersonId:person.personId,attended:false}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Absent</button></div>)}</div>}
+    <button disabled={busy||!writesEnabled} className="underline" onClick={()=>recordAttendance(person.personId,true)}>Present</button>
+    <button disabled={busy||!writesEnabled} className="underline" onClick={()=>recordAttendance(person.personId,false)}>Absent</button></div>)}</div>}
     <h3 className="font-semibold">Schedule a session</h3><select className="w-full rounded border p-2" aria-label="Choose study group" value={groupId} onChange={e=>setGroupId(e.target.value)}><option value="">Choose a group</option>{visibleGroups.map(g=><option key={g.id} value={g.id}>{g.title}</option>)}</select>
     <input className="w-full rounded border p-2" placeholder="Session title" aria-label="Session title" value={sessionTitle} onChange={e=>setSessionTitle(e.target.value)}/>
     <textarea className="w-full rounded border p-2" placeholder="Agenda" aria-label="Agenda" value={agenda} onChange={e=>setAgenda(e.target.value)}/>

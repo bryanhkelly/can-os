@@ -124,6 +124,7 @@ describe("persistent server-initialized workspace shell", () => {
     expect(html).toContain('aria-label="Demo account"');
     expect(html).toContain("admin.demo@valorschool.demo");
     expect(html).toContain("jordan.student@valorschool.demo");
+    expect(html).toContain('aria-label="Demo account" disabled=""');
     expect(html).not.toContain('href="/admissions"');
     view.queryClient.clear();
   });
