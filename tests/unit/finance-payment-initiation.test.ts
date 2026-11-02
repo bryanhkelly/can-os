@@ -44,6 +44,17 @@ describe("guardian payment intent", () => {
       .resolves.toEqual({ kind: "unavailable", reason: "Existing payment intent requires server-side reconciliation before checkout" });
     expect(processor.requestPayment).not.toHaveBeenCalled();
   });
+  it("preserves an unresolved attempt after a provider timeout and blocks replay", async () => {
+    const { store, processor } = fixture();
+    processor.requestPayment = vi.fn(async () => { throw new Error("Provider timeout"); });
+    await expect(initiateGuardianPayment(store, processor, identity, "ob", "stable-key"))
+      .rejects.toThrow("Provider timeout");
+    expect(store.finishPaymentAttempt).not.toHaveBeenCalled();
+    store.reservePaymentAttempt = vi.fn(async () => ({ kind: "existing", status: "pending" }));
+    await expect(initiateGuardianPayment(store, processor, identity, "ob", "stable-key"))
+      .resolves.toMatchObject({ kind: "unavailable" });
+    expect(processor.requestPayment).toHaveBeenCalledOnce();
+  });
   it("rejects unsafe projected outstanding cents", async () => {
     const { store, processor } = fixture();
     store.readInvoice = vi.fn(async () => ({ ...record, capturedCents: Number.NaN }));
