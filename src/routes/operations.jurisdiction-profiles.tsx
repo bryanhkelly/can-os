@@ -26,10 +26,10 @@ function ReviewEditor({item}:{item:Item}){
  const router=useRouter();
  const [title,setTitle]=useState(item.title);
  const [summary,setSummary]=useState(item.summary);
- const [profile,setProfile]=useState<Record<string,unknown>>(item.profile && typeof item.profile==="object"&&!Array.isArray(item.profile)?item.profile as Record<string,unknown>:{});
+ const [profile,setProfile]=useState<Record<string,unknown>>(JSON.parse(item.profile) as Record<string,unknown>);
  const models=Array.isArray(profile.operatingModels)?profile.operatingModels as string[]:[];
  const [sources,setSources]=useState<Array<{title:string;url:string;authority:string;checkedAt:string}>>(
-  Array.isArray(item.evidence)?item.evidence.filter((s):s is {title:string;url:string;authority:string;checkedAt:string}=>Boolean(s&&typeof s==="object"&&"url" in s&&"title" in s&&"authority" in s&&"checkedAt" in s)):[]);
+  Array.isArray(JSON.parse(item.evidence))?(JSON.parse(item.evidence) as unknown[]).filter((s):s is {title:string;url:string;authority:string;checkedAt:string}=>Boolean(s&&typeof s==="object"&&"url" in s&&"title" in s&&"authority" in s&&"checkedAt" in s)):[]);
  function editSource(index:number,field:"title"|"url"|"authority"|"checkedAt",value:string){
   setSources(previous=>previous.map((source,i)=>i===index?{...source,[field]:value}:source));
  }
