@@ -1,6 +1,7 @@
+import { useRouter } from "@tanstack/react-router";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { listJurisdictionProfileReviews,saveJurisdictionProfileReview } from "@/modules/programs/jurisdiction-profile.functions";
+import { listJurisdictionProfileReviews,saveJurisdictionProfileReview,publishJurisdictionProfile } from "@/modules/programs/jurisdiction-profile.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import { WorkspaceShell } from "@/components/workspace";
@@ -22,6 +23,7 @@ function ReviewPage(){
 }
 type Item=Awaited<ReturnType<typeof listJurisdictionProfileReviews>>[number];
 function ReviewEditor({item}:{item:Item}){
+ const router=useRouter();
  const [title,setTitle]=useState(item.title);
  const [summary,setSummary]=useState(item.summary);
  const [profile,setProfile]=useState(JSON.stringify(item.profile,null,2));
@@ -38,7 +40,15 @@ function ReviewEditor({item}:{item:Item}){
    if(!Array.isArray(parsedEvidence))throw Error("Evidence must be a JSON array");
    await saveJurisdictionProfileReview({data:{id:item.id,title,summary,profile:parsedProfile,evidence:parsedEvidence}});
    setMessage("Review saved. This content is not published.");
+   await router.invalidate();
   }catch(error){setMessage(error instanceof Error?error.message:"Unable to save review");}
+  finally{setSaving(false);}
+ }
+ async function publish(){
+  if(!window.confirm("Publish this state profile as verified guidance? Confirm all sources and requirements have been reviewed."))return;
+  setSaving(true);setMessage("");
+  try{await publishJurisdictionProfile({data:{id:item.id}});setMessage("Published. The state guidance is now available during launch.");await router.invalidate();}
+  catch(error){setMessage(error instanceof Error?error.message:"Unable to publish");}
   finally{setSaving(false);}
  }
  return <details className="rounded-xl border bg-card p-4">
@@ -48,7 +58,7 @@ function ReviewEditor({item}:{item:Item}){
    <label className="block text-sm">Summary<textarea className="mt-1 w-full rounded border bg-background p-2" rows={3} value={summary} disabled={!editable} onChange={e=>setSummary(e.target.value)}/></label>
    <label className="block text-sm">Structured profile (JSON)<textarea className="mt-1 w-full rounded border bg-background p-2 font-mono text-xs" rows={14} value={profile} disabled={!editable} onChange={e=>setProfile(e.target.value)}/></label>
    <label className="block text-sm">Evidence sources (JSON array; HTTPS, authority, checkedAt required)<textarea className="mt-1 w-full rounded border bg-background p-2 font-mono text-xs" rows={6} value={evidence} disabled={!editable} onChange={e=>setEvidence(e.target.value)}/></label>
-   <div className="flex items-center gap-3"><button type="button" disabled={!editable||saving} onClick={save} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving?"Saving…":"Save review"}</button><p role="status" className="text-sm">{message}</p></div>
+   <div className="flex items-center gap-3"><button type="button" disabled={!editable||saving} onClick={save} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving?"Saving…":"Save review"}</button>{item.status==="in_review"&&<button type="button" disabled={saving} onClick={publish} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Publish reviewed profile</button>}<p role="status" className="text-sm">{message}</p></div>
   </div>
  </details>;
 }
