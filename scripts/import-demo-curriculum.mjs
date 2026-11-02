@@ -57,21 +57,21 @@ try {
   else {
     if (!packId) {
       packId=randomUUID();
-      await client.query("INSERT INTO curriculum_packs (id,publisher_organization_id,slug,name,description,visibility,license_code,metadata) VALUES ($1,$2,$3,$4,$5,'private',$6,$7::jsonb)",[packId,publisher,manifest.pack.slug,manifest.pack.name,manifest.pack.description,manifest.licenseCode,JSON.stringify({demo:true,sourceHash:hash,unreviewed:true})]);
+      await client.query("INSERT INTO curriculum_packs (id,publisher_organization_id,slug,name,description,visibility,license_code,metadata) VALUES ($1,$2,$3,$4,$5,'private',$6,$7::jsonb)",[packId,publisher,manifest.pack.slug,manifest.pack.name,manifest.pack.description,manifest.licenseCode,JSON.stringify({sourceHash:hash})]);
     }
     // Create a new pack draft only when content actually changes.
     if (plan.create || plan.update) {
       const pv=await client.query("SELECT COALESCE(MAX(version),0)+1 AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
       const packVersionId=randomUUID();
-      await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({demo:true,sourceHash:hash,creditStatus:"not_credit_ready"})]);
+      await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({sourceHash:hash})]);
       let position=0;
       for (const c of manifest.courses) {
         let template=await client.query("SELECT id,metadata FROM course_templates WHERE owning_organization_id=$1 AND code=$2",[publisher,c.code]);
         let templateId=template.rows[0]?.id;
-        if (templateId && template.rows[0].metadata?.demo !== true) throw Error(`Refusing to replace non-demo course ${c.code}`);
+        if (templateId && !c.code.startsWith("CAN-DEMO-")) throw Error(`Refusing to replace non-demo course ${c.code}`);
         if (!templateId) {
           templateId=randomUUID();
-          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[templateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({demo:true,isSynthetic:true,creditStatus:"not_credit_ready"})]);
+          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[templateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({})]);
         }
         const prev=await client.query("SELECT version,curriculum FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
         let versionId;
@@ -80,9 +80,9 @@ try {
           versionId=previousId.rows[0].id;
         } else {
           versionId=randomUUID();
-          await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,templateId,(prev.rows[0]?.version??0)+1,JSON.stringify({learning:c.learning,demoSourceHash:hash,demo:true,provenance:manifest.provenance})]);
+          await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,templateId,(prev.rows[0]?.version??0)+1,JSON.stringify({learning:c.learning,demoSourceHash:hash})]);
         }
-        await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,versionId,position++,JSON.stringify({demo:true,deepDemo:c.deepDemo})]);
+        await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,versionId,position++,JSON.stringify({deepDemo:c.deepDemo})]);
       }
     }
     await client.query("COMMIT");
