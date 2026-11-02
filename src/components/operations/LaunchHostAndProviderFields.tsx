@@ -6,8 +6,9 @@ import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
 const selectClass = inputClass;
 
-export function LaunchHostAndProviderFields({ options, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
+  jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   hostOrganizationId: string; setHostOrganizationId: (value: string) => void;
   siteId: string; setSiteId: (value: string) => void;
   setCreatedSiteDraft: (value: {siteId:string;host:string} | null) => void;
