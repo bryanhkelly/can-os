@@ -12,6 +12,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "@neondatabase/serverless";
 
 const argv = process.argv;
+if (argv.includes("--apply") && !process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED) throw Error("Set DEMO_CURRICULUM_DATABASE_CONFIRMED to the exact current_database() name before writing");
 const value = flag => {const i=argv.indexOf(flag);return i === -1 ? null : argv[i+1];};
 const file=value("--file"), publisher=value("--publisher");
 const apply=argv.includes("--apply");
@@ -36,6 +37,10 @@ const pool=new Pool({connectionString:process.env.DATABASE_URL});
 const client=await pool.connect();
 try {
   await client.query("BEGIN");
+  if(apply){
+    const db=await client.query("SELECT current_database() AS name");
+    if(db.rows[0].name!==process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)throw Error("Database identity mismatch");
+  }
   const org=await client.query("SELECT id,slug,type,metadata FROM organizations WHERE id=$1", [publisher]);
   if (org.rowCount !== 1 || org.rows[0].slug !== "can-demo-publisher" || org.rows[0].metadata?.demoPublisher !== true) throw Error("Only the dedicated CAN Demo Publisher organization can own demo curriculum");
   const existing=await client.query("SELECT id,metadata FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug=$2", [publisher,manifest.pack.slug]);
@@ -70,10 +75,10 @@ try {
       for (const c of manifest.courses) {
         let template=await client.query("SELECT id,metadata FROM course_templates WHERE owning_organization_id=$1 AND code=$2",[publisher,c.code]);
         let templateId=template.rows[0]?.id;
-        if (templateId && !c.code.startsWith("CAN-DEMO-")) throw Error(`Refusing to replace non-demo course ${c.code}`);
+        if (templateId && template.rows[0]?.metadata?.sourceSystem !== "can-demo-catalog-factory") throw Error(`Refusing to replace course not owned by this importer: ${c.code}`);
         if (!templateId) {
           templateId=randomUUID();
-          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[templateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({})]);
+          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[templateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({sourceSystem:"can-demo-catalog-factory"})]);
         }
         const prev=await client.query("SELECT version,curriculum FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
         let versionId;
