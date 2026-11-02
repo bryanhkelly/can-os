@@ -35,8 +35,7 @@
     "test:storybook": "vitest run --config vitest.storybook.config.ts",
     "test:visual": "npm run build-storybook && chromatic",
     "lint": "eslint . && node scripts/check-design-system.mjs",
-    "lint:fix": "eslint . --fix",
-    "demo:academic-marketplace": "node scripts/seed-demo-academic-marketplace.mjs"
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
