@@ -115,33 +115,3 @@ try {
   }
 } catch(e){await client.query("ROLLBACK");throw e;}
 finally{client.release();await pool.end();}
- THEN version::int END),0)+1 AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
-      const packVersionId=randomUUID();
-      await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({sourceHash:hash})]);
-      let position=0;
-      for (const c of manifest.courses) {
-        let template=await client.query("SELECT id,metadata FROM course_templates WHERE owning_organization_id=$1 AND code=$2",[publisher,c.code]);
-        let templateId=template.rows[0]?.id;
-        if (templateId && template.rows[0]?.metadata?.sourceSystem !== "can-demo-catalog-factory") throw Error(`Refusing to replace course not owned by this importer: ${c.code}`);
-        if (!templateId) {
-          templateId=randomUUID();
-          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[templateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({sourceSystem:"can-demo-catalog-factory"})]);
-        }
-        const prev=await client.query("SELECT version,curriculum FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
-        let versionId;
-        if (prev.rows[0]?.curriculum?.demoSourceHash === courseHash(c)) {
-          const previousId=await client.query("SELECT id FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
-          versionId=previousId.rows[0].id;
-        } else {
-          versionId=randomUUID();
-          await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,templateId,(prev.rows[0]?.version??0)+1,JSON.stringify({learning:c.learning,demoSourceHash:courseHash(c)})]);
-        }
-        await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,versionId,position++,JSON.stringify({deepDemo:c.deepDemo})]);
-      }
-    }
-    await client.query("UPDATE curriculum_packs SET metadata=jsonb_set(COALESCE(metadata,'{}'::jsonb),'{sourceHash}',to_jsonb($2::text)) WHERE id=$1",[packId,hash]);
-    await client.query("COMMIT");
-    console.log(JSON.stringify({...plan,packId,status:"draft",published:false},null,2));
-  }
-} catch(e){await client.query("ROLLBACK");throw e;}
-finally{client.release();await pool.end();}
