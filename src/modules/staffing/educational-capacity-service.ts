@@ -379,6 +379,8 @@ export async function findCapacityCandidates(
     .where(
       and(
         eq(instructionalCapacityOfferings.status, "open"),
+        // Preview-only synthetic listings must never be reservable candidates.
+        sql`coalesce(${instructionalCapacityOfferings.metadata}->>'previewOnly', 'false') <> 'true'`,
         eq(instructorCapabilities.active, true),
         eq(instructorAvailabilityWindows.active, true),
         lte(instructorAvailabilityWindows.startsAt, demand.startsAt),
@@ -491,6 +493,7 @@ export async function reserveInstructionalCapacity(
         capabilityId: instructionalCapacityOfferings.capabilityId,
         maxSeats: instructionalCapacityOfferings.maxSeats,
         status: instructionalCapacityOfferings.status,
+        metadata: instructionalCapacityOfferings.metadata,
         modality: instructionalCapacityOfferings.modality,
         organizationId: instructionalCapacityOfferings.organizationId,
         siteId: instructionalCapacityOfferings.siteId,
@@ -510,6 +513,7 @@ export async function reserveInstructionalCapacity(
       .for("update");
 
     if (!offering || offering.status !== "open") throw new Error("Capacity offering is not available");
+    if (offering.metadata?.previewOnly === true) throw new Error("Preview-only demo teaching capacity cannot be reserved");
 
     const courseMatches =
       offering.capabilityCourseTemplateId === demand.courseTemplateId ||
