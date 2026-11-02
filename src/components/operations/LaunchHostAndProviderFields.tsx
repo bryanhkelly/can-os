@@ -94,6 +94,16 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hos
                       ))}
                     </select>
                   </label>
+                  {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4" role="status">
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
+                    {jurisdictionGuidance[jurisdictionId]?<>
+                     <p className="mt-2 text-sm leading-6">{jurisdictionGuidance[jurisdictionId].summary}</p>
+                     <p className="mt-2 text-xs text-muted-foreground">Published guidance is informational. Your school still needs its own operating approvals.</p>
+                    </>:<>
+                     <p className="mt-2 text-sm">State-specific guidance is being reviewed. You can continue preparing your school.</p>
+                     <p className="mt-2 text-xs text-muted-foreground">Configuration does not authorize enrollment or operation.</p>
+                    </>}
+                  </div>}
                   <label className="block text-xs">
                     Academic provider
                     <select aria-label="Academic provider organization" className={selectClass} value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)} required>
