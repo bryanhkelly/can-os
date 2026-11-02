@@ -35,7 +35,7 @@ export const listJurisdictionProfileReviews = createServerFn({method:"GET"}).han
  .innerJoin(jurisdictions,eq(jurisdictions.id,jurisdictionProfileVersions.jurisdictionId))
  .where(inArray(jurisdictionProfileVersions.status,["draft","in_review","published"]))
  .orderBy(jurisdictions.name,desc(jurisdictionProfileVersions.createdAt));
- return rows;
+ return rows.map(row=>({...row,profile:JSON.stringify(row.profile),evidence:JSON.stringify(row.evidence)}));
 });
 
 export const listPublishedJurisdictionGuidance = createServerFn({method:"GET"}).handler(async()=>{
