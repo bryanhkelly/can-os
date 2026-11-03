@@ -5,7 +5,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts, accountPersonGrants, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents, studentProfiles } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, actions, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents, studentProfiles } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
@@ -308,6 +308,41 @@ export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST"
         contactedAt: current.contactedAt ?? (data.status === "contacted" ? now : null),
         updatedAt: now,
       }).where(eq(publicAdmissionsInterests.id, current.id));
+      // Resolve or advance the existing follow-up work item, preserving
+      // evidence and ownership. Older interests without one remain valid.
+      const followups=await tx.select({id:actions.id,status:actions.status})
+        .from(actions).where(and(
+          eq(actions.type,"public_admissions_interest_followup"),
+          eq(actions.subjectType,"public_admissions_interest"),
+          eq(actions.subjectId,current.id),
+          eq(actions.organizationId,current.organizationId),
+          eq(actions.siteId,current.siteId),
+          eq(actions.programId,current.programId),
+        )).for("update");
+      for(const followup of followups) {
+        if(["resolved","cancelled"].includes(followup.status))continue;
+        await tx.update(actions).set({
+          status:data.status==="closed"?"resolved":"in_progress",
+          ...(data.status==="closed"?{resolvedAt:now,
+            resolutionNote:"Admissions interest closed by authorized registrar"}:{}),
+          updatedAt:now,
+        }).where(eq(actions.id,followup.id));
+        if(data.status==="closed") {
+          await emitEvent(tx,{eventType:EventTypes.ActionResolved,
+            aggregateType:"action",aggregateId:followup.id,
+            actorPersonId:actor.actorPersonId,
+            organizationId:current.organizationId,siteId:current.siteId,
+            programId:current.programId,payload:{subjectId:current.id}});
+        }
+        await writeAudit(tx,actor,{
+          action:"admissions.public_interest.followup_status",
+          entityType:"action",entityId:followup.id,
+          scope:{organizationId:current.organizationId,siteId:current.siteId,
+            programId:current.programId},
+          before:{status:followup.status},
+          after:{status:data.status==="closed"?"resolved":"in_progress"},
+        });
+      }
       await writeAudit(tx, actor, {
         action: "admissions.public_interest.status_change",
         entityType: "public_admissions_interest", entityId: current.id,
