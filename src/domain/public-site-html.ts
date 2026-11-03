@@ -475,7 +475,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .approved-program-schedule{margin-top:24px;padding:22px;background:var(--site-paper);border:1px solid #dce2e8;border-radius:8px}.approved-program-schedule h4{margin:0 0 14px;font-size:1.07rem}.schedule-periods{list-style:none;margin:0;padding:0}.schedule-periods li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #dce2e8;padding:12px 0;flex-wrap:wrap}.schedule-periods li strong{min-width:110px}.schedule-periods li span{font-variant-numeric:tabular-nums}.schedule-periods+.availability{margin:12px 0 0}
 .inquiry-form{margin-top:22px;padding:clamp(18px,3vw,28px);background:var(--site-paper);border:1px solid #dce2e8;border-radius:10px;display:grid;gap:16px}
 .inquiry-form label:not(.consent){display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:.9rem}
-.inquiry-form input:not([type=checkbox]),.inquiry-form textarea{display:block;width:100%;max-width:100%;font:inherit;padding:12px 13px;border:1px solid #8b989e;border-radius:5px;background:#fff;color:#172d38}
+.inquiry-form input:not([type=checkbox]):not([type=hidden]),.inquiry-form textarea{display:block;width:100%;max-width:100%;font:inherit;padding:12px 13px;border:1px solid #8b989e;border-radius:5px;background:#fff;color:#172d38}
 .inquiry-form input:focus-visible,.inquiry-form textarea:focus-visible,.inquiry-form button:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
 .inquiry-form .consent{display:flex;align-items:flex-start;gap:10px;font-size:.88rem;line-height:1.5}
 .inquiry-form .consent input{margin-top:4px;width:18px;height:18px;flex:0 0 18px}
