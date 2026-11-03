@@ -62,8 +62,10 @@ export async function ensureSchoolJurisdictionReviewAction(
         await writeAudit(tx,actor,{
           action:"program.jurisdiction.legal_review.reopened",
           entityType:"action",entityId:existing.id,scope,
-          before:{status:existing.status,profileRevision:existing.metadata.profileRevision},
-          after:{status:"open",profileRevision:review.revision},
+          before:{status:existing.status,profileRevision:existing.metadata.profileRevision,
+            scopeFingerprint:existing.metadata.scopeFingerprint},
+          after:{status:"open",profileRevision:review.revision,
+            scopeFingerprint:review.scopeFingerprint},
         });
       }
       return {programId,created:false,needed:true,actionId:existing.id};
@@ -79,6 +81,7 @@ export async function ensureSchoolJurisdictionReviewAction(
       metadata:{version:1,reviewState:"legal_review_requested",
         profileRevision:review.revision,requesterPersonId:actor.actorPersonId,
         locationReviewReason:review.locationReviewReason ?? null,
+        scopeFingerprint:review.scopeFingerprint,
         pendingRequirementIds:review.decisions.filter(item=>
           item.status==="legal_review_required").map(item=>item.id)},
     }).returning({id:actions.id});
