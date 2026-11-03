@@ -2,6 +2,10 @@ import { resolve4 } from "node:dns/promises";
 import https from "node:https";
 import { normalizeChurchReferenceUrl } from "@/domain/church-source-references";
 import { boundedChurchBrandEvidence, type ChurchBrandEvidence } from "@/domain/church-brand-suggestions";
+import {
+  ChurchWebFetchError, classifyChurchWebFetchFailure,
+  summaryChurchWebFetchFailure, type ChurchWebFailureCode,
+} from "@/domain/church-web-fetch-diagnostics";
 
 /**
  * Bounded public-HTML fetch for voluntary church-website evidence.
@@ -219,12 +223,16 @@ export async function extractChurchPublicWebsite(
   ];
   const results: WebsitePageEvidence[] = [];
   const dedup = new Set<string>();
+  const skipped: ChurchWebFailureCode[] = [];
   for (const candidate of candidates) {
     if (results.length >= 5) break;
     const url = new URL(candidate.path, origin);
     if (dedup.has(url.pathname)) continue;
     dedup.add(url.pathname);
-    if (robots.status === 200 && !robotsAllows(robots.text, url.pathname)) continue;
+    if (robots.status === 200 && !robotsAllows(robots.text, url.pathname)) {
+      skipped.push("robots_denied");
+      continue;
+    }
     try {
       const response = await requestPublicPage(url.toString(), origin, MAX_HTML_BYTES, 0,
         robots.status === 200 ? robots.text : undefined);
@@ -235,10 +243,12 @@ export async function extractChurchPublicWebsite(
         ...(candidate.path === parsed.pathname
           ? { brandEvidence: boundedChurchBrandEvidence(response.text, response.url) } : {}),
       });
-    } catch {
-      // Per-page failure never manufactures evidence or blocks other pages.
+    } catch (error) {
+      // No raw exception content crosses this boundary. When all pages fail,
+      // report a bounded reason instead of misleading editors with "no text".
+      skipped.push(classifyChurchWebFetchFailure(error).code);
     }
   }
-  if (!results.length) throw new Error("No public, permitted church website text could be retrieved");
+  if (!results.length) throw new ChurchWebFetchError(summaryChurchWebFetchFailure(skipped));
   return results;
 }
