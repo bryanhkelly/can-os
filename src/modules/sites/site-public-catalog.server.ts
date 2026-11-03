@@ -1,3 +1,4 @@
+import { projectApprovedParentInformation } from "@/domain/parent-information";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, sitePublications, sites } from "@/db/schema";
@@ -38,12 +39,18 @@ export async function readPublishedSiteCatalog(slug: string) {
     const offerings = await readEnrichmentCatalog(site.id, tx);
     const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
+    const publicOfferings = offerings.map(toPublicSiteEnrichment);
+    const localContent = locallyPublished?.content ?? null;
     return {
+      parentInformation: projectApprovedParentInformation({
+        site: { name: site.name, organizationName: site.organizationName },
+        academicPrograms, offerings: publicOfferings, localContent,
+      }),
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms,
-      localContent: locallyPublished?.content ?? null,
-      offerings: offerings.map(toPublicSiteEnrichment),
+      localContent,
+      offerings: publicOfferings,
     };
   });
 }
