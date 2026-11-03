@@ -4,10 +4,10 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import { uuidProgramSelectionSchema } from "@/lib/route-search";
 import { getCurriculumAdopterPrograms } from "@/modules/learning/curriculum-marketplace.functions";
-import { getTeacherMarketplace } from "@/modules/staffing/teacher-marketplace.functions";
-import { listTeacherStaffingRequests, requestTeacherStaffing } from "@/modules/staffing/teacher-staffing-requests.functions";
+import {
+  engageMarketplaceTeacher, getTeacherMarketplace,
+} from "@/modules/staffing/teacher-marketplace.functions";
 import { Button } from "@/components/ui/button";
-import { assignLaunchTeacher } from "@/modules/programs/launch-academics.functions";
 
 export const Route = createFileRoute("/operations/teacher-marketplace")({
   validateSearch: (search: Record<string, unknown>) => uuidProgramSelectionSchema.parse(search),
@@ -15,7 +15,6 @@ export const Route = createFileRoute("/operations/teacher-marketplace")({
   loader: ({ deps }) => safeLoader(async () => ({
     programs: await getCurriculumAdopterPrograms(),
     market: deps.programId ? await getTeacherMarketplace({ data: { programId: deps.programId } }) : null,
-    staffingRequests: deps.programId ? await listTeacherStaffingRequests({ data: { programId: deps.programId } }) : null,
   }), { authMessage: "An authorized school registrar is required." })(),
   component: TeacherMarketplacePage,
 });
@@ -29,39 +28,27 @@ function TeacherMarketplacePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   if (!result.ok) return <LoaderFailure title="CAN teacher marketplace" outcome={result}/>;
-  const { programs, market, staffingRequests } = result.data;
-  async function selectTeacher(courseVersionId: string, teacherPersonId: string) {
+  const { programs, market } = result.data;
+  async function engageTeacher(courseVersionId: string, teacherPersonId: string, sectionId?: string) {
     if (!market || submitting) return;
     setError(""); setNotice("");
-    const selectionKey = `${courseVersionId}:${teacherPersonId}`;
+    const selectionKey = `${courseVersionId}:${teacherPersonId}:${sectionId ?? "course"}`;
     setSubmitting(selectionKey);
     try {
-      const outcome = await requestTeacherStaffing({ data: {
-        requestId: crypto.randomUUID(),
+      const outcome = await engageMarketplaceTeacher({ data: {
         programId: market.program.id, courseVersionId, teacherPersonId,
-        ...(targetSection[courseVersionId] ? { sectionId: targetSection[courseVersionId] } : {}),
+        ...(sectionId ? { sectionId } : {}),
       } });
       await router.invalidate();
-      setNotice(outcome.replayed ? "Your existing CAN staffing request is recorded." :
-        "CAN staffing request recorded. Teacher assignment is not yet authorized.");
+      if (sectionId) {
+        setNotice(outcome.engaged
+          ? "Teacher engaged for the selected class."
+          : "Teacher was already engaged for the selected class.");
+      } else {
+        setNotice(`${outcome.engaged} compatible classes newly engaged; ${outcome.alreadyEngaged} already engaged.`);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The teacher request could not be saved.");
-    } finally { setSubmitting(null); }
-  }
-  async function assignTeacher(courseVersionId: string, teacherPersonId: string) {
-    if (!market || submitting || !targetSection[courseVersionId]) return;
-    setError(""); setNotice("");
-    setSubmitting(`assign:${courseVersionId}:${teacherPersonId}`);
-    try {
-      await assignLaunchTeacher({ data: {
-        programId: market.program.id,
-        sectionId: targetSection[courseVersionId],
-        teacherPersonId,
-      } });
-      await router.invalidate();
-      setNotice("CAN-authorized teacher assignment saved to the selected class.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The instructor could not be assigned to this class.");
+      setError(cause instanceof Error ? cause.message : "The teacher could not be engaged.");
     } finally { setSubmitting(null); }
   }
   const search = query.trim().toLowerCase();
@@ -69,17 +56,17 @@ function TeacherMarketplacePage() {
     !search || [course.code, course.title, course.subject, ...course.teacherOptions.map(t => t.name)]
       .some(value => value.toLowerCase().includes(search))) ?? [];
   return <main className="mx-auto max-w-6xl space-y-6 px-5 py-10">
-    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN Academy · Academic staffing</p>
+    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Academic staffing</p>
     <h1 className="font-serif text-4xl">Choose your teachers</h1>
     <p className="max-w-3xl text-sm text-muted-foreground">
-      After selecting your school curriculum, review CAN-managed instructor options by course.
-      A course recommendation can be carried into class staffing, with individual section overrides.
+      After adopting curriculum, your school can directly engage an onboarded instructor across a course
+      or for an individual class. Each class assignment uses the existing school launch checks.
     </p>
     {error && <p role="alert" className="rounded-lg border border-destructive px-4 py-3 text-sm">{error}</p>}
     {notice && <p role="status" className="rounded-lg border px-4 py-3 text-sm">{notice}</p>}
     <p className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
-      CAN Academy manages teacher onboarding and staffing. Course matches are recommendations;
-      assignment requires current qualifications, availability, capacity and CAN authorization.
+      Real candidates are shown only for classes where published qualifications, schedule availability,
+      and reserved capacity currently match. Your school decides whom to engage.
     </p>
     <nav aria-label="Choose school program" className="flex flex-wrap gap-2">
       {programs.map(program => <Link key={program.id} to="/operations/teacher-marketplace"
@@ -117,53 +104,46 @@ function TeacherMarketplacePage() {
            </div>
           <p className="text-xs text-muted-foreground">{course.sectionCount} current classes</p>
         </div>
-        {course.sections.length > 0 && <label className="block max-w-sm space-y-1 text-sm">
-          <span className="font-medium">Apply selection to</span>
-          <select value={targetSection[course.versionId] ?? ""}
-            onChange={event => setTargetSection(previous => ({ ...previous, [course.versionId]: event.target.value }))}
-            className="w-full rounded-lg border bg-background px-3 py-2">
-            <option value="">Course-wide staffing request</option>
-            {course.sections.map(section => <option key={section.id} value={section.id}>
-              {section.code} · {section.title}
-            </option>)}
-          </select>
-        </label>}
         {course.teacherOptions.length ? <div className="grid gap-3 md:grid-cols-2">
-          {course.teacherOptions.map(teacher => <article key={teacher.personId}
-            className="space-y-1 rounded-lg border p-3">
+          {course.teacherOptions.map(teacher => {
+            const eligibleSections = course.sections.filter(section =>
+              teacher.eligibleSectionIds.includes(section.id));
+            const selectionKey = `${course.versionId}:${teacher.personId}`;
+            const selection = targetSection[selectionKey] ?? "";
+            const selectedIsEligible = selection
+              ? teacher.eligibleSectionIds.includes(selection)
+              : eligibleSections.length > 0;
+            return <article key={teacher.personId} className="space-y-2 rounded-lg border p-3">
             <p className="font-semibold">{teacher.name}{teacher.isSynthetic && <span className="text-xs font-normal text-muted-foreground"> · Sample profile</span>}</p>
-            <p className="text-sm text-muted-foreground">{teacher.modality.replaceAll("_", " ")} · Offered capacity: {teacher.indicativeSeatCapacity} seats (subject to confirmation)</p>
-            <p className="text-xs text-muted-foreground">Teacher qualification, scheduling and assignment require CAN approval.</p>
-            {(() => {
-              const sectionId = targetSection[course.versionId] || null;
-              const pendingRequest = staffingRequests?.requests.find(request =>
-                request.status === "open" && request.courseVersionId === course.versionId &&
-                request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
-              const recentDecline = staffingRequests?.requests.find(request =>
-                request.status === "cancelled" && request.reviewState === "declined" &&
-                request.courseVersionId === course.versionId &&
-                request.teacherPersonId === teacher.personId && request.sectionId === sectionId);
-              return <div className="mt-2 space-y-2">
-                {recentDecline && <p className="text-xs text-muted-foreground">
-                  Previous request declined{recentDecline.declineReason ? `: ${recentDecline.declineReason}` : "."}
-                </p>}
-                <Button type="button" size="sm" variant="outline"
-                  disabled={Boolean(pendingRequest) || submitting !== null}
-                  onClick={() => void selectTeacher(course.versionId, teacher.personId)}>
-                  {pendingRequest ? pendingRequest.reviewState === "in_review"
-                    ? "Under CAN review" : "CAN review requested"
-                    : submitting === `${course.versionId}:${teacher.personId}`
-                      ? "Submitting…" : "Request CAN staffing review"}
-                </Button>
-                {sectionId && !teacher.isSynthetic && <Button type="button" size="sm"
-                  disabled={submitting !== null}
-                  onClick={() => void assignTeacher(course.versionId, teacher.personId)}>
-                  {submitting === `assign:${course.versionId}:${teacher.personId}` ? "Assigning…" : "Assign authorized teacher"}
-                </Button>}
-              </div>;
-            })()}
-          </article>)}
-        </div> : <p className="text-sm text-muted-foreground">No CAN teacher currently matches this course. CAN staffing review may be required.</p>}
+            <p className="text-sm text-muted-foreground">{teacher.modality.replaceAll("_", " ")} · Offered capacity: {teacher.indicativeSeatCapacity} seats</p>
+            {teacher.isSynthetic && <p className="text-xs text-muted-foreground">
+              Sample profiles are preview data and cannot be engaged as instructors.
+            </p>}
+            {!teacher.isSynthetic && <p className="text-xs text-muted-foreground">
+              Currently eligible and reservable for {eligibleSections.length} of {course.sectionCount} classes.
+            </p>}
+            {!teacher.isSynthetic && eligibleSections.length > 0 && <label className="block space-y-1 text-sm">
+              <span className="font-medium">Apply selection to</span>
+              <select value={selection}
+                onChange={event => setTargetSection(previous => ({ ...previous, [selectionKey]: event.target.value }))}
+                className="w-full rounded-lg border bg-background px-3 py-2">
+                <option value="">All compatible classes ({eligibleSections.length})</option>
+                {eligibleSections.map(section => <option key={section.id} value={section.id}>
+                  {section.code} · {section.title}
+                </option>)}
+              </select>
+            </label>}
+            <Button type="button" size="sm" variant="outline"
+              disabled={teacher.isSynthetic || !selectedIsEligible || submitting !== null}
+              onClick={() => void engageTeacher(course.versionId, teacher.personId, selection || undefined)}>
+              {submitting === `${course.versionId}:${teacher.personId}:${selection || "course"}`
+                ? "Engaging…" : selection ? "Engage for this class" : "Engage across compatible classes"}
+            </Button>
+          </article>;
+          })}
+        </div> : <p className="text-sm text-muted-foreground">
+          No eligible instructor has reservable capacity for these classes. Confirm each class has an open instructional capacity demand.
+        </p>}
       </section>)}
       {market.courses.length > 0 && courses.length === 0 &&
         <p className="rounded-lg border p-4 text-sm">No matches for this search.</p>}

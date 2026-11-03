@@ -517,22 +517,13 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/operations.can-teacher-requests.tsx",
-      "route": "/operations/can-teacher-requests",
-      "owner": "staffing",
-      "verification": "pending",
-      "roleJourney": "CAN academic provider registrar reviews requests from its own church school programs",
-      "writeBoundary": "review transitions update existing staffing Action metadata or record a declined request with audit and event",
-      "readBoundary": "provider-scoped staffing inbox; verified registrar and capacity.manage"
-    },
-    {
       "file": "src/routes/operations.teacher-marketplace.tsx",
       "route": "/operations/teacher-marketplace",
       "owner": "staffing",
       "verification": "pending",
-      "roleJourney": "registrar selects CAN-managed teachers after adopting curriculum",
-      "writeBoundary": "staffing requests persist in canonical Actions; direct teacher assignment uses existing launch staffing authorization",
-      "readBoundary": "getTeacherMarketplace (authorized school, adopted curriculum, provider membership and candidate capacity)"
+      "roleJourney": "school registrar chooses an eligible onboarded provider teacher and engages the teacher across compatible adopted-course classes or one selected class",
+      "writeBoundary": "engagement revalidates adoption, teaching eligibility, open capacity demand, offering, seat capacity and cross-school schedule availability, then commits reservations and canonical assignments in one transaction",
+      "readBoundary": "getTeacherMarketplace (authorized school, adopted curriculum, provider offering, published teaching eligibility, instructional capacity and schedule compatibility)"
     },
     {
       "file": "src/routes/operations.curriculum-marketplace.tsx",

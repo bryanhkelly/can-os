@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, type Database } from "@/db/client";
 import { personLegalName } from "@/domain/person-name";
 import {
 courseTemplates,
@@ -7,13 +7,16 @@ instructionalCapacityOfferings,
 instructionalCapacityReservations,
 instructorAvailabilityWindows,
 instructorCapabilities,
+deliveryArrangements,
 people,
 programs,
 roleAssignments,
+schoolYears,
 scheduleTemplatePeriods,
 sectionCapacityDemands,
 sections,
-sectionTeachers
+sectionTeachers,
+terms,
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
@@ -25,9 +28,10 @@ type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
-import { and,eq,gte,inArray,lte,sql } from "drizzle-orm";
+import { and,eq,gte,inArray,isNull,lte,or,sql } from "drizzle-orm";
 import { currentCapacityReservationFilter, isCurrentCapacityReservation } from "./reservation-policy";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
+import { recurringSchedulesConflict } from "@/domain/recurring-schedule-conflict";
 
 /** Acquired before capacity reservation locks when teacher assignments may change. */
 async function lockSectionStaffingSite(
@@ -47,6 +51,8 @@ export type CapacityCandidate = {
   offeringId: string;
   personId: string;
   instructorName: string;
+  requiredSeats: number;
+  remainingDemandSeats: number;
   capabilityId: string;
   modality: string;
   maxSeats: number;
@@ -69,6 +75,9 @@ export type CapacityCandidate = {
 export function remainingSeats(maxSeats: number, reservedSeats: number): number {
   return Math.max(0, maxSeats - reservedSeats);
 }
+
+type CapacityReader = Pick<Database, "select">;
+type CapacityTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function createInstructorCapability(
   context: CommandContext,
@@ -213,16 +222,98 @@ function weeklyPatternCovers(
   });
 }
 
-async function loadSectionPeriods(executor: any, scheduleTemplateId: string | null) {
+async function loadSectionPeriods(executor: CapacityReader, scheduleTemplateId: string | null) {
   if (!scheduleTemplateId) return [];
   return executor
     .select({
       dayOfWeek: scheduleTemplatePeriods.dayOfWeek,
       startsAtLocal: scheduleTemplatePeriods.startsAtLocal,
       endsAtLocal: scheduleTemplatePeriods.endsAtLocal,
+      type: scheduleTemplatePeriods.type,
     })
     .from(scheduleTemplatePeriods)
     .where(eq(scheduleTemplatePeriods.scheduleTemplateId, scheduleTemplateId));
+}
+
+async function hasScheduleConflict(
+  executor: CapacityReader,
+  personId: string,
+  demand: NonNullable<Awaited<ReturnType<typeof loadDemandContext>>>,
+) {
+  const targetPeriods = (await loadSectionPeriods(executor, demand.scheduleTemplateId))
+    .filter(period => period.type === "instruction");
+  if (!targetPeriods.length) return false;
+
+  const activeArrangements = await executor.select({
+    sectionId: sections.id,
+    scheduleTemplateId: sections.scheduleTemplateId,
+    timezone: schoolYears.timezone,
+    startsAt: deliveryArrangements.effectiveFrom,
+    endsAt: deliveryArrangements.effectiveThrough,
+  }).from(deliveryArrangements)
+    .innerJoin(sections, eq(sections.id, deliveryArrangements.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
+    .where(and(
+      eq(deliveryArrangements.instructorPersonId, personId),
+      eq(deliveryArrangements.status, "active"),
+      or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, demand.endsAt)),
+      or(isNull(deliveryArrangements.effectiveThrough), gte(deliveryArrangements.effectiveThrough, demand.startsAt)),
+    ));
+  const committedReservations = await executor.select({
+    sectionId: sections.id,
+    scheduleTemplateId: sections.scheduleTemplateId,
+    timezone: schoolYears.timezone,
+    startsAt: sectionCapacityDemands.startsAt,
+    endsAt: sectionCapacityDemands.endsAt,
+  }).from(instructionalCapacityReservations)
+    .innerJoin(instructionalCapacityOfferings,
+      eq(instructionalCapacityOfferings.id, instructionalCapacityReservations.offeringId))
+    .innerJoin(sectionCapacityDemands, eq(sectionCapacityDemands.id, instructionalCapacityReservations.demandId))
+    .innerJoin(sections, eq(sections.id, instructionalCapacityReservations.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
+    .where(and(
+      eq(instructionalCapacityOfferings.personId, personId),
+      eq(instructionalCapacityReservations.status, "committed"),
+      currentCapacityReservationFilter(new Date()),
+      or(isNull(sectionCapacityDemands.startsAt), lte(sectionCapacityDemands.startsAt, demand.endsAt)),
+      or(isNull(sectionCapacityDemands.endsAt), gte(sectionCapacityDemands.endsAt, demand.startsAt)),
+    ));
+  const existing = [...activeArrangements, ...committedReservations];
+  const otherSectionIds = [...new Set(existing
+    .filter(row => row.sectionId !== demand.sectionId && row.scheduleTemplateId)
+    .map(row => row.sectionId))];
+  if (!otherSectionIds.length) return false;
+  const periods = await executor.select({
+    sectionId: sections.id,
+    dayOfWeek: scheduleTemplatePeriods.dayOfWeek,
+    startsAtLocal: scheduleTemplatePeriods.startsAtLocal,
+    endsAtLocal: scheduleTemplatePeriods.endsAtLocal,
+  }).from(sections)
+    .innerJoin(scheduleTemplatePeriods, eq(scheduleTemplatePeriods.scheduleTemplateId, sections.scheduleTemplateId))
+    .where(and(inArray(sections.id, otherSectionIds), eq(scheduleTemplatePeriods.type, "instruction")));
+  const periodsBySection = new Map<string, typeof periods>();
+  for (const period of periods) {
+    const sectionPeriods = periodsBySection.get(period.sectionId) ?? [];
+    sectionPeriods.push(period);
+    periodsBySection.set(period.sectionId, sectionPeriods);
+  }
+  for (const row of existing) {
+    const otherPeriods = periodsBySection.get(row.sectionId);
+    if (row.sectionId === demand.sectionId || !otherPeriods?.length) continue;
+    const from = row.startsAt && row.startsAt > demand.startsAt ? row.startsAt : demand.startsAt;
+    const through = row.endsAt && row.endsAt < demand.endsAt ? row.endsAt : demand.endsAt;
+    if (recurringSchedulesConflict(
+      { timezone: demand.scheduleTimezone, periods: targetPeriods },
+      { timezone: row.timezone, periods: otherPeriods },
+      from,
+      through,
+    )) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function scopedMatch(
@@ -247,7 +338,7 @@ function scopedMatch(
   );
 }
 
-async function loadDemandContext(executor: any, demandId: string) {
+async function loadDemandContext(executor: CapacityReader, demandId: string) {
   const [row] = await executor
     .select({
       demandId: sectionCapacityDemands.id,
@@ -265,10 +356,13 @@ async function loadDemandContext(executor: any, demandId: string) {
       courseSubject: courseTemplates.subject,
       courseTitle: courseTemplates.title,
       scheduleTemplateId: sections.scheduleTemplateId,
+      scheduleTimezone: schoolYears.timezone,
     })
     .from(sectionCapacityDemands)
     .innerJoin(sections, eq(sections.id, sectionCapacityDemands.sectionId))
     .innerJoin(programs, eq(programs.id, sections.programId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
     .innerJoin(courseTemplateVersions, eq(courseTemplateVersions.id, sections.courseTemplateVersionId))
     .innerJoin(courseTemplates, eq(courseTemplates.id, courseTemplateVersions.courseTemplateId))
     .where(eq(sectionCapacityDemands.id, demandId))
@@ -345,14 +439,22 @@ export async function findCapacityCandidates(
   context: CommandContext,
   demandId: string,
 ): Promise<CapacityCandidate[]> {
+  return findCapacityCandidatesInTransaction(db, context, demandId);
+}
+
+export async function findCapacityCandidatesInTransaction(
+  executor: CapacityReader,
+  context: CommandContext,
+  demandId: string,
+): Promise<CapacityCandidate[]> {
   assertCapability(context, "capacity.read");
-  const demand = await loadDemandContext(db, demandId);
+  const demand = await loadDemandContext(executor, demandId);
   if (!demand) throw new Error("Section capacity demand not found");
   assertDemandScope(context, demand);
 
-  const sectionPeriods = await loadSectionPeriods(db, demand.scheduleTemplateId);
+  const sectionPeriods = await loadSectionPeriods(executor, demand.scheduleTemplateId);
 
-  const rows = await db
+  const rows = await executor
     .select({
       offeringId: instructionalCapacityOfferings.id,
       personId: instructionalCapacityOfferings.personId,
@@ -404,11 +506,16 @@ export async function findCapacityCandidates(
   });
 
   if (!compatible.length) return [];
+  const conflictFree = [];
+  for (const row of compatible) {
+    if (!await hasScheduleConflict(executor, row.personId, demand)) conflictFree.push(row);
+  }
 
   const now = new Date();
-  const reservations = await db
+  const reservations = await executor
     .select({
       offeringId: instructionalCapacityReservations.offeringId,
+      demandId: instructionalCapacityReservations.demandId,
       seats: instructionalCapacityReservations.seats,
     })
     .from(instructionalCapacityReservations)
@@ -416,27 +523,41 @@ export async function findCapacityCandidates(
       and(
         inArray(
           instructionalCapacityReservations.offeringId,
-          compatible.map((row) => row.offeringId),
+          conflictFree.map((row) => row.offeringId),
         ),
         currentCapacityReservationFilter(now),
       ),
     );
+  const demandReservations = await executor.select({
+    offeringId: instructionalCapacityReservations.offeringId,
+    seats: instructionalCapacityReservations.seats,
+    status: instructionalCapacityReservations.status,
+    expiresAt: instructionalCapacityReservations.expiresAt,
+  }).from(instructionalCapacityReservations)
+    .where(eq(instructionalCapacityReservations.demandId, demand.demandId));
 
   const reservedByOffering = new Map<string, number>();
   for (const reservation of reservations) {
+    if (reservation.demandId === demand.demandId) continue;
     reservedByOffering.set(
       reservation.offeringId,
       (reservedByOffering.get(reservation.offeringId) ?? 0) + reservation.seats,
     );
   }
 
-  return compatible
+  return conflictFree
     .map((row) => {
       const reservedSeats = reservedByOffering.get(row.offeringId) ?? 0;
+      const reservedDemandSeats = demandReservations
+        .filter(reservation => reservation.offeringId !== row.offeringId &&
+          isCurrentCapacityReservation(reservation, now))
+        .reduce((sum, reservation) => sum + reservation.seats, 0);
       return {
         offeringId: row.offeringId,
         personId: row.personId,
         instructorName: personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
+        requiredSeats: demand.expectedSeats,
+        remainingDemandSeats: remainingSeats(demand.expectedSeats, reservedDemandSeats),
         capabilityId: row.capabilityId,
         modality: row.modality,
         maxSeats: row.maxSeats,
@@ -472,7 +593,21 @@ export async function reserveInstructionalCapacity(
 ): Promise<{ reservationId: string; remainingSeats: number }> {
   assertCapability(context, "capacity.reserve");
 
-  return db.transaction(async (tx) => {
+  return db.transaction(tx => reserveInstructionalCapacityInTransaction(tx, context, input));
+}
+
+export async function reserveInstructionalCapacityInTransaction(
+  tx: CapacityTransaction,
+  context: CommandContext,
+  input: {
+    demandId: string;
+    offeringId: string;
+    seats?: number;
+    status?: "held" | "committed";
+    expiresAt?: Date | null;
+  },
+): Promise<{ reservationId: string; remainingSeats: number }> {
+  assertCapability(context, "capacity.reserve");
     const demand = await loadDemandContext(tx, input.demandId);
     if (!demand) throw new Error("Section capacity demand not found");
     assertDemandScope(context, demand);
@@ -514,6 +649,7 @@ export async function reserveInstructionalCapacity(
 
     if (!offering || offering.status !== "open") throw new Error("Capacity offering is not available");
     if (offering.metadata?.previewOnly === true) throw new Error("Preview-only demo teaching capacity cannot be reserved");
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"teacher-schedule:" + offering.personId}))`);
 
     const courseMatches =
       offering.capabilityCourseTemplateId === demand.courseTemplateId ||
@@ -530,6 +666,8 @@ export async function reserveInstructionalCapacity(
     if (!weeklyPatternCovers(offering.weeklyPattern, sectionPeriods)) {
       throw new Error("Instructor weekly availability does not cover the section schedule");
     }
+    if (await hasScheduleConflict(tx, offering.personId, demand))
+      throw new Error("Instructor has an overlapping class schedule at another school");
 
     const seats = input.seats ?? demand.expectedSeats;
     if (!Number.isInteger(seats) || seats < 1 || seats > demand.expectedSeats) {
@@ -557,6 +695,14 @@ export async function reserveInstructionalCapacity(
         isCurrentCapacityReservation(row, now),
       )
       .reduce((sum, row) => sum + row.seats, 0);
+
+    const sameReservation = existingRows.find(row => row.demandId === input.demandId);
+    if (sameReservation?.status === "committed" && sameReservation.seats === seats) {
+      return {
+        reservationId: sameReservation.id,
+        remainingSeats: remainingSeats(offering.maxSeats, usedByOthers),
+      };
+    }
 
     if (usedByOthers + seats > offering.maxSeats) {
       throw new Error(`Only ${remainingSeats(offering.maxSeats, usedByOthers)} seats remain in this instructional capacity offering`);
@@ -668,7 +814,6 @@ export async function reserveInstructionalCapacity(
       reservationId: reservation.id,
       remainingSeats: remainingSeats(offering.maxSeats, usedByOthers + seats),
     };
-  });
 }
 
 export async function releaseInstructionalCapacity(

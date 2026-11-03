@@ -1159,35 +1159,23 @@
         "audit_events"
       ]
     },
-    "/operations/can-teacher-requests": {
-      "persona": "registrar",
-      "fixtureRequired": false,
-      "rationale": "Provider-scoped staffing requests use existing Actions created by school registrars; no separate demo fixtures or staffing state are introduced.",
-      "interactions": [
-        "CAN provider registrar sees only requests from programs where the registrar has academic provider organization scope",
-        "start staffing review while leaving the request open and school authorization unchanged",
-        "decline a staffing request with an auditable reason"
-      ],
-      "downstreamRecords": [
-        "actions",
-        "audit_events",
-        "domain_events"
-      ]
-    },
     "/operations/teacher-marketplace": {
       "persona": "registrar",
       "fixtureRequired": false,
-      "rationale": "The standard teacher marketplace reads authorized adopted curriculum, provider memberships, capabilities and offerings. Synthetic sample teachers are labeled through provider metadata. Synthetic offerings cannot confer verified eligibility or assign a Section.",
+      "rationale": "The standard teacher marketplace reads authorized adopted curriculum, provider memberships, capabilities and offerings. Synthetic sample teachers are labeled through provider metadata and cannot be engaged.",
       "interactions": [
         "select the authorized school after curriculum adoption",
-        "find CAN Academy and labeled sample teacher candidates by adopted course",
-        "inspect availability and capacity offers without assigning teaching authority",
-        "open canonical class staffing to complete independently authorized assignment"
+        "find onboarded provider teachers and labeled sample profiles by adopted course",
+        "engage an onboarded teacher across all active classes for a course or for one selected class",
+        "recheck qualification and program authority through the canonical launch assignment command"
       ],
       "downstreamRecords": [
-        "actions",
+        "section_teachers",
+        "delivery_arrangements",
+        "staffing_eligibility_evaluations",
         "audit_events",
-        "domain_events"
+        "domain_events",
+        "notifications"
       ]
     },
     "/operations/curriculum-marketplace": {

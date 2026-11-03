@@ -10,6 +10,9 @@
 import { readFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "@neondatabase/serverless";
+import {
+  demoCurriculumSource, isOwnedPrivateDemoPack, selectSingleImporterDraft,
+} from "./lib/demo-curriculum-import.mjs";
 
 const argv = process.argv;
 if (argv.includes("--apply") && !process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED) throw Error("Set DEMO_CURRICULUM_DATABASE_CONFIRMED to the exact current_database() name before writing");
@@ -59,19 +62,23 @@ try {
   }
   const org=await client.query("SELECT id,slug,type,metadata FROM organizations WHERE id=$1", [publisher]);
   if (org.rowCount !== 1 || org.rows[0].slug !== "can-demo-publisher" || org.rows[0].metadata?.demoPublisher !== true) throw Error("Only the dedicated CAN Demo Publisher organization can own demo curriculum");
-  const existing=await client.query("SELECT id,metadata FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug=$2", [publisher,manifest.pack.slug]);
+  const existing=await client.query("SELECT id,metadata,visibility FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug=$2 FOR UPDATE", [publisher,manifest.pack.slug]);
   if (existing.rowCount > 1) throw Error("Ambiguous demo pack");
   let packId=existing.rows[0]?.id;
   if (packId) {
-    if (existing.rows[0].metadata?.sourceHash === undefined) throw Error("Refusing to modify a pack not created by this importer");
-    const versions=await client.query("SELECT count(*)::int AS count FROM curriculum_pack_versions WHERE pack_id=$1 AND status<>'draft'",[packId]);
-    if (versions.rows[0].count) throw Error("Refusing to modify previously released demo pack");
+    if (!isOwnedPrivateDemoPack(existing.rows[0]))
+      throw Error("Refusing to reuse a pack not privately owned by this importer");
+    const versions=await client.query("SELECT id,version,status,metadata FROM curriculum_pack_versions WHERE pack_id=$1 ORDER BY version DESC FOR UPDATE",[packId]);
+    if (versions.rows.some(version => version.status !== "draft"))
+      throw Error("Refusing to modify a previously released demo pack");
+    selectSingleImporterDraft(versions.rows, version =>
+      version.metadata?.sourceSystem === demoCurriculumSource);
   }
-  // Every catalog refresh creates a new DRAFT course version, while published
-  // course versions remain immutable. No duplicate version for identical hash.
+  // Published course versions remain immutable; importer-owned drafts are
+  // refreshed in place and unchanged versions are reused.
   const plan={publisher,manifestHash:hash,pack:manifest.pack.slug,courses:manifest.courses.length,create:0,unchanged:0,update:0,apply};
   for (const c of manifest.courses) {
-    const result=await client.query("SELECT t.id, v.id AS version_id, v.status, v.curriculum FROM course_templates t LEFT JOIN LATERAL (SELECT id,status,curriculum FROM course_template_versions WHERE course_template_id=t.id ORDER BY version DESC LIMIT 1) v ON true WHERE t.owning_organization_id=$1 AND t.code=$2",[publisher,c.code]);
+    const result=await client.query("SELECT t.id, t.metadata AS template_metadata, v.id AS version_id, v.version, v.status, v.curriculum FROM course_templates t LEFT JOIN LATERAL (SELECT id,version,status,curriculum FROM course_template_versions WHERE course_template_id=t.id ORDER BY version DESC LIMIT 1) v ON true WHERE t.owning_organization_id=$1 AND t.code=$2",[publisher,c.code]);
     if (!result.rowCount) plan.create++;
     else if (result.rows[0].curriculum?.demoSourceHash === courseHash(c)) plan.unchanged++;
     else plan.update++;
@@ -80,36 +87,67 @@ try {
   else {
     if (!packId) {
       packId=randomUUID();
-      await client.query("INSERT INTO curriculum_packs (id,publisher_organization_id,slug,name,description,visibility,license_code,metadata) VALUES ($1,$2,$3,$4,$5,'private',$6,$7::jsonb)",[packId,publisher,manifest.pack.slug,manifest.pack.name,manifest.pack.description,manifest.licenseCode,JSON.stringify({sourceHash:hash})]);
+      await client.query("INSERT INTO curriculum_packs (id,publisher_organization_id,slug,name,description,visibility,license_code,metadata) VALUES ($1,$2,$3,$4,$5,'private',$6,$7::jsonb)",[packId,publisher,manifest.pack.slug,manifest.pack.name,manifest.pack.description,manifest.licenseCode,JSON.stringify({sourceSystem:demoCurriculumSource,sourceHash:hash})]);
     }
-    // A pack's own content hash changes only when a new draft is created.
-    // Re-running an identical manifest is a no-op.
-    if (plan.create || plan.update || existing.rowCount === 0 || existing.rows[0]?.metadata?.sourceHash !== hash) {
-      const pv=await client.query("SELECT (COALESCE(MAX(CASE WHEN version ~ '^[0-9]+$' THEN version::int END),0)+1)::text AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
-      const packVersionId=randomUUID();
-      await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({sourceHash:hash})]);
+    const packVersions=packId && existing.rowCount
+      ? await client.query("SELECT id,version,status,metadata FROM curriculum_pack_versions WHERE pack_id=$1 ORDER BY version DESC FOR UPDATE",[packId])
+      : { rows: [] };
+    const packDraft=selectSingleImporterDraft(packVersions.rows, version =>
+      version.metadata?.sourceSystem === demoCurriculumSource);
+    const courseVersions=new Map();
+    for (const c of manifest.courses) {
+      const template=await client.query("SELECT id,metadata FROM course_templates WHERE owning_organization_id=$1 AND code=$2 FOR UPDATE",[publisher,c.code]);
+      const templateId=template.rows[0]?.id;
+      if (templateId && template.rows[0]?.metadata?.sourceSystem !== demoCurriculumSource)
+        throw Error(`Refusing to replace course not owned by this importer: ${c.code}`);
+      const versions=templateId
+        ? await client.query("SELECT id,version,status,curriculum FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC FOR UPDATE",[templateId])
+        : { rows: [] };
+      const draft=selectSingleImporterDraft(versions.rows, version =>
+        (version.curriculum?.sourceSystem === demoCurriculumSource ||
+          (typeof version.curriculum?.demoSourceHash === "string" &&
+            version.curriculum?.authoringRequestId === undefined)) &&
+        version.curriculum?.authoringRequestId === undefined);
+      const latest=versions.rows[0];
+      let versionId;
+      if (latest?.curriculum?.demoSourceHash === courseHash(c)) {
+        versionId=latest.id;
+      } else if (draft) {
+        versionId=draft.id;
+        await client.query("UPDATE course_template_versions SET curriculum=jsonb_set(jsonb_set(jsonb_set(COALESCE(curriculum,'{}'::jsonb),'{sourceSystem}',to_jsonb($2::text)),'{learning}',$3::jsonb),'{demoSourceHash}',to_jsonb($4::text)),updated_at=now() WHERE id=$1",
+          [versionId,demoCurriculumSource,JSON.stringify(c.learning),courseHash(c)]);
+      } else {
+        let ownedTemplateId=templateId;
+        if (!ownedTemplateId) {
+          ownedTemplateId=randomUUID();
+          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[ownedTemplateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({sourceSystem:demoCurriculumSource})]);
+        }
+        versionId=randomUUID();
+        await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,ownedTemplateId,(latest?.version??0)+1,JSON.stringify({sourceSystem:demoCurriculumSource,learning:c.learning,demoSourceHash:courseHash(c)})]);
+      }
+      courseVersions.set(c.code,{versionId,deepDemo:c.deepDemo});
+    }
+    const needsPackRefresh=plan.create || plan.update || existing.rowCount === 0 ||
+      existing.rows[0]?.metadata?.sourceHash !== hash;
+    let packVersionId=packDraft?.id;
+    if (needsPackRefresh) {
+      if (!packVersionId) {
+        const pv=await client.query("SELECT (COALESCE(MAX(CASE WHEN version ~ '^[0-9]+$' THEN version::int END),0)+1)::text AS version FROM curriculum_pack_versions WHERE pack_id=$1",[packId]);
+        packVersionId=randomUUID();
+        await client.query("INSERT INTO curriculum_pack_versions (id,pack_id,version,status,metadata) VALUES ($1,$2,$3,'draft',$4::jsonb)",[packVersionId,packId,pv.rows[0].version,JSON.stringify({sourceSystem:demoCurriculumSource,sourceHash:hash})]);
+      }
+      await client.query("DELETE FROM curriculum_pack_items WHERE pack_version_id=$1",[packVersionId]);
       let position=0;
       for (const c of manifest.courses) {
-        let template=await client.query("SELECT id,metadata FROM course_templates WHERE owning_organization_id=$1 AND code=$2",[publisher,c.code]);
-        let templateId=template.rows[0]?.id;
-        if (templateId && template.rows[0]?.metadata?.sourceSystem !== "can-demo-catalog-factory") throw Error(`Refusing to replace course not owned by this importer: ${c.code}`);
-        if (!templateId) {
-          templateId=randomUUID();
-          await client.query("INSERT INTO course_templates (id,owning_organization_id,code,title,subject,description,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",[templateId,publisher,c.code,c.title,c.subject,c.description,JSON.stringify({sourceSystem:"can-demo-catalog-factory"})]);
-        }
-        const prev=await client.query("SELECT version,curriculum FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
-        let versionId;
-        if (prev.rows[0]?.curriculum?.demoSourceHash === courseHash(c)) {
-          const previousId=await client.query("SELECT id FROM course_template_versions WHERE course_template_id=$1 ORDER BY version DESC LIMIT 1",[templateId]);
-          versionId=previousId.rows[0].id;
-        } else {
-          versionId=randomUUID();
-          await client.query("INSERT INTO course_template_versions (id,course_template_id,version,status,curriculum) VALUES ($1,$2,$3,'draft',$4::jsonb)",[versionId,templateId,(prev.rows[0]?.version??0)+1,JSON.stringify({learning:c.learning,demoSourceHash:courseHash(c)})]);
-        }
-        await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,versionId,position++,JSON.stringify({deepDemo:c.deepDemo})]);
+        const version=courseVersions.get(c.code);
+        if (!version) throw Error(`Unable to resolve imported course version: ${c.code}`);
+        await client.query("INSERT INTO curriculum_pack_items (id,pack_version_id,course_template_version_id,position,metadata) VALUES ($1,$2,$3,$4,$5::jsonb)",[randomUUID(),packVersionId,version.versionId,position++,JSON.stringify({deepDemo:version.deepDemo})]);
       }
+      await client.query("UPDATE curriculum_pack_versions SET metadata=jsonb_set(jsonb_set(COALESCE(metadata,'{}'::jsonb),'{sourceSystem}',to_jsonb($2::text)),'{sourceHash}',to_jsonb($3::text)),updated_at=now() WHERE id=$1",
+        [packVersionId,demoCurriculumSource,hash]);
     }
-    await client.query("UPDATE curriculum_packs SET metadata=jsonb_set(COALESCE(metadata,'{}'::jsonb),'{sourceHash}',to_jsonb($2::text)) WHERE id=$1",[packId,hash]);
+    await client.query("UPDATE curriculum_packs SET name=$2,description=$3,license_code=$4,metadata=jsonb_set(jsonb_set(COALESCE(metadata,'{}'::jsonb),'{sourceSystem}',to_jsonb($5::text)),'{sourceHash}',to_jsonb($6::text)),updated_at=now() WHERE id=$1",
+      [packId,manifest.pack.name,manifest.pack.description,manifest.licenseCode,demoCurriculumSource,hash]);
     await client.query("COMMIT");
     console.log(JSON.stringify({...plan,packId,status:"draft",published:false},null,2));
   }

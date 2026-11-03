@@ -39,15 +39,13 @@ The current scope intentionally favors safe, deterministic marketplace data over
 
 ## CAN-managed demo teacher marketplace (PR #240 extension)
 
-The CAN Academy model is **centrally procured instructors**: CAN recruits,
-screens, onboards and governs teachers before churches can select them. Churches
-select curriculum while setting up a school, then choose from CAN-managed
-teacher candidates afterward. Teachers may serve multiple church schools
-through existing cross-school instructional capacity. Course-level selection
-should propagate to compatible sections, with an explicit section-level
-override. Real staffing supports both directly confirmed assignments and
-request/acceptance when needed; qualification, capacity, agreements and
-institutional authority remain mandatory.
+The CAN Academy model is **centrally onboarded instructors**: CAN recruits,
+screens and onboards teachers before schools can select them. Schools select
+curriculum while setting up, then directly decide which onboarded teachers to
+engage. A course-level choice applies to its active Sections, with an explicit
+section-level override. The school remains the staffing decision-maker;
+qualification policy and institutional authority are enforced by the existing
+launch assignment command.
 
 ### Generate 30 teacher profiles connected to all 120 demo courses
 
@@ -121,20 +119,17 @@ course templates. Each sample is visibly labeled, not treated as verified.
 A curriculum draft is not available for school teacher selection until
 its normal publication and adoption workflow is completed.
 
-The school administrator may request a candidate for a selected course or
-a particular existing Section. Requests use `teacher_staffing_request`
-Actions, not appointments. Eligibility, contract authority, availability,
-and real cross-school capacity still have to be validated through the
-existing canonical launch staffing / reservation services. Preview-only
-sample offerings are blocked from both reservations and replacements.
+The school administrator directly engages an onboarded provider teacher
+across all active Sections for a course or for one selected Section. The
+engagement uses the existing launch assignment command, which rechecks the
+school's published qualification policy, program scope and operating-service
+authority in the same transaction. Sample profiles and preview-only offerings
+are not assignable.
 
 ### Remaining product work (not claimed by this PR)
 
 - Implement CAN's real teacher onboarding, verified credential/contract status
   and CAN-only marketplace publishing.
-- Complete one-course-to-many-section selection, matching and confirmation
-  with real teacher request/acceptance, cross-school scheduling conflict checks,
-  compliance eligibility, and auditable capacity reservations.
 - Provision 15 *actual* sample sections using existing school years, terms,
   program authorizations and curriculum entitlements after the guarded demo
   publication path exists; do not insert unattached `section_teachers` rows.
@@ -142,22 +137,27 @@ sample offerings are blocked from both reservations and replacements.
   marketplace and school staffing journeys. Until then code is not database-
   or browser-accepted.
 
-## November 2 — Post-setup CAN teacher selection
+## November 2 — Post-setup school teacher selection
 
 Administrators configure schools and adopt curriculum first, then use
 the same CAN teacher marketplace to choose instructors. No special demo
 launch flag, UI pathway or alternative application tables are required.
 
-`getTeacherMarketplace` lists real and explicitly labeled synthetic
-candidates matched to the selected authorized school, adopted curriculum
-and CAN provider affiliation. School-level selection may be narrowed to
-a specific already-created Section. `requestTeacherStaffing` verifies
-the provider relationship and records an idempotent, scoped CAN staffing
-Action with audit and event evidence. `listTeacherStaffingRequests`
-shows the current requests. None of this creates permission to teach,
-approved credentials, delivery arrangements or `section_teachers`.
-Direct assignments continue to use the independently authorized
-launch staffing workflow.
+`getTeacherMarketplace` lists onboarded provider teachers and explicitly
+labeled synthetic preview profiles matched to the selected authorized school,
+adopted curriculum and provider affiliation. A school registrar may engage a
+real candidate across compatible active Sections or narrow the choice to one
+Section. Each Section needs an open instructional-capacity demand. Discovery
+shows real candidates only where published teaching eligibility, offering
+scope, availability, full enrollment capacity and recurring schedule
+compatibility pass. Schedule conflicts are compared across schools using each
+school year's timezone. Engagement rechecks those conditions in one
+transaction, commits the capacity reservation, links it to the active delivery
+arrangement, and records capacity and assignment audit/event evidence.
+Course-wide engagement applies only to compatible Sections; a selected-class
+engagement fails explicitly if that class is no longer compatible. CAN does
+not review or approve the school's selection. Synthetic preview profiles
+remain visible but cannot be engaged.
 
 The dedicated synthetic generator, optional seeding command and guarded
 Neon loader are developer/data-operations utilities only. They are not
@@ -178,6 +178,10 @@ Generate curriculum and matching teacher records with
 confirmations. Draft content must pass normal publication and school
 adoption to become selectable. Importing does not create instructor
 permissions, class assignments or real qualifications.
+The curriculum loader reuses only private packs explicitly marked as
+importer-owned and updates one importer-owned draft in place. It refuses
+unmarked packs, published packs, and ambiguous or user-owned drafts instead
+of modifying released content or adding another draft.
 
 **Observed data state, November 2, 2026:** The isolated Neon validation
 branch contains 120 draft courses (15 with 20 lessons and 105 with one),
