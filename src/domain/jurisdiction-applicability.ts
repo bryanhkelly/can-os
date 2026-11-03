@@ -1,6 +1,7 @@
 import {
   jurisdictionProfileSchema,
   isJurisdictionProfileVerificationEvidenceCurrent,
+  isOfficialJurisdictionSource,
   type JurisdictionProfile,
 } from "./jurisdiction-profile";
 
@@ -80,10 +81,13 @@ export function isCurrentVerifiedJurisdictionProfileVersion(
     version.verificationStatus !== "verified" || !version.verifiedByPersonId ||
     !version.publishedAt || !version.effectiveAt || !version.nextReviewAt ||
     !Array.isArray(version.evidence) || version.evidence.length === 0 ||
-    !version.evidence.every(source =>
-      source !== null && typeof source === "object" &&
-      typeof (source as {url?:unknown}).url === "string" &&
-      (source as {url:string}).url.startsWith("https://")))
+    !version.evidence.every(source => source !== null &&
+      typeof source === "object" &&
+      isOfficialJurisdictionSource(source as {
+        url:string;authority:string;checkedAt:string;
+        officialAuthorityVerified?:boolean;
+        officialAuthorityVerificationNote?:string;
+      })))
     return false;
   const published = isoDay(version.publishedAt);
   const effective = isoDay(version.effectiveAt);
@@ -114,7 +118,7 @@ export function evaluateSchoolJurisdictionRequirements(
   const today = isoDay(now);
   const published = isCurrentVerifiedJurisdictionProfileVersion(version, now);
   const knownUrls = new Set(profile.evidence
-    .filter(source => source.url.startsWith("https://"))
+    .filter(isOfficialJurisdictionSource)
     .map(source => source.url));
   const decisions: RequirementDecision[] = profile.requirements.map(requirement => {
     const result = (status: RequirementDecision["status"], reason: string): RequirementDecision => ({
