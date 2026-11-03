@@ -73,7 +73,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.
   const previewPages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
-    path, renderPublicSiteHtml(page,{path}),
+    path, renderPublicSiteHtml(page,{path,localPreview:true}),
   ]));
   return {...base,includesSuggestions:needsPlanningCard||!local,
     previewHtml:previewPages["/"] ?? null, previewPages,
