@@ -10,9 +10,14 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import {
   evaluateSchoolJurisdictionRequirements,
+  isCurrentVerifiedJurisdictionProfileVersion,
   type SchoolJurisdictionContext,
 } from "@/domain/jurisdiction-applicability";
 import { isJurisdictionProfileVerificationEvidenceCurrent } from "@/domain/jurisdiction-profile";
+import {
+  projectSchoolJurisdictionReadiness,
+  unavailableSchoolJurisdictionReadiness,
+} from "@/domain/school-jurisdiction-readiness";
 
 /** Physical Site state is independently confirmed; timezone is never a legal locator. */
 function siteStateCode(address: Record<string, unknown> | null): string | null {
@@ -87,9 +92,12 @@ export async function readSchoolJurisdictionReview(
     programId,siteId:school.siteId,revision:version?.revision ?? null,
     reviewRequired:true,locationReviewReason,
     decisions:[],candidateDisclosures:[],
+    readiness:unavailableSchoolJurisdictionReadiness(locationReviewReason,
+      version?.id ?? null,version?.revision ?? null),
   };
   if (!version) return {programId,siteId:school.siteId,revision:null,
-    reviewRequired:true,locationReviewReason:null,decisions:[],candidateDisclosures:[]};
+    reviewRequired:true,locationReviewReason:null,decisions:[],candidateDisclosures:[],
+    readiness:unavailableSchoolJurisdictionReadiness("No published jurisdiction policy is available")};
   const [decision] = await executor.select({
     reviewerPersonId:jurisdictionProfileVerificationDecisions.reviewerPersonId,
     evidence:jurisdictionProfileVerificationDecisions.evidence,
@@ -128,21 +136,32 @@ export async function readSchoolJurisdictionReview(
     locality:typeof school.address?.county === "string"
       ? school.address.county : null,
   };
-  const evaluated = evaluateSchoolJurisdictionRequirements({
+  const rawProfile = {
     ...version.profile,summary:version.summary,evidence:version.evidence,
-  },{
+  };
+  const versionGate = {
     status:version.status,
     verificationStatus:currentDecision?version.verificationStatus:"unverified",
     verifiedByPersonId:currentDecision?version.verifiedByPersonId:null,
     publishedAt:version.publishedAt,effectiveAt:version.effectiveAt,
     nextReviewAt:version.nextReviewAt,evidence:version.evidence,
     verificationEvidence:version.verificationEvidence,
-  },context,now);
+  };
+  const evaluated = evaluateSchoolJurisdictionRequirements(
+    rawProfile,versionGate,context,now,
+  );
+  const readiness = projectSchoolJurisdictionReadiness({
+    profile:rawProfile,decisions:evaluated.decisions,
+    verifiedCurrent:isCurrentVerifiedJurisdictionProfileVersion(versionGate,now),
+    profileVersionId:version.id,revision:version.revision,
+    reviewedAt:version.reviewedAt,nextReviewAt:version.nextReviewAt,
+  });
   return {
     programId,siteId:school.siteId,revision:version.revision,
     reviewRequired:evaluated.reviewRequired,
     locationReviewReason:null,
     decisions:evaluated.decisions,
+    readiness,
     // Candidates only: requires separate institution-approved public DTO gate.
     candidateDisclosures:evaluated.publicDisclosures,
   };
