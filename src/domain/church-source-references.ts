@@ -118,3 +118,27 @@ export function initialChurchReferenceState(
 ): ChurchReferenceState {
   return kind === "website" ? "saved" : "unsupported";
 }
+
+/**
+ * Canonical private reference identity check at review time. A proposal page
+ * must remain on the active source's origin; new proposals also carry the
+ * source root URL at capture time in their private audit. Old proposals
+ * without that audit evidence are still checked against their page origin,
+ * while URL replacements invalidate all pending rows transactionally.
+ */
+export function assertChurchProposalSourceIdentity(
+  currentSourceUrl: string, proposalPageUrl: string | null,
+  capturedSourceUrl?: string | null,
+): void {
+  let current: string, page: string;
+  try {
+    current = normalizeChurchReferenceUrl("website", currentSourceUrl);
+    page = normalizeChurchReferenceUrl("website", proposalPageUrl ?? "");
+    if (new URL(page).origin !== new URL(current).origin ||
+        (capturedSourceUrl && normalizeChurchReferenceUrl("website", capturedSourceUrl) !== current)) {
+      throw new Error("Source reference changed");
+    }
+  } catch {
+    throw new Error("The church source changed or the proposed page is invalid. Discard the suggestion and submit it from the current church website.");
+  }
+}
