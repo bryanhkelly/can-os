@@ -48,8 +48,34 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
     </p>
     {loading&&<p className="mt-3 text-sm" role="status">Loading your school's jurisdiction review…</p>}
     {!loading&&review&&<div className="mt-3 space-y-3 text-sm">
-      <p className="font-medium">{review.reviewRequired?"CAN legal review is required":"No additional jurisdiction review was identified by the current evaluation"}</p>
+      <p className="font-medium">{review.reviewRequired?"CAN legal review is required":"This school's current jurisdiction scope has been independently reviewed"}</p>
+      {review.schoolReviewReason&&<p role="status" className="rounded-lg border p-3 text-sm">{review.schoolReviewReason}</p>}
+      {review.locationReviewReason&&<p className="text-xs text-muted-foreground">Please correct the physical Site address in school configuration before requesting independent verification.</p>}
       <p className="text-xs text-muted-foreground">Profile revision: {review.revision??"not published"}. This is a scoped evaluation, not authorization to open or enroll.</p>
+      {review.readiness.status==="verified_policy"&&<>
+        <details className="rounded-lg border p-3">
+          <summary className="cursor-pointer font-medium">School-specific legal requirements ({review.readiness.requirements.length})</summary>
+          <ul className="mt-2 space-y-3">{review.readiness.requirements.map(item=><li key={item.id}>
+            <p className="font-medium">{item.title} · {item.applicability.replaceAll("_"," ")}</p>
+            <p className="text-muted-foreground">{item.nextAction}</p>
+            <p className="text-xs text-muted-foreground">Owner: {item.responsibleParty} · {item.phase.replaceAll("_"," ")}</p>
+            {item.filingDeadline&&<p className="text-xs">Verified filing date: {item.filingDeadline}</p>}
+            {item.sources.map(source=><a key={source.url} className="block underline" href={source.url}
+              target="_blank" rel="noopener noreferrer">{source.title} · checked {source.checkedAt.slice(0,10)}</a>)}
+          </li>)}</ul>
+        </details>
+        <details className="rounded-lg border p-3">
+          <summary className="cursor-pointer font-medium">Sourced funding research ({review.readiness.fundingOpportunities.length})</summary>
+          <p className="mt-2 text-xs text-muted-foreground">These are researched opportunities, not confirmed school eligibility, provider participation, government approval or revenue.</p>
+          <ul className="mt-2 space-y-3">{review.readiness.fundingOpportunities.map(item=><li key={item.id}>
+            <p className="font-medium">{item.name}</p><p>{item.summary}</p>
+            <p className="text-xs text-muted-foreground">{item.nextAction}</p>
+            {item.applicationDeadline&&<p className="text-xs">Verified application date: {item.applicationDeadline}</p>}
+            {item.sources.map(source=><a key={source.url} href={source.url} className="block underline"
+              target="_blank" rel="noopener noreferrer">{source.title}</a>)}
+          </li>)}</ul>
+        </details>
+      </>}
       {review.decisions.length>0&&<details className="rounded-lg border p-3">
         <summary className="cursor-pointer font-medium">Requirement evaluation ({review.decisions.length})</summary>
         <ul className="mt-2 space-y-2">{review.decisions.map(item=><li key={item.id}>
