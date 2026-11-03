@@ -135,6 +135,70 @@ integration("church source review real transaction races", () => {
       .toBe(versions.length);
   });
 
+  it("replays the committed revision receipt without a second review audit or publication", async () => {
+    const f = await fixture();
+    const p = await f.propose("Our church welcomed neighbors for decades and serves families locally.");
+    const input = { suggestionId: p.id, decision: "accepted" as const,
+      expectedRevision: 0, rightsConfirmed: true };
+    const first = await f.review.reviewChurchSourceExcerpt(f.actor, input);
+    expect(first.publication?.revision).toBe(1);
+    const replay = await f.review.reviewChurchSourceExcerpt(f.actor, input);
+    expect(replay.alreadyReviewed).toBe(true);
+    expect(replay.publication?.revision).toBe(1);
+    expect(await f.versions()).toHaveLength(1);
+    const audit = await f.db.select().from(f.schema.auditEvents)
+      .where(eq(f.schema.auditEvents.resourceId, p.id));
+    expect(audit.filter(x => x.action === "site.website.source_excerpt.reviewed")).toHaveLength(1);
+    const capture = audit.find(x => x.action === "site.website.source_excerpt.submitted");
+    expect(capture?.after?.origin).toBe("manual_summary");
+    expect(capture?.after?.sourceUrlAtCapture).toBe(`${f.url}/`);
+    expect(typeof capture?.after?.excerptDigest).toBe("string");
+    expect(audit.find(x => x.action === "site.website.source_excerpt.reviewed")
+      ?.after?.publicationRevision).toBe(1);
+  });
+
+  it("rejects a source URL silently replaced within the same origin", async () => {
+    const f = await fixture();
+    const p = await f.propose();
+    // Mimic a migration or a competing writer that did not use the canonical
+    // reference-save command. The immutable capture audit must still detect it.
+    await f.db.update(f.schema.churchSourceReferences).set({
+      normalizedUrl: `${f.url}/new-campus`,
+    }).where(eq(f.schema.churchSourceReferences.id, f.reference.id));
+    await expect(f.review.reviewChurchSourceExcerpt(f.actor, {
+      suggestionId: p.id, decision: "accepted", expectedRevision: 0, rightsConfirmed: true,
+    })).rejects.toThrow(/source changed|source changed or the proposed page is invalid/i);
+    expect(await f.versions()).toHaveLength(0);
+    const [proposal] = await f.db.select().from(f.schema.churchContentSuggestions)
+      .where(eq(f.schema.churchContentSuggestions.id, p.id));
+    expect(proposal.reviewDecision).toBe("pending");
+  });
+
+  it("preserves already-reviewed copy on source revocation and flags a provenance check", async () => {
+    const f = await fixture();
+    const p = await f.propose();
+    await f.review.reviewChurchSourceExcerpt(f.actor, {
+      suggestionId: p.id, decision: "accepted", expectedRevision: 0, rightsConfirmed: true,
+    });
+    await f.sources.removeChurchSourceReference(f.actor, { kind: "website" });
+    expect(await f.versions()).toHaveLength(1);
+    const flags = await f.db.select().from(f.schema.actions).where(and(
+      eq(f.schema.actions.subjectId, f.reference.id),
+      eq(f.schema.actions.type, "site_website_source_provenance_review"),
+    ));
+    expect(flags).toHaveLength(1);
+  });
+
+  it("rejects source-derived admissions promises before suggestion persistence", async () => {
+    const f = await fixture();
+    await expect(f.propose("Our school is enrolling students and accepting applications."))
+      .rejects.toThrow(/admissions|school/);
+    const rows = await f.db.select().from(f.schema.churchContentSuggestions)
+      .where(eq(f.schema.churchContentSuggestions.siteId, f.site.id));
+    expect(rows).toHaveLength(0);
+    expect(await f.versions()).toHaveLength(0);
+  });
+
   it("rejects missing rights, stale revisions, unauthorized sites and unsafe content with no partial publish", async () => {
     const f = await fixture();
     const p = await f.propose();
