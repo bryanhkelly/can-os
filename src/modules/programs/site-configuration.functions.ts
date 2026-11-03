@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, draftSiteContactSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
 import { eq, and, inArray } from "drizzle-orm";
@@ -124,7 +124,7 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
   .validator((v:unknown)=>z.object({
     siteId:z.string().uuid(),
     expectedRevision:z.string().datetime({offset:true}),
-    contact:draftSiteContactSchema,
+    contact:draftSiteContactSchema.nullable(),
   }).strict().parse(v))
   .handler(async ({data})=>{
     const actor=await getCommandContext(getRequest());
@@ -164,6 +164,7 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
 export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
   .validator((v:unknown)=>z.object({siteId:z.string().uuid()}).strict().parse(v))
   .handler(async ({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     assertCapability(actor,"program.read");
     if(!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
