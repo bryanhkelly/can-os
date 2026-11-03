@@ -10,6 +10,7 @@ export function GuidedSchoolJourney({program,journey}:{
 }) {
   const steps=guidedSchoolJourney(program,journey);
   const recorded=steps.filter(s=>s.state==="recorded").length;
+  const nextStep=steps.find(step=>step.state==="needs_attention")??steps.find(step=>step.state==="review");
   return <section className="rounded-xl border bg-card p-5" aria-label={program.name+" guided launch"}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -19,7 +20,7 @@ export function GuidedSchoolJourney({program,journey}:{
           Review steps require verification; they never self-complete.
         </p>
       </div>
-      <a href={steps[0]?.href} className="text-sm underline">{steps[0]?.nextAction} →</a>
+      {nextStep&&<a href={nextStep.href} className="text-sm underline">{nextStep.nextAction} →</a>}
     </div>
     <ol className="mt-4 grid gap-3 md:grid-cols-2">
       {steps.map((step,index)=><li key={step.key} className="rounded-lg border p-4">
