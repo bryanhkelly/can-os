@@ -25,6 +25,8 @@ export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, famil
   const currentInvitationPurpose=familyInvitations?.programs.find(program=>
     (!programId||program.id===programId)&&(!siteId||program.siteId===siteId))?.purpose ?? "unavailable";
   return <>
+        {!admissionsCounts&&<p role="status" className="mt-5 rounded-xl border border-warning/40 bg-muted/30 p-4 text-sm">Admissions totals could not be loaded for the selected school. Review applications in Admissions; an unavailable summary does not mean there are no applicants.</p>}
+        {!enrollmentCounts&&<p role="status" className="mt-3 rounded-xl border border-warning/40 bg-muted/30 p-4 text-sm">Active enrollment counts could not be verified. Check the canonical enrollment records before relying on enrollment totals.</p>}
         {admissionsCounts&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Admissions progress</h2>
           <p className="mt-1 text-xs text-muted-foreground">Current application records for the selected school; invitation responses are tracked separately.</p>
