@@ -10,6 +10,7 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { publishPartnerLocalContent, readLocalContentHistory } from "./site-local-content.server";
+import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
 
 /**
  * These are USER-SUBMITTED excerpts, not fetched or AI-generated claims.
@@ -171,4 +172,119 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
     });
   });
   return { decision: input.decision, publication };
+}
+
+
+/**
+ * Explicit, rate-limited website-only refresh. This is opt-in and defaults
+ * disabled until secure egress and per-tenant acceptance are independently
+ * verified by the integration owner. No social APIs or auto-publication.
+ */
+export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
+  if (process.env.CAN_CHURCH_WEBSITE_DISCOVERY_ENABLED !== "true") {
+    return { status: "unsupported" as const, count: 0,
+      message: "Website extraction is not enabled. You can submit attributed summaries manually." };
+  }
+  const input = await db.transaction(async tx => {
+    const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
+    const [reference] = await tx.select().from(churchSourceReferences)
+      .where(and(eq(churchSourceReferences.siteId, site.id),
+        eq(churchSourceReferences.kind, "website"),
+        isNull(churchSourceReferences.revokedAt))).for("update").limit(1);
+    if (!reference) throw new Error("Save a church website reference before requesting suggestions");
+    if (reference.lastAttemptAt &&
+        Date.now() - reference.lastAttemptAt.getTime() < 30 * 60 * 1000) {
+      return null;
+    }
+    await tx.update(churchSourceReferences).set({ lastAttemptAt: new Date() })
+      .where(eq(churchSourceReferences.id, reference.id));
+    await writeAudit(tx, actor, {
+      action: "site.website.source_refresh.requested",
+      entityType: "church_source_reference", entityId: reference.id,
+      scope: { siteId: site.id, organizationId: site.organizationId },
+      after: { kind: "website" },
+    });
+    return { site, reference };
+  });
+  if (!input) return { status: "throttled" as const, count: 0,
+    message: "This website was checked recently. Try again later." };
+  const { site, reference } = input;
+  let pages: Awaited<ReturnType<typeof extractChurchPublicWebsite>>;
+  try {
+    pages = await extractChurchPublicWebsite(reference.normalizedUrl);
+  } catch (error) {
+    const blocked = error instanceof Error && /robots|DNS|Cross-origin/.test(error.message);
+    await db.transaction(async tx => {
+      const checked = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
+      const [current] = await tx.select().from(churchSourceReferences)
+        .where(and(eq(churchSourceReferences.id, reference.id),
+          eq(churchSourceReferences.siteId, checked.id))).for("update").limit(1);
+      if (current && !current.revokedAt && current.normalizedUrl === reference.normalizedUrl) {
+        await tx.update(churchSourceReferences).set({
+          referenceState: blocked ? "blocked" : "failed", updatedAt: new Date(),
+        }).where(eq(churchSourceReferences.id, reference.id));
+        await writeAudit(tx, actor, {
+          action: "site.website.source_refresh.failed",
+          entityType: "church_source_reference", entityId: reference.id,
+          scope: { organizationId: checked.organizationId, siteId: checked.id },
+          after: { blocked },
+        });
+      }
+    });
+    return { status: blocked ? "blocked" as const : "failed" as const, count: 0,
+      message: "The website could not be read safely. Use the manual church-story editor instead." };
+  }
+  return db.transaction(async tx => {
+    const checked = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
+    const [current] = await tx.select().from(churchSourceReferences)
+      .where(and(eq(churchSourceReferences.id, reference.id),
+        eq(churchSourceReferences.siteId, checked.id))).for("update").limit(1);
+    if (!current || current.revokedAt || current.normalizedUrl !== reference.normalizedUrl) {
+      return { status: "stale" as const, count: 0,
+        message: "Church website link changed during retrieval. No suggestions were saved." };
+    }
+    await tx.update(churchContentSuggestions).set({
+      reviewDecision: "discarded", reviewedAt: new Date(),
+      reviewedByPersonId: actor.actorPersonId!,
+    }).where(and(eq(churchContentSuggestions.siteId, checked.id),
+      eq(churchContentSuggestions.sourceReferenceId, reference.id),
+      eq(churchContentSuggestions.reviewDecision, "pending")));
+    const values = pages.flatMap(page => {
+      const target = suggestionTargetFields[page.sourceField];
+      if (!target) return [];
+      const proposedText = page.pageText.slice(0, siteLocalContentLimits[target]).trim();
+      return proposedText ? [{
+        siteId: checked.id,
+        sourceReferenceId: reference.id,
+        field: page.sourceField,
+        proposedText,
+        sourcePageUrl: page.pageUrl,
+        retrievedAt: new Date(),
+        confidence: "low" as const,
+        reviewDecision: "pending" as const,
+        createdByPersonId: actor.actorPersonId!,
+      }] : [];
+    });
+    if (!values.length) return { status: "failed" as const, count: 0,
+      message: "No appropriate church story text was found." };
+    await tx.insert(churchContentSuggestions).values(values);
+    await tx.update(churchSourceReferences).set({
+      referenceState: "fetchable", updatedAt: new Date(),
+    }).where(eq(churchSourceReferences.id, reference.id));
+    await writeAudit(tx, actor, {
+      action: "site.website.source_refresh.completed",
+      entityType: "church_source_reference", entityId: reference.id,
+      scope: { organizationId: checked.organizationId, siteId: checked.id },
+      after: { count: values.length },
+    });
+    await emitEvent(tx, {
+      eventType: "ChurchWebsiteSuggestionsRetrieved",
+      aggregateType: "church_source_reference", aggregateId: reference.id,
+      actorPersonId: actor.actorPersonId,
+      organizationId: checked.organizationId, siteId: checked.id,
+      payload: { count: values.length },
+    });
+    return { status: "ready" as const, count: values.length,
+      message: "Public church website excerpts are ready for individual review. Nothing was published." };
+  });
 }
