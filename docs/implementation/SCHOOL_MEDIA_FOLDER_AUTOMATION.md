@@ -1,6 +1,6 @@
 # CAN School Sites — Folder-first automatic media (approved product direction)
 
-Status: implementation contract. Pure rights-gated placement planner committed; connector, ingestion, approval, storage and publisher UI are NOT yet integrated. This decision supersedes Unsplash discovery proposals. There is no Unsplash dependency.
+Status (2026-11-03): **Integrated implementation on draft PR #264, NOT released.** Folder upload from a browser-selected local directory, private R2 staging, canonical Document metadata, bulk copyright/subject-release attestation, deterministic keyword-based auto placement, public read-only tenant image proxy, shared editor controls, original abstract fallback artwork, and revocation are implemented. `CAN_R2_SITE_MEDIA_UPLOADS_ENABLED` is OFF by default. **Unverified:** isolated database/R2/CORS/browser acceptance, production host and image-quality visual review. **Not implemented:** persistent remote Google Drive/OneDrive/Dropbox folder connections, image-content computer vision/classification, automatic resync/deletions, true 24-image photographic collection, institution-owned campus/child consent validation beyond explicit editor attestation. This supersedes Unsplash proposals; no Unsplash dependency.
 
 ## Experience
 
