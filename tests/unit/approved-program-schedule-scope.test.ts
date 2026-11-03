@@ -1,6 +1,7 @@
 import {describe,expect,it} from "vitest";
 import {
   projectPublicSchoolDay,publicSchoolDayScheduleSignature,
+  competingActiveSchoolDaySchedules,isIndependentPublicScheduleReviewer,
   type PublicScheduleApprovalScope,
 } from "@/domain/public-school-day";
 
@@ -81,6 +82,55 @@ describe("v2 versioned, Program-specific public weekly schedules",()=>{
     for(const pair of variants)
       expect(projectPublicSchoolDay(pair,scope.siteTimezone,now).weeklyPatternState)
         .toBe("pending");
+  });
+  it("rejects a second active timetable even when it is unapproved",()=>{
+    const approvedOne=approved();
+    expect(projectPublicSchoolDay([approvedOne,{
+      ...approvedOne,approval:null,
+    }],scope.siteTimezone,now).weeklyPatternState).toBe("pending");
+    const overlapping=[{
+      schoolYearStatus:"active",templateActive:true,
+      programMatches:true,siteMatches:true,
+      startsOn:"2026-08-01",endsOn:"2027-06-30",
+      effectiveFrom:"2026-08-01",effectiveThrough:null,
+    },{
+      schoolYearStatus:"active",templateActive:true,
+      programMatches:true,siteMatches:true,
+      startsOn:"2026-08-01",endsOn:"2027-06-30",
+      effectiveFrom:"2026-11-01",effectiveThrough:"2026-11-10",
+    }];
+    expect(competingActiveSchoolDaySchedules(overlapping,{
+      schoolYearStartsOn:"2026-08-01",schoolYearEndsOn:"2027-06-30",
+      effectiveFrom:"2026-08-01",effectiveThrough:null,
+    })).toBe(true);
+    expect(competingActiveSchoolDaySchedules(overlapping.map((item,index)=>
+      index===1?{...item,effectiveFrom:"2027-07-01"}:item),{
+        schoolYearStartsOn:"2026-08-01",schoolYearEndsOn:"2027-06-30",
+        effectiveFrom:"2026-08-01",effectiveThrough:null,
+      })).toBe(false);
+  });
+  it("requires an independent academic schedule reviewer",()=>{
+    expect(isIndependentPublicScheduleReviewer("publisher","editor")).toBe(true);
+    expect(isIndependentPublicScheduleReviewer("editor","editor")).toBe(false);
+    expect(isIndependentPublicScheduleReviewer(null,"editor")).toBe(false);
+    expect(isIndependentPublicScheduleReviewer("publisher",null)).toBe(false);
+  });
+  it("shows split-day teaching intervals rather than inventing uninterrupted instruction",()=>{
+    const split=[
+      {...sunday[0]!,dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"11:00"},
+      {...sunday[0]!,dayOfWeek:0,startsAtLocal:"13:00",endsAtLocal:"15:00",sequence:2},
+    ];
+    const shown=projectPublicSchoolDay([approved(split)],scope.siteTimezone,now);
+    expect(shown.weeklyPatternState).toBe("approved");
+    expect(shown.state).toBe("pending");
+    expect(shown.weeklyPattern).toEqual([
+      {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"11:00",timezone:scope.siteTimezone},
+      {dayOfWeek:0,startsAtLocal:"13:00",endsAtLocal:"15:00",timezone:scope.siteTimezone},
+    ]);
+    expect(shown.days.canDisplay).toBe(false);
+    const overlapping=[...split,{...split[1]!,startsAtLocal:"10:00"}];
+    expect(projectPublicSchoolDay([approved(overlapping)],scope.siteTimezone,now)
+      .weeklyPatternState).toBe("pending");
   });
   it("does not mistake a reviewed template for holiday-specific attendance",()=>{
     const result=projectPublicSchoolDay([approved()],scope.siteTimezone,now);
