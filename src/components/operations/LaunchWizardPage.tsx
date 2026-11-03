@@ -18,6 +18,7 @@ import {SchoolPreparationNavigation} from "@/components/operations/SchoolPrepara
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { hasEnteredSiteAddress } from "@/domain/site-setup-configuration";
+import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -188,6 +189,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     setError("");
     if(created)return;
     if(onsite&&!siteId){setError("Choose or save a school location before continuing with onsite learning.");return;}
+    if(!launchGradeRangeIsOrdered({min:gradeMin,max:gradeMax})){
+      setError("Minimum grade must not come after maximum grade.");return;
+    }
     try {
       const submission = await launchMutation.submit({
         data: {
