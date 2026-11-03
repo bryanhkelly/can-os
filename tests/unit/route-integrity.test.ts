@@ -115,6 +115,8 @@ describe("navigation link targets", () => {
     const broken:string[]=[];
     for(const file of sourceFiles(join(repoRoot,"src"))){
       if(file.endsWith("routeTree.gen.ts"))continue;
+      // The church source extractor references external website paths, not CAN app routes.
+      if(file.endsWith("church-public-web-fetch.server.ts"))continue;
       const source=ts.createSourceFile(file,readFileSync(file,"utf8"),ts.ScriptTarget.Latest,true,
         file.endsWith(".tsx")?ts.ScriptKind.TSX:ts.ScriptKind.TS);
       const visit=(node:ts.Node):void=>{
