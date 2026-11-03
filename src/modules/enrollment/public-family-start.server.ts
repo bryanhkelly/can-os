@@ -4,6 +4,7 @@ import { programs, programPublications, publicFamilyStartRequests, sitePublicati
 import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { publicFamilyStartInput, verifiedFamilyStartEmail, type PublicFamilyStartInput } from "@/domain/public-family-start";
 import { assertPublishedFamilyInvitationDestination } from "@/domain/family-invitations";
+import { isCurrentAcademicMarketingSnapshot } from "@/domain/academic-program-publication";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { sendAccessLinkViaResend, type AccessEmailSender } from "@/modules/identity/resend-access-mail.server";
@@ -36,6 +37,10 @@ export async function resolvePublishedFamilyStartDestination(
    programName:programs.name,slug:sitePublications.slug,
    programOrganizationId:programs.organizationId,programSiteId:programs.siteId,
    type:programs.type,status:programs.status,
+   reviewedTitle:programPublications.title,reviewedSummary:programPublications.summary,
+   reviewedGrades:programPublications.gradeRange,reviewedDelivery:programPublications.deliveryModel,
+   currentName:programs.name,currentGrades:programs.gradeRange,
+   currentDelivery:programs.deliveryModel,
  }).from(sitePublications)
    .innerJoin(sites,eq(sites.id,sitePublications.siteId))
    .innerJoin(programPublications,and(eq(programPublications.siteId,sites.id),
@@ -54,8 +59,20 @@ export async function resolvePublishedFamilyStartDestination(
    programOrganizationId:school.programOrganizationId,
    siteOrganizationId:school.organizationId,publicationSiteId:school.siteId,
  });
- // Marketing publication alone is not operating/registration authority.
- await requireChurchHostedOperatingServices(tx,programId,["admissions","school_of_record"]);
+ // A published snapshot can become stale after the institution edits a
+ // Program. Keep the public Apply destination aligned with the same reviewed
+ // facts required by the public academic catalog, including after link issue.
+ if(!isCurrentAcademicMarketingSnapshot({
+   title:school.reviewedTitle,summary:school.reviewedSummary,
+   gradeRange:school.reviewedGrades,deliveryModel:school.reviewedDelivery,
+   programName:school.currentName,canonicalGrades:school.currentGrades,
+   canonicalDelivery:school.currentDelivery,
+ }))throw new Error("School application details require renewed approval");
+ // Public Apply must meet *both* the public listing authority and the
+ // independent admissions authority. Neither marketing publication nor
+ // an admissions-only agreement can establish a valid school listing.
+ await requireChurchHostedOperatingServices(tx,programId,
+   ["academic_instruction","school_of_record","admissions"]);
  return {siteId:school.siteId,organizationId:school.organizationId,
    programId:school.programId,programName:school.programName,slug:school.slug};
 }
