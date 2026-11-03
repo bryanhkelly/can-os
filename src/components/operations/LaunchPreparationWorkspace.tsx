@@ -73,13 +73,13 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           </nav>
         </details>}
 
-        {hasSchoolPreparation && currentProgram && <LaunchFamilyProgress
+        {hasSchoolPreparation && currentProgram && <section id="invite-families" className="scroll-mt-6" aria-label="Invite families and review admissions progress"><LaunchFamilyProgress
           admissionsCounts={admissionsCounts}
           enrollmentCounts={enrollmentCounts}
           familyInvitations={familyInvitations}
           siteId={schoolSelection.siteId}
           programId={schoolSelection.programId}
-        />}
+        /></section>}
 
   </>;
 }
