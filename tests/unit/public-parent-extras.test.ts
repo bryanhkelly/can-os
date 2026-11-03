@@ -50,13 +50,6 @@ const program=(programId:string,title:string,grades={min:"K",max:"5"})=>({
 });
 const claim=<T,>(value:T)=>({value,source:"calendar",revision:2,
   audience:"public",status:"verified",canDisplay:true});
-const pending=()=>({
-  state:"pending",timezone:null,weeklyPatternState:"pending",weeklyPattern:[],
-  days:{...claim<number[]|null>(null),canDisplay:false,status:"not_configured"},
-  startTime:{...claim<string|null>(null),canDisplay:false,status:"not_configured"},
-  endTime:{...claim<string|null>(null),canDisplay:false,status:"not_configured"},
-  mode:{...claim<string|null>(null),canDisplay:false,status:"not_configured"},
-});
 const reviewed=(programId:string,days:number[],start="09:00",end="13:00")=>({
   state:"approved",timezone:"America/Los_Angeles",
   days:claim(days),startTime:claim(start),endTime:claim(end),
