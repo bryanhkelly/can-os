@@ -83,7 +83,7 @@ describe("standalone public site HTML", () => {
     expect(html).toContain("A request for information is not an application or an enrollment offer");
     expect(html).toContain('action="/inquiry"');
     expect(html).not.toContain('action="/apply"');
-    expect(html).toContain("<title>Church School | Founding families</title>");
+    expect(html).toContain("<title>Church School | Programs</title>");
   });
 
   it("renders an empty published catalog without claiming enrollment is available", () => {
