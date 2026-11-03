@@ -300,19 +300,21 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
     const destination = await resolvePrivateFamilyStartDestination(db,interest.programId);
     if (destination.siteId!==interest.siteId || destination.organizationId!==interest.organizationId)
       throw new AuthorizationError("private family application destination");
+    // Atomically link interest, verification request, Action and audit in
+    // the canonical family-start transaction before any outbound email.
     const outcome = await requestConsentedInterestFamilyStart(interest.id,
-      sendAccessLinkViaResend,{idempotencyKey:`consented-interest:${interest.id}:${Math.floor(Date.now() / (10 * 60 * 1000))}`});
-    await db.transaction(async tx => {
+      sendAccessLinkViaResend,{idempotencyKey:`consented-interest:${interest.id}:${Math.floor(Date.now() / (10 * 60 * 1000))}`},
+      async (tx, requestId) => {
       const [current] = await tx.select({id:publicAdmissionsInterests.id,
         status:publicAdmissionsInterests.status,contactedAt:publicAdmissionsInterests.contactedAt})
         .from(publicAdmissionsInterests).where(and(
           eq(publicAdmissionsInterests.id,interest.id),
           inArray(publicAdmissionsInterests.status,["new","contacted"]),
         )).for("update").limit(1);
-      if (!current) throw new Error("Inquiry changed while the family invitation was sent");
+      if (!current) throw new Error("The interest is no longer eligible for a family invitation");
       const now = new Date();
       await tx.update(publicAdmissionsInterests).set({status:"contacted",
-        familyStartRequestId:outcome.requestId,
+        familyStartRequestId:requestId,
         contactedAt:current.contactedAt??now,updatedAt:now})
         .where(eq(publicAdmissionsInterests.id,interest.id));
       // Requesting a verified-email application invitation is a recorded
@@ -337,17 +339,17 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
           scope:{organizationId:interest.organizationId,siteId:interest.siteId,
             programId:interest.programId},
           before:{status:followup.status},after:{status:"in_progress"},
-        });
+          });
       }
       await writeAudit(tx,actor,{action:"admissions.public_interest.family_start_invite",
         entityType:"public_admissions_interest",entityId:interest.id,
         scope:{organizationId:interest.organizationId,siteId:interest.siteId,programId:interest.programId},
-        before:{status:current.status},after:{status:"contacted",familyStartRequestId:outcome.requestId}});
+        before:{status:current.status},after:{status:"contacted",familyStartRequestId:requestId}});
       await emitEvent(tx,{eventType:EventTypes.PublicAdmissionsInterestStatusChanged,
         aggregateType:"public_admissions_interest",aggregateId:interest.id,
         actorPersonId:actor.actorPersonId,organizationId:interest.organizationId,
         siteId:interest.siteId,programId:interest.programId,
-        payload:{status:"contacted",familyStartRequestId:outcome.requestId}});
+        payload:{status:"contacted",familyStartRequestId:requestId}});
     });
     return outcome;
   });
