@@ -17,7 +17,8 @@ import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-di
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
-import { hasEnteredSiteAddress } from "@/domain/site-setup-configuration";
+import { hasEnteredSiteAddress, physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
+import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
@@ -124,25 +125,33 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       setError("Complete street, city, state and postal code, or leave the location address blank for later.");
       return;
     }
+    const addressInput={
+      street1:newSiteAddress.street1,
+      ...(newSiteAddress.street2.trim()?{street2:newSiteAddress.street2}:{}),
+      city:newSiteAddress.city,state:newSiteAddress.state,
+      postalCode:newSiteAddress.postalCode,country:newSiteAddress.country||"US",
+      ...(newSiteAddress.county.trim()?{county:newSiteAddress.county}:{}),
+    };
+    const parsedAddress=hasAddress ? physicalSiteAddressSchema.safeParse(addressInput) : null;
+    if(parsedAddress && !parsedAddress.success) {
+      const issue=parsedAddress.error.issues[0];
+      setError(issue?.message??"Enter a valid physical address before saving the Site.");
+      return;
+    }
     setError("");
     try{
       const submission=await siteMutation.submit({data:{organizationId:hostOrganizationId,name:newSiteName,
         slug:newSiteSlug,timezone:newSiteTimezone,
-        ...(hasAddress ? {address:{
-          street1:newSiteAddress.street1,street2:newSiteAddress.street2||undefined,
-          city:newSiteAddress.city,state:newSiteAddress.state,
-          postalCode:newSiteAddress.postalCode,country:newSiteAddress.country||"US",
-          county:newSiteAddress.county||undefined,
-        }} : {})}});
+        ...(parsedAddress?.success ? {address:parsedAddress.data} : {})}});
       if (submission.status === "ignored") return;
       const result = submission.value;
       setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host,status:result.publicSiteDraft.status,replayed:result.replayed});
       setSiteId(result.siteId);
       if (submission.refreshError) setError("Site created, but the page could not refresh. Reopen launch setup; do not create another Site.");
       setNewSiteName("");setNewSiteSlug("");setNewSiteAddress(emptySiteAddress);
-      if(hasAddress && options && ["US","USA","UNITED STATES"].includes(newSiteAddress.country.trim().toUpperCase())) {
-        const inferred=options.jurisdictions.find(j=>[j.name.toUpperCase(),j.code.toUpperCase().replace(/^US[-_]/,"")].includes(newSiteAddress.state.trim().toUpperCase()));
-        if(inferred)setJurisdictionId(inferred.id);
+      if(parsedAddress?.success && options) {
+        const suggested=addressStateJurisdiction(parsedAddress.data,options.jurisdictions);
+        if(suggested)setJurisdictionId(suggested);
       }
     }catch(e){setError(mutationErrorMessage(e, "Unable to create site"));}
 
@@ -189,6 +198,12 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     setError("");
     if(created)return;
     if(onsite&&!siteId){setError("Choose or save a school location before continuing with onsite learning.");return;}
+    const selectedSite=options?.sites.find(site=>site.id===siteId);
+    const addressJurisdiction=selectedSite&&options
+      ? addressStateJurisdiction(selectedSite.address,options.jurisdictions):null;
+    if(addressJurisdiction && jurisdictionId!==addressJurisdiction){
+      setError("The school Program's jurisdiction conflicts with the saved Site's state. Correct the location or jurisdiction, or request a CAN jurisdiction review before launch.");return;
+    }
     if(!launchGradeRangeIsOrdered({min:gradeMin,max:gradeMax})){
       setError("Minimum grade must not come after maximum grade.");return;
     }
