@@ -44,13 +44,6 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           {currentLaunch.journey?.status==="ready"&&<p className="mt-2 text-sm">Independent review of opening is the next institutional handoff; journey readiness is not an opening timestamp.</p>}
           <p className="mt-2 text-xs text-muted-foreground">This timestamp is from the saved Program, not a browser stopwatch. No completion duration is claimed until a separately persisted completion or opening event is available. CAN review, hosting and third-party response time cannot be counted as school-controlled setup time without independently timestamped events.</p>
         </details>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<nav aria-label="School preparation steps" className="mt-4 flex flex-wrap gap-4 rounded-xl border bg-card p-4 text-sm font-semibold">
-          <a href="#launch-services" className="underline">1. CAN services</a>
-          <a href="#launch-academic-year" className="underline">2. Academic year</a>
-          <a href="#launch-first-class" className="underline">3. First classroom</a>
-          <a href="#launch-website" className="underline">4. School website</a>
-          <a href="#invite-families" className="underline">5. Invite families</a>
-        </nav>}
         {currentSchoolStatus!=="active"&&<div id="launch-requirements" className="scroll-mt-6">
           <OneHourSchoolLaunch key={currentLaunch?.id??`${selection.siteId??""}:${selection.programId??""}`}
             launches={launches} selectedProgramId={currentLaunch?.id??selection.programId}
