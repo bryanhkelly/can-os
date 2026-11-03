@@ -192,6 +192,35 @@ describe("school-specific jurisdiction and funding readiness", () => {
     })).not.toBe(fingerprint);
     expect(fingerprint).not.toContain("Main Street");
   });
+  it("invalidates independent legal scope on changes to provider, host, grade, delivery or target opening",()=>{
+    const original={
+      address:{street1:"10 Main Street",city:"Oakland",state:"CA",
+        postalCode:"94612",country:"US"},
+      programId:"program-1",siteId:"site-1",
+      hostOrganizationId:"church-1",academicProviderOrganizationId:"can-1",
+      gradeRange:{min:"K",max:"5"},
+      deliveryModel:{onsite:true,liveOnline:false},
+      targetOpeningDate:"2027-08-01",
+    };
+    const stamp=jurisdictionReviewScopeFingerprint(original);
+    for(const changed of [
+      {...original,hostOrganizationId:"church-2"},
+      {...original,academicProviderOrganizationId:"can-2"},
+      {...original,gradeRange:{min:"6",max:"8"}},
+      {...original,deliveryModel:{onsite:false,liveOnline:true}},
+      {...original,targetOpeningDate:"2027-09-01"},
+    ]){
+      expect(jurisdictionReviewScopeFingerprint(changed)).not.toBe(stamp);
+    }
+  });
+  it("requires another policy review within a running school year when future dates exceed the review horizon",()=>{
+    const horizon="2027-01-01T00:00:00Z";
+    expect(requiresFutureJurisdictionPolicyReview(horizon,
+      ["2026-08-01","2027-01-15"],now)).toBe(true);
+    expect(isCurrentVerifiedJurisdictionProfileVersion({
+      ...version,nextReviewAt:horizon,
+    },new Date("2027-01-02T12:00:00Z"))).toBe(false);
+  });
   it("returns no candidate requirements or funding if profile is absent or unverified", () => {
     const unverified = unavailableSchoolJurisdictionReadiness("Site state requires confirmation");
     expect(unverified).toMatchObject({
