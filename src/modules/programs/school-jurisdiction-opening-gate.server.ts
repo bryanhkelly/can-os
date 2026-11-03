@@ -11,7 +11,8 @@ import {
   openingApprovalPredatesLocationChange,
 } from "@/domain/school-jurisdiction-approval";
 import {
-  evaluateSchoolJurisdictionRequirements,requiresFutureJurisdictionPolicyReview,
+  evaluateSchoolJurisdictionRequirements,
+  expandKnownSchoolGradeRange,requiresFutureJurisdictionPolicyReview,
 } from "@/domain/jurisdiction-applicability";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { launchOpeningDate } from "@/domain/launch-opening-date";
@@ -115,8 +116,7 @@ export async function requireCurrentSchoolJurisdictionForOpening(
     programType:school.type,
     serviceType:isExtendedLearningType(school.type)?"enrichment":"academic",
     deliveryModel:onsite&&online?"hybrid":onsite?"onsite":online?"online":null,
-    gradeLevels:school.gradeRange.min===school.gradeRange.max
-      ? [school.gradeRange.min] : [],
+    gradeLevels:expandKnownSchoolGradeRange(school.gradeRange),
   },now);
   if(evaluation.reviewRequired ||
     requiresFutureJurisdictionPolicyReview(policy.nextReviewAt,[
