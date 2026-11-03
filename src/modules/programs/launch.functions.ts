@@ -5,7 +5,7 @@ import { completeJourneyRequirement } from "@/modules/journeys/complete-requirem
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress, launchOnsiteDaysPerWeekSchema } from "@/domain/site-setup-configuration";
 import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
@@ -81,6 +81,7 @@ async function registrarContext(capability: string) {
 /** Wizard dropdown options, scoped to the registrar's verified organization grant. */
 export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
   async () => {
+    setResponseHeader("Cache-Control","private, no-store");
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) {
