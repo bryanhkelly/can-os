@@ -46,17 +46,29 @@ function requireSubmittedDocument(document:typeof documents.$inferSelect | undef
 export async function submitSchoolJurisdictionRequirementEvidence(
   actor:AccessContext,input:{actionId:string;documentId:string;statement:string},
 ){
-  if(!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
-    throw new AuthorizationError("verified Site registrar");
-  assertCapability(actor,"program.launch.start");
+  const canSubmitter=actor.role==="can_jurisdiction_reviewer";
+  if(!actor.actorPersonId || (!hasRegistrarAuthority(actor.role)&&!canSubmitter))
+    throw new AuthorizationError("verified responsible jurisdiction evidence submitter");
+  assertCapability(actor,canSubmitter?"jurisdiction.profile.verify":"program.launch.start");
   if(input.statement.trim().length<10||input.statement.length>4000)
     throw new Error("Provide a specific legal requirement evidence statement");
   return db.transaction(async tx=>{
     const {site,program,action}=await lockRequirement(tx,input.actionId);
-    if(!actor.scope.organizationIds?.includes(program.organizationId)||
-      !actor.scope.siteIds?.includes(site.id)||
-      !actor.scope.programIds?.includes(program.id))
-      throw new AuthorizationError("school legal document submission scope");
+    if(canSubmitter){
+      if(actor.grantSiteId!==null || actor.sessionAccountId ||
+        !actor.scope.organizationIds?.includes(
+          (await tx.select({id:programs.academicProviderOrganizationId})
+            .from(programs).where(eq(programs.id,program.id)).limit(1))[0]?.id))
+        throw new AuthorizationError("CAN academic provider evidence submission scope");
+      if(action.metadata.responsibleParty!=="can")
+        throw new AuthorizationError("CAN reviewer cannot submit a church or family legal obligation");
+    }else{
+      if(!actor.scope.organizationIds?.includes(program.organizationId)||
+        !actor.scope.siteIds?.includes(site.id)||
+        !actor.scope.programIds?.includes(program.id) ||
+        action.metadata.responsibleParty!=="church")
+        throw new AuthorizationError("only the responsible church registrar may submit this obligation");
+    }
     const review=await readSchoolJurisdictionReview(actor,program.id,tx);
     if(review.reviewRequired || !review.policyVersionId ||
       action.metadata.profileVersionId!==review.policyVersionId ||
@@ -67,7 +79,7 @@ export async function submitSchoolJurisdictionRequirementEvidence(
     const now=new Date();
     requireSubmittedDocument(document,program.id,site.id,program.organizationId,now);
     if(!document || document.uploadedByPersonId!==actor.actorPersonId)
-      throw new AuthorizationError("evidence uploaded by the school registrar");
+      throw new AuthorizationError("evidence uploaded by the authorized submitter");
     const prior=[...action.evidence].reverse().find(entry=>
       entry.kind==="school_jurisdiction_requirement_submission");
     if(action.status==="waiting"&&
