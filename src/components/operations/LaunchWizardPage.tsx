@@ -330,8 +330,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     : nextTask
       ? nextTask.description+" Responsible: "+launchResponsibility(nextTask.state)+"."
       : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
-  const nextHref = currentSchool?.status==="active" ? null
-    : !currentProgram ? "#new-school-launch"
+  const nextHref = !currentProgram ? "#new-school-launch"
     : !currentLaunch ? "#launch-website"
     : "#launch-services";
 
@@ -364,6 +363,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
         </Button>}
+        <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
         <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
           <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>
@@ -379,6 +379,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
               : currentLaunch && pendingSchoolAction && !openingReview && nextTask?.action==="admissions"
                 ? <Link to="/admissions/intake" search={{siteId:currentLaunch.siteId??undefined,programId:currentLaunch.id}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review authorized family intake</Link>
+              : currentLaunch && pendingSchoolAction && nextTask?.action==="orientation"
+                ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
+                    search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Complete orientation setup</Link>
               : currentLaunch && pendingSchoolAction && !openingReview && nextTask?.action==="academics"
                 ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
@@ -395,7 +399,6 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           </p>}
           <p className="mt-3 text-xs text-muted-foreground">This guidance reflects saved Journey requirements, not a live authorization decision. The server separately checks whether the school may open.</p>
         </section>
-        <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
         <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
           <p className="mt-3 text-sm text-muted-foreground">Continue a saved launch in the guided view, or open its academic setup. Journey requirements remain the canonical source; this summary does not duplicate or grant opening approval.</p>
