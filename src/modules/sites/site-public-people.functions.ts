@@ -7,11 +7,23 @@ import { memberships,people,personProfileDetails,roleAssignments,sites } from "@
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { publicBioConsentSchema,readPublicBioConsent,readPublicStaffApprovals } from "@/domain/public-site-people";
-import { changeOwnSiteBioConsent } from "./site-public-people-consent.server";
+import { assertActiveSiteStaffPerson,changeOwnSiteBioConsent } from "./site-public-people-consent.server";
 import { approvePublicSitePeople } from "./site-public-people.server";
 import { requireSitePublisher } from "./site-publication.server";
 
 const scope=z.object({siteId:z.string().uuid()}).strict();
+
+export const getMyPublicSiteBioConsent=createServerFn({method:"GET"})
+  .validator((value:unknown)=>scope.parse(value))
+  .handler(async ({data})=>{
+    const actor=await getCommandContext(getRequest());
+    if(!actor.actorPersonId)throw new Error("Sign in to review your own biography");
+    await assertActiveSiteStaffPerson(actor.actorPersonId,data.siteId);
+    const [profile]=await db.select({metadata:personProfileDetails.metadata})
+      .from(personProfileDetails)
+      .where(eq(personProfileDetails.personId,actor.actorPersonId)).limit(1);
+    return readPublicBioConsent(profile?.metadata??null,data.siteId);
+  });
 
 export const changeMyPublicSiteBio=createServerFn({method:"POST"})
   .validator((value:unknown)=>z.discriminatedUnion("action",[
