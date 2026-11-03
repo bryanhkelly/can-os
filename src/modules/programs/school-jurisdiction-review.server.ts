@@ -1,8 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   jurisdictionProfileVersions, jurisdictionProfileVerificationDecisions,
-  jurisdictions, programs, sites,
+  jurisdictions, programs, schoolYears, sites,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -15,6 +15,7 @@ import {
 } from "@/domain/jurisdiction-applicability";
 import { isJurisdictionProfileVerificationEvidenceCurrent } from "@/domain/jurisdiction-profile";
 import {
+  jurisdictionReviewScopeFingerprint,
   projectSchoolJurisdictionReadiness,
   unavailableSchoolJurisdictionReadiness,
 } from "@/domain/school-jurisdiction-readiness";
@@ -46,6 +47,7 @@ export async function readSchoolJurisdictionReview(
     organizationId:programs.organizationId,
     jurisdictionId:programs.jurisdictionId, type:programs.type,
     programMetadata:programs.metadata, gradeRange:programs.gradeRange,
+    academicProviderOrganizationId:programs.academicProviderOrganizationId,
     deliveryModel:programs.deliveryModel, hostOrganizationId:programs.hostOrganizationId,
     siteOrganizationId:sites.organizationId, address:sites.address,
     code:jurisdictions.code,
@@ -59,6 +61,27 @@ export async function readSchoolJurisdictionReview(
     !actor.scope.siteIds?.includes(school.siteId) ||
     !actor.scope.programIds?.includes(programId))
     throw new AuthorizationError("school-specific jurisdiction review");
+  // School-year changes and Site address edits must reopen stale legal-review Actions.
+  // This scope fingerprint is a change detector, not itself an approval.
+  const years = await executor.select({
+    id:schoolYears.id,key:schoolYears.key,status:schoolYears.status,
+    startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
+  }).from(schoolYears).where(and(
+    eq(schoolYears.organizationId,school.organizationId),
+    eq(schoolYears.siteId,school.siteId),
+    or(eq(schoolYears.programId,programId),isNull(schoolYears.programId)),
+  )).orderBy(desc(schoolYears.startsOn)).limit(100);
+  const scopeFingerprint = jurisdictionReviewScopeFingerprint({
+    siteId:school.siteId,address:school.address,
+    jurisdictionId:school.jurisdictionId,
+    type:school.type,gradeRange:school.gradeRange,
+    deliveryModel:school.deliveryModel,hostOrganizationId:school.hostOrganizationId,
+    academicProviderOrganizationId:school.academicProviderOrganizationId,
+    operatingModel:school.programMetadata.jurisdictionOperatingModel,
+    responsibleEntity:school.programMetadata.jurisdictionResponsibleEntity,
+    targetOpeningDate:school.programMetadata.targetOpeningDate,
+    schoolYears:years,
+  });
   const [version] = await executor.select({
     id:jurisdictionProfileVersions.id, revision:jurisdictionProfileVersions.revision,
     status:jurisdictionProfileVersions.status,
@@ -90,13 +113,14 @@ export async function readSchoolJurisdictionReview(
       : null;
   if (locationReviewReason) return {
     programId,siteId:school.siteId,revision:version?.revision ?? null,
-    reviewRequired:true,locationReviewReason,
+    reviewRequired:true,locationReviewReason,scopeFingerprint,
     decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness(locationReviewReason,
       version?.id ?? null,version?.revision ?? null),
   };
   if (!version) return {programId,siteId:school.siteId,revision:null,
-    reviewRequired:true,locationReviewReason:null,decisions:[],candidateDisclosures:[],
+    reviewRequired:true,locationReviewReason:null,scopeFingerprint,
+    decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness("No published jurisdiction policy is available")};
   const [decision] = await executor.select({
     reviewerPersonId:jurisdictionProfileVerificationDecisions.reviewerPersonId,
@@ -159,7 +183,7 @@ export async function readSchoolJurisdictionReview(
   return {
     programId,siteId:school.siteId,revision:version.revision,
     reviewRequired:evaluated.reviewRequired,
-    locationReviewReason:null,
+    locationReviewReason:null,scopeFingerprint,
     decisions:evaluated.decisions,
     readiness,
     // Candidates only: requires separate institution-approved public DTO gate.
