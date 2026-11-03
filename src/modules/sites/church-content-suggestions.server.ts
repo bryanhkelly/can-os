@@ -193,6 +193,13 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
         eq(churchSourceReferences.kind, "website"),
         isNull(churchSourceReferences.revokedAt))).for("update").limit(1);
     if (!reference) throw new Error("Save a church website reference before requesting suggestions");
+    const [pendingReview] = await tx.select({ id: churchContentSuggestions.id })
+      .from(churchContentSuggestions).where(and(
+        eq(churchContentSuggestions.siteId, site.id),
+        eq(churchContentSuggestions.sourceReferenceId, reference.id),
+        eq(churchContentSuggestions.reviewDecision, "pending"),
+      )).limit(1);
+    if (pendingReview) return { status: "review_pending" as const };
     if (reference.lastAttemptAt &&
         Date.now() - reference.lastAttemptAt.getTime() < 30 * 60 * 1000) {
       return null;
@@ -210,6 +217,8 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
   });
   if (!input) return { status: "throttled" as const, count: 0,
     message: "This website was checked recently. Try again later." };
+  if ("status" in input) return { status: "review_pending" as const, count: 0,
+    message: "Review or discard the existing church suggestions before requesting a new website check." };
   const { site, reference, attemptAt } = input;
   let pages: Awaited<ReturnType<typeof extractChurchPublicWebsite>>;
   try {
@@ -247,6 +256,16 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       return { status: "stale" as const, count: 0,
         message: "Church website link changed during retrieval. No suggestions were saved." };
     }
+    // An editor may have submitted a proposal while the HTTP fetch ran.
+    // Never discard unsaved editorial work merely because a refresh completed.
+    const [pendingReview] = await tx.select({ id: churchContentSuggestions.id })
+      .from(churchContentSuggestions).where(and(
+        eq(churchContentSuggestions.siteId, checked.id),
+        eq(churchContentSuggestions.sourceReferenceId, reference.id),
+        eq(churchContentSuggestions.reviewDecision, "pending"),
+      )).limit(1);
+    if (pendingReview) return { status: "review_pending" as const, count: 0,
+      message: "New suggestions were saved while this website check was running. Review them before retrying." };
     const values = pages.flatMap(page => {
       const target = suggestionTargetFields[page.sourceField];
       if (!target) return [];
@@ -265,12 +284,6 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
     });
     if (!values.length) return { status: "failed" as const, count: 0,
       message: "No appropriate church story text was found." };
-    await tx.update(churchContentSuggestions).set({
-      reviewDecision: "discarded", reviewedAt: new Date(),
-      reviewedByPersonId: actor.actorPersonId!,
-    }).where(and(eq(churchContentSuggestions.siteId, checked.id),
-      eq(churchContentSuggestions.sourceReferenceId, reference.id),
-      eq(churchContentSuggestions.reviewDecision, "pending")));
     await tx.insert(churchContentSuggestions).values(values);
     await tx.update(churchSourceReferences).set({
       referenceState: "fetchable", updatedAt: new Date(),
