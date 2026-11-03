@@ -172,6 +172,35 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    Retry institutional change refresh
   </button>}
   <AttentionQueue items={attentionItems}/>
+  <section aria-label="School improvement and planning" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+    <p className="text-xs font-bold uppercase tracking-widest text-primary">Sustain · Review and plan</p>
+    <h2 className="mt-2 font-serif text-2xl font-semibold">Keep your school moving forward</h2>
+    <p className="mt-2 text-sm text-muted-foreground">Use the existing school records for recurring review. These links are suggested routines, not proof that a review or compliance requirement is complete.</p>
+    <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <article className="rounded-xl border p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Weekly · Operational review</p>
+        <h3 className="mt-2 font-semibold">Resolve open issues</h3>
+        <p className="mt-2 text-sm text-muted-foreground">Review assigned actions, staffing exceptions and unresolved follow-ups.</p>
+        <a href="#operations-actions" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Review action queue →</a>
+      </article>
+      <article className="rounded-xl border p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Monthly · School health</p>
+        <h3 className="mt-2 font-semibold">Review evidence and insights</h3>
+        <p className="mt-2 text-sm text-muted-foreground">Inspect observed signals, accept follow-up actions, or dismiss with a recorded reason.</p>
+        <Link to="/operations/insights" search={{siteId:selected.siteId,programId:selected.programId}}
+          className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open insights →</Link>
+      </article>
+      <article className="rounded-xl border p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Term / Annual · Planning</p>
+        <h3 className="mt-2 font-semibold">Prepare the next school period</h3>
+        <p className="mt-2 text-sm text-muted-foreground">Review saved school years, calendars and academic requirements before configuring new periods.</p>
+        <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}}
+          className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Review school years →</Link>
+      </article>
+    </div>
+    <p className="mt-4 text-xs text-muted-foreground">Reenrollment is not represented as a completed workflow here. Use authorized admissions and enrollment records to review returning families; do not infer renewal from previous enrollment.</p>
+  </section>
+
   {commandCenter&&<section aria-label="Operations exception summary" className="mt-8">
     <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
     <p className="mt-2 text-sm text-muted-foreground">Prioritize verified staffing and capacity exceptions before routine school monitoring. Readiness approvals remain controlled by their owning workflows.</p>
@@ -279,7 +308,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Overdue",data.summary.overdue],["Unassigned",data.summary.unassigned],["Waiting",data.summary.waiting],["Needs response",data.summary.needsResponse]].map(([label,num])=><StatCard key={label} label={label} value={num}/>)}
   </div>
   <p className="mt-6"><Link to="/sites" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Open School/Site Today →</Link> <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
-  <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
+  <div id="operations-actions" className="mt-8 scroll-mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
   {selected.action&&<Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
   {selected.action&&<Link to="/actions/$actionId" params={{actionId:selected.action}} className="ml-4 text-sm underline">View Action details</Link>}
   {selected.action&&!data.items.some(item=>item.id===selected.action)&&<WorkspaceNotice tone="danger">This action is unavailable in the current operations queue.</WorkspaceNotice>}
