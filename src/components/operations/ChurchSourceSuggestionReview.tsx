@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { getChurchSourceReferenceView } from "@/modules/sites/church-source-references.functions";
 import {
-  getChurchContentSuggestionView, reviewChurchSourceExcerptCommand,
+  getChurchContentSuggestionView, refreshChurchWebsiteSuggestionsCommand, reviewChurchSourceExcerptCommand,
   submitChurchSourceExcerptCommand,
 } from "@/modules/sites/church-content-suggestions.functions";
 import { type ChurchSuggestionField } from "@/domain/church-source-references";
@@ -64,6 +64,18 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     setReferences(refs); setItems(suggestions);
   }
 
+  async function discover() {
+    if (busy || !website) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const result = await refreshChurchWebsiteSuggestionsCommand({ data: {} });
+      await refresh();
+      setMessage(result.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to retrieve church website suggestions.");
+    } finally { setBusy(false); }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!website || busy) return;
@@ -102,9 +114,10 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   return <section aria-labelledby="church-source-review" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
     <h2 id="church-source-review" className="font-serif text-2xl font-semibold">Review suggested church information</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Automated website import is not enabled. For now, copy a short excerpt from a page on your saved church website,
-      cite its page address, and review it here. This is user-supplied source material—not independent CAN verification.
-      Never paste private information, protected third-party works, or images of children.
+      Where enabled, you can request a bounded read of your public church website and review each proposed excerpt.
+      If automated reading is unavailable, supply a short fact-based summary from a page on your church's website.
+      Suggestions are unverified editorial inputs, not school facts. Never paste private information,
+      protected third-party works, or images of children.
     </p>
     {loading && <p role="status" className="mt-3 text-sm">Loading review queue…</p>}
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
@@ -112,6 +125,18 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     {!loading && !website && <p className="mt-4 rounded-lg border p-4 text-sm">
       Save your church's public website above to add attributed excerpts. You can always write local copy manually.
     </p>}
+    {website && <div className="mt-4 rounded-xl border p-4">
+      <h3 className="font-semibold">Discover church website suggestions</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Optional and user-initiated. Only bounded public text is considered; no images,
+        social posts, transcripts or school authorization facts are imported.
+        If extraction is disabled or the website blocks it, use the manual editor.
+      </p>
+      <button type="button" disabled={busy} onClick={() => void discover()}
+        className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+        Check church website for suggestions
+      </button>
+    </div>}
     {website && <form onSubmit={event => void submit(event)} className="mt-4 grid gap-3 rounded-xl border p-4">
       <h3 className="font-semibold">Add a source excerpt for review</h3>
       <label className="text-sm">Church information field
