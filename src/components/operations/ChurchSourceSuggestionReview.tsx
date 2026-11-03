@@ -5,7 +5,7 @@ import {
   getChurchContentSuggestionView, getChurchSourceReviewContextView, refreshChurchWebsiteSuggestionsCommand, reviewChurchSourceExcerptCommand,
   submitChurchSourceExcerptCommand,
 } from "@/modules/sites/church-content-suggestions.functions";
-import { churchSuggestionTargetFields, type ChurchSuggestionField } from "@/domain/church-source-references";
+import { churchSuggestionTargetFields, churchSourcesChangedEvent, type ChurchSuggestionField } from "@/domain/church-source-references";
 import { siteLocalContentLimits } from "@/domain/site-local-content";
 
 type Ref = Awaited<ReturnType<typeof getChurchSourceReferenceView>>[number];
@@ -40,7 +40,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
+    const reload = () => { void Promise.all([
       getChurchSourceReferenceView({ data: {} }),
       getChurchContentSuggestionView({ data: {} }),
       getChurchSourceReviewContextView({ data: {} }),
@@ -48,13 +48,15 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       if (!active) return;
       setReferences(refs); setItems(suggestions); setReviewContext(context);
       setLoading(false);
-    }).catch(() => { if (active) { setLoading(false); setError("Could not load church source suggestions."); } });
-    return () => { active = false; };
+    }).catch(() => { if (active) { setLoading(false); setError("Could not load church source suggestions."); } }); };
+    reload();
+    window.addEventListener(churchSourcesChangedEvent, reload);
+    return () => { active = false; window.removeEventListener(churchSourcesChangedEvent, reload); };
   }, []);
 
   useEffect(() => {
-    if (website && !sourcePageUrl) setSourcePageUrl(website.normalizedUrl);
-  }, [website?.id, website?.normalizedUrl, sourcePageUrl]);
+    if (website) setSourcePageUrl(website.normalizedUrl);
+  }, [website?.id, website?.normalizedUrl]);
 
   async function refresh() {
     const [refs, suggestions, context] = await Promise.all([
