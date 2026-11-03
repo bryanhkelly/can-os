@@ -51,7 +51,7 @@ export async function readChurchSourceReviewContext(actor: AccessContext) {
 
 export async function readChurchContentSuggestions(actor: AccessContext) {
   const site = await requirePartnerWebsiteEditor(actor);
-  return db.select({
+  const rows = await db.select({
     id: churchContentSuggestions.id,
     field: churchContentSuggestions.field,
     proposedText: churchContentSuggestions.proposedText,
@@ -67,7 +67,30 @@ export async function readChurchContentSuggestions(actor: AccessContext) {
     .where(and(eq(churchContentSuggestions.siteId, site.id),
       eq(churchSourceReferences.siteId, site.id), isNull(churchSourceReferences.revokedAt),
       eq(churchContentSuggestions.reviewDecision, "pending")))
-    .orderBy(desc(churchContentSuggestions.createdAt)).limit(200);
+    .orderBy(desc(churchContentSuggestions.createdAt)).limit(25);
+  if (!rows.length) return [];
+  const capture = await db.select({
+    resourceId: auditEvents.resourceId, after: auditEvents.after,
+  }).from(auditEvents).where(and(
+    eq(auditEvents.resourceType, "church_content_suggestion"),
+    inArray(auditEvents.resourceId, rows.map(item => item.id)),
+    inArray(auditEvents.action, [
+      "site.website.source_excerpt.submitted",
+      "site.website.source_excerpt.retrieved",
+    ]),
+  )).orderBy(desc(auditEvents.occurredAt)).limit(50);
+  const byId = new Map<string, "manual_summary" | "public_html">();
+  for (const entry of capture) {
+    if (byId.has(entry.resourceId)) continue;
+    const origin = entry.after?.origin;
+    if (origin === "manual_summary" || origin === "public_html") {
+      byId.set(entry.resourceId, origin);
+    }
+  }
+  return rows.map(row => ({
+    ...row,
+    origin: byId.get(row.id) ?? "legacy_unknown" as const,
+  }));
 }
 
 export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
