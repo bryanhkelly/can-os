@@ -23,6 +23,9 @@ vi.mock("@/db/client", () => {
       callback({ select }),
   } };
 });
+vi.mock("@/modules/sites/site-media-folder.server", () => ({
+  readApprovedSchoolSitePhotos: async () => [],
+}));
 vi.mock("@/modules/sites/site-local-content.server", () => ({
   readCurrentLocalContent: async () => null,
 }));
