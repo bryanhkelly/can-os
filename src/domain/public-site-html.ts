@@ -504,6 +504,30 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .demo-experience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(18px,3vw,42px);margin:36px 0 20px}.demo-experience-grid article{min-width:0;border-top:2px solid var(--site-ink);padding-top:24px}.demo-experience-grid h3{font-family:var(--site-display);font-size:clamp(1.6rem,2.4vw,2.35rem);line-height:1.18;letter-spacing:-.035em;font-weight:500}.demo-experience-grid p:last-child{color:var(--site-muted);line-height:1.7}@media(max-width:760px){.demo-experience-grid{grid-template-columns:1fr}.demo-experience-grid article{padding-top:18px}}
  .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
+/* Editorial school identity: human-scale typography, generous negative space,
+   photography-ready hero and a quiet, heritage-inspired visual rhythm. */
+body{font-size:1.04rem;letter-spacing:-.005em}
+header{padding-top:29px;padding-bottom:29px;gap:24px}
+header .brand{font-family:var(--site-display);font-size:.93rem;letter-spacing:.08em;font-weight:700}
+header nav{gap:clamp(14px,1.8vw,28px)}
+main{padding-top:clamp(22px,3vw,48px)}
+.public-hero:not(.compact-hero){min-height:clamp(510px,66vh,760px);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:clamp(36px,8vw,110px);border-radius:4px}
+.public-hero:not(.compact-hero) h1{font-size:clamp(4rem,8.2vw,8rem);line-height:.98;max-width:880px;letter-spacing:-.072em}
+.public-hero:not(.has-image){background:var(--site-ink)}
+.public-hero:not(.has-image)::after{display:none}
+.public-hero .hero-art{display:none}
+.public-hero .intro{font-size:clamp(1rem,1.3vw,1.2rem);max-width:630px;line-height:1.7}
+.public-hero .hero-subtitle{font-size:clamp(1.85rem,3.2vw,3.1rem);max-width:700px;line-height:1.2}
+.editorial-section>h2,.section-heading h2{font-size:clamp(2.3rem,4.4vw,4.75rem);line-height:1.1}
+.editorial-section>.grid .card{box-shadow:none;border-radius:2px;border:1px solid rgba(18,33,29,.15);padding:clamp(28px,3vw,44px)}
+.explore-link{background:transparent;border-top:1px solid var(--site-ink);transition:background .15s ease}
+.explore-link:hover{background:rgba(18,33,29,.055);transform:none}
+.closing-action{border-radius:3px;padding-block:clamp(54px,7vw,100px)}
+.closing-action h2{font-size:clamp(2.4rem,4vw,4.7rem);line-height:1.07}
+.compact-hero{border-radius:3px;background:var(--site-ink);min-height:280px;padding:clamp(32px,5vw,74px)}
+.compact-hero::after{display:none}
+.compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
+@media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
 </style>
 </head>
 <body class="theme-${theme}" style="${visualCss}">
