@@ -1,3 +1,5 @@
+import { DailyCanvas } from "@/components/student/DailyCanvas";
+import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
@@ -172,6 +174,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    onClick={()=>void retryExitRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
    Retry institutional change refresh
   </button>}
+  <DailyCanvas audience="operations" content={resolveEditorialCanvas("operations", new Date())} className="mt-6" />
   <AttentionQueue items={attentionItems}/>
   <section aria-label="School improvement and planning" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
     <p className="text-xs font-bold uppercase tracking-widest text-primary">Sustain · Review and plan</p>
