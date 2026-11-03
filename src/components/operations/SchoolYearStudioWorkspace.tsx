@@ -58,7 +58,17 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
   {mutation.refreshError&&<button type="button" disabled={mutation.isSubmitting} onClick={()=>void retryRefresh()}
    className="mt-3 rounded border px-3 py-2 text-sm disabled:opacity-50">Retry saved school-year refresh</button>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-  <section className="mt-8 rounded-xl border bg-card p-5">
+  <section aria-label="School-year planning steps" className="mt-6 rounded-2xl border bg-card p-5">
+    <p className="text-xs font-bold uppercase tracking-widest text-primary">Sustain · Term and annual planning</p>
+    <h2 className="mt-2 font-serif text-2xl font-semibold">Review saved years before creating another</h2>
+    <p className="mt-2 text-sm text-muted-foreground">School-year records are authoritative only when saved and reviewed under the existing academic operations workflow. Review active periods, dates, calendars, and grading requirements; this page does not automatically renew a student's enrollment.</p>
+    <div className="mt-4 flex flex-wrap gap-3">
+      <a href="#saved-school-years" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">Review saved school years</a>
+      <a href="#create-school-year" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">Create a new school year</a>
+      <Link to="/admissions" search={{siteId:siteId||undefined,programId:programId||undefined}} className="inline-flex min-h-11 items-center text-sm font-semibold underline">Review enrollment records →</Link>
+    </div>
+  </section>
+  <section id="create-school-year" className="mt-8 scroll-mt-6 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Create a school year</h2>
    <div className="mt-4 grid gap-3 sm:grid-cols-2">
     <label className="text-sm">Site<select value={siteId} onChange={e=>{setSiteId(e.target.value);setProgramId("");setScaleId("");}} className="mt-1 w-full rounded border p-2 bg-background">{data.sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
@@ -95,8 +105,8 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
    </div>
    <button disabled={busy||!siteId||!selectedScaleId} onClick={()=>run(()=>createStudioYear({data:{siteId,...(programId?{programId}:{}),gradeScaleId:selectedScaleId,key,name,startsOn:start,endsOn:end}}))} className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create school year</button>
   </section>
-  <h2 className="mt-10 font-serif text-2xl">School years</h2>
+  <h2 id="saved-school-years" className="mt-10 scroll-mt-6 font-serif text-2xl">School years</h2>
   <div className="mt-4 space-y-4">{data.years.filter(y=>!siteId||y.siteId===siteId).map(y=><SchoolYearCard key={y.id} year={y} busy={busy} run={run}/>)}
-  {!data.years.length&&<p className="rounded-xl border p-5 text-sm">No school years have been configured at your sites.</p>}</div>
+  {!data.years.some(y=>!siteId||y.siteId===siteId)&&<p className="rounded-xl border p-5 text-sm">No school years have been configured for the selected site. Review the dates and grading scale above before creating one.</p>}</div>
  </WorkspaceShell>;
 }
