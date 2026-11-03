@@ -142,7 +142,9 @@ function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartne
     {title:"Your school's purpose and story",ready:Boolean(content?.schoolVision?.trim() &&
       (content?.localDescription?.trim() || content?.churchHistory?.trim())),
       help:"Describe why this school exists and the people and community behind it."},
-    {title:"Reviewed school photography",ready:Boolean(content?.branding.heroImage?.rightsConfirmed &&\n      content?.branding.heroImage?.altText?.trim() &&\n      content?.branding.heroImage?.childImageConsent !== "unconfirmed"),
+    {title:"Reviewed school photography",ready:Boolean(content?.branding.heroImage?.rightsConfirmed &&
+      content?.branding.heroImage?.altText?.trim() &&
+      content?.branding.heroImage?.childImageConsent !== "unconfirmed"),
       help:"Add one rights-cleared photograph with accessible alt text; the layout works without a photo."},
     {title:"A complete About page",ready:publishedPages.includes("/about"),
       help:"Publish local identity content to make the About page available."},
