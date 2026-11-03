@@ -376,6 +376,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 ${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
 <title>${pageTitle}</title>
 <meta name="description" content="${pageDescription}"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="${school}"/>
+<meta property="og:title" content="${pageTitle}"/>
+<meta property="og:description" content="${pageDescription}"/>
+${isLive ? `<meta property="og:url" content="${canonical}"/>` : ""}
+<meta name="twitter:card" content="summary"/>
 <style>
 :root{font-family:var(--site-body);color:var(--site-ink);background:var(--site-paper);line-height:1.65}
 body.theme-warm,body.theme-light{color:var(--site-ink);background:var(--site-paper)}
