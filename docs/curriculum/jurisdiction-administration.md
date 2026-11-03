@@ -16,10 +16,10 @@ Prioritize TX, FL, AZ, WV, AR, IA, OK, and WI as research/configuration candidat
 - Evidence/History: provenance, source URL, checked date, reviewer, versioned decisions and audit log.
 
 ## Demo publisher policy
-The dedicated CAN Demo Publisher is identified through publisher organization ownership (UUID), not per-course flags. In the demo environment, every version of its 120 catalog courses must have internal academic approval status 'approved' for all supported jurisdictions. Use the same version/jurisdiction approval records as real publishers. Reconcile approvals whenever jurisdictions or demo course versions are added. This is simulated internal approval only, not a claim of external government authorization, accreditation, or credit recognition.
+The dedicated CAN Demo Publisher is identified through publisher organization ownership (UUID), not per-course flags. The guarded demo reconciliation creates `under_review` records for the 120 draft course versions across the eight configured jurisdictions (960 records). These are synthetic review-queue records, not academic approvals. Preserve existing decisions; do not convert the demo catalog to `approved` or imply external government authorization, accreditation, or credit recognition. Reconcile coverage when the demo course versions or configured jurisdictions change.
 
 ## Controls
-- Only authorized CAN network administrators can edit jurisdiction policy; draft, review, approve and publish changes.
+- Only the scoped CAN network steward can edit and publish jurisdiction policy. A separately assigned `can_jurisdiction_reviewer` records an independent evidence review; reviewers cannot edit or publish, and an editor cannot verify their own changes. Verification records preserve the reviewer, note and exact source snapshot; later edits invalidate the current gate without deleting prior attestations.
 - Do not silently overwrite effective policy versions or mutate historical decisions. Record effective dates and provide impact preview for existing programs.
 - Distinguish verified legal requirements from CAN policy and from pending research. Unknown is not allowed.
 - Academic approval and publication are distinct. Funding eligibility and program operating eligibility are also distinct.
@@ -30,7 +30,7 @@ The dedicated CAN Demo Publisher is identified through publisher organization ow
 1. Inspect existing jurisdiction schema, permissions, admin navigation and compliance APIs; reuse before creating new primitives.
 2. Build central jurisdiction list/detail and evidence-backed editable configuration.
 3. Add version-specific, jurisdiction-scoped curriculum approval statuses with approval history.
-4. Implement demo-publisher approval reconciliation for all jurisdictions.
+4. Reconcile synthetic demo-publisher review-queue records for configured jurisdictions without treating them as approvals.
 5. Integrate readiness checks with program setup and adoption; verify no bypass of real-world regulatory requirements.
 6. Validate admin authorization, audit history and a full church program adoption flow.
 

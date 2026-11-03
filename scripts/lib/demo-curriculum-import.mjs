@@ -1,4 +1,5 @@
 export const demoCurriculumSource = "can-demo-catalog-factory";
+export const demoCurriculumReviewStatus = "under_review";
 
 export function isOwnedPrivateDemoPack(pack) {
   return pack?.visibility === "private" &&

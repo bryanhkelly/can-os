@@ -1,6 +1,9 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { listJurisdictionProfileReviews, saveJurisdictionProfileReview, publishJurisdictionProfile } from "@/modules/programs/jurisdiction-profile.functions";
+import {
+ listJurisdictionProfileReviews, saveJurisdictionProfileReview,
+ verifyJurisdictionProfileReview, publishJurisdictionProfile,
+} from "@/modules/programs/jurisdiction-profile.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import { ActionDialog, EmptyState, MutationFeedback, WorkspaceShell } from "@/components/workspace";
@@ -47,9 +50,13 @@ function ReviewEditor({item}:{item:Item}){
   setSources(previous=>previous.map((source,i)=>i===index?{...source,[field]:value}:source));
  }
  const [publishDialogOpen,setPublishDialogOpen]=useState(false);
+ const [verifyDialogOpen,setVerifyDialogOpen]=useState(false);
+ const [verificationNote,setVerificationNote]=useState("");
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
- const editable=item.status==="draft"||item.status==="in_review";
+ const editable=item.canEdit&&(item.status==="draft"||item.status==="in_review");
+ const dirty=title!==item.title||summary!==item.summary||
+  JSON.stringify(profile)!==item.profile||JSON.stringify(sources)!==item.evidence;
  function saveReview(){
   const parsedProfile={...profile,summary};
   return saveJurisdictionProfileReview({data:{id:item.id,title,summary,profile:parsedProfile,evidence:sources}});
@@ -62,21 +69,23 @@ function ReviewEditor({item}:{item:Item}){
   });
  }
  async function publish(){
-  const saved=await mutation.run(saveReview,{
-   successMessage:"Review saved and refreshed. Publishing the reviewed profile.",
-   commandErrorMessage:"Unable to save the profile review; it was not published.",
-   refreshErrorMessage:"The review was saved, but the profile could not be refreshed. Retry refresh before publishing.",
-  });
-  if(saved.status!=="saved"){
-   if(saved.status!=="duplicate")setPublishDialogOpen(false);
-   return;
-  }
   const published=await mutation.run(()=>publishJurisdictionProfile({data:{id:item.id}}),{
-   successMessage:"Saved and published. The state guidance is now available during launch.",
-   commandErrorMessage:"The review was saved, but the profile could not be published.",
+   successMessage:"Published the independently verified profile. State guidance is now available during launch.",
+   commandErrorMessage:"Unable to publish the jurisdiction profile.",
    refreshErrorMessage:"The profile was published, but current review status could not be loaded. Retry refresh before continuing.",
   });
   if(published.status!=="duplicate")setPublishDialogOpen(false);
+ }
+ async function verify(){
+  const verified=await mutation.run(
+   ()=>verifyJurisdictionProfileReview({data:{id:item.id,note:verificationNote}}),
+   {
+    successMessage:"Independent verification recorded for the current profile evidence.",
+    commandErrorMessage:"Unable to verify the jurisdiction profile.",
+    refreshErrorMessage:"Verification was recorded, but the profile could not be refreshed. Retry refresh before continuing.",
+   },
+  );
+  if(verified.status!=="duplicate")setVerifyDialogOpen(false);
  }
  return <details className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
   <summary className="cursor-pointer font-serif text-lg font-semibold">{item.name} · {item.revision} · {item.status} · {item.verificationStatus}</summary>
@@ -132,14 +141,28 @@ function ReviewEditor({item}:{item:Item}){
      {editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} className="justify-self-start" onClick={()=>setSources(previous=>previous.filter((_,index)=>index!==i))}>Remove source</Button>}
     </div>)}
    </section>
+   {item.verificationStatus==="verified"&&item.verifiedByPersonId&&<section className="rounded-xl border border-border/70 bg-card p-4">
+    <h3 className="font-semibold">Independent verification</h3>
+    <p className="text-sm text-muted-foreground">Reviewer {item.verifiedByPersonId} · {item.reviewedAt?new Date(item.reviewedAt).toISOString():"time unavailable"}</p>
+    <p className="mt-2 text-sm">{(JSON.parse(item.verificationEvidence) as {note?:string}).note}</p>
+   </section>}
    <div className="flex flex-wrap items-center gap-3">
     <Button type="button" variant="outline" disabled={!editable||busy} onClick={()=>void save()}>{mutation.pending?"Saving…":"Save review"}</Button>
-    {item.status==="in_review"&&<Button type="button" disabled={busy} onClick={()=>setPublishDialogOpen(true)}>Publish reviewed profile</Button>}
+    {item.canVerify&&item.status==="in_review"&&item.verificationStatus!=="verified"&&
+     <Button type="button" disabled={busy} onClick={()=>setVerifyDialogOpen(true)}>Record independent verification</Button>}
+    {item.canPublish&&item.status==="in_review"&&item.verificationStatus==="verified"&&
+     <Button type="button" disabled={busy||dirty} onClick={()=>setPublishDialogOpen(true)}>Publish verified profile</Button>}
    </div>
    <MutationFeedback state={mutation} pendingMessage="Saving jurisdiction profile review."/>
   </div>
+  <ActionDialog open={verifyDialogOpen} title="Verify jurisdiction profile?"
+   description="Confirm that you independently reviewed every current official source listed on this profile. Your identity, note, and the reviewed source snapshot will be recorded."
+   confirmLabel="Record verification" pending={mutation.pending} confirmDisabled={mutation.refreshFailed||verificationNote.trim().length<25}
+   onConfirm={()=>void verify()} onClose={()=>setVerifyDialogOpen(false)}>
+   <Field label="Independent review note"><Textarea rows={4} value={verificationNote} onChange={event=>setVerificationNote(event.target.value)} placeholder="Describe what you verified in the official sources."/></Field>
+  </ActionDialog>
   <ActionDialog open={publishDialogOpen} title="Publish jurisdiction profile?"
-   description="Confirm that the official sources, requirements, and responsibilities have been reviewed. Published guidance does not authorize a school to open."
+   description="Publish the current profile only after a separate reviewer has verified its evidence. Published guidance does not authorize a school to open."
    confirmLabel="Publish profile" pending={mutation.pending} confirmDisabled={mutation.refreshFailed}
    onConfirm={()=>void publish()} onClose={()=>setPublishDialogOpen(false)}/>
  </details>;

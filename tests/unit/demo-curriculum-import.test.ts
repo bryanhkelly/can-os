@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  demoCurriculumSource, isOwnedPrivateDemoPack, selectSingleImporterDraft,
+  demoCurriculumReviewStatus, demoCurriculumSource, isOwnedPrivateDemoPack, selectSingleImporterDraft,
 } from "../../scripts/lib/demo-curriculum-import.mjs";
 
 describe("demo curriculum importer ownership", () => {
+  it("uses the database's under_review curriculum approval status", () => {
+    expect(demoCurriculumReviewStatus).toBe("under_review");
+  });
   it("only reuses privately visible packs marked as importer-owned", () => {
     expect(isOwnedPrivateDemoPack({
       visibility: "private",

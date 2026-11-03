@@ -12,14 +12,13 @@
 9. Allow program adoption only through existing entitlement and approval gates. Section schedules and delivery configuration are downstream.
 
 ## Demo policy
-CAN Demo Publisher is the synthetic publisher. All 120 demo course versions should be approved for all supported jurisdictions in the **demo environment** via normal approval records. Approval reconciliation is needed for new jurisdictions and new course versions. Never imply government approval or credit authorization.
+CAN Demo Publisher is the synthetic publisher. The guarded reconciliation creates `under_review` records for its 120 draft course versions across eight configured jurisdictions. These are review-queue records, not approvals. Preserve existing decisions and never imply government approval or credit authorization. The current legacy pack requires the controlled provenance reconciliation documented in [the demo catalog procedure](./demo-catalog-factory.md) before import.
 
 ## Readiness blockers
-- The initial importer is demo-specific and uses a manifest-wide hash, not per-course hashes.
+- The importer has per-course content hashes and a manifest-wide pack hash; two full identical runs still need execution against a disposable branch.
 - The draft pack is not discoverable through the ordinary marketplace.
-- Jurisdiction approval records and automatic demo reconciliation are not implemented.
-- The state profile and its school-launch projection are specified but not implemented.
+- Jurisdiction reconciliation and the separate profile reviewer workflow are implemented in code, but the live database migration and reviewer/publication acceptance have not been executed for this change.
 - Ingestion requires a durable staging/reporting path and licensed content review.
 - Teacher guides, assessment blueprints and end-to-end classroom adoption still need integration.
 
-Do not turn on unattended external-source ingestion until rights checks, idempotency, review gates and target environment protections are verified.
+Do not turn on unattended external-source ingestion until rights checks, importer idempotency, review gates and target environment protections are verified.

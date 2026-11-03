@@ -36,6 +36,23 @@ export const jurisdictionProfileSchema = z.object({
 });
 export type JurisdictionProfile = z.infer<typeof jurisdictionProfileSchema>;
 
+export function isJurisdictionProfileVerificationEvidenceCurrent(
+  verificationEvidence: unknown,
+  sources: unknown,
+): verificationEvidence is {note:string;sources:Array<{title:string;url:string;authority:string;checkedAt:string}>} {
+  if(!verificationEvidence||typeof verificationEvidence!=="object"||!Array.isArray(sources))return false;
+  const evidence=verificationEvidence as {note?:unknown;sources?:unknown};
+  if(typeof evidence.note!=="string"||evidence.note.trim().length<25||!Array.isArray(evidence.sources)||
+     evidence.sources.length!==sources.length)return false;
+  return evidence.sources.every((item,index)=>{
+    const source=sources[index];
+    if(!item||typeof item!=="object"||!source||typeof source!=="object")return false;
+    const attested=item as Record<string,unknown>;
+    const current=source as Record<string,unknown>;
+    return ["title","url","authority","checkedAt"].every(key=>attested[key]===current[key]);
+  });
+}
+
 /** Public/setup projection of canonical state policy. Never duplicates launch state. */
 export function schoolLaunchJurisdictionSummary(profile: JurisdictionProfile) {
   return {
