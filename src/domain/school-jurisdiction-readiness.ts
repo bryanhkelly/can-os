@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   jurisdictionProfileSchema,
+  isOfficialJurisdictionSource,
   type JurisdictionProfile,
 } from "./jurisdiction-profile";
 import type { RequirementDecision } from "./jurisdiction-applicability";
@@ -105,7 +106,7 @@ export function projectSchoolJurisdictionReadiness(input: {
   const parsed = jurisdictionProfileSchema.safeParse(input.profile);
   if (!parsed.success) return empty;
   const profile = parsed.data;
-  const sources = profile.evidence.filter(source => source.url.startsWith("https://"));
+  const sources = profile.evidence.filter(isOfficialJurisdictionSource);
   const sourceFor = (ids: string[]) => sources.filter(source => ids.includes(source.url));
   const decisions = new Map(input.decisions.map(item => [item.id, item]));
   const toIso = (value: Date | string | null): string | null => {
