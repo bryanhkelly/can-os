@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { projectApprovedParentInformation } from "@/domain/parent-information";
 import { db } from "@/db/client";
-import { sitePublications } from "@/db/schema";
+import { sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
@@ -11,6 +11,7 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
+import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 
 /** Public-safe private preview; institution-owned fields are still read-only. */
 export async function getPartnerWebsitePreview(actor: AccessContext) {
@@ -32,9 +33,14 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent) : null;
+  const [siteConfiguration] = host ? await db.select({metadata: sites.metadata})
+    .from(sites).where(eq(sites.id, site.id)).limit(1) : [];
+  const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
+    academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : {};
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
     academicPrograms, offerings, localContent: local?.content ?? null,
+    ...parentExtras,
   });
   const previewPage = host ? {
     host, site: { name: site.name, organizationName: site.organizationName },
