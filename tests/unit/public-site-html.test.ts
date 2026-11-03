@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { escapePublicHtml, renderPublicSiteHtml } from "@/domain/public-site-html";
+import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
 
 describe("standalone public site HTML", () => {
   it("escapes all publisher-controlled text and contains no client script or private links", () => {
@@ -193,5 +194,53 @@ describe("standalone public site HTML", () => {
     expect(authorized).toContain('action="/apply" method="post"');
     expect(authorized).toContain("Verify email to apply");
   });
+
+
+  it("shows only approved Sunday-inclusive school hours and reviewed family services", () => {
+    const academicProgram = {
+      programId: "00000000-0000-4000-8000-000000000002",
+      title: "Community Academy", typeLabel: "Hybrid academy",
+      summary: "Reviewed academic program.", grades: {min: "K", max: "5"},
+      delivery: {onsite: true, liveOnline: false, asynchronous: true, onsiteDaysPerWeek: 2},
+      availability: "planned" as const,
+    };
+    const site = {name: "Community Academy", organizationName: "Community Church"};
+    const page = {
+      host: "community.can-os.com", site, academicPrograms: [academicProgram],
+      offerings: [],
+      parentInformation: projectApprovedParentInformation({
+        site, academicPrograms: [academicProgram], offerings: [], localContent: null,
+        schoolDay: {
+          days: verifiedPublicClaim([0, 3], "calendar", 6),
+          startTime: verifiedPublicClaim("09:00", "calendar", 6),
+          endTime: verifiedPublicClaim("14:00", "calendar", 6),
+          mode: unconfiguredClaim<"onsite" | "online" | "hybrid">("institutional_record"),
+        },
+        services: [
+          {category: "meals", description: verifiedPublicClaim(
+            "Lunch available for enrolled students.", "institutional_record", 2)},
+          {category: "transportation", description: unconfiguredClaim("institutional_record")},
+        ],
+      }),
+    };
+    const schoolDayHtml = renderPublicSiteHtml(page, {path: "/school-day"});
+    expect(schoolDayHtml).toContain("Institutionally reviewed schedule");
+    expect(schoolDayHtml).toContain("Sunday, Wednesday");
+    expect(schoolDayHtml).toContain("09:00–14:00 (school-local time)");
+    expect(schoolDayHtml).toContain("not confirmation that the school is");
+    const familiesHtml = renderPublicSiteHtml(page, {path: "/families"});
+    expect(familiesHtml).toContain("Lunch available for enrolled students.");
+    expect(familiesHtml).not.toContain("<h3>transportation</h3>");
+    expect(familiesHtml).not.toContain("reviewedByPersonId");
+    const withheld = projectApprovedParentInformation({
+      site, academicPrograms: [academicProgram], offerings: [], localContent: null,
+    });
+    const unpublished = renderPublicSiteHtml({
+      ...page, parentInformation: withheld,
+    }, {path: "/school-day"});
+    expect(unpublished).not.toContain("Sunday, Wednesday");
+    expect(unpublished).toContain("reviewed public timetable is not available");
+  });
+
 
 });
