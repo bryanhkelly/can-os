@@ -179,10 +179,10 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
       const active=app.offers.find(o=>o.enrollmentActive);
       const issued=app.offers.find(o=>o.status==="issued");
       const accepted=app.offers.find(o=>o.status==="accepted");
-      const next=app.waitlisted?"Your application is on the waitlist. Contact admissions for an update.":
+      const next=active?"Enrollment is active. Review first-day preparation and student access.":
+       accepted?"Your offer is accepted. The school is completing enrollment and class placement.":
        issued?"An enrollment offer is ready for your decision.":
-       accepted&&!active?"Your offer is accepted. The school is completing enrollment and class placement.":
-       active?"Enrollment is active. Review first-day preparation and student access.":
+       app.waitlisted?"Your application is on the waitlist. Contact admissions for an update.":
        app.blockers.length>0?"Review the outstanding enrollment requirements.":
        "Your application is with the school. Review its status and any requested steps.";
       return <article key={app.applicationId} className="rounded-xl border p-4">
@@ -190,7 +190,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        <p className="mt-2 text-sm">{next}</p>
        <Link to="/guardian/admission-offers" search={{student:app.studentPersonId,application:app.applicationId}}
         className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">
-        {issued?"Review offer":active?"Prepare for school":"View enrollment steps"} →
+        {active?"Prepare for school":accepted?"View enrollment steps":issued?"Review offer":"View enrollment steps"} →
        </Link>
       </article>;
      })}
@@ -255,13 +255,13 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      {visibleEnrollmentApplications.map(app=>{
       const activeOffer=app.offers.find(offer=>offer.enrollmentActive);
       const issuedOffer=app.offers.find(offer=>offer.status==="issued");
-      const stage=app.waitlisted?"Waitlisted":activeOffer?"Enrollment active":
+      const stage=activeOffer?"Enrollment active":app.waitlisted?"Waitlisted":
        issuedOffer?"Offer issued":app.applicationStage==="accepted"?"Accepted · enrollment checklist":
        `Admissions · ${app.applicationStage.replaceAll("_"," ")}`;
       return <article key={app.applicationId} className="rounded-xl border bg-card p-4">
        <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="font-semibold">{app.studentName}</h3><p className="mt-1 text-sm text-muted-foreground">{app.program}</p></div>
-        <StatusBadge tone={app.waitlisted?"attention":activeOffer?"success":issuedOffer?"info":"neutral"}>{stage}</StatusBadge>
+        <StatusBadge tone={activeOffer?"success":app.waitlisted?"attention":issuedOffer?"info":"neutral"}>{stage}</StatusBadge>
        </div>
        {app.blockers.length>0&&<ul className="mt-3 space-y-1 text-sm">
         {app.blockers.map(requirement=><li key={requirement.id}>{requirement.title} · {requirement.status.replaceAll("_"," ")}</li>)}
