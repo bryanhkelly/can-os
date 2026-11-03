@@ -75,6 +75,20 @@ export function isJurisdictionRequirementRenewalCurrent(
     new Date(reviewed).toISOString().slice(0,10)>deadline;
 }
 
+/** Verified renewal evidence must be a newly uploaded document for the
+ * elapsed legal renewal period; an old file must never be re-verified to
+ * satisfy a new requirement without new evidence. */
+export function isJurisdictionRenewalDocumentCurrent(
+  createdAt:Date,metadata:Record<string,unknown>,now=new Date(),
+):boolean {
+  const deadline=metadata.renewalDeadline;
+  if(deadline===null||deadline===undefined)return true;
+  if(typeof deadline!=="string"||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(deadline))
+    return false;
+  if(now.toISOString().slice(0,10)<=deadline)return true;
+  return createdAt.toISOString().slice(0,10)>deadline;
+}
+
 /** A normal Action resolution is never legal evidence. Require the current
  * verified document and independently recorded C-domain attestation. */
 export function hasCurrentJurisdictionRequirementEvidence(
