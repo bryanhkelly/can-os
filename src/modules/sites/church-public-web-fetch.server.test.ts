@@ -38,6 +38,24 @@ describe("church website robots boundaries", () => {
     expect(robotsAllows(robots, "/about")).toBe(true);
     expect(robotsAllows(robots, "/leadership")).toBe(false);
   });
+  it("does not merge wildcard denials into a named CANOS group", () => {
+    const robots = "User-agent: *\nDisallow: /\n\nUser-agent: CANOS-ChurchReference\nAllow: /\n";
+    expect(robotsAllows(robots, "/about")).toBe(true);
+  });
+  it("uses a named CANOS disallow instead of wildcard allowances", () => {
+    const robots = "User-agent: *\nAllow: /\n\nUser-agent: CANOS-ChurchReference\nDisallow: /leadership\n";
+    expect(robotsAllows(robots, "/leadership")).toBe(false);
+    expect(robotsAllows(robots, "/about")).toBe(true);
+  });
+  it("groups consecutive user agents and separates later groups", () => {
+    const robots = "User-agent: Googlebot\nUser-agent: CANOS-ChurchReference\nDisallow: /private\nUser-agent: Otherbot\nDisallow: /about\n";
+    expect(robotsAllows(robots, "/private")).toBe(false);
+    expect(robotsAllows(robots, "/about")).toBe(true);
+  });
+  it("honors a more specific named user agent over a shorter name", () => {
+    const robots = "User-agent: CANOS\nDisallow: /\nUser-agent: CANOS-ChurchReference\nAllow: /\n";
+    expect(robotsAllows(robots, "/about")).toBe(true);
+  });
   it("honors end anchors", () => {
     const robots = "User-agent: *\nDisallow: /private$\n";
     expect(robotsAllows(robots, "/private")).toBe(false);
