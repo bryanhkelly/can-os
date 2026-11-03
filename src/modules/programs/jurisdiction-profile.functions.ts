@@ -108,7 +108,7 @@ export const publishJurisdictionProfile=createServerFn({method:"POST"})
    // A separate verified reviewer must attest to this exact revision before publication.
    if(record.verificationStatus!=="verified" || !record.reviewedAt || !record.reviewOwnerPersonId)
     throw Error("Independent review and verification are required before publication");
-   if(record.reviewOwnerPersonId===context.personId)
+   if(record.reviewOwnerPersonId===context.actorPersonId)
     throw Error("The verifier cannot publish their own jurisdiction review");
    const sources=record.evidence;
    jurisdictionProfileSchema.parse({...record.profile,summary:record.summary,evidence:sources});
