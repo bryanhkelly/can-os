@@ -166,6 +166,29 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <h3 className="mb-2 font-serif text-2xl">{x.studentName??x.id}</h3>
           <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
           <p className="mt-1 text-sm text-muted-foreground">{formatStatus(x.stage)} · {x.outstandingRequirements} outstanding blocking requirements</p>
+          <section aria-label="Next enrollment action" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
+           <p className="text-xs font-bold uppercase tracking-widest text-primary">Next action</p>
+           {activated ? <>
+            <p className="mt-2 font-semibold">{x.activeSectionCount===0?"Place this student in a staffed class":x.studentAccessStatus==="pending_review"?"Review the student's account request":x.studentAccessStatus==="approved"?"Prepare the student's first school day":"Complete the student's learning access"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{x.activeSectionCount===0?"Use Class placement below to select an eligible section.":x.studentAccessStatus==="approved"?"Confirm the school's scheduled day and local supervision separately from enrollment.":"Use the student learning-access section below. Guardian consent and independent identity review remain required."}</p>
+           </> : latest?.status==="accepted" ? <>
+            <p className="mt-2 font-semibold">Activate the accepted enrollment and class placement</p>
+            <p className="mt-1 text-sm text-muted-foreground">Select a staffed section in Class placement below. If a transfer or eligibility check blocks activation, follow its specific resolution instructions.</p>
+           </> : latest?.status==="issued" ? <>
+            <p className="mt-2 font-semibold">Waiting for the family to respond</p>
+            <p className="mt-1 text-sm text-muted-foreground">The guardian reviews and accepts the offer in their own account. No registrar action is needed until a response or follow-up is required.</p>
+           </> : x.disposition==="waitlisted" ? <>
+            <p className="mt-2 font-semibold">Review waitlist status</p>
+            <p className="mt-1 text-sm text-muted-foreground">Review availability and the application decision before issuing another offer.</p>
+            <Link to="/admissions/intake" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold underline">Open admissions review →</Link>
+           </> : x.outstandingRequirements>0 ? <>
+            <p className="mt-2 font-semibold">Review {x.outstandingRequirements} outstanding enrollment requirement{x.outstandingRequirements===1?"":"s"}</p>
+            <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold underline">Review household requirements →</Link>
+           </> : <>
+            <p className="mt-2 font-semibold">Review application and offer eligibility</p>
+            <Link to="/admissions/intake" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold underline">Open admissions review →</Link>
+           </>}
+          </section>
           {x.disposition==="waitlisted"&&<p role="status" className="mt-2 text-sm">Waitlisted - restore this application to review in admissions intake before issuing an offer.</p>}
           <Link to="/admissions/intake" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-block text-xs underline">Manage admissions decisions and waitlist →</Link>
           <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
