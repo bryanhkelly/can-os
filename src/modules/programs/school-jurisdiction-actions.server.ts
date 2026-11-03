@@ -155,13 +155,8 @@ export async function decideSchoolJurisdictionLegalReview(
       throw new Error("Church registrar must reopen legal review for the amended school configuration");
     if(input.decision==="verify" && !review.reviewRequired &&
       legal.status==="resolved" && legal.metadata.reviewState==="independently_verified")
-      const reconciliation=await reconcileSchoolJurisdictionRequirementActions(tx,actor,{
-        programId:input.programId,siteId:target.siteId,
-        organizationId:program.organizationId,profileVersionId:policy.id,
-        scopeFingerprint:review.scopeFingerprint,profile:parsed.data,
-        decisions:review.decisions,
-      });
-      return {programId:input.programId,verified:true,actionId:legal.id,reconciliation};
+      return {programId:input.programId,verified:true,actionId:legal.id,
+        reconciliation:{created:0,reopened:0,superseded:0}};
     const [location]=await tx.select().from(actions).where(and(
       eq(actions.type,"site_location_change_review"),
       eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
@@ -230,7 +225,13 @@ export async function decideSchoolJurisdictionLegalReview(
           policyVersionId:policy.id,siteRevision:review.siteAddressRevision,
           sourceCount:cited.length},
       });
-      return {programId:input.programId,verified:true,actionId:legal.id};
+      const reconciliation=await reconcileSchoolJurisdictionRequirementActions(tx,actor,{
+        programId:input.programId,siteId:target.siteId,
+        organizationId:program.organizationId,profileVersionId:policy.id,
+        scopeFingerprint:review.scopeFingerprint,profile:parsed.data,
+        decisions:review.decisions,
+      });
+      return {programId:input.programId,verified:true,actionId:legal.id,reconciliation};
     }
     await tx.update(actions).set({
       status:"open",resolvedAt:null,resolutionNote:null,
