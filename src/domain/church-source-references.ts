@@ -6,6 +6,8 @@
  * fetch authorization boundary (DNS, redirects and resolved IPs require separate
  * server-side checks).
  */
+/** Same-page notification only; no content or tenant identifiers are emitted. */
+export const churchSourcesChangedEvent = "can:church-sources-changed";
 export const churchReferenceKinds = [
   "website", "youtube", "instagram", "facebook", "tiktok",
 ] as const;
