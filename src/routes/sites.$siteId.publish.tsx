@@ -144,6 +144,19 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           disabled={saving || !candidate} type="submit">{saving ? "Reserving…" : "Reserve address"}</button>
       </form>}
     </section>
+    <section className="mt-6 rounded-xl border bg-card p-5">
+      <h2 className="text-xl font-semibold">Public campus and family contact approval</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Your reserved website URL is different from your physical Site location.
+        A saved legal address or internal contact is never automatically public.
+        An institutional publisher separately reviews the exact family-visible
+        address and school-controlled contact, with expiry, evidence and withdrawal.
+      </p>
+      <Link to="/sites/$siteId/parent-information" params={{siteId:data.site.id}}
+        className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
+        Review public address and contact
+      </Link>
+    </section>
     {data.canRename && data.address && <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">School name and address</h2>
       <p className="mt-2 text-sm text-muted-foreground">
