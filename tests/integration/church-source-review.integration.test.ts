@@ -208,6 +208,26 @@ integration("church source review real transaction races", () => {
     expect(events.filter(x => x.eventType === EventTypes.ChurchContentSuggestionReviewed)).toHaveLength(1);
   });
 
+  it("coalesces repeated source withdrawal into one open provenance review task", async () => {
+    const f = await fixture();
+    const p = await f.propose();
+    await f.review.reviewChurchSourceExcerpt(f.actor, {
+      suggestionId: p.id, decision: "accepted", expectedRevision: 0, rightsConfirmed: true,
+    });
+    await f.sources.saveChurchSourceReference(f.actor, {
+      kind: "website", url: `${f.url}/another-campus`, authorizedToSubmit: true,
+    });
+    await f.sources.removeChurchSourceReference(f.actor, { kind: "website" });
+    const flags = await f.db.select().from(f.schema.actions).where(and(
+      eq(f.schema.actions.subjectId, f.reference.id),
+      eq(f.schema.actions.type, "site_website_source_provenance_review"),
+      eq(f.schema.actions.status, "open"),
+    ));
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.metadata?.reviewedSuggestionId).toBe(p.id);
+    expect(await f.versions()).toHaveLength(1);
+  });
+
   it("rejects source-derived admissions promises before suggestion persistence", async () => {
     const f = await fixture();
     await expect(f.propose("Our school is enrolling students and accepting applications."))
