@@ -32,6 +32,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   const [sourcePageUrl, setSourcePageUrl] = useState("");
   const [text, setText] = useState("");
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [rightsConfirmations, setRightsConfirmations] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -100,6 +101,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     try {
       const result = await reviewChurchSourceExcerptCommand({ data: {
         suggestionId: item.id, decision,
+        ...(decision !== "discarded" ? { rightsConfirmed: rightsConfirmations[item.id] === true } : {}),
         ...(decision === "edited" ? { editedText: edits[item.id] ?? item.proposedText } : {}),
         ...(decision !== "discarded" ? { expectedRevision: reviewContext?.revision ?? currentRevision } : {}),
       } });
@@ -200,16 +202,22 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
             onChange={event => setEdits(old => ({ ...old, [item.id]: event.target.value }))}
             className="mt-1 block w-full rounded-lg border bg-background p-2" />
         </label>
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={rightsConfirmations[item.id] === true}
+            onChange={event => setRightsConfirmations(old => ({ ...old, [item.id]: event.target.checked }))} />
+          <span>I confirm our church owns this text or has permission to publish it on the school website.
+            A public web page alone does not grant copying rights.</span>
+        </label>
         <p className="mt-2 text-xs text-muted-foreground">
           Accept or edit saves via the canonical versioned church content command. Safe copy may publish immediately;
           protected institutional claims are held for CAN review. Discard never changes website content.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" disabled={busy} onClick={() => void review(item, "accepted")}
+          <button type="button" disabled={busy || rightsConfirmations[item.id] !== true} onClick={() => void review(item, "accepted")}
             className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">
             Accept and save church copy
           </button>
-          <button type="button" disabled={busy} onClick={() => void review(item, "edited")}
+          <button type="button" disabled={busy || rightsConfirmations[item.id] !== true} onClick={() => void review(item, "edited")}
             className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Save edited copy</button>
           <button type="button" disabled={busy} onClick={() => void review(item, "discarded")}
             className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Discard</button>
