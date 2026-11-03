@@ -7,6 +7,7 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
@@ -33,17 +34,6 @@ function safeJsonObject(value:Record<string,unknown>):Record<string,SafeJson>{
 const uuid = z.string().uuid();
 
 /** Physical location is submitted by the church. It is not jurisdiction verification. */
-const launchSiteAddress = z.object({
-  street1: z.string().trim().min(2).max(200),
-  street2: z.string().trim().max(200).optional(),
-  city: z.string().trim().min(2).max(120),
-  state: z.string().trim().min(2).max(80),
-  postalCode: z.string().trim().min(3).max(24),
-  country: z.string().trim().min(2).max(80).default("US"),
-  county: z.string().trim().max(120).optional(),
-}).strict();
-
-
 const startLaunchInput = z.object({
   name: z.string().trim().min(2).max(200),
   slug: z
@@ -507,7 +497,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
   organizationId:uuid,name:z.string().trim().min(2).max(160),
   slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   timezone:z.string().trim().min(3).max(80),
-  address:launchSiteAddress.optional(),
+  address:physicalSiteAddressSchema.optional(),
  }).strict().parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
