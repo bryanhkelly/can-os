@@ -1,0 +1,35 @@
+name: PX B visual website acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/capture-school-site-visuals.mjs'
+      - 'src/domain/site-theme.ts'
+      - 'src/domain/public-site-html.ts'
+      - 'src/domain/site-local-content.ts'
+      - '.github/workflows/px-b-visual-acceptance.yml'
+permissions:
+  contents: read
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium browser for isolated screenshot acceptance
+        run: npx playwright install chromium --with-deps
+      - name: Capture three fictional school configurations
+        run: node --import tsx scripts/capture-school-site-visuals.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: px-b-visual-screenshots
+          path: artifacts/site-visuals/
+          if-no-files-found: error
+          retention-days: 30
