@@ -163,6 +163,42 @@ export const getTeacherMarketplace = createServerFn({ method: "GET" })
         course.teacherOptions.map(teacher => teacher.personId))).size };
   });
 
+/** Registrar-only discovery of synthetic teacher previews. No adoption or entitlement is
+ * required to browse; these profiles can never be engaged through this endpoint. */
+export const getDemoTeacherPreviews = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({ programId: z.string().uuid() }).strict().parse(value))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const actor = await requireActor(["registrar"]);
+    await readMarketplace(actor, data.programId); // Institutional authorization and scope.
+    const rows = await db.select({
+      personId: people.id, firstName: people.legalFirstName, lastName: people.legalLastName,
+      courseCode: courseTemplates.code, courseTitle: courseTemplates.title,
+      subject: courseTemplates.subject,
+    }).from(instructorCapabilities)
+      .innerJoin(people, eq(people.id, instructorCapabilities.personId))
+      .innerJoin(memberships, eq(memberships.personId, people.id))
+      .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
+      .innerJoin(courseTemplates, eq(courseTemplates.id, instructorCapabilities.courseTemplateId))
+      .where(and(
+        sql`${organizations.metadata}->>'demoProvider' = 'true'`,
+        sql`${organizations.metadata}->>'isSynthetic' = 'true'`,
+        sql`${courseTemplates.metadata}->>'sourceSystem' = 'can-demo-catalog-factory'`,
+        eq(instructorCapabilities.active, true), eq(people.active, true),
+      )).orderBy(asc(people.legalLastName), asc(people.legalFirstName), asc(courseTemplates.code));
+    const teachers = new Map<string, {personId:string;name:string;courses:{code:string;title:string;subject:string}[]}>();
+    for (const row of rows) {
+      let teacher = teachers.get(row.personId);
+      if (!teacher) {
+        teacher = {personId:row.personId,name:`${row.firstName} ${row.lastName}`,courses:[]};
+        teachers.set(row.personId,teacher);
+      }
+      if (!teacher.courses.some(course=>course.code===row.courseCode))
+        teacher.courses.push({code:row.courseCode,title:row.courseTitle,subject:row.subject});
+    }
+    return {teachers:[...teachers.values()],synthetic:true as const,engagementAllowed:false as const};
+  });
+
 const engageInput = z.object({
   programId: z.string().uuid(),
   courseVersionId: z.string().uuid(),
