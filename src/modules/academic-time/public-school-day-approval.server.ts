@@ -6,6 +6,7 @@ import { publicSchoolDayScheduleSignature, isIndependentPublicScheduleReviewer }
 import { writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "@/modules/sites/site-publication.server";
 import { publicSchoolDaySiteRevision } from "./public-school-day-site-revision.server";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { competingActiveSchoolDaySchedules } from "@/domain/public-school-day";
 
 /**
@@ -23,6 +24,10 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
     const site = await requireSitePublisher(actor, input.siteId, tx);
     if (!actor.scope.programIds?.includes(input.programId))
       throw new Error("Program not in authorized publication scope");
+    // Use the existing academic-time advisory lock before reading timetable
+    // periods. Studio edits also acquire this lock, so approval cannot race a
+    // concurrent period replacement with a stale author/signature.
+    await lockAttendanceConfigurationAtSite(tx,site.id);
     // Serialize against the authoritative Site address/timezone editor.
     const [siteRecord]=await tx.select({
       timezone:sites.timezone,address:sites.address,metadata:sites.metadata,
