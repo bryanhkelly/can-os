@@ -66,6 +66,33 @@ export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
   branding: emptySiteLocalBranding,
 });
 
+/**
+ * Reusable fictional starter copy for explicitly synthetic school previews.
+ * Never writes to the database. A Site editor must review and publish this
+ * through the ordinary revisioned church-content command.
+ */
+export function createIllustrativeSchoolContent(schoolName: string): SiteLocalContent {
+  const name = schoolName.trim().slice(0, 80) || "Our School";
+  return {
+    welcomeMessage: "A place to belong. A world of possibilities.",
+    localDescription: `${name} is an illustrative community-rooted school where students are known, ideas are welcomed, and meaningful learning is part of everyday life. Explore this sample experience to imagine what a local partner school could become.`,
+    denomination: "",
+    statementOfFaith: "",
+    spiritualFormation: "Our fictional school community makes room for reflection, encouragement, faith, and service. Partner-specific faith practices require local review.",
+    churchHistory: "This is the sample origin story of a school imagined around a simple conviction: each young person deserves to be seen, challenged, and supported. A real church partner would replace this with its own history.",
+    communityOutreach: "Student-led neighborhood projects, community conversations, and service opportunities help connect learning to life. These are illustrative concepts rather than scheduled activities.",
+    schoolVision: "Curious minds. Courageous hearts. A community that sees what each student can become. We imagine an education that makes room for both academic challenge and authentic relationships.",
+    leadershipWelcome: "Welcome. We hope this example helps you picture a thoughtful school community with meaningful relationships, purposeful learning, and a clear path for families.",
+    localTraditions: "Imagine student exhibitions, family showcases, Friday celebrations, and community service days. These are fictional examples, not confirmed events.",
+    branding: {
+      theme: "classic",
+      paletteId: "heritage",
+      typographyId: "editorial",
+      heroImage: null,
+    },
+  };
+}
+
 export const siteLocalContentLimits: Readonly<Record<SiteLocalTextField, number>> = {
   welcomeMessage: 240,
   localDescription: 1400,
