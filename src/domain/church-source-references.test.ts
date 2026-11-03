@@ -21,6 +21,8 @@ describe("church reference URLs", () => {
   it.each([
     ["website", "http://church.org"],
     ["website", "https://user:pass@church.org"],
+    ["website", "https://church.org/about?access_token=private"],
+    ["youtube", "https://youtube.com/@Church?api_key=private"],
     ["website", "https://localhost/admin"],
     ["website", "https://127.0.0.1"],
     ["website", "https://[::1]"],
