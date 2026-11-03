@@ -99,6 +99,14 @@ function InsightsPage() {
   <div className="mx-auto max-w-5xl">
    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Insights</p>
    <h1 className="mt-2 font-serif text-4xl">Insights</h1>
+   <nav aria-label="School review navigation" className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
+    <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Back to operations</Link>
+    <Link to="/operations/school-years" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">School-year planning</Link>
+   </nav>
+   <section aria-label="Review process" className="mt-5 rounded-xl border bg-card p-4">
+    <h2 className="font-semibold">School-health review</h2>
+    <p className="mt-2 text-sm text-muted-foreground">Review the latest recorded signals in your authorized scope. Inspect supporting evidence before creating a follow-up Action; dismiss signals with a documented reason when appropriate. The page does not establish that a monthly review has been performed.</p>
+   </section>
    <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
     Signals surfaced from school activity, with the evidence behind each one. Review the evidence chain before accepting an insight as an Action or dismissing it.
    </p>
