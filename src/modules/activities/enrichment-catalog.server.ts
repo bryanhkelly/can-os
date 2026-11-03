@@ -96,7 +96,8 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
   )).orderBy(asc(s.calendarEvents.startsAt)).limit(6000) : [];
   const firstSession = new Map<string, (typeof sessionRows)[number]>();
   for (const item of sessionRows) if (item.seasonId &&
-    item.metadata.extendedLearningDraft === false && !firstSession.has(item.seasonId))
+    item.metadata.extendedLearningDraft === false && item.metadata.cancelled !== true &&
+    item.endsAt > now && !firstSession.has(item.seasonId))
     firstSession.set(item.seasonId, item);
   const registrationRows = ids.length ? await executor.select({
     seasonId: s.activityRegistrations.activitySeasonId,
@@ -106,7 +107,8 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
   return published.map(row => {
     const packages = readEnrichmentPackages(row.seasonMetadata);
     const sessions = sessionRows.filter(event => event.seasonId === row.seasonId &&
-      event.metadata.extendedLearningDraft === false && event.metadata.cancelled !== true)
+      event.metadata.extendedLearningDraft === false && event.metadata.cancelled !== true &&
+      event.endsAt > now)
       .map(event => event.id ?? "").filter(Boolean);
     const bookings = registrationRows.filter(entry => entry.seasonId === row.seasonId);
     const occupied = sessionOccupancy(sessions, bookings);
@@ -121,19 +123,24 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
         seatsRemaining: available ? seatsFor(item.sessionIds) : 0,
       };
     });
+    const seatsRemaining = seatsFor(sessions);
+    const registrationWindowOpen = (!row.registrationOpensAt || now >= row.registrationOpensAt) &&
+      (!row.registrationClosesAt || now <= row.registrationClosesAt);
+    const hasBookableCapacity = packages.length
+      ? packageAvailability.some(item => item.available && (item.seatsRemaining ?? 0) > 0)
+      : seatsRemaining !== null && seatsRemaining > 0;
     return {
     seasonId: row.seasonId, name: row.name, seasonName: row.seasonName,
     programName: row.programName, programType: row.programType,
     siteName: row.siteName, startsOn: row.startsOn, endsOn: row.endsOn,
-    capacity: row.capacity, seatsRemaining: seatsFor(sessions),
+    capacity: row.capacity, seatsRemaining,
     packages: packageAvailability,
     feeAmountCents: row.feeAmountCents ?? 0,
     firstMeeting: firstSession.get(row.seasonId)?.startsAt.toISOString() ?? null,
     meetingTimezone: firstSession.get(row.seasonId)?.timezone ?? null,
     permissionVersion: row.permission.permissionVersion,
     permissionText: row.permission.permissionText,
-    registrationOpen: (!row.registrationOpensAt || now >= row.registrationOpensAt) &&
-      (!row.registrationClosesAt || now <= row.registrationClosesAt),
+    registrationOpen: registrationWindowOpen && sessions.length > 0 && hasBookableCapacity,
   };
   });
 }
