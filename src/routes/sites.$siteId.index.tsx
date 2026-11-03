@@ -8,6 +8,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
 import { SiteTodayPriorities } from "@/components/operations/SiteTodayPriorities";
+import type { DailyAttentionItem } from "@/domain/daily-operations";
 import { SiteOwnedActionResolution } from "@/components/operations/SiteOwnedActionResolution";
 
 export const Route = createFileRoute("/sites/$siteId/")({
@@ -47,6 +48,27 @@ function SiteTodayPage() {
     student.healthVisitCount>0||student.incidentCount>0||student.activeEmergencyHold||
     student.activeCustodyHold||student.deniedPickupAttempts>0||!!student.uncollectedActionId);
   const blockedOpenings=data.schoolOpenings.filter(opening=>opening.blocked);
+  // Derived attention is guidance, never a new source of operating approval.
+  const operatingAlerts: DailyAttentionItem[] = [
+    ...blockedOpenings.map(opening=>{
+      const program=data.programs.find(item=>item.id===opening.programId);
+      return {
+        id:"opening-status:"+opening.programId,category:"opening" as const,
+        title:(program?.name??"School program")+" — opening not authorized",
+        detail:"CAN opening approval or current prerequisites are missing. Program activity is not authorization to receive children.",
+        href:"/operations/launch",nextStep:"Review launch and contact the CAN opening officer",
+        ownerName:"CAN school-opening officer",dueAt:null,priority:"critical" as const,
+      };
+    }),
+    ...(staffingExceptions.length ? [{
+      id:"school-day-staffing",category:"staffing" as const,
+      title:staffingExceptions.length+" supervised block"+(staffingExceptions.length===1?"":"s")+" need coverage review",
+      detail:"Resolve missing schedules, adult assignments and independently witnessed coverage before treating the day as ready.",
+      href:"#staffing-exceptions",nextStep:"Review staffed blocks and responsible adults",
+      ownerName:"Local site director",dueAt:null,priority:"high" as const,
+    }] : []),
+  ];
+  const leaderAttention=[...operatingAlerts,...data.attentionItems];
   const ownedFollowUps=data.actions.filter(action=>
     action.ownerPersonId===data.viewerPersonId&&ownerResolvableTypes.has(action.type));
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
@@ -66,6 +88,11 @@ function SiteTodayPage() {
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
+    <section aria-label="School-day operating decision" role="status" className="mt-6 rounded-xl border p-5">
+      <h2 className="font-semibold">Can this site receive students today?</h2>
+      <p className="mt-2 text-sm">{blockedOpenings.length>0 ? "Not authorized — an opening approval or required evidence is missing." : data.schoolDay.projectionTruncated ? "Not verified — source records are incomplete." : staffingExceptions.length>0 ? "Coverage review required — operating readiness is not established." : "Opening blockers were not identified in the visible records. Confirm the required daily handoff and current coverage before receiving students."}</p>
+      <p className="mt-2 text-xs text-muted-foreground">Academic program status and attendance records do not authorize school opening or certify daily coverage.</p>
+    </section>
     {blockedOpenings.length>0&&
       <section role="alert" aria-label="School opening authorization"
         className="mt-6 border-l-4 border-destructive bg-muted/40 px-5 py-4">
@@ -90,7 +117,7 @@ function SiteTodayPage() {
           })}
         </ul>
       </section>}
-    <SiteTodayPriorities items={data.attentionItems} siteId={data.site.id} siteTimezone={data.site.timezone}
+    <SiteTodayPriorities items={leaderAttention} siteId={data.site.id} siteTimezone={data.site.timezone}
       ownedActionIds={ownedFollowUps.map(action => `action:${action.id}`)}
       staffingExceptionCount={staffingExceptions.length}
       studentExceptionCount={studentExceptions.length}/>
