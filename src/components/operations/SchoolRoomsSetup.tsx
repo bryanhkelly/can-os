@@ -39,7 +39,7 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
                 retire={reason => feedback.run(() => retireSchoolRoomFn({
                   data: { programId, roomId: room.id, expectedRevision: room.revision, reason, confirmed: true },
                 }), { successMessage: "Classroom retired. Review defaults that still reference it; approved plans and history were not rewritten.",
-                  commandErrorMessage: "Unable to retire this classroom." })}/>}
+                  commandErrorMessage: "Unable to retire this classroom." })}/> : null}
         </li>)}
       </ul> : <p role="status" className="mt-4 text-sm">No physical classrooms have been created for this Site.</p>}
       {!rooms.data.canManage && <p className="mt-4 text-sm" role="status">Room configuration is managed by the school registrar. You may review this physical directory, but cannot edit rooms or class locations.</p>}
