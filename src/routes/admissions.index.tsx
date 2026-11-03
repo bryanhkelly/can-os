@@ -295,6 +295,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     setSections([]);
     setChosen("");
     setTransferBlocker(null);
+    setError("");
     setLoaded(false);
     listEnrollmentPlacements({ data: { applicationId } }).then(result => {
       if (current) { setSections(result.sections); setTransferBlocker(result.transferBlocker); setLoaded(true); }
@@ -307,6 +308,9 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     const result = await listEnrollmentPlacements({ data: { applicationId } });
     setSections(result.sections);
     setTransferBlocker(result.transferBlocker);
+    // A section selected before the refresh may no longer be staffed or have
+    // capacity. Require an explicit fresh choice rather than carrying it over.
+    setChosen("");
     setLoaded(true);
   }
   async function open() {
