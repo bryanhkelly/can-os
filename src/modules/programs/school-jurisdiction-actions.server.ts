@@ -126,8 +126,8 @@ export async function decideSchoolJurisdictionLegalReview(
     const [site]=await tx.select({id:sites.id,updatedAt:sites.updatedAt})
       .from(sites).where(eq(sites.id,target.siteId)).for("update").limit(1);
     if(!site)throw new AuthorizationError("canonical Site record");
-    const [program]=await tx.select({id:programs.id}).from(programs)
-      .where(eq(programs.id,input.programId)).for("update").limit(1);
+    const [program]=await tx.select({id:programs.id,organizationId:programs.organizationId})
+      .from(programs).where(eq(programs.id,input.programId)).for("update").limit(1);
     if(!program)throw new AuthorizationError("canonical Program record");
     const review=await readSchoolJurisdictionReview(actor,input.programId,tx);
     if(review.scopeFingerprint!==input.expectedScopeFingerprint ||
@@ -139,11 +139,15 @@ export async function decideSchoolJurisdictionLegalReview(
       eq(actions.type,schoolJurisdictionReviewActionType),
       eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
       eq(actions.siteId,target.siteId),eq(actions.programId,input.programId),
+      eq(actions.organizationId,program.organizationId),
     )).for("update").limit(1);
     if(!legal || typeof legal.metadata.requesterPersonId!=="string")
       throw new Error("Church registrar must request the legal review first");
     if(legal.metadata.requesterPersonId===actor.actorPersonId)
       throw new AuthorizationError("reviewer must be independent of requester");
+    if(input.decision==="verify" && !review.reviewRequired &&
+      legal.status==="resolved" && legal.metadata.reviewState==="independently_verified")
+      return {programId:input.programId,verified:true,actionId:legal.id};
     const [location]=await tx.select().from(actions).where(and(
       eq(actions.type,"site_location_change_review"),
       eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
