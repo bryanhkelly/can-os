@@ -534,7 +534,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
   ]);
   return db.transaction(async tx=>{
    // Serialize identical retry/submission attempts before checking existing Sites.
-   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:" + data.organizationId + ":" + data.slug}))`);
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:" + data.organizationId + ":" + data.name.trim().toLowerCase()}))`);
    // The unique index only covers slug; a renamed slug would otherwise fork the campus.
    const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug,
      timezone:s.sites.timezone,address:s.sites.address})
