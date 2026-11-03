@@ -135,8 +135,8 @@ export async function decideSchoolJurisdictionLegalReview(
     if(review.scopeFingerprint!==input.expectedScopeFingerprint ||
       review.siteAddressRevision!==input.expectedSiteRevision)
       throw new Error("Site or Program configuration changed; refresh current review");
-    if(review.locationReviewReason)
-      throw new Error("Physical Site address requires correction before independent review");
+    if(review.locationReviewReason && input.decision==="verify")
+      throw new Error("Physical Site address requires correction before independent verification");
     const [legal]=await tx.select().from(actions).where(and(
       eq(actions.type,schoolJurisdictionReviewActionType),
       eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
