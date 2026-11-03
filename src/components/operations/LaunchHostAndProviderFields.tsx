@@ -90,7 +90,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       <Field label="Location time zone">
                        <Select value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
                         <option value="">Choose the school time zone…</option>
-                        {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
+                        {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].filter(Boolean).map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
                        </Select>
                       </Field>
                     </div>
