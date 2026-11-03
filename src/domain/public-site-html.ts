@@ -1,4 +1,5 @@
 import { type PublicSitePath } from "./public-site-paths";
+import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import { normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
@@ -9,6 +10,8 @@ export type PublicSitePage = {
   site: { name: string; organizationName: string };
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
+  /** Only institutionally reviewed claims with public display permission are rendered. */
+  parentInformation?: PublicParentSchoolProfile;
   /** Locally authored church copy, separately versioned and safety screened. */
   localContent?: SiteLocalContent | null;
 };
@@ -31,9 +34,16 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     local.schoolVision, local.leadershipWelcome, local.localTraditions, local.denomination,
     local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
   const academic = Boolean(page.academicPrograms?.length);
+  const parent = page.parentInformation;
+  const tuition = Boolean(parent?.tuition.description.canDisplay && parent.tuition.description.value);
+  const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
+  const faq = Boolean(parent?.admissions.description.canDisplay && parent.admissions.description.value);
   return ["/", ...(hasStory ? ["/about"] as const : []),
     ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
-    ...(page.offerings.length ? ["/student-life"] as const : []), "/contact"];
+    ...(page.offerings.length ? ["/student-life"] as const : []),
+    ...(tuition ? ["/tuition"] as const : []),
+    ...(services ? ["/families"] as const : []),
+    ...(faq ? ["/faq"] as const : []), "/contact"];
 }
 
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
@@ -64,7 +74,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "School day",
-    "/admissions": "Admissions", "/contact": "Contact",
+    "/admissions": "Admissions", "/tuition": "Tuition", "/families": "Families",
+    "/faq": "Questions", "/contact": "Contact",
   };
   const navigation = availablePaths.map(destination =>
     `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`
@@ -196,6 +207,18 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">Exact schedules and days are confirmed by the school; this overview
       does not imply a Monday–Friday schedule or that the program is operating.</p></article>`;
   }).join("");
+  const parent = page.parentInformation;
+  const verifiedText = (claim: { canDisplay: boolean; value: string | null } | undefined) =>
+    claim?.canDisplay && claim.value ? escapePublicHtml(claim.value) : "";
+  const tuitionText = verifiedText(parent?.tuition.description);
+  const aidText = verifiedText(parent?.tuition.financialAid);
+  const tuitionSection = tuitionText ? `<section class="church-section" aria-labelledby="tuition-title">
+    <h2 id="tuition-title">Tuition and costs</h2><p>${tuitionText}</p>
+    ${aidText ? `<h3>Financial assistance</h3><p>${aidText}</p>` : ""}</section>` : "";
+  const serviceCards = parent?.services.filter(item => item.description.canDisplay && item.description.value)
+    .map(item => `<article class="card"><h3>${escapePublicHtml(item.category.replace(/_/g, " "))}</h3>
+      <p>${verifiedText(item.description)}</p></article>`).join("") ?? "";
+  const admissionExplanation = verifiedText(parent?.admissions.description);
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero"><p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   const pageContent: Record<PublicSitePath, string> = {
@@ -212,6 +235,15 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/admissions": secondaryHero("For families", "Admissions and next steps",
       "Explore eligible programs. Applications are available only when separately authorized.") +
       academicSection,
+    "/tuition": secondaryHero("Planning your education", "Tuition and financial information",
+      "Only officially approved tuition information appears here.") + tuitionSection,
+    "/families": secondaryHero("Supporting families", "Family services",
+      "Services shown here have been reviewed for public description.") +
+      `<section aria-label="Verified family services" class="grid">${serviceCards}</section>`,
+    "/faq": secondaryHero("Common questions", "Questions about joining",
+      "Verified guidance from the school.") +
+      `<section class="church-section" aria-labelledby="faq-admissions"><h2 id="faq-admissions">How does admissions work?</h2>
+      <p>${admissionExplanation}</p></section>`,
     "/contact": secondaryHero("Get in touch", "Connect with our school",
       "Start with an approved program inquiry when available.") + academicSection + contactSection,
   };
