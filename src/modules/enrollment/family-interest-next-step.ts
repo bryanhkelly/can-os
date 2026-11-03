@@ -8,7 +8,7 @@ export type FamilyInterestNextStep = {
   state: "closed" | "follow_up" | "await_admissions" | "invite_to_apply" |
     "await_email_verification" | "await_application" | "review_application" |
     "await_guardian_offer" | "activate_enrollment" | "assign_class" |
-    "student_access" | "first_day_preparation";
+    "student_access" | "first_day_preparation" | "authorization_unavailable";
   owner: "registrar" | "guardian" | "school";
   message: string;
 };
@@ -31,6 +31,7 @@ export function familyInterestNextStep(input: {
   interestStatus: string;
   consented: boolean;
   admissionsAuthorized: boolean;
+  authorizationUnavailable?: boolean;
   canInvite: boolean;
   hasFamilyStartRequest: boolean;
   emailVerified: boolean;
@@ -78,6 +79,10 @@ export function familyInterestNextStep(input: {
   if (!input.consented) return {
     state: "follow_up", owner: "registrar",
     message: "No affirmative adult contact consent is recorded. Do not initiate unsolicited follow-up.",
+  };
+  if (input.authorizationUnavailable) return {
+    state: "authorization_unavailable", owner: "registrar",
+    message: "Admissions authorization cannot be verified right now. Retry the read before inviting this family.",
   };
   if (!input.admissionsAuthorized) return {
     state: "await_admissions", owner: "school",
