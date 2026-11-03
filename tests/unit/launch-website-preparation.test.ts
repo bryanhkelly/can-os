@@ -17,6 +17,9 @@ describe("launch website preparation",()=>{
   expect(view).toMatchObject({programId:"program",siteId:"site",status:"draft",includesSuggestions:true});
   expect(view.previewHtml).toContain("Hope School");expect(view.previewHtml).toContain("Hope Church");
   expect(view.previewHtml).toContain("2027-08-23");expect(view.previewHtml).toContain("K–8");
+  expect(view.previewPages["/academics"]).toContain("Hope School");
+  expect(view.previewPages["/school-day"]).toContain("5 onsite days per week");
+  expect(view.previewPages["/admissions"]).not.toContain("<form");
   expect(view.previewHtml).not.toContain('<form action="/apply"');expect(view.previewHtml).not.toContain('<form action="/inquiry"');
  });
  it("does not create a second planning card for an approved listing",async()=>{
