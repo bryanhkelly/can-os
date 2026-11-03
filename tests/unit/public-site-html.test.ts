@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapePublicHtml, renderPublicSiteHtml } from "@/domain/public-site-html";
+import { escapePublicHtml, isIndexablePublicSite, renderPublicSiteHtml, availablePublicSitePaths } from "@/domain/public-site-html";
 import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
 
 describe("standalone public site HTML", () => {
@@ -68,6 +68,24 @@ describe("standalone public site HTML", () => {
     expect(() => renderPublicSiteHtml({ ...page, academicPrograms: [] },
       { path: "/academics" })).toThrow(/not available/);
   });
+  it("does not advertise an unconfigured contact page and clarifies pre-opening interest", () => {
+    const empty = {host: "church.can-os.com", site: {name: "Church School", organizationName: "Church"}, offerings: []};
+    expect(availablePublicSitePaths(empty)).toEqual(["/"]);
+    const planned = {...empty, academicPrograms: [{
+      programId: "00000000-0000-4000-8000-000000000002",
+      title: "Elementary program", typeLabel: "Hybrid program", summary: "Proposed program",
+      grades: {min: "K", max: "5"},
+      delivery: {onsite: true, asynchronous: true, liveOnline: false, onsiteDaysPerWeek: 2},
+      availability: "planned" as const,
+    }]};
+    const html = renderPublicSiteHtml(planned, {makeRequestId: () => "00000000-0000-4000-8000-000000000001"});
+    expect(html).toContain("Welcoming founding families");
+    expect(html).toContain("A request for information is not an application or an enrollment offer");
+    expect(html).toContain('action="/inquiry"');
+    expect(html).not.toContain('action="/apply"');
+    expect(html).toContain("<title>Church School | Founding families</title>");
+  });
+
   it("renders an empty published catalog without claiming enrollment is available", () => {
     const html = renderPublicSiteHtml({
       host: "partner.can-os.com",
@@ -149,7 +167,7 @@ describe("standalone public site HTML", () => {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
     });
     for (const shared of [
-      "<!doctype html>", "<title>Fellowship Academy | Programs</title>",
+      "<!doctype html>", "<title>Fellowship Academy | Founding families</title>",
       "Fellowship Church", "Hybrid Grade 9", "Approved school program information.",
       "Program planned", "fellowship-academy.can-os.com",
     ]) {
@@ -314,6 +332,8 @@ describe("standalone public site HTML", () => {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
     });
     expect(hostedDemo).toContain('content="noindex,nofollow"');
+    expect(isIndexablePublicSite({...page, demonstration: true})).toBe(false);
+    expect(isIndexablePublicSite(page)).toBe(true);
     const hostedOrdinary = renderPublicSiteHtml(page, {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
     });
