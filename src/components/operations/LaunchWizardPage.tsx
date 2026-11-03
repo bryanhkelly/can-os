@@ -38,6 +38,7 @@ export type LaunchWizardData = {
  enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
  extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
  jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
+ jurisdictionResearch: Record<string,LaunchJurisdictionResearch>;
  authError: string;
 };
 
