@@ -4,7 +4,6 @@ import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import { type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
-import { OutboxHealthPanel } from "@/components/operations/OutboxHealthPanel";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
 import {useRef,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
