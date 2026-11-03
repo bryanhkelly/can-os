@@ -23,10 +23,29 @@ function money(cents: number): string {
     .format(cents / 100);
 }
 
+export const publicSitePagePaths = ["/", "/about", "/academics", "/student-life", "/school-day", "/admissions", "/contact"] as const;
+export type PublicSitePath = typeof publicSitePagePaths[number];
+
+/** Navigation is derived from available approved facts; missing sections are never linked. */
+export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[] {
+  const local = page.localContent;
+  const hasStory = Boolean(local && [local.localDescription, local.churchHistory, local.communityOutreach,
+    local.schoolVision, local.leadershipWelcome, local.localTraditions, local.denomination,
+    local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
+  const academic = Boolean(page.academicPrograms?.length);
+  return ["/", ...(hasStory ? ["/about"] as const : []),
+    ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
+    ...(page.offerings.length ? ["/student-life"] as const : []), "/contact"];
+}
+
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   /** Caller supplies one server-generated random request ID per form. */
   makeRequestId?: () => string;
+  path?: PublicSitePath;
 }): string {
+  const path = options?.path ?? "/";
+  const availablePaths = availablePublicSitePaths(page);
+  if (!availablePaths.includes(path)) throw new Error("This public page is not available");
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
@@ -44,13 +63,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ["Spiritual formation", local.spiritualFormation],
   ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
   const image = local?.branding.heroImage;
-  const navigation = [
-    `<a href="#welcome">Welcome</a>`,
-    ...(localItems.length || image ? [`<a href="#church-identity-title">Our community</a>`] : []),
-    ...((page.academicPrograms ?? []).length ? [`<a href="#academic-title">Academics</a>`] : []),
-    `<a href="#programs-title">Enrichment</a>`,
-    `<a href="#contact">Contact</a>`,
-  ].join(" ");
+  const pageLabels: Record<PublicSitePath, string> = {
+    "/": "Home", "/about": "About", "/academics": "Academics",
+    "/student-life": "Student life", "/school-day": "School day",
+    "/admissions": "Admissions", "/contact": "Contact",
+  };
+  const navigation = availablePaths.map(destination =>
+    `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`
+  ).join(" ");
   const localSection = localItems.length || image ? `<section aria-labelledby="church-identity-title" class="church-section">
     <p class="tag">Content provided by the local church</p>
     <h2 id="church-identity-title">Our church and community</h2>
@@ -145,14 +165,69 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">${escapePublicHtml(registrationStatus)}</p>
     </article>`;
   }).join("\n");
+  const hero = `<div id="welcome" class="public-hero"><p class="tag">Welcome to our school</p><h1>${school}</h1>
+    ${local?.welcomeMessage ? `<p class="intro">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
+    <p class="intro">Explore the verified program information and local church story below.
+    A planned school is not yet authorized to admit or operate.</p></div>`;
+  const academicSection = academicCards ? `<section aria-labelledby="academic-title">
+    <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : "";
+  const enrichmentSection = `<section aria-labelledby="programs-title" style="margin-top:40px">
+    <h2 id="programs-title">Enrichment and student experiences</h2>
+    ${cards ? `<div class="grid">${cards}</div>` : academicCards
+      ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
+      : '<p class="empty">There are no programs to display at this time.</p>'}</section>`;
+  const contactSection = `<section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px">
+    <h2 id="contact-title">Connect with our school</h2>
+    <p>${academicCards ? "For program questions, use the request-information form on the academic listing." :
+      "Academic inquiries become available when an approved program is published."}
+    An inquiry does not guarantee admission or enrollment.</p></section>`;
+  const schoolDay = (page.academicPrograms ?? []).map(program => {
+    const days = program.delivery.onsiteDaysPerWeek;
+    const modes = [
+      program.delivery.onsite ? "Onsite learning" : null,
+      program.delivery.liveOnline ? "Live online learning" : null,
+      program.delivery.asynchronous ? "Self-paced online learning" : null,
+    ].filter(Boolean).join(" · ");
+    return `<article class="card"><h3>${escapePublicHtml(program.title)}</h3>
+      <p>${escapePublicHtml(modes || "Contact the school for delivery details")}</p>
+      ${program.delivery.onsite && days !== null ? `<p>${days} onsite days per week</p>` : ""}
+      <p class="availability">Exact schedules and days are confirmed by the school; this overview
+      does not imply a Monday–Friday schedule or that the program is operating.</p></article>`;
+  }).join("");
+  const secondaryHero = (eyebrow: string, title: string, summary: string) =>
+    `<div class="public-hero compact-hero"><p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
+  const pageContent: Record<PublicSitePath, string> = {
+    "/": hero + localSection + academicSection + enrichmentSection + contactSection,
+    "/about": secondaryHero("Our community", "A school rooted in community",
+      "Learn about the church and local people behind this school.") + localSection,
+    "/academics": secondaryHero("Learning", "Academic programs",
+      "Explore institutionally reviewed program information and delivery options.") + academicSection,
+    "/student-life": secondaryHero("Beyond the classroom", "Student life",
+      "See currently published enrichment and activities.") + enrichmentSection,
+    "/school-day": secondaryHero("Learning together", "A look at the school day",
+      "Program-specific delivery patterns, not a promised daily timetable.") +
+      `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>`,
+    "/admissions": secondaryHero("For families", "Admissions and next steps",
+      "Explore eligible programs. Applications are available only when separately authorized.") +
+      academicSection,
+    "/contact": secondaryHero("Get in touch", "Connect with our school",
+      "Start with an approved program inquiry when available.") + academicSection + contactSection,
+  };
+  const pageTitle = path === "/" ? `${school} | Programs` :
+    `${escapePublicHtml(pageLabels[path])} | ${school}`;
+  const pageDescription = path === "/" ? `Explore programs offered through ${school}.` :
+    `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
+  const isLive = Boolean(options?.makeRequestId);
+  const canonical = `https://${host}${path}`;
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="robots" content="index,follow"/>
-<title>${school} | Programs</title>
-<meta name="description" content="Explore programs offered through ${school}."/>
+<meta name="robots" content="${isLive ? "index,follow" : "noindex,nofollow"}"/>
+${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
+<title>${pageTitle}</title>
+<meta name="description" content="${pageDescription}"/>
 <style>
 :root{font-family:ui-sans-serif,system-ui,sans-serif;color:#193047;background:#f6f8fa;line-height:1.5}
 body.theme-warm{color:#422f28;background:#fbf6ef}body.theme-light{color:#24313b;background:#fff}
@@ -188,30 +263,12 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px}.card{padding:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .bot-field{display:none}
-header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a{color:inherit;text-underline-offset:4px}html{scroll-behavior:smooth}
+header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:4px}html{scroll-behavior:smooth}
 </style>
 </head>
 <body class="theme-${theme}">
 <header><p class="brand">CAN Academy · Local partner site</p><nav aria-label="School website navigation">${navigation}</nav><p>${org}</p></header>
-<main>
-  <div id="welcome" class="public-hero"><p class="tag">Welcome to our school</p><h1>${school}</h1>
-  ${local?.welcomeMessage ? `<p class="intro">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
-  <p class="intro">Discover academic and enrichment opportunities at this location.
-  Listings are reviewed marketing information, not accreditation, admission or
-  registration approvals.</p></div>
-  ${localSection}
-  ${academicCards ? `<section aria-labelledby="academic-title">
-    <h2 id="academic-title">Academic programs</h2>
-    <div class="grid">${academicCards}</div>
-  </section>` : ""}
-  <section aria-labelledby="programs-title" style="margin-top:40px">
-    <h2 id="programs-title">Summer and after-school enrichment</h2>
-    ${cards ? `<div class="grid">${cards}</div>` : academicCards
-      ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
-      : '<p class="empty">There are no programs to display at this time.</p>'}
-  </section>
-  <section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px"><h2 id="contact-title">Connect with our school</h2><p>${academicCards ? "For academic program questions, use the request-information form on the program listing above." : "Academic inquiries are not available on this website until a school program is published."} An application invitation appears only for an eligible operating program; submitting a request does not guarantee admission.</p></section>
-</main>
+<main>\n  ${pageContent[path]}\n</main>
 <footer>${host} · Powered by CAN OS</footer>
 </body>
 </html>`;
