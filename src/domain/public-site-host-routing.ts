@@ -1,4 +1,4 @@
-import { isPublicSitePagePath } from "./public-site-paths.ts";
+import { isPublicSiteReadPath } from "./public-site-paths.ts";
 import { PUBLIC_SITE_DOMAIN, slugFromPublicSiteHost } from "./public-site-address.ts";
 
 /** Only these known platform hosts can serve CAN OS, never a partner site. */
@@ -42,7 +42,7 @@ export function classifyPublicSiteRequest(
   if (method === "POST" && (url.pathname === "/published-site/inquiry" ||
       url.pathname === "/published-site/family-start"))
     return { kind: "site", slug, rewrite: false };
-  if (method === "GET" && isPublicSitePagePath(url.pathname))
+  if (method === "GET" && isPublicSiteReadPath(url.pathname))
     return { kind: "site", slug, rewrite: true };
   // Netlify may re-run edge middleware on the internal rewrite.
   if (method === "GET" && (url.pathname === "/published-site" ||
@@ -55,7 +55,7 @@ export function classifyPublicSiteRequest(
 function isRewrittenSitePage(path: string): boolean {
   return path.startsWith("/published-site/") &&
     path !== "/published-site/" &&
-    isPublicSitePagePath(path.slice("/published-site".length));
+    isPublicSiteReadPath(path.slice("/published-site".length));
 }
 
 /** Independently verify the final origin request: never trust a slug in a URL
