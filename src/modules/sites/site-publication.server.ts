@@ -13,6 +13,8 @@ import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
+import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
@@ -92,6 +94,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     readCurrentLocalContent(site.id),
   ]);
   const publicOfferings = publishedOfferings.map(toPublicSiteEnrichment);
+  const approvedPhotos=address[0] ? await readApprovedSchoolSitePhotos(site.id) : [];
+  const media=address[0] ? projectApprovedSchoolSiteMedia(site.id,publicSiteHost(address[0].slug),approvedPhotos) : {};
   const [siteConfiguration] = await db.select({metadata: sites.metadata})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const parentExtras = await readApprovedPublicParentExtras(site.id,
@@ -114,6 +118,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     localContent: localCopy?.content ?? null,
     offerings: publicOfferings,
     parentInformation,
+    media,
   }) : null;
   const previewPages = publisherPreview ? Object.fromEntries(
     availablePublicSitePaths(publisherPreview).map(path => [path,
