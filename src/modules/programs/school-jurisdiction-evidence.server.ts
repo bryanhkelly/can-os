@@ -19,6 +19,7 @@ async function lockRequirement(tx:Tx,actionId:string){
   const [site]=await tx.select({id:sites.id}).from(sites)
     .where(eq(sites.id,candidate.siteId)).for("update").limit(1);
   const [program]=await tx.select({id:programs.id,organizationId:programs.organizationId,
+    academicProviderOrganizationId:programs.academicProviderOrganizationId,
     siteId:programs.siteId}).from(programs)
     .where(eq(programs.id,candidate.programId)).for("update").limit(1);
   const [action]=await tx.select().from(actions).where(eq(actions.id,actionId))
@@ -56,9 +57,7 @@ export async function submitSchoolJurisdictionRequirementEvidence(
     const {site,program,action}=await lockRequirement(tx,input.actionId);
     if(canSubmitter){
       if(actor.grantSiteId!==null || actor.sessionAccountId ||
-        !actor.scope.organizationIds?.includes(
-          (await tx.select({id:programs.academicProviderOrganizationId})
-            .from(programs).where(eq(programs.id,program.id)).limit(1))[0]?.id))
+        !actor.scope.organizationIds?.includes(program.academicProviderOrganizationId))
         throw new AuthorizationError("CAN academic provider evidence submission scope");
       if(action.metadata.responsibleParty!=="can")
         throw new AuthorizationError("CAN reviewer cannot submit a church or family legal obligation");
