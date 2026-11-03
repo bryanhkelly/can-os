@@ -129,6 +129,13 @@ describe("standalone public site HTML", () => {
     expect(faq).toContain("Which programs and grades are available?");
     expect(faq).toContain("Applications are not currently open");
     expect(faq).not.toContain("Tuition is free");
+    expect(availablePublicSitePaths({...base,parentInformation:profile})).toContain("/tuition");
+    const tuition=renderPublicSiteHtml({...base,parentInformation:profile},{path:"/tuition"});
+    expect(tuition).toContain("Reviewed tuition and fee details have not yet been published");
+    expect(tuition).toContain("Reviewed financial assistance details are not yet available");
+    expect(tuition).toContain('href="/academics"');
+    expect(tuition).not.toContain("Tuition is free");
+    expect(faq).toContain("Request current details for your program");
     const academics=renderPublicSiteHtml({...base,parentInformation:profile},{path:"/academics"});
     expect(academics).toContain("How learning is organized");
     expect(academics).toContain("Self-paced online learning");
