@@ -1,3 +1,4 @@
+import { getDemoCurriculumPreview } from "@/modules/learning/demo-curriculum-preview.functions";
 import { OneRosterStudentReconciliation } from "@/components/learning/OneRosterStudentReconciliation";
 import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
 import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
@@ -27,8 +28,9 @@ export const Route=createFileRoute("/operations/curriculum-marketplace")({
  loader:({deps})=>safeLoader(async()=>{
   const programs=await getCurriculumAdopterPrograms();
   const marketplace=deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null;
+  const demoPreview=deps.programId?await getDemoCurriculumPreview({data:{programId:deps.programId}}):null;
   return {
-   programs,marketplace,
+   programs,marketplace,demoPreview,
    journey:deps.programId?await getCurriculumJourneyReadiness({data:{programId:deps.programId}}):null,
    pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
    imports:deps.programId&&marketplace?.canPublish
@@ -43,7 +45,7 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
+function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};demoPreview:Awaited<ReturnType<typeof getDemoCurriculumPreview>>|null;imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
@@ -82,6 +84,17 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  return <main className="mx-auto max-w-6xl space-y-6 px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Academic operations</p>
   <h1 className="font-serif text-4xl">Curriculum Marketplace</h1>
+  {data.demoPreview && <section className="space-y-3 rounded-xl border p-5" aria-label="Sample curriculum catalog">
+    <h2 className="font-serif text-2xl">Explore sample curriculum</h2>
+    <p className="text-sm text-muted-foreground">These {data.demoPreview.courses.length} synthetic courses are for demonstration and planning only. They are not academically approved or available for adoption.</p>
+    <div className="grid max-h-96 gap-2 overflow-y-auto md:grid-cols-2">
+      {data.demoPreview.courses.map(course=><article key={course.code} className="rounded-lg border p-3">
+        <p className="text-xs text-muted-foreground">{course.subject} · {course.code}</p>
+        <p className="font-medium">{course.title}</p>
+        <p className="text-sm text-muted-foreground">{course.description}</p>
+      </article>)}
+    </div>
+  </section>}
   <p className="max-w-3xl text-sm text-muted-foreground">Install published curriculum packs into your organization's library, adopt releases for a school program and supplement classes without changing the publisher's immutable material.</p>
   <CurriculumProgramNavigation programs={data.programs} selectedProgramId={market?.program.id} canPublish={Boolean(market?.canPublish)} />
   <MutationFeedback state={mutation} pendingMessage="Saving curriculum change..."/>
