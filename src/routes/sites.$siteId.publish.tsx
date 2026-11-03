@@ -37,6 +37,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [reason, setReason] = useState("");
   const [contentReviewed, setContentReviewed] = useState(false);
   const [reachability, setReachability] = useState<"live" | "unreachable" | "hosting_disabled" | "not_published" | null>(null);
+  const [previewPath, setPreviewPath] = useState("/");
   const [verifying, setVerifying] = useState(false);
   const [schoolName, setSchoolName] = useState(data.site.name);
   const [newSlug, setNewSlug] = useState(data.address?.slug ?? "");
@@ -209,14 +210,26 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </span>
       </div>
       {data.previewHtml ? <>
+        <div role="group" aria-label="Preview school website pages" className="mt-4 flex flex-wrap gap-2">
+          {Object.keys(data.previewPages).map(path =>
+            <button type="button" key={path} aria-pressed={previewPath === path}
+              onClick={() => setPreviewPath(path)}
+              className="rounded-md border px-3 py-2 text-sm font-semibold aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+              {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
+            </button>)}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Select a page above to preview it. Navigation inside this isolated frame
+          is not a live site link; public site links operate only on its published host.
+        </p>
         <p className="mt-4 text-xs text-muted-foreground">
           Reserved address: <span className="font-mono">{data.address?.host}</span>.
           {data.hostingConfigured && data.address?.status === "published"
             ? "Hosting is enabled in the application; external DNS/TLS reachability must still be verified."
             : "This is a private preview, not an active public website."}
         </p>
-        <iframe title={`${data.site.name} private website draft preview`}
-          srcDoc={data.previewHtml} sandbox="" referrerPolicy="no-referrer"
+        <iframe key={previewPath} title={`${data.site.name} ${previewPath} private website draft preview`}
+          srcDoc={data.previewPages[previewPath] ?? data.previewHtml} sandbox="" referrerPolicy="no-referrer"
           loading="lazy" className="mt-3 h-[680px] w-full rounded-lg border bg-white"
         />
         <p className="mt-2 text-xs text-muted-foreground">
