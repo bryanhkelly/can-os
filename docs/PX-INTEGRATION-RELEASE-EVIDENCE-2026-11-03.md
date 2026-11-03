@@ -25,6 +25,19 @@ The baseline CI at `ab30effbfe5295277b013bddcfad9b492ba01993`, [run 41670982979]
 - Workstream B, [visual run 41665968060](https://github.com/bryanhkelly/can-os/actions/runs/41665968060), reported 35 synthetic screenshot captures, no overflow or scripts. These are earlier SHA captures, not proof of latest source or pixel fidelity to supplied comps.
 - [Admissions Neon run 41670982946](https://github.com/bryanhkelly/can-os/actions/runs/41670982946) failed the prerequisite check for an isolated test database secret. **Do not use a production connection string as a substitute**.
 
+## Verified source CI after regression burn-down
+
+**Green source SHA:** `6447209786c4c5bd5ec9e427e0fc7392529a6fba`. [CI run 41674077653](https://github.com/bryanhkelly/can-os/actions/runs/41674077653): **SUCCESS**.
+
+- Full Vitest suite: **490/490 test files, 3,247/3,247 cases passed**.
+- Build, whole-repository TypeScript, lint/design-system checks, admissions/authorization regressions and route/mutation-contract checks: **passed**.
+- FullFlow migration artifact checks, `drizzle-kit check`, and incremental Drizzle generate diff: **passed** (`No schema changes, nothing to migrate`).
+- Repaired exact migration/integration defects over commits `f07322d`, `741dc5e`, `b35fd74`, `a7b5d4d`, `66d2f33`, `9e26eb2`, `ebe4200`, `c761022`, `96460e2`, `a34cd8d`, `30658ad`, `28db818`, `f353c98`, and `6447209`. Tests reconcile current canonical admission offer state, production-safe school operating status, church external URL paths, source event registry, current editorial tenant identity, and school room/editor permissions. No production deploy or permissions were enabled.
+
+**Isolated database rehearsal:** Neon project `sweet-hall-62441909`, independently created child branch `integration-0067-0068-acceptance-20261103` (`br-blue-river-ar1k956t`; not production default `br-restless-sea-ar9ooo55`). The exact SQL statements in committed `0067` and `0068` were applied in one successful disposable-branch transaction; tables and constraints were independently inspected. This was a SQL DDL rehearsal **not** a Drizzle journal migration run, authenticated site/guardian acceptance, or a rollout to production. The isolated acceptance secret is still absent from GitHub `integration-test`, and production remains unchanged.
+
+**Remaining external gate:** [Admissions Neon Acceptance](https://github.com/bryanhkelly/can-os/actions/runs/41674077498) cannot execute database and Playwright journeys until GitHub environment `integration-test` has `CAN_ADMISSIONS_TEST_DATABASE_URL` (secret for an approved disposable Neon endpoint), `CAN_APPLICATION_DB_HOST` (nonsecret production-host comparator), and `CAN_ADMISSIONS_TEST_BRANCH_ID` (nonsecret ID of that disposable branch). Do not use production credentials as test credentials. Source CI success does not certify tenant routing under real DNS/TLS, screenshot fidelity or lawful school opening.
+
 ## Release acceptance matrix (pending unless an exact execution result is attached)
 
 | ID | Scenario / release assertion | Status | Required evidence |
@@ -46,8 +59,8 @@ The baseline CI at `ab30effbfe5295277b013bddcfad9b492ba01993`, [run 41670982979]
 | I-15 | Missing/unreachable sources do not block draft preview | UNVERIFIED | Authenticated browser acceptance |
 | I-16 | Image/child consent prevents unlicensed auto-import | UNVERIFIED | Rights and negative source tests |
 | I-17 | Visual fidelity at 1440/768/375/320 across 3 schools | PARTIAL / EARLIER SHA | Latest screenshots **and actual comp references** |
-| I-18 | Full typecheck, lint, build, route inventory, Drizzle diff and relevant suite | PENDING RERUN | CI job logs tied to exact main SHA |
-| I-19 | Isolated Neon `0067/0068` migration, CRUD, rollback and audit | BLOCKED / NOT RUN | Disposable branch and migration ledger checks |
+| I-18 | Full typecheck, lint, build, route inventory, Drizzle diff and relevant suite | **PASS at `6447209`** | [Exact CI run 41674077653](https://github.com/bryanhkelly/can-os/actions/runs/41674077653) |
+| I-19 | Isolated Neon `0067/0068` migration, CRUD, rollback and audit | **PARTIAL**: SQL DDL rehearsal passed; migration ledger, authenticated CRUD and rollback acceptance unverified | Branch `br-blue-river-ar1k956t`, verified schema checks |
 | I-20 | Public custom host DNS/TLS, edge, security headers, index/canonicals | NOT AUTHORIZED | Explicit launch authority and real host verification |
 
 ## Required release sequence
@@ -58,4 +71,4 @@ The baseline CI at `ab30effbfe5295277b013bddcfad9b492ba01993`, [run 41670982979]
 4. Validate host allowlists, tenant isolation, TLS/CSP, consent, source rights, refresh/SSRF and revocation; verify source DTO exposure through network responses.
 5. Obtain independent institutional/legal review and explicit production migration/hosting/rollout authorization. Until then keep both feature switches off and do not mutate production.
 
-**Current release decision: code integration underway; production rollout not authorized.**
+**Current release decision: source CI GREEN at `6447209`; product/browser acceptance NOT GREEN; production rollout NOT AUTHORIZED.**
