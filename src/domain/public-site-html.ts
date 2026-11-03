@@ -101,7 +101,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <p>${escapePublicHtml(value)}</p>
       </article>`).join("\n")}
     </div>
-    <p class="availability">Community and faith content comes from the local Site editor.
+    <p class="availability">Content provided by the local church. Community and faith content comes from the local Site editor.
     Academic, enrollment, and institutional statements are controlled separately by CAN.</p>
   </section>` : "";
   const academicCards = (page.academicPrograms ?? []).map(program => {
