@@ -85,6 +85,11 @@ describe("church website robots boundaries", () => {
     const robots = "User-agent: *\nDisallow: /\nUser-agent: CANOS-OtherBot\nAllow: /\n";
     expect(robotsAllows(robots, "/about")).toBe(false);
   });
+  it("honors an explicit robots group for the versioned outbound crawler token", () => {
+    const robots = "User-agent: *\nAllow: /\nUser-agent: CANOS-ChurchReference/1.0\nDisallow: /private\n";
+    expect(robotsAllows(robots, "/private")).toBe(false);
+    expect(robotsAllows(robots, "/about")).toBe(true);
+  });
   it("honors end anchors", () => {
     const robots = "User-agent: *\nDisallow: /private$\n";
     expect(robotsAllows(robots, "/private")).toBe(false);
