@@ -34,7 +34,7 @@ function approved(periods= sunday,reviewScope=scope){
 }
 describe("v2 versioned, Program-specific public weekly schedules",()=>{
   it("preserves Sunday and Saturday even for weekend-only enrichment",()=>{
-    const weekend=[...sunday,{...sunday,dayOfWeek:6,label:"Saturday studio"}];
+    const weekend=[...sunday,{...sunday[0]!,dayOfWeek:6,label:"Saturday studio"}];
     const result=projectPublicSchoolDay([approved(weekend)],scope.siteTimezone,now);
     expect(result.state).toBe("approved");
     expect(result.weeklyPattern.map(x=>x.dayOfWeek)).toEqual([0,6]);
@@ -42,8 +42,8 @@ describe("v2 versioned, Program-specific public weekly schedules",()=>{
   });
   it("preserves differing Tuesday and Friday times without fictitious uniform hours",()=>{
     const periods=[
-      {...sunday,dayOfWeek:2,startsAtLocal:"08:00",endsAtLocal:"13:00"},
-      {...sunday,dayOfWeek:5,startsAtLocal:"10:00",endsAtLocal:"15:00"},
+      {...sunday[0]!,dayOfWeek:2,startsAtLocal:"08:00",endsAtLocal:"13:00"},
+      {...sunday[0]!,dayOfWeek:5,startsAtLocal:"10:00",endsAtLocal:"15:00"},
     ];
     const result=projectPublicSchoolDay([approved(periods)],scope.siteTimezone,now);
     expect(result.state).toBe("pending");
