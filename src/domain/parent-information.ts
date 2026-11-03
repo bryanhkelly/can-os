@@ -94,7 +94,8 @@ export type PublicActivitySummary = {
   registrationOpen: boolean; // enrichment gate, not academic admissions
 };
 export type PublicSchoolService = {
-  category: "meals" | "transportation" | "before_care" | "after_care" | "safety_summary";
+  category: "meals" | "transportation" | "before_care" | "after_care" |
+    "communication" | "family_visits" | "safety_summary";
   description: PublicClaim<string>;
 };
 export type PublicTuitionSummary = {
@@ -233,7 +234,7 @@ export function projectApprovedParentInformation(input: {
       }, "enrichment_catalog"),
       registrationOpen: activity.registrationOpen,
     })),
-    services: input.services ?? (["meals", "transportation", "before_care", "after_care", "safety_summary"] as const)
+    services: input.services ?? (["meals", "transportation", "before_care", "after_care", "communication", "family_visits", "safety_summary"] as const)
       .map(category => ({ category, description: unconfiguredClaim<string>("institutional_record") })),
     tuition: input.tuition ?? {
       description: unconfiguredClaim("institutional_record"),
