@@ -7,7 +7,7 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema, siteTimezoneSchema } from "@/domain/site-setup-configuration";
+import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress } from "@/domain/site-setup-configuration";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
@@ -504,24 +504,40 @@ export const createLaunchSite = createServerFn({method:"POST"})
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
    throw new AuthorizationError("organization-wide site creation");
-  const [{db},s,{provisionNewSitePublicationDraft},{and,eq,or,sql}]=await Promise.all([
+  const [{db},s,{provisionNewSitePublicationDraft,ensureExistingSitePublicationDraftForLaunch},{and,eq,or,sql}]=await Promise.all([
    import("@/db/client"),import("@/db/schema"),
    import("@/modules/sites/site-public-provisioning.server"),
    import("drizzle-orm"),
   ]);
   return db.transaction(async tx=>{
-   // D1: recognize the church's existing Site instead of creating a duplicate.
+   // Serialize identical retry/submission attempts before checking existing Sites.
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:" + data.organizationId + ":" + data.slug}))`);
    // The unique index only covers slug; a renamed slug would otherwise fork the campus.
-   const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug})
+   const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug,
+     timezone:s.sites.timezone,address:s.sites.address})
     .from(s.sites)
     .where(and(eq(s.sites.organizationId,data.organizationId),or(
      eq(s.sites.slug,data.slug),
      sql`lower(${s.sites.name}) = ${data.name.trim().toLowerCase()}`,
     )))
     .limit(1);
-   if(existing)throw new Error(
-    `This church already has the site "${existing.name}" (${existing.slug}). Select it from the Site list instead of creating a duplicate.`);
-   const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
+   if(existing) {
+    // Exact replay returns the original canonical Site and its website reservation;
+    // a changed name, timezone or location must be edited, not silently adopted.
+    if(existing.slug===data.slug && existing.name.trim().toLowerCase()===data.name.trim().toLowerCase() &&
+      existing.timezone===data.timezone &&
+      (data.address ? samePhysicalSiteAddress(existing.address,data.address) : existing.address===null)) {
+      const publicSiteDraft=await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
+        id:existing.id,organizationId:data.organizationId,slug:existing.slug,
+      });
+      return {siteId:existing.id,publicSiteDraft,replayed:true};
+    }
+    throw new Error(`This church already has the site "${existing.name}" (${existing.slug}). Select its saved record and edit it instead of creating another Site.`);
+   }
+   const createdAt=new Date();
+   const [site]=await tx.insert(s.sites).values({...data,updatedAt:createdAt,
+     ...(data.address?{metadata:{sitePhysicalAddressRevision:createdAt.toISOString()}}:{})})
+     .returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
@@ -537,7 +553,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
    const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
     id:site.id,organizationId:data.organizationId,slug:data.slug,
    });
-   return {siteId:site.id,publicSiteDraft};
+   return {siteId:site.id,publicSiteDraft,replayed:false};
   });
  });
 /** Create a unique orientation event and expose it to site/program calendars. */
