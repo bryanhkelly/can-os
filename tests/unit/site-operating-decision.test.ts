@@ -19,6 +19,18 @@ describe("site operating decision never invents opening authority", () => {
   it("fails closed when a registrar cannot access opening evidence", () => {
     expect(deriveSiteOperatingDecision({...base,openings:[]}).status).toBe("opening_unverified");
   });
+  it("fails closed when one of multiple scoped programs has no opening evidence", () => {
+    const result = deriveSiteOperatingDecision({
+      ...base, programIds: ["program-a", "program-b"],
+    });
+    expect(result.status).toBe("opening_unverified");
+  });
+  it("does not accept a different program's approval as the scoped school's approval", () => {
+    const result = deriveSiteOperatingDecision({
+      ...base, openings: [{ programId: "program-b", blocked: false }],
+    });
+    expect(result.status).toBe("opening_unverified");
+  });
   it("makes an independent opening blocker more urgent than staffing", () => {
     expect(deriveSiteOperatingDecision({
       ...base,openings:[{programId:"program-a",blocked:true}],
