@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
-import { isPublicSitePagePath } from "@/domain/public-site-paths";
+import { isPublicSitePagePath, isPublicSiteReadPath } from "@/domain/public-site-paths";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 
 const headers = {
@@ -32,11 +32,24 @@ export const Route = createFileRoute("/published-site/$page")({
         if (!slug) return unavailable(404);
         const internalPath = new URL(request.url).pathname;
         const path = internalPath.slice("/published-site".length);
-        if (!isPublicSitePagePath(path) || path === "/") return unavailable(404);
+        if (!isPublicSiteReadPath(path) || path === "/") return unavailable(404);
         try {
           const { readPublishedSiteCatalog } = await import("@/modules/sites/site-public-catalog.server");
           const catalog = await readPublishedSiteCatalog(slug);
-          if (!catalog || !availablePublicSitePaths(catalog).includes(path)) return unavailable(404);
+          if (!catalog) return unavailable(404);
+          if (path === "/robots.txt") return new Response(
+            `User-agent: *\nAllow: /\nSitemap: https://${catalog.host}/sitemap.xml\n`, {
+              status: 200, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+            });
+          if (path === "/sitemap.xml") {
+            const urls = availablePublicSitePaths(catalog).map(pagePath =>
+              `<url><loc>https://${catalog.host}${pagePath}</loc></url>`).join("");
+            return new Response(`<?xml version="1.0" encoding="UTF-8"?>` +
+              `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`, {
+                status: 200, headers: { ...headers, "Content-Type": "application/xml; charset=utf-8" },
+              });
+          }
+          if (!isPublicSitePagePath(path) || !availablePublicSitePaths(catalog).includes(path)) return unavailable(404);
           return new Response(renderPublicSiteHtml(catalog, {
             path, makeRequestId: () => crypto.randomUUID(),
           }), { status: 200, headers });
