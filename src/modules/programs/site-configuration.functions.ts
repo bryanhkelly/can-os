@@ -6,9 +6,8 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
-import { sites, programs, actions } from "@/db/schema";
-import { writeAudit, emitEvent } from "@/platform/mutation";
-import { EventTypes } from "@/domain/event-types";
+import { sites, programs, actions, sitePublications } from "@/db/schema";
+import { writeAudit } from "@/platform/mutation";
 
 /** Church-entered location, not jurisdiction certification or an approved public claim. */
 export const physicalSiteAddressSchema = z.object({
@@ -52,8 +51,12 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       const [changed]=await tx.update(sites).set({address,updatedAt:new Date()})
         .where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
       if(!changed)throw new Error("Unable to save Site configuration");
-      const attached=await tx.select({id:programs.id}).from(programs)
+      const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
         .where(eq(programs.siteId,site.id));
+      const [publication]=await tx.select({status:sitePublications.status})
+        .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
+      if(publication?.status==="published" || attached.some(p=>p.status==="active" || p.status==="ready"))
+        throw new Error("An active or approved school/publication needs institutional review before its authoritative address can change.");
       // Every location revision can change locality requirements or eligibility.
       // Keep prior legal decisions untouched; flag them for independent review.
       for(const program of attached){
@@ -87,11 +90,6 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         scope:{organizationId:site.organizationId,siteId:site.id},
         before:{address:oldAddress},after:{address,reason:data.changeReason,
           reviewRequired:attached.length>0},
-      });
-      await emitEvent(tx,{
-        eventType:EventTypes.SiteUpdated,aggregateType:"site",aggregateId:site.id,
-        actorPersonId:actor.actorPersonId,organizationId:site.organizationId,
-        siteId:site.id,payload:{addressChanged:true,programReviewCount:attached.length},
       });
       return {siteId:site.id,updated:true,revision:changed.updatedAt.toISOString(),
         reviewRequested:attached.length>0};
