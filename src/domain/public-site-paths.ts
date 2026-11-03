@@ -1,6 +1,6 @@
 /** Explicit safe, read-only public paths. Never proxy arbitrary application routes. */
 export const publicSitePagePaths = [
-  "/", "/about", "/academics", "/student-life", "/school-day", "/admissions", "/contact",
+  "/", "/about", "/academics", "/student-life", "/school-day", "/admissions", "/tuition", "/families", "/faq", "/contact",
 ] as const;
 export type PublicSitePath = typeof publicSitePagePaths[number];
 
