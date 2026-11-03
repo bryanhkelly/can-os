@@ -24,6 +24,9 @@ function WebsiteStep({programId}:{programId:string}){
  </section>;
 }
 export function LaunchWebsitePreview({data}:{data:Website}){
+ const [selectedPage,setSelectedPage]=useState("/");
+ const previewPages=data.previewPages??{};
+ const previewHtml=previewPages[selectedPage]??data.previewHtml;
  return <>
   <p className="mt-2 text-sm">Review {data.programName}'s school page here. Church-owned welcome and community copy is edited by your assigned website editor; institutional claims follow their separate approval process.</p>
   <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"}</p>
@@ -34,7 +37,14 @@ export function LaunchWebsitePreview({data}:{data:Website}){
     : "Ask your CAN contact to finish connecting your school website address. You can continue preparing your page and inviting families in the meantime."}</p>}
 
   {data.includesSuggestions&&<p className="mt-3 rounded border p-3 text-sm">This private preview includes suggested local welcome copy or a planned school listing. Suggestions are not saved editorial revisions or approved public claims.</p>}
-  {data.previewHtml&&<iframe title={`${data.programName} private school website preview`} srcDoc={data.previewHtml}
+  {Object.keys(previewPages).length>0&&<nav aria-label="Preview school website pages" className="mt-4 flex flex-wrap gap-2">
+    {Object.keys(previewPages).map(path=><button type="button" key={path}
+      aria-pressed={selectedPage===path} onClick={()=>setSelectedPage(path)}
+      className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+      {path==="/"? "Home":path.slice(1).replace(/-/g," ")}
+    </button>)}
+  </nav>}
+  {previewHtml&&<iframe key={selectedPage} title={`${data.programName} ${selectedPage} private school website preview`} srcDoc={previewHtml}
    sandbox="" referrerPolicy="no-referrer" className="mt-4 h-[34rem] w-full rounded-lg border bg-white"/>}
   <nav aria-label="School website preparation" className="mt-4 flex flex-wrap gap-4 text-sm">
    <LaunchWebsiteEditorHandoff siteId={data.siteId} programId={data.programId}/>
