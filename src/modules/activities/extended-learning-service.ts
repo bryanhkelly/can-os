@@ -12,7 +12,7 @@ type NewSeason = {
   programId: string;
   offeringName: string;
   seasonName: string;
-  activityType: "athletics" | "club" | "arts" | "service" | "other";
+  activityType: "athletics" | "club" | "arts" | "service" | "stem" | "faith" | "leadership" | "outings" | "other";
   startsOn: string;
   endsOn: string;
   capacity: number;
