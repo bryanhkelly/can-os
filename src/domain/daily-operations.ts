@@ -65,6 +65,9 @@ const restrictedBroadActionTypes = new Set([
   "safeguarding_concern",
   "safeguarding_response_required",
   "coach_outreach",
+  // Student academic and recovery cases are not school-leader operating decisions.
+  "student_recovery",
+  "student_support",
 ]);
 
 function actionCategory(action: DailyOperationsAction): DailyAttentionCategory {
@@ -108,9 +111,19 @@ function programHref(path: string, program: DailyProgramProjection): string {
   return path + "?" + query.toString();
 }
 
-function sortAttention(items: DailyAttentionItem[]): DailyAttentionItem[] {
+/**
+ * A site leader's first decision must concern the operating day, not a student
+ * assignment or routine case with an earlier due date. Priority still orders
+ * decisions within each authority-sensitive category.
+ */
+function sortAttention(items: DailyAttentionItem[], role: "registrar" | "site_admin" | "site_leader"): DailyAttentionItem[] {
   const rank = { critical: 0, high: 1, normal: 2 } as const;
+  const leadershipRank: Record<DailyAttentionCategory, number> = {
+    opening: 0, staffing: 1, operations: 2, family: 3,
+    admissions: 4, documents: 5, academic: 6,
+  };
   return [...items].sort((a, b) =>
+    (role === "site_leader" ? leadershipRank[a.category] - leadershipRank[b.category] : 0) ||
     rank[a.priority] - rank[b.priority] ||
     (a.dueAt ? Date.parse(a.dueAt) : Infinity) - (b.dueAt ? Date.parse(b.dueAt) : Infinity) ||
     a.id.localeCompare(b.id));
@@ -135,7 +148,7 @@ export function buildDailyOperationsAttention(input: {
       action.type === "program_opening_handoff" || action.openingHandoff ||
       (action.type === "onsite_coverage_gap" && action.ownerPersonId === null)));
   const items = actions.map(action => actionAttention(action, input.role));
-  if (input.role === "site_leader") return sortAttention(items);
+  if (input.role === "site_leader") return sortAttention(items, input.role);
 
   for (const issue of input.staffingIssues ?? []) {
     items.push({
@@ -199,7 +212,7 @@ export function buildDailyOperationsAttention(input: {
       priority: "normal",
     });
   }
-  return sortAttention(items);
+  return sortAttention(items, input.role);
 }
 
 export function buildTeacherAttention(data: {
