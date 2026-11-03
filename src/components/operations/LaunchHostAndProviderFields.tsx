@@ -1,3 +1,5 @@
+import type { LaunchJurisdictionResearch as LaunchResearch } from "@/domain/jurisdiction-launch-research";
+import { JurisdictionLaunchResearch } from "@/components/operations/JurisdictionLaunchResearch";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { Link } from "@tanstack/react-router";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
@@ -6,9 +8,10 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
   jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
+  jurisdictionResearch: Record<string,LaunchResearch>;
   hostOrganizationId: string; setHostOrganizationId: (value: string) => void;
   siteId: string; setSiteId: (value: string) => void;
   setCreatedSiteDraft: (value: {siteId:string;host:string} | null) => void;
@@ -92,15 +95,9 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hos
                       ))}
                     </Select>
                   </Field>
-                  {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4" role="status">
+                  {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
-                    {jurisdictionGuidance[jurisdictionId]?<>
-                     <p className="mt-2 text-sm leading-6">{jurisdictionGuidance[jurisdictionId].summary}</p>
-                     <p className="mt-2 text-xs text-muted-foreground">Published guidance is informational. Your school still needs its own operating approvals.</p>
-                    </>:<>
-                     <p className="mt-2 text-sm">State-specific guidance is being reviewed. You can continue preparing your school.</p>
-                     <p className="mt-2 text-xs text-muted-foreground">Configuration does not authorize enrollment or operation.</p>
-                    </>}
+                    <JurisdictionLaunchResearch research={jurisdictionResearch[jurisdictionId]}/>
                   </div>}
                   <Field label="Academic provider" required>
                     <Select value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)}>
