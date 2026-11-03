@@ -344,7 +344,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
         <strong>Receiving-school enrollment blocked:</strong> {transferBlocker}
         {" "}The family may retain an accepted offer while the origin school finishes its exit.
-        <Link to="/admissions/intake" className="ml-2 font-semibold underline">Review admissions →</Link>
+        <Link to="/admissions/intake" search={{application:applicationId}} className="ml-2 font-semibold underline">Review this application →</Link>
       </p>}
     {!loaded && !error && <p role="status" className="mt-3 text-xs text-muted-foreground">Loading eligible classes…</p>}
     {loaded && <div className="mt-3 space-y-3">
@@ -374,7 +374,9 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
         {sections.length
           ? sections.every(s => s.enrolled) ? "All currently available sections are assigned."
             : "No class is ready for placement: verify its teacher, first lesson, operating agreement, remaining capacity and add/drop deadline."
-          : "No eligible sections are configured for this student's active school year."}
+          : acceptedOfferId&&!enrollmentActivated
+            ? "No eligible sections are configured for the accepted offer's school year. Review its calendar, staffed classes, and enrollment capacity."
+            : "No eligible sections are configured for this student's active school year."}
       </p>}
     </div>}
   </section>;
