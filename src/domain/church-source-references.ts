@@ -30,6 +30,18 @@ export const churchSuggestionFields = [
   "faith_and_values", "branding_hint",
 ] as const;
 export type ChurchSuggestionField = typeof churchSuggestionFields[number];
+/** Church-owned editable Site fields only; no institutional claims or approvals. */
+export const churchSuggestionTargetFields: Partial<Record<ChurchSuggestionField, import("./site-local-content").SiteLocalTextField>> = {
+  church_history: "churchHistory",
+  church_mission: "localDescription",
+  church_vision: "localDescription",
+  denomination: "denomination",
+  local_community: "communityOutreach",
+  leadership_intro: "leadershipWelcome",
+  ministries: "localTraditions",
+  welcome_message: "welcomeMessage",
+  faith_and_values: "statementOfFaith",
+};
 export type ChurchContentSuggestion = {
   id: string;
   siteId: string;
