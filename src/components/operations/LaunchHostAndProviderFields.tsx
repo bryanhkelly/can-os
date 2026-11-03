@@ -11,6 +11,8 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
+export type SavedLaunchSiteDraft = {siteId:string;host:string;status:"draft"|"published";replayed:boolean};
+
 export type LaunchSiteAddressDraft = {
   street1: string; street2: string; city: string; state: string;
   postalCode: string; country: string; county: string;
@@ -22,7 +24,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
   jurisdictionResearch: Record<string,LaunchResearch>;
   hostOrganizationId: string; setHostOrganizationId: (value: string) => void;
   siteId: string; setSiteId: (value: string) => void;
-  setCreatedSiteDraft: (value: {siteId:string;host:string} | null) => void;
+  setCreatedSiteDraft: (value: SavedLaunchSiteDraft | null) => void;
   hostSites: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"];
   newSiteName: string; setNewSiteName: (value: string) => void;
   newSiteSlug: string; setNewSiteSlug: (value: string) => void;
@@ -32,7 +34,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
   newSiteAddress: LaunchSiteAddressDraft;
   setNewSiteAddress: (value: LaunchSiteAddressDraft) => void;
   duplicateNewSite: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"][number] | undefined;
-  createdSiteDraft: {siteId:string;host:string} | null;
+  createdSiteDraft: SavedLaunchSiteDraft | null;
   busy: boolean; addSite: () => Promise<void>;
   jurisdictionId: string; setJurisdictionId: (value: string) => void;
   academicProviderOrganizationId: string; setAcademicProviderOrganizationId: (value: string) => void;
@@ -115,11 +117,11 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                     </p>}
                     <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||!newSiteTimezone||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
-                      <p className="font-semibold">Your website draft is prepared</p>
+                      <p className="font-semibold">{createdSiteDraft.status==="published"?"Your saved school website is already published":createdSiteDraft.replayed?"Resumed your existing school Site and private website draft":"Your private school website draft is prepared"}</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Private draft only. The address is reserved, but no public site, admissions,
-                        or registration is open. An explicitly authorized Site publisher must
+                        {createdSiteDraft.status==="published"?"This Site already has a published website. Publication is separate from admissions and authorization.":"Private website draft only. The host is reserved, but no public school site, admissions,"}
+                        and registration remain independently gated. An explicitly authorized Site publisher must
                         review and approve marketing before publication.
                       </p>
                       <Link to="/sites/$siteId/publish" params={{siteId:createdSiteDraft.siteId}}
