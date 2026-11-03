@@ -38,7 +38,9 @@ export default function siteHostGate(request: Request): Response | URL | undefin
   // Never accept forwarded Host or user-supplied destination overrides.
   // The origin must independently authorize the resolved publication.
   if (decision.rewrite) {
-    const target=request.method!=="POST"?"/published-site":
+    const target=request.method!=="POST"
+      ? (new URL(request.url).pathname === "/" ? "/published-site"
+        : `/published-site${new URL(request.url).pathname}`) :
       new URL(request.url).pathname==="/apply"
         ?"/published-site/family-start":"/published-site/inquiry";
     return new URL(target,request.url);
