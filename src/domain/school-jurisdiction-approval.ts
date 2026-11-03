@@ -53,3 +53,24 @@ export function openingApprovalPredatesLocationChange(
   const changed = new Date(locationChangeRevision).getTime();
   return !Number.isFinite(approved) || !Number.isFinite(changed) || approved < changed;
 }
+
+/** A normal Action resolution is never legal evidence. Require the current
+ * verified document and independently recorded C-domain attestation. */
+export function hasCurrentJurisdictionRequirementEvidence(
+  action: SchoolJurisdictionReviewAction | null,
+  scope:SchoolJurisdictionReviewStamp & {requirementId:string},
+  now=new Date(),
+):boolean {
+  if(!action || action.status!=="resolved")return false;
+  const m=action.metadata;
+  const reviewedAt=typeof m.reviewedAt==="string"?Date.parse(m.reviewedAt):NaN;
+  return m.reviewState==="independently_verified_documentation" &&
+    m.requirementId===scope.requirementId &&
+    m.profileVersionId===scope.profileVersionId &&
+    m.scopeFingerprint===scope.scopeFingerprint &&
+    typeof m.evidenceDocumentId==="string" && m.evidenceDocumentId.length>0 &&
+    typeof m.reviewedByPersonId==="string" && m.reviewedByPersonId.length>0 &&
+    typeof m.submittedByPersonId==="string" &&
+    m.submittedByPersonId!==m.reviewedByPersonId &&
+    Number.isFinite(reviewedAt) && reviewedAt<=now.getTime();
+}
