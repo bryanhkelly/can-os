@@ -13,6 +13,8 @@ import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
+import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 
 /** Public-safe private preview; institution-owned fields are still read-only. */
 export async function getPartnerWebsitePreview(actor: AccessContext) {
@@ -31,6 +33,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const host = address ? publicSiteHost(address.slug) : null;
   const local = address ? await readCurrentLocalContent(site.id) : null;
   const history = address ? await readLocalContentHistory(site.id) : [];
+  const approvedPhotos = host ? await readApprovedSchoolSitePhotos(site.id) : [];
+  const media = host ? projectApprovedSchoolSiteMedia(site.id,host,approvedPhotos) : {};
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent) : null;
@@ -49,7 +53,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
-    parentInformation,
+    parentInformation, media,
   } : null;
   const previewPages = previewPage
     ? Object.fromEntries(availablePublicSitePaths(previewPage).map(path => [
