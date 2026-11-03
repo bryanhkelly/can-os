@@ -234,6 +234,7 @@ describe("application contextual navigation",()=>{
         href:"/operations?siteId=school&action=task",nextStep:"Review action",ownerName:null,dueAt:null,priority:"normal"}],
       events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
       programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
+      operatingDecision:{status:"opening_unverified",title:"Opening authorization not verified",detail:"No independent opening record",owner:"CAN opening officer",nextStep:"Confirm authorization",href:"#school-day-operating-decision",staffingExceptionCount:0},
       openingHandoffs:[],schoolOpenings:[],viewerPersonId:"operator",canOpenOnsiteDay:false,
       schoolDay:{
         staffing:{blocks:[],unassignedOrConflicting:0,missingAdultReports:0,substitutions:0,
