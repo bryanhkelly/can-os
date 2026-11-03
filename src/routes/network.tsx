@@ -1,5 +1,7 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { DailyCanvas } from "@/components/student/DailyCanvas";
+import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
@@ -55,6 +57,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
 
   return <WorkspaceShell eyebrow="CAN OS · Network partner" title={data.organization.name}
     subtitle="Denomination HQ can establish and manage its own locations. This does not grant access to school academic records or enroll students.">
+    <DailyCanvas audience="network" content={resolveEditorialCanvas("network", new Date())} />
     <section className="mt-8 rounded-xl border bg-card p-5">
       <h2 className="font-serif text-2xl">School affiliation requests</h2>
       <p className="mt-2 text-sm text-muted-foreground">Schools retain their own organizations and academic permissions. Approving a link does not give HQ access to students, families, courses or admissions.</p>
