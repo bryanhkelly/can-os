@@ -202,6 +202,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     await test.step("stage 1b: school year, term, grading period and calendar via School-year Studio", async () => {
       const page = operator.page;
       await goto(page, `/operations/school-years?siteId=${fixture.siteId}&programId=${fixture.programId}`);
+      await expect(page.getByRole("region", { name: "School-year planning steps" })).toBeVisible();
       await page.getByRole("button", { name: /standard A.F scale/i }).click();
       await expect
         .poll(() => rowCount(sql, "select id from grade_scales where owning_organization_id = $1", [fixture.schoolOrgId]))
@@ -434,6 +435,10 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
           (await singleRow(sql, "select status from programs where id = $1", [fixture.programId!])).status,
         )
         .toBe("active");
+      await page.reload();
+      await waitForAppHydration(page);
+      await expect(page.getByRole("region", { name: "Transition from launch to operations" })).toBeVisible();
+      await expect(page.getByRole("link", { name: /Open school operations/i })).toBeVisible();
     });
 
     // ------------------------------------------------------------------
@@ -602,7 +607,11 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Sign and submit enrollment form" })).toHaveCount(0);
 
+      await goto(guardian.page, "/guardian");
+      await expect(guardian.page.getByRole("region", { name: "Enrollment next steps" })).toBeVisible();
+      await expect(guardian.page.getByRole("link", { name: /Review offer/i })).toBeVisible();
       await goto(guardian.page, offersUrl);
+      await expect(guardian.page.getByRole("region", { name: "Your next enrollment step" })).toBeVisible();
       await guardian.page.getByRole("button", { name: "Accept" }).click();
       await expect(guardian.page.getByText(/acceptance is recorded/i)).toBeVisible();
 
@@ -705,6 +714,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // Follow the learner's real first-week handoff instead of jumping
       // directly to a known assessment URL from the test fixture.
       await goto(sp, "/student");
+      await expect(sp.getByRole("region", { name: "Continue learning" })).toBeVisible();
       await expect(sp.getByText("Your first week")).toBeVisible();
       await sp.getByRole("link", { name: /Study.*Solving for x/ }).click();
       await expect(sp.getByText("Students isolate the variable by applying inverse operations.")).toBeVisible();
@@ -894,6 +904,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     await test.step("stage 6: operations record, reload, fresh session, negative checks, revocation", async () => {
       const page = operator.page;
       await goto(page, `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}`);
+      await expect(page.getByRole("region", { name: "School improvement and planning" })).toBeVisible();
       await expect(page.getByText(fixture.programName).first()).toBeVisible();
       await expect(page.getByText("Active students")).toBeVisible();
       await expect(page.getByText("Class placements")).toBeVisible();
