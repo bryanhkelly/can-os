@@ -26,7 +26,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [programId, setProgramId] = useState("");
   const [offeringName, setOfferingName] = useState("");
   const [seasonName, setSeasonName] = useState("");
-  const [activityType, setActivityType] = useState<"club"|"athletics"|"arts"|"service"|"other">("other");
+  const [activityType, setActivityType] = useState<"club"|"athletics"|"arts"|"service"|"stem"|"faith"|"leadership"|"outings"|"other">("other");
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [capacity, setCapacity] = useState(24);
@@ -38,7 +38,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [scheduleSeasonId, setScheduleSeasonId] = useState("");
   const [scheduleFrom, setScheduleFrom] = useState("");
   const [scheduleThrough, setScheduleThrough] = useState("");
-  const [scheduleDays, setScheduleDays] = useState<number[]>([1,2,3,4,5]);
+  const [scheduleDays, setScheduleDays] = useState<number[]>([]);
   const [scheduleStart, setScheduleStart] = useState("09:00");
   const [scheduleEnd, setScheduleEnd] = useState("15:00");
   const [scheduleLocation, setScheduleLocation] = useState("");
@@ -214,7 +214,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
         </label>
         <label className="text-xs">Category
           <select className={inputClass} value={activityType} onChange={e => setActivityType(e.target.value as typeof activityType)}>
-            <option value="other">Academic / other</option>
+            <option value="other">Other enrichment</option>\n            <option value="stem">STEM / robotics</option>\n            <option value="faith">Faith / discipleship</option>\n            <option value="leadership">Leadership</option>\n            <option value="outings">Outings / field trips</option>
             <option value="club">Club</option>
             <option value="arts">Arts</option>
             <option value="athletics">Athletics</option>
