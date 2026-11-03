@@ -84,6 +84,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     const outcome=await siteMutation.retryRefresh();
     if(outcome.status==="refreshed")setError("");
   }
+  async function retryAddressRefresh(){
+    const outcome=await addressMutation.retryRefresh();
+    if(outcome.status==="refreshed")setError("");
+  }
   async function retryLaunchRefresh(){
     const outcome=await launchMutation.retryRefresh();
     if(outcome.status==="refreshed")setError("");
@@ -245,6 +249,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         {siteMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={siteMutation.isSubmitting}
           onClick={()=>void retrySiteRefresh()} className="mt-2">
           Retry Site refresh
+        </Button>}
+        {addressMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={addressMutation.isSubmitting}
+          onClick={()=>void retryAddressRefresh()} className="mt-2">
+          Retry address refresh
         </Button>}
         {launchMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={launchMutation.isSubmitting}
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
