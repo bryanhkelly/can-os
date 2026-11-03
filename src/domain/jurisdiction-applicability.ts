@@ -78,7 +78,9 @@ export function evaluateSchoolJurisdictionRequirements(
   const profile: JurisdictionProfile = parsed.data;
   const today = isoDay(now);
   const published = isCurrentVerifiedJurisdictionProfileVersion(version, now);
-  const knownUrls = new Set(profile.evidence.map(source => source.url));
+  const knownUrls = new Set(profile.evidence
+    .filter(source => source.url.startsWith("https://"))
+    .map(source => source.url));
   const decisions: RequirementDecision[] = profile.requirements.map(requirement => {
     const result = (status: RequirementDecision["status"], reason: string): RequirementDecision => ({
       id: requirement.id, status, reason, disclosureAudience: requirement.disclosureAudience,
@@ -132,7 +134,9 @@ export function evaluateSchoolJurisdictionRequirements(
       : [];
   });
   return {
-    reviewRequired: !published || decisions.some(item => item.status === "legal_review_required"),
+    // A sourced profile with no assessed requirements is not a complete school legal review.
+    reviewRequired: !published || profile.requirements.length === 0 ||
+      decisions.some(item => item.status === "legal_review_required"),
     decisions,
     publicDisclosures,
   };
