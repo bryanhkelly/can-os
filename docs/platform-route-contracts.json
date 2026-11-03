@@ -760,6 +760,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/sites.$siteId.parent-information.tsx",
+      "route": "/sites/$siteId/parent-information",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "Only verified registrar/site-admin with current Site publisher capability and active membership can view private current Site address/contact and exact source review state",
+      "writeBoundary": "Separate institutional public-display review, expected canonical Site and review revisions, exact source digest, positive location/contact attestations, finite expiry, Site row lock, scoped audit and withdraw; cannot grant opening, admissions or accreditation"
+    },
+    {
       "file": "src/routes/sites.$siteId.publish.tsx",
       "route": "/sites/$siteId/publish",
       "owner": "operations",
