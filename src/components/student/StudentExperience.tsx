@@ -25,6 +25,7 @@ export function StudentExperience({ liveData, success, support }: {
  const upcomingCount=success ? success.dueSoon + success.toDo : upcoming.length;
  const summaryUnavailable=success === null;
  const otherOpenActions=liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id));
+ const nextAssignment=success?.steps.find(step=>["revision","overdue","due_soon","to_do"].includes(step.kind));
  const firstWeek=liveData.firstWeek??[];
  const starter=firstWeek.find(item=>item.ready);
  const format=(date:Date|string,timeZone?:string)=>new Intl.DateTimeFormat("en-US",{
@@ -36,9 +37,16 @@ export function StudentExperience({ liveData, success, support }: {
     { id: "student-default", audience: "student", priority: "default", headline: "Make today count.", supportingCopy: "A fresh start, a clear next step, and everything you need to keep learning.", campaignLabel: "Your learning day" },
   ] satisfies DailyCanvasContent[], "student", new Date())}
    operationalSummary={<span>{liveData.sections.length} classes · {summaryUnavailable ? "Assignments updating" : `${upcomingCount} assignments to do or due soon`}</span>}
-   primaryAction={starter ? <Link to="/student/assignments" search={{section:starter.sectionId,assessment:starter.firstWeek.assessment!.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start first-week work <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">View my classes <ArrowUpRight className="size-4" /></Link>}
+   primaryAction={nextAssignment ? <Link to="/student/assignments" search={{section:nextAssignment.sectionId??undefined,assessment:nextAssignment.assessmentId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{nextAssignment.kind==="revision"?"Continue revision":nextAssignment.kind==="overdue"?"Complete overdue work":"Continue learning"} <ArrowUpRight className="size-4" /></Link> : starter ? <Link to="/student/assignments" search={{section:starter.sectionId,assessment:starter.firstWeek.assessment!.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start first-week work <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">View my classes <ArrowUpRight className="size-4" /></Link>}
    secondaryAction={<Link to="/student/assignments" className="inline-flex min-h-11 items-center rounded-xl border border-white/70 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Assignments</Link>}
   />
+  {nextAssignment&&<section aria-label="Continue learning" className="mt-6 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+   <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next learning step</p>
+   <h2 className="mt-2 font-serif text-2xl font-semibold">{nextAssignment.title}</h2>
+   <p className="mt-1 text-sm text-muted-foreground">{nextAssignment.course} · {nextAssignment.label}</p>
+   <Link to="/student/assignments" search={{assessment:nextAssignment.assessmentId,section:nextAssignment.sectionId??undefined}}
+    className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open this assignment <ArrowUpRight className="ml-2 size-4"/></Link>
+  </section>}
   {liveData.hasEnrollmentGuardian === false && <WorkspaceNotice tone="danger">
    Your student record does not have a verified guardian with enrollment permission. Study-group requests need guardian permission. Ask your school office to verify the parent or guardian on your record; you cannot add or verify a guardian from this student account.
   </WorkspaceNotice>}
