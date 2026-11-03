@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema, draftSiteContactSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact } from "@/domain/site-setup-configuration";
+import { physicalSiteAddressSchema, draftSiteContactSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
 import { eq, and, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
-import { sites, programs, actions, sitePublications, organizations } from "@/db/schema";
+import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | {[key:string]:JsonValue};
@@ -50,12 +50,34 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         throw new Error("This Site changed since you opened it. Refresh before saving to avoid overwriting another editor.");
       const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
         .where(eq(programs.siteId,site.id));
-      const [publication]=await tx.select({status:sitePublications.status})
-        .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
-      if(publication?.status==="published" || attached.some(p=>p.status==="active" || p.status==="ready"))
-        throw new Error("An active or approved school/publication needs institutional review before its authoritative address can change.");
+      const attachedIds=attached.map(item=>item.id);
+      const [publication,approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
+        tx.select({status:sitePublications.status})
+          .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1),
+        attachedIds.length?tx.select({id:schoolConfigurationVersions.id})
+          .from(schoolConfigurationVersions)
+          .where(and(inArray(schoolConfigurationVersions.programId,attachedIds),
+            eq(schoolConfigurationVersions.status,"approved"))).limit(1):Promise.resolve([]),
+        attachedIds.length?tx.select({programId:programPublications.programId})
+          .from(programPublications)
+          .where(and(inArray(programPublications.programId,attachedIds),
+            eq(programPublications.status,"published"))).limit(1):Promise.resolve([]),
+        attachedIds.length?tx.select({id:programSiteAuthorizations.id})
+          .from(programSiteAuthorizations)
+          .where(and(inArray(programSiteAuthorizations.programId,attachedIds),
+            eq(programSiteAuthorizations.status,"approved"))).limit(1):Promise.resolve([]),
+      ]);
+      // Fail closed even if a Program still says "launching". Independent
+      // authorization and marketing can already have been approved.
+      if(publication[0]?.status==="published" ||
+        attached.some(p=>p.status==="active" || p.status==="ready") ||
+        approvedConfigurations.length>0 || publishedPrograms.length>0 ||
+        approvedServices.length>0)
+        throw new Error("This school has active, approved, or published records. Ask your CAN launch coordinator for a controlled location amendment and independent re-review; the saved address has not changed.");
+      const nextRevision=nextSiteConfigurationRevision(site.updatedAt);
       const [changed]=await tx.update(sites).set({
-        address,updatedAt:nextSiteConfigurationRevision(site.updatedAt),
+        address,metadata:{...site.metadata,sitePhysicalAddressRevision:nextRevision.toISOString()},
+        updatedAt:nextRevision,
       }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
       if(!changed)throw new Error("Unable to save Site configuration");
       // Every location revision can change locality requirements or eligibility.
@@ -181,10 +203,15 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     const [publication]=await db.select({status:sitePublications.status})
       .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
     const {address,metadata,...identity}=site;
+    const physical=readSitePhysicalAddress(address);
+    const savedLocationRevision=typeof metadata.sitePhysicalAddressRevision==="string"
+      ? metadata.sitePhysicalAddressRevision:null;
     return {
       ...identity,revision:site.updatedAt.toISOString(),
       updatedAt:site.updatedAt.toISOString(),
-      physicalLocation:{value:serializableJson(address??null),source:"church_site_record" as const,
+      physicalLocation:{value:physical.value,source:"church_site_record" as const,
+        configurationStatus:physical.status,
+        revision:savedLocationRevision,
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       programs:attached.map(program=>({
         ...program,
@@ -203,10 +230,11 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
         },
         academicProviderApprovalStatus:"not_asserted" as const,
         jurisdictionApprovalStatus:"not_asserted" as const,
+        locationReviewState:savedLocationRevision?"independent_review_required" as const:"unverified_legacy" as const,
       })),
       publication:{status:publication?.status??"unconfigured",
         publicReachability:"not_asserted" as const},
-      contact:{value:serializableJson(draftSiteContactSchema.safeParse(metadata.setupContact).success ? metadata.setupContact : null),source:"church_site_draft" as const,
+      contact:{value:serializableJson(draftSiteContactSchema.safeParse(metadata.setupContact).success ? draftSiteContactSchema.parse(metadata.setupContact) : null),source:"church_site_draft" as const,
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       calendar:{status:"read_from_academic_program_calendar" as const},
     };
