@@ -31,6 +31,11 @@ export const schoolConfigurationVersions = pgTable("school_configuration_version
     /** Responsibility owners are rows in programResponsibilityAssignments. */
     services: string[];
     fundingModel?: string;
+    /** Bound to the independently reviewed jurisdiction and physical Site scope at approval. */
+    jurisdictionOpeningApproval?: {
+      scopeFingerprint: string;
+      profileVersionId: string;
+    };
   }>().notNull(),
   approvedByPersonId: uuid("approved_by_person_id").references(() => people.id, { onDelete: "restrict" }),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
