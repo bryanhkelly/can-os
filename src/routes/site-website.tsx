@@ -15,6 +15,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
+import {SchoolMediaFolderManager} from "@/components/operations/SchoolMediaFolderManager";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
 const websiteSearchSchema=siteProgramSelectionSchema.extend({returnGrantId:optionalSearchString});
@@ -65,6 +66,7 @@ function PartnerSiteWebsitePage() {
     </section>
     <WebsiteInformationChecklist data={data} />
     <WebsiteDesignChecklist data={data} />
+    <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}/>
     <ChurchSourceReferenceEditor />
     <ChurchSourceSuggestionReview currentRevision={data.currentRevision} />
     {data.host && <LocalWebsiteCopyEditor data={data} />}
