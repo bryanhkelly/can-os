@@ -50,6 +50,23 @@ vi.mock("@/modules/activities/enrichment-catalog.server", () => ({
   },
 }));
 
+// Site publisher authorization/preview contract tests isolate the approved
+// extras reader. Program-specific scheduling, identity revision and admissions
+// publication gates are covered in public-parent-extras/identity tests.
+vi.mock("@/modules/sites/public-parent-extras.server", () => ({
+  readApprovedPublicParentExtras: async () => ({
+    programSchedules: [],
+    people: [],
+    admissions: {
+      applicationOpen: false,
+      description: {value:null,source:"admissions",revision:null,
+        audience:"public",status:"not_configured",canDisplay:false},
+      programs: [],
+    },
+    services: [],
+  }),
+}));
+
 vi.mock("@/modules/sites/site-local-content.server", () => ({
   readCurrentLocalContent: async () => null,
   readLocalContentHistory: async () => [],

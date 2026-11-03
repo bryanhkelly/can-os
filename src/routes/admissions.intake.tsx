@@ -28,8 +28,8 @@ const load=async(selection:{interest?:string;siteId?:string;programId?:string;pa
   listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.application?undefined:selection.search,applicationId:selection.application}}),
   listAdmissionsIntakePrograms(),
   listAdmissionsExistingStudentsPage({data:{siteId:selection.siteId,programId:selection.programId,page:selection.studentPage??1}}),
-  listPublicAdmissionsInterests({data:{}}),
-  selection.interest?listPublicAdmissionsInterests({data:{interestId:selection.interest}}):Promise.resolve(null),
+  listPublicAdmissionsInterests({data:{siteId:selection.siteId,programId:selection.programId}}),
+  selection.interest?listPublicAdmissionsInterests({data:{interestId:selection.interest,siteId:selection.siteId,programId:selection.programId}}):Promise.resolve(null),
   getAdmissionsStageCounts({data:{siteId:selection.siteId,programId:selection.programId,search:selection.search}}),
  ]);
  return {records,programs,existingStudents:existingStudentPage.items,existingStudentHasMore:existingStudentPage.nextPage!==null,publicInterests,

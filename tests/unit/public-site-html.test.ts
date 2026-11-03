@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapePublicHtml, renderPublicSiteHtml } from "@/domain/public-site-html";
+import { escapePublicHtml, isIndexablePublicSite, renderPublicSiteHtml, availablePublicSitePaths } from "@/domain/public-site-html";
 import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
 
 describe("standalone public site HTML", () => {
@@ -68,6 +68,94 @@ describe("standalone public site HTML", () => {
     expect(() => renderPublicSiteHtml({ ...page, academicPrograms: [] },
       { path: "/academics" })).toThrow(/not available/);
   });
+  it("does not advertise an unconfigured contact page and clarifies pre-opening interest", () => {
+    const empty = {host: "church.can-os.com", site: {name: "Church School", organizationName: "Church"}, offerings: []};
+    expect(availablePublicSitePaths(empty)).toEqual(["/"]);
+    const planned = {...empty, academicPrograms: [{
+      programId: "00000000-0000-4000-8000-000000000002",
+      title: "Elementary program", typeLabel: "Hybrid program", summary: "Proposed program",
+      grades: {min: "K", max: "5"},
+      delivery: {onsite: true, asynchronous: true, liveOnline: false, onsiteDaysPerWeek: 2},
+      availability: "planned" as const,
+    }]};
+    const html = renderPublicSiteHtml(planned, {makeRequestId: () => "00000000-0000-4000-8000-000000000001"});
+    expect(html).toContain("Welcoming founding families");
+    expect(html).toContain("A request for information is not an application or an enrollment offer");
+    expect(html).toContain('action="/inquiry"');
+    expect(html).not.toContain('action="/apply"');
+    expect(html).toContain("<title>Church School | Programs</title>");
+  });
+
+  it("distinguishes multiple academic Programs by grade without inventing universal weekdays", () => {
+    const page = {
+      host: "academy.can-os.com", site: {name: "Academy", organizationName: "Church"},
+      offerings: [],
+      academicPrograms: [
+        {programId: "program-elementary", title: "Elementary Academy", typeLabel: "School",
+          summary: "Elementary", grades: {min: "K", max: "5"},
+          delivery: {onsite: true, asynchronous: false, liveOnline: false, onsiteDaysPerWeek: 3},
+          availability: "planned" as const},
+        {programId: "program-high-school", title: "High School Hybrid", typeLabel: "Hybrid",
+          summary: "High school", grades: {min: "9", max: "12"},
+          delivery: {onsite: true, asynchronous: true, liveOnline: true, onsiteDaysPerWeek: 2},
+          availability: "planned" as const},
+      ],
+    };
+    const html = renderPublicSiteHtml(page, {path: "/school-day"});
+    expect(html).toContain("Select a program's school day");
+    expect(html).toContain('href="#school-day-program-elementary"');
+    expect(html).toContain('id="school-day-program-high-school"');
+    expect(html).toContain("Grades K–5");
+    expect(html).toContain("Grades 9–12");
+    expect(html).toContain("3 onsite days per week");
+    expect(html).toContain("2 onsite days per week");
+    expect(html).not.toContain("Monday, Tuesday, Wednesday, Thursday, Friday");
+  });
+
+  it("renders only the matching approved Program weekly calendar including Sunday", () => {
+    const site = {name: "Two Program School", organizationName: "Church"};
+    const academicPrograms = [
+      {programId: "school-a", title: "Elementary", typeLabel: "School",
+        summary: "Elementary study", grades: {min: "K", max: "5"},
+        delivery: {onsite:true, asynchronous:false, liveOnline:false, onsiteDaysPerWeek:2},
+        availability: "planned" as const},
+      {programId: "school-b", title: "High School", typeLabel: "Hybrid",
+        summary: "Secondary study", grades: {min: "9", max: "12"},
+        delivery: {onsite:true, asynchronous:true, liveOnline:true, onsiteDaysPerWeek:3},
+        availability: "planned" as const},
+    ];
+    const profile = Object.assign(projectApprovedParentInformation({
+      site, academicPrograms, offerings:[],localContent:null,
+    }), {programSchedules: [{
+      programId:"school-a",
+      name:verifiedPublicClaim("Elementary","program_publication"),
+      grades:verifiedPublicClaim({min:"K",max:"5"},"program_publication"),
+      timezone:verifiedPublicClaim("America/Los_Angeles","calendar"),
+      effectiveFrom:verifiedPublicClaim("2027-01-01","calendar"),
+      effectiveThrough:unconfiguredClaim<string>("calendar"),
+      weeklyPattern:verifiedPublicClaim([
+        {dayOfWeek:0,startsAtLocal:"10:00",endsAtLocal:"13:00",timezone:"America/Los_Angeles"},
+        {dayOfWeek:3,startsAtLocal:"09:00",endsAtLocal:"14:00",timezone:"America/Los_Angeles"},
+      ],"calendar"),
+    }]});
+    const html = renderPublicSiteHtml({
+      host:"two.can-os.com",site,offerings:[],academicPrograms,parentInformation:profile,
+    },{path:"/school-day"});
+    expect(html).toContain("Approved weekly learning schedule");
+    expect(html).toContain("<strong>Sunday</strong>");
+    expect(html).toContain("10:00–13:00");
+    expect(html).toContain("Effective from 2027-01-01");
+    expect(html).toContain("America/Los_Angeles");
+    expect(html).toContain("Exact schedules and days are confirmed by the school");
+    expect(html).not.toContain("Published learning days and hours");
+    profile.programSchedules[0]!.weeklyPattern.canDisplay=false;
+    const withdrawn = renderPublicSiteHtml({
+      host:"two.can-os.com",site,offerings:[],academicPrograms,parentInformation:profile,
+    },{path:"/school-day"});
+    expect(withdrawn).not.toContain("<strong>Sunday</strong>");
+    expect(withdrawn).not.toContain("10:00–13:00");
+  });
+
   it("renders an empty published catalog without claiming enrollment is available", () => {
     const html = renderPublicSiteHtml({
       host: "partner.can-os.com",
@@ -157,6 +245,9 @@ describe("standalone public site HTML", () => {
       expect(hosted).toContain(shared);
     }
     expect(draft).not.toContain("<form");
+    expect(availablePublicSitePaths(page)).toContain("/school-day");
+    expect(availablePublicSitePaths(page)).toContain("/admissions");
+    expect(availablePublicSitePaths(page)).not.toContain("/student-life");
     expect(draft).not.toContain('name="contactEmail"');
     expect(draft).not.toContain('action="/inquiry"');
     expect(draft).not.toContain("<script");
@@ -314,6 +405,8 @@ describe("standalone public site HTML", () => {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
     });
     expect(hostedDemo).toContain('content="noindex,nofollow"');
+    expect(isIndexablePublicSite({...page, demonstration: true})).toBe(false);
+    expect(isIndexablePublicSite(page)).toBe(true);
     const hostedOrdinary = renderPublicSiteHtml(page, {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
     });
@@ -342,9 +435,8 @@ describe("standalone public site HTML", () => {
       site, academicPrograms: [], offerings: [], localContent: null,
     });
     const page = { host: "example.can-os.com", site, offerings: [], parentInformation };
-    const withheld = renderPublicSiteHtml(page, { path: "/contact" });
-    expect(withheld).toContain("No public inquiry channel is currently available");
-    expect(withheld).not.toContain("Published contact information");
+    expect(() => renderPublicSiteHtml(page, { path: "/contact" }))
+      .toThrow(/not available/);
 
     parentInformation.site.contact = verifiedPublicClaim(
       "Office: family@example.org <please call>", "institutional_record", 4);

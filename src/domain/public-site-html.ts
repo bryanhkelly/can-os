@@ -19,6 +19,25 @@ export type PublicSitePage = {
   localContent?: SiteLocalContent | null;
 };
 
+/** A published synthetic school is a demonstration, never an indexed institution. */
+export function isIndexablePublicSite(page: PublicSitePage): boolean {
+  return page.demonstration !== true;
+}
+
+/** Optional Agent A approved, Program-scoped public calendar contract.
+ * Keep B compatible with main until Integration I merges A's authoritative DTO. */
+type ApprovedProgramSchedule = {
+  programId: string;
+  name: {canDisplay:boolean;value:string|null};
+  grades: {canDisplay:boolean;value:{min:string;max:string}|null};
+  timezone: {canDisplay:boolean;value:string|null};
+  effectiveFrom: {canDisplay:boolean;value:string|null};
+  effectiveThrough: {canDisplay:boolean;value:string|null};
+  weeklyPattern: {canDisplay:boolean;value:readonly {
+    dayOfWeek:number;startsAtLocal:string;endsAtLocal:string;timezone:string;
+  }[]|null};
+};
+
 export function escapePublicHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -41,12 +60,14 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const tuition = Boolean(parent?.tuition.description.canDisplay && parent.tuition.description.value);
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
   const faq = Boolean(parent?.admissions.description.canDisplay && parent.admissions.description.value);
+  const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
+    (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
   return ["/", ...(hasStory ? ["/about"] as const : []),
     ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
     ...(page.offerings.length ? ["/student-life"] as const : []),
     ...(tuition ? ["/tuition"] as const : []),
     ...(services ? ["/families"] as const : []),
-    ...(faq ? ["/faq"] as const : []), "/contact"];
+    ...(faq ? ["/faq"] as const : []), ...(contact ? ["/contact"] as const : [])];
 }
 
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
@@ -191,15 +212,21 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     </article>`;
   }).join("\n");
   const hasOpenApplications = (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
+  const foundingFamilies = !hasOpenApplications && (page.academicPrograms ?? []).some(program =>
+    program.availability === "planned");
   const navigationCtaPath = availablePaths.includes("/admissions") && hasOpenApplications ? "/admissions" :
-    availablePaths.includes("/academics") ? "/academics" : "/contact";
+    availablePaths.includes("/academics") ? "/academics" :
+    availablePaths.includes("/contact") ? "/contact" : "/";
   const navigationCtaLabel = hasOpenApplications ? "Applications" :
-    availablePaths.includes("/academics") ? "Explore programs" : "Contact";
-  const hero = `<div id="welcome" class="public-hero${image ? " has-image" : ""}${page.site.name.length > 28 ? " long-name" : ""}">${image ? `<img class="hero-background-image" src="${escapePublicHtml(image.dataUrl)}" alt="${escapePublicHtml(image.altText)}" decoding="async"/>` : ""}<p class="tag">Welcome to our school</p><h1>${school}</h1>
+    foundingFamilies ? "Founding families" :
+    availablePaths.includes("/academics") ? "Explore programs" :
+    availablePaths.includes("/contact") ? "Contact" : "Home";
+  const hero = `<div id="welcome" class="public-hero${image ? " has-image" : ""}${page.site.name.length > 28 ? " long-name" : ""}">${image ? `<img class="hero-background-image" src="${escapePublicHtml(image.dataUrl)}" alt="${escapePublicHtml(image.altText)}" decoding="async"/>` : ""}<p class="tag">${foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${school}</h1>
     ${local?.welcomeMessage ? `<p class="hero-subtitle">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
     <p class="intro">${academicCards ? "Explore reviewed educational programs and the local community." :
       "This school site is preparing to share verified program information."}
     ${hasOpenApplications ? "Applications are available for eligible approved programs, subject to verification." :
+      foundingFamilies ? "We are gathering interest from founding families. A request for information is not an application or an enrollment offer." :
       academicCards ? "Inquire about published programs; applications are not currently open through this website." :
       "Check back for published educational opportunities."}</p>
     <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
@@ -235,19 +262,56 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
           : "No public inquiry channel is currently available. The school has not published a verified contact method."}
     ${!options?.localPreview && academicCards
       ? "An inquiry does not guarantee admission or enrollment." : ""}</p></section>`;
+  const approvedSchedules = ((page.parentInformation as
+    (PublicParentSchoolProfile & {programSchedules?: ApprovedProgramSchedule[]}) | undefined)
+    ?.programSchedules ?? []);
+  const weekDayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const schoolDay = (page.academicPrograms ?? []).map(program => {
+    // A's published, source-current per-Program calendar is authoritative.
+    // Never infer hours from onsiteDaysPerWeek or apply one Program's times to another.
+    const approved = approvedSchedules.find(schedule =>
+      schedule.programId === program.programId &&
+      schedule.name.canDisplay && schedule.name.value === program.title &&
+      schedule.grades.canDisplay &&
+      schedule.grades.value?.min === program.grades.min &&
+      schedule.grades.value?.max === program.grades.max &&
+      schedule.timezone.canDisplay && Boolean(schedule.timezone.value) &&
+      schedule.weeklyPattern.canDisplay && Boolean(schedule.weeklyPattern.value?.length));
+    const periods = approved?.weeklyPattern.value ?? [];
+    const approvedScheduleHtml = approved ? `<div class="approved-program-schedule">
+      <h4>Approved weekly learning schedule</h4>
+      <ul class="schedule-periods">${periods.map(period =>
+        `<li><strong>${weekDayNames[period.dayOfWeek] ?? "Day not specified"}</strong>
+        <span>${escapePublicHtml(period.startsAtLocal)}–${escapePublicHtml(period.endsAtLocal)}</span></li>`
+      ).join("")}</ul>
+      <p class="availability">Times shown in ${escapePublicHtml(approved.timezone.value ?? "")}.
+        ${approved.effectiveFrom.canDisplay && approved.effectiveFrom.value
+          ? `Effective from ${escapePublicHtml(approved.effectiveFrom.value)}.` : ""}
+        ${approved.effectiveThrough.canDisplay && approved.effectiveThrough.value
+          ? ` Through ${escapePublicHtml(approved.effectiveThrough.value)}.` : ""}
+        A published learning schedule does not establish authorization to open.</p>
+      </div>` : "";
     const days = program.delivery.onsiteDaysPerWeek;
     const modes = [
       program.delivery.onsite ? "Onsite learning" : null,
       program.delivery.liveOnline ? "Live online learning" : null,
       program.delivery.asynchronous ? "Self-paced online learning" : null,
     ].filter(Boolean).join(" · ");
-    return `<article class="card"><h3>${escapePublicHtml(program.title)}</h3>
+    return `<article class="card" id="school-day-${escapePublicHtml(program.programId)}">
+      <p class="tag">Grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}</p>
+      <h3>${escapePublicHtml(program.title)}</h3>
       <p>${escapePublicHtml(modes || "Contact the school for delivery details")}</p>
       ${program.delivery.onsite && days !== null ? `<p>${days} onsite days per week</p>` : ""}
-      <p class="availability">Exact schedules and days are confirmed by the school; this overview
-      does not imply a Monday–Friday schedule or that the program is operating.</p></article>`;
+      ${approvedScheduleHtml || `<p class="availability">Exact schedules and days are confirmed by the school; this overview
+      does not imply a Monday–Friday schedule or that the program is operating.</p>`}</article>`;
   }).join("");
+  const schoolDayProgramNav = (page.academicPrograms?.length ?? 0) > 1
+    ? `<nav class="program-jump-nav" aria-label="Select a program's school day">
+        <p class="tag">Choose your program</p>
+        <div class="program-jump-links">${(page.academicPrograms ?? []).map(program =>
+          `<a href="#school-day-${escapePublicHtml(program.programId)}">${escapePublicHtml(program.title)} · Grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}</a>`
+        ).join("")}</div>
+      </nav>` : "";
   const parent = page.parentInformation;
   const verifiedText = (claim: { canDisplay: boolean; value: string | null } | undefined) =>
     claim?.canDisplay && claim.value ? escapePublicHtml(claim.value) : "";
@@ -258,7 +322,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // A single fully reviewed timetable is shown only when the canonical
   // projection can truthfully represent the Site. Sunday is never excluded.
   const approvedDayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const reviewedSchoolDay = schoolDayDays?.length && schoolDayStart && schoolDayEnd
+  const reviewedSchoolDay = !approvedSchedules.length && schoolDayDays?.length && schoolDayStart && schoolDayEnd
     ? `<section class="church-section" aria-labelledby="reviewed-day-title">
       <p class="tag">Institutionally reviewed schedule</p>
       <h2 id="reviewed-day-title">Published learning days and hours</h2>
@@ -267,7 +331,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">These are approved instructional times, not confirmation that the school is
       authorized to receive students on any particular day. Confirm attendance and opening with the school.</p>
       </section>`
-    : `<p class="availability">A reviewed public timetable is not available for this school.
+    : approvedSchedules.length
+      ? `<p class="availability">Schedules differ by Program. Review each Program below for its approved weekly pattern.</p>`
+      : `<p class="availability">A reviewed public timetable is not available for this school.
       Contact the school for confirmed instructional days and times.</p>`;
   const tuitionText = verifiedText(parent?.tuition.description);
   const aidText = verifiedText(parent?.tuition.financialAid);
@@ -328,7 +394,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "See currently published enrichment and activities.") + enrichmentSection,
     "/school-day": secondaryHero("Learning together", "A look at the school day",
       "Program-specific delivery patterns, not a promised daily timetable.") +
-      reviewedSchoolDay + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
+      reviewedSchoolDay + schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
       (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : ""),
     "/admissions": secondaryHero("For families", "Admissions and next steps",
       "Explore eligible programs. Applications are available only when separately authorized.") +
@@ -348,7 +414,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   };
   const pageTitle = path === "/" ? `${school} | Programs` :
     `${escapePublicHtml(pageLabels[path])} | ${school}`;
-  const pageDescription = path === "/" ? `Explore programs offered through ${school}.` :
+  const pageDescription = path === "/" ? (foundingFamilies
+    ? `Learn about planned programs at ${school} and request founding-family information. Applications are not open.`
+    : `Explore programs offered through ${school}.`) :
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
   const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
   const canonical = `https://${host}${path}`;
@@ -361,6 +429,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 ${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
 <title>${pageTitle}</title>
 <meta name="description" content="${pageDescription}"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="${school}"/>
+<meta property="og:title" content="${pageTitle}"/>
+<meta property="og:description" content="${pageDescription}"/>
+${isLive ? `<meta property="og:url" content="${canonical}"/>` : ""}
+<meta name="twitter:card" content="summary"/>
 <style>
 :root{font-family:var(--site-body);color:var(--site-ink);background:var(--site-paper);line-height:1.65}
 body.theme-warm,body.theme-light{color:var(--site-ink);background:var(--site-paper)}
@@ -397,6 +471,18 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .section-heading{max-width:740px;margin-bottom:32px}.section-heading>p:last-child{color:#475467}.explore-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.explore-link{display:flex;align-items:flex-start;gap:16px;min-width:0;padding:clamp(18px,3vw,30px);border-top:2px solid var(--site-ink);background:#fff;color:var(--site-ink);text-decoration:none;transition:background .2s ease,transform .2s ease}.explore-link:hover{background:#f4f5f2;transform:translateY(-2px)}.explore-number{font-size:.75rem;letter-spacing:.1em;color:#526578;font-weight:700;padding-top:5px}.explore-copy{display:grid;gap:7px;flex:1;min-width:0}.explore-copy strong{font-family:var(--site-display);font-size:clamp(1.3rem,2vw,1.8rem);font-weight:500;line-height:1.2}.explore-copy>span{font-size:.9rem;color:#475467;line-height:1.55}.explore-arrow{font-size:1.4rem;line-height:1.1;align-self:center}.explore-link:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}.public-hero.has-image{background:#16373d}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.96) 0%,rgba(9,28,38,.78) 52%,rgba(9,28,38,.32) 100%)}.public-hero .intro{position:relative}.inquiry-form input:not([type=checkbox]):focus-visible,.inquiry-form textarea:focus-visible{outline-offset:2px}@media(max-width:700px){.explore-grid{grid-template-columns:1fr}.explore-link{padding:20px}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.94),rgba(9,28,38,.67))}}@media(max-width:375px){.mobile-menu[open] .mobile-links{grid-template-columns:1fr}.public-hero h1{font-size:clamp(2.1rem,11vw,3.2rem)}.hero-actions{align-items:stretch;gap:12px}.hero-button{justify-content:center}.explore-link{gap:12px}}\n .contact-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:24px;margin:24px 0;padding:22px 0;border-top:1px solid #e5e2d9;border-bottom:1px solid #e5e2d9}.contact-details h3{font-family:var(--site-display);font-size:1.3rem;font-weight:500;margin:0 0 6px}.contact-details p{white-space:pre-line;overflow-wrap:anywhere;margin:0}.admissions-status{border-left:3px solid var(--site-accent);padding:12px 18px;background:#fff}.admissions-next-steps{max-width:900px}.admissions-next-steps>p:not(.tag){color:#475467;line-height:1.75}.text-action{display:inline-flex;margin:12px 20px 8px 0;color:var(--site-ink);font-weight:700;text-underline-offset:5px}.public-next-step{margin-top:32px;font-weight:700}.public-next-step a{color:var(--site-ink);text-underline-offset:5px}.disclosure-item{border-top:1px solid #e5e2d9;padding:20px 0}.disclosure-item h3{font-family:var(--site-display);font-size:1.3rem;margin:0 0 8px}.disclosure-item p{margin:0;color:#475467;white-space:pre-line;overflow-wrap:anywhere}
 .community-section{margin-top:clamp(36px,8vw,108px)}.community-heading{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(230px,.7fr);gap:clamp(20px,5vw,90px);align-items:end;border-top:2px solid var(--site-ink);padding-top:30px;margin-bottom:34px}.community-heading h2{font-size:clamp(2rem,4.5vw,4.2rem);line-height:1.13;max-width:700px}.community-heading>p{color:var(--site-muted);font-size:1.06rem;line-height:1.8}.community-stories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(22px,5vw,72px)}.community-story{padding:28px 0;border-top:1px solid #cdd2cd;min-width:0}.community-story h3{font-family:var(--site-display);font-size:clamp(1.25rem,2.4vw,1.9rem);font-weight:500;line-height:1.25;margin:8px 0 12px}.community-story p:last-child{white-space:pre-line;overflow-wrap:anywhere;color:#475467;line-height:1.75}.story-index{margin:0;font-size:.76rem;letter-spacing:.12em;font-weight:700;color:var(--site-muted)}.community-photo{width:100%;max-height:580px;object-fit:cover;margin-bottom:34px}.community-section>.availability{margin-top:16px}@media(max-width:700px){.community-heading{grid-template-columns:1fr}.community-stories{grid-template-columns:1fr}.community-story{padding:24px 0}}
 .hero-subtitle{font-family:var(--site-display);font-size:clamp(1.5rem,3vw,2.85rem);font-weight:500;line-height:1.2;letter-spacing:-.028em;max-width:760px;margin:20px 0 20px;color:#fff}.public-hero h1{max-width:1100px}.public-hero.has-image .hero-subtitle{text-shadow:0 1px 12px rgba(0,0,0,.15)}
+.program-jump-nav{margin:28px 0;padding:22px;border:1px solid #dce2e8;border-radius:8px}.program-jump-links{display:flex;flex-wrap:wrap;gap:12px}.program-jump-links a{display:inline-block;padding:10px 14px;border:1px solid currentColor;border-radius:5px;text-underline-offset:3px}.program-jump-links a:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
+.approved-program-schedule{margin-top:24px;padding:22px;background:var(--site-paper);border:1px solid #dce2e8;border-radius:8px}.approved-program-schedule h4{margin:0 0 14px;font-size:1.07rem}.schedule-periods{list-style:none;margin:0;padding:0}.schedule-periods li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #dce2e8;padding:12px 0;flex-wrap:wrap}.schedule-periods li strong{min-width:110px}.schedule-periods li span{font-variant-numeric:tabular-nums}.schedule-periods+.availability{margin:12px 0 0}
+.inquiry-form{margin-top:22px;padding:clamp(18px,3vw,28px);background:var(--site-paper);border:1px solid #dce2e8;border-radius:10px;display:grid;gap:16px}
+.inquiry-form label:not(.consent){display:flex;flex-direction:column;gap:7px;font-weight:650;font-size:.9rem}
+.inquiry-form input:not([type=checkbox]):not([type=hidden]),.inquiry-form textarea{display:block;width:100%;max-width:100%;font:inherit;padding:12px 13px;border:1px solid #8b989e;border-radius:5px;background:#fff;color:#172d38}
+.inquiry-form input:focus-visible,.inquiry-form textarea:focus-visible,.inquiry-form button:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
+.inquiry-form .consent{display:flex;align-items:flex-start;gap:10px;font-size:.88rem;line-height:1.5}
+.inquiry-form .consent input{margin-top:4px;width:18px;height:18px;flex:0 0 18px}
+.inquiry-form button{width:100%;padding:13px 18px;min-height:46px;border:0;border-radius:5px;background:var(--site-ink);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.inquiry-form button:hover{filter:brightness(1.18)}
+.inquiry-form h4{font-size:1.1rem;line-height:1.3;margin:0}
+@media(prefers-reduced-motion:reduce){.inquiry-form button{transition:none}}
  .demo-banner{padding:9px 22px;background:#162e39;color:#f9f5ed;text-align:center;font-size:.78rem;line-height:1.5;letter-spacing:.01em}.demo-banner strong{font-weight:700}.vision-feature{display:grid;grid-template-columns:minmax(90px, .3fr) minmax(0,1fr);gap:clamp(20px,5vw,80px);background:var(--site-ink);color:#fff;padding:clamp(28px,5vw,72px);border-radius:5px;margin:clamp(24px,5vw,64px) 0}.vision-feature h2{max-width:800px;font-size:clamp(2.1rem,4.5vw,4.3rem);line-height:1.13;letter-spacing:-.045em}.vision-feature p:not(.tag){color:#e3e6e0;max-width:800px;font-size:1.1rem;line-height:1.8}.vision-feature .tag{color:#e8c996}.vision-number{font-family:var(--site-display);font-size:clamp(4rem,11vw,10rem);line-height:1;color:#d5ac69}.hero-art{pointer-events:none;position:absolute;right:-3%;bottom:-24%;width:min(52%,580px);aspect-ratio:1;border:1px solid rgba(255,255,255,.32);border-radius:50%;opacity:.55;z-index:-1}.hero-art .art-ring{position:absolute;inset:15%;border:1px solid rgba(255,255,255,.45);border-radius:50%}.hero-art .art-line{position:absolute;top:6%;left:45%;width:1px;height:90%;background:rgba(255,255,255,.35);transform:rotate(34deg)}.hero-art .art-dot{position:absolute;top:18%;left:12%;height:12px;width:12px;border-radius:50%;background:#f2d19b}.public-hero.has-image .hero-art{display:none}@media(max-width:700px){.vision-feature{grid-template-columns:1fr}.vision-number{font-size:4rem}.hero-art{width:75%;right:-30%;bottom:-18%;opacity:.3}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}

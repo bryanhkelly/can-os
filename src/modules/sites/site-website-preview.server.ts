@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
@@ -37,16 +37,18 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const [siteConfiguration] = host ? await db.select({metadata: sites.metadata})
     .from(sites).where(eq(sites.id, site.id)).limit(1) : [];
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
-    academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : {};
+    academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
+  const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
+    parentExtras?.admissions);
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms, offerings, localContent: local?.content ?? null,
-    ...parentExtras,
+    academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
+    ...(parentExtras ?? {}),
   });
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms, offerings, localContent: local?.content ?? null,
+    academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
     parentInformation,
   } : null;
   const previewPages = previewPage

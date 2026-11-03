@@ -36,7 +36,9 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
     loadingMoreRef.current=true;
     setLoadingMore(true);setLoadError("");
     try {
-      const page=await listPublicAdmissionsInterests({data:{cursor:nextCursor}});
+      const page=await listPublicAdmissionsInterests({data:{
+        cursor:nextCursor,siteId,programId,
+      }});
       setOlderRows(current=>[...current,...page.items]);
       setNextCursor(page.nextCursor);
     } catch (cause) {
@@ -113,6 +115,10 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
             </button>}
           </div>
         </div>
+        <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+          <p className="font-semibold">Next family step · {row.nextStep.owner}</p>
+          <p className="mt-1">{row.nextStep.message}</p>
+        </div>
         <ol className="mt-3 space-y-1 border-l pl-4 text-xs text-muted-foreground" aria-label="Family relationship history">
           {row.invitationBatchId && <li>Pre-opening invitation recorded · Provider receipt does not prove delivery or consent.</li>}
           <li>Family inquiry received · {new Date(row.createdAt).toLocaleString()}</li>
@@ -120,7 +126,11 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
             ? `Follow-up requested by family · ${new Date(row.consentAt).toLocaleString()}`
             : "No affirmative follow-up consent recorded"}</li>
           {row.contactedAt && <li>Registrar follow-up recorded · {new Date(row.contactedAt).toLocaleString()}</li>}
-          <li>{row.admissionsAuthorized ? "CAN admissions and school-of-record services authorized" : "Application invitations blocked until CAN authorization"}</li>
+          <li>{row.admissionsAuthorizationStatus === "temporarily_unavailable"
+            ? "Admissions authorization could not be checked. Refresh before taking action."
+            : row.admissionsAuthorized
+              ? "CAN admissions and school-of-record services authorized"
+              : "Application invitations blocked until CAN authorization"}</li>
           {row.familyStartRequestId && <li>Verified-email application invitation requested · Delivery is not confirmed
             {row.applicationLinkExpiresAt && !row.emailVerifiedAt &&
               (new Date(row.applicationLinkExpiresAt).getTime() <= Date.now() ? " · Link expired" :
@@ -172,7 +182,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
         </div>}
         {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
           <p className="mt-2 text-xs text-muted-foreground">Awaiting family email verification or application. A sent invitation is not an accepted application.</p>}
-        {!row.admissionsAuthorized && !row.applicationId && row.status !== "closed" &&
+        {row.admissionsAuthorizationStatus === "not_authorized" && !row.applicationId && row.status !== "closed" &&
           <p className="mt-2 text-xs text-muted-foreground">The family's interest is saved. Application invitations become available after CAN authorizes this school.</p>}
         {row.message && <p className="mt-3 whitespace-pre-wrap text-sm">{row.message}</p>}
       </article>)}

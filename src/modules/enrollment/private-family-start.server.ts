@@ -61,6 +61,7 @@ export async function requestInvitedFamilyStart(batchId:string,recipientKey:stri
  */
 export async function requestConsentedInterestFamilyStart(
  interestId:string,sender:AccessEmailSender,options:FamilyStartEmailOptions={},
+ onPersisted?:(tx:FamilyStartTransaction,requestId:string)=>Promise<void>,
 ){
  return requestVerifiedFamilyStart(async tx=>{
   const [interest]=await tx.select({
@@ -73,7 +74,9 @@ export async function requestConsentedInterestFamilyStart(
    lastName:publicAdmissionsInterests.contactLastName,
    email:publicAdmissionsInterests.contactEmail,
   }).from(publicAdmissionsInterests).where(eq(publicAdmissionsInterests.id,interestId))
-    .for("share").limit(1);
+    // A concurrent resend must wait until the original interest->request
+    // linkage commits; no second request can race this callback.
+    .for("update").limit(1);
   if(!interest||!interest.consentAt||!["new","contacted"].includes(interest.status))
    throw new AuthorizationError("consented family interest");
   const school=await resolvePrivateFamilyStartDestination(tx,interest.programId);
@@ -82,7 +85,7 @@ export async function requestConsentedInterestFamilyStart(
     programId:school.programId,firstName:interest.firstName,lastName:interest.lastName,
     email:normalizeAccessEmail(interest.email),
    },evidence:{source:"consented_interest" as const,interestId:interest.id}};
- },sender,options);
+ },sender,options,onPersisted);
 }
 
 /** Only server-recorded issuance evidence selects the private path. A token or

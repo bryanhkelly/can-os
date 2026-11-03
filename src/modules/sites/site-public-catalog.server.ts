@@ -1,4 +1,4 @@
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, sitePublications, sites } from "@/db/schema";
@@ -47,16 +47,21 @@ export async function readPublishedSiteCatalog(slug: string) {
     // the authorized private editor; no draft services or invented weekday defaults.
     const parentExtras = await readApprovedPublicParentExtras(site.id,
       academicPrograms.map(program => program.programId), site.metadata, tx);
+    // The existing academic catalog's service-level applicationOpen is not
+    // sufficient for a public Apply CTA. The actual family-start command also
+    // requires a current, positive-capacity academic-year seat pool. Keep the
+    // renderer's Program-level button and the parent DTO on the SAME decision.
+    const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
     return {
       parentInformation: projectApprovedParentInformation({
         site: { name: site.name, organizationName: site.organizationName },
-        academicPrograms, offerings: publicOfferings, localContent,
+        academicPrograms:authorizedPrograms, offerings: publicOfferings, localContent,
         ...parentExtras,
       }),
       demonstration: site.metadata?.synthetic === true,
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms,
+      academicPrograms:authorizedPrograms,
       localContent,
       offerings: publicOfferings,
     };

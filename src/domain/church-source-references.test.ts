@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertChurchProposalSourceIdentity,
   initialChurchReferenceState,
+  churchSuggestionTargetFields,
   normalizeChurchReferenceUrl,
 } from "./church-source-references";
 
@@ -20,6 +22,8 @@ describe("church reference URLs", () => {
   it.each([
     ["website", "http://church.org"],
     ["website", "https://user:pass@church.org"],
+    ["website", "https://church.org/about?access_token=private"],
+    ["youtube", "https://youtube.com/@Church?api_key=private"],
     ["website", "https://localhost/admin"],
     ["website", "https://127.0.0.1"],
     ["website", "https://[::1]"],
@@ -33,11 +37,48 @@ describe("church reference URLs", () => {
     expect(() => normalizeChurchReferenceUrl(kind, url)).toThrow();
   });
 
+  it("maps source excerpts only into locally editable church-owned fields", () => {
+    expect(churchSuggestionTargetFields.church_history).toBe("churchHistory");
+    expect(churchSuggestionTargetFields.church_mission).toBe("localDescription");
+    expect(churchSuggestionTargetFields.local_community).toBe("communityOutreach");
+    expect(churchSuggestionTargetFields.faith_and_values).toBe("statementOfFaith");
+    expect(churchSuggestionTargetFields.branding_hint).toBeUndefined();
+    expect(Object.values(churchSuggestionTargetFields)).not.toContain("tuition");
+    expect(Object.values(churchSuggestionTargetFields)).not.toContain("admissions");
+  });
+
   it("never treats a saved social link as extracted material", () => {
     expect(initialChurchReferenceState("youtube")).toBe("unsupported");
     expect(initialChurchReferenceState("instagram")).toBe("unsupported");
     expect(initialChurchReferenceState("facebook")).toBe("unsupported");
     expect(initialChurchReferenceState("tiktok")).toBe("unsupported");
     expect(initialChurchReferenceState("website")).toBe("saved");
+  });
+});
+
+describe("private proposal source identity", () => {
+  it("permits church pages on the same origin when source has not changed", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", "https://church.org/about", "https://church.org/",
+    )).not.toThrow();
+  });
+  it("rejects different-origin proposal pages even without a historical source snapshot", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", "https://impostor.church.org/about",
+    )).toThrow(/source changed|invalid/);
+  });
+  it("rejects a source root changed within the same origin", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/new-campus", "https://church.org/about",
+      "https://church.org/old-campus",
+    )).toThrow(/source changed|invalid/);
+  });
+  it("rejects missing or malformed proposal pages rather than accepting unsourced copy", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", null,
+    )).toThrow(/source changed|invalid/);
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", "http://church.org/about",
+    )).toThrow(/source changed|invalid/);
   });
 });

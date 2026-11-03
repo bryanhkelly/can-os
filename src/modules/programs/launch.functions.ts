@@ -5,8 +5,11 @@ import { completeJourneyRequirement } from "@/modules/journeys/complete-requirem
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress, launchOnsiteDaysPerWeekSchema } from "@/domain/site-setup-configuration";
+import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
+import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
@@ -32,6 +35,7 @@ function safeJsonObject(value:Record<string,unknown>):Record<string,SafeJson>{
 
 const uuid = z.string().uuid();
 
+/** Physical location is submitted by the church. It is not jurisdiction verification. */
 const startLaunchInput = z.object({
   name: z.string().trim().min(2).max(200),
   slug: z
@@ -42,13 +46,13 @@ const startLaunchInput = z.object({
   gradeRange: z.object({
     min: z.string().trim().min(1).max(10),
     max: z.string().trim().min(1).max(10),
-  }),
+  }).refine(launchGradeRangeIsOrdered,"Minimum grade cannot come after maximum grade"),
   deliveryModel: z
     .object({
       onsite: z.boolean().optional(),
       asynchronous: z.boolean().optional(),
       liveOnline: z.boolean().optional(),
-      onsiteDaysPerWeek: z.number().int().min(1).max(7).optional(),
+      onsiteDaysPerWeek: launchOnsiteDaysPerWeekSchema.optional(),
     })
     .refine(
       (model) => !!(model.onsite || model.asynchronous || model.liveOnline),
@@ -77,6 +81,7 @@ async function registrarContext(capability: string) {
 /** Wizard dropdown options, scoped to the registrar's verified organization grant. */
 export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
   async () => {
+    setResponseHeader("Cache-Control","private, no-store");
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) {
@@ -102,8 +107,13 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
           slug: s.sites.slug,
           timezone: s.sites.timezone,
           address: s.sites.address,
+          metadata: s.sites.metadata,
+          updatedAt: s.sites.updatedAt,
+          websiteSlug:s.sitePublications.slug,
+          websiteStatus:s.sitePublications.status,
         })
         .from(s.sites)
+        .leftJoin(s.sitePublications,eq(s.sitePublications.siteId,s.sites.id))
         .where(and(inArray(s.sites.organizationId, organizationIds),
           ...(context.grantSiteId === null ? [] : [eq(s.sites.id, context.grantSiteId)])))
         .orderBy(asc(s.sites.name)),
@@ -126,7 +136,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(site => ({ ...site, address: site.address === null ? null : safeJsonObject(site.address) })),
+      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
       jurisdictions: jurisdictionRows,
       schoolSetupAdministrator: context.role === "site_admin",
     };
@@ -147,6 +157,27 @@ export const startLaunch = createServerFn({ method: "POST" })
     }
     if (data.siteId && !organizationWide && !context.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site scope");
+    }
+    // A state mismatch is not equivalent to a manual legal exception. Reject it
+    // before creation; jurisdiction applicability remains independently reviewed by C.
+    if(data.siteId) {
+      const [{db},schema,{eq}]=await Promise.all([
+        import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
+      ]);
+      const [site]=await db.select({address:schema.sites.address,
+        organizationId:schema.sites.organizationId}).from(schema.sites)
+        .where(eq(schema.sites.id,data.siteId)).limit(1);
+      if(site && site.organizationId===data.hostOrganizationId) {
+        const address=readSitePhysicalAddress(site.address);
+        if(address.value?.country==="US") {
+          const [target]=await db.select({
+            id:schema.jurisdictions.id,code:schema.jurisdictions.code,
+            name:schema.jurisdictions.name,
+          }).from(schema.jurisdictions).where(eq(schema.jurisdictions.id,data.jurisdictionId)).limit(1);
+          if(target && !addressStateJurisdiction(address.value,[target]))
+            throw new Error("The selected Program jurisdiction differs from the saved school's US state. Correct the Site or select the matching jurisdiction; ask CAN for independent review of any exception.");
+        }
+      }
     }
     // Organization-wide grants have no site filter. The domain service checks
     // that the target site belongs to the selected host organization.
@@ -492,46 +523,63 @@ export const createLaunchSite = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({
   organizationId:uuid,name:z.string().trim().min(2).max(160),
   slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  timezone:z.string().trim().min(3).max(80),
- }).parse(v))
+  timezone:siteTimezoneSchema,
+  address:physicalSiteAddressSchema.optional(),
+ }).strict().parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
    throw new AuthorizationError("organization-wide site creation");
-  const [{db},s,{provisionNewSitePublicationDraft},{and,eq,or,sql}]=await Promise.all([
+  const [{db},s,{provisionNewSitePublicationDraft,ensureExistingSitePublicationDraftForLaunch},{and,eq,or,sql}]=await Promise.all([
    import("@/db/client"),import("@/db/schema"),
    import("@/modules/sites/site-public-provisioning.server"),
    import("drizzle-orm"),
   ]);
   return db.transaction(async tx=>{
-   // D1: recognize the church's existing Site instead of creating a duplicate.
+   // Serialize identical retry/submission attempts before checking existing Sites.
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:" + data.organizationId + ":" + data.name.trim().toLowerCase()}))`);
    // The unique index only covers slug; a renamed slug would otherwise fork the campus.
-   const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug})
+   const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug,
+     timezone:s.sites.timezone,address:s.sites.address})
     .from(s.sites)
     .where(and(eq(s.sites.organizationId,data.organizationId),or(
      eq(s.sites.slug,data.slug),
      sql`lower(${s.sites.name}) = ${data.name.trim().toLowerCase()}`,
     )))
     .limit(1);
-   if(existing)throw new Error(
-    `This church already has the site "${existing.name}" (${existing.slug}). Select it from the Site list instead of creating a duplicate.`);
-   const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
+   if(existing) {
+    // Exact replay returns the original canonical Site and its website reservation;
+    // a changed name, timezone or location must be edited, not silently adopted.
+    if(existing.slug===data.slug && existing.name.trim().toLowerCase()===data.name.trim().toLowerCase() &&
+      existing.timezone===data.timezone &&
+      (data.address ? samePhysicalSiteAddress(existing.address,data.address) : existing.address===null)) {
+      const publicSiteDraft=await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
+        id:existing.id,organizationId:data.organizationId,slug:existing.slug,
+      });
+      return {siteId:existing.id,publicSiteDraft,replayed:true};
+    }
+    throw new Error(`This church already has the site "${existing.name}" (${existing.slug}). Select its saved record and edit it instead of creating another Site.`);
+   }
+   const createdAt=new Date();
+   const [site]=await tx.insert(s.sites).values({...data,updatedAt:createdAt,
+     metadata:{siteIdentityRevision:createdAt.toISOString(),...(data.address?{sitePhysicalAddressRevision:createdAt.toISOString()}:{})}})
+     .returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
     actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
-    siteId:site.id,payload:{name:data.name,timezone:data.timezone},
+    siteId:site.id,payload:{name:data.name,timezone:data.timezone,addressProvided:Boolean(data.address)},
    });
    await writeAudit(tx,actor,{
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
-    after:{name:data.name,timezone:data.timezone}});
+    after:{name:data.name,timezone:data.timezone,address:data.address??null}});
    // PUB-12: create the draft within the same transaction, AFTER the Site
    // creation evidence. Nothing is public, and no publishing grant is issued.
    const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
     id:site.id,organizationId:data.organizationId,slug:data.slug,
    });
-   return {siteId:site.id,publicSiteDraft};
+   return {siteId:site.id,publicSiteDraft,replayed:false};
   });
  });
 /** Create a unique orientation event and expose it to site/program calendars. */

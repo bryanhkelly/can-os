@@ -1393,6 +1393,21 @@
         "domain_events"
       ]
     },
+    "/sites/$siteId/parent-information": {
+      "persona": "authorized institutional site registrar",
+      "fixtureRequired": false,
+      "rationale": "Exact Site identity disclosure review requires an isolated database with canonical Site draft configuration and a verified institutional publisher assignment; approval/revocation browser acceptance is not yet executed, and missing source values remain private.",
+      "interactions": [
+        "open private current Site location and school-controlled contact only with explicit institutional publisher permission",
+        "approve exact canonical source digests with separate public display attestations, audit evidence and finite expiry",
+        "reject stale Site revisions and modified contact or physical Site location",
+        "withdraw both public claims and confirm anonymous Site host no longer displays them"
+      ],
+      "downstreamRecords": [
+        "sites",
+        "audit_events"
+      ]
+    },
     "/sites/$siteId/publish": {
       "persona": "authorized site registrar",
       "fixtureRequired": false,

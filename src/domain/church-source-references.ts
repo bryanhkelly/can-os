@@ -6,6 +6,8 @@
  * fetch authorization boundary (DNS, redirects and resolved IPs require separate
  * server-side checks).
  */
+/** Same-page notification only; no content or tenant identifiers are emitted. */
+export const churchSourcesChangedEvent = "can:church-sources-changed";
 export const churchReferenceKinds = [
   "website", "youtube", "instagram", "facebook", "tiktok",
 ] as const;
@@ -30,6 +32,18 @@ export const churchSuggestionFields = [
   "faith_and_values", "branding_hint",
 ] as const;
 export type ChurchSuggestionField = typeof churchSuggestionFields[number];
+/** Church-owned editable Site fields only; no institutional claims or approvals. */
+export const churchSuggestionTargetFields: Partial<Record<ChurchSuggestionField, import("./site-local-content").SiteLocalTextField>> = {
+  church_history: "churchHistory",
+  church_mission: "localDescription",
+  church_vision: "localDescription",
+  denomination: "denomination",
+  local_community: "communityOutreach",
+  leadership_intro: "leadershipWelcome",
+  ministries: "localTraditions",
+  welcome_message: "welcomeMessage",
+  faith_and_values: "statementOfFaith",
+};
 export type ChurchContentSuggestion = {
   id: string;
   siteId: string;
@@ -50,6 +64,8 @@ const socialHosts: Record<Exclude<ChurchReferenceKind, "website">, readonly stri
   tiktok: ["tiktok.com", "www.tiktok.com"],
 };
 const trackingKeys = new Set(["fbclid", "gclid", "dclid", "mc_cid", "mc_eid", "igshid"]);
+const secretQueryKeys = new Set(["access_token", "id_token", "api_key", "apikey",
+  "authorization", "password", "secret", "session_token", "auth_token", "signature"]);
 
 /**
  * Parse a single optional field. Host-specific matching prevents a website
@@ -86,6 +102,9 @@ export function normalizeChurchReferenceUrl(
   }
   url.hash = "";
   for (const key of [...url.searchParams.keys()]) {
+    if (secretQueryKeys.has(key.toLowerCase())) {
+      throw new Error("Church public reference links must not contain access credentials");
+    }
     if (trackingKeys.has(key.toLowerCase()) || key.toLowerCase().startsWith("utm_")) {
       url.searchParams.delete(key);
     }
@@ -98,4 +117,28 @@ export function initialChurchReferenceState(
   kind: ChurchReferenceKind,
 ): ChurchReferenceState {
   return kind === "website" ? "saved" : "unsupported";
+}
+
+/**
+ * Canonical private reference identity check at review time. A proposal page
+ * must remain on the active source's origin; new proposals also carry the
+ * source root URL at capture time in their private audit. Old proposals
+ * without that audit evidence are still checked against their page origin,
+ * while URL replacements invalidate all pending rows transactionally.
+ */
+export function assertChurchProposalSourceIdentity(
+  currentSourceUrl: string, proposalPageUrl: string | null,
+  capturedSourceUrl?: string | null,
+): void {
+  let current: string, page: string;
+  try {
+    current = normalizeChurchReferenceUrl("website", currentSourceUrl);
+    page = normalizeChurchReferenceUrl("website", proposalPageUrl ?? "");
+    if (new URL(page).origin !== new URL(current).origin ||
+        (capturedSourceUrl && normalizeChurchReferenceUrl("website", capturedSourceUrl) !== current)) {
+      throw new Error("Source reference changed");
+    }
+  } catch {
+    throw new Error("The church source changed or the proposed page is invalid. Discard the suggestion and submit it from the current church website.");
+  }
 }
