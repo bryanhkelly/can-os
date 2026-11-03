@@ -97,7 +97,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
   const firstSession = new Map<string, (typeof sessionRows)[number]>();
   for (const item of sessionRows) if (item.seasonId &&
     item.metadata.extendedLearningDraft === false && item.metadata.cancelled !== true &&
-    item.endsAt > now && !firstSession.has(item.seasonId))
+    item.endsAt !== null && item.endsAt > now && !firstSession.has(item.seasonId))
     firstSession.set(item.seasonId, item);
   const registrationRows = ids.length ? await executor.select({
     seasonId: s.activityRegistrations.activitySeasonId,
@@ -108,7 +108,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     const packages = readEnrichmentPackages(row.seasonMetadata);
     const sessions = sessionRows.filter(event => event.seasonId === row.seasonId &&
       event.metadata.extendedLearningDraft === false && event.metadata.cancelled !== true &&
-      event.endsAt > now)
+      event.endsAt !== null && event.endsAt > now)
       .map(event => event.id ?? "").filter(Boolean);
     const bookings = registrationRows.filter(entry => entry.seasonId === row.seasonId);
     const occupied = sessionOccupancy(sessions, bookings);
