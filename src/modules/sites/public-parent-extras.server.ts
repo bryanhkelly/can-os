@@ -152,7 +152,8 @@ export async function readApprovedPublicParentExtras(
   let admissions: PublicAdmissionsState = {
     applicationOpen:false, description:unconfiguredClaim("admissions"),
     programs:programs.map(program=>({
-      programId:program.programId, status:"information_only" as const,
+      programId:program.programId, status:program.availability === "planned" ? "preopening_inquiry" as const : "information_only" as const,
+      informationSessionInterestAvailable:false,
       description:unconfiguredClaim<string>("admissions"),
     })),
   };
@@ -173,7 +174,9 @@ export async function readApprovedPublicParentExtras(
       }
       states.push({
         programId:program.programId,
-        status:eligible ? "verified_application" : "information_only",
+        status:eligible ? "verified_application" :
+          program.availability === "planned" ? "preopening_inquiry" : "information_only",
+        informationSessionInterestAvailable:false,
         description:eligible
           ? verifiedPublicClaim(
             "Applications can begin after adult email verification. Admission and enrollment are subject to school review.",
