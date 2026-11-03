@@ -33,6 +33,8 @@ export async function requireCurrentSchoolJurisdictionForOpening(
     now?: Date;
     openingApprovedAt?: Date | null;
     configurationCreatedAt: Date | null;
+    /** Legal obligations that must be evidenced for this operation. */
+    requiredPhases?: readonly ("before_opening" | "before_enrollment")[];
   },
 ) {
   const now=options.now??new Date();
@@ -167,8 +169,9 @@ export async function requireCurrentSchoolJurisdictionForOpening(
     eq(actions.organizationId,school.organizationId),eq(actions.siteId,school.siteId),
     eq(actions.programId,programId),
   ));
+  const requiredPhases=new Set<string>(options.requiredPhases??["before_opening"]);
   const openingDuties=parsedPolicy.data.requirements.filter(requirement=>
-    requirement.phase==="before_opening" &&
+    requiredPhases.has(requirement.phase) &&
     evaluation.decisions.some(decision=>
       decision.id===requirement.id && decision.status==="applicable"));
   for(const duty of openingDuties){
@@ -206,4 +209,18 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   return {siteId:school.siteId,programId,
     jurisdictionProfileVersionId:policy.id,scopeFingerprint:fingerprint,
     addressChangeRevision:physicalRevision};
+}
+
+/**
+ * I-owned admissions entrypoints may call this after their existing
+ * independently authorized enrollment + institution + Site/Program gates.
+ * This verifies ONLY before-enrollment obligations, never grants admissions.
+ */
+export async function requireCurrentSchoolJurisdictionForEnrollment(
+  executor:Pick<typeof db,"select">,programId:string,
+  options:{now?:Date;configurationCreatedAt:Date|null;openingApprovedAt?:Date|null},
+) {
+  return requireCurrentSchoolJurisdictionForOpening(executor,programId,{
+    ...options,requiredPhases:["before_enrollment"],
+  });
 }
