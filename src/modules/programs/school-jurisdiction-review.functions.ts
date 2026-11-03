@@ -7,6 +7,9 @@ import {db} from "@/db/client";
 import {actions,documents,organizations,programs,sites} from "@/db/schema";
 import {and,eq,inArray} from "drizzle-orm";
 import {isJurisdictionRequirementRenewalCurrent} from "@/domain/school-jurisdiction-approval";
+import {
+  beginSchoolJurisdictionDocumentUpload,finishSchoolJurisdictionDocumentUpload,
+} from "./school-jurisdiction-document-upload.server";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
 import { ensureSchoolJurisdictionReviewAction, decideSchoolJurisdictionLegalReview } from "./school-jurisdiction-actions.server";
 import {submitSchoolJurisdictionRequirementEvidence,
@@ -185,4 +188,32 @@ export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET
             actor.role==="can_jurisdiction_reviewer"),
         updatedAt:row.updatedAt.toISOString(),
       }))};
+  });
+
+const jurisdictionDocumentUploadInput=z.object({
+  actionId:z.string().uuid(),
+  expiresAt:z.string().datetime({offset:true}),
+  fileName:z.string().trim().min(1).max(150),
+  mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),
+  size:z.number().int().min(16).max(10*1024*1024),
+}).strict();
+
+/** Private jurisdiction requirement upload, scoped to a verified legal Action.
+ * Uses existing R2 storage and documents; no second store or opening approval. */
+export const beginSchoolJurisdictionDocumentUploadFn=createServerFn({method:"POST"})
+  .validator((value:unknown)=>jurisdictionDocumentUploadInput.parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    return beginSchoolJurisdictionDocumentUpload(actor,data);
+  });
+
+export const finishSchoolJurisdictionDocumentUploadFn=createServerFn({method:"POST"})
+  .validator((value:unknown)=>jurisdictionDocumentUploadInput.extend({
+    key:z.string().regex(/^school-jurisdiction\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i),
+  }).parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    return finishSchoolJurisdictionDocumentUpload(actor,data);
   });
