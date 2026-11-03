@@ -186,8 +186,9 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
           enrollment.programId === row.programId &&
           enrollment.schoolYearId === offer.schoolYearId &&
           enrollment.kind === "program"));
-      const offerYearId = enrollmentOffer?.schoolYearId ??
-        (row.applicationId ? latestOffers.get(row.applicationId)?.schoolYearId : null);
+      const displayOffer = enrollmentOffer ??
+        (row.applicationId ? latestOffers.get(row.applicationId) : undefined);
+      const offerYearId = displayOffer?.schoolYearId ?? null;
       const programEnrollmentYears = new Set(activeEnrollments.filter(enrollment =>
         enrollment.studentProfileId === row.studentProfileId &&
         enrollment.programId === row.programId && enrollment.kind === "program" &&
@@ -221,11 +222,9 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       activeEnrollment,
       placedInClass,
       studentAccessStatus,
-      latestOfferStatus: row.applicationId ? latestOffers.get(row.applicationId)?.status ?? null : null,
-      latestOfferIssuedAt: row.applicationId
-        ? latestOffers.get(row.applicationId)?.issuedAt?.toISOString() ?? null : null,
-      latestOfferRespondedAt: row.applicationId
-        ? latestOffers.get(row.applicationId)?.respondedAt?.toISOString() ?? null : null,
+      latestOfferStatus: displayOffer?.status ?? null,
+      latestOfferIssuedAt: displayOffer?.issuedAt?.toISOString() ?? null,
+      latestOfferRespondedAt: displayOffer?.respondedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
@@ -240,12 +239,12 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         interestStatus: row.status,
         consented: Boolean(row.consentAt),
         admissionsAuthorized: authorization.get(row.programId) === "authorized",
+        authorizationUnavailable: authorization.get(row.programId) === "temporarily_unavailable",
         canInvite: invitationEligible,
         hasFamilyStartRequest: Boolean(row.familyStartRequestId),
         emailVerified: Boolean(row.emailVerifiedAt),
         hasApplication: Boolean(row.applicationId),
-        latestOfferStatus: row.applicationId
-          ? latestOffers.get(row.applicationId)?.status ?? null : null,
+        latestOfferStatus: displayOffer?.status ?? null,
         activeEnrollment,
         placedInClass,
         studentAccessStatus,
