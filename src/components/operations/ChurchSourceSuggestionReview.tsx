@@ -7,6 +7,7 @@ import {
 } from "@/modules/sites/church-content-suggestions.functions";
 import { churchSuggestionTargetFields, churchSourcesChangedEvent, type ChurchSuggestionField } from "@/domain/church-source-references";
 import { siteLocalContentLimits } from "@/domain/site-local-content";
+import type { ChurchBrandProposal } from "@/domain/church-brand-suggestions";
 
 type Ref = Awaited<ReturnType<typeof getChurchSourceReferenceView>>[number];
 type Suggestion = Awaited<ReturnType<typeof getChurchContentSuggestionView>>[number];
@@ -28,6 +29,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   const [references, setReferences] = useState<Ref[]>([]);
   const [items, setItems] = useState<Suggestion[]>([]);
   const [reviewContext, setReviewContext] = useState<ReviewContext | null>(null);
+  const [brandProposal, setBrandProposal] = useState<ChurchBrandProposal | null>(null);
   const [field, setField] = useState<ChurchSuggestionField>("church_history");
   const [sourcePageUrl, setSourcePageUrl] = useState("");
   const [text, setText] = useState("");
@@ -73,6 +75,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     setBusy(true); setError(""); setMessage("");
     try {
       const result = await refreshChurchWebsiteSuggestionsCommand({ data: {} });
+      setBrandProposal("brandProposal" in result ? result.brandProposal ?? null : null);
       await refresh();
       setMessage(result.message);
     } catch (e) {
@@ -149,6 +152,35 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
         className="mt-3 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
         Check church website for suggestions
       </button>
+    </div>}
+    {brandProposal && <div className="mt-4 rounded-xl border p-4" aria-label="Church brand suggestions">
+      <h3 className="font-semibold">Suggested church brand direction · private review</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Observed {new Date(brandProposal.observedAt).toLocaleDateString()} from your saved church website.
+        These are evidence-backed suggestions only, not verified brand identity or permission to reproduce assets.
+        Select a maintained palette and typography preset in the website branding editor below.
+        Nothing is applied automatically.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {brandProposal.paletteCandidates.map(candidate => <div key={candidate.paletteId}
+          className="rounded-lg border bg-background p-3">
+          <p className="font-semibold capitalize">{candidate.paletteId} palette</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Ink/canvas: {candidate.contrastInkCanvas.toFixed(1)}:1 · Muted/canvas:
+            {" "}{candidate.contrastMutedCanvas.toFixed(1)}:1 · White/ink: {candidate.contrastWhiteInk.toFixed(1)}:1
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">{candidate.reason}</p>
+        </div>)}
+        {brandProposal.typographyCandidates.map(candidate => <div key={candidate.typographyId}
+          className="rounded-lg border bg-background p-3">
+          <p className="font-semibold capitalize">{candidate.typographyId} typography</p>
+          <p className="mt-2 text-xs text-muted-foreground">{candidate.reason}</p>
+        </div>)}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Source evidence: {brandProposal.evidence.map(e => `${e.signal}: ${e.value} (${e.pageUrl})`).join("; ")}.
+        Extraction: {brandProposal.extractionVersion}. Photos, logos and font files are never imported.
+      </p>
     </div>}
     {website && <form onSubmit={event => void submit(event)} className="mt-4 grid gap-3 rounded-xl border p-4">
       <h3 className="font-semibold">Add a source excerpt for review</h3>
