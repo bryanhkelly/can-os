@@ -7,6 +7,7 @@ import { projectPublicSchoolDay } from "@/domain/public-school-day";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readApprovedPublicSchoolDay } from "@/modules/academic-time/public-school-day.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
+import { readApprovedPublicSitePeople } from "./site-public-people.server";
 
 /**
  * Narrow Agent C -> Agent A adapter. Safe output only, gated by one locked,
@@ -50,8 +51,9 @@ export async function readPublishedSiteOperationFragments(
     const schoolDay=publishedAcademic
       ? await readApprovedPublicSchoolDay(siteId,programId,tx)
       : projectPublicSchoolDay([],"UTC");
+    const people=await readApprovedPublicSitePeople(siteId,tx);
     return {
-      siteId,programId,activities,schoolDay,
+      siteId,programId,activities,schoolDay,people,
       services:projectPublicFamilyServices(scope.metadata),
     };
   });
