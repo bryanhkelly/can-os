@@ -8,9 +8,11 @@ import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { isExtendedLearningType } from "@/domain/program-offerings";
+import { launchOpeningDate } from "@/domain/launch-opening-date";
 import {
   evaluateSchoolJurisdictionRequirements,
   isCurrentVerifiedJurisdictionProfileVersion,
+  requiresFutureJurisdictionPolicyReview,
   type SchoolJurisdictionContext,
 } from "@/domain/jurisdiction-applicability";
 import { isJurisdictionProfileVerificationEvidenceCurrent } from "@/domain/jurisdiction-profile";
@@ -113,13 +115,13 @@ export async function readSchoolJurisdictionReview(
       : null;
   if (locationReviewReason) return {
     programId,siteId:school.siteId,revision:version?.revision ?? null,
-    reviewRequired:true,locationReviewReason,scopeFingerprint,
+    reviewRequired:true,locationReviewReason,plannedOpeningReviewReason:null,scopeFingerprint,
     decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness(locationReviewReason,
       version?.id ?? null,version?.revision ?? null),
   };
   if (!version) return {programId,siteId:school.siteId,revision:null,
-    reviewRequired:true,locationReviewReason:null,scopeFingerprint,
+    reviewRequired:true,locationReviewReason:null,plannedOpeningReviewReason:null,scopeFingerprint,
     decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness("No published jurisdiction policy is available")};
   const [decision] = await executor.select({
@@ -174,6 +176,13 @@ export async function readSchoolJurisdictionReview(
   const evaluated = evaluateSchoolJurisdictionRequirements(
     rawProfile,versionGate,context,now,
   );
+  const plannedOpeningReviewReason = requiresFutureJurisdictionPolicyReview(
+    version.nextReviewAt, [
+      ...years.map(year=>year.startsOn),
+      ...(launchOpeningDate(school.programMetadata)
+        ? [launchOpeningDate(school.programMetadata)!] : []),
+    ], now,
+  ) ? "Current policy must be re-reviewed before the planned opening or upcoming academic year" : null;
   const readiness = projectSchoolJurisdictionReadiness({
     profile:rawProfile,decisions:evaluated.decisions,
     verifiedCurrent:isCurrentVerifiedJurisdictionProfileVersion(versionGate,now),
@@ -182,8 +191,8 @@ export async function readSchoolJurisdictionReview(
   });
   return {
     programId,siteId:school.siteId,revision:version.revision,
-    reviewRequired:evaluated.reviewRequired,
-    locationReviewReason:null,scopeFingerprint,
+    reviewRequired:evaluated.reviewRequired || Boolean(plannedOpeningReviewReason),
+    locationReviewReason:null,plannedOpeningReviewReason,scopeFingerprint,
     decisions:evaluated.decisions,
     readiness,
     // Candidates only: requires separate institution-approved public DTO gate.
