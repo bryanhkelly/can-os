@@ -143,6 +143,8 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   });
   if(!parsedPolicy.success)
     throw new AuthorizationError("valid current jurisdiction requirements");
+  const physicalRevision=typeof locationChange?.metadata.siteAddressRevision==="string"
+    ? locationChange.metadata.siteAddressRevision : null;
   const requirementActions=await executor.select({
     status:actions.status,metadata:actions.metadata,
   }).from(actions).where(and(
@@ -175,11 +177,10 @@ export async function requireCurrentSchoolJurisdictionForOpening(
       !evidence.verifiedAt || evidence.verifiedAt>now ||
       !evidence.verifiedByPersonId ||
       evidence.uploadedByPersonId===evidence.verifiedByPersonId ||
-      (evidence.expiresAt && evidence.expiresAt<=now))
+      (evidence.expiresAt && evidence.expiresAt<=now) ||
+      (physicalRevision && evidence.createdAt<new Date(physicalRevision)))
       throw new AuthorizationError("current independently verified opening document: "+duty.id);
   }
-  const physicalRevision=typeof locationChange?.metadata.siteAddressRevision==="string"
-    ? locationChange.metadata.siteAddressRevision : null;
   // Fresh opening/safety approval must follow the address change; a legal review
   // alone cannot reauthorize an old school configuration or old facilities proof.
   if(physicalRevision && (
