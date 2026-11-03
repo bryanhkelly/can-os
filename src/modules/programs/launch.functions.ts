@@ -7,7 +7,7 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
+import { physicalSiteAddressSchema, siteTimezoneSchema } from "@/domain/site-setup-configuration";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
@@ -496,7 +496,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({
   organizationId:uuid,name:z.string().trim().min(2).max(160),
   slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  timezone:z.string().trim().min(3).max(80),
+  timezone:siteTimezoneSchema,
   address:physicalSiteAddressSchema.optional(),
  }).strict().parse(v))
  .handler(async({data})=>{
