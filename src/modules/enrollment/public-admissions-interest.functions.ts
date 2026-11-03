@@ -8,6 +8,7 @@ import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, actions, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents, studentProfiles } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { resolveOperationsSelection } from "@/modules/operations/operations-scope.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
 import { canInviteConsentedFamily, familyInterestNextStep } from "./family-interest-next-step";
@@ -18,13 +19,21 @@ import { DomainError } from "@/domain/errors";
 import { EventTypes } from "@/domain/event-types";
 async function requireAdmissionsIntakeReader() {
   const actor = await getCommandContext(getRequest());
-  const programIds = actor.scope.programIds;
-  const organizationIds = actor.scope.organizationIds;
   if (!hasRegistrarAuthority(actor.role) || !actor.actorPersonId ||
-    !programIds?.length || !organizationIds?.length)
+    !actor.scope.organizationIds?.length)
     throw new AuthorizationError("admissions intake registrar");
   assertCapability(actor, "enrollment.decide");
-  return { ...actor, scope: { ...actor.scope, programIds, organizationIds } };
+
+  // Resolve the effective School/Program intersection from the verified active
+  // grant and canonical ownership records. An organization-wide registrar may
+  // not carry explicit Site IDs in the original grant; that is not a denial.
+  // A Site-specific registrar must not gain access to sibling Sites.
+  const { siteIds, programIds } = await resolveOperationsSelection(actor, {});
+  return {
+    ...actor,
+    scope: { ...actor.scope, organizationIds: actor.scope.organizationIds,
+      siteIds, programIds },
+  };
 }
 
 /**
