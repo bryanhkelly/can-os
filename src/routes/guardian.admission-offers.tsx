@@ -94,7 +94,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
      {!o.enrollmentActive&&app.blockers.length>0&&<ul aria-label="Enrollment requirements awaiting review" className="mt-2 list-inside list-disc text-sm">
        {app.blockers.map(requirement=><li key={requirement.id}>{requirement.title} · {requirement.status.replaceAll("_"," ")}</li>)}
      </ul>}
-     {o.status==="issued"&&(!o.expiresAt||new Date(o.expiresAt).getTime()>Date.now())&&<div className="mt-3 flex gap-3">
+     {o.status==="issued"&&!o.enrollmentActive&&(!o.expiresAt||new Date(o.expiresAt).getTime()>Date.now())&&<div className="mt-3 flex gap-3">
        <Button variant="outline" disabled={busy||!o.progress.canAccept} onClick={()=>void respond(o.id,"accept")}>Accept</Button>
        <Button variant="outline" disabled={busy} onClick={()=>setDeclineTarget({offerId:o.id,studentName:app.studentName,program:app.program})}>Decline</Button>
      </div>}
