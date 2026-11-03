@@ -147,6 +147,12 @@ export async function decideSchoolJurisdictionLegalReview(
       throw new Error("Church registrar must request the legal review first");
     if(legal.metadata.requesterPersonId===actor.actorPersonId)
       throw new AuthorizationError("reviewer must be independent of requester");
+    // A past submission cannot authorize a new Site/Program scope. The church
+    // must explicitly request the current revision before CAN re-verifies it.
+    if(input.decision==="verify" && legal.status==="resolved" &&
+      (legal.metadata.scopeFingerprint!==review.scopeFingerprint ||
+       legal.metadata.profileRevision!==review.revision))
+      throw new Error("Church registrar must reopen legal review for the amended school configuration");
     if(input.decision==="verify" && !review.reviewRequired &&
       legal.status==="resolved" && legal.metadata.reviewState==="independently_verified")
       const reconciliation=await reconcileSchoolJurisdictionRequirementActions(tx,actor,{
