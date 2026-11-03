@@ -72,3 +72,57 @@ describe("PX parent public information contract", () => {
     expect(JSON.stringify(profile)).not.toContain("programId");
   });
 });
+
+describe("PX synthetic Site and offering scenarios", () => {
+  it.each([
+    ["pre-opening academy", "planned", false],
+    ["operating elementary", "operating", false],
+    ["hybrid microschool", "planned", false],
+    ["multi-program Site", "operating", false],
+  ] as const)("%s: publishing never independently unlocks admissions", (_scenario, availability, expectedApply) => {
+    const profile = projectApprovedParentInformation({
+      ...base,
+      academicPrograms: [{
+        programId: "internal-key", title: "Approved academic option",
+        summary: "An approved description of instruction and learning",
+        typeLabel: "School program", grades: { min: "K", max: "8" },
+        delivery: { onsite: true, asynchronous: true, liveOnline: true, onsiteDaysPerWeek: 7 },
+        availability, applicationOpen: true,
+      }],
+    });
+    expect(profile.academics[0]?.delivery.value?.onsiteDaysPerWeek).toBe(7);
+    expect(profile.admissions.applicationOpen).toBe(expectedApply);
+    expect(profile.schoolDay.days.canDisplay).toBe(false);
+  });
+
+  it("enrichment-only Site does not gain an academic program", () => {
+    const profile = projectApprovedParentInformation({
+      ...base, offerings: [{
+        title: "Weekend STEAM", season: "Autumn",
+        startsOn: "2027-09-01", endsOn: "2027-12-01",
+        registrationOpen: true,
+      }],
+    });
+    expect(profile.academics).toEqual([]);
+    expect(profile.activities).toHaveLength(1);
+    expect(profile.activities[0]?.registrationOpen).toBe(true);
+    expect(profile.admissions.applicationOpen).toBe(false);
+  });
+
+  it("cross-organization sibling cannot be introduced by projection output", () => {
+    // Site scoping is enforced in the server reader, not by a caller-provided
+    // organization key or browser-side filter. The public DTO has no keys.
+    const profile = projectApprovedParentInformation(base);
+    expect(JSON.stringify(profile)).not.toContain("organizationId");
+    expect(JSON.stringify(profile)).not.toContain("siteId");
+    expect(profile.site.organizationName.value).toBe("Oakwood Church");
+  });
+
+  it("closed admissions, unknown jurisdiction, absent tuition and care remain withheld", () => {
+    const profile = projectApprovedParentInformation(base);
+    expect(profile.admissions.applicationOpen).toBe(false);
+    expect(profile.disclosures.every(item => item.statement.status === "not_configured")).toBe(true);
+    expect(profile.tuition.financialAid.canDisplay).toBe(false);
+    expect(profile.services.every(service => !service.description.canDisplay)).toBe(true);
+  });
+});
