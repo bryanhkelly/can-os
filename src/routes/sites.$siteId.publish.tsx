@@ -9,6 +9,8 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { getSitePublicationDraftView, renameSitePublicIdentity, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
 import { AcademicProgramMarketingEditor } from "@/components/sites/AcademicProgramMarketingEditor";
+import { SitePublicPeopleReviewPanel } from "@/components/operations/SitePublicPeopleReviewPanel";
+import { FamilyServicesSetupPanel } from "@/components/operations/FamilyServicesSetupPanel";
 
 export const Route = createFileRoute("/sites/$siteId/publish")({
   loader: ({ params }) => safeLoader(
@@ -290,6 +292,10 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </p>}
       </div>
     </section>
+    <div className="mt-6 grid gap-5 xl:grid-cols-2" id="parent-information-review">
+      <SitePublicPeopleReviewPanel siteId={data.site.id}/>
+      <FamilyServicesSetupPanel siteId={data.site.id}/>
+    </div>
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Site publication decision</h2>
       <p className="mt-2 text-sm text-muted-foreground">
