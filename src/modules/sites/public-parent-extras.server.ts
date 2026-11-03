@@ -28,8 +28,8 @@ type DetailedSchedule = Awaited<ReturnType<typeof readApprovedPublicSchoolDay>> 
   effectiveThrough?: string | null;
 };
 const isDay = (v:number) => Number.isInteger(v) && v >= 0 && v <= 6;
-const isTime = (v:string) => /^([01]\\d|2[0-3]):[0-5]\\d$/.test(v);
-const isDate = (v:string) => /^\\d{4}-\\d{2}-\\d{2}$/.test(v);
+const isTime = (v:string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+const isDate = (v:string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** The C reader is the authority: exact schedule signature, current academic
  * year, Site/Program scope, reviewer and timezone are validated there.
