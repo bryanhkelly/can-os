@@ -37,13 +37,23 @@ export async function readLocalContentHistory(siteId: string, executor: Reader =
  * Rollback appends another revision, preserving authorship and evidence.
  * Neither action changes official Site/Program publication or admission.
  */
-export async function publishPartnerLocalContent(actor: AccessContext, input: {
+export type PartnerLocalContentTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type PartnerLocalContentCommand = {
   expectedRevision: number;
   operation: "save" | "restore";
   content?: SiteLocalContent;
   restoreRevision?: number;
-}) {
-  return db.transaction(async tx => {
+};
+
+/**
+ * Shared canonical local-content publisher within an existing DB transaction.
+ * The caller MUST acquire the Site publication row before any lower-level
+ * source locks, if source review is involved. All policy, audit and outbox
+ * writes remain in this single implementation.
+ */
+export async function publishPartnerLocalContentWithinTransaction(
+  actor: AccessContext, input: PartnerLocalContentCommand, tx: PartnerLocalContentTx,
+) {
     // Relationship authorization runs inside the write transaction.
     const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
     const [sitePublication] = await tx.select({
@@ -136,5 +146,11 @@ export async function publishPartnerLocalContent(actor: AccessContext, input: {
     });
     return { changed: true, revision, status: decision.status,
       flaggedFields: decision.flaggedFields };
-  });
 }
+
+export async function publishPartnerLocalContent(
+  actor: AccessContext, input: PartnerLocalContentCommand,
+) {
+  return db.transaction(tx => publishPartnerLocalContentWithinTransaction(actor, input, tx));
+}
+
