@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import {
   physicalSiteAddressSchema,
+  siteTimezoneSchema,
   draftSiteContactSchema,
   hasEnteredSiteAddress,
   nextSiteConfigurationRevision,
@@ -25,6 +27,17 @@ describe("canonical church Site configuration input",()=>{
     expect(draftSiteContactSchema.safeParse({
       displayName:"School Office",email:"invalid",phone:"",website:"",
     }).success).toBe(false);
+  });
+  it("requires an explicit real time zone and does not pretend that state identifies it",()=>{
+    expect(siteTimezoneSchema.safeParse("America/Los_Angeles").success).toBe(true);
+    expect(siteTimezoneSchema.safeParse("America/New_York").success).toBe(true);
+    expect(siteTimezoneSchema.safeParse("Unrecognized/Time_Zone").success).toBe(false);
+    expect(siteTimezoneSchema.safeParse("").success).toBe(false);
+  });
+  it("rejects a reversed school grade range and allows Sunday-capable learning models",()=>{
+    expect(launchGradeRangeIsOrdered({min:"TK",max:"12"})).toBe(true);
+    expect(launchGradeRangeIsOrdered({min:"12",max:"K"})).toBe(false);
+    expect(launchGradeRangeIsOrdered({min:"9",max:"12"})).toBe(true);
   });
   it("advances Site revision even when two mutations share one millisecond",()=>{
     const previous=new Date("2026-11-03T18:00:00.000Z");
