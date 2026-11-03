@@ -199,10 +199,12 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
       .where(and(eq(churchContentSuggestions.id, input.suggestionId),
         eq(churchContentSuggestions.siteId, site.id)))
       .for("update").limit(1);
-    if (!source || source.revokedAt || !proposal ||
-        proposal.sourceReferenceId !== source.id) {
+    if (!source || !proposal || proposal.sourceReferenceId !== source.id) {
       throw new Error("Church suggestion source was removed or changed; refresh before reviewing");
     }
+    // A committed decision remains replayable even after the original source
+    // is revoked. The persisted audit receipt is the authority for the prior
+    // revision, and this path cannot publish or mutate anything.
     if (proposal.reviewDecision !== "pending") {
       if (proposal.reviewDecision === input.decision) {
         // The committed review audit is the authoritative receipt until I
@@ -227,6 +229,9 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
         return { decision: input.decision, publication: priorPublication, alreadyReviewed: true };
       }
       throw new Error("This church suggestion has already been reviewed; refresh first");
+    }
+    if (source.revokedAt) {
+      throw new Error("Church suggestion source was removed; no copy was published");
     }
 
     const [capture] = await tx.select({ after: auditEvents.after })
