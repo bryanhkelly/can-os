@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateSchoolJurisdictionRequirements,
   isCurrentVerifiedJurisdictionProfileVersion,
+  requiresFutureJurisdictionPolicyReview,
 } from "@/domain/jurisdiction-applicability";
 import {
   jurisdictionReviewScopeFingerprint,
@@ -131,6 +132,17 @@ describe("school-specific jurisdiction and funding readiness", () => {
     expect(isCurrentVerifiedJurisdictionProfileVersion({
       ...version,verificationStatus:"unverified",
     },now)).toBe(false);
+  });
+  it("requires renewed policy review when a future school year starts after the policy review horizon", () => {
+    expect(requiresFutureJurisdictionPolicyReview(
+      version.nextReviewAt, ["2027-08-15"], now,
+    )).toBe(true);
+    expect(requiresFutureJurisdictionPolicyReview(
+      version.nextReviewAt, ["2026-08-15", "2026-11-20"], now,
+    )).toBe(false);
+    expect(requiresFutureJurisdictionPolicyReview(
+      version.nextReviewAt, ["2027-02-30"], now,
+    )).toBe(true);
   });
   it("detects changed legal scope without storing the street address in an Action", () => {
     const original = {
