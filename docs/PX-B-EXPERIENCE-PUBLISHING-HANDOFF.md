@@ -12,7 +12,7 @@
 3. **Premium responsive shared renderer:** server-only editorial typography, responsive mobile navigation, accessible headings/forms/alt text/focus styling, safe theme choices, conditional sections and truthful application-status wording. No client hydration, arbitrary HTML/JS, custom page tree or tracker. Existing metadata-free, bounded inline PNG restriction remains.
 4. **Pages:** the shared presentation system renders `/`, `/about`, `/academics`, `/student-life`, `/school-day`, `/admissions`, `/contact`. `/tuition`, `/families`, `/faq` exist but appear **only** when the institutional parent DTO supplies an approved public display claim. Empty sections have no navigation entry or public page.
 5. **Public isolation:** exact GET page/metadata allowlist and Netlify rewrites to a standalone `/published-site/$page` server handler, with origin Host verification, published-Site lookup, site-scoped projection, no shell/session data, no forms in previews and existing POST `/inquiry` / `/apply` unchanged. All other tenant paths and methods fail closed.
-6. **Private preview:** editor has per-page selector with form-inactive, sandboxed `srcDoc` rendering from the same presentation template. Local church edits and official program data remain separately sourced.
+6. **Private preview:** editor **and registrar launch website step** have per-page selectors with form-inactive, sandboxed `srcDoc` rendering from the same presentation template. The launch step retains optional planning-only cards clearly marked as suggestions, not public approval. Local church edits and official program data remain separately sourced.
 7. **SEO:** page-specific titles/descriptions, conditional canonical URLs, draft noindex, published-host-scoped `robots.txt` and `sitemap.xml`, generated only after a published Site lookup and only for eligible pages. Host isolation and hosting feature flag are retained.
 
 ## Important interfaces
@@ -22,6 +22,7 @@
 - `src/modules/sites/site-public-catalog.server.ts`: published site projection now forwards `projectApprovedParentInformation` to the renderer.
 - `src/modules/sites/site-website-preview.server.ts`: same DTO in editor; returns `previewPages` in addition to the backwards-compatible `previewHtml`.
 - `src/routes/published-site.$page.ts`: GET-only route. Public tenant edge rewrites exact allowlisted paths here.
+- `src/modules/programs/launch-website.functions.ts` + `src/components/operations/LaunchWebsiteStep.tsx`: authorized registrar launch path returns `previewPages` alongside `previewHtml` for page-by-page planning.
 - `docs/platform-route-contracts.json`: route ownership record added.
 
 ## Verification and evidence
@@ -42,3 +43,7 @@ The existing generic CI had successful build and its three admissions-specific t
 - AI copy polishing intentionally deferred: no existing approved service pattern was used.
 
 **Do not equate code merged to `main` with verified production readiness, legal opening authority, or deployment.**
+
+## Follow-on B slice
+
+The registrar launch preview now supports every populated page rather than home only (PX-017), using the same server-only renderer and preserving sandboxed, inactive forms. Focused CI was expanded to cover the launch preparation and preview component; verify [the latest PX-B run](https://github.com/bryanhkelly/can-os/actions/runs/41662666470) after it completes. This change does not enable live hosting, modify authority, or add a CMS.
