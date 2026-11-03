@@ -288,6 +288,33 @@ describe("standalone public site HTML", () => {
     expect(reviewed).toContain("Applications are not currently open through this website");
   });
 
+  it("marks synthetic schools explicitly without affecting real school pages", () => {
+    const site = { name: "Fictional Learning Academy", organizationName: "Sample Community" };
+    const page = { host: "example.can-os.com", site, offerings: [] };
+    const ordinary = renderPublicSiteHtml(page);
+    const demonstration = renderPublicSiteHtml({ ...page, demonstration: true });
+    expect(ordinary).not.toContain('class="demo-banner"');
+    expect(demonstration).toContain('class="demo-banner"');
+    expect(demonstration).toContain("Fictional Learning Academy is a fictional demonstration school.");
+    expect(demonstration).not.toContain("Valor is a fictional");
+  });
+
+  it("shows mission storytelling only when local school vision exists", () => {
+    const site = { name: "Heritage Academy", organizationName: "Heritage Community" };
+    const page = {host: "heritage.can-os.com", site, offerings: []};
+    const ordinary = renderPublicSiteHtml(page);
+    expect(ordinary).not.toContain("Learning with purpose. Growing together.");
+    const story = renderPublicSiteHtml({...page, localContent: {
+      welcomeMessage: "Come learn with us.", localDescription: "",
+      denomination: "", statementOfFaith: "", spiritualFormation: "",
+      schoolVision: "Growth, curiosity & community.",
+      branding: {theme: "classic" as const, heroImage: null},
+    }});
+    expect(story).toContain("Learning with purpose. Growing together.");
+    expect(story).toContain("Growth, curiosity &amp; community.");
+    expect(story).not.toContain("<script");
+  });
+
   it("only renders independently reviewed Site address and contact details", () => {
     const site = { name: "Example Academy", organizationName: "Example Partner" };
     const parentInformation = projectApprovedParentInformation({
