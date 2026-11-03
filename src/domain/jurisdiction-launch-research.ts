@@ -48,7 +48,11 @@ export function projectLaunchJurisdictionResearch(
   const profile = parsed.data;
   // No research details go to a school operator without an authoritative source.
   // A verified publication can still provide its summary if it has been approved.
-  if (!verifiedGuidance && profile.evidence.length === 0) return null;
+  const editorial = (row.profile && typeof row.profile === "object" && !Array.isArray(row.profile))
+    ? (row.profile as Record<string,unknown>).editorial : null;
+  const shareableResearch = Boolean(editorial && typeof editorial === "object" &&
+    (editorial as Record<string,unknown>).launchResearchVisibility === "school_operator");
+  if (!verifiedGuidance && (!shareableResearch || profile.evidence.length === 0)) return null;
   const safeSources = profile.evidence.filter(source => source.url.startsWith("https://"));
   const sourceFor = (ids: string[]) =>
     safeSources.filter(source => ids.includes(source.url));
