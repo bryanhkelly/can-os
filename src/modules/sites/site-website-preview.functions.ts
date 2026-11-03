@@ -24,9 +24,10 @@ import { publishPartnerLocalContent } from "./site-local-content.server";
 
 const localFields = Object.fromEntries(
   Object.entries(siteLocalContentLimits).map(([name, max]) => [
-    name, z.string().max(max),
+    name, ["churchHistory", "communityOutreach", "schoolVision", "leadershipWelcome", "localTraditions"].includes(name)
+      ? z.string().max(max).optional() : z.string().max(max),
   ]),
-) as Record<keyof typeof siteLocalContentLimits, z.ZodString>;
+) as Record<keyof typeof siteLocalContentLimits, z.ZodType<string | undefined>>;
 const localContentSchema = z.object({
   ...localFields,
   branding: z.object({
