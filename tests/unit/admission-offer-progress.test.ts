@@ -23,7 +23,8 @@ describe("admissions next steps",()=>{
   for(const status of ["declined","revoked","expired","draft"])
    expect(admissionOfferProgress({...base,status},now).canAccept).toBe(false);
   expect(admissionOfferProgress({...base,status:"revoked"},now).message).toContain("withdrawn");
-  expect(admissionOfferProgress({...base,status:"revoked",enrollmentActive:true,sectionCount:1},now).state).toBe("revoked");
+  // The active canonical enrollment takes precedence over a historic revoked offer.
+  expect(admissionOfferProgress({...base,status:"revoked",enrollmentActive:true,sectionCount:1},now).state).toBe("enrolled");
  });
  it("explains closed and waitlisted applications without offering acceptance",()=>{
   for(const applicationStage of ["withdrawn","declined","inquiry","lead"])
