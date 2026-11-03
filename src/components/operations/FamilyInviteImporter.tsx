@@ -1,3 +1,6 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import type { RefreshOutcome } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useMemo, useRef, useState } from "react";
 import { familyInvitationProgress, familyInvitationRetryLabel } from "@/domain/family-invitation-progress";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -43,11 +46,13 @@ export function FamilyInviteImporter({
   const [introduction, setIntroduction] = useState("We're excited to invite your family to learn about our school.");
   const [preview, setPreview] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
   const [result, setResult] = useState("");
   const [awaitingVerification, setAwaitingVerification] = useState(false);
   const requestId = useRef(crypto.randomUUID());
+  const verificationKind = useRef<"send" | "retry" | null>(null);
   const parsed = useMemo(() => parseFamilyContacts(raw), [raw]);
   const tooMany = parsed.contacts.length > FAMILY_INVITATION_MAX_RECIPIENTS;
 
@@ -69,11 +74,9 @@ export function FamilyInviteImporter({
     changed();
   }
   async function send() {
-    if (awaitingVerification || !selectedProgram || !confirmed) return;
-    setBusy(true);
+    if (awaitingVerification || busy || !selectedProgram || !confirmed) return;
     setError("");
-    try {
-      const response = await sendFamilyInvitations({ data: {
+    const outcome=await mutation.run(()=>sendFamilyInvitations({ data: {
         requestId: requestId.current,
         programId: selectedProgram.id,
         purpose: selectedProgram.purpose,
@@ -81,50 +84,74 @@ export function FamilyInviteImporter({
         subject,
         introduction,
         confirmed: true,
-      } });
+      } }),{
+      successMessage:response=>response.created
+        ? `${response.recipientCount} recipients saved and queued. ${response.skippedExisting} already had an invitation or response.`
+        : "This invitation batch was already saved; no duplicate batch was created.",
+      commandErrorMessage:"The invitation command could not be confirmed. Retry with the unchanged recipients and message to reuse the same request ID.",
+      refreshErrorMessage:"Invitations were saved by the server, but updated outreach records could not be loaded. Retry the refresh; do not send another batch.",
+    });
+    if(outcome.status==="saved"){
+      const response=outcome.value;
       setResult(response.created
         ? `${response.recipientCount} recipients saved and queued. ${response.skippedExisting} already had an invitation or response.`
         : "This invitation batch was already saved; no duplicate batch was created.");
-      try {
-        await router.invalidate();
-        setRaw("");
-        setPreview(false);
-        setConfirmed(false);
-        requestId.current = crypto.randomUUID();
-        setAwaitingVerification(false);
-      } catch {
-        setAwaitingVerification(true);
-        setConfirmed(false);
-        setError("Invitations were saved by the server, but updated outreach records could not be loaded. Reopen this launch to verify the saved batch; do not send another batch.");
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The invitation command could not be confirmed. Retry with the unchanged recipients and message to reuse the same request ID.");
-    } finally {
-      setBusy(false);
+      setRaw("");setPreview(false);setConfirmed(false);requestId.current=crypto.randomUUID();
+      setAwaitingVerification(false);verificationKind.current=null;
+    }else if(outcome.status==="refresh-failed"){
+      setResult(outcome.value.created
+        ? `${outcome.value.recipientCount} recipients saved and queued. ${outcome.value.skippedExisting} already had an invitation or response.`
+        : "This invitation batch was already saved; no duplicate batch was created.");
+      setConfirmed(false);setAwaitingVerification(true);verificationKind.current="send";
     }
   }
 
   async function retryFailed(batchId: string) {
-    setBusy(true);
+    if(busy||awaitingVerification)return;
     setError("");
-    try {
-      const response = await retryFamilyInvitationBatch({ data: { batchId } });
-      setResult(response.retried
+    const outcome=await mutation.run(()=>retryFamilyInvitationBatch({ data: { batchId } }),{
+      successMessage:response=>response.retried
         ? `Retry queued for ${response.retried} recipient${response.retried === 1 ? "" : "s"}. Provider acceptance is not inbox delivery.`
+        : "No failed recipients are waiting for a retry.",
+      commandErrorMessage:"Could not confirm whether the retry was queued. Verify the existing delivery record before another retry.",
+      refreshErrorMessage:"The retry command was accepted, but updated delivery records could not be loaded. Retry the refresh before queueing another retry.",
+    });
+    if(outcome.status==="saved"){
+      setResult(outcome.value.retried
+        ? `Retry queued for ${outcome.value.retried} recipient${outcome.value.retried===1?"":"s"}. Provider acceptance is not inbox delivery.`
         : "No failed recipients are waiting for a retry.");
-      try { await router.invalidate(); }
-      catch {
-        setAwaitingVerification(true);
-        setError("The retry command was accepted, but updated delivery records could not be loaded. Verify the saved batch before retrying again.");
-      }
-    } catch {
+      setAwaitingVerification(false);verificationKind.current=null;
+    }else if(outcome.status==="refresh-failed"){
+      setResult(outcome.value.retried
+        ? `Retry queued for ${outcome.value.retried} recipient${outcome.value.retried===1?"":"s"}. Provider acceptance is not inbox delivery.`
+        : "No failed recipients are waiting for a retry.");
+      setAwaitingVerification(true);verificationKind.current="retry";
+    }else if(outcome.status==="failed"){
       // A lost response cannot establish whether a retry was queued. Unlike
       // sending a batch, this endpoint has no client-request idempotency key.
       setAwaitingVerification(true);
+      verificationKind.current="retry";
       setError("Could not confirm whether the retry was queued. Verify the existing delivery record before another retry.");
-    } finally {
-      setBusy(false);
     }
+  }
+
+  async function verifySavedBatch():Promise<RefreshOutcome>{
+    if(mutation.refreshFailed){
+      const outcome=await mutation.retryRefresh();
+      if(outcome.status!=="refreshed")return outcome;
+    }else{
+      try{await router.invalidate();}
+      catch{
+        setError("Saved invitation records are still unavailable. Do not resend; reopen this launch or contact the registrar.");
+        return {status:"refresh-failed"};
+      }
+    }
+    if(verificationKind.current==="send"){
+      setRaw("");setPreview(false);setConfirmed(false);requestId.current=crypto.randomUUID();
+    }
+    verificationKind.current=null;
+    setAwaitingVerification(false);setError("");
+    return {status:"refreshed"};
   }
 
   if (!workspace) {
@@ -217,7 +244,12 @@ export function FamilyInviteImporter({
     </>}
 
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
-    {awaitingVerification && <button type="button" disabled={busy} onClick={()=>void router.invalidate().then(()=>{setAwaitingVerification(false);setRaw("");setPreview(false);setConfirmed(false);requestId.current=crypto.randomUUID();setError("");}).catch(()=>setError("Saved invitation records are still unavailable. Do not resend; reopen this launch or contact the registrar."))} className="mt-3 rounded border px-3 py-2 text-sm font-semibold">Verify saved invitation batch</button>}
+    <MutationFeedback state={{...mutation,retryRefresh:verifySavedBatch}} className="mt-3"
+      pendingMessage="Updating invitation records…"/>
+    {awaitingVerification && !mutation.refreshFailed && <button type="button" disabled={busy}
+      onClick={()=>void verifySavedBatch()} className="mt-3 rounded border px-3 py-2 text-sm font-semibold">
+      Verify saved invitation batch
+    </button>}
     {result && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{result}</p>}
 
     {batches.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-4" aria-label="Family invitation progress">

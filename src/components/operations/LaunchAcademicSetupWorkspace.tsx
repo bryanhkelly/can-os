@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { LaunchTeacherQualificationPolicy } from "@/components/operations/LaunchTeacherQualificationPolicy";
 import { SchoolYearScheduleSetup } from "@/components/operations/SchoolYearScheduleSetup";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
@@ -20,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatCard } from "@/components/workspace/stat-card";
+import { SchoolRoomsSetup } from "@/components/operations/SchoolRoomsSetup";
 
 export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
@@ -44,7 +46,13 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
- const busy=mutation.isSubmitting;
+ const busy=mutation.isSubmitting||!!mutation.refreshError;
+ async function retryRefresh(){
+  const outcome=await mutation.retryRefresh();
+  if(outcome.status==="refreshed"){
+   setError("");setNotice("Saved launch setup records refreshed. You may continue working.");
+  }
+ }
  async function run(operation:()=>Promise<unknown>,message:string){
   setError("");setNotice("");
   try{
@@ -52,7 +60,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    if(submission.status === "ignored") return;
    if(submission.refreshError){setError("The server accepted the command, but fresh records could not be loaded. Reopen this workspace to verify before retrying.");return;}
    setNotice(message);
-  }catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
+  }catch(e){setError(mutationErrorMessage(e, "Unable to save launch setup"));}
  }
  return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
   subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
@@ -60,6 +68,8 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
   </Button>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+  {mutation.refreshError&&<Button type="button" variant="outline" className="mt-3"
+   disabled={mutation.isSubmitting} onClick={()=>void retryRefresh()}>Retry saved setup refresh</Button>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    <StatCard label="School years" value={data.years.length}/>
@@ -77,6 +87,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     data.program.academicProviderOrganizationId!==data.program.organizationId&&
     <SchoolOpeningEvidencePanel programId={data.program.id}/>}
   {data.program.siteId && <>
+    <SchoolRoomsSetup key={data.program.id} programId={data.program.id}/>
     <LocalSiteDelegationPanel programId={data.program.id}/>
     <SectionFacilitatorPanel programId={data.program.id}/>
   </>}
@@ -177,6 +188,8 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   </p>}
   <details className="mt-5 rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-semibold">Teacher requirements and shared qualification definitions</summary>
    <p className="mt-2 text-sm">Review existing requirements before creating definitions or publishing a new policy. These controls are for authorized academic administrators.</p>
+   <p className="mt-2 text-sm">Your school chooses which documented qualifications its program requires, such as degrees, licenses or training.
+    Teacher evidence is reusable across schools. Applicable institutional and jurisdiction requirements still apply; catalog entries alone are not mandatory.</p>
    <QualificationCatalog programId={data.program.id} canAuthor={data.canAuthorCatalog}
     changed={async()=>{await router.invalidate();}}/>
    <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>

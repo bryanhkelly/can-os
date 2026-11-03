@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
@@ -11,35 +13,27 @@ type Action = {
   priority: string; dueAt: Date | string | null;
   metadata: Record<string, unknown>; type: string;
   subjectType?: string; subjectId?: string;
+  canComplete?: boolean;
 };
 export function LiveQuickWins({ actions, connected, actionId }: { actions: Action[]; connected: boolean; actionId?: string }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const outstanding = actions.filter(action => ["open", "in_progress", "waiting"].includes(action.status));
   const visible = actionId ? actions.filter(action => action.id === actionId) : actions;
 
   async function finish(actionId: string) {
-    setBusy(true); setError(""); setSaved("");
-    try {
-      await finishQuickWinAction({ data: { actionId } });
-      setSaved("Action saved as complete .");
-      await router.invalidate();
-    } catch (err) { setError(err instanceof Error ? err.message : "Could not save"); }
-    finally { setBusy(false); }
+    await mutation.run(() => finishQuickWinAction({ data: { actionId } }), {
+      successMessage: "Action saved as complete.", commandErrorMessage: "Could not save action.",
+    });
   }
 
   async function requestHelp() {
-    setBusy(true); setError(""); setSaved("");
-    try {
+    await mutation.run(async () => {
       await requestQuickWinHelp({ data: { message } });
       setMessage("");
-      setSaved("Help request saved .");
-      await router.invalidate();
-    } catch (err) { setError(err instanceof Error ? err.message : "Could not save"); }
-    finally { setBusy(false); }
+    }, { successMessage: "Help request saved.", commandErrorMessage: "Could not save help request." });
   }
 
   return <section className="mt-8 rounded-2xl border-2 border-foreground/15 bg-card p-5 sm:p-7">
@@ -48,8 +42,7 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
       <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Your actions</p><h2 className="mt-2 font-serif text-3xl">Your saved actions</h2><p className="mt-2 text-sm text-muted-foreground">Your assigned actions and support requests.</p></div>
       <span className="rounded-full bg-stone-warm px-3 py-2 text-xs font-semibold">{connected ? "Neon connected" : "Neon unavailable"}</span>
     </div>
-    {error && <p role="alert" className="mt-4 rounded-lg border border-red-300 px-3 py-2 text-sm">{error}</p>}
-    {saved && <p role="status" className="mt-4 rounded-lg border border-emerald-300 px-3 py-2 text-sm">{saved}</p>}
+    <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving action..."/>
     <div className="mt-5 space-y-3">
       {visible.map(action => {
         const target = action.subjectType === "assessment" && action.subjectId
@@ -62,9 +55,9 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
         <span className={"text-xs font-semibold capitalize"+(action.status==="resolved"?" text-emerald-800":" text-muted-foreground")}>
           {action.status==="resolved"?"Completed":action.status.replaceAll("_"," ")}
         </span>
-        {canCompleteStudentAction(action) &&
+        {canCompleteStudentAction(action) && action.canComplete !== false &&
           <button disabled={busy||!connected} onClick={()=>finish(action.id)} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">Mark complete</button>}
-        {action.status==="open"&&!canCompleteStudentAction(action)&&
+        {action.status==="open"&&(!canCompleteStudentAction(action)||action.canComplete===false)&&
           <p className="text-xs text-muted-foreground">
             {action.type==="student_learning_goal"
               ? "Review this goal with your teacher; your teacher will confirm the outcome."

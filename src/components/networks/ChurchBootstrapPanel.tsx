@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { prepareChurchOnboarding } from "@/modules/networks/network-steward.functions";
@@ -33,7 +34,7 @@ export function ChurchBootstrapPanel() {
         " School opening still requires independent CAN approval.");
       await router.invalidate();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to prepare church onboarding");
+      setError(mutationErrorMessage(cause, "Unable to prepare church onboarding"));
     } finally { setBusy(false); }
   }
   return <section className="mt-6 rounded-xl border bg-card p-5" aria-label="Church onboarding">

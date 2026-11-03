@@ -1,7 +1,8 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { PrerequisiteChecklist } from "@/components/workspace/prerequisite-checklist";
 import { EvidenceDetails } from "@/components/evidence/EvidenceDetails";
 import {useCallback,useEffect,useRef,useState} from "react";
-import { QueryState } from "@/components/workspace";
+import { MutationFeedback, QueryState } from "@/components/workspace";
 import {
   decideChurchSchoolOpeningFn,getChurchSchoolOpeningFn,
 } from "@/modules/operations/school-opening.functions";
@@ -15,10 +16,7 @@ export function SchoolOpeningReviewPanel({programId}:{programId:string}){
 function SchoolOpeningReviewForm({programId}:{programId:string}){
   const [opening,setOpening]=useState<Model|null>(null);
   const [reason,setReason]=useState("");
-  const [error,setError]=useState("");
   const [readError,setReadError]=useState("");
-  const [notice,setNotice]=useState("");
-  const [busy,setBusy]=useState(false);
   const [loading,setLoading]=useState(true);
   const requestSequence=useRef(0);
   const refresh=useCallback(async()=>{
@@ -29,36 +27,38 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
       if(request===requestSequence.current)setOpening(current);
     }catch(cause){
       if(request===requestSequence.current)setReadError(
-        cause instanceof Error?cause.message:"Unable to load the current opening review");
+        mutationErrorMessage(cause, "Unable to load the current opening review"));
+      throw cause;
     }finally{
       if(request===requestSequence.current)setLoading(false);
     }
   },[programId]);
+  const mutation=useMutationFeedback(refresh);
+  const busy=mutation.pending||mutation.refreshFailed;
   useEffect(()=>{
-    void refresh();
+    void refresh().catch(()=>{});
     return ()=>{requestSequence.current++};
   },[refresh]);
   function reload(){
     if(busy||loading)return;
-    setError("");setNotice("");void refresh();
+    void refresh().catch(()=>{});
   }
   const decide=async(decision:"approve"|"suspend")=>{
     if(busy||loading||!opening)return;
     const reviewed=opening;
-    setBusy(true);setError("");setNotice("");
-    try{
-      await decideChurchSchoolOpeningFn({data:{
+    await mutation.run(
+      ()=>decideChurchSchoolOpeningFn({data:{
         programId,configurationId:reviewed.configurationId,
         expectedVersion:reviewed.version,decision,reason,
-      }});
-      setNotice(decision==="approve"
+      }}),
+      {
+        successMessage:decision==="approve"
         ?"Institutional opening approval recorded. Daily supervision remains a separate gate."
-        :"Institutional opening suspended; new onsite attendance coverage cannot be verified.");
-      // A refresh error is shown separately; it must not imply the decision failed.
-      await refresh();
-    }catch(cause){
-      setError(cause instanceof Error?cause.message:"Opening decision was not recorded");
-    }finally{setBusy(false);}
+        :"Institutional opening suspended; new onsite attendance coverage cannot be verified.",
+        commandErrorMessage:"Opening decision was not recorded",
+        refreshErrorMessage:"The opening decision was recorded, but the latest review could not be loaded. Retry the refresh before making another decision.",
+      },
+    );
   };
   return <section className="mt-4 rounded-lg border p-4 text-sm">
     <h3 className="font-semibold">Church school opening authorization</h3>
@@ -68,8 +68,7 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
       to the signed school services agreement and a named church Site director.
       This does not certify that adults are physically present today.
     </p>
-    {error&&<p role="alert" className="mt-2">{error}</p>}
-    {notice&&<p role="status" className="mt-2">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-2" pendingMessage="Saving opening decision…"/>
     {!readError&&<button type="button" onClick={reload} disabled={busy||loading}
       className="mt-3 underline disabled:opacity-50">Reload review</button>}
     <QueryState loading={loading?"Loading current opening review…":undefined}

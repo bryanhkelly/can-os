@@ -1,6 +1,8 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createPersonalEvent,
   getCalendarMonth,
@@ -59,19 +61,17 @@ function CalendarPage() {
   const search=Route.useSearch();
   const navigate=Route.useNavigate();
   const today = useMemo(() => new Date(), []);
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const year = search.date ? Number(search.date.slice(0,4)) : today.getFullYear();
+  const month = search.date ? Number(search.date.slice(5,7)) : today.getMonth() + 1;
   const [data, setData] = useState<MonthData | null>(null);
   const [items, setItems] = useState<CalendarFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const selectedDay = search.date??null;
   const [formTitle, setFormTitle] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("");
-  const [saving, setSaving] = useState(false);
   const [manageMode, setManageMode] = useState<{ id: string; mode: "edit" | "reschedule" } | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -79,31 +79,35 @@ function CalendarPage() {
   const [moveDate, setMoveDate] = useState("");
   const [moveStart, setMoveStart] = useState("09:00");
   const [moveEnd, setMoveEnd] = useState("");
+  const loadVersion = useRef(0);
 
-  const load = useCallback((y: number, m: number) => {
+  const load = useCallback(async (y: number, m: number) => {
+    const version = ++loadVersion.current;
     setLoading(true);
     setError("");
-    getCalendarMonth({ data: { year: y, month: m } })
-      .then((result) => {
-        setData(result);
-        setItems(result.items);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Sign in to view your calendar.");
-        setLoading(false);
-      });
+    setData(null);
+    setItems([]);
+    try {
+      const result = await getCalendarMonth({ data: { year: y, month: m } });
+      if(version!==loadVersion.current)return;
+      setData(result);
+      setItems(result.items);
+      return result;
+    } finally {
+      if(version===loadVersion.current)setLoading(false);
+    }
   }, []);
+  const mutation = useMutationFeedback(() => load(year, month));
+  const saving = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
-    load(year, month);
+    void load(year, month).catch(() => setError("Unable to load your calendar. Sign in or reload to try again."));
+    return () => { loadVersion.current++; };
   }, [year, month, load]);
 
   useEffect(()=>{
     if(!search.date)return;
-    const [requestedYear,requestedMonth]=search.date.split("-").map(Number);
-    setYear(requestedYear!);setMonth(requestedMonth!);
-    setSelectedDay(search.date);setFormDate(search.date);
+    setFormDate(search.date);
     setManageMode(null);setConfirmCancelId(null);
   },[search.date,search.event]);
 
@@ -136,15 +140,13 @@ function CalendarPage() {
 
   const shiftMonth = (delta: number) => {
     const next = new Date(year, month - 1 + delta, 1);
-    setYear(next.getFullYear());
-    setMonth(next.getMonth() + 1);
-    setSelectedDay(null);
+    const date = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,"0")}-01`;
+    void navigate({search:{...search,date,event:undefined}});
   };
 
   const openDay = (key: string) => {
-    setSelectedDay(key);
+    void navigate({search:{...search,date:key,event:undefined}});
     setFormDate(key);
-    setNotice("");
     setManageMode(null);
     setConfirmCancelId(null);
   };
@@ -152,7 +154,6 @@ function CalendarPage() {
   const startManage = (item: CalendarFeedItem, mode: "edit" | "reschedule") => {
     setConfirmCancelId(null);
     setError("");
-    setNotice("");
     if (mode === "edit") {
       setEditTitle(item.title);
       setEditDescription(item.description ?? "");
@@ -167,18 +168,13 @@ function CalendarPage() {
 
   const runRevision = (data: RevisionInput, done: string) => {
     if (saving) return;
-    setSaving(true);
     setError("");
-    setNotice("");
-    reviseCalendarEvent({ data })
-      .then(() => {
-        setNotice(done);
+    void mutation.run(async () => {
+        const result = await reviseCalendarEvent({ data });
         setManageMode(null);
         setConfirmCancelId(null);
-        load(year, month);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to update event"))
-      .finally(() => setSaving(false));
+        return result;
+      }, { successMessage: done, commandErrorMessage: "Unable to update event." });
   };
 
   const submitManage = (item: CalendarFeedItem) => {
@@ -199,7 +195,7 @@ function CalendarPage() {
         `Moved "${item.title}" to ${moveDate} (${item.timezone}).`,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Enter a valid date and time");
+      setError(mutationErrorMessage(err, "Enter a valid date and time"));
     }
   };
 
@@ -211,7 +207,6 @@ function CalendarPage() {
     const title = formTitle.trim();
     if (!title || !formDate || !formStart || saving) return;
     setError("");
-    setNotice("");
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     let startsAt: string;
     let endsAt: string | undefined;
@@ -219,18 +214,14 @@ function CalendarPage() {
       startsAt = dateTimeInputInTimezone(`${formDate}T${formStart}`, timezone);
       endsAt = formEnd ? dateTimeInputInTimezone(`${formDate}T${formEnd}`, timezone) : undefined;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Enter a valid date and time");
+      setError(mutationErrorMessage(err, "Enter a valid date and time"));
       return;
     }
-    setSaving(true);
-    createPersonalEvent({ data: { title, startsAt, endsAt, timezone } })
-      .then(() => {
+    void mutation.run(async () => {
+        const result = await createPersonalEvent({ data: { title, startsAt, endsAt, timezone } });
         setFormTitle("");
-        setNotice("Personal event saved.");
-        load(year, month);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to save event"))
-      .finally(() => setSaving(false));
+        return result;
+      }, { successMessage: "Personal event saved.", commandErrorMessage: "Unable to save event." });
   };
 
   const onDragStart = (event: React.DragEvent, item: CalendarFeedItem) => {
@@ -239,32 +230,28 @@ function CalendarPage() {
     event.dataTransfer.effectAllowed = "move";
   };
 
-  const onDrop = (event: React.DragEvent, targetKey: string) => {
-    if (!isTeacher) return;
+  const onDrop = async (event: React.DragEvent, targetKey: string) => {
+    if (!isTeacher || saving) return;
     const id = event.dataTransfer.getData("text/plain");
     if (!id.startsWith("assessment:")) return;
     event.preventDefault();
     const item = items.find((entry) => entry.id === id);
     if (!item || dateKeyInTimezone(item.startsAt, item.timezone) === targetKey) return;
     const previous = items;
-    const original = new Date(item.startsAt);
     const originalTime = dateTimeInputValue(item.startsAt, item.timezone).slice(11);
     let newDueAt: string;
     try {
       newDueAt = dateTimeInputInTimezone(`${targetKey}T${originalTime}`, item.timezone);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Enter a valid date and time");
+      setError(mutationErrorMessage(err, "Enter a valid date and time"));
       return;
     }
-    setItems(items.map((entry) => (entry.id === id ? { ...entry, startsAt: newDueAt } : entry)));
     setError("");
-    setNotice("");
-    moveAssessmentDueDate({ data: { assessmentId: id.slice("assessment:".length), newDueAt } })
-      .then(() => setNotice(`Moved "${item.title}" to ${targetKey}.`))
-      .catch((err) => {
-        setItems(previous);
-        setError(err instanceof Error ? err.message : "Unable to move due date");
-      });
+    const outcome = await mutation.run(() => {
+      setItems(items.map((entry) => (entry.id === id ? { ...entry, startsAt: newDueAt } : entry)));
+      return moveAssessmentDueDate({ data: { assessmentId: id.slice("assessment:".length), newDueAt } });
+    }, { successMessage: `Moved "${item.title}" to ${targetKey}.`, commandErrorMessage: "Unable to move due date." });
+    if (outcome.status === "failed") setItems(previous);
   };
 
   const selectedItems = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
@@ -294,7 +281,7 @@ function CalendarPage() {
         </div>
 
         {error && <p role="alert" className="mt-4 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}
-        {notice && <p role="status" className="mt-4 rounded-lg border border-emerald-300 p-3 text-sm">{notice}</p>}
+        <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving calendar change..."/>
 
         <div className="mt-6 flex items-center gap-3">
           <button type="button" onClick={() => shiftMonth(-1)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold">← Prev</button>

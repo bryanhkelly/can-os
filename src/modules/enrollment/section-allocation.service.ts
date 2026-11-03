@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import type { CommandContext } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import { isPassingGrade } from "@/domain/grade-scale-policy";
 import { requireAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
@@ -50,13 +51,13 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   .limit(1).for("update");
  if(!section)throw new Error("Section not active");
  if(section.curriculumStatus!=="published")
-  throw new Error("Publish the instructional course version before placing students in this class");
+  throw new DomainError("COURSE_CONTENT_REQUIRED", "Publish the instructional course version before placing students in this class");
  requireAccessibleFirstLesson(section.curriculum);
  // Active roster membership must land in a real, staffed instructional class,
  // not a Section shell whose assigned teacher has no current school access.
  const staffed=await verifiedTeacherSectionIds([sectionId],tx);
  if(!staffed.has(sectionId))
-  throw new Error("Assign an active teacher with verified school access, qualifications and delivery coverage for the instructional term before placing a student in this class");
+  throw new DomainError("COURSE_STAFFING_REQUIRED", "Assign an active teacher with verified school access, qualifications and delivery coverage for the instructional term before placing a student in this class");
  await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","curriculum","school_of_record"]);
  if(!actor.scope.organizationIds?.includes(section.organizationId)||
   (actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(section.programId))||
@@ -69,7 +70,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
    eq(s.enrollments.programId,section.programId),
    eq(s.enrollments.schoolYearId,section.schoolYearId),
    eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
- if(!membership)throw new Error("Student needs an active program enrollment");
+ if(!membership)throw new DomainError("COURSE_PROGRAM_REQUIRED", "Student needs an active program enrollment");
  const [already]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
   .where(and(eq(s.enrollments.studentProfileId,studentProfileId),
    eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
@@ -84,7 +85,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  if(section.siteId&&!siteClock)throw new Error("Section host Site missing");
  const timezone=siteClock?.timezone??section.schoolYearTimezone;
  const today=dateKeyInTimezone(now.toISOString(),timezone);
- if(today>policy.addDropEndsOn)throw new Error("Add/drop deadline has passed");
+ if(today>policy.addDropEndsOn)throw new DomainError("COURSE_REGISTRATION_CLOSED", "Add/drop deadline has passed");
  const [rosterCount]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
   .where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active")));
@@ -93,7 +94,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   addDropEndsOn:policy.addDropEndsOn,
   enrollmentCapacity:policy.enrollmentCapacity,
   occupiedSeats:total,timezone,now,
- }))throw new Error("Section is full");
+ }))throw new DomainError("COURSE_CAPACITY_REACHED", "Section is full");
  const current=await tx.select({id:s.enrollments.id,termId:s.sections.termId,
   code:s.sections.code,metadata:s.sections.metadata,template:s.sections.courseTemplateVersionId,
   sectionId:s.sections.id})
@@ -106,9 +107,9 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   const currentPolicy=await getSectionRegistrationPolicy(row.sectionId,tx);
   return n+currentPolicy.credits;
  },Promise.resolve(0));
- if(sum+policy.credits>policy.maxCreditsPerTerm)throw new Error("Term credit limit exceeded");
+ if(sum+policy.credits>policy.maxCreditsPerTerm)throw new DomainError("COURSE_CREDIT_LIMIT", "Term credit limit exceeded");
  const conflicts=await findSectionScheduleConflicts(sectionId,sameTerm.map(row=>row.sectionId),tx);
- if(conflicts.length)throw new Error("Schedule conflict");
+ if(conflicts.length)throw new DomainError("COURSE_SCHEDULE_CONFLICT", "Schedule conflict");
  const prereqs=policy.prerequisites;
  if(prereqs.length){
   const grades=await tx.select({sectionCode:s.sections.code,courseCode:s.courseTemplates.code,
@@ -130,7 +131,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   })
    .flatMap(g=>[g.sectionCode,g.courseCode]));
   const unmet=prereqs.filter(prereq=>!completed.has(prereq));
-  if(unmet.length)throw new Error("Unmet prerequisites: "+unmet.join(", "));
+  if(unmet.length)throw new DomainError("COURSE_PREREQUISITES_REQUIRED", "Unmet prerequisites: "+unmet.join(", "));
  }
  const [enrolled]=await tx.insert(s.enrollments).values({
   studentProfileId,kind:"section",status:"active",organizationId:section.organizationId,

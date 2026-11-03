@@ -64,7 +64,24 @@ describe("useWorkspaceMutation", () => {
     renderToString(createElement(Harness));
     const result = await submit("save");
     expect(result.status).toBe("completed");
-    if (result.status === "completed") expect(result.refreshError?.message).toBe("offline");
+    if (result.status === "completed") expect(result.refreshError?.message).toBe("Unable to refresh saved changes.");
     expect(mocks.mutateAsync).toHaveBeenCalledOnce();
+  });
+
+  it("blocks resubmission until a read-only refresh succeeds", async () => {
+    mocks.mutateAsync.mockReset().mockResolvedValue("saved");
+    mocks.invalidateQueries.mockReset().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    let mutation!: ReturnType<typeof useWorkspaceMutation<string, string>>;
+    function Harness() {
+      mutation = useWorkspaceMutation({ mutationFn: async (value: string) => value, invalidateQueries: [["site"]] });
+      return null;
+    }
+    renderToString(createElement(Harness));
+    expect((await mutation.submit("save")).status).toBe("completed");
+    expect(await mutation.submit("duplicate")).toEqual({ status: "ignored" });
+    expect(await mutation.retryRefresh()).toEqual({ status: "refreshed" });
+    expect(mocks.mutateAsync).toHaveBeenCalledOnce();
+    expect(mocks.invalidateQueries).toHaveBeenLastCalledWith({ queryKey: ["site"] }, { throwOnError: true });
+    expect((await mutation.submit("next")).status).toBe("completed");
   });
 });

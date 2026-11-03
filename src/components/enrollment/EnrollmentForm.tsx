@@ -1,3 +1,6 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { DomainError } from "@/domain/errors";
 import { useEffect, useRef, useState } from "react";
 import type { EnrollmentFormAnswers, enrollmentFormState } from "@/domain/enrollment-form";
 import { decideEnrollmentForm, submitGuardianEnrollmentForm } from "@/modules/enrollment/enrollment-form.functions";
@@ -28,7 +31,8 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
 }) {
   const [answers, setAnswers] = useState<EnrollmentFormAnswers>(record.submission?.answers ?? {});
   const [signerName, setSignerName] = useState(""), [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const mutation = useMutationFeedback(onChanged);
+  const busy = mutation.pending || mutation.refreshFailed;
   const [interactive, setInteractive] = useState(false);
   useEffect(() => setInteractive(true), []);
   const requestId = useRef<string | null>(null);
@@ -38,15 +42,15 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
   }
   return <section className="space-y-3">
     <EnrollmentFormSnapshot record={record} />
-    {error && <p role="alert">{error}</p>}
+    <MutationFeedback state={mutation} pendingMessage="Submitting signed enrollment form..."/>
     {editable && <form className="space-y-3" onSubmit={async event => {
-      event.preventDefault(); setBusy(true); setError(""); requestId.current ??= crypto.randomUUID();
-      try {
-        await submitGuardianEnrollmentForm({ data: { applicationId, requirementId, answers, signerName,
-          requestId: requestId.current, formRevision: record.revision, confirmed } });
-        await onChanged();
-      } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to submit signed enrollment form."); }
-      finally { setBusy(false); }
+      event.preventDefault(); requestId.current ??= crypto.randomUUID();
+      const id = requestId.current;
+      await mutation.run(() => submitGuardianEnrollmentForm({ data: { applicationId, requirementId, answers, signerName,
+        requestId: id, formRevision: record.revision, confirmed } }), {
+        successMessage: "Signed enrollment form submitted for registrar review.",
+        commandErrorMessage: "Unable to submit signed enrollment form.",
+      });
     }}>
       <fieldset disabled={busy || !interactive} className="space-y-3">
         {record.form.fields.map(field => <label key={field.key} className="block text-sm">
@@ -89,22 +93,25 @@ export function RegistrarEnrollmentFormReview({ applicationId, requirementId, re
 }) {
   const [status, setStatus] = useState<"accepted" | "rejected">("accepted");
   const [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const mutation = useMutationFeedback(onChanged);
+  const busy = mutation.pending || mutation.refreshFailed;
   const [interactive, setInteractive] = useState(false);
   useEffect(() => setInteractive(true), []);
   return <section className="space-y-3">
     <EnrollmentFormSnapshot record={record} />
-    {error && <p role="alert">{error}</p>}
+    <MutationFeedback state={mutation} pendingMessage="Saving enrollment form review..."/>
     {!record.submission && <p className="text-sm">A currently authorized managing guardian must sign before review. No checklist waiver is available.</p>}
     {!closed && record.submission && !record.review && <form className="space-y-3" onSubmit={async event => {
-      event.preventDefault(); setBusy(true); setError("");
-      try {
-        if (!record.submission) throw new Error("A guardian signature is required.");
-        await decideEnrollmentForm({ data: { applicationId, requirementId, submissionId: record.submission.id,
+      event.preventDefault();
+      await mutation.run(() => {
+        const submission = record.submission;
+        if (!submission) throw new DomainError("CONFLICT", "The signed enrollment form is no longer available for review.");
+        return decideEnrollmentForm({ data: { applicationId, requirementId, submissionId: submission.id,
           status, reason, confirmed } });
-        await onChanged();
-      } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to review enrollment form."); }
-      finally { setBusy(false); }
+      }, {
+        successMessage: status === "accepted" ? "Signed enrollment form approved." : "Enrollment form returned for correction.",
+        commandErrorMessage: "Unable to review enrollment form.",
+      });
     }}>
       <fieldset disabled={busy || !interactive} className="space-y-3">
         <label className="block text-sm">Form decision

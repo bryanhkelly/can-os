@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   cancelTeacherConferenceBooking,
   completeTeacherConference,
@@ -6,8 +6,26 @@ import {
   getTeacherConferences,
   queueTeacherConferenceReminder,
 } from "@/modules/conferences/conference.functions";
+import { conferenceOutcomeProblem } from "@/modules/conferences/eligibility";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { QueryState } from "@/components/workspace/query-state";
+import { ActionDialog } from "@/components/workspace/action-dialog";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type Data = Awaited<ReturnType<typeof getTeacherConferences>>;
+type Publication = {
+  seriesId: string; title: string; startsAt: string; endsAt: string; slotMinutes: number;
+};
+type CompletionTarget = {
+  booking: Data["bookings"][number];
+  outcome: "held" | "no_show";
+};
 
 const pad = (value: number) => String(value).padStart(2, "0");
 /** Local wall-time value for <input type="datetime-local">. */
@@ -29,29 +47,91 @@ function defaultWindow() {
  */
 export function TeacherConferencePanel() {
   const [data, setData] = useState<Data | null>(null);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [title, setTitle] = useState("Family office hours");
   const [range, setRange] = useState(defaultWindow);
   const [slotMinutes, setSlotMinutes] = useState(20);
+  const [now, setNow] = useState(() => new Date());
+  const [cancelTarget, setCancelTarget] = useState<Data["bookings"][number] | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [completionTarget, setCompletionTarget] = useState<CompletionTarget | null>(null);
+  const [completionNote, setCompletionNote] = useState("");
+  const [noteVisibility, setNoteVisibility] = useState<"staff_private" | "family_visible">("staff_private");
+  const [createFollowUp, setCreateFollowUp] = useState(false);
+  const [followUpTitle, setFollowUpTitle] = useState("");
+  const [followUpDescription, setFollowUpDescription] = useState("");
+  const publications = useRef(new Map<string, Publication>());
 
+  async function loadConferences() {
+    const result = await getTeacherConferences();
+    if (!result.connected) throw new Error("Conference scheduling unavailable");
+    return result;
+  }
   async function refresh() {
     try {
-      setData(await getTeacherConferences());
+      setData(await loadConferences());
       setLoadError("");
-    } catch {
-      setLoadError("Conference scheduling is unavailable for this account.");
+    } catch (error) {
+      setLoadError(mutationErrorMessage(error, "Conference scheduling is unavailable for this account."));
+      throw error;
     }
   }
-  useEffect(() => { void refresh(); }, []);
+  const mutation = useMutationFeedback(refresh);
+  const busy = mutation.pending || mutation.refreshFailed;
+  useEffect(() => {
+    let active = true;
+    void loadConferences().then(result => {
+      if (active) { setData(result); setLoadError(""); }
+    }).catch(error => {
+      if (active) setLoadError(mutationErrorMessage(error, "Conference scheduling is unavailable for this account."));
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   async function perform(operation: () => Promise<unknown>, success: string) {
-    setBusy(true); setError(""); setMessage("");
-    try { await operation(); setMessage(success); await refresh(); }
-    catch (err) { setError(err instanceof Error ? err.message : "Unable to save change"); }
-    finally { setBusy(false); }
+    return mutation.run(operation, {
+      successMessage: success,
+      commandErrorMessage: "Unable to save conference change.",
+      refreshErrorMessage: "Conference scheduling could not refresh. Retry refresh before making another change.",
+    });
+  }
+  async function retryLoad() {
+    setLoading(true);
+    try { await refresh(); }
+    catch { /* The query state already contains the safe, retryable load error. */ }
+    finally { setLoading(false); }
+  }
+  function beginCompletion(booking: Data["bookings"][number], outcome: CompletionTarget["outcome"]) {
+    setCompletionNote("");
+    setNoteVisibility("staff_private");
+    setCreateFollowUp(false);
+    setFollowUpTitle(`Follow up with ${booking.studentName}`);
+    setFollowUpDescription("");
+    setCompletionTarget({ booking, outcome });
+  }
+  async function saveCompletion() {
+    if (!completionTarget) return;
+    const note = completionNote.trim();
+    const followUp = followUpTitle.trim();
+    const result = await perform(() => completeTeacherConference({ data: {
+      bookingId: completionTarget.booking.id,
+      outcome: completionTarget.outcome,
+      ...(note ? { note, noteVisibility } : {}),
+      ...(createFollowUp ? {
+        followUp: {
+          title: followUp,
+          ...(followUpDescription.trim() ? { description: followUpDescription.trim() } : {}),
+        },
+      } : {}),
+    } }), completionTarget.outcome === "held" ? "Appointment marked as held." : "No-show recorded.");
+    if (result.status === "saved" || result.status === "refresh-failed") setCompletionTarget(null);
   }
 
   const format = (stamp: string) => new Intl.DateTimeFormat("en-US", {
@@ -63,46 +143,53 @@ export function TeacherConferencePanel() {
     <p className="mt-2 text-sm text-muted-foreground">
       Open bookable office-hour windows for your students' guardians, then record how each appointment went.
     </p>
-    {loadError && <p role="status" className="mt-3 text-sm">{loadError}</p>}
-    {message && <p role="status" className="mt-3 rounded-lg border border-emerald-300 p-3 text-sm">{message}</p>}
-    {error && <p role="alert" className="mt-3 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}
+    {!cancelTarget && <MutationFeedback state={mutation} pendingMessage="Saving conference change..." className="mt-3" />}
 
+    {!data && <QueryState loading={loading ? "Loading conference scheduling..." : undefined}
+      error={!loading ? loadError || "Conference scheduling is unavailable for this account." : undefined}
+      onRetry={() => void retryLoad()} retrying={loading}/>}
     {data?.connected && <>
       <form className="mt-4 grid gap-3 rounded-xl border bg-card p-5 sm:grid-cols-2" aria-label="Open office-hour window"
         onSubmit={event => {
           event.preventDefault();
-          void perform(() => createTeacherConferenceSeries({ data: {
-            title,
-            startsAt: new Date(range.startsAt).toISOString(),
-            endsAt: new Date(range.endsAt).toISOString(),
-            slotMinutes,
-          } }), "Office-hour window published for guardians.");
+          void perform(async () => {
+            const payload = {
+              title: title.trim(),
+              startsAt: new Date(range.startsAt).toISOString(),
+              endsAt: new Date(range.endsAt).toISOString(),
+              slotMinutes,
+            };
+            const key = JSON.stringify(payload);
+            // Keep each uncertain payload's identity even when the form is edited.
+            const request = publications.current.get(key) ?? { ...payload, seriesId: crypto.randomUUID() };
+            publications.current.set(key, request);
+            const result = await createTeacherConferenceSeries({ data: request });
+            publications.current.delete(key);
+            return result;
+          }, "Office-hour window published for guardians.");
         }}>
-        <label className="text-xs sm:col-span-2">Title
-          <input required minLength={3} value={title} onChange={event => setTitle(event.target.value)}
-            className="mt-1 block w-full rounded border bg-background p-2" />
-        </label>
-        <label className="text-xs">Window starts
-          <input required type="datetime-local" value={range.startsAt}
-            onChange={event => setRange(value => ({ ...value, startsAt: event.target.value }))}
-            className="mt-1 block w-full rounded border bg-background p-2" />
-        </label>
-        <label className="text-xs">Window ends
-          <input required type="datetime-local" value={range.endsAt}
-            onChange={event => setRange(value => ({ ...value, endsAt: event.target.value }))}
-            className="mt-1 block w-full rounded border bg-background p-2" />
-        </label>
-        <label className="text-xs">Minutes per appointment
-          <input required type="number" min={5} max={120} step={5} value={slotMinutes}
-            onChange={event => setSlotMinutes(Number(event.target.value))}
-            className="mt-1 block w-full rounded border bg-background p-2" />
-        </label>
+        <fieldset disabled={busy} aria-busy={mutation.pending} className="contents">
+        <Field label="Title" required className="sm:col-span-2">
+          <Input required minLength={3} value={title} onChange={event => setTitle(event.target.value)} />
+        </Field>
+        <Field label="Window starts" required>
+          <Input required type="datetime-local" value={range.startsAt}
+            onChange={event => setRange(value => ({ ...value, startsAt: event.target.value }))} />
+        </Field>
+        <Field label="Window ends" required>
+          <Input required type="datetime-local" value={range.endsAt}
+            onChange={event => setRange(value => ({ ...value, endsAt: event.target.value }))} />
+        </Field>
+        <Field label="Minutes per appointment" required>
+          <Input required type="number" min={5} max={120} step={5} value={slotMinutes}
+            onChange={event => setSlotMinutes(Number(event.target.value))} />
+        </Field>
         <div className="flex items-end">
-          <button type="submit" disabled={busy}
-            className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          <Button type="submit" disabled={busy}>
             Publish bookable window
-          </button>
+          </Button>
         </div>
+        </fieldset>
       </form>
 
       <div className="mt-6 grid gap-3">
@@ -118,7 +205,9 @@ export function TeacherConferencePanel() {
         </article>)}
       </div>
 
-      {data.bookings.length > 0 && <div className="mt-6 grid gap-3" aria-label="Upcoming conference bookings">
+      {data.bookings.length > 0 && <div className="mt-6 grid gap-3" aria-label="Conference bookings">
+        <p className="text-xs text-muted-foreground">Up to 50 appointments, with pending bookings first; includes the past 30 days.
+          Record held appointments only after they start, and no-shows after they end.</p>
         {data.bookings.map(booking => <article key={booking.id} className="rounded-xl border bg-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -128,33 +217,105 @@ export function TeacherConferencePanel() {
               </p>
             </div>
             {booking.status === "booked" && <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={busy}
-                className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => void perform(() => completeTeacherConference({ data: { bookingId: booking.id, outcome: "held" } }), "Appointment marked as held.")}>
+              <Button type="button" variant="outline" size="sm" disabled={busy || conferenceOutcomeProblem({
+                  status: booking.status, outcome: "held",
+                  startsAt: new Date(booking.startsAt), endsAt: new Date(booking.endsAt),
+                  now,
+                }) !== null}
+                onClick={() => beginCompletion(booking, "held")}>
                 Mark held
-              </button>
-              <button type="button" disabled={busy}
-                className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => void perform(() => completeTeacherConference({ data: { bookingId: booking.id, outcome: "no_show" } }), "No-show recorded.")}>
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={busy || conferenceOutcomeProblem({
+                  status: booking.status, outcome: "no_show",
+                  startsAt: new Date(booking.startsAt), endsAt: new Date(booking.endsAt),
+                  now,
+                }) !== null}
+                onClick={() => beginCompletion(booking, "no_show")}>
                 No-show
-              </button>
-              <button type="button" disabled={busy}
-                className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={() => void perform(() => queueTeacherConferenceReminder({ data: { bookingId: booking.id } }), "Reminder queued for the guardian.")}>
                 Send reminder
-              </button>
-              <button type="button" disabled={busy}
-                className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => {
-                  if (!window.confirm("Cancel this appointment? The slot will open for another family.")) return;
-                  void perform(() => cancelTeacherConferenceBooking({ data: { bookingId: booking.id } }), "Appointment cancelled and slot reopened.");
-                }}>
+              </Button>
+              <Button type="button" variant="destructive" size="sm" disabled={busy}
+                onClick={() => { setCancelSubmitting(false); setCancelTarget(booking); }}>
                 Cancel booking
-              </button>
+              </Button>
             </div>}
+            {booking.notes.map(note => <p key={note.id} className="mt-3 rounded-lg border p-3 text-sm">
+              <span className="font-semibold">{note.visibility === "family_visible" ? "Family-visible summary" : "Staff-private note"}</span>
+              <span className="ml-2">{note.note}</span>
+            </p>)}
           </div>
         </article>)}
       </div>}
     </>}
+    <ActionDialog open={cancelTarget !== null}
+      title={`Cancel appointment for ${cancelTarget?.studentName ?? "this family"}?`}
+      description={cancelTarget
+        ? `Cancel ${cancelTarget.seriesTitle} on ${format(cancelTarget.startsAt)}? The appointment will be canceled and its slot will open for another family.`
+        : "Cancel this appointment? The slot will open for another family."}
+      confirmLabel="Cancel booking" destructive pending={mutation.pending} confirmDisabled={busy}
+      onClose={() => { setCancelTarget(null); setCancelSubmitting(false); }}
+      onConfirm={() => {
+        if (!cancelTarget) return;
+        setCancelSubmitting(true);
+        void perform(() => cancelTeacherConferenceBooking({ data: { bookingId: cancelTarget.id } }),
+          "Appointment cancelled and slot reopened.").then(result => {
+          if (result.status === "saved" || result.status === "refresh-failed") {
+            setCancelTarget(null);
+            setCancelSubmitting(false);
+          } else if (result.status !== "failed") setCancelSubmitting(false);
+        });
+      }}>
+      {cancelSubmitting && <MutationFeedback state={mutation} pendingMessage="Canceling appointment..." />}
+    </ActionDialog>
+    <ActionDialog open={completionTarget !== null}
+      title={completionTarget?.outcome === "held" ? "Record conference outcome" : "Record no-show"}
+      description={completionTarget
+        ? `Record the outcome for ${completionTarget.booking.studentName}'s ${completionTarget.booking.seriesTitle} appointment. Notes default to staff-private; share only an appropriate summary with the family.`
+        : "Record this conference outcome."}
+      confirmLabel={completionTarget?.outcome === "held" ? "Mark held" : "Record no-show"}
+      pending={mutation.pending}
+      confirmDisabled={busy || (createFollowUp && followUpTitle.trim().length < 3) ||
+        (completionTarget !== null && conferenceOutcomeProblem({
+          status: completionTarget.booking.status,
+          outcome: completionTarget.outcome,
+          startsAt: new Date(completionTarget.booking.startsAt),
+          endsAt: new Date(completionTarget.booking.endsAt),
+          now,
+        }) !== null)}
+      onClose={() => setCompletionTarget(null)}
+      onConfirm={() => void saveCompletion()}>
+      <Field label="Conference note">
+        <Textarea maxLength={2000} rows={3} value={completionNote}
+          onChange={event => setCompletionNote(event.target.value)}
+        />
+      </Field>
+      {completionNote.trim() && <Field label="Note visibility">
+        <Select value={noteVisibility} onChange={event => setNoteVisibility(event.target.value as typeof noteVisibility)}>
+          <option value="staff_private">Staff-private</option>
+          <option value="family_visible">Family-visible summary</option>
+        </Select>
+      </Field>}
+      <Label className="flex items-start gap-2 text-sm">
+        <Input type="checkbox" checked={createFollowUp}
+          onChange={event => setCreateFollowUp(event.target.checked)}
+          className="mt-1 h-4 w-4 min-h-0 p-0" />
+        <span>Create a follow-up action for this student</span>
+      </Label>
+      {createFollowUp && <>
+        <Field label="Follow-up action" required>
+          <Input required minLength={3} maxLength={200} value={followUpTitle}
+            onChange={event => setFollowUpTitle(event.target.value)} />
+        </Field>
+        <Field label="Follow-up details">
+          <Textarea maxLength={1500} rows={3} value={followUpDescription}
+            onChange={event => setFollowUpDescription(event.target.value)}
+          />
+        </Field>
+        <p className="text-xs text-muted-foreground">This action will appear in the student&apos;s support actions.</p>
+      </>}
+    </ActionDialog>
   </section>;
 }

@@ -30,6 +30,8 @@ export function Qualifications({ personId, programId, onChanged }: Selection & {
     <h2 className="font-serif text-2xl">Qualification evidence</h2>
     <p className="mt-2 text-sm">Private credential records are separate from public profile information.
       Verification confirms evidence review, not program eligibility or legal authorization to teach.</p>
+    <p className="mt-2 text-sm">Document resumes, degrees, licenses and other qualifications using the shared catalog.
+      Each school chooses its required qualifications through program policy; submitting a resume does not verify a degree or license.</p>
     <QueryState loading={!snapshot&&!error?"Loading qualification records...":undefined}
       error={error?<>{error} Review requires an independent, explicitly granted credential verifier in the teacher's institution.</>:undefined}
       onRetry={()=>setRevision(value=>value+1)}>
@@ -143,6 +145,15 @@ function Claim({ claim, canReview, selection, busy, run }: {
     <h3 className="font-semibold">{claim.title}</h3>
     <p className="mt-1 text-sm">{claim.issuerName ?? "Issuer not recorded"}{claim.jurisdiction ? ` - ${claim.jurisdiction}` : ""}</p>
     <p className="mt-1 text-sm">Review status: {claim.status}{expired ? " - expired" : ""}</p>
+    <p className="mt-2 text-sm">
+      {claim.status === "pending" && !expired
+        ? "Next: an independent credential verifier reviews the submitted evidence. Submission alone does not complete school qualification requirements."
+        : claim.status === "unverified" && !expired
+        ? "Next: the teacher submits evidence for independent review. An unverified claim does not satisfy school qualification requirements."
+        : claim.status === "rejected" || claim.status === "revoked" || expired
+        ? "Next: the teacher reviews the recorded decision and submits current replacement evidence as needed. The school's qualification policy still controls eligibility."
+        : "Evidence review is complete. Program qualification policy and staffing coverage are evaluated separately before teaching eligibility is confirmed."}
+    </p>
     <p className="mt-1 text-xs text-muted-foreground">Issued: {claim.issuedAt ?? "Not recorded"} | Expires: {claim.expiresAt ?? "Not recorded"}</p>
     {claim.hasEvidence && <button type="button" disabled={busy} className="mt-3 underline text-sm" onClick={() =>
       void run(async () => { const result = await getQualificationEvidence({ data: { ...selection, claimId: claim.id } });

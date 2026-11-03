@@ -13,6 +13,13 @@ import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOp
 import {completeRegistrarEnrollmentExit} from "@/modules/enrollment/registrar-enrollment-exit.functions";
 import {AttentionQueue} from "@/components/operations/AttentionQueue";
 import {buildDailyOperationsAttention} from "@/domain/daily-operations";
+import {ActionDialog} from "@/components/workspace/action-dialog";
+import {mutationErrorMessage} from "@/lib/mutation-feedback";
+
+type ActionInput =
+ | {kind:"resolve";id:string;title:string}
+ | {kind:"deadline";id:string;title:string;value:string}
+ | {kind:"exit";id:string;title:string;exitKind:"withdrawal"|"transfer"};
 
 export type OperationsWorkspaceData = {
  operations: Awaited<ReturnType<typeof getOperationsActions>> | null;
@@ -42,62 +49,86 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
  const exitMutation=useWorkspaceMutation({mutationFn:(input:{actionId:string;resolutionNote:string})=>completeRegistrarEnrollmentExit({data:{actionId:input.actionId,confirmInstitutionalReview:true,resolutionNote:input.resolutionNote}}),invalidateRouter:()=>router.invalidate()});
  const [busy,setBusy]=useState<string|null>(null);
+ const [dialog,setDialog]=useState<ActionInput|null>(null);
+ const [dialogNote,setDialogNote]=useState("");
+ const [exitConfirmed,setExitConfirmed]=useState(false);
+ const commandsBlocked=busy!==null||exitMutation.isSubmitting||!!mutation.refreshError||!!exitMutation.refreshError;
  const actionInFlight=useRef(false);
  async function submitAction(id:string, operation:()=>Promise<unknown>){
-  if(actionInFlight.current||exitMutation.isSubmitting)return false;
+  if(actionInFlight.current||exitMutation.isSubmitting||mutation.refreshError||exitMutation.refreshError)return false;
   actionInFlight.current=true;
   setBusy(id);
   try{const submission=await mutation.submit(operation);
    if(submission.status === "ignored")return false;
    if(submission.refreshError)setError("Action saved, but refresh failed. Reopen the action; do not resubmit.");
-   return !submission.refreshError;}
+   return true;}
   finally{actionInFlight.current=false;setBusy(null);}
  }
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
+ async function retryActionRefresh(){
+  const outcome=await mutation.retryRefresh();
+  if(outcome.status==="refreshed"){
+   setError("");setNotice("Saved action changes were refreshed. You may continue working.");
+  }
+ }
+ async function retryExitRefresh(){
+  const outcome=await exitMutation.retryRefresh();
+  if(outcome.status==="refreshed"){
+   setError("");setNotice("The saved institutional change was refreshed. You may continue working.");
+  }
+ }
  if(authError||!data)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program.">
   <QueryState error={authError||"Operations data is unavailable. No operational changes were made."}/>
  </WorkspaceShell>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
   setError("");
-  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}}));}
-  catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
+  if(status==="resolved"){openActionInput({kind:"resolve",id,title:data?.items.find(item=>item.id===id)?.title??"Action"});return;}
+  try{await submitAction(id,()=>updateOperationsAction({data:{id,status}}));}
+  catch(e){setError(mutationErrorMessage(e,"Unable to update action"));}
  }
 
- async function completeEnrollmentExit(id:string,kind:"withdrawal"|"transfer"){
-  const note=window.prompt("Record the institutional "+kind+" decision and academic records handoff (at least 20 characters):");
-  if(!note?.trim()||note.trim().length<20)return;
-  if(!window.confirm("Confirm the registrar verified this exit? Active Program and class memberships end immediately. The student login at this school may also be revoked."))return;
-  setError("");setNotice("");
-  try{
-   const submission=await exitMutation.submit({actionId:id,resolutionNote:note.trim()});
-   if(submission.status === "ignored")return;
-   const result=submission.value;
-   setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
-   if(submission.refreshError)setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");
-  }catch(e){setError(e instanceof Error?e.message:"Unable to complete institutional enrollment change");}
+ function openActionInput(input:ActionInput){
+  if(commandsBlocked)return;
+  setError("");setNotice("");setDialogNote("");setExitConfirmed(false);setDialog(input);
+ }
+ function completeEnrollmentExit(id:string,kind:"withdrawal"|"transfer"){
+  openActionInput({kind:"exit",id,exitKind:kind,title:data?.items.find(item=>item.id===id)?.title??"Enrollment change"});
  }
 
  async function assignAction(id:string,ownerPersonId:string|null,priority:"normal"|"high"|"urgent"){
   setError("");
   try{await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}}));}
-  catch(e){setError(e instanceof Error?e.message:"Unable to assign action");}
+  catch(e){setError(mutationErrorMessage(e,"Unable to assign action"));}
  }
 
- async function changeDeadline(id:string,value:string){
-   const reason=window.prompt("Reason for the deadline change (required)");
-   if(!reason?.trim()||reason.trim().length<5)return;
-   setError("");
-   try{
-     const saved=await submitAction(id,()=>setOperationsActionDeadline({data:{
-       id,dueAt:value?new Date(value).toISOString():null,reason:reason.trim(),
-     }}));
-     if(!saved)return;
-     setDueDrafts(prev=>{const next={...prev};delete next[id];return next;});
-
-   }catch(e){setError(e instanceof Error?e.message:"Unable to save deadline");}
+ function changeDeadline(id:string,value:string){
+  openActionInput({kind:"deadline",id,value,title:data?.items.find(item=>item.id===id)?.title??"Action"});
+ }
+ async function confirmActionInput(){
+  if(!dialog||commandsBlocked)return;
+  const note=dialogNote.trim();
+  if(note.length<(dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1)||
+    (dialog.kind==="exit"&&!exitConfirmed))return;
+  setError("");setNotice("");
+  try{
+   if(dialog.kind==="exit"){
+    const submission=await exitMutation.submit({actionId:dialog.id,resolutionNote:note});
+    if(submission.status==="ignored")return;
+    setNotice(submission.value.completed?"Official "+dialog.exitKind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
+    if(submission.refreshError)setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");
+   }else{
+    const saved=await submitAction(dialog.id,()=>dialog.kind==="resolve"
+     ?updateOperationsAction({data:{id:dialog.id,status:"resolved",resolutionNote:note}})
+     :setOperationsActionDeadline({data:{id:dialog.id,dueAt:dialog.value?new Date(dialog.value).toISOString():null,reason:note}}));
+    if(!saved)return;
+    if(dialog.kind==="deadline")setDueDrafts(prev=>{const next={...prev};delete next[dialog.id];return next;});
+    setNotice(dialog.kind==="resolve"?"Action resolved. It no longer appears in the open operations queue.":"Action deadline saved.");
+   }
+   setDialog(null);setDialogNote("");setExitConfirmed(false);
+  }catch(e){setError(mutationErrorMessage(e,"Unable to save operational change"));}
  }
  function localDue(iso:string|null){
    if(!iso)return "";
@@ -133,7 +164,15 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   </section>
   {health ? <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p> : <p className="mt-4 text-xs text-muted-foreground">Release health is temporarily unavailable; core operations remain accessible.</p>}
   <OutboxHealthPanel/>
-  {error&&<WorkspaceNotice tone="danger" className="mt-4">No operational change was completed. {error}</WorkspaceNotice>}
+  {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
+  {mutation.refreshError&&<button type="button" disabled={mutation.isSubmitting}
+   onClick={()=>void retryActionRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
+   Retry action refresh
+  </button>}
+  {exitMutation.refreshError&&<button type="button" disabled={exitMutation.isSubmitting}
+   onClick={()=>void retryExitRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
+   Retry institutional change refresh
+  </button>}
   <AttentionQueue items={attentionItems}/>
   {commandCenter&&<section aria-label="Operations exception summary" className="mt-8">
     <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
@@ -244,6 +283,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   <p className="mt-6"><Link to="/sites" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Open School/Site Today →</Link> <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
   <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
   {selected.action&&<Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
+  {selected.action&&<Link to="/actions/$actionId" params={{actionId:selected.action}} className="ml-4 text-sm underline">View Action details</Link>}
   {selected.action&&!data.items.some(item=>item.id===selected.action)&&<WorkspaceNotice tone="danger">This action is unavailable in the current operations queue.</WorkspaceNotice>}
   {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
   <p className="mt-2 text-xs text-muted-foreground">Status: {i.status?.replaceAll("_"," ") ?? "open"}
@@ -251,8 +291,11 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     {new Date(i.dueAt).getTime()<Date.now()&&<strong className="ml-2 text-foreground">Overdue</strong>}</>}
    {!i.ownerPersonId&&" · Unassigned"}
   </p>
-  <div className="mt-3 flex flex-wrap gap-3">{i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><label className="flex items-center gap-2 text-xs">Assigned to
- <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={busy!==null} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
+  <div className="mt-3 flex flex-wrap gap-3">{i.type==="section_creation_request"?i.programId?
+   <Link to="/operations/launch/$programId" params={{programId:i.programId}} className="text-sm underline">Review teacher class request in academic setup →</Link>:
+   <WorkspaceNotice tone="danger">This class request is missing its program. Contact your school administrator.</WorkspaceNotice>:
+   i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><label className="flex items-center gap-2 text-xs">Assigned to
+ <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
  <option value="" disabled={i.type==="onsite_coverage_gap"&&!!i.eligibleOwnerPersonId}>Unassigned</option>
  {i.type==="onsite_coverage_gap"&&i.ownerPersonId&&i.ownerPersonId!==i.eligibleOwnerPersonId&&
   <option value={i.ownerPersonId} disabled>Previous assignee — reassign to the current director</option>}
@@ -262,15 +305,15 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  <label className="flex flex-col gap-1 text-xs">Due date (your local time)
   <input type="datetime-local" aria-label={"Deadline for "+i.title}
    className="rounded border bg-background px-2 py-1"
-   disabled={busy!==null}
+   disabled={commandsBlocked}
    value={dueDrafts[i.id]??localDue(i.dueAt)}
    onChange={event=>setDueDrafts(prev=>({...prev,[i.id]:event.target.value}))}/>
  </label>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50"
-   disabled={busy!==null||dueDrafts[i.id]===undefined}
+   disabled={commandsBlocked||dueDrafts[i.id]===undefined}
    onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
  {i.type==="guardian_health_information_review"?
   <Link to="/operations/health-review" search={{action:i.id}}
     className="rounded border px-3 py-1 text-xs font-semibold">Review confidential family update</Link>:
@@ -278,15 +321,32 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   <Link to="/operations/transfer-records" className="rounded border px-3 py-1 text-xs font-semibold">Complete verified records transfer →</Link>:
   (i.enrollmentChangeKind==="transfer"||i.enrollmentChangeKind==="withdrawal")?
   <button type="button" className="rounded border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
-    disabled={busy!==null} onClick={()=>{if(i.enrollmentChangeKind==="withdrawal"||i.enrollmentChangeKind==="transfer")void completeEnrollmentExit(i.id,i.enrollmentChangeKind);}}>
+    disabled={commandsBlocked} onClick={()=>{if(i.enrollmentChangeKind==="withdrawal"||i.enrollmentChangeKind==="transfer")void completeEnrollmentExit(i.id,i.enrollmentChangeKind);}}>
     Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
   </button>:
   i.type==="onsite_coverage_gap"&&i.siteId?
   <Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-xs underline">Assigned director resolves in Site Today →</Link>:
-  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>}
+  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>}
  </>}</div></article>)}
   {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
+ {dialog&&<ActionDialog open title={dialog.kind==="resolve"?"Resolve action":dialog.kind==="deadline"?"Change action deadline":"Complete official "+dialog.exitKind}
+  description={<><p>{dialog.title}</p><p className="mt-2">{dialog.kind==="exit"
+   ?"Active Program and class memberships end immediately. The student login at this school may also be revoked. Record the institutional decision and academic records handoff."
+   :dialog.kind==="deadline"?(dialog.value?"New due date (your local time): "+dialog.value.replace("T"," "):"This removes the action's due date."):"Record how this action was resolved. The note is retained with the canonical Action."}</p></>}
+  confirmLabel={dialog.kind==="resolve"?"Resolve action":dialog.kind==="deadline"?"Save deadline":"Complete official "+dialog.exitKind}
+  destructive={dialog.kind==="exit"} pending={busy!==null||exitMutation.isSubmitting}
+  confirmDisabled={commandsBlocked||dialogNote.trim().length<(dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1)||(dialog.kind==="exit"&&!exitConfirmed)}
+  onClose={()=>{setDialog(null);setDialogNote("");setError("");}} onConfirm={()=>void confirmActionInput()}>
+  <label className="block text-sm">{dialog.kind==="deadline"?"Reason for deadline change":"Resolution note"}
+   <textarea required minLength={dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1} maxLength={dialog.kind==="deadline"?500:2000}
+    value={dialogNote} onChange={event=>setDialogNote(event.target.value)} rows={4}
+    className="mt-2 w-full rounded-lg border bg-background p-3"/></label>
+  {dialog.kind==="exit"&&<label className="flex items-start gap-3 text-sm">
+   <input type="checkbox" checked={exitConfirmed} onChange={event=>setExitConfirmed(event.target.checked)}/>
+   I confirm the registrar has verified this institutional exit and understand that enrollment and student access may end immediately.
+  </label>}
+  {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+ </ActionDialog>}
  </WorkspaceShell>;
 }
-

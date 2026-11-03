@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useLaunchInstitutionDefaults } from "@/hooks/useLaunchInstitutionDefaults";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 import type { LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
@@ -43,7 +44,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const router = useRouter();
   const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input), invalidateRouter: () => router.invalidate() });
   const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input), invalidateRouter: () => router.invalidate() });
-  const busy = siteMutation.isSubmitting || launchMutation.isSubmitting;
+  const busy = siteMutation.isSubmitting || launchMutation.isSubmitting ||
+    !!siteMutation.refreshError || !!launchMutation.refreshError;
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>(
@@ -69,6 +71,14 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  async function retrySiteRefresh(){
+    const outcome=await siteMutation.retryRefresh();
+    if(outcome.status==="refreshed")setError("");
+  }
+  async function retryLaunchRefresh(){
+    const outcome=await launchMutation.retryRefresh();
+    if(outcome.status==="refreshed")setError("");
+  }
   async function addSite(){
     if(!hostOrganizationId)return;
     setError("");
@@ -81,7 +91,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       setSiteId(result.siteId);
       if (submission.refreshError) setError("Site created, but the page could not refresh. Reopen launch setup; do not create another Site.");
       setNewSiteName("");setNewSiteSlug("");
-    }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
+    }catch(e){setError(mutationErrorMessage(e, "Unable to create site"));}
 
   }
 
@@ -137,7 +147,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         setError("The school launch was saved, but automatic navigation failed. Use its saved launch handoff below, or reopen launch setup; do not start a duplicate Program.");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to start launch");
+      setError(mutationErrorMessage(e, "Unable to start launch"));
     }
   }
 
@@ -174,6 +184,14 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
+        {siteMutation.refreshError&&<button type="button" disabled={siteMutation.isSubmitting}
+          onClick={()=>void retrySiteRefresh()} className="mt-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+          Retry Site refresh
+        </button>}
+        {launchMutation.refreshError&&<button type="button" disabled={launchMutation.isSubmitting}
+          onClick={()=>void retryLaunchRefresh()} className="mt-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+          Retry launch refresh
+        </button>}
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
         <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>

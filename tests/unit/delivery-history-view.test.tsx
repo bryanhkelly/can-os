@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { DeliveryHistory } from "@/components/communication/DeliveryHistory";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, search, children, ...props }: { to: string; search: Record<string, string>; children: ReactNode }) =>
-    <a href={to + "?" + new URLSearchParams(search)} {...props}>{children}</a>,
+  Link: ({ to, search, hash, children, ...props }: { to: string; search?: Record<string, string>; hash?: string; children: ReactNode }) =>
+    <a href={to + (search ? "?" + new URLSearchParams(search) : "") + (hash ? "#" + hash : "")} {...props}>{children}</a>,
 }));
 
 describe("watch delivery history presentation", () => {
@@ -15,6 +15,7 @@ describe("watch delivery history presentation", () => {
         id: "delivery", channel: "email", kind: "Watch update", status: "delivered",
         label: "Accepted by provider",
         detail: "Inbox or handset delivery and reading are not verified.",
+        nextStep: "Check your inbox, spam folder or handset.", recovery: null,
         attempts: 2, createdAt: "2030-01-01T12:00:00.000Z",
         acceptedAt: "2030-01-01T12:01:00.000Z", nextAttemptAt: null,
       }], nextCursor: "older-page",
@@ -37,6 +38,19 @@ describe("watch delivery history presentation", () => {
     expect(html).toContain("disabled");
     expect(html).not.toContain("Older deliveries");
     expect(html).not.toContain("Available in CAN");
+  });
+  it("links consent repair to preferences without offering a resend", () => {
+    const html = renderToStaticMarkup(<DeliveryHistory history={{ items: [{
+      id: "failed-delivery", channel: "sms", kind: "Watch update", status: "failed",
+      label: "Failed", detail: "SMS requires a verified phone number and current opt-in.",
+      nextStep: "Verify your phone and explicitly opt in. This does not resend the failed update.",
+      recovery: "preferences", attempts: 1, createdAt: "2030-01-01T12:00:00.000Z",
+      acceptedAt: null, nextAttemptAt: null,
+    }], nextCursor: null }} refreshing={false} onRefresh={vi.fn()} />);
+    expect(html).toContain("/guardian/watching#notification-preferences");
+    expect(html).toContain("does not resend");
+    expect(html).toContain("failed-delivery");
+    expect(html).not.toContain("Retry delivery");
   });
   it("keeps history errors explicit and offers recovery without claiming an empty history", () => {
     const html = renderToStaticMarkup(<DeliveryHistory history={null} cursor="unavailable-page"

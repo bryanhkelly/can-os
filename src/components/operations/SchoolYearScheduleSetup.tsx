@@ -2,6 +2,11 @@ import { useState } from "react";
 import { addStudioSchedule } from "@/modules/academic-time/school-year-studio.functions";
 import { defaultScheduleDayPattern, scheduleDayPattern } from "@/domain/schedule-day-pattern";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /** Uses the school-year studio command; launch does not own a second timetable. */
 export function SchoolYearScheduleSetup({ schoolYearId, programId, startsOn, endsOn, timezone, disabled, changed }: {
@@ -29,25 +34,31 @@ export function SchoolYearScheduleSetup({ schoolYearId, programId, startsOn, end
       });
     }}>
       <fieldset disabled={busy} className="space-y-3">
-        <label className="block">Schedule name<input required minLength={2} maxLength={100} value={name} onChange={event => setName(event.target.value)} className="ml-2 rounded border bg-background p-2"/></label>
-        <fieldset><legend>Instructional weekdays</legend><div className="mt-2 flex flex-wrap gap-3">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => <label key={day} className="flex items-center gap-1">
-            <input type="checkbox" checked={pattern.weekdays.includes(index)} onChange={event => setPattern(current => ({ ...current,
-              weekdays: event.target.checked ? [...current.weekdays, index].sort() : current.weekdays.filter(value => value !== index),
-            }))}/>{day}
-          </label>)}
-        </div></fieldset>
-        <div className="flex flex-wrap gap-4">
-          <label>Instruction starts<input required type="time" value={pattern.startsAtLocal} onChange={event => setPattern(current => ({ ...current, startsAtLocal: event.target.value }))} className="ml-2 rounded border bg-background p-2"/></label>
-          <label>Instruction ends<input required type="time" value={pattern.endsAtLocal} onChange={event => setPattern(current => ({ ...current, endsAtLocal: event.target.value }))} className="ml-2 rounded border bg-background p-2"/></label>
-        </div>
-        {!valid && <p role="status">Choose at least one weekday, a schedule name, and an end time later than the start time.</p>}
-        <button type="submit" disabled={!valid || busy} className="rounded bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50">{mutation.pending ? "Saving schedule…" : "Save reviewed instructional schedule"}</button>
+      <Field label="Schedule name" required>
+        <Input minLength={2} maxLength={100} value={name} onChange={event => setName(event.target.value)} />
+      </Field>
+      <fieldset><legend>Instructional weekdays</legend><div className="mt-2 flex flex-wrap gap-3">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => <Label key={day} className="flex items-center gap-2">
+          <Checkbox checked={pattern.weekdays.includes(index)} onChange={event => setPattern(current => ({ ...current,
+            weekdays: event.target.checked ? [...current.weekdays, index].sort() : current.weekdays.filter(value => value !== index),
+          }))}/>{day}
+        </Label>)}
+      </div></fieldset>
+      <div className="flex flex-wrap gap-4">
+        <Field label="Instruction starts" required className="min-w-40">
+          <Input type="time" value={pattern.startsAtLocal} onChange={event => setPattern(current => ({ ...current, startsAtLocal: event.target.value }))} />
+        </Field>
+        <Field label="Instruction ends" required className="min-w-40">
+          <Input type="time" value={pattern.endsAtLocal} onChange={event => setPattern(current => ({ ...current, endsAtLocal: event.target.value }))} />
+        </Field>
+      </div>
+      {!valid && <p role="status">Choose at least one weekday, a schedule name, and an end time later than the start time.</p>}
+      <Button type="submit" disabled={!valid || busy}>{mutation.pending ? "Saving schedule…" : "Save reviewed instructional schedule"}</Button>
       </fieldset>
     </form>
     <p className="mt-3 text-xs text-muted-foreground">Holidays and closures stay in the academic calendar. Adjust individual periods in school-year settings. Saving this schedule does not activate the year or open the school.</p>
     {mutation.notice && <p role="status" className="mt-3 text-sm">{mutation.notice}</p>}
     {mutation.error && <p role="alert" className="mt-3 text-sm">{mutation.error}</p>}
-    {mutation.refreshFailed && <button type="button" disabled={mutation.pending} onClick={() => void mutation.retryRefresh()} className="mt-3 rounded border px-3 py-2 text-sm">Refresh saved schedule choices</button>}
+    {mutation.refreshFailed && <Button type="button" variant="outline" disabled={mutation.pending} onClick={() => void mutation.retryRefresh()} className="mt-3">Refresh saved schedule choices</Button>}
   </section>;
 }

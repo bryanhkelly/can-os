@@ -1,3 +1,4 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { EvidenceUploadSection, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -5,6 +6,7 @@ import {
   readExtendedEvidenceFn, reviewExtendedEvidenceFn, getExtendedEvidenceDownloadFn,
 } from "@/modules/activities/extended-learning-evidence.functions";
 import type { ExtendedSeasonApprovalCategory } from "@/domain/extended-learning-approval";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 
 type Model = Awaited<ReturnType<typeof readExtendedEvidenceFn>>;
 type Item = Model["categories"][number];
@@ -36,12 +38,17 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
     } catch (cause) {
       if (request === requestSequence.current) {
         setModel(null);
-        setError(cause instanceof Error ? cause.message : "Unable to read evidence");
+        setError(mutationErrorMessage(cause, "Unable to read evidence"));
       }
+      throw cause;
     } finally { if (request === requestSequence.current) setLoading(false); }
   }, [seasonId]);
-  useEffect(() => { void load(); return () => { requestSequence.current++; }; }, [load]);
-  async function changed() { await load(); await onChange?.(); }
+  useEffect(() => { void load().catch(() => {}); return () => { requestSequence.current++; }; }, [load]);
+  async function changed() {
+    const result = await readExtendedEvidenceFn({ data: { seasonId } });
+    setModel(result);
+    await onChange?.();
+  }
   return <section className="mt-3 rounded-lg border bg-card p-4" aria-label="Extended-learning operational approvals">
     <h3 className="text-sm font-semibold">Independent operating approval</h3>
     <p className="mt-1 text-xs text-muted-foreground">
@@ -49,7 +56,7 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
       Scheduled sessions must also have currently active, assigned onsite staff.
       Expired or superseded evidence blocks new registrations immediately.
     </p>
-    <button type="button" className="mt-2 text-xs underline" onClick={() => void load()} disabled={loading}>
+    <button type="button" className="mt-2 text-xs underline" onClick={() => void load().catch(() => {})} disabled={loading}>
       {loading ? "Refreshing…" : "Refresh evidence"}
     </button>
     {error && <p role="alert" className="mt-2 text-xs">{error}</p>}
@@ -76,19 +83,19 @@ function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
 function EvidenceCard({ model, item, changed }: {
   model: Model; item: Item; changed: () => Promise<void>;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback(changed);
+  const busy = mutation.pending || mutation.refreshFailed;
   async function review(decision: "approve" | "reject", reason: string) {
     if (!item.documentId || !item.version || busy) return;
-    setBusy(true); setError("");
-    try {
-      await reviewExtendedEvidenceFn({ data: {
+    const outcome = await mutation.run(() => reviewExtendedEvidenceFn({ data: {
         seasonId: model.seasonId, documentId: item.documentId,
         expectedVersion: item.version, reason, decision,
-      } });
-      await changed();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Review failed"); throw cause; }
-    finally { setBusy(false); }
+      } }), {
+      successMessage: decision === "approve" ? "Independent evidence approval recorded." : "Evidence rejected with correction instructions.",
+      commandErrorMessage: "Review failed",
+      refreshErrorMessage: "The evidence review was recorded, but current evidence records could not be loaded. Retry the refresh before reviewing again.",
+    });
+    if (outcome.status === "failed") throw outcome.error;
   }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
     {item.documentId && <EvidenceDocumentSummary
@@ -102,6 +109,7 @@ function EvidenceCard({ model, item, changed }: {
       }}/>}
     {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
       disabled={busy} onReview={review}/>}
+    <MutationFeedback state={mutation} className="mt-2" pendingMessage="Recording evidence review…"/>
     {model.canSubmit && <div>
       <EvidenceUploadSection<UploadInput> disabled={!model.uploadsEnabled}
         heading={item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}
@@ -111,6 +119,5 @@ function EvidenceCard({ model, item, changed }: {
           fileName:file.name,mimeType:file.type as UploadInput["mimeType"],size:file.size,expiresAt})}
         onUploaded={changed}/>
     </div>}
-    {error && <p role="alert" className="mt-2">{error}</p>}
   </EvidenceWorkflow>;
 }

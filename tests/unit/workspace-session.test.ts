@@ -18,7 +18,7 @@ beforeEach(() => {
   state.filters = [];
   state.rows = [];
   state.context.mockResolvedValue({
-    accountId: "account", grantId: "student-grant", role: "student",
+    accountId: "account", actorPersonId:"person", grantId: "student-grant", role: "student",
     scope: { organizationIds: ["org"], siteIds: ["site"], programIds: ["program"] },
   });
   state.select.mockImplementation(() => {
@@ -48,6 +48,7 @@ describe("shared workspace session read", () => {
       [], [],
       [{ id: "site", name: "School", organizationId: "org" }],
       [{ id: "program", name: "Program", siteId: "site" }],
+      [{metadata:{studentDisplayPreferences:{density:"compact",defaultStudentTab:"courses",reduceMotion:true,showCompletedAssignments:false},privateStudentNote:"not for the session"}}],
     ];
     const result = await readWorkspaceSession(new Request("http://localhost/access/session"));
     expect(result).toMatchObject({
@@ -55,6 +56,7 @@ describe("shared workspace session read", () => {
       grants: [{ id: "student-grant", firstName: "Test" }],
       sites: [{ id: "site" }], programs: [{ id: "program" }],
       activeContext: { organizationIds: ["org"], siteIds: ["site"], programIds: ["program"] },
+      studentPreferences:{density:"compact",defaultStudentTab:"courses",reduceMotion:true,showCompletedAssignments:false},
     });
     const dialect = new PgDialect();
     const queries = state.filters.map(filter => dialect.sqlToQuery(filter));
@@ -63,6 +65,8 @@ describe("shared workspace session read", () => {
     expect(queries[1]?.params).toContain("student");
     expect(queries[4]?.params).toEqual(["site"]);
     expect(queries[5]?.params).toEqual(["program"]);
+    expect(queries[6]?.params).toEqual(["person"]);
+    expect(JSON.stringify(result)).not.toContain("privateStudentNote");
     expect(queries[1]?.sql).toContain("people");
     expect(queries[1]?.sql).toContain("active");
     expect(result).not.toHaveProperty("sessionId");
@@ -71,16 +75,17 @@ describe("shared workspace session read", () => {
 
   it("does not broaden empty site or program scopes", async () => {
     state.context.mockResolvedValue({
-      accountId: "account", grantId: "grant", role: "student", scope: {},
+      accountId: "account", actorPersonId:"person", grantId: "grant", role: "student", scope: {},
     });
     state.rows = [
       [{ email: "staff@example.org" }],
       [{ id: "grant", accountId: "account", personId: "person", role: "student",
         firstName: "Test", lastName: "Learner", active: true }],
+      [],[],[{metadata:{}}],
     ];
     const result = await readWorkspaceSession(new Request("http://localhost/access/session"));
     expect(result).toMatchObject({ authenticated: true, sites: [], programs: [] });
-    expect(state.select).toHaveBeenCalledTimes(4);
+    expect(state.select).toHaveBeenCalledTimes(5);
   });
 
   it("returns signed out for authorization failures without reading display data", async () => {
@@ -88,6 +93,33 @@ describe("shared workspace session read", () => {
     expect(await readWorkspaceSession(new Request("http://localhost/access/session")))
       .toEqual({ authenticated: false });
     expect(state.select).not.toHaveBeenCalled();
+  });
+
+  it("does not apply student preferences to a staff workspace",async()=>{
+    state.context.mockResolvedValue({
+      accountId:"account",actorPersonId:"staff-person",grantId:"staff-grant",role:"registrar",scope:{},
+    });
+    state.rows=[
+      [{email:"staff@example.org"}],
+      [{id:"staff-grant",accountId:"account",personId:"staff-person",role:"registrar",firstName:"School",lastName:"Staff",active:true}],
+      [],[],
+    ];
+    const result=await readWorkspaceSession(new Request("http://localhost/access/session"));
+    expect(result).toMatchObject({authenticated:true,role:"registrar"});
+    expect(result).not.toHaveProperty("studentPreferences");
+    expect(state.select).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not present missing student identity as default preferences",async()=>{
+    state.context.mockResolvedValue({
+      accountId:"account",actorPersonId:"missing-student",grantId:"student-grant",role:"student",scope:{},
+    });
+    state.rows=[
+      [{email:"student@example.org"}],
+      [{id:"student-grant",accountId:"account",personId:"missing-student",role:"student",firstName:"Test",lastName:"Learner",active:true}],
+      [],[],[],
+    ];
+    await expect(readWorkspaceSession(new Request("http://localhost/access/session"))).rejects.toThrow("student preferences identity");
   });
 
   it("does not disguise database failures as a signed-out session", async () => {

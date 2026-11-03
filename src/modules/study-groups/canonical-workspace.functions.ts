@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { personLegalName } from "@/domain/person-name";
+import { personDisplayName, personLegalName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, inArray, or, isNull, desc } from "drizzle-orm";
@@ -245,8 +245,13 @@ export const listCanonicalGuardianGroupConsents = createServerFn({ method: "GET"
       or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, actor.scope.programIds ?? []))))
     .orderBy(desc(s.actions.createdAt)).limit(100);
   if (!rows.length) return [];
-  const guardians = await db.select({ studentPersonId: s.guardianRelationships.studentPersonId })
+  const guardians = await db.select({
+    studentPersonId: s.guardianRelationships.studentPersonId,
+    preferredName: s.people.preferredName,
+    legalFirstName: s.people.legalFirstName, legalLastName: s.people.legalLastName,
+  })
     .from(s.guardianRelationships)
+    .innerJoin(s.people, eq(s.people.id, s.guardianRelationships.studentPersonId))
     .where(guardianRelationshipPredicate({
       guardianPersonId: actor.actorPersonId, access: "enrollment",
     }));
@@ -263,6 +268,8 @@ export const listCanonicalGuardianGroupConsents = createServerFn({ method: "GET"
     inArray(s.studyGroupMemberships.groupId, filtered.map(r => r.groupId)),
     inArray(s.studyGroupMemberships.personId, [...studentIds])));
   return filtered.flatMap(row => {
+    const student = guardians.find(person => person.studentPersonId === row.metadata.studentPersonId);
+    if (!student) return [];
     const pending = memberships.some(m =>
       m.groupId === row.groupId && m.personId === row.metadata.studentPersonId &&
       m.status === "pending" && (!row.metadata.membershipId || row.metadata.membershipId === m.id));
@@ -273,6 +280,7 @@ export const listCanonicalGuardianGroupConsents = createServerFn({ method: "GET"
     return [{
       id: row.id, status: row.status, groupTitle: row.groupTitle,
       studentPersonId: String(row.metadata.studentPersonId),
+      studentName: personDisplayName(student),
       decision: row.metadata.decision === "approve" ? "approve" :
         row.metadata.decision === "decline" ? "decline" : null,
       obsolete,

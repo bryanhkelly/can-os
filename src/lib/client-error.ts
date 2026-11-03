@@ -34,6 +34,14 @@ export function normalizeClientError(error: unknown, fallback?: string): ClientE
     VALIDATION_FAILED: "validation", CONFLICT: "conflict",
     UNAVAILABLE: "unavailable", UNEXPECTED: "unexpected",
     CANCELLED: "unavailable",
+    COURSE_CONTENT_REQUIRED: "validation", COURSE_STAFFING_REQUIRED: "validation",
+    COURSE_CAPACITY_REACHED: "validation", COURSE_CREDIT_LIMIT: "validation",
+    COURSE_SCHEDULE_CONFLICT: "validation", COURSE_PREREQUISITES_REQUIRED: "validation",
+    COURSE_REGISTRATION_CLOSED: "validation", COURSE_PROGRAM_REQUIRED: "validation",
+    SITE_ROOM_NAME_CONFLICT: "conflict", SITE_ROOM_IDENTIFIER_CONFLICT: "conflict", SITE_ROOM_RETIRED: "conflict",
+    CONFERENCE_NOT_BOOKED: "conflict", CONFERENCE_NOT_STARTED: "validation",
+    CONFERENCE_NOT_ENDED: "validation",
+    ATTENDANCE_CONFLICT: "conflict",
   } as const;
   return {
     code,

@@ -4,7 +4,7 @@ import { getQuickWinActions, finishQuickWinAction } from "@/modules/actions/stud
 
 const state=vi.hoisted(()=>({
   actor:{actorPersonId:"student-owner",scope:{siteIds:["authorized-site"],programIds:["authorized-program"]}},
-  requireActor:vi.fn(),select:vi.fn(),where:vi.fn(),limit:vi.fn(),header:vi.fn(),update:vi.fn(),
+  requireActor:vi.fn(),select:vi.fn(),where:vi.fn(),join:vi.fn(),limit:vi.fn(),header:vi.fn(),update:vi.fn(),
   rows:[] as Record<string,unknown>[],
 }));
 vi.mock("@tanstack/react-start",()=>({
@@ -35,6 +35,7 @@ beforeEach(()=>{
   state.select.mockImplementation(()=>{
     const query={
       from:()=>query,where:(filter:unknown)=>{state.where(filter);return query;},
+      leftJoin:(_table:unknown,filter:unknown)=>{state.join(filter);return query;},
       orderBy:()=>query,for:()=>query,
       limit:async(count:number)=>{state.limit(count);return state.rows;},
     };
@@ -53,22 +54,53 @@ describe("exact student Action reads",()=>{
     const query=selectedQuery();
     expect(query.sql).toContain('"actions"."id" =');
     expect(query.sql).toContain('"actions"."owner_person_id" =');
+    expect(query.sql).toContain('"actions"."type" =');
+    expect(query.sql).toContain('"actions"."subject_type" =');
+    expect(query.sql).toContain('"actions"."subject_id" = "student_profiles"."id"');
     expect(query.sql).toContain('"actions"."site_id" in');
     expect(query.sql).toContain('"actions"."program_id" in');
-    expect(query.params).toEqual(["student-owner","authorized-site","authorized-program",actionId]);
+    expect(query.params).toEqual([
+      "student-owner","student_support_request","student_profile",
+      "authorized-site","authorized-program",actionId,
+    ]);
+    const profileJoin = new PgDialect().sqlToQuery(state.join.mock.calls[0]![0]);
+    expect(profileJoin.sql).toContain('"student_profiles"."person_id" =');
+    expect(profileJoin.params).toEqual(["student-owner"]);
     expect(state.limit).toHaveBeenCalledWith(1);
     expect(state.requireActor).toHaveBeenCalledWith(["student"]);
     expect(state.header).toHaveBeenCalledWith("Cache-Control","private, no-store");
   });
   it("retains the bounded directory contract for callers without a selection",async()=>{
     expect(await getQuickWinActions()).toEqual({connected:true,actions:[]});
-    expect(selectedQuery().params).toEqual(["student-owner","authorized-site","authorized-program"]);
+    expect(selectedQuery().params).toEqual([
+      "student-owner","student_support_request","student_profile",
+      "authorized-site","authorized-program",
+    ]);
     expect(state.limit).toHaveBeenCalledWith(100);
   });
   it("returns an explicit empty result for an unavailable ID without a directory fallback",async()=>{
     expect(await getQuickWinActions({data:{actionId}})).toEqual({connected:true,actions:[]});
     expect(state.select).toHaveBeenCalledOnce();
     expect(state.limit).toHaveBeenCalledWith(1);
+  });
+  it("projects completion only for open supported actions owned by the student",async()=>{
+    const action = {
+      id:actionId,title:"Help request",description:null,status:"open",priority:"normal",
+      dueAt:null,resolvedAt:null,metadata:{},type:"student_support_request",
+      subjectType:"student_profile",subjectId:"student-profile",
+    };
+    state.rows=[
+      {...action,ownerPersonId:"assigned-staff"},
+      {...action,id:"00000000-0000-4000-8000-000000000002",ownerPersonId:"student-owner"},
+    ];
+
+    const result = await getQuickWinActions();
+
+    expect(result.actions.map(({id,canComplete})=>({id,canComplete}))).toEqual([
+      {id:actionId,canComplete:false},
+      {id:"00000000-0000-4000-8000-000000000002",canComplete:true},
+    ]);
+    expect(result.actions.every(row=>!("ownerPersonId" in row))).toBe(true);
   });
   it("rejects malformed IDs before resolving identity or reading Actions",async()=>{
     await expect(getQuickWinActions({data:{actionId:"invalid"}})).rejects.toThrow();
@@ -77,7 +109,10 @@ describe("exact student Action reads",()=>{
   });
   it("does not accept a caller-selected owner or scope",async()=>{
     await getQuickWinActions({data:{actionId,ownerPersonId:"foreign",siteIds:["foreign"]}});
-    expect(selectedQuery().params).toEqual(["student-owner","authorized-site","authorized-program",actionId]);
+    expect(selectedQuery().params).toEqual([
+      "student-owner","student_support_request","student_profile",
+      "authorized-site","authorized-program",actionId,
+    ]);
   });
   it("propagates failed reads instead of treating them as empty detail",async()=>{
     state.select.mockImplementationOnce(()=>{throw new Error("Database unavailable");});
@@ -86,6 +121,14 @@ describe("exact student Action reads",()=>{
 });
 
 describe("student Action completion boundary",()=>{
+  it("does not let subject-based visibility satisfy the owner check for completion",async()=>{
+    await expect(finishQuickWinAction({data:{actionId}}))
+      .rejects.toThrow("open owned action in authorized program");
+    const query=new PgDialect().sqlToQuery(state.where.mock.calls[0]![0]);
+    expect(query.sql).toContain('"actions"."owner_person_id" =');
+    expect(query.params).toContain("student-owner");
+    expect(state.update).not.toHaveBeenCalled();
+  });
   it.each(["academic_intervention","support_referral","field_trip_consent"])("continues to deny generic completion for %s",async type=>{
     state.rows=[{id:actionId,type,programId:"authorized-program"}];
     await expect(finishQuickWinAction({data:{actionId}})).rejects.toThrow("owning workflow");

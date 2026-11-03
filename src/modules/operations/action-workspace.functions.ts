@@ -2,6 +2,7 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { accountPersonGrants,actions,guardianRelationships,people,programs,sites,studentProfiles } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { dedupeQueue,notificationSummary } from "@/domain/notification-triage";
@@ -101,6 +102,8 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(!record)throw new AuthorizationError("action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   if(record.type==="section_creation_request")
+     throw new DomainError("CONFLICT","Use academic setup to fulfill or decline the teacher class request");
    if(record.type==="onsite_pickup_custody_hold")throw new Error("A site leader must resolve this pickup restriction in the onsite pickup workflow");
    if(record.type==="guardian_health_information_review" && data.status==="resolved")throw new Error("Use the restricted health review decision workflow");
    if(record.type==="transfer_academic_records_handoff"&&data.status==="resolved")throw new Error("Complete the verified records handoff through the institutional transfer workspace");
@@ -158,6 +161,8 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(!record||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   if(record.type==="section_creation_request")
+     throw new DomainError("CONFLICT","Teacher class requests retain their original requester; use academic setup");
    if(record.type==="onsite_pickup_custody_hold")throw new Error("A site leader must resolve this pickup restriction in the onsite pickup workflow");
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    const academic=(record.type==="academic_intervention"||record.type===gradeResponseActionType)&&record.subjectType==="student_profile"&&record.sectionId!==null;

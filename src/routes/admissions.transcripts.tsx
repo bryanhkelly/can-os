@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -48,14 +50,13 @@ function TranscriptIssuanceView({
   const router = useRouter();
   const [search, setSearch] = useState(query);
   const [purpose, setPurpose] = useState("");
-  const [busy, setBusy] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setNotice("");
     const normalized = search.trim();
     if (normalized.length < 2) {
       setError("Enter at least two characters to search for a student.");
@@ -65,21 +66,14 @@ function TranscriptIssuanceView({
   }
 
   async function issue(studentPersonId: string, studentName: string) {
-    setBusy(studentPersonId);
     setError("");
-    setNotice("");
-    try {
-      await issueTranscript({ data: {
+    await mutation.run(() => issueTranscript({ data: {
         studentPersonId,
         purpose: purpose.trim() || undefined,
-      } });
-      await router.invalidate();
-      setNotice(`Official transcript issued for ${studentName}.`);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to issue the transcript.");
-    } finally {
-      setBusy("");
-    }
+      } }), {
+        successMessage: `Official transcript issued for ${studentName}.`,
+        commandErrorMessage: "Unable to issue the transcript.",
+      });
   }
 
   return (
@@ -100,7 +94,7 @@ function TranscriptIssuanceView({
         not certify graduation or award a diploma.
       </p>
       {error && <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3 text-sm">{error}</p>}
-      {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      <MutationFeedback state={mutation} pendingMessage="Issuing official transcript..." className="mt-4"/>
       <form onSubmit={submitSearch} className="mt-6 flex flex-wrap items-end gap-3">
         <label className="min-w-64 flex-1 text-sm font-semibold">
           Student name
@@ -153,7 +147,7 @@ function TranscriptIssuanceView({
                   onClick={() => void issue(candidate.studentPersonId, candidate.studentName)}
                   className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
                 >
-                  {busy === candidate.studentPersonId ? "Issuing…" : "Issue official transcript"}
+                  {mutation.pending ? "Issuing…" : "Issue official transcript"}
                 </button>
               </article>
             ))}

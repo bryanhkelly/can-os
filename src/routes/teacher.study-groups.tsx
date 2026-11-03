@@ -1,3 +1,4 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {listFacilitatorGroupScopes,listStudyGroupReviewQueue,listStudyGroupReports} from "@/modules/study-groups/study-group-queries.functions";
@@ -10,7 +11,6 @@ import {decideCanonicalGroupMembership} from "@/modules/study-groups/canonical-m
 import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {dateTimeInputValue,formatTimestamp} from "@/modules/calendar/timezone";
 import {siteLocalTimeToIso} from "@/modules/calendar/site-local-time";
 import {DomainError} from "@/domain/errors";
@@ -85,7 +85,7 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
          id:session.id,title:session.title,timezone:group.timezone,
          start:dateTimeInputValue(session.startsAt,group.timezone),end:dateTimeInputValue(session.endsAt,group.timezone),
        })}>Reschedule</button>
-       <button disabled={busy} className="rounded border px-2 py-1" onClick={async()=>{try{setAttendanceError("");setAttendance(await listStudyGroupAttendance({data:{sessionId:session.id}}));setAttendanceSession(session.id)}catch(e){setAttendanceError(e instanceof Error?e.message:"Attendance unavailable")}}}>Attendance</button></>}
+       <button disabled={busy} className="rounded border px-2 py-1" onClick={async()=>{try{setAttendanceError("");setAttendance(await listStudyGroupAttendance({data:{sessionId:session.id}}));setAttendanceSession(session.id)}catch(e){setAttendanceError(mutationErrorMessage(e, "Attendance unavailable"))}}}>Attendance</button></>}
       </div>)}
     </div>)}
     {attendanceSession&&<div className="space-y-2"><h3 className="font-semibold">Attendance</h3>{attendanceError&&<WorkspaceNotice tone="danger">{attendanceError}</WorkspaceNotice>}{attendance.map(person=><div key={person.personId} className="flex gap-2 text-xs"><span>{person.personId.slice(0,8)} · {person.rsvp??"No RSVP"} · {person.attended===null?"Unrecorded":person.attended?"Present":"Absent"}</span>

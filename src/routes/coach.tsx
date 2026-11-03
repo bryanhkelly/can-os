@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { useEffect, useState } from "react";
@@ -71,7 +72,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
       })
       .catch((cause) => {
         if (!active) return;
-        setTimeline([]);setHistoryError(cause instanceof Error?cause.message:"Unable to load student history.");
+        setTimeline([]);setHistoryError(mutationErrorMessage(cause, "Unable to load student history."));
         setTimelineLoading(false);
       });
     return () => {
@@ -97,7 +98,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
       setStudents(caseload.students);
       setTimeline(history.timeline);
     } catch (cause) {
-      setFormError(cause instanceof Error ? cause.message : "Could not log outreach");
+      setFormError(mutationErrorMessage(cause, "Could not log outreach"));
     } finally {
       setBusy(false);
     }

@@ -90,7 +90,7 @@ integration("recipient delivery history", () => {
         expect(combined.some(item => item.detail.includes("verified phone"))).toBe(true);
         expect(JSON.stringify(combined)).not.toMatch(/secret provider|Do not expose|subscriptionId|domainEventId|subjectId|lastError/);
         expect(Object.keys(combined[0]!).sort()).toEqual([
-          "id", "channel", "kind", "status", "label", "detail", "attempts", "createdAt", "acceptedAt", "nextAttemptAt",
+          "id", "channel", "kind", "status", "label", "detail", "nextStep", "recovery", "attempts", "createdAt", "acceptedAt", "nextAttemptAt",
         ].sort());
         expect((await listDeliveryHistory(outsider)).items.map(item => item.id)).toEqual([otherDelivery.id]);
         await expect(listDeliveryHistory(outsider, first.nextCursor!)).rejects.toThrow("unavailable");

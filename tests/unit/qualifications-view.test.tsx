@@ -25,6 +25,7 @@ describe("qualification submission and review presentation",()=>{
     expect(html).toContain("Submit qualification evidence");
     expect(html).toContain("Submit for review");
     expect(html).toContain("Review status: pending");
+    expect(html).toContain("Next: an independent credential verifier");
     expect(html).toContain("Storage verification does not approve");
     expect(html).toContain("Prior claims and review history are retained");
     expect(html).not.toContain(">approve</button>");
@@ -54,6 +55,16 @@ describe("qualification submission and review presentation",()=>{
     const html=render({...snapshot,claims:snapshot.claims.map(claim=>({...claim,status:"verified",
       expiresAt:"2000-01-01T00:00:00Z"}))});
     expect(html).toContain("Review status: verified - expired");
+    expect(html).toContain("submits current replacement evidence");
+  });
+  it("does not confuse verified evidence with Program teaching eligibility",()=>{
+    const html=render({...snapshot,claims:snapshot.claims.map(claim=>({...claim,status:"verified"}))});
+    expect(html).toContain("Program qualification policy and staffing coverage are evaluated separately");
+  });
+  it("does not describe an unverified claim as a completed evidence review",()=>{
+    const html=render({...snapshot,claims:snapshot.claims.map(claim=>({...claim,status:"unverified"}))});
+    expect(html).toContain("submits evidence for independent review");
+    expect(html).not.toContain("Evidence review is complete");
   });
   it("distinguishes missing catalog, empty claims and truncated history from success",()=>{
     const html=render({...snapshot,catalog:[],claims:[],hasMore:true});

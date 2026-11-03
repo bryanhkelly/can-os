@@ -1,27 +1,56 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { getNotifications, readNotification } from "@/modules/communication/notification-center.functions";
-import { StatusBadge } from "@/components/workspace";
+import { MutationFeedback, QueryState, StatusBadge } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { useMutationFeedback, mutationErrorMessage } from "@/lib/mutation-feedback";
 
-export function NotificationTray({ onNavigate }: { onNavigate: () => void }) {
+export function NotificationTray({ onNavigate, enabled }: { onNavigate: () => void; enabled: boolean }) {
   const [notices, setNotices] = useState<Awaited<ReturnType<typeof getNotifications>>>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const refresh = async () => {
+    const rows = await getNotifications();
+    setNotices(rows);
+    setLoadError("");
+  };
+  const mutation = useMutationFeedback(refresh);
+
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
-    getNotifications().then(rows => { if (active) setNotices(rows); })
-      .catch(error => { if (active) setError(error instanceof Error ? error.message : "Unable to load notifications."); })
-      .finally(() => { if (active) setLoading(false); });
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setLoading(true);
+      setLoadError("");
+      try {
+        const rows = await getNotifications();
+        if (active) setNotices(rows);
+      } catch (error) {
+        if (active) setLoadError(mutationErrorMessage(error, "Unable to load notifications."));
+      } finally {
+        if (active) setLoading(false);
+      }
+    });
     return () => { active = false; };
-  }, []);
+  }, [enabled]);
+
+  async function retryLoad() {
+    setLoading(true);
+    try { await refresh(); }
+    catch (error) { setLoadError(mutationErrorMessage(error, "Unable to load notifications.")); }
+    finally { setLoading(false); }
+  }
+
   async function markRead(id: string) {
-    setBusy(id); setError("");
+    setBusyId(id);
     try {
-      await readNotification({ data: { id } });
-      setNotices(previous => previous.map(item => item.id === id ? { ...item, status: "read" } : item));
-    } catch(error) { setError(error instanceof Error ? error.message : "Unable to update notification."); }
-    finally { setBusy(null); }
+      await mutation.run(() => readNotification({ data: { id } }), {
+        successMessage: "Notification marked as read.",
+        commandErrorMessage: "Unable to update notification.",
+      });
+    } finally { setBusyId(null); }
   }
   const visible = notices.filter(item => item.status !== "dismissed");
   return <div>
@@ -29,9 +58,11 @@ export function NotificationTray({ onNavigate }: { onNavigate: () => void }) {
       <p className="text-sm text-muted-foreground">Updates for your signed-in account.</p>
       <Link to="/notifications" onClick={onNavigate} className="text-sm underline">Open notification center</Link>
     </div>
-    {error && <p role="alert" className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">{error}</p>}
-    {loading ? <p role="status" className="mt-5 text-sm">Loading notifications...</p> :
-      <ul className="mt-5 space-y-3">{visible.map(notice => <li key={notice.id} className="rounded-xl border bg-card p-4">
+    <MutationFeedback state={mutation} pendingMessage="Updating notification..." className="mt-4"/>
+    {loading || loadError
+      ? <QueryState loading={loading ? "Loading notifications..." : undefined}
+          error={loadError || undefined} onRetry={() => void retryLoad()} retrying={loading}/>
+      : <ul className="mt-5 space-y-3">{visible.map(notice => <li key={notice.id} className="rounded-xl border bg-card p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-semibold">{notice.href ? <Link to={notice.href} href={notice.href} onClick={onNavigate} className="underline">{notice.title}</Link> :
             <Link to="/notifications" search={{ notification: notice.id }} onClick={onNavigate} className="underline">{notice.title}</Link>}</h3>
@@ -39,9 +70,12 @@ export function NotificationTray({ onNavigate }: { onNavigate: () => void }) {
         </div>
         <p className="mt-2 text-sm text-muted-foreground">{notice.body}</p>
         <time dateTime={notice.date} className="mt-2 block text-xs text-muted-foreground">{new Date(notice.date).toLocaleString()}</time>
-        {notice.status === "unread" && <button type="button" disabled={busy !== null} onClick={() => void markRead(notice.id)}
-          className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">{busy === notice.id ? "Saving..." : "Mark as read"}</button>}
+        {notice.status === "unread" && <Button variant="outline" size="sm"
+          disabled={busyId !== null || mutation.pending || mutation.refreshFailed}
+          onClick={() => void markRead(notice.id)} className="mt-3">
+          {busyId === notice.id ? "Saving..." : "Mark as read"}
+        </Button>}
       </li>)}</ul>}
-    {!loading && !error && !visible.length && <p role="status" className="mt-5 rounded-xl border p-4 text-sm text-muted-foreground">No notifications yet.</p>}
+    {!loading && !loadError && !visible.length && <p role="status" className="mt-5 rounded-xl border p-4 text-sm text-muted-foreground">No notifications yet.</p>}
   </div>;
 }

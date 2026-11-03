@@ -1,3 +1,5 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
@@ -82,16 +84,16 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
     void router.navigate({href:"/admissions"+(query.size?"?"+query.toString():"")});
   };
   const router = useRouter();
-  const [pending, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
   const [interactive,setInteractive]=useState(false);
   useEffect(()=>setInteractive(true),[]);
-  const busy=interactive?pending:"hydrating";
+  const busy=!interactive||mutation.pending||mutation.refreshFailed;
 
-  async function transact(id: string, fn: () => Promise<unknown>) {
-    setBusy(id); setError(""); setNotice("");
-    try { await fn(); await router.invalidate(); setNotice("Saved to enrollment records."); }
-    catch (e) { setError(e instanceof Error ? e.message : "Admissions transaction failed"); }
-    finally { setBusy(null); }
+  async function transact(fn: () => Promise<unknown>) {
+    await mutation.run(fn, {
+      successMessage: "Saved to enrollment records.",
+      commandErrorMessage: "Admissions transaction failed",
+    });
   }
 
   return (
@@ -103,8 +105,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><Link to="/admissions/invite-families" className="rounded-lg border px-3 py-2 text-sm">Invite transfer families</Link><Link to="/admissions/transcripts" search={{query:""}} className="rounded-lg border px-3 py-2 text-sm">Official transcripts</Link><Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg border px-3 py-2 text-sm">Program capacity</Link></div>}
     >
       <WorkflowIntro eyebrow="Admissions & enrollment" title="A thoughtful path from inquiry to enrollment." description="Track each family's progress, review decisions, and hand accepted offers into authorized enrollment. Guardian verification remains independent." actions={<Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Open intake <ArrowUpRight className="size-4" /></Link>} />
-      {error && <p role="alert" className="mt-4 rounded-xl border border-destructive/40 p-3 text-destructive">{error}</p>}
-      {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
+      <MutationFeedback state={mutation} pendingMessage="Saving enrollment records..." className="mt-4"/>
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
         <label className="text-sm">School
           <select aria-label="Admissions school" className="ml-2 rounded border bg-background p-2"
@@ -181,7 +182,12 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
           {activated && <p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
           <div className="mt-4 flex flex-wrap gap-2">
-            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
+            {!years.length && !latest && (x.stage==="application"||x.stage==="eligibility") &&
+              <p role="status" className="text-sm">No school-year seat pool is configured for this application.{" "}
+                <Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:x.programId}}
+                  className="underline">Configure program capacity →</Link>
+              </p>}
+            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <button key={year.id} disabled={busy} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(() => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
             {latest?.status === "issued" && <p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
             {latest?.status === "accepted" && !activated && <p role="status" className="text-xs">Accepted offer ready. Select a staffed class below to activate enrollment and placement together.</p>}
           </div>
@@ -218,7 +224,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
       })}
-        {!rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
+        {!selected.application && !rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
     </WorkspaceShell>
   );
 }
@@ -226,7 +232,9 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
 function OfferWithdrawal({offerId}:{offerId:string}){
  const router=useRouter();
  const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
- const [busy,setBusy]=useState(false),[error,setError]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
+ const [error,setError]=useState("");
  return <details className="mt-3 rounded border p-3 text-sm">
   <summary>Withdraw an unaccepted offer</summary>
   <p className="mt-2">This releases the offered seat without deleting the application or its history.
@@ -234,10 +242,9 @@ function OfferWithdrawal({offerId}:{offerId:string}){
   <form className="mt-3 space-y-3" onSubmit={async event=>{
    event.preventDefault();
    if(!confirmed||reason.trim().length<10){setError("Enter a withdrawal reason and confirm the family notification.");return;}
-   setBusy(true);setError("");
-   try{await withdrawIssuedAdmissionOffer({data:{offerId,reason,confirmed:true}});await router.invalidate();}
-   catch(failure){setError(failure instanceof Error?failure.message:"Unable to withdraw offer");}
-   finally{setBusy(false);}
+   setError("");
+   await mutation.run(()=>withdrawIssuedAdmissionOffer({data:{offerId,reason,confirmed:true}}),{
+    successMessage:"Offer withdrawn. The family will be notified.",commandErrorMessage:"Unable to withdraw offer"});
   }}>
    <label className="block">Reason for withdrawal (internal)
     <textarea required minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}
@@ -248,6 +255,7 @@ function OfferWithdrawal({offerId}:{offerId:string}){
    <button type="submit" disabled={busy||!confirmed||reason.trim().length<10}
     className="rounded border px-3 py-2 disabled:opacity-50">Withdraw offer</button>
    {error&&<p role="alert">{error}</p>}
+   <MutationFeedback state={mutation} pendingMessage="Withdrawing offer..."/>
   </form>
  </details>;
 }
@@ -260,7 +268,9 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
   const [loaded, setLoaded] = useState(false);
   const [chosen, setChosen] = useState("");
   const [transferBlocker,setTransferBlocker]=useState<string|null>(null);
-  const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState(false);
+  const mutation = useMutationFeedback(async () => { await refresh(); await router.invalidate(); });
+  const busy = reading || mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
   // An activated student's eligible classes should be visible immediately.
   // Reload on application change, and never reuse another child's prior choices.
@@ -273,7 +283,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     listEnrollmentPlacements({ data: { applicationId } }).then(result => {
       if (current) { setSections(result.sections); setTransferBlocker(result.transferBlocker); setLoaded(true); }
     }).catch(cause => {
-      if (current) { setError(cause instanceof Error ? cause.message : "Cannot load course placements"); setLoaded(true); }
+      if (current) { setError(mutationErrorMessage(cause, "Cannot load course placements")); setLoaded(true); }
     });
     return () => { current = false; };
   }, [applicationId]);
@@ -284,23 +294,21 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     setLoaded(true);
   }
   async function open() {
-    setBusy(true); setError("");
+    if (busy) return;
+    setReading(true); setError("");
     try { await refresh(); }
-    catch(e) { setError(e instanceof Error ? e.message : "Cannot load course placements"); }
-    finally { setBusy(false); }
+    catch(e) { setError(mutationErrorMessage(e, "Cannot load course placements")); }
+    finally { setReading(false); }
   }
   async function place() {
     if (!chosen || (acceptedOfferId&&!enrollmentActivated&&transferBlocker)) return;
-    setBusy(true); setError("");
-    try {
+    setError("");
+    await mutation.run(async () => {
       if(acceptedOfferId&&!enrollmentActivated)
         await activateOfferedEnrollment({data:{offerId:acceptedOfferId,sectionId:chosen}});
       else await placeEnrolledStudent({ data: { applicationId, sectionId: chosen } });
       setChosen("");
-      await refresh();
-      await router.invalidate();
-    } catch(e) { setError(e instanceof Error ? e.message : "Cannot assign course"); }
-    finally { setBusy(false); }
+    }, { successMessage: "Course placement saved.", commandErrorMessage: "Cannot assign course" });
   }
   return <section className="mt-4 rounded-lg border bg-card p-4" aria-label="Course placement">
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -311,6 +319,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       </button>
     </div>
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
+    <MutationFeedback state={mutation} pendingMessage="Saving course placement..." className="mt-2"/>
     {acceptedOfferId&&!enrollmentActivated&&transferBlocker&&
       <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
         <strong>Receiving-school enrollment blocked:</strong> {transferBlocker}

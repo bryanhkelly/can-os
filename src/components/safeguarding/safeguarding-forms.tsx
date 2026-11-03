@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ export function SafeguardingEvidenceForm({ incidentId, onSaved }: {
       setDescription(""); setDocumentId(""); idempotencyKey.current = "";
       await onSaved(); setOpen(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Evidence was not saved. Do not assume it was recorded; retry with the same details.");
+      setError(mutationErrorMessage(cause, "Evidence was not saved. Do not assume it was recorded; retry with the same details."));
     } finally { setBusy(false); }
   }
 
@@ -94,7 +95,7 @@ export function SafeguardingExternalReportForm({ incidentId, onSaved }: {
       idempotencyKey.current = ""; setOpen(false); setDetails(""); setReference("");
       await onSaved();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The outside action was not recorded. Retry; do not infer submission from an error.");
+      setError(mutationErrorMessage(cause, "The outside action was not recorded. Retry; do not infer submission from an error."));
     } finally { setBusy(false); }
   }
 

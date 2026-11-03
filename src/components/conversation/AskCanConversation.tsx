@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useRef, useState } from "react";
 import {
   confirmAskCanAction,
@@ -39,7 +40,7 @@ export function AskCanConversation() {
         if (active) { setConversationId(newest.id); setMessages(history); }
       }
     }).catch(error => {
-      if (active) setError(error instanceof Error ? error.message : "Could not load conversation history.");
+      if (active) setError(mutationErrorMessage(error, "Could not load conversation history."));
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -51,7 +52,7 @@ export function AskCanConversation() {
         if (!active) return;
         setMessages(rows);
       }).catch(error => {
-        if (active) setError(error instanceof Error ? error.message : "Could not refresh conversation.");
+        if (active) setError(mutationErrorMessage(error, "Could not refresh conversation."));
       });
     }, 15_000);
     return () => { active = false; clearInterval(timer); };
@@ -66,7 +67,7 @@ export function AskCanConversation() {
         setConversationId(id); setMessages(history);
       }
     } catch(error) {
-      if (request === selection.current) setError(error instanceof Error ? error.message : "Could not reopen that conversation.");
+      if (request === selection.current) setError(mutationErrorMessage(error, "Could not reopen that conversation."));
     } finally { if (request === selection.current) setBusy(false); }
   }
 
@@ -88,7 +89,7 @@ export function AskCanConversation() {
       setThreads(previous => [...previous.filter(thread => thread.id !== turn.conversationId),
         { id: turn.conversationId, lastActiveAt: new Date() }]);
     } catch(error) {
-      setError(error instanceof Error ? error.message : "Your message could not be sent. Your draft has been kept.");
+      setError(mutationErrorMessage(error, "Your message could not be sent. Your draft has been kept."));
     } finally {
       setBusy(false);
     }
@@ -110,7 +111,7 @@ export function AskCanConversation() {
         turn.message,
       ]);
     } catch(error) {
-      setError(error instanceof Error ? error.message : "That action could not be completed. It may already be decided.");
+      setError(mutationErrorMessage(error, "That action could not be completed. It may already be decided."));
     } finally {
       setBusy(false);
     }

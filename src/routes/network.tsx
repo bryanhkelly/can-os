@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
@@ -31,37 +33,24 @@ function NetworkSites({ data }: { data: NetworkData }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [timezone, setTimezone] = useState("America/Los_Angeles");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [reasons, setReasons] = useState<Record<string, string>>({});
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true); setError(""); setNotice("");
-    try {
+    await mutation.run(async () => {
       const outcome = await createNetworkSite({ data: { name, slug, timezone } });
-      await router.invalidate();
-      setNotice(outcome.created ? "Location created for your denomination." : "This location already exists.");
       setName(""); setSlug("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to create denomination location");
-    } finally {
-      setBusy(false);
-    }
+      return outcome;
+    }, { successMessage: outcome => outcome.created ? "Location created for your denomination." : "This location already exists.",
+      commandErrorMessage: "Unable to create denomination location." });
   }
 
   async function decide(id: string, decision: "approve" | "reject" | "revoke") {
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await reviewNetworkAffiliation({ data: {
+    await mutation.run(() => reviewNetworkAffiliation({ data: {
         affiliationId: id, decision, reason: reasons[id] ?? "",
-      } });
-      await router.invalidate();
-      setNotice("Affiliation decision recorded.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to review affiliation.");
-    } finally { setBusy(false); }
+      } }), { successMessage: "Affiliation decision recorded.", commandErrorMessage: "Unable to review affiliation." });
   }
 
   return <WorkspaceShell eyebrow="CAN OS · Network partner" title={data.organization.name}
@@ -124,8 +113,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
           </button>
         </div>
       </form>
-      {error && <p className="mt-3 text-sm" role="alert">{error}</p>}
-      {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
+      <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording network change..."/>
     </section>
     <section className="mt-8">
       <h2 className="font-serif text-2xl">Directly operated locations</h2>

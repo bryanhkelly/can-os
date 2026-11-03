@@ -41,6 +41,7 @@ vi.mock("@/components/operations/GuardianPickupPanel", () => ({ GuardianPickupPa
 
 const section = {
   id: "english", title: "English Literature", code: "ENG", subject: "English", description: "Read and discuss.",
+  contentReady: true,
   credits: 1, mode: "hybrid", timezone: "America/Los_Angeles", enrollmentId: "enrollment", enrollmentStatus: "active" as const, withdrawalNotation: null,
   policy: { capacity: 20, prerequisites: [], addDropEndsOn: "2099-01-01", withdrawalEndsOn: "2099-02-01", guardianApprovalRequired: false, meetingKey: null },
 };
@@ -80,6 +81,15 @@ describe("enrolled learning workspace", () => {
     const html = courses({ ...registration, sections: [{ ...section, enrollmentStatus: null }], classwork: [] });
     expect(html).toContain("Course catalog");
     expect(html).toContain("Request class");
+  });
+  it("shows school content readiness before a family starts a class request", () => {
+    state.search = { view: "catalog" };
+    const html = courses({ ...registration, sections: [{ ...section, enrollmentStatus: null, contentReady: false }], classwork: [] });
+    expect(html).toContain("School content setup pending");
+    expect(html).toContain("before enrollment can be approved");
+    expect(html).toContain("a request does not reserve a seat or enroll you");
+    expect(html).toContain("Request class");
+    expect(html).not.toContain("Available to request");
   });
   it("keeps class tabs and connected pages tied to the exact section", () => {
     state.search = { section: "english", tab: "grades" };

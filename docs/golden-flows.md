@@ -203,6 +203,15 @@ Site operations, attendance, family workflow, documents, notifications, audit, m
 
 ### Current cross-role acceptance evidence
 
+Daily attendance and Site Today explain each missing configuration category
+and identify the school registrar as the next actor. Authorized academic-year
+operators receive same-Site/Program links to school-year setup, enrollment or
+delivery setup as appropriate; other staff receive the explanation without
+registrar controls. A missing calendar date must be explicitly classified as
+instructional or non-instructional, never automatically made a school day to
+populate a roster. These advisory handoffs do not grant editing authority or
+prove observed presence.
+
 The `attendance-handoff` integration mode verifies actual registrar, teacher,
 guardian and School-Year Studio endpoints. It covers configured expected
 rosters, absence notifications, guardian excuses, append-only corrections,
@@ -523,6 +532,10 @@ Prove that distributed CAN students can form durable, safe academic peer connect
 - Site, Section, and participant calendar visibility must not bypass these Group membership and scope checks.
 - Session creation, rescheduling, and cancellation write through the shared calendar projection service in the owning workflow's transaction, alongside its audit, domain event, and member notifications.
 - School Experiences derives event status from the canonical CalendarEvent cancellation metadata and displays cancelled events explicitly rather than presenting them as scheduled.
+- Guardian permission cards identify the child as well as the group. Pending
+  student guidance must not imply facilitator approval alone replaces current
+  guardian permission. Student content reports use the standard in-page
+  dialog and bounded reason input, not a browser-native prompt.
 
 ### Proves
 peer-group domain model, membership, moderation/safety, calendar integration, academic context, distributed-network community.

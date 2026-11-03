@@ -1,3 +1,4 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {listStudyGroups,listStudentStudyGroupSections,listStudentStudyGroupClassmates,getStudyGroupDetail,hasStudentStudyGroupGuardian} from "@/modules/study-groups/study-group-queries.functions";
@@ -7,10 +8,10 @@ import {rsvpCanonicalGroupSession as rsvpStudyGroupSession} from "@/modules/stud
 import {createStudentStudyGroup,requestCanonicalGroupMembership,leaveCanonicalGroup} from "@/modules/study-groups/canonical-membership.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {formatTimestamp} from "@/modules/calendar/timezone";
 import {EmptyState,StatusBadge,WorkspaceNotice,WorkspacePanel,WorkspaceShell} from "@/components/workspace";
 import {groupSessionSelectionSchema} from "@/lib/route-search";
+import {ActionDialog} from "@/components/workspace/action-dialog";
 const loadStudyGroups=async()=>{
  const {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled,groups:[],sections:[],hasEnrollmentGuardian:null};
@@ -38,6 +39,8 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
  const [inviteeIds,setInviteeIds]=useState<string[]>([]);
  const [groupTitle,setGroupTitle]=useState(""),[groupDescription,setGroupDescription]=useState("");
  const [rosterLoading,setRosterLoading]=useState(false),[rosterError,setRosterError]=useState("");
+ const [report,setReport]=useState<{groupId:string;postId:string;body:string}|null>(null);
+ const [reportReason,setReportReason]=useState("");
  useEffect(()=>{
   let active=true;
   setClassmates([]);setInviteeIds([]);setRosterError("");
@@ -45,7 +48,7 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
   setRosterLoading(true);
   listStudentStudyGroupClassmates({data:{sectionId}})
    .then(result=>{if(active)setClassmates(result);})
-   .catch(error=>{if(active)setRosterError(error instanceof Error?error.message:"Unable to load classmates.");})
+   .catch(error=>{if(active)setRosterError(mutationErrorMessage(error, "Unable to load classmates."));})
    .finally(()=>{if(active)setRosterLoading(false);});
   return()=>{active=false;};
  },[sectionId]);
@@ -55,7 +58,7 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
   if(!groups.some(g=>g.id===search.group)){setOpenError("This study group is unavailable in your current workspace.");return;}
   let active=true;
   setOpening(true);
-  getStudyGroupDetail({data:{groupId:search.group}}).then(result=>{if(active){setSelected(search.group!);setDetail(result);}}).catch(cause=>{if(active)setOpenError(cause instanceof Error?cause.message:"Unable to open the requested study group");}).finally(()=>{if(active)setOpening(false);});
+  getStudyGroupDetail({data:{groupId:search.group}}).then(result=>{if(active){setSelected(search.group!);setDetail(result);}}).catch(cause=>{if(active)setOpenError(mutationErrorMessage(cause, "Unable to open the requested study group"));}).finally(()=>{if(active)setOpening(false);});
   return ()=>{active=false};
  },[enabled,search.group,search.session,groups]);
  async function refresh(id?:string){if(id)setDetail(await getStudyGroupDetail({data:{groupId:id}}));await router.invalidate();}
@@ -131,8 +134,27 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
  <section aria-label="Available study groups" className="grid gap-3 md:grid-cols-2">{groups.filter(group=>!search.group||group.id===search.group).map(g=><article className="rounded-2xl border bg-card p-5" key={g.id}><p className="text-xs uppercase text-muted-foreground">{g.kind} group</p><h2 className="mt-2 text-xl font-semibold"><Link to="/student/study-groups" search={{group:g.id}} className="hover:underline">{g.title}</Link></h2><p className="mt-2 text-sm">{g.description}</p><div className="mt-3 flex flex-wrap items-center gap-2"><StatusBadge tone={g.membership==="approved"?"success":g.membership==="pending"?"attention":"neutral"}>Membership: {g.membership??"not joined"}</StatusBadge><span className="text-xs text-muted-foreground">Capacity {g.capacity}</span></div><div className="mt-4 flex flex-wrap gap-2">{!search.group&&<Link to="/student/study-groups" search={{group:g.id}} className="rounded-lg border px-3 py-2">Open</Link>}{!g.membership||g.membership==="left"||g.membership==="declined"?<button disabled={busy||!membershipEnabled||!hasEnrollmentGuardian} className="rounded-lg border px-3 py-2 disabled:opacity-40" onClick={()=>action(()=>requestCanonicalGroupMembership({data:{groupId:g.id}}),g.id)}>Request to join</button>:g.membership==="approved"||g.membership==="pending"?<button disabled={busy||!membershipEnabled} className="rounded-lg border px-3 py-2 disabled:opacity-40" onClick={()=>action(()=>leaveCanonicalGroup({data:{groupId:g.id}}),g.id)}>{g.membership==="pending"?"Withdraw request":"Leave"}</button>:null}</div></article>)}</section>
  {!groups.length&&<EmptyState title="No study groups are available for your current enrollment." description="Groups require active program enrollment and, for course groups, matching class enrollment. Contact your school if an expected group is missing."/>}
  {search.session&&detail?.memberStatus==="approved"&&!detail.sessions.some(session=>session.id===search.session)&&<WorkspaceNotice tone="danger">This session is unavailable in the selected study group.</WorkspaceNotice>}
- {detail&&detail.memberStatus!=="approved"&&<WorkspaceNotice>{detail.memberStatus==="pending"?"Your request is awaiting facilitator approval.":"Request membership to access group discussions and sessions."}</WorkspaceNotice>}
- {selected&&detail&&<WorkspacePanel title={detail.group.title}><div className="space-y-4"><StatusBadge tone={detail.memberStatus==="approved"?"success":"attention"}>Membership: {detail.memberStatus??"not joined"}</StatusBadge>{detail.memberStatus==="approved"&&<><h3 className="font-semibold">Sessions</h3>{detail.sessions.map(s=><div className={search.session===s.id?"rounded-lg border-2 border-primary p-3":"rounded-lg border p-3"} key={s.id}><p>{s.title} · {formatTimestamp(s.startsAt,detail.group.timezone)} ({detail.group.timezone}) · {s.agenda}{s.cancelled?" · Cancelled":""}</p><div className="mt-2 flex flex-wrap gap-2">{!s.cancelled&&(["going","maybe","declined"] as const).map(r=><button key={r} disabled={busy||!writesEnabled} className="rounded-lg border px-2 py-1 text-xs disabled:opacity-40" onClick={()=>action(()=>rsvpStudyGroupSession({data:{sessionId:s.id,rsvp:r}}),selected)}>RSVP {r}</button>)}</div></div>)}<h3 className="font-semibold">Discussion</h3><p className="text-xs text-muted-foreground">Posts are visible to approved group members. Report unsafe or inappropriate content for facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly.</p>{detail.posts.map(p=><div className="border-b py-2" key={p.id}><p>{p.body}</p><button disabled={busy||!contentEnabled} className="text-xs underline disabled:opacity-40" onClick={()=>{const reason=window.prompt("Why should this post be reviewed?");if(reason)void action(()=>reportStudyGroupPost({data:{groupId:selected,postId:p.id,reason}}),selected)}}>Report</button></div>)}<textarea aria-label="Study group message" disabled={busy||!contentEnabled} className="w-full rounded-lg border p-3 disabled:opacity-40" value={message} onChange={e=>setMessage(e.target.value)} placeholder="Ask a question or share study tips"/><button disabled={busy||!contentEnabled||!message.trim()} className="rounded-lg border px-3 py-2 disabled:opacity-40" onClick={()=>action(async()=>{await postStudyGroupMessage({data:{groupId:selected,body:message}});setMessage("")},selected)}>Post message</button></>}</div></WorkspacePanel>}
+ {detail&&detail.memberStatus!=="approved"&&<WorkspaceNotice>{detail.memberStatus==="pending"?"Participation requires current guardian permission and facilitator approval. Check with your guardian and facilitator about this pending request.":"Request membership to access group discussions and sessions."}</WorkspaceNotice>}
+ {selected&&detail&&<WorkspacePanel title={detail.group.title}><div className="space-y-4"><StatusBadge tone={detail.memberStatus==="approved"?"success":"attention"}>Membership: {detail.memberStatus??"not joined"}</StatusBadge>{detail.memberStatus==="approved"&&<><h3 className="font-semibold">Sessions</h3>{detail.sessions.map(s=><div className={search.session===s.id?"rounded-lg border-2 border-primary p-3":"rounded-lg border p-3"} key={s.id}><p>{s.title} · {formatTimestamp(s.startsAt,detail.group.timezone)} ({detail.group.timezone}) · {s.agenda}{s.cancelled?" · Cancelled":""}</p><div className="mt-2 flex flex-wrap gap-2">{!s.cancelled&&(["going","maybe","declined"] as const).map(r=><button key={r} disabled={busy||!writesEnabled} className="rounded-lg border px-2 py-1 text-xs disabled:opacity-40" onClick={()=>action(()=>rsvpStudyGroupSession({data:{sessionId:s.id,rsvp:r}}),selected)}>RSVP {r}</button>)}</div></div>)}<h3 className="font-semibold">Discussion</h3><p className="text-xs text-muted-foreground">Posts are visible to approved group members. Report unsafe or inappropriate content for facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly.</p>{detail.posts.map(p=><div className="border-b py-2" key={p.id}><p>{p.body}</p><button disabled={busy||!contentEnabled} className="text-xs underline disabled:opacity-40" onClick={()=>{setReport({groupId:selected,postId:p.id,body:p.body});setReportReason("");}}>Report</button></div>)}<textarea aria-label="Study group message" disabled={busy||!contentEnabled} className="w-full rounded-lg border p-3 disabled:opacity-40" value={message} onChange={e=>setMessage(e.target.value)} placeholder="Ask a question or share study tips"/><button disabled={busy||!contentEnabled||!message.trim()} className="rounded-lg border px-3 py-2 disabled:opacity-40" onClick={()=>action(async()=>{await postStudyGroupMessage({data:{groupId:selected,body:message}});setMessage("")},selected)}>Post message</button></>}</div></WorkspacePanel>}
+ {report&&<ActionDialog open title="Report study group post"
+  description="Explain why this post needs facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly."
+  confirmLabel="Send report" pending={mutation.pending}
+  confirmDisabled={busy||!contentEnabled||reportReason.trim().length<5}
+  onClose={()=>setReport(null)}
+  onConfirm={()=>void mutation.run(()=>reportStudyGroupPost({data:{
+   groupId:report.groupId,postId:report.postId,reason:reportReason,
+  }}),{
+   successMessage:"Your report was sent for facilitator review.",
+   commandErrorMessage:"Unable to report this post.",
+   refresh:()=>refresh(report.groupId),
+  }).then(outcome=>{if(outcome.status==="saved"||outcome.status==="refresh-failed")setReport(null);})}>
+  <blockquote className="rounded border bg-muted p-3 text-sm whitespace-pre-wrap">{report.body}</blockquote>
+  <label className="block text-sm">Reason for reporting
+   <textarea required minLength={5} maxLength={1000} value={reportReason}
+    onChange={event=>setReportReason(event.target.value)} className="mt-1 w-full rounded border p-2"/>
+  </label>
+  <MutationFeedback state={mutation} pendingMessage="Sending report..."/>
+ </ActionDialog>}
  </div>
  </WorkspaceShell>;
 }

@@ -10,7 +10,7 @@ const dateTime = z.string().datetime({ offset: true });
 
 /**
  * Teacher-facing conference workspace: the signed-in teacher's own published
- * series, their slots and upcoming bookings. Reads are scoped to the verified
+ * series, their slots and upcoming/recent bookings. Reads are scoped to the verified
  * actor's person id and site grant; mutations delegate to the conference
  * service, which remains the sole authorization gate.
  */
@@ -37,12 +37,13 @@ export const getTeacherConferences = createServerFn({ method: "GET" }).handler(a
     ))
     .orderBy(asc(schema.conferenceSeries.startsAt)).limit(10);
   const seriesIds = seriesRows.map(row => row.id);
-  const [slotRows, bookingRows] = seriesIds.length === 0 ? [[], []] : await Promise.all([
-    db.select({
+  const recent = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const [slotRows, bookingRows] = await Promise.all([
+    seriesIds.length ? db.select({
       seriesId: schema.conferenceSlots.conferenceSeriesId,
       status: schema.conferenceSlots.status,
     }).from(schema.conferenceSlots)
-      .where(inArray(schema.conferenceSlots.conferenceSeriesId, seriesIds)),
+      .where(inArray(schema.conferenceSlots.conferenceSeriesId, seriesIds)) : Promise.resolve([]),
     db.select({
       id: schema.conferenceBookings.id,
       status: schema.conferenceBookings.status,
@@ -60,10 +61,20 @@ export const getTeacherConferences = createServerFn({ method: "GET" }).handler(a
         eq(schema.conferenceSeries.teacherPersonId, actor.actorPersonId),
         inArray(schema.conferenceSeries.siteId, sites),
         ne(schema.conferenceBookings.status, "cancelled"),
-        gte(schema.conferenceSlots.endsAt, now),
+        gte(schema.conferenceSlots.endsAt, recent),
       ))
-      .orderBy(asc(schema.conferenceSlots.startsAt)).limit(50),
+      .orderBy(asc(schema.conferenceBookings.status), asc(schema.conferenceSlots.startsAt)).limit(50),
   ]);
+  const bookingIds = bookingRows.map(row => row.id);
+  const noteRows = bookingIds.length ? await db.select({
+    id: schema.conferenceNotes.id,
+    bookingId: schema.conferenceNotes.conferenceBookingId,
+    visibility: schema.conferenceNotes.visibility,
+    note: schema.conferenceNotes.note,
+    createdAt: schema.conferenceNotes.createdAt,
+  }).from(schema.conferenceNotes)
+    .where(inArray(schema.conferenceNotes.conferenceBookingId, bookingIds))
+    .orderBy(asc(schema.conferenceNotes.createdAt)) : [];
   return {
     connected: true as const,
     series: seriesRows.map(row => ({
@@ -83,6 +94,12 @@ export const getTeacherConferences = createServerFn({ method: "GET" }).handler(a
       endsAt: row.endsAt.toISOString(),
       seriesTitle: row.seriesTitle,
       studentName: `${row.studentFirstName} ${row.studentLastName}`,
+      notes: noteRows.filter(note => note.bookingId === row.id).map(note => ({
+        id: note.id,
+        visibility: note.visibility,
+        note: note.note,
+        createdAt: note.createdAt.toISOString(),
+      })),
     })),
   };
 });
@@ -90,6 +107,7 @@ export const getTeacherConferences = createServerFn({ method: "GET" }).handler(a
 /** Open a bookable office-hour window. The series always belongs to the signed-in teacher. */
 export const createTeacherConferenceSeries = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
+    seriesId: z.string().uuid().optional(),
     title: z.string().trim().min(3).max(120),
     startsAt: dateTime,
     endsAt: dateTime,
@@ -101,6 +119,7 @@ export const createTeacherConferenceSeries = createServerFn({ method: "POST" })
     if (!siteId) throw new AuthorizationError("site membership");
     const { createConferenceSeries } = await import("@/modules/conferences/conference-service");
     const seriesId = await createConferenceSeries(actor, {
+      ...(data.seriesId ? { seriesId: data.seriesId } : {}),
       siteId,
       teacherPersonId: actor.actorPersonId,
       title: data.title,
@@ -117,6 +136,12 @@ export const completeTeacherConference = createServerFn({ method: "POST" })
     bookingId: z.string().uuid(),
     outcome: z.enum(["held", "no_show"]),
     note: z.string().trim().max(2000).optional(),
+    noteVisibility: z.enum(["staff_private", "family_visible"]).optional(),
+    followUp: z.object({
+      title: z.string().trim().min(3).max(200),
+      description: z.string().trim().max(1500).optional(),
+      dueAt: z.string().datetime({ offset: true }).optional(),
+    }).strict().optional(),
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await teacher();
@@ -125,6 +150,11 @@ export const completeTeacherConference = createServerFn({ method: "POST" })
       bookingId: data.bookingId,
       outcome: data.outcome,
       note: data.note,
+      noteVisibility: data.noteVisibility,
+      followUp: data.followUp ? {
+        ...data.followUp,
+        dueAt: data.followUp.dueAt ? new Date(data.followUp.dueAt) : undefined,
+      } : undefined,
     });
   });
 

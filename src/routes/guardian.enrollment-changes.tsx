@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -33,8 +35,10 @@ function GuardianEnrollmentChanges(){
  const [destinationSchoolContactEmail,setDestinationSchoolContactEmail]=useState("");
  const [intendedLastDay,setIntendedLastDay]=useState("");
  const [recordsReleaseAuthorized,setRecordsReleaseAuthorized]=useState(false);
- const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
- const [notice,setNotice]=useState(""),[error,setError]=useState("");
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState("");
+ const mutation=useMutationFeedback(refresh);
+ const busy=mutation.pending||mutation.refreshFailed;
  async function refresh(){
   const [options,records,published]=await Promise.all([
     getGuardianEnrollmentChangeOptions(),
@@ -69,8 +73,8 @@ function GuardianEnrollmentChanges(){
   const choice=choices.find(choice=>choice.studentPersonId+":"+choice.programId===selected);
   if(!choice||reason.trim().length<10||busy||kind==="transfer"&&(destinationSchoolName.trim().length<3||!recordsReleaseAuthorized))return;
   if(kind==="withdrawal"&&!window.confirm("Request that the school review withdrawal for "+choice.studentName+"? The request does not immediately unenroll the student."))return;
-  setBusy(true);setNotice("");setError("");
-  try{
+  setError("");
+  await mutation.run(async()=>{
    const result=await requestGuardianEnrollmentChange({data:{
     studentPersonId:choice.studentPersonId,programId:choice.programId,kind,reason,
     ...(kind==="transfer"?{
@@ -79,14 +83,12 @@ function GuardianEnrollmentChanges(){
       ...(intendedLastDay?{intendedLastDay}:{}),
     }:{}),
    }});
-   setNotice(result.created
-    ?"Request sent to the school. Enrollment stays active until the registrar completes the official process."
-    :"An open request of this type already exists. The school has your request.");
    setReason("");setDestinationSchoolName("");setDestinationSchoolContactEmail("");setIntendedLastDay("");setRecordsReleaseAuthorized(false);
-   try{await refresh();}
-   catch{setError("Request saved, but its updated status could not be loaded. Reopen this page before submitting again.");}
-  }catch(e){setError(e instanceof Error?e.message:"Unable to submit family request");}
-  finally{setBusy(false);}
+   return result;
+  },{successMessage:result=>result.created
+    ?"Request sent to the school. Enrollment stays active until the registrar completes the official process."
+    :"An open request of this type already exists. The school has your request.",
+    commandErrorMessage:"Unable to submit family request"});
  }
  async function requestDestination(item:Case){
    if(busy||item.kind!=="transfer"||item.destinationApplicationId)return;
@@ -94,19 +96,16 @@ function GuardianEnrollmentChanges(){
    const school=destinations.find(program=>program.id===destinationProgramId);
    if(!school||!destinationConfirmations[item.id])return;
    if(!window.confirm("Send a secure email verification link for "+school.name+"? This requests prospective family application access only; no child record or enrollment is shared."))return;
-   setBusy(true);setError("");setNotice("");
-   try{
-     const result=await requestTransferDestinationFamilyStart({data:{
+   setError("");
+   await mutation.run(()=>requestTransferDestinationFamilyStart({data:{
        originTransferActionId:item.id,destinationProgramId:school.id,
        requestId:crypto.randomUUID(),confirmedDestination:true,
-     }});
-     setNotice(result.alreadyHasAccess
+     }}),{successMessage:result=>result.alreadyHasAccess
        ?"You already have receiving-school account access. Open Apply to school to reuse your verified student's identity and link this transfer."
        :result.requested
        ?"Check your verified family email for a secure sign-in link to "+result.destinationName+". Open it to access the receiving school's application."
-       :"A verification link was already requested recently. Check your email before requesting another.");
-   }catch(e){setError(e instanceof Error?e.message:"Could not request a receiving-school verification link.");}
-   finally{setBusy(false);}
+       :"A verification link was already requested recently. Check your email before requesting another.",
+     commandErrorMessage:"Could not request a receiving-school verification link."});
  }
  const visibleRequests=requests.filter(item=>!selected||item.studentPersonId===selected.split(":")[0]);
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment and family changes"
@@ -114,7 +113,7 @@ function GuardianEnrollmentChanges(){
    actions={<Link to="/guardian" search={{student}} className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
   {loading&&<p className="mt-6" role="status">Checking verified family enrollment…</p>}
   {error&&<p className="mt-6 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-  {notice&&<p className="mt-6 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
+  <MutationFeedback state={mutation} className="mt-6" pendingMessage="Saving family request..."/>
   {!loading&&choices.length===0&&<p className="mt-6 rounded-lg border p-4 text-sm">No active school enrollment is available for a new request. Contact admissions if your child has already transferred or withdrawn.</p>}
   {choices.length>0&&<form onSubmit={event=>void submit(event)} className="mt-6 max-w-2xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="text-lg font-semibold">New request to your school</h2>

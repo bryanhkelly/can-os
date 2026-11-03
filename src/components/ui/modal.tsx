@@ -2,7 +2,8 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/utils";
 
 export function Modal({ open, onClose, label, children, className, initialFocus,
-  dismissOnBackdrop = true, dismissible = true, labelledBy, describedBy, busy }: {
+  dismissOnBackdrop = true, dismissible = true, keepMounted = false,
+  labelledBy, describedBy, busy }: {
   open: boolean;
   onClose: () => void;
   label: string;
@@ -11,6 +12,7 @@ export function Modal({ open, onClose, label, children, className, initialFocus,
   initialFocus?: RefObject<HTMLElement | null>;
   dismissOnBackdrop?: boolean;
   dismissible?: boolean;
+  keepMounted?: boolean;
   labelledBy?: string;
   describedBy?: string;
   busy?: boolean;
@@ -65,6 +67,6 @@ export function Modal({ open, onClose, label, children, className, initialFocus,
       startedOutside.current = false;
     }}
     className={cn("m-auto w-[calc(100%_-_2rem)] max-w-xl max-h-[85dvh] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-2xl backdrop:bg-foreground/40", className)}>
-    {open && children}
+    {(open || keepMounted) && children}
   </dialog>;
 }

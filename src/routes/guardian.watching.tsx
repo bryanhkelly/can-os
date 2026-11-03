@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   getMyWatches,
   getMyWatchDeliveries,
@@ -8,6 +9,8 @@ import {
 } from "@/modules/conversation/ask-can.functions";
 import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
 import { NotificationPreferences } from "@/components/guardian/NotificationPreferences";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 
 export const Route = createFileRoute("/guardian/watching")({
   component: WatchingPage,
@@ -19,14 +22,15 @@ function WatchingPage() {
   const [watches, setWatches] = useState<Watch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [busyId, setBusyId] = useState("");
   const [historyFor, setHistoryFor] = useState("");
-  const [history, setHistory] = useState<Awaited<ReturnType<typeof getMyWatchDeliveries>>>([]);
 
   const load = useCallback(async () => {
     const rows = await getMyWatches();
     setWatches(rows);
+    setError("");
   }, []);
+  const mutation = useMutationFeedback(load);
+  const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
     load()
@@ -35,16 +39,10 @@ function WatchingPage() {
   }, [load]);
 
   async function setStatus(subscriptionId: string, status: "active" | "paused" | "revoked") {
-    setBusyId(subscriptionId);
     setError("");
-    try {
-      await updateWatchStatus({ data: { subscriptionId, status } });
-      await load();
-    } catch {
-      setError("That watch could not be updated.");
-    } finally {
-      setBusyId("");
-    }
+    await mutation.run(() => updateWatchStatus({ data: { subscriptionId, status } }), {
+      successMessage: "Watch updated.", commandErrorMessage: "That watch could not be updated.",
+    });
   }
 
   return (
@@ -54,6 +52,7 @@ function WatchingPage() {
       subtitle="Every standing instruction you've given CAN — inspect it, pause it, or turn it off."
     >
       <NotificationPreferences />
+      <MutationFeedback state={mutation} className="mt-4" pendingMessage="Updating watch..."/>
       <QueryState loading={loading ? "Loading your watches…" : ""} error={error}>
         {watches.length === 0 && (
           <EmptyState
@@ -93,16 +92,14 @@ function WatchingPage() {
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 <button type="button" className="rounded-full border px-3 py-1"
-                  onClick={async () => {
+                  onClick={() => {
                     if (historyFor === watch.id) { setHistoryFor(""); return; }
                     setHistoryFor(watch.id);
-                    try { setHistory(await getMyWatchDeliveries({ data: { subscriptionId: watch.id } })); }
-                    catch { setError("Unable to load delivery history."); }
                   }}>Delivery history</button>
                 {watch.status === "active" && (
                   <button
                     type="button"
-                    disabled={busyId === watch.id}
+                    disabled={busy}
                     onClick={() => setStatus(watch.id, "paused")}
                     className="rounded-full border px-3 py-1 hover:bg-muted disabled:opacity-50"
                   >
@@ -112,7 +109,7 @@ function WatchingPage() {
                 {watch.status === "paused" && (
                   <button
                     type="button"
-                    disabled={busyId === watch.id}
+                    disabled={busy}
                     onClick={() => setStatus(watch.id, "active")}
                     className="rounded-full border px-3 py-1 hover:bg-muted disabled:opacity-50"
                   >
@@ -122,7 +119,7 @@ function WatchingPage() {
                 {(watch.status === "active" || watch.status === "paused") && (
                   <button
                     type="button"
-                    disabled={busyId === watch.id}
+                    disabled={busy}
                     onClick={() => setStatus(watch.id, "revoked")}
                     className="rounded-full border border-amber-500 px-3 py-1 text-amber-600 hover:bg-muted disabled:opacity-50"
                   >
@@ -131,14 +128,7 @@ function WatchingPage() {
                 )}
               </div>
               {watch.status === "active" && <WatchSettings watch={watch} onSaved={load} />}
-              {historyFor === watch.id && <div className="mt-4 border-t pt-3 text-xs">
-                <p className="mb-2 font-semibold">Recent reminder deliveries</p>
-                {history.length === 0 && <p>No history yet.</p>}
-                {history.map(item => <div key={item.id} className="mb-2 rounded border p-2">
-                  {item.kind} · {item.channel} · {item.status} · {new Date(item.createdAt).toLocaleString()}
-                  {item.lastError && <p className="text-amber-600">{item.lastError}</p>}
-                </div>)}
-              </div>}
+              {historyFor === watch.id && <WatchDeliveryHistory subscriptionId={watch.id}/>}
             </article>
           ))}
         </div>
@@ -147,24 +137,40 @@ function WatchingPage() {
   );
 }
 
+function WatchDeliveryHistory({ subscriptionId }: { subscriptionId: string }) {
+  const history = useQuery({ queryKey: ["watch-delivery-history", subscriptionId],
+    queryFn: () => getMyWatchDeliveries({ data: { subscriptionId } }), retry: false });
+  return <div className="mt-4 border-t pt-3 text-xs">
+    <p className="mb-2 font-semibold">Recent reminder deliveries</p>
+    <button type="button" className="mb-2 underline" disabled={history.isFetching}
+      onClick={() => void history.refetch()}>{history.isFetching ? "Refreshing..." : "Refresh delivery status"}</button>
+    <p className="mb-2">Refreshing only reads status; it never resends an update.</p>
+    {history.isPending ? <p role="status">Loading delivery history...</p> :
+      history.isError ? <p role="alert">{mutationErrorMessage(history.error, "Unable to load delivery history.")} Retry using refresh above.</p> :
+      history.data.length === 0 ? <p>No history yet.</p> :
+      history.data.map(item => <div key={item.id} className="mb-2 rounded border p-2">
+        {item.kind} · {item.channel} · {item.label} · {new Date(item.createdAt).toLocaleString()}
+        <p className="mt-1">{item.detail}</p>
+        <p className="mt-1">Next: {item.nextStep}</p>
+        <p className="mt-1">Delivery ID: {item.id}</p>
+        {item.nextAttemptAt && <p>Next attempt: {new Date(item.nextAttemptAt).toLocaleString()}</p>}
+      </div>)}
+  </div>;
+}
+
 function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promise<void> }) {
   const [channel, setChannel] = useState<"in_app" | "email" | "sms">(
     watch.channel === "sms" ? "sms" : watch.channel === "email" ? "email" : "in_app");
   const [first, setFirst] = useState(watch.reminderAfterHours ?? 24);
   const [repeat, setRepeat] = useState(watch.repeatEveryHours ?? 24);
   const [maximum, setMaximum] = useState(watch.maxReminders);
-  const [saving, setSaving] = useState(false);
-  const [note, setNote] = useState("");
+  const mutation = useMutationFeedback(onSaved);
+  const saving = mutation.pending || mutation.refreshFailed;
   async function save() {
-    setSaving(true); setNote("");
-    try {
-      await updateWatchOptions({ data: {
+    await mutation.run(() => updateWatchOptions({ data: {
         subscriptionId: watch.id, channel, remindAfterHours: first,
         repeatEveryHours: repeat, maxReminders: maximum,
-      } });
-      await onSaved(); setNote("Saved.");
-    } catch { setNote("Could not save reminder settings."); }
-    finally { setSaving(false); }
+      } }), { successMessage: "Saved.", commandErrorMessage: "Could not save reminder settings." });
   }
   return <div className="mt-4 grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
     <label>Channel
@@ -191,7 +197,7 @@ function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promis
     <div className="flex items-center gap-2">
       <button type="button" disabled={saving} onClick={() => void save()}
         className="rounded-full bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save</button>
-      <span role="status" className="text-muted-foreground">{note}</span>
+      <MutationFeedback state={mutation} pendingMessage="Saving reminder settings..."/>
     </div>
   </div>;
 }

@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryState } from "@/components/workspace";
@@ -31,7 +32,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
     });
   }
   const error = mutation.isError
-    ? mutation.error instanceof Error ? mutation.error.message : "Unable to change staffing assignment."
+    ? mutationErrorMessage(mutation.error, "Unable to change staffing assignment.")
     : "";
   const notice = mutation.data ? mutation.variables?.action === "appoint"
     ? "Named Section responsibility recorded. It does not certify staff screening, scheduled coverage, or school opening."
@@ -64,7 +65,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
       <button type="button" onClick={retry} disabled={busy} className="ml-3 underline disabled:opacity-50">Refresh staffing</button>
     </p>}
     <QueryState loading={query.isPending ? "Loading class staffing…" : undefined}
-      error={query.isError ? query.error.message : undefined}
+      error={query.isError ? mutationErrorMessage(query.error, "Unable to load class staffing.") : undefined}
       onRetry={retry} retrying={busy}>
     {data && (!data.hasConfiguration ? <p role="status" className="mt-4 rounded border p-3 text-sm">
         Appoint your local Site director first to establish a draft school-operations

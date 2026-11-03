@@ -1,3 +1,6 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
@@ -13,27 +16,39 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
   const router = useRouter();
   const [status,setStatus] = useState<Status|null>(null);
   const [selected,setSelected] = useState<OperatingService[]>([]);
-  const [busy,setBusy] = useState(false);
+  const [refreshing,setRefreshing] = useState(false);
+  const [readFailed,setReadFailed] = useState(false);
   const [error,setError] = useState("");
   const [notice,setNotice] = useState("");
   const [revokeReason,setRevokeReason] = useState("");
   const load = useCallback(async () => {
-    const result = await getHostProgramSiteAuthorizationFn({data:{programId}});
-    setStatus(result);
-    // The first proposal includes the services needed after school opening,
-    // not just the launch gate. Keep a user-edited proposal across refreshes.
-    setSelected(current => current.length ? current.filter(service =>
-      result.canIssueCredit || service !== "credit_issuance") : result.recommendedServices);
+    try {
+      const result = await getHostProgramSiteAuthorizationFn({data:{programId}});
+      setStatus(result);
+      setReadFailed(false);
+      // The first proposal includes the services needed after school opening,
+      // not just the launch gate. Keep a user-edited proposal across refreshes.
+      setSelected(current => current.length ? current.filter(service =>
+        result.canIssueCredit || service !== "credit_issuance") : result.recommendedServices);
+    } catch (cause) {
+      setReadFailed(true);
+      throw cause;
+    }
   },[programId]);
+  const mutation = useMutationFeedback(async () => {
+    await load();
+    await router.invalidate();
+  });
+  const busy = refreshing || mutation.pending || mutation.refreshFailed || readFailed;
   useEffect(()=>{
     let current = true;
     void load().catch(e=>{
-      if(current){setStatus(null);setError(e instanceof Error?e.message:"Unable to load agreement status");}
+      if(current){setStatus(null);setError(mutationErrorMessage(e, "Unable to load agreement status"));}
     });
     return ()=>{current=false;};
   },[load]);
   async function refresh() {
-    setBusy(true);setError("");setNotice("");
+    setRefreshing(true);setError("");setNotice("");
     try {
       await load();
       // Recompute the owning route's academic authority and classroom readiness
@@ -41,27 +56,34 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       await router.invalidate();
     } catch(e) {
       setStatus(null);
-      setError(e instanceof Error?e.message:"Unable to refresh agreement and readiness");
-    } finally { setBusy(false); }
+      setError(mutationErrorMessage(e, "Unable to refresh agreement and readiness"));
+    } finally { setRefreshing(false); }
   }
   async function request() {
-    setBusy(true);setError("");setNotice("");
-    try {
-      await requestProgramSiteAuthorizationFn({data:{programId,services:selected}});
-      await load();await router.invalidate();setNotice("Request recorded for independent CAN institutional review.");
-    } catch(e){setError(e instanceof Error?e.message:"Request failed");}
-    finally{setBusy(false);}
+    setError("");setNotice("");
+    await mutation.run(
+      () => requestProgramSiteAuthorizationFn({data:{programId,services:selected}}),
+      {
+        successMessage: "Request recorded for independent CAN institutional review.",
+        commandErrorMessage: "Request failed",
+        refreshErrorMessage: "The authorization request was recorded, but current agreement and readiness records could not be loaded. Retry the refresh before submitting another request.",
+      },
+    );
   }
   async function revoke() {
     if(!status?.authorization) return;
-    setBusy(true);setError("");setNotice("");
-    try {
-      await revokeProgramSiteAuthorizationFn({data:{
-        authorizationId:status.authorization.id,reason:revokeReason,
-      }});
-      await load();await router.invalidate();setNotice("Operating authorization revoked; new delegated activity is blocked.");
-    }catch(e){setError(e instanceof Error?e.message:"Revocation failed");}
-    finally{setBusy(false);}
+    const authorization=status.authorization;
+    setError("");setNotice("");
+    await mutation.run(
+      () => revokeProgramSiteAuthorizationFn({data:{
+        authorizationId:authorization.id,reason:revokeReason,
+      }}),
+      {
+        successMessage: "Operating authorization revoked; new delegated activity is blocked.",
+        commandErrorMessage: "Revocation failed",
+        refreshErrorMessage: "Operating authorization was revoked, but current agreement and readiness records could not be loaded. Retry the refresh before submitting another change.",
+      },
+    );
   }
   if(status && !status.eligible) return null;
   return <section className="mt-7 rounded-xl border bg-card p-5" aria-label="CAN church institutional authorization">
@@ -71,10 +93,11 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       transferring church ownership. The contract, individual staff grants, school opening
       and safeguarding approvals are independent checks.
     </p>
-    <button type="button" disabled={busy} onClick={()=>void refresh()}
+    <button type="button" disabled={refreshing||mutation.pending||mutation.refreshFailed} onClick={()=>void refresh()}
       className="mt-3 min-h-11 rounded border px-3 py-2 text-sm disabled:opacity-50">
       {busy?"Updating…":"Refresh agreement and readiness"}
     </button>
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Updating agreement and readiness…"/>
     <p className="mt-2 text-xs text-muted-foreground">
       After CAN reviews, renews or withdraws this agreement, refresh to recheck the
       current service authority and academic setup. Only CAN can approve institutional services;
@@ -146,4 +169,3 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     </div>}
   </section>;
 }
-

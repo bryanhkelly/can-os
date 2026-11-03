@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { getExcuseAttachmentDownload } from "@/modules/learning/submission-attachments.functions";
 
@@ -30,7 +31,7 @@ export function ExcuseAttachments({ attendanceEventId, attachments, disabled }: 
           });
           window.location.assign(result.downloadUrl);
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : "Unable to open attachment");
+          setError(mutationErrorMessage(cause, "Unable to open attachment"));
         }
       }}
     >{file.fileName}</button>)}

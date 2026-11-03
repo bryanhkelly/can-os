@@ -1,15 +1,17 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
-import { normalizeClientError } from "./client-error";
+import { normalizeClientError, type ClientError } from "./client-error";
 
-export function sanitizeServerError(error: unknown): Error {
+type ClientSafeError = Pick<ClientError, "code" | "message" | "retryable"> & { name: "ClientSafeError" };
+
+export function sanitizeServerError(error: unknown): ClientSafeError {
   const normalized = normalizeClientError(error);
   if (normalized.kind === "unexpected") console.error("Server function failed", error);
-  // Only these safe fields cross the server-function serialization boundary.
-  return Object.assign(new Error(normalized.message), {
-    name: "ClientSafeError", code: normalized.code,
+  // Start's shallow Error serializer drops custom fields; use a plain safe DTO.
+  return {
+    name: "ClientSafeError", code: normalized.code, message: normalized.message,
     retryable: normalized.retryable,
-  });
+  };
 }
 
 export async function withSafeServerErrors<T>(operation: () => Promise<T>): Promise<T> {

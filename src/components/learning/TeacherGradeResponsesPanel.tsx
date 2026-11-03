@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { getTeacherGradeResponses, resolveTeacherGradeResponse } from "@/modules/learning/teacher-grade-response.functions";
@@ -8,8 +10,8 @@ type Item = TeacherGradeResponseItem;
 
 function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: string, answer: string) => void; selected: boolean }) {
   const [response, setResponse] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const mutation=useMutationFeedback(async()=>{});
+  const busy=mutation.pending||mutation.refreshFailed;
   const [savedResponse, setSavedResponse] = useState<string | null>(null);
   return <article id={"grade-action-"+item.id} className={"rounded-xl border p-4"+(selected?" ring-2 ring-primary":"")}>
     <p className="font-semibold">{item.studentName} · {item.assessmentTitle}</p>
@@ -32,15 +34,12 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
       : <form className="mt-3 space-y-3" onSubmit={async event => {
         event.preventDefault();
         if (busy) return;
-        setBusy(true); setError("");
-        try {
+        await mutation.run(async()=>{
           await resolveTeacherGradeResponse({ data: { actionId: item.id, response } });
           // Preserve the confirmed resolution even if refreshing the queue fails.
           setSavedResponse(response.trim());
-          onSaved(item.id, response.trim());
-        } catch (cause) {
-          setError(cause instanceof Error ? cause.message : "Unable to record the school response.");
-        } finally { setBusy(false); }
+        },{successMessage:"School response recorded.",commandErrorMessage:"Unable to record the school response.",
+          refresh:async()=>onSaved(item.id,response.trim())});
       }}>
         <label className="block text-sm font-semibold">Response to the guardian
           <textarea value={response} onChange={event => setResponse(event.target.value)} required
@@ -52,7 +51,7 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
           {busy ? "Saving…" : "Respond and resolve"}
         </button>
       </form>}
-    {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording school response..."/>
   </article>;
 }
 

@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { safeLoader } from "@/lib/safe-loader";
@@ -35,8 +37,8 @@ function EnrichmentFamilyView({ data }: {
   const [studentSelections, setStudentSelections] = useState<Record<string,string>>({});
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
   const [packageSelections, setPackageSelections] = useState<Record<string,string[]>>({});
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
   const [childFormOpen, setChildFormOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -44,59 +46,54 @@ function EnrichmentFamilyView({ data }: {
   const [gradeLevel, setGradeLevel] = useState("");
 
   async function addChild(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError(""); setNotice("");
-    try {
+    event.preventDefault(); setError("");
+    await mutation.run(async () => {
       const created = await addEnrichmentChild({ data: {
         firstName, lastName, gradeLevel,
         ...(householdId ? { householdId } : {}),
       } });
       if (!householdId) setHouseholdId(created.householdId);
       setChildFormOpen(false); setFirstName(""); setLastName(""); setGradeLevel("");
-      setNotice("Child added to your family. This does not enroll them in CAN Academy.");
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add child.");
-    } finally { setBusy(false); }
+    }, { successMessage: "Child added to your family. This does not enroll them in CAN Academy.",
+      commandErrorMessage: "Could not add child." });
   }
 
   async function register(seasonId: string, permissionVersion: string) {
-    setBusy(true); setError(""); setNotice("");
-    try {
+    setError("");
       const studentProfileId = studentSelections[seasonId] ?? data.family.children[0]?.studentProfileId;
       if (!householdId || !studentProfileId)
-        throw new Error("Choose a child and family household to register.");
+        return setError("Choose a child and family household to register.");
       if (acknowledged[seasonId] !== true)
-        throw new Error("Read and acknowledge the published permission statement.");
+        return setError("Read and acknowledge the published permission statement.");
       const offer = data.catalog.find(item => item.seasonId === seasonId);
-      if (!offer) throw new Error("Offering no longer available");
+      if (!offer) return setError("Offering no longer available");
       const selectedPackageIds = packageSelections[seasonId] ?? [];
       if (offer.packages.some(item => selectedPackageIds.includes(item.id) && !item.available))
-        throw new Error("A selected package has canceled or unavailable sessions");
+        return setError("A selected package has canceled or unavailable sessions");
       if (offer.packages.length && !selectedPackageIds.length)
-        throw new Error("Select at least one camp package or weekly option");
+        return setError("Select at least one camp package or weekly option");
       const selectedPackages = offer.packages.filter(item => selectedPackageIds.includes(item.id));
       const count = selectedPackages.flatMap(item => item.sessionIds);
       if (new Set(count).size !== count.length)
-        throw new Error("Selected package options contain overlapping days");
+        return setError("Selected package options contain overlapping days");
+    await mutation.run(async () => {
       const registered = await registerEnrichmentChild({ data: {
         seasonId, studentProfileId, householdId, permissionVersion, acknowledged: true,
         ...(offer.packages.length ? { selectedPackageIds } : {}),
       } });
-      setNotice(registered.status === "waitlisted"
-        ? "Your child is on the waitlist. No activity fee was charged."
-        : "Registration submitted. Review the status and any fee due below.");
       setAcknowledged(prev => ({ ...prev, [seasonId]: false }));
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to register for this offering.");
-    } finally { setBusy(false); }
+      return registered;
+    }, { successMessage: registered => registered.status === "waitlisted"
+        ? "Your child is on the waitlist. No activity fee was charged."
+        : "Registration submitted. Review the status and any fee due below.",
+      commandErrorMessage: "Unable to register for this offering." });
   }
 
   return <WorkspaceShell eyebrow="CAN OS · Family"
     title="Summer and enrichment programs"
     subtitle="Explore available programs and register your children, whether or not they attend CAN Academy."
     actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
-    {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family registration..."/>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     <section className="mt-6 rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">

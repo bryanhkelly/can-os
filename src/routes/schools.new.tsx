@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { schoolSetupSchema, type SchoolSetupResult } from "@/domain/school-setup";
 import { DomainError } from "@/domain/errors";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export const Route = createFileRoute("/schools/new")({
   server: { handlers: {
@@ -49,6 +50,7 @@ export const Route = createFileRoute("/schools/new")({
 });
 
 function SchoolSetupPage() {
+  const hydrated = useHydrated();
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [timezone, setTimezone] = useState("America/Los_Angeles");
@@ -107,7 +109,7 @@ function SchoolSetupPage() {
       </label>
       <p className="text-sm text-muted-foreground">Each .demo domain creates a separate tenant. External email and SMS are suppressed. This domain is a demo identity, not a live website address; publishing and opening readiness remain separate.</p>
       {mutation.error && <p role="alert" className="text-sm text-destructive">{mutation.error}</p>}
-      <button disabled={mutation.pending} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">
+      <button disabled={!hydrated || mutation.pending} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">
         {mutation.pending ? "Creating school..." : "Create demo school"}
       </button>
     </form>}

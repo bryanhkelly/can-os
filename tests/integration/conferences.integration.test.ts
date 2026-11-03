@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { expectEvidenceFailure, expectMutationEvidence } from "./helpers/mutation-evidence";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
+
+afterEach(() => vi.useRealTimers());
 
 integration("GF39 parent-teacher conferences", () => {
   it("creates slots, authorizes guardian booking, fuses calendar participants, reminds, and records follow-up", async () => {
@@ -211,6 +213,14 @@ integration("GF39 parent-teacher conferences", () => {
       .where(eq(schema.notifications.recipientPersonId, guardian.id));
     expect(reminders.some((n) => n.type === "conference_reminder")).toBe(true);
 
+    await expect(conferences.completeConference(teacherContext, { bookingId, outcome: "held" }))
+      .rejects.toThrow("before the appointment starts");
+    const noShowBooking = await conferences.bookConference(guardianContext, {
+      conferenceSlotId: slots[2]!.id, studentProfileId: student.id,
+    });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2027-11-11T00:00:00Z"));
+
     const completionInput = {
       bookingId,
       outcome: "held" as const,
@@ -218,7 +228,6 @@ integration("GF39 parent-teacher conferences", () => {
       noteVisibility: "family_visible" as const,
       followUp: {
         title: "Check reading goal in two weeks",
-        ownerPersonId: teacher.id,
       },
     };
     for (const writer of ["writeAudit", "emitEvent"] as const) {
@@ -244,6 +253,7 @@ integration("GF39 parent-teacher conferences", () => {
       .where(eq(schema.actions.id, completed.actionId!));
     expect(followUp.subjectType).toBe("student_profile");
     expect(followUp.subjectId).toBe(student.id);
+    expect(followUp.ownerPersonId).toBe(studentPerson.id);
 
     const [completedBooking] = await db.select().from(schema.conferenceBookings)
       .where(eq(schema.conferenceBookings.id, bookingId));
@@ -262,9 +272,6 @@ integration("GF39 parent-teacher conferences", () => {
       expect(JSON.stringify(evidence)).not.toContain(completionInput.note);
       expect(JSON.stringify(evidence)).not.toContain(completionInput.followUp.title);
     }
-    const noShowBooking = await conferences.bookConference(guardianContext, {
-      conferenceSlotId: slots[2]!.id, studentProfileId: student.id,
-    });
     await conferences.completeConference(teacherContext, { bookingId: noShowBooking, outcome: "no_show" });
     await expectMutationEvidence(db, {
       resourceType: "conference_booking", resourceId: noShowBooking, action: "conference.complete",

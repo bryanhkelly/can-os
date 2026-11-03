@@ -6,7 +6,8 @@ import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachm
 import { attachmentAccept, attachmentMimeForFileName } from "@/modules/learning/attachment-mimes";
 import { GuardianPickupPanel } from "@/components/operations/GuardianPickupPanel";
 import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
-import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
 
 // Shared with the server-side excuse attachment validation (attachment-mimes).
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/guardian/attendance")({
   student:typeof search.student==="string"?search.student:undefined,
   attendance:typeof search.attendance==="string"?search.attendance:undefined,
  }),
- component: GuardianAttendancePage,
+ component: () => <GuardianAttendancePage key={JSON.stringify(Route.useSearch())}/>,
 });
 
 type Absence = Awaited<ReturnType<typeof listGuardianEffectiveAbsences>>["absences"][number];
@@ -30,13 +31,11 @@ function GuardianAttendancePage() {
   const requestVersion = useRef(0);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [excuseFiles, setExcuseFiles] = useState<Record<string, File | null>>({});
   const uploads = useRef(new Map<string,{file:File;task:{run:()=>Promise<unknown>}}>());
-  const attaching = useRef(false);
 
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
@@ -59,49 +58,41 @@ function GuardianAttendancePage() {
       } else {
         if (version === requestVersion.current) setDocCounts({});
       }
-    } catch {
-      if (version === requestVersion.current) {
-        setAbsences([]);
-        setError("Sign in with an authorized guardian account to review attendance.");
-      }
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
   }, [student]);
+  const mutation = useMutationFeedback(load);
+  const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
     // Clear drafts when switching children to avoid cross-child form state.
     setReasons({});
     setExcuseFiles({});
     setNotice("");
-    void load();
+    void load().catch(cause => {
+      setAbsences([]);
+      setError(mutationErrorMessage(cause, "Unable to load attendance."));
+    });
   }, [load]);
 
   const submit = async (absence: Absence) => {
-    setBusy(absence.attendanceEventId);
     setNotice("");
     setError("");
-    try {
+    await mutation.run(async () => {
       await submitEffectiveAttendanceExcuse({
         data: { attendanceEventId: absence.attendanceEventId, reason: reasons[absence.attendanceEventId] ?? "" },
       });
-      setNotice(`Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`);
-      await load();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to submit excuse");
-    } finally {
-      setBusy("");
-    }
+    }, { successMessage: `Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`,
+      commandErrorMessage: "Unable to submit excuse" });
   };
 
   const attachDocument = async (absence: Absence) => {
     const file = excuseFiles[absence.attendanceEventId];
-    if (!file || attaching.current) return;
-    attaching.current=true;
-    setBusy(`${absence.attendanceEventId}:attach`);
+    if (!file) return;
     setNotice("");
     setError("");
-    try {
+    await mutation.run(async () => {
       const contentType = excuseAttachmentMime(file.name);
       if (!contentType) throw new Error("Unsupported file type. Use PDF, PNG or JPG.");
       let attempt=uploads.current.get(absence.attendanceEventId);
@@ -116,15 +107,10 @@ function GuardianAttendancePage() {
       }
       await attempt.task.run();
       uploads.current.delete(absence.attendanceEventId);
-      setNotice(`Document attached for ${absence.studentName}.`);
       setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: null }));
       setDocCounts(current => ({ ...current, [absence.attendanceEventId]: (current[absence.attendanceEventId] ?? 0) + 1 }));
-    } catch (cause) {
-      setError(mutationErrorMessage(cause,"Unable to attach document. Retry to finish without uploading the file again."));
-    } finally {
-      attaching.current=false;
-      setBusy("");
-    }
+    }, { successMessage: `Document attached for ${absence.studentName}.`,
+      commandErrorMessage: "Unable to attach document. Retry to finish without uploading the file again." });
   };
 
   const needsExcuse = absences.filter(absence => !absence.excuse &&
@@ -134,6 +120,7 @@ function GuardianAttendancePage() {
     subtitle={`Review recent attendance cases and submit explanations for authorized school review. Submitted excuses do not automatically change attendance.${student?" Showing the selected child.":""}`}
     breadcrumbs={<><Link to="/guardian" search={{student}} className="underline focus-visible:outline-2">Family home</Link><span>/</span><span>Attendance</span></>}>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving attendance information..."/>
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
       {!loading && !error && <>
@@ -186,14 +173,14 @@ function GuardianAttendancePage() {
                     key={`${absence.attendanceEventId}:${docCounts[absence.attendanceEventId] ?? 0}`}
                     type="file"
                     accept={excuseAttachmentAccept}
-                    disabled={busy !== ""}
+                    disabled={busy}
                     className="mt-2 w-full rounded-lg border bg-background p-2 text-xs focus-visible:outline-2 focus-visible:outline-offset-2"
                     onChange={event => setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: event.target.files?.[0] ?? null }))}
                   />
                 </label>
                 <button
                   type="button"
-                  disabled={busy !== "" || !excuseFiles[absence.attendanceEventId]}
+                  disabled={busy || !excuseFiles[absence.attendanceEventId]}
                   className="mt-2 inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50"
                   onClick={() => attachDocument(absence)}
                 >Attach document</button>
@@ -212,7 +199,7 @@ function GuardianAttendancePage() {
               </label>
               <button
                 type="button"
-                disabled={busy !== ""}
+                disabled={busy}
                 className="mt-3 inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50"
                 onClick={() => submit(absence)}
               >Submit excuse</button>

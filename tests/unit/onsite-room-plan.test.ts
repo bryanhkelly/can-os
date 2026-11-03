@@ -3,7 +3,11 @@ import type { AccessContext } from "@/domain/access-context";
 import { submitRoomPlanSchema, effectiveRoomPrimary, assertRoomPrimaryChoice } from "@/domain/onsite-room-plan";
 import { submitOnsiteRoomPlan, reviewOnsiteRoomPlan, getOnsiteRoomPlanning } from "@/modules/operations/onsite-room-plan.server";
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], inserts: [] as Record<string, unknown>[],
-  updates: [] as Record<string, unknown>[], delegate: vi.fn(), reviewer: vi.fn(), safety: vi.fn(), appointed: true }));
+  updates: [] as Record<string, unknown>[], delegate: vi.fn(), reviewer: vi.fn(), safety: vi.fn(),
+  room: vi.fn(), appointed: true }));
+vi.mock("@/modules/operations/site-rooms.server", () => ({
+  requireSiteRoom: state.room, listSiteRooms: async () => [],
+}));
 vi.mock("@/modules/operations/school-opening.server", () => ({
   schoolIdentity: async () => ({ programId:"program", siteId:"site", organizationId:"church", institutionId:"can" }),
   verifyChurchEvidenceSubmitter: vi.fn(), verifyCANSchoolApprover: state.reviewer,
@@ -33,14 +37,24 @@ const actor = () => ({ actorPersonId:"director", role:"site_leader", grantSiteId
   scope:{ organizationIds:["church"], siteIds:["site"], programIds:["program"] } }) as AccessContext;
 const input = () => ({ programId:id(1), sectionId:id(2), periodId:id(3), documentId:id(4), expectedDocumentId:null,
   date:new Date(Date.now()+86400_000).toISOString().slice(0,10), primaryPersonId:id(5), backupPersonId:id(6),
-  roomLabel:"Classroom A", roomCapacity:20, expiresAt:new Date(Date.now()+3*86400_000).toISOString(),
+  roomId:id(7),roomLabel:"Classroom A", roomCapacity:20, expiresAt:new Date(Date.now()+3*86400_000).toISOString(),
   rationale:"The local director has reviewed this room and named adult plan." });
 beforeEach(() => {
   vi.clearAllMocks(); state.inserts=[]; state.updates=[]; state.appointed=true;
+  state.room.mockResolvedValue({id:id(7),name:"Classroom A",capacity:20});
   state.rows=[[{id:"program"}],[{ startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class" }],
     [{timezone:"UTC"}],[{personId:id(5),from:null,through:null}],[],[]];
 });
 describe("room plan submission", () => {
+  it("rejects a room outside the current Site", async () => {
+    state.room.mockRejectedValueOnce(new Error("physical room belonging to this exact Site"));
+    await expect(submitOnsiteRoomPlan(actor(),input())).rejects.toThrow("this exact Site");
+    expect(state.inserts).toEqual([]);
+  });
+  it("does not accept an inflated client occupancy limit", async () => {
+    await expect(submitOnsiteRoomPlan(actor(),{...input(),roomCapacity:99})).rejects.toThrow("Room details changed");
+    expect(state.inserts).toEqual([]);
+  });
   it("creates an unapproved structured plan without claiming physical presence or external evidence", async () => {
     expect(await submitOnsiteRoomPlan(actor(),input())).toMatchObject({ created:true });
     expect(state.inserts[0]).toMatchObject({ storageProvider:"internal_record",
@@ -84,6 +98,12 @@ function prepareReview() {
   return {review,document,can:{...actor(),role:"can_network_steward",actorPersonId:"reviewer"} as AccessContext};
 }
 describe("independent room plan review",()=>{
+  it("rechecks the room's canonical Site and occupancy limit before approving",async()=>{
+    const {review,can}=prepareReview();
+    state.room.mockResolvedValueOnce({id:id(7),name:"Classroom A",capacity:10});
+    await expect(reviewOnsiteRoomPlan(can,review)).rejects.toThrow("room details no longer match");
+    expect(state.updates).toEqual([]);
+  });
   it("checks both adult appointments and safety before approving",async()=>{
     const {review,can}=prepareReview();
     expect(await reviewOnsiteRoomPlan(can,review)).toMatchObject({changed:true});

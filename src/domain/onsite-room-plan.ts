@@ -11,6 +11,7 @@ export const roomPlanBlockSchema = z.object({
 export const submitRoomPlanSchema = roomPlanBlockSchema.extend({
   documentId: uuid, expectedDocumentId: uuid.nullable(),
   primaryPersonId: uuid, backupPersonId: uuid, substitutesForPersonId: uuid.optional(),
+  roomId: uuid,
   roomLabel: z.string().trim().min(2).max(120), roomCapacity: z.number().int().min(1).max(1000),
   expiresAt: z.string().datetime({ offset: true }),
   rationale: z.string().trim().min(10).max(2000),

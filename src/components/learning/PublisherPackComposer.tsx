@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import {
  createAuthoredPublisherPack, getPublisherPackStudio, publishAuthoredPublisherPack,
@@ -21,7 +22,7 @@ function PackDraftEditor({programId,release,courses,onSaved}:{
  async function act(command:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
   try{await command();setNotice(success);await onSaved();}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save publisher pack draft.");}
+  catch(e){setError(mutationErrorMessage(e, "Unable to save publisher pack draft."));}
   finally{setBusy(false);}
  }
  return <section className="mt-3 space-y-3 rounded border p-4" aria-label="Publisher pack draft composer">
@@ -78,7 +79,7 @@ export function PublisherPackComposer({studio,onSaved}:{studio:Studio;onSaved:()
  async function act(command:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
   try{await command();setNotice(success);await onSaved();}
-  catch(e){setError(e instanceof Error?e.message:"Unable to manage publisher pack.");}
+  catch(e){setError(mutationErrorMessage(e, "Unable to manage publisher pack."));}
   finally{setBusy(false);}
  }
  return <section className="space-y-4 rounded border p-5" aria-label="Publisher curriculum packs">

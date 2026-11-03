@@ -5,12 +5,13 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, consentRecords, enrollments, guardianRelationships, people, programs,
-  sections, studentProfiles, terms, sites as siteTable,
+  sections, studentProfiles, terms, sites as siteTable, courseTemplateVersions,
 } from "@/db/schema";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
 import { todayInTimezone } from "@/modules/calendar/timezone";
+import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 
 /** Registrar's canonical Action queue for pending course changes (not a shadow workflow). */
 export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).handler(async () => {
@@ -25,11 +26,13 @@ export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).han
     studentName: people.legalFirstName, studentLastName: people.legalLastName,
     sectionId: sections.id, sectionTitle: sections.title, sectionCode: sections.code,
     sectionSiteId: sections.siteId, sectionProgramId: sections.programId,
+    curriculumStatus: courseTemplateVersions.status, curriculum: courseTemplateVersions.curriculum,
     timezone: siteTable.timezone,
     organizationId: programs.organizationId, schoolYearId: terms.schoolYearId,
     createdAt: actions.createdAt,
   }).from(actions)
     .innerJoin(sections, eq(sections.id, actions.subjectId))
+    .innerJoin(courseTemplateVersions, eq(courseTemplateVersions.id, sections.courseTemplateVersionId))
     .innerJoin(siteTable, eq(siteTable.id, sections.siteId))
     .innerJoin(programs, eq(programs.id, sections.programId))
     .innerJoin(terms, eq(terms.id, sections.termId))
@@ -101,14 +104,16 @@ export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).han
     );
     const today = todayInTimezone(row.timezone);
     const deadline = operation === "withdraw" ? policy.withdrawalEndsOn : policy.addDropEndsOn;
+    const contentReady = row.curriculumStatus === "published" && hasAccessibleFirstLesson(row.curriculum);
     return {
       id: row.id, operation, title: row.title,
       studentName: row.studentName + " " + row.studentLastName,
       sectionTitle: row.sectionTitle, sectionCode: row.sectionCode,
+      sectionId: row.sectionId, contentReady,
       siteId: row.sectionSiteId, programId: row.sectionProgramId,
       programActive, deadline, deadlinePassed: today > deadline,
       guardianState: approvalState,
-      canApprove: programActive && today <= deadline &&
+      canApprove: programActive && today <= deadline && (operation !== "add" || contentReady) &&
         (approvalState === "not_required" || approvalState === "approved"),
       createdAt: row.createdAt.toISOString(),
     };

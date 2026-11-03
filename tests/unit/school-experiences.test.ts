@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 
-const { select, requireActor, setResponseHeader } = vi.hoisted(() => ({
-  select: vi.fn(), requireActor: vi.fn(), setResponseHeader: vi.fn(),
+const { select, requireActor, setResponseHeader, getNotifications } = vi.hoisted(() => ({
+  select: vi.fn(), requireActor: vi.fn(), setResponseHeader: vi.fn(), getNotifications: vi.fn(),
 }));
 vi.mock("@/db/client", () => ({ db: { select } }));
 vi.mock("@/modules/identity/actors.server", () => ({
@@ -10,7 +10,7 @@ vi.mock("@/modules/identity/actors.server", () => ({
   actorSiteIds: (actor: { scope: { siteIds: string[] } }) => actor.scope.siteIds,
 }));
 vi.mock("@tanstack/react-start/server", () => ({ setResponseHeader }));
-vi.mock("@/modules/communication/notification-center.functions", () => ({ getNotifications: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/modules/communication/notification-center.functions", () => ({ getNotifications }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({
     validator() { return this; },
@@ -31,6 +31,8 @@ function rows(data: unknown[]) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("DATABASE_URL", "postgresql://test.invalid/unused-mocked-db");
+  select.mockImplementation(() => rows([]));
+  getNotifications.mockResolvedValue([]);
   requireActor.mockResolvedValue({
     actorPersonId: "student", role: "student",
     scope: { siteIds: ["site"], programIds: ["program"] },
@@ -72,5 +74,29 @@ describe("School Experiences event status", () => {
     expect(result.events.slice(1).every(event => event.status === "scheduled")).toBe(true);
     expect(result.connected).toBe(true);
     expect(setResponseHeader).toHaveBeenCalledWith("Cache-Control", "private, no-store");
+  });
+
+  it("returns only family-visible notes for the authorized guardian query", async () => {
+    requireActor.mockResolvedValue({
+      actorPersonId: "guardian",
+      role: "guardian",
+      scope: { siteIds: ["site"], programIds: ["program"] },
+    });
+    const startsAt = new Date("2029-12-01T12:00:00Z");
+    const noteRow = {
+        id: "note-1", bookingId: "booking-1", studentPersonId: "student-1",
+        status: "held", startsAt, seriesTitle: "Family conference",
+        timezone: "America/Los_Angeles", note: "We agreed on a reading goal.",
+        teacherFirstName: "Taylor", teacherLastName: "Teacher", teacherPreferredName: null,
+      };
+    select.mockImplementation((projection?: Record<string, unknown>) =>
+      rows(projection && "note" in projection ? [noteRow] : []));
+    const result = await getSchoolExperiences();
+    expect(result.recentConferenceNotes).toEqual([{
+      id: "note-1", bookingId: "booking-1", studentPersonId: "student-1",
+      status: "held", startsAt: startsAt.toISOString(), seriesTitle: "Family conference",
+      timezone: "America/Los_Angeles", note: "We agreed on a reading goal.",
+      teacherName: "Taylor Teacher",
+    }]);
   });
 });

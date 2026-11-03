@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { Route } from "@/routes/operations.launch.$programId";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
@@ -47,9 +48,16 @@ function render(data: Snapshot) {
   state.data = { ok: true, data };
   const Page = Route.options.component;
   if (typeof Page !== "function") throw new Error("Missing launch page");
-  return renderToStaticMarkup(<Page />);
+  return renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><Page /></QueryClientProvider>);
 }
 describe("launch staffing presentation", () => {
+  it("includes reusable physical room setup separately from teaching classes", () => {
+    const html = render(snapshot);
+    expect(html).toContain("Physical classrooms");
+    expect(html).toContain("actual rooms at this Site once");
+    expect(html).toContain("does not certify an inspection");
+    expect(html).toContain("Set up your first classroom");
+  });
   it("shows missing policy blockers, catalog requirements and explicit publication confirmation", () => {
     const html = render(snapshot);
     expect(html).toContain("Qualification policy not configured.");
@@ -67,6 +75,16 @@ describe("launch staffing presentation", () => {
     expect(html).toContain("verified, program-scoped institutional staffing-policy publisher");
     expect(html).not.toContain("Publish reviewed requirements");
     expect(html).not.toContain("I confirm these requirements are reviewed");
+  });
+  it("keeps an assigned instructor selectable for canonical coverage repair", () => {
+    const section=snapshot.sections[0]!;
+    const html=render({...snapshot,sections:[{...section,
+      teachers:[{personId:"teacher",first:"Alex",last:"Teacher"}],
+    }]});
+    expect(html).toContain('value="teacher"');
+    expect(html).toContain("Alex Teacher (assigned)");
+    expect(html).toContain("restore missing instructional coverage without duplicating");
+    expect(html).toContain("Qualification policy not configured.");
   });
   it("shows published status without suggesting that publication verifies a teacher", () => {
     const html = render({ ...snapshot, policyPublished: true });

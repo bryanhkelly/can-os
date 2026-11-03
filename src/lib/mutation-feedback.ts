@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeClientError } from "./client-error";
+import { assertRefreshResult } from "./router-refresh";
 
 export type MutationFeedbackState = {
   pending: boolean;
@@ -50,7 +51,7 @@ export function createMutationRunner({ refresh, update }: MutationRunnerOptions)
     inFlight = true;
     update({ pending: true, error: "", notice: savedNotice, refreshFailed: true });
     try {
-      await failedRefresh();
+      assertRefreshResult(await failedRefresh());
       refreshRequired = false;
       failedRefresh = undefined;
       update({ pending: false, error: "", notice: savedNotice, refreshFailed: false });
@@ -90,7 +91,7 @@ export function createMutationRunner({ refresh, update }: MutationRunnerOptions)
         ? options.successMessage(value)
         : options.successMessage;
       try {
-        await (options.refresh ?? refresh)();
+        assertRefreshResult(await (options.refresh ?? refresh)());
       } catch {
         refreshRequired = true;
         failedRefresh = options.refresh ?? refresh;

@@ -1,3 +1,5 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
@@ -28,9 +30,9 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [capacity, setCapacity] = useState(24);
-  const [busy, setBusy] = useState(false);
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [readinessOwners, setReadinessOwners] = useState<Record<string,string>>({});
   const [evidenceSeasonId, setEvidenceSeasonId] = useState("");
   const [scheduleSeasonId, setScheduleSeasonId] = useState("");
@@ -61,43 +63,45 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
 
   async function createDraft(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true); setError(""); setSuccess("");
-    try {
+    setError("");
+    const outcome = await mutation.run(async () => {
       if (!selected) throw new Error("Choose a program in your site");
-      await createExtendedSeasonDraftFn({ data: {
+      return createExtendedSeasonDraftFn({ data: {
         programId: selected.id, offeringName, seasonName, activityType,
         startsOn, endsOn, capacity,
       } });
-      setSuccess("Draft season saved. Registration is not open.");
+    }, {
+      successMessage: "Draft season saved. Registration is not open.",
+      commandErrorMessage: "Unable to save draft season",
+      refreshErrorMessage: "The draft season was saved, but current planning records could not be loaded. Retry the refresh before creating another season.",
+    });
+    if (outcome.status === "saved" || outcome.status === "refresh-failed") {
       setOfferingName(""); setSeasonName("");
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to save draft season");
-    } finally {
-      setBusy(false);
     }
   }
 
   async function publishSeason(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError(""); setSuccess("");
-    try {
+    event.preventDefault(); setError("");
+    const outcome = await mutation.run(async () => {
       if (!publishSeasonId || !operatorConfirmed) throw new Error("Confirm the release responsibility");
       const dollars = Number(feeDollars);
       if (!Number.isFinite(dollars) || dollars < 0 || Math.abs(Math.round(dollars * 100) - dollars * 100) > 1e-6)
         throw new Error("Enter a fee in dollars and cents");
-      await publishExtendedSeasonFn({ data: {
+      return publishExtendedSeasonFn({ data: {
         seasonId: publishSeasonId,
         permissionVersion, permissionText, feeAmountCents: Math.round(dollars * 100),
         ...(packages.length ? { packages } : {}),
         operationalResponsibilityConfirmed: true,
       } });
+    }, {
+      successMessage: "Offering published to the enrichment catalog. Families can now register.",
+      commandErrorMessage: "Unable to publish registration",
+      refreshErrorMessage: "Registration was published, but current planning records could not be loaded. Retry the refresh before making another change.",
+    });
+    if (outcome.status === "saved" || outcome.status === "refresh-failed") {
       setPublishSeasonId(""); setOperatorConfirmed(false); setPackages([]);
       setPermissionText(""); setPermissionVersion("");
-      setSuccess("Offering published to the enrichment catalog. Families can now register.");
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to publish registration");
-    } finally { setBusy(false); }
+    }
   }
 
   async function showRoster(seasonId: string, sessionId: string) {
@@ -107,7 +111,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       const result = await listEnrichmentSessionRoster({data:{seasonId,sessionId}});
       setRoster(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to view session roster");
+      setError(mutationErrorMessage(e, "Unable to view session roster"));
     } finally {setRosterLoading(false);}
   }
 
@@ -143,31 +147,30 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   }
 
   async function assignReadiness(seasonId: string, programId: string) {
-    setBusy(true); setError(""); setSuccess("");
-    try {
+    setError("");
+    await mutation.run(async () => {
       const existing = planning.assignments.find(a => a.seasonId === seasonId);
       const recipientPersonId = readinessOwners[seasonId] ?? existing?.ownerPersonId ?? "";
       if (!recipientPersonId || !planning.operators.some(
         op => op.programId === programId && op.personId === recipientPersonId
       )) throw new Error("Select an eligible site operator");
-      const result = await createExtendedReadinessAssignmentsFn({
+      return createExtendedReadinessAssignmentsFn({
         data: { seasonId, recipientPersonId },
       });
-      setSuccess(result.created ? `Created ${result.created} readiness evidence requests. These are not approvals.`
-        : "All evidence requests already exist; registration remains blocked.");
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to assign evidence requests");
-    } finally {
-      setBusy(false);
-    }
+    }, {
+      successMessage: result => result.created
+        ? `Created ${result.created} readiness evidence requests. These are not approvals.`
+        : "All evidence requests already exist; registration remains blocked.",
+      commandErrorMessage: "Unable to assign evidence requests",
+      refreshErrorMessage: "Evidence requests were saved, but current planning records could not be loaded. Retry the refresh before assigning again.",
+    });
   }
 
   async function saveSessions(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError(""); setSuccess("");
-    try {
+    event.preventDefault(); setError("");
+    const outcome = await mutation.run(async () => {
       if (!scheduleSeasonId) throw new Error("Choose a season");
-      const result = await scheduleExtendedSessionsFn({ data: {
+      return scheduleExtendedSessionsFn({ data: {
         seasonId: scheduleSeasonId,
         fromDate: scheduleFrom,
         throughDate: scheduleThrough,
@@ -177,13 +180,13 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
         location: scheduleLocation,
         ...(scheduleStaffId ? { facilitatorPersonId: scheduleStaffId } : {}),
       } });
-      setSuccess(`Planned ${result.created} new sessions out of ${result.total} matching dates. Registration remains closed.`);
+    }, {
+      successMessage: result => `Planned ${result.created} new sessions out of ${result.total} matching dates. Registration remains closed.`,
+      commandErrorMessage: "Unable to schedule sessions",
+      refreshErrorMessage: "Sessions were scheduled, but current planning records could not be loaded. Retry the refresh before scheduling again.",
+    });
+    if (outcome.status === "saved" || outcome.status === "refresh-failed") {
       setScheduleSeasonId("");
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to schedule sessions");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -195,7 +198,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
         Operating approval, supervision, pickup safeguards and session scheduling are separate steps.
       </p>
       {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
-      {success && <p role="status" className="mt-3 text-sm">{success}</p>}
+      <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving season changes…"/>
       <form onSubmit={createDraft} className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-xs sm:col-span-2">Extended-learning program
           <select className={inputClass} value={programId} onChange={e => setProgramId(e.target.value)} required>

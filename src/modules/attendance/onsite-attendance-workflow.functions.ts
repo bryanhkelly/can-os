@@ -300,8 +300,9 @@ export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:Ac
     .map(e => [e.programId + ":" + e.studentProfileId, e]));
   return {
     date: data.date,
+    canConfigureAcademicYear: hasRegistrarAuthority(actor.role) && actor.capabilities.has("academic_year.manage"),
     programs: programsAtSite.map(p => ({
-      id: p.id, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
+      id: p.id, siteId: p.siteId, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
       expectedDays: coverage.get(p.id)?.expectedDays ?? 0,
       missingCalendarDates: coverage.get(p.id)?.daysWithoutCalendarConfiguration ?? 0,
     })),

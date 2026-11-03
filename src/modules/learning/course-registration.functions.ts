@@ -16,6 +16,7 @@ import { todayInTimezone } from "@/modules/calendar/timezone";
 
 import { EventTypes } from "@/domain/event-types";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 async function studentProfileFor(actor: Actor) {
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  const [profile] = await db.select({ id: s.studentProfiles.id }).from(s.studentProfiles).where(eq(s.studentProfiles.personId, actor.actorPersonId)).limit(1);
@@ -37,6 +38,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
     db.select({ id:s.sections.id, title:s.sections.title, code:s.sections.code, metadata:s.sections.metadata,
       templateId:s.courseTemplates.id, subject:s.courseTemplates.subject, description:s.courseTemplates.description,
       termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn,timezone:s.sites.timezone,
+      curriculumStatus:s.courseTemplateVersions.status,curriculum:s.courseTemplateVersions.curriculum,
     }).from(s.sections)
       .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
       .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
@@ -72,6 +74,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
     const policy=await getSectionRegistrationPolicy(course.id);
     return {
       id:course.id,title:course.title,code:course.code,subject:course.subject,description:course.description,
+      contentReady:course.curriculumStatus==="published"&&hasAccessibleFirstLesson(course.curriculum),
       timezone:course.timezone,
       teachers:teachers.filter(teacher=>teacher.sectionId===course.id).map(teacher=>({
         personId:teacher.personId,name:personDisplayName({ preferredName: teacher.preferredName, legalFirstName: teacher.firstName, legalLastName: teacher.lastName }),

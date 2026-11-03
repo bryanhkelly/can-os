@@ -2,6 +2,7 @@ export * from "./common";
 export * from "./enums";
 export * from "./identity";
 export * from "./organizations";
+export * from "./site-rooms";
 export * from "./academic-time";
 export * from "./academics";
 export * from "./work";

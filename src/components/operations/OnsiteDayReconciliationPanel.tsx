@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { deriveOnsiteDayReconciliation } from "@/domain/onsite-day-reconciliation";
 import type { listExpectedOnsiteRoster } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import {
@@ -20,24 +22,29 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
   const summary=deriveOnsiteDayReconciliation(roster.programs,roster.students);
   const [review,setReview]=useState<Review|null>(null);
   const [loading,setLoading]=useState(true);
-  const [busy,setBusy]=useState(false);
   const [confirmed,setConfirmed]=useState(false);
   const [error,setError]=useState("");
-  const [refresh,setRefresh]=useState(0);
+  const reload=useCallback(async()=>{
+    const response=await getOnsiteDayReview({data:{date}});
+    setReview(response);
+    setError("");
+  },[date]);
+  const mutation=useMutationFeedback(async()=>{
+    setLoading(true);
+    try{await reload();}
+    finally{setLoading(false);}
+  });
+  const busy=mutation.pending||mutation.refreshFailed;
 
   useEffect(()=>{
     let live=true;
     setReview(null);setLoading(true);setConfirmed(false);setError("");
-    void getOnsiteDayReview({data:{date}}).then(response=>{
+    void reload().catch(()=>{
       if(!live)return;
-      setReview(response);setLoading(false);
-    }).catch(()=>{
-      if(!live)return;
-      setLoading(false);
       setError("Unable to check the latest attendance review. No closure status is assumed.");
-    });
+    }).finally(()=>{if(live)setLoading(false);});
     return ()=>{live=false};
-  },[date,roster,refresh,refreshRevision]);
+  },[date,roster,refreshRevision,reload]);
 
   const ready=summary.readyForAttendanceReview &&
     review?.readyForAttendanceReview===true && review.unresolvedIssues===0;
@@ -127,14 +134,17 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
           className="mt-3 rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
           onClick={async()=>{
             if(!ready||busy||!confirmed)return;
-            setBusy(true);setError("");
-            try{
-              await attestOnsiteDayReview({data:{date,confirmedRecordsReviewed:true as const}});
-              setConfirmed(false);setRefresh(n=>n+1);
-            }catch{
-              setError("Review could not be recorded. Refresh attendance and check unresolved issues.");
-            }finally{setBusy(false)}
+            const outcome=await mutation.run(
+              ()=>attestOnsiteDayReview({data:{date,confirmedRecordsReviewed:true as const}}),
+              {
+                successMessage:"Site leader attendance review recorded for this snapshot.",
+                commandErrorMessage:"Review could not be recorded. Refresh attendance and check unresolved issues.",
+                refreshErrorMessage:"The attendance review was recorded, but the latest review status could not be loaded. Retry the refresh before attesting again.",
+              },
+            );
+            if(outcome.status==="saved"||outcome.status==="refresh-failed")setConfirmed(false);
           }}>{busy?"Recording review…":"Record site leader attendance review"}</button>
+        <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording attendance review…"/>
       </>}
     </>}
     <p className="mt-4 text-xs text-muted-foreground">{summary.note}</p>

@@ -19,6 +19,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { DomainError } from "@/domain/errors";
 import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import type { AccessContext } from "@/domain/access-context";
@@ -219,7 +220,7 @@ export async function submitAttendanceExcuse(
       )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
     if (!latest || latest.id !== attendance.id ||
         !["absent", "tardy"].includes(latest.status)) {
-      throw new Error("Attendance conflict: the record was corrected. Refresh before submitting an excuse.");
+      throw new DomainError("ATTENDANCE_CONFLICT", "Attendance conflict: the record was corrected. Refresh before submitting an excuse.");
     }
 
     const [excuse] = await tx
@@ -354,7 +355,7 @@ export async function reviewAttendanceExcuse(
       )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
     if (!latest || latest.id !== record.attendanceEventId ||
         !["absent", "tardy"].includes(latest.status))
-      throw new Error("Attendance conflict: school record changed after this excuse was submitted. Refresh and reconcile.");
+      throw new DomainError("ATTENDANCE_CONFLICT", "Attendance conflict: school record changed after this excuse was submitted. Refresh and reconcile.");
 
     // Preserve event order even when two corrections share one millisecond.
     const reviewedAt = new Date(Math.max(Date.now(), latest.recordedAt.getTime() + 1));
@@ -513,7 +514,7 @@ export async function closeObsoleteAttendanceExcuse(
     if (!current || current.id === record.attendanceEventId)
       throw new Error("This excuse still belongs to the current attendance record; review it instead");
     if (current.id !== input.expectedCurrentEventId)
-      throw new Error("Attendance conflict: the school record changed. Refresh before closing this excuse.");
+      throw new DomainError("ATTENDANCE_CONFLICT", "Attendance conflict: the school record changed. Refresh before closing this excuse.");
     const now = new Date();
     await tx.update(attendanceExcuses).set({
       status: "withdrawn", reviewedByPersonId: context.actorPersonId,
@@ -636,7 +637,7 @@ export async function recordAttendanceRevision(
    .orderBy(desc(attendanceEvents.recordedAt),desc(attendanceEvents.id))
    .limit(1);
   if(input.expectedPreviousEventId!==undefined && (prior?.id??null)!==input.expectedPreviousEventId)
-   throw new Error("Attendance conflict: the school record changed after this entry was prepared. Refresh and review.");
+   throw new DomainError("ATTENDANCE_CONFLICT", "Attendance conflict: the school record changed after this entry was prepared. Refresh and review.");
   if(prior?.status===input.status)return prior.id;
   if(prior?.status==="excused"&&!input.note?.trim())
    throw new Error("Give a reason before changing excused attendance");

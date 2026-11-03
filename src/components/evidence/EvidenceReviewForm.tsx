@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -30,7 +31,7 @@ export function EvidenceReviewForm({
       await onReview(decision, reason);
       setReason("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Evidence review was not recorded");
+      setError(mutationErrorMessage(cause, "Evidence review was not recorded"));
     } finally {
       inFlight.current = false;
       setPending(false);

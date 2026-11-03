@@ -26,6 +26,39 @@ Status: Proposed, binding design guardrails for PR #32 before production migrati
 ## Evolution strategy
 Keep the current pure rules under `src/domain/qualification-policy.ts` as a minimal, fail-closed expression evaluator. Extend via versioned rules and a backend validation registry, not ad-hoc `if (role === ...)` branches. Apply policies at a specific date, with a deterministic evaluator and clear explanation/reasons. Store immutable evaluation snapshots for audit, while calculating current status on demand or via invalidated materialized projections.
 
+## Teacher records and school-selected requirements
+
+Document a teacher's resume/work history, education and degrees, licenses,
+certifications, training and other qualification evidence in the person-owned
+private qualification record. These are reusable facts about the teacher, not
+automatic requirements for every school and not public profile attachments.
+A resume is a self-reported history document, not proof of a degree or license.
+Evidence submission, independent verification, expiration and revocation remain
+separate facts.
+
+Each school, through its authorized academic policy publisher, selects the
+qualifications required for its Programs and teaching roles from the shared
+catalog. Applicable jurisdictional and institutional requirements still apply;
+school choice does not waive them. Different schools may select different
+requirements while evaluating the same teacher's existing evidence. Neither
+an agent nor a seed script should choose a license-versus-degree policy simply
+to make a demo eligible.
+
+Current code supports basic catalog definitions, private PDF/JPEG/PNG evidence,
+claims, independent review and effective-dated Program policies. It does not
+establish a dedicated structured resume editor or specialized degree/license
+validation merely by accepting a catalog entry. The current launch policy
+editor publishes nonempty sets of required qualifications before opening;
+active-Program policy repair requires a separately reviewed migration.
+Missing policy or evidence remains a readiness blocker, not implicit approval.
+
+Synthetic demonstrations use the same records, policies and authorization.
+Simulated evidence must be explicitly labeled and never represented as real
+credentials, legal consent or delivered email. `.demo` shared-code access
+does not depend on working email delivery, and must not silently turn into
+ordinary verified-email ownership. Existing operator-reconciled fixture
+verification must retain its simulated-source audit evidence.
+
 ## Scale acceptance scenarios
 - One instructor teaches across many independent sites without duplicate Person or degree rows; each school applies its own requirements.
 - A region introduces stricter teacher credentials with an effective date; historical reviews remain reproducible.

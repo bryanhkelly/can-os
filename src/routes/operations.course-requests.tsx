@@ -81,6 +81,23 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
             {request.deadlinePassed && (
               <p className="mt-3 text-sm text-amber-700">The registration deadline has passed.</p>
             )}
+            {request.operation === "add" && !request.contentReady && <div className="mt-3 rounded-lg border p-3 text-sm">
+              <p className="font-semibold">Next: school curriculum setup</p>
+              <p>The school's authorized curriculum publisher must provide a published release with at least one student-accessible lesson.
+                The registrar must then use that release for this class. Publishing a newer release alone does not update the class's pinned version.</p>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <Link to="/operations/curriculum" search={{ programId: request.programId }} className="font-semibold underline">Review curriculum releases</Link>
+                <Link to="/operations/launch/$programId" params={{ programId: request.programId }} className="font-semibold underline">Review class setup</Link>
+              </div>
+            </div>}
+            <p className="mt-3 text-sm text-muted-foreground">
+              {!request.programActive ? "Next: registrar reviews the student's Program enrollment." :
+                request.deadlinePassed ? "Next: registrar reviews the expired request; approval is unavailable under the current deadline." :
+                request.operation === "add" && !request.contentReady ? "Approval is blocked until school content is ready." :
+                request.guardianState === "pending" ? "Next: an authorized guardian reviews permission in Family course approvals, then the registrar decides." :
+                request.guardianState === "declined" ? "Guardian permission was declined. The registrar can decline this request; enrollment is unchanged." :
+                "Next: registrar reviews this request. Approval rechecks staffing, capacity, prerequisites, credits and schedule; this is not a readiness certificate."}
+            </p>
             <div className="mt-4 flex gap-3">
               <button type="button" disabled={busy}
                 onClick={() => void decide(request.id, false)}

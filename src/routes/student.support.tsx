@@ -6,6 +6,8 @@ import {getQuickWinActions,requestQuickWinHelp} from "@/modules/actions/student-
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isStudentSupportAction } from "@/modules/actions/student-action-policy";
 import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import {useMutationFeedback} from "@/lib/mutation-feedback";
+import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 
 const loadSupportReferrals=async()=>{
  const viewer=await getSupportViewerRole();
@@ -26,29 +28,23 @@ export const Route=createFileRoute("/student/support")({
 function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuickWinActions>>["actions"]}){
  const router=useRouter();
  const [message,setMessage]=useState("");
- const [busy,setBusy]=useState(false);
- const [notice,setNotice]=useState("");
- const [error,setError]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const relevant=actions.filter(action=>isStudentSupportAction(action.type));
  async function askForHelp(){
-  setBusy(true);setError("");setNotice("");
-  try{
-   await requestQuickWinHelp({data:{message}});
-   setMessage("");
-   await router.invalidate();
-   setNotice("Your support request has been recorded.");
-  }catch(cause){
-   setError(cause instanceof Error?cause.message:"Unable to request support");
-  }finally{setBusy(false);}
+  const result=await mutation.run(()=>requestQuickWinHelp({data:{message}}),{
+   successMessage:"Your support request has been recorded.",
+   commandErrorMessage:"Unable to request support.",
+  });
+  if(result.status==="saved"||result.status==="refresh-failed")setMessage("");
  }
  return <WorkspaceShell eyebrow="CAN OS · Student support" title="Get help and follow through."
   subtitle="Your open support requests and recovery actions appear here. Teachers and support staff manage the private referral and service records in their own workspaces."
   breadcrumbs={<Link to="/student" className="underline">Student Today</Link>}>
-  {error&&<WorkspaceNotice tone="danger" className="mb-5">{error}</WorkspaceNotice>}
-  {notice&&<WorkspaceNotice tone="success" className="mb-5">{notice}</WorkspaceNotice>}
+  <MutationFeedback state={mutation} className="mb-5" pendingMessage="Sending support request..."/>
   <WorkspacePanel title="Ask your school for help">
    <label className="block text-sm">What do you need help with?
-    <textarea value={message} onChange={event=>setMessage(event.target.value)}
+    <textarea disabled={busy} value={message} onChange={event=>setMessage(event.target.value)}
       rows={4} maxLength={1000} className="mt-2 w-full rounded border bg-background p-3"
       placeholder="Describe the schoolwork, learning, or support concern"/>
    </label>
@@ -78,6 +74,29 @@ const destinations=[
  {value:"planning",label:"College and career planning"},
 ] as const;
 const stages=["submitted","accepted","plan_created","in_service","review","closed"] as const;
+export function supportServicesReadyForReview(services:readonly {status:string}[]) {
+ return services.length>0&&services.every(service=>service.status==="completed");
+}
+export function supportNextStep(referral:{stage:string;assignedTo:string;services:readonly {status:string}[]}) {
+ const owner=referral.assignedTo==="Unassigned"?"Site support lead":referral.assignedTo;
+ if(referral.stage==="closed")return "No further action — this referral is closed.";
+ let action:string;
+ switch(referral.stage){
+  case "submitted":action="accept the referral or route it to the correct support function.";break;
+  case "accepted":action="create the support plan with a student goal, intervention and review target.";break;
+  case "plan_created":action="schedule the first support service.";break;
+  case "in_service":
+   action=!referral.services.length?"schedule a support service before requesting review.":
+    supportServicesReadyForReview(referral.services)?"review completed services and record the outcome.":
+     `complete all scheduled services before requesting review (${referral.services.filter(service=>service.status!=="completed").length} remaining).`;
+   break;
+  case "review":action="document the disposition and close the referral.";break;
+  default:action="review the case and continue its support plan.";
+ }
+ return referral.assignedTo==="Unassigned"
+  ?`Next actor: site support lead — assign an active case owner, then ${action}`
+  :`Next actor: ${owner} — ${action}`;
+}
 function SupportPage(){
  const outcome=Route.useLoaderData();
  const search=Route.useSearch();
@@ -101,7 +120,9 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
  const [serviceDate,setServiceDate]=useState("");
  const [serviceKind,setServiceKind]=useState<"tutoring"|"coaching"|"planning"|"learning_support">("coaching");
  const [area,setArea]=useState<"academic"|"learning"|"counselor"|"planning">(()=>referrals.find(item=>item.id===search.referral)?.requestedArea??(role==="counselor"?"counselor":"academic"));
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
+ const [error,setError]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const chosen=referrals.find(r=>r.id===selected);
  useEffect(()=>{
   if(role!=="teacher")return;
@@ -112,10 +133,9 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
  },[role]);
  useEffect(()=>{if(search.assessment){setCategory("academic");setObservations("Academic support requested after review of assignment "+search.assessment+". Please review the assessment evidence and plan targeted assistance.");setIncludeEvidence(true);}},[search.assessment]);
  async function execute(work:()=>Promise<unknown>,success:string) {
-  setBusy(true);setError("");setMessage("");
-  try{await work();await router.invalidate();setMessage(success);setNote("");}
-  catch(e){setError(e instanceof Error?e.message:"Could not save changes");}
-  finally{setBusy(false);}
+  setError("");
+  const result=await mutation.run(work,{successMessage:success,commandErrorMessage:"Could not save changes"});
+  if(result.status==="saved"||result.status==="refresh-failed")setNote("");
  }
  const next=chosen?stages[stages.indexOf(chosen.stage as typeof stages[number])+1]:undefined;
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student support" title="Student support that follows through."
@@ -124,7 +144,7 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
   actions={<StatusBadge tone="info">{referrals.length} referral(s)</StatusBadge>}>
   <p className="mb-5 text-sm">Verified staff role: <strong>{role??"Unavailable"}</strong></p>
   {error&&<WorkspaceNotice tone="danger" className="mb-5">{error}</WorkspaceNotice>}
-  {message&&<WorkspaceNotice tone="success" className="mb-5">{message}</WorkspaceNotice>}
+  <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving support changes..."/>
   {selected&&<Link to={route} search={{}} className="mb-4 inline-block text-sm underline">View all referrals</Link>}
   {selected&&!chosen&&<WorkspaceNotice tone="danger" className="mb-4">This referral is unavailable in your current support workspace.</WorkspaceNotice>}
   <div className="mt-8 grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
@@ -136,6 +156,7 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
       <h3 className="mt-2 text-base font-semibold">{item.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
       <p className="mt-3 text-xs text-muted-foreground">Assigned: {item.assignedTo}</p>
+      <p className="mt-2 text-sm"><strong>{supportNextStep(item)}</strong></p>
       {role==="teacher"&&item.academicRecommendation&&<p className="mt-2 rounded-lg bg-muted p-3 text-xs">Academic update: {item.academicRecommendation}</p>}
      </Link>)}
      {!referrals.length&&<EmptyState title="No support referrals are available in your workspace."/>}
@@ -169,6 +190,7 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
      <p className="mt-3 text-sm font-semibold">{chosen.title}</p>
      <p className="mt-2 text-sm text-muted-foreground">{chosen.description}</p>
      <p className="mt-4 text-xs text-muted-foreground">Current: {chosen.stage.replaceAll("_"," ")} · Owner: {chosen.assignedTo}</p>
+     <p role="status" className="mt-2 text-sm"><strong>{supportNextStep(chosen)}</strong></p>
      <label className="mt-5 block text-sm">Assign to
       <select value={area} onChange={e=>setArea(e.target.value as typeof area)} className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm">
        <option value="academic">Academic Coach</option><option value="learning">Learning Specialist</option><option value="counselor">School Counselor</option><option value="planning">College & Career Advisor</option>
@@ -197,7 +219,14 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
        {service.outcome&&<p className="mt-2 text-xs">Outcome: {service.outcome}</p>}
        {service.status==="scheduled"&&<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3 rounded-lg border border-border px-3 py-2 text-xs">Record completed service using note</button>}
      </div>)}
-     {next&&next!=="plan_created"&&next!=="in_service"?<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>advanceSupportReferral({data:{referralId:chosen.id,nextStage:next,note,area}}),`Referral advanced to ${next.replaceAll("_"," ")}.`)} className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</button>:<p className="mt-4 text-sm font-semibold">{chosen.stage==="closed"?"Referral closed":chosen.stage==="accepted"?"Create the support plan to continue.":"Schedule and complete services before review."}</p>}
+     {next&&next!=="plan_created"&&next!=="in_service"?<>
+      {next==="review"&&!supportServicesReadyForReview(chosen.services)&&
+       <p role="status" className="mt-4 text-sm">Complete every scheduled service before requesting review. The review transition requires at least one completed service.</p>}
+      <button disabled={busy||note.trim().length<3||
+       (next==="review"&&!supportServicesReadyForReview(chosen.services))}
+       onClick={()=>execute(()=>advanceSupportReferral({data:{referralId:chosen.id,nextStage:next,note,area}}),`Referral advanced to ${next.replaceAll("_"," ")}.`)}
+       className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</button>
+     </>:<p className="mt-4 text-sm font-semibold">{chosen.stage==="closed"?"Referral closed":chosen.stage==="accepted"?"Create the support plan to continue.":"Schedule and complete services before review."}</p>}
     </>:<p className="mt-4 text-sm text-muted-foreground">Select a referral from your caseload to accept, plan, monitor or close it.</p>}
    </section>}
   </div>

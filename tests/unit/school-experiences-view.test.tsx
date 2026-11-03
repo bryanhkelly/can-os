@@ -20,7 +20,7 @@ describe("School Experiences calendar status display", () => {
     const html = renderToStaticMarkup(<LiveSchoolExperiences data={{
       connected: true, viewerRole: "student",
       notices: [{ id: "notice-1", title: "Synthetic announcement", body: "Synthetic update.", acknowledged: false }],
-      slots: [], bookings: [],
+      slots: [], bookings: [], recentConferenceNotes: [],
       events: [
         { id: "cancelled", title: "Cancelled assembly", startsAt: "2030-01-01T12:00:00Z", timezone: "UTC", status: "cancelled" },
         { id: "scheduled", title: "Upcoming assembly", startsAt: "2030-01-02T12:00:00Z", timezone: "UTC", status: "scheduled" },
@@ -32,6 +32,6 @@ describe("School Experiences calendar status display", () => {
     expect(html.match(/>Scheduled<\/span>/g)).toHaveLength(1);
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=cancelled"');
     expect(html).toContain("focus-visible:outline-2");
-    expect(html).toContain("min-h-11");
+    expect(html).toContain("min-h-10");
   });
 });

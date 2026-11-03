@@ -1,3 +1,5 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { Eye, Globe2, LockKeyhole, PencilLine } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -145,8 +147,9 @@ function LocalWebsiteCopyEditor({
   const [content, setContent] = useState<SiteLocalContent>(
     data.editingContent ?? emptySiteLocalContent,
   );
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [preparingArtwork, setPreparingArtwork] = useState(false);
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const [error, setError] = useState("");
   useEffect(() => {
     setContent(data.editingContent ?? emptySiteLocalContent);
@@ -154,50 +157,40 @@ function LocalWebsiteCopyEditor({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setBusy(true); setError(""); setNotice("");
-    try {
-      const result = await publishChurchWebsiteContent({
+    if (busy) return;
+    setError("");
+    await mutation.run(() => publishChurchWebsiteContent({
         data: { content, expectedRevision: data.currentRevision,siteId:data.siteId },
-      });
-      setNotice(result.status === "review_required"
+      }), { successMessage: result => result.status === "review_required"
         ? "Protected institutional language was held for CAN review. Previously published church content remains unchanged."
-        : "Church content published. If this Site is publicly active, the new copy is available without separate CAN editorial approval.");
-      await router.invalidate();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save church content.");
-    } finally {
-      setBusy(false);
-    }
+        : "Church content published. If this Site is publicly active, the new copy is available without separate CAN editorial approval.",
+      commandErrorMessage: "Could not save church content." });
   }
 
   async function restore(revision: number) {
-    setBusy(true); setError(""); setNotice("");
-    try {
-      const result = await restoreChurchWebsiteContent({
+    if (busy) return;
+    setError("");
+    await mutation.run(() => restoreChurchWebsiteContent({
         data: { expectedRevision: data.currentRevision, restoreRevision: revision,siteId:data.siteId },
-      });
-      setNotice(result.status === "review_required"
+      }), { successMessage: result => result.status === "review_required"
         ? "Historical copy needs review under current claim rules; existing public content is unchanged."
-        : `Revision ${revision} was restored as a new published revision.`);
-      await router.invalidate();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to restore this revision.");
-    } finally { setBusy(false); }
+        : `Revision ${revision} was restored as a new published revision.`,
+      commandErrorMessage: "Unable to restore this revision." });
   }
 
   async function selectArtwork(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
-    setBusy(true); setError(""); setNotice("");
+    if (!file || busy) return;
+    setPreparingArtwork(true); setError("");
     try {
       const dataUrl = await prepareWebsiteArtwork(file);
       setContent(old => ({ ...old, branding: { ...old.branding, heroImage: {
         dataUrl, altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed",
       } } }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Artwork could not be prepared");
-    } finally { setBusy(false); }
+      setError(mutationErrorMessage(caught, "Artwork could not be prepared"));
+    } finally { setPreparingArtwork(false); }
   }
 
   return <section aria-labelledby="local-copy-title" className="mt-6 rounded-xl border bg-card p-5">
@@ -218,7 +211,7 @@ function LocalWebsiteCopyEditor({
       the last published church copy remains unchanged.
     </p>}
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website content..."/>
     <form onSubmit={event => void submit(event)} className="mt-5 space-y-4">
       <fieldset disabled={busy || !data.canPublish} className="space-y-4 rounded-xl border p-4">
         <legend className="px-2 text-sm font-semibold">Local branding and approved artwork</legend>

@@ -2,7 +2,7 @@ import { db } from "@/db/client";
 import {
 accessAccounts,accountPersonGrants,actions,consentRecords,
 enrollments,guardianRelationships,
-people,programs,sections,sites as siteTable,studentProfiles,terms
+people,programs,sections,sites as siteTable,studentProfiles,terms,courseTemplateVersions
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -14,6 +14,7 @@ import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 import { todayInTimezone } from "@/modules/calendar/timezone";
+import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 
 import { EventTypes } from "@/domain/event-types";
 const CONSENT_TYPE = "course_registration_add_decision";
@@ -33,6 +34,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     id: actions.id, status: actions.status, metadata: actions.metadata,
     ownerPersonId: actions.ownerPersonId, studentProfileId: studentProfiles.id,
     sectionId: sections.id, sectionTitle: sections.title, sectionCode: sections.code,
+    curriculumStatus: courseTemplateVersions.status, curriculum: courseTemplateVersions.curriculum,
     siteId: sections.siteId, programId: sections.programId,
     timezone: siteTable.timezone,
     requestSiteId: actions.siteId, requestProgramId: actions.programId,
@@ -41,6 +43,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     studentName: people.legalFirstName, studentLastName: people.legalLastName,
   }).from(actions)
     .innerJoin(sections, eq(sections.id, actions.subjectId))
+    .innerJoin(courseTemplateVersions, eq(courseTemplateVersions.id, sections.courseTemplateVersionId))
     .innerJoin(siteTable,eq(siteTable.id,sections.siteId))
     .innerJoin(programs, eq(programs.id, sections.programId))
     .innerJoin(terms, eq(terms.id, sections.termId))
@@ -119,6 +122,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
       studentPersonId: row.ownerPersonId,
       sectionTitle: row.sectionTitle,
       sectionCode: row.sectionCode,
+      contentReady: row.curriculumStatus === "published" && hasAccessibleFirstLesson(row.curriculum),
       studentName: row.studentName + " " + row.studentLastName,
       status: row.status,
       myDecision: (latest.get(row.id + ":" + actor.actorPersonId) as string | undefined) ?? null,

@@ -19,6 +19,17 @@ function createHarness(refresh: () => Promise<unknown> = async () => undefined) 
 }
 
 describe("mutation feedback", () => {
+  it.each([{ ok: false }, { isError: true }])("blocks further commands for a failed read outcome", async result => {
+    const refresh = vi.fn().mockResolvedValueOnce(result).mockResolvedValueOnce({ ok: true });
+    const command = vi.fn(async () => "saved");
+    const harness = createHarness(refresh);
+    expect(await harness.run(command, { successMessage, commandErrorMessage })).toEqual({
+      status: "refresh-failed", value: "saved",
+    });
+    expect(await harness.run(command, { successMessage, commandErrorMessage })).toEqual({ status: "refresh-required" });
+    expect(await harness.run.retryRefresh()).toEqual({ status: "refreshed" });
+    expect(command).toHaveBeenCalledOnce();
+  });
   it("reports a command failure without refreshing", async () => {
     const refresh = vi.fn(async () => undefined);
     const harness = createHarness(refresh);

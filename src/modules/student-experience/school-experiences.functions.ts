@@ -5,6 +5,7 @@ import { and, eq, asc, inArray, isNull, ne, notExists, gte, or } from "drizzle-o
 import { z } from "zod";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
+import { personDisplayName } from "@/domain/person-name";
 
 
 
@@ -15,9 +16,10 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   setResponseHeader("Cache-Control","private, no-store");
   const sites=actorSiteIds(actor);
   const viewerRole=actor.role as "student"|"guardian"|"registrar"|"teacher";
-  if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[]};
+  if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[],recentConferenceNotes:[]};
   const [{db},schema,{getNotifications}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("@/modules/communication/notification-center.functions")]);
-  const [events,notices,slots,bookings]=await Promise.all([
+  const recentConferenceCutoff=new Date(Date.now()-30*24*60*60*1000);
+  const [events,notices,slots,bookings,recentConferenceNotes]=await Promise.all([
     db.select().from(schema.calendarEvents)
       .innerJoin(schema.scheduledOccurrences,eq(schema.calendarEvents.scheduledOccurrenceId,schema.scheduledOccurrences.id))
       .where(and(inArray(schema.scheduledOccurrences.siteId,sites),gte(schema.scheduledOccurrences.startsAt,new Date()),isNull(schema.scheduledOccurrences.sectionId),ne(schema.calendarEvents.type,"personal"),ne(schema.calendarEvents.type,"study_group"),or(isNull(schema.scheduledOccurrences.programId),inArray(schema.scheduledOccurrences.programId,actor.scope.programIds??[])),notExists(db.select({id:schema.calendarEventParticipants.id}).from(schema.calendarEventParticipants).where(eq(schema.calendarEventParticipants.calendarEventId,schema.calendarEvents.id)))))
@@ -29,12 +31,20 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
       }))),
     // Reuse the current guardian/student permission filtering on title and body.
     getNotifications(),
-    viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
+    viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status,
+      seriesTitle:schema.conferenceSeries.title,timezone:schema.sites.timezone,
+      legalFirstName:schema.people.legalFirstName,legalLastName:schema.people.legalLastName,preferredName:schema.people.preferredName})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
+      .innerJoin(schema.sites,eq(schema.sites.id,schema.conferenceSeries.siteId))
+      .innerJoin(schema.people,eq(schema.people.id,schema.conferenceSeries.teacherPersonId))
       .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
-    viewerRole==="guardian" ? db.select({id:schema.conferenceBookings.id,slotId:schema.conferenceBookings.conferenceSlotId,studentPersonId:schema.studentProfiles.personId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,seriesId:schema.conferenceSlots.conferenceSeriesId}).from(schema.conferenceBookings)
+    viewerRole==="guardian" ? db.select({id:schema.conferenceBookings.id,slotId:schema.conferenceBookings.conferenceSlotId,studentPersonId:schema.studentProfiles.personId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,seriesId:schema.conferenceSlots.conferenceSeriesId,
+      seriesTitle:schema.conferenceSeries.title,timezone:schema.sites.timezone,
+      legalFirstName:schema.people.legalFirstName,legalLastName:schema.people.legalLastName,preferredName:schema.people.preferredName}).from(schema.conferenceBookings)
       .innerJoin(schema.conferenceSlots,eq(schema.conferenceSlots.id,schema.conferenceBookings.conferenceSlotId))
       .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
+      .innerJoin(schema.sites,eq(schema.sites.id,schema.conferenceSeries.siteId))
+      .innerJoin(schema.people,eq(schema.people.id,schema.conferenceSeries.teacherPersonId))
       .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.id,schema.conferenceBookings.studentProfileId))
       .innerJoin(schema.guardianRelationships,guardianRelationshipPredicate({
         guardianPersonId:actor.actorPersonId,
@@ -51,12 +61,65 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
         eq(schema.programs.siteId,schema.conferenceSeries.siteId),
       ))
       .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),inArray(schema.programs.id,actor.scope.programIds??[]),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
+    viewerRole==="guardian" ? db.select({
+      id:schema.conferenceNotes.id,
+      bookingId:schema.conferenceBookings.id,
+      studentPersonId:schema.studentProfiles.personId,
+      status:schema.conferenceBookings.status,
+      startsAt:schema.conferenceSlots.startsAt,
+      seriesTitle:schema.conferenceSeries.title,
+      timezone:schema.sites.timezone,
+      note:schema.conferenceNotes.note,
+      teacherFirstName:schema.people.legalFirstName,
+      teacherLastName:schema.people.legalLastName,
+      teacherPreferredName:schema.people.preferredName,
+    }).from(schema.conferenceNotes)
+      .innerJoin(schema.conferenceBookings,eq(schema.conferenceBookings.id,schema.conferenceNotes.conferenceBookingId))
+      .innerJoin(schema.conferenceSlots,eq(schema.conferenceSlots.id,schema.conferenceBookings.conferenceSlotId))
+      .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
+      .innerJoin(schema.sites,eq(schema.sites.id,schema.conferenceSeries.siteId))
+      .innerJoin(schema.people,eq(schema.people.id,schema.conferenceSeries.teacherPersonId))
+      .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.id,schema.conferenceBookings.studentProfileId))
+      .innerJoin(schema.guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:actor.actorPersonId,
+        studentPersonId:schema.studentProfiles.personId,
+        access:"academic",
+      }))
+      .innerJoin(schema.enrollments,and(
+        eq(schema.enrollments.studentProfileId,schema.studentProfiles.id),
+        eq(schema.enrollments.kind,"program"),eq(schema.enrollments.status,"active"),
+      ))
+      .innerJoin(schema.programs,and(
+        eq(schema.programs.id,schema.enrollments.programId),
+        eq(schema.programs.status,"active"),
+        eq(schema.programs.siteId,schema.conferenceSeries.siteId),
+      ))
+      .where(and(
+        eq(schema.conferenceNotes.visibility,"family_visible"),
+        eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),
+        inArray(schema.conferenceBookings.status,["held","no_show"]),
+        inArray(schema.conferenceSeries.siteId,sites),
+        inArray(schema.programs.id,actor.scope.programIds??[]),
+        gte(schema.conferenceSlots.endsAt,recentConferenceCutoff),
+      )).orderBy(asc(schema.conferenceSlots.endsAt)).limit(50) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:e.metadata.cancelled===true?"cancelled":"scheduled"})),
     notices:notices.map(n=>({id:n.id,title:n.title,body:n.body??"",acknowledged:n.status==="read"})),
-    slots:slots.map(s=>({id:s.id,seriesId:s.seriesId,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status})),
-    bookings:bookings.map(b=>({...b,startsAt:b.startsAt.toISOString(),endsAt:b.endsAt.toISOString()})),
+    slots:slots.map(s=>({id:s.id,seriesId:s.seriesId,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status,
+      seriesTitle:s.seriesTitle,timezone:s.timezone,teacherName:personDisplayName(s)})),
+    bookings:bookings.map(b=>({id:b.id,slotId:b.slotId,studentPersonId:b.studentPersonId,seriesId:b.seriesId,
+      startsAt:b.startsAt.toISOString(),endsAt:b.endsAt.toISOString(),
+      seriesTitle:b.seriesTitle,timezone:b.timezone,teacherName:personDisplayName(b)})),
+    recentConferenceNotes:recentConferenceNotes.map(note=>({
+      id:note.id,bookingId:note.bookingId,studentPersonId:note.studentPersonId,status:note.status,
+      startsAt:note.startsAt.toISOString(),seriesTitle:note.seriesTitle,timezone:note.timezone,
+      note:note.note,teacherName:personDisplayName({
+        legalFirstName:note.teacherFirstName,
+        legalLastName:note.teacherLastName,
+        preferredName:note.teacherPreferredName,
+      }),
+    })),
   };
 });
 export const bookOfficeHour=createServerFn({method:"POST"})

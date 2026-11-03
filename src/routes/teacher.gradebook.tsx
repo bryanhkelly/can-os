@@ -1,3 +1,5 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { GradebookScoringEditor } from "@/components/learning/GradebookScoringEditor";
 import { GradebookAssessmentComposer } from "@/components/learning/GradebookAssessmentComposer";
 import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
@@ -52,7 +54,12 @@ function TeacherGradebookPage() {
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
  const [notice, setNotice] = useState("");
- const [busy, setBusy] = useState(false);
+ const mutation=useMutationFeedback(async()=>{
+  const refreshed=await getGradebook({data:{sectionId:selected}});
+  setGradebook(refreshed);
+  return refreshed;
+ });
+ const busy=mutation.pending||mutation.refreshFailed;
  const [gradingKey, setGradingKey] = useState("");
  const [detailKey, setDetailKey] = useState("");
  const [score, setScore] = useState("");
@@ -115,10 +122,12 @@ function TeacherGradebookPage() {
   return getGradebook({ data: { sectionId } }).then(result => {
    setGradebook(result);
    setLoading(false);
-  }).catch(() => {
+   return result;
+  }).catch(cause => {
    setGradebook(null);
    setError("Unable to load the gradebook for this section.");
    setLoading(false);
+   throw cause;
   });
  };
 
@@ -168,7 +177,7 @@ function TeacherGradebookPage() {
    try {
    scoreRubric(assessment.rubric, grades);
    } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Enter a valid score for every criterion.");
+   setNotice(mutationErrorMessage(cause, "Enter a valid score for every criterion."));
    return;
    }
    payload.rubricScores = grades;
@@ -177,52 +186,30 @@ function TeacherGradebookPage() {
    if (!score.trim() || !Number.isFinite(value)) { setNotice("Enter a numeric score."); return; }
    payload.score = value;
   }
-  setBusy(true);
   setNotice("");
-  try {
-   await gradeSubmission({ data: payload });
-   if(draftOnly){
-    setNotice("Grading draft saved. The score and feedback have not been released to the student or family.");
-    // Reflect the persisted draft in the queue without closing the review.
-    if(selected){
-     try{
-      const refreshed=await getGradebook({data:{sectionId:selected}});
-      setGradebook(refreshed);
-     }catch{
-      setNotice("Grading draft saved, but the gradebook could not refresh. Reopen this submission to see the saved draft.");
-     }
-    }
-    return;
-   }
-   setNotice("Grade posted.");
+  let refreshed:Gradebook|undefined;
+  const result=await mutation.run(()=>gradeSubmission({data:payload}),{
+   successMessage:draftOnly
+    ?"Grading draft saved. The score and feedback have not been released to the student or family."
+    :"Grade posted.",
+   commandErrorMessage:draftOnly?"Unable to save grading draft.":"Unable to post the grade.",
+   refresh:async()=>{
+    refreshed=await getGradebook({data:{sectionId:selected}});
+    setGradebook(refreshed);
+    return refreshed;
+   },
+  });
+  if(draftOnly||result.status!=="saved"||!refreshed)return;
    setGradingKey("");
    setDetailKey("");
    setScore("");
    setComment("");
    setRubricInputs({});
-   // Refresh the canonical queue before advancing. A classmate may have
-   // submitted new work while the teacher was grading this attempt.
-   if (selected) {
-    try {
-     const refreshed=await getGradebook({data:{sectionId:selected}});
-     setGradebook(refreshed);
      const pending=refreshed.cells.filter(item=>item.status==="submitted"&&item.submissionId!==cell.submissionId);
      const next=pending.find(item=>item.gradingDraft)??pending[0];
      void navigate({search:next
       ?{section:selected,assessment:next.assessmentId,student:next.studentProfileId}
       :{section:selected}});
-    } catch {
-     // Posting succeeded; do not imply the grade failed just because the
-     // follow-up refresh was unavailable.
-     setNotice("Grade posted. Refresh the gradebook to continue reviewing.");
-     void navigate({search:{section:selected}});
-    }
-   }
-  } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : draftOnly?"Unable to save grading draft.":"Unable to post the grade.");
-  } finally {
-   setBusy(false);
-  }
  };
 
  const liveRubricScore = (assessment: Assessment) => liveRubricTotal(assessment.rubric, rubricInputs);
@@ -258,10 +245,9 @@ function TeacherGradebookPage() {
    ...(row.description.trim()?{description:row.description.trim()}:{}),
   }));
   try { validateAssessmentRubric(rubricCriteria,pointsValue); }
-  catch(cause){setNotice(cause instanceof Error?cause.message:"Invalid scoring rubric.");return;}
-  setBusy(true);
+  catch(cause){setNotice(mutationErrorMessage(cause, "Invalid scoring rubric."));return;}
   setNotice("");
-  try {
+  await mutation.run(async()=>{
    const result = await createAssessment({ data: {
     sectionId: selected,
     title,
@@ -276,7 +262,6 @@ function TeacherGradebookPage() {
     ...(releaseAt?{availableAt:new Date(releaseAt).toISOString()}:{}),
     ...(closeAt?{closesAt:new Date(closeAt).toISOString()}:{}),
    } });
-   setNotice(result.status === "published" ? "Assessment published and assigned to enrolled students." : "Assessment saved as a draft.");
    setTitle("");
    setInstructions("");
    setNewRubric([]);
@@ -286,12 +271,10 @@ function TeacherGradebookPage() {
    setReleaseAt("");setCloseAt("");
    setPublishConfirmed(false);
    setCurriculumLessonId("");
-   if (selected) await loadGradebook(selected);
-  } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Unable to create the assessment.");
-  } finally {
-   setBusy(false);
-  }
+   return result;
+  },{successMessage:result=>result.status==="published"
+    ?"Assessment published and assigned to enrolled students.":"Assessment saved as a draft.",
+    commandErrorMessage:"Unable to create the assessment."});
  };
 
  async function changeAssessment(id:string,action:"publish"|"close"|"reopen"|"reschedule"){
@@ -301,26 +284,20 @@ function TeacherGradebookPage() {
     (!savedDueAt||new Date(savedDueAt)<=new Date()))){
    setNotice("Select a future due date first.");return;
   }
-  setBusy(true);setNotice("");
-  try{
-   const result=await manageAssessment({data:{
+  setNotice("");
+  await mutation.run(()=>manageAssessment({data:{
     assessmentId:id,action,
     ...(date?{dueAt:new Date(date+"T23:59:00").toISOString()}:{})
-   }});
-   setNotice("Assessment "+result.status+".");
-   if(selected)await loadGradebook(selected);
-  }catch(cause){setNotice(cause instanceof Error?cause.message:"Unable to update assessment");}
-  finally{setBusy(false);}
+   }}),{successMessage:result=>"Assessment "+result.status+".",
+    commandErrorMessage:"Unable to update assessment"});
  }
  async function returnForRevision(submissionId:string){
-  setBusy(true);setNotice("");
-  try{
+  setNotice("");
+  await mutation.run(async()=>{
    await returnSubmissionForRevision({data:{submissionId}});
-   setNotice("Assignment returned to student for revision.");
    setDetailKey("");
-   if(selected)await loadGradebook(selected);
-  }catch(cause){setNotice(cause instanceof Error?cause.message:"Unable to return assignment");}
-  finally{setBusy(false);}
+  },{successMessage:"Assignment returned to student for revision.",
+    commandErrorMessage:"Unable to return assignment"});
  }
 
  const cellLabel = (cell: Cell | undefined, assessment: Assessment) => {
@@ -350,6 +327,7 @@ function TeacherGradebookPage() {
    {loading && <p className="mt-8 text-sm" role="status">Loading gradebook…</p>}
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
    {notice && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
+   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving gradebook changes..."/>
    {!loading && !error && sections.length === 0 && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
 
    {!loading && !error && gradebook?.connected && gradebook.section && <>
@@ -401,7 +379,7 @@ function TeacherGradebookPage() {
           dueDate={assessmentDueDates[assessment.id]??""}
           onDueDateChange={value=>setAssessmentDueDates(current=>({...current,[assessment.id]:value}))}
           onAction={action=>void changeAssessment(assessment.id,action)}
-          onDraftSaved={async()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");await loadGradebook(selected);}}
+          onDraftSaved={()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");return loadGradebook(selected);}}
           onScheduleSaved={()=>loadGradebook(selected)}/>)}
        </tr>
       </thead>
@@ -410,7 +388,6 @@ function TeacherGradebookPage() {
         <th className="p-3 text-left font-semibold">{student.displayName}</th>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map((assessment, colIndex) => {
          const cell = cellFor(student.studentProfileId, assessment.id);
-         const key = `${student.studentProfileId}:${assessment.id}`;
          const label = cellLabel(cell, assessment);
          const gradeable = cell?.status === "submitted";
          const reviewable = !!cell && (cell.status === "graded" || cell.status === "returned");

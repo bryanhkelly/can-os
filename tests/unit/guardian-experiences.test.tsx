@@ -41,8 +41,13 @@ const guardianData = {
   viewerRole: "guardian" as const,
   events: [],
   notices: [],
-  slots: [{ id: "slot-1", seriesId: "series-1", startsAt: "2027-11-10T22:00:00.000Z", endsAt: "2027-11-10T22:20:00.000Z", status: "available" }],
-  bookings: [{ id: "booking-1", slotId: "slot-2", studentPersonId: "student-1", seriesId: "series-1", startsAt: "2027-11-11T22:00:00.000Z", endsAt: "2027-11-11T22:20:00.000Z" }],
+  slots: [{ id: "slot-1", seriesId: "series-1", startsAt: "2027-11-10T22:00:00.000Z", endsAt: "2027-11-10T22:20:00.000Z", status: "available",
+    seriesTitle:"Synthetic office hours",teacherName:"Synthetic Teacher",timezone:"America/Los_Angeles" }],
+  recentConferenceNotes: [{ id: "note-1", bookingId: "booking-1", studentPersonId: "student-1",
+    status: "held", startsAt: "2027-11-09T22:00:00.000Z", seriesTitle: "Synthetic office hours",
+    timezone: "America/Los_Angeles", note: "We agreed on a reading goal.", teacherName: "Synthetic Teacher" }],
+  bookings: [{ id: "booking-1", slotId: "slot-2", studentPersonId: "student-1", seriesId: "series-1", startsAt: "2027-11-11T22:00:00.000Z", endsAt: "2027-11-11T22:20:00.000Z",
+    seriesTitle:"Synthetic office hours",teacherName:"Synthetic Teacher",timezone:"America/Los_Angeles" }],
 };
 
 beforeEach(() => {
@@ -74,7 +79,12 @@ describe("guardian office-hour cancellation", () => {
     const html = renderToStaticMarkup(<LiveSchoolExperiences data={guardianData} />);
     expect(html).toContain('aria-label="Cancel appointment"');
     expect(html).not.toContain("Coming soon");
-    expect(html).not.toMatch(/<button[^>]*disabled[^>]*aria-label="Cancel appointment"/);
+    expect(html).not.toMatch(/<button\b(?=[^>]*\saria-label="Cancel appointment")(?=[^>]*\sdisabled(?:=""|(?=\s|>)))[^>]*>/);
     expect(html).toContain("Cancel appointment");
+    expect(html).toContain("Synthetic office hours");
+    expect(html).toContain("Synthetic Teacher");
+    expect(html).toContain("America/Los_Angeles");
+    expect(html).toContain("Recent conference notes");
+    expect(html).toContain("We agreed on a reading goal.");
   });
 });

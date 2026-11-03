@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 
 /** Explicitly sandbox imported markup: never inject into the CAN application DOM. */
@@ -16,7 +17,7 @@ export function CommonCartridgeStaticLesson({programId,sectionId,resourceId}:{
      const result=await readCommonCartridgeStaticLesson({data:{programId,sectionId,resourceId}});
      setHtml(result.html);
     }catch(cause){
-     setHtml(null);setError(cause instanceof Error?cause.message:"Unable to open lesson");
+     setHtml(null);setError(mutationErrorMessage(cause, "Unable to open lesson"));
     }finally{setLoading(false);}
    }}>{loading?"Opening lesson…":"Open static lesson"}</button>
   {error&&<p role="alert">{error}</p>}

@@ -19,7 +19,7 @@ describe("reusable workflow presentation", () => {
     const html = renderToStaticMarkup(<MutationFeedback state={{...idle,error:"Unable to save"}}
       pendingMessage="Saving..." successAction={<a href="#saved">Saved record</a>}/>);
     expect(html).toContain('role="alert"');
-    expect(html).toContain("No change was completed.");
+    expect(html).toContain("The command could not be confirmed.");
     expect(html).not.toContain("Saved record");
   });
   it("preserves a real saved-record link on refresh failure and avoids a second success announcement", () => {

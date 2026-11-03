@@ -1,22 +1,25 @@
-import { useState } from "react";
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { useRef, useState } from "react";
 import { getReceivingSchoolTransferTranscript } from "@/modules/enrollment/transfer-records-handoff.functions";
 
 export function ReceivingTransferTranscript({applicationId,consentRequested}:{
  applicationId:string;consentRequested:boolean;
 }){
  const [busy,setBusy]=useState(false);
+ const inFlight=useRef(false);
  const [error,setError]=useState("");
  const [result,setResult]=useState<Awaited<ReturnType<typeof getReceivingSchoolTransferTranscript>>|null>(null);
  async function open(){
-  if(busy||!consentRequested)return;
+  if(inFlight.current||!consentRequested)return;
+  inFlight.current=true;
   setBusy(true);setError("");
   try{
    const record=await getReceivingSchoolTransferTranscript({data:{applicationId}});
    setResult(record);
   }catch(e){
    setResult(null);
-   setError(e instanceof Error?e.message:"The receiving school is not authorized to view this transcript.");
-  }finally{setBusy(false);}
+   setError(mutationErrorMessage(e, "The receiving school is not authorized to view this transcript."));
+  }finally{inFlight.current=false;setBusy(false);}
  }
  return <section className="mt-3 rounded-lg border bg-background p-3" aria-label="Released official transfer transcript">
   <h4 className="font-semibold">Originating school's official transcript</h4>

@@ -19,7 +19,7 @@ export function GradebookAssessmentHeader({
   dueDate: string;
   onDueDateChange: (value: string) => void;
   onAction: (action: Action) => void;
-  onDraftSaved: () => Promise<void>;
+  onDraftSaved: () => Promise<unknown>;
   onScheduleSaved: () => Promise<unknown>;
 }) {
   return (

@@ -71,8 +71,12 @@ integration("canonical room-plan lifecycle",()=>{
             siteIds:role==="registrar"?[site!.id]:[],programIds:role==="registrar"?[program!.id]:[]}} as AccessContext;
       }
       const host=actor("registrar",0),reviewer=actor("can_network_steward",1);
+      const rooms=await tx.insert(s.siteRooms).values([
+        {siteId:site!.id,name:"Classroom A",capacity:20},
+        {siteId:site!.id,name:"Classroom B",capacity:20},
+      ]).returning();
       const input={programId:program!.id,sectionId:section!.id,periodId:period!.id,date,documentId:crypto.randomUUID(),expectedDocumentId:null,
-        primaryPersonId:people[2]!.id,backupPersonId:people[3]!.id,roomLabel:"Classroom A",roomCapacity:20,
+        primaryPersonId:people[2]!.id,backupPersonId:people[3]!.id,roomId:rooms[0]!.id,roomLabel:"Classroom A",roomCapacity:20,
         expiresAt:new Date(Date.now()+3*86400_000).toISOString(),rationale:"Synthetic room and named adult plan for isolated verification."};
       await expect(submitOnsiteRoomPlan(host,input)).rejects.toThrow("current scheduled instructional Section");
       await tx.update(s.academicCalendarDays).set({type:"instructional",instructionalMinutes:60}).where(and(eq(s.academicCalendarDays.calendarDate,date),inArray(s.academicCalendarDays.academicCalendarId,calendarIds)));
@@ -86,7 +90,8 @@ integration("canonical room-plan lifecycle",()=>{
       expect(await reviewOnsiteRoomPlan(reviewer,review)).toMatchObject({changed:true});
       expect(parseVerifiedRoomPlan(await read(input.documentId),scope)).not.toBeNull();
       expect(await reviewOnsiteRoomPlan(reviewer,review)).toMatchObject({changed:false});
-      const replacement={...input,documentId:crypto.randomUUID(),expectedDocumentId:input.documentId,roomLabel:"Classroom B"};
+      const replacement={...input,documentId:crypto.randomUUID(),expectedDocumentId:input.documentId,
+        roomId:rooms[1]!.id,roomLabel:"Classroom B"};
       expect(await submitOnsiteRoomPlan(host,replacement)).toMatchObject({created:true});
       expect(parseVerifiedRoomPlan(await read(input.documentId),scope)).toBeNull();
       expect(parseVerifiedRoomPlan(await read(replacement.documentId),scope)).toBeNull();

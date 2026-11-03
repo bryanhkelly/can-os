@@ -12,7 +12,9 @@ import {WorkspaceShell,StatusBadge,WorkspaceNotice} from "@/components/workspace
 import {useHydrated} from "@/lib/use-hydrated";
 import {createPrivateUploadTask,documentUploadPolicy} from "@/platform/storage/private-upload";
 import {attachmentAccept,attachmentMimeForFileName as attachmentMime} from "@/modules/learning/attachment-mimes";
-import {mutationErrorMessage} from "@/lib/mutation-feedback";
+import {mutationErrorMessage,useMutationFeedback} from "@/lib/mutation-feedback";
+import {MutationFeedback} from "@/components/workspace/mutation-feedback";
+import {useStudentDisplayPreferences} from "@/components/shell/WorkspaceSession";
 
 const loadAssignments=()=>getAssignments();
 export const Route=createFileRoute("/student/assignments")({
@@ -32,15 +34,17 @@ type AssignmentData=Awaited<ReturnType<typeof loadAssignments>>;
 function StudentAssignments(){
  const result=Route.useLoaderData();
  const {filter="all",assessment,section}=Route.useSearch();
+ const preferences=useStudentDisplayPreferences();
  if(!result.ok)return <LoaderFailure eyebrow="CAN OS · Student" title="Your assignments" outcome={result}/>;
- return <StudentAssignmentsView key={JSON.stringify([filter,assessment,section])} data={result.data}/>;
+ return <StudentAssignmentsView key={JSON.stringify([filter,assessment,section,preferences.showCompletedAssignments])} data={result.data} showCompleted={preferences.showCompletedAssignments}/>;
 }
-function StudentAssignmentsView({data}:{data:AssignmentData}){
+function StudentAssignmentsView({data,showCompleted}:{data:AssignmentData;showCompleted:boolean}){
  const {connected,assignments}=data;
  const router=useRouter();
  const {filter="all",assessment,section}=Route.useSearch();
- const [busy,setBusy]=useState(false);
- const [notice,setNotice]=useState("");
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
+ const notice=mutation.notice;
  const [progress,setProgress]=useState("");
  const [submittedReceipt,setSubmittedReceipt]=useState<string|null>(null);
  const [error,setError]=useState("");
@@ -53,9 +57,10 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const uploads=useRef(new Map<string,Map<File,{run:()=>Promise<unknown>}>>());
  const hydrated=useHydrated();
  useEffect(()=>{
-  if(error||notice)feedbackRef.current?.focus();
- },[error,notice]);
- const items=assignments.filter(item=>(!section||item.sectionId===section)&&(
+  if(error||notice||mutation.error)feedbackRef.current?.focus();
+ },[error,notice,mutation.error]);
+ const items=assignments.filter(item=>(!section||item.sectionId===section)&&
+  (filter!=="all"||showCompleted||item.assessmentId===assessment||!["submitted","graded"].includes(item.status??""))&&(
   filter==="all"||
   (filter==="todo"&&(!item.status||item.status==="assigned"||item.status==="returned"))||
   (filter==="missing"&&item.timeliness==="missing")||
@@ -106,8 +111,9 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   }
   saving.current=true;
   saveGeneration.current++;
-  setBusy(true);setError("");setNotice("");setProgress("Saving your draft...");
+  setError("");setProgress("Saving your draft...");
   try{
+   await mutation.run(async()=>{
    const work={
     files:pendingFiles,
     saveDraft:()=>saveAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}}),
@@ -141,23 +147,24 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      return saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}});
     }});
     setSubmittedReceipt(receipt.submissionId);
-    setNotice("Your assignment has been submitted. Receipt: "+receipt.submissionId);
+    return receipt.submissionId;
    }else{
     await saveAssignmentWork(work);
     setDraftStatus("saved");
-    setNotice("Draft and attached files saved. You can return to continue before submitting.");
+    return null;
    }
-   try{
+   },{
+    successMessage:receipt=>receipt?"Your assignment has been submitted. Receipt: "+receipt:
+     "Draft and attached files saved. You can return to continue before submitting.",
+    commandErrorMessage:(submitFinal?"Unable to confirm assignment submission.":"Unable to confirm draft save.")+
+     " Your response and pending files are retained; review the current status before retrying.",
+    refresh:async()=>{
     const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
     setAttachments(updatedFiles.attachments);
     await router.invalidate();
-   }catch{
-    setNotice(current=>current+" The latest view could not load. Reload to review your saved work.");
-   }
-  }catch(cause){
-   const message=mutationErrorMessage(cause,submitFinal?"Unable to submit assignment":"Unable to save draft");
-   setError(message+" Your assignment has not been confirmed as submitted. Your response and pending files are retained; correct the problem and retry.");
-  }finally{saving.current=false;setBusy(false);setProgress("");}
+    },
+   });
+  }finally{saving.current=false;setProgress("");}
  }
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
   subtitle="Read instructions, save your response, submit work and follow through on feedback."
@@ -176,6 +183,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     .map(([key,label])=><Link key={key} to="/student/assignments" search={{filter:key,section}} aria-current={filter===key?"page":undefined}
      className={"rounded-full border px-4 py-2 text-xs font-semibold "+(filter===key?"bg-foreground text-background":"bg-card")}>{label}</Link>)}
   </nav>
+  {!showCompleted&&filter==="all"&&<p role="status" className="mt-4 text-sm text-muted-foreground">Completed assignments are hidden by your display preference. Use Submitted or Feedback to review them; direct assignment links remain available.</p>}
   <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]">
    <section aria-label="Assignments" className="space-y-3">
     {!items.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No assignments in this view.</p>}
@@ -236,14 +244,14 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      {chosen.revisionFeedbackSubmissionId&&<SubmissionAnnotations
        key={chosen.revisionFeedbackSubmissionId} submissionId={chosen.revisionFeedbackSubmissionId}/>}
      <AssignmentConversation key={`conversation-${chosen.assessmentId}`} assessmentId={chosen.assessmentId}/>
-     {chosen.attempts.length>1&&<AssignmentAttemptHistory key={chosen.assessmentId} assessmentId={chosen.assessmentId}/>}
+     {chosen.attempts.length>1&&<AssignmentAttemptHistory key={JSON.stringify([chosen.assessmentId,chosen.attempts])} assessmentId={chosen.assessmentId}/>}
      {attachments.length>0&&<div className="mt-4 rounded-lg border p-3"><p className="font-semibold text-sm">Attached files</p>{attachments.map(file=><button type="button" key={file.documentId}
       className="mt-1 block text-xs underline" onClick={async()=>{
        if(!chosen)return;
        try{
         const result=await getSubmissionAttachmentDownload({data:{assessmentId:chosen.assessmentId,documentId:file.documentId}});
         window.location.assign(result.downloadUrl);
-       }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open attachment")}
+       }catch(cause){setError(mutationErrorMessage(cause, "Unable to open attachment"))}
       }}>{file.fileName}</button>)}</div>}
      {editable?<div className="mt-6" aria-busy={busy}>
       <label className="text-sm font-semibold">Your response (optional when submitting a file)
@@ -264,9 +272,10 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
       <button type="button" disabled={!hydrated||busy||!canSubmit} onClick={()=>saveWork(true)}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">{busy?"Saving assignment...":"Submit assignment"}</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
-     {busy&&<p role="status" className="mt-4 text-sm">{progress}</p>}
      {error&&<WorkspaceNotice ref={feedbackRef} tone="danger" className="mt-4">{error}</WorkspaceNotice>}
-     {notice&&<WorkspaceNotice ref={feedbackRef} tone="success" className="mt-4">{notice}</WorkspaceNotice>}
+     <div tabIndex={-1} ref={feedbackRef} className="mt-4">
+      <MutationFeedback state={mutation} pendingMessage={progress||"Saving assignment..."}/>
+     </div>
     </article>}
    </section>
   </div>

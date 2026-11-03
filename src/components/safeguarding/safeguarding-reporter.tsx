@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState, type FormEvent } from "react";
 import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,7 @@ export function SafeguardingReporter({ workspace, reload }: {
       idempotencyKey.current = ""; setFactualObservation(""); setImmediateActions("");
       await reload();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The concern was not recorded. Use the offline procedure and retry without assuming success.");
+      setError(mutationErrorMessage(cause, "The concern was not recorded. Use the offline procedure and retry without assuming success."));
     } finally { setBusy(false); }
   }
 

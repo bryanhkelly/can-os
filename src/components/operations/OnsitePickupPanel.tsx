@@ -1,5 +1,6 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StatusBadge, WorkspacePanel } from "@/components/workspace";
+import { MutationFeedback, StatusBadge, WorkspacePanel } from "@/components/workspace";
 import {
   createPickupCustodyHold,
   getOnsitePickupRoster,
@@ -17,16 +18,14 @@ const keyFor = (student: Student) => student.programId + ":" + student.studentPr
 /** Staff-only custody surface. Every command revalidates authority server-side. */
 export function OnsitePickupPanel({ date, onChanged }: {
   date: string;
-  onChanged?: () => void;
+  onChanged?: () => Promise<void> | void;
 }) {
   const [roster, setRoster] = useState<Roster | null>(null);
   // Preserve the server idempotency identity if a witnessed custody command
   // succeeds but its response is lost. A second click must not invent a new event.
   const pendingMutationIds = useRef(new Map<string, string>());
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [evidence, setEvidence] = useState<Record<string, string>>({});
   const [verifiedNames, setVerifiedNames] = useState<Record<string, string>>({});
@@ -48,51 +47,63 @@ export function OnsitePickupPanel({ date, onChanged }: {
       setRoster(await getOnsitePickupRoster({ data: { date } }));
     } catch (cause) {
       setRoster(null);
-      setError(cause instanceof Error ? cause.message : "Unable to load the verified pickup roster");
+      setError(mutationErrorMessage(cause, "Unable to load the verified pickup roster"));
+      throw cause;
     } finally {
       setLoading(false);
     }
   }, [date]);
+  const mutation = useMutationFeedback(async () => {
+    await load();
+    await onChanged?.();
+  });
+  const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
     setSelected({});
     setEvidence({});
     setVerifiedNames({});
-    setNotice("");
     pendingMutationIds.current.clear(); // Never carry observation IDs across dates.
-    void load();
+    void load().catch(() => {});
   }, [load]);
 
   async function run(key: string, message: string, command: (mutationId: string) => Promise<unknown>) {
     if (busy) return;
     const mutationId = pendingMutationIds.current.get(key) ?? crypto.randomUUID();
     pendingMutationIds.current.set(key, mutationId);
-    setBusy(key);
     setError("");
-    setNotice("");
-    try {
-      await command(mutationId);
+    const outcome=await mutation.run(()=>command(mutationId),{
+      successMessage:message,
+      commandErrorMessage:"Pickup command could not be confirmed.",
+      refreshErrorMessage:"The pickup command was accepted, but the verified roster could not be refreshed. Retry the refresh before recording another event.",
+    });
+    if(outcome.status==="saved"){
       // Only a confirmed response retires an idempotency identity. A subsequent
       // independent observed event may then receive its own new request ID.
       pendingMutationIds.current.delete(key);
-      setNotice(message);
-      await load();
-      onChanged?.();
-    } catch (cause) {
+    }else if(outcome.status==="failed"){
       // Server writes may have committed before a network error. Keep this ID
       // for a same-payload retry rather than creating a second child event.
-      setError((cause instanceof Error ? cause.message : "Pickup command could not be confirmed") +
+      setError((mutationErrorMessage(outcome.error, "Pickup command could not be confirmed")) +
         " The result may be saved. Refresh the roster and retry with identical details; the retry will reuse the original request ID.");
-    } finally {
-      setBusy("");
     }
+  }
+  async function retryRefresh(){
+    const outcome=await mutation.retryRefresh();
+    if(outcome.status==="refreshed"){
+      for(const key of pendingMutationIds.current.keys())pendingMutationIds.current.delete(key);
+      setError("");
+    }
+    return outcome;
   }
 
   return <WorkspacePanel id="pickup" title="Verified pickup & custody release"
     description="Match the adult to current family authority, verify identity, and personally witness the handoff. A denied attempt is not a release. Custody disputes require verified staff-directed family contact, not a broadcast."
     className="mt-9">
-    {notice && <p role="status" className="mb-4 rounded border p-3 text-sm">{notice}</p>}
     {error && <p role="alert" className="mb-4 rounded border p-3 text-sm">{error}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh}} className="mb-4" pendingMessage="Updating verified pickup records…"/>
+    <button type="button" disabled={loading||busy} onClick={()=>void load().catch(()=>{})}
+      className="mb-4 rounded border px-3 py-2 text-sm disabled:opacity-50">Refresh verified roster</button>
     {loading && <p role="status" className="text-sm">Loading family release authority…</p>}
     {!loading && roster && <>
       <p className="mb-5 text-xs text-muted-foreground">{roster.note}</p>

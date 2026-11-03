@@ -135,6 +135,24 @@
   --topbar-height: 3rem;
 }
 
+[data-density="compact"] main {
+  padding: var(--shell-pad);
+}
+
+[data-density="compact"] [aria-label="Workspace top bar"] {
+  padding-block: 0.5rem;
+}
+
+[data-reduce-motion="true"],
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 .dark {
   --background: #101728;
   --stone-warm: #182238;

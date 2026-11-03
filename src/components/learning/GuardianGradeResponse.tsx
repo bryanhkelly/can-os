@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useEffect, useState } from "react";
 import {
   getGuardianGradeResponse, requestGuardianGradeResponse,
@@ -12,11 +14,15 @@ type ResponseState = Awaited<ReturnType<typeof getGuardianGradeResponse>>["respo
 export function GuardianGradeResponse({ submissionId }: { submissionId: string }) {
   const [current, setCurrent] = useState<ResponseState>(null);
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [savedRequest, setSavedRequest] = useState(false);
+  const mutation=useMutationFeedback(async()=>{
+    const updated=await getGuardianGradeResponse({data:{submissionId}});
+    setCurrent(updated.response);
+    setSavedRequest(Boolean(updated.response));
+  });
+  const busy=mutation.pending||mutation.refreshFailed;
 
   useEffect(() => {
     let live = true;
@@ -30,7 +36,11 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
   }, [submissionId]);
 
   async function refresh() {
-    if (busy || loading) return;
+    if (mutation.pending || loading) return;
+    if (mutation.refreshFailed) {
+      await mutation.retryRefresh();
+      return;
+    }
     setLoading(true); setError("");
     try {
       const result = await getGuardianGradeResponse({ data: { submissionId } });
@@ -43,29 +53,22 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
 
   async function request(event: React.FormEvent) {
     event.preventDefault();
-    setError(""); setNotice(""); setBusy(true);
-    try {
+    setError("");
+    await mutation.run(async()=>{
       const result = await requestGuardianGradeResponse({ data: { submissionId, message } });
       // The write has succeeded: a transient status-read failure must not
       // invite the family to submit a second request.
       setSavedRequest(true);
-      setNotice(result.created ? "Your question was sent to the school." : "Your existing question is already recorded.");
       setMessage("");
-      try {
-        const updated = await getGuardianGradeResponse({ data: { submissionId } });
-        setCurrent(updated.response);
-      } catch {
-        setError("Your question was saved, but its status could not be refreshed. Use Refresh school response to check it.");
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to submit your question.");
-    } finally { setBusy(false); }
+      return result;
+    },{successMessage:result=>result.created?"Your question was sent to the school.":"Your existing question is already recorded.",
+      commandErrorMessage:"Unable to submit your question."});
   }
 
   return <section className="mt-5 rounded-lg border p-4" aria-label="School grade follow-up">
     <h3 className="font-semibold">Ask the school about this grade</h3>
     <p className="mt-1 text-xs text-muted-foreground">Your question creates a school follow-up. It does not change the grade.</p>
-    <button type="button" onClick={() => void refresh()} disabled={busy || loading}
+    <button type="button" onClick={() => void refresh()} disabled={mutation.pending || loading}
       className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
       {loading ? "Checking…" : "Refresh school response"}
     </button>
@@ -90,7 +93,7 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
         </button>
       </form>}
     {error && <p className="mt-3 text-sm" role="alert">{error}</p>}
-    {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Sending school follow-up..."/>
   </section>;
 }
 

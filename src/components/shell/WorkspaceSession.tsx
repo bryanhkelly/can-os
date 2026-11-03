@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
+import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
 
 const WorkspaceSessionContext = createContext<WorkspaceSessionResult | null>(null);
 
@@ -83,4 +84,11 @@ export function useWorkspaceSession() {
   const value = useContext(WorkspaceSessionContext);
   if (!value) throw new Error("Workspace session provider is required.");
   return value;
+}
+
+export function useStudentDisplayPreferences() {
+  const {session}=useWorkspaceSession();
+  return session?.authenticated && session.role==="student"
+    ? session.studentPreferences ?? defaultStudentDisplayPreferences
+    : defaultStudentDisplayPreferences;
 }

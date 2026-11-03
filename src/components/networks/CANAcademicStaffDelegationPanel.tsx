@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
 import {
   delegateCANAcademicProgramStaffFn,
@@ -18,7 +19,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
     setDesk(await listCANAcademicProgramStaffFn({data:{programId}}));
   },[programId]);
   useEffect(()=>{void load().catch(e=>setError(
-    e instanceof Error?e.message:"Unable to load verified CAN staff"
+    mutationErrorMessage(e, "Unable to load verified CAN staff")
   ));},[load]);
   const grant=async(event:React.FormEvent)=>{
     event.preventDefault();
@@ -32,7 +33,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
       }});
       await load();
       setNotice(result.created?"Scoped CAN academic staff grant recorded.":"The same scoped staff grant already exists.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to delegate CAN staff");}
+    }catch(cause){setError(mutationErrorMessage(cause, "Unable to delegate CAN staff"));}
     finally{setBusy(false);}
   };
   const revoke=async(roleAssignmentId:string)=>{
@@ -40,7 +41,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
     try{
       await revokeCANAcademicProgramStaffFn({data:{roleAssignmentId,reason}});
       await load();setNotice("Scoped CAN academic staff grant revoked.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to revoke staff");}
+    }catch(cause){setError(mutationErrorMessage(cause, "Unable to revoke staff"));}
     finally{setBusy(false);}
   };
   const field="mt-1 block w-full rounded border bg-background p-2 text-sm";

@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {useEffect,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
 import {getLaunchAcademicYearPlan,prepareLaunchAcademicYear} from "@/modules/programs/launch-year-preparation.functions";
@@ -31,24 +33,28 @@ export function ReviewAcademicYear({plan,onReload}:{plan:Plan;onReload?:()=>void
   plan.gradeScales.find(scale=>scale.name==="Standard A–F")?.id??"standard");
  const [structure,setStructure]=useState(plan.recommendedStructure);
  const [weekdays,setWeekdays]=useState([1,2,3,4,5]);
- const [minutes,setMinutes]=useState(390),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [minutes,setMinutes]=useState(390);
  const [saved,setSaved]=useState(false);
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const existing=plan.years.find(year=>year.id===yearId);
  const dates=existing??plan.suggested;
  const proposed=schoolYearStructure(dates.startsOn,dates.endsOn,structure);
  async function prepare(){
   if(busy)return;
-  setBusy(true);setError("");
-  try{
-   await prepareLaunchAcademicYear({data:{programId:plan.programId,
+  const outcome=await mutation.run(
+   ()=>prepareLaunchAcademicYear({data:{programId:plan.programId,
     ...(yearId?{schoolYearId:yearId}:{}),
     ...(scaleId==="standard"?{useStandardGradeScale:true}:{gradeScaleId:scaleId}),
     structure,instructionalDays:{weekdays,instructionalMinutes:minutes},
-   }});
-   setSaved(true);
-   try{await router.invalidate();}catch{setError("The server accepted the academic setup command, but updated records could not be loaded. Reload the launch to verify the saved year; do not submit a duplicate.");}
-  }catch(cause){setError(cause instanceof Error?cause.message:"Academic setup could not be saved. Retry to resume the same records.");}
-  finally{setBusy(false);}
+   }}),
+   {
+    successMessage:"Academic setup saved. Review the current school-year records before creating a classroom.",
+    commandErrorMessage:"Academic setup could not be saved. Retry to resume the same records.",
+    refreshErrorMessage:"The server accepted the academic setup command, but updated records could not be loaded. Retry the refresh to verify the saved year; do not submit a duplicate.",
+   },
+  );
+  if(outcome.status==="saved"||outcome.status==="refresh-failed")setSaved(true);
  }
  return <section id="launch-academic-year" aria-label="Prepare your academic year" className="mt-5 rounded-xl border bg-card p-5">
   <p className="text-xs font-semibold uppercase text-muted-foreground">School preparation · Academic year</p>
@@ -77,7 +83,7 @@ export function ReviewAcademicYear({plan,onReload}:{plan:Plan;onReload?:()=>void
    </div>
   </details>
   <p className="mt-3 text-xs text-muted-foreground">Existing calendar exceptions stay unchanged. Review local holidays and onsite schedules before activating the year. This preparation does not authorize school opening.</p>
-  {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
+  <MutationFeedback state={mutation} className="mt-3" pendingMessage="Preparing your academic year…"/>
   {saved?<div role="status" className="mt-4 rounded border p-3 text-sm"><p>Your academic year has been saved. Before creating a classroom, review its instructional schedule and eligible instructor. Saving the year does not create a class timetable or approve school opening.</p>{onReload&&<button type="button" onClick={onReload} className="mt-2 mr-3 rounded border px-3 py-2 font-semibold">Review saved academic setup</button>}<Link to="/operations/school-years" search={{siteId:plan.siteId,programId:plan.programId}} className="mt-2 mr-3 inline-block font-semibold underline">Review instructional schedule →</Link><a href="#launch-first-class" className="mt-2 inline-block font-semibold underline">Continue to your first classroom →</a></div>:
    <button type="button" disabled={busy||Boolean(plan.years.length&&!existing)||!weekdays.length||!Number.isInteger(minutes)||minutes<1||minutes>1440} onClick={()=>void prepare()} className="mt-4 rounded bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy?"Preparing your academic year…":existing?.status==="active"?"Use this active school year":"Save reviewed academic setup"}</button>}
   <Link to="/operations/school-years" search={{siteId:plan.siteId,programId:plan.programId}} className="ml-3 inline-block text-sm underline">Adjust dates, holidays or detailed settings</Link>

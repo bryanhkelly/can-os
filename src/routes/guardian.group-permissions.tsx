@@ -47,7 +47,15 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
   {action&&!items.some(item=>item.id===action)&&<p role="alert" className="mt-4 rounded-xl border p-4">This permission request is unavailable in your current family workspace.</p>}
   <div className="mt-7 space-y-3">{items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
    <h2 className="font-semibold">{item.groupTitle}</h2>
+   <p className="mt-1 text-sm font-medium">Student: {item.studentName}</p>
    <p className="mt-2 text-sm text-muted-foreground">{item.obsolete?"This request is no longer active — the student's membership request was withdrawn or already decided.":item.status==="open"?"Your decision is needed":item.decision==="approve"?"Permission approved":"Permission declined"}</p>
+   <p role="status" className="mt-2 text-sm">{item.obsolete
+    ?"Next: dismiss this outdated request; no guardian decision remains."
+    :item.status==="open"
+     ?"Next actor: you — allow or decline participation. If you allow it, the facilitator must still approve membership."
+     :item.decision==="approve"
+      ?"Next actor: the group facilitator — guardian permission is recorded, but membership is not active until the facilitator approves."
+      :"No further action: permission was declined and the student was not added to the group."}</p>
    {item.obsolete&&<div className="mt-4 flex gap-2">
     <button disabled={busy} onClick={()=>decide(item.id,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Dismiss</button>
    </div>}

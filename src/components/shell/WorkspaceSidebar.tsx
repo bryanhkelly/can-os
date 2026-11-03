@@ -12,7 +12,7 @@ export function WorkspaceSidebar({ member, sites, links, activePath }: {
 }) {
   return <aside aria-label="Workspace sidebar" className="hidden border-r bg-card lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
     <div className="border-b p-5">
-      <Link to={getWorkspaceHome(member.role) ?? "/"} className="rounded-sm font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>
+      <Link to={member.role==="student"?"/":getWorkspaceHome(member.role) ?? "/"} className="rounded-sm font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>
       <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Church Academy Network</p>
     </div>
     <div className="p-4">

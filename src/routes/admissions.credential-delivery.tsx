@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { authorizeAcademicCredentialRelease,listAcademicCredentialDeliveries,listAcademicCredentialReleaseAuthorizations,listAcademicCredentialReleaseAccessHistory,listVerifiedCredentialRecipients,revokeAcademicCredentialRelease,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
@@ -19,9 +21,16 @@ function CredentialDeliveryPage(){
  const [transferActionId,setTransferActionId]=useState("");
  const [consentId,setConsentId]=useState("");
  const [releaseAcknowledged,setReleaseAcknowledged]=useState(false);
- const [busy,setBusy]=useState(false);
+ const [reading,setReading]=useState(false);
+ const readingRef=useRef(false);
+ const mutation=useMutationFeedback(async()=>undefined);
+ const busy=reading||mutation.pending||mutation.refreshFailed;
  const [message,setMessage]=useState("");
- async function run(fn:()=>Promise<void>){setBusy(true);setMessage("");try{await fn()}catch(e){setMessage(e instanceof Error?e.message:"Unable to process credential")}finally{setBusy(false)}}
+ async function run(fn:()=>Promise<void>){
+  if(readingRef.current||busy)return;
+  readingRef.current=true;setReading(true);setMessage("");
+  try{await fn()}catch(e){setMessage(mutationErrorMessage(e, "Unable to process credential"))}finally{readingRef.current=false;setReading(false)}
+ }
  function download(base64:string,filename:string){
   const bytes=Uint8Array.from(atob(base64),char=>char.charCodeAt(0));
   const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
@@ -32,6 +41,7 @@ function CredentialDeliveryPage(){
   <div className="space-y-5 py-6">
    <p className="text-sm">Documents are generated from issued transcript snapshots or approved, active diploma records. Email acceptance does not prove delivery to the recipient's inbox.</p>
    {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}
+   <MutationFeedback state={mutation} pendingMessage="Recording credential authorization..."/>
    <section className="space-y-3 rounded-xl border p-4">
     <label className="block text-sm font-medium">Credential type<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([]);setReleases([]);setRecipients([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></select></label>
     {field("Issued credential ID",credentialId,value=>{setCredentialId(value);setHistory([]);setReleases([])})}
@@ -47,7 +57,7 @@ function CredentialDeliveryPage(){
     {field("Completed transfer action ID",transferActionId,setTransferActionId)}
     {field("Signed transfer consent ID",consentId,setConsentId)}
     <label className="flex gap-2 text-sm"><input type="checkbox" checked={releaseAcknowledged} onChange={e=>setReleaseAcknowledged(e.target.checked)}/>I reviewed the completed transfer, signed consent, guardian authority and verified recipient. This grants guardian access, not delivery to an outside institution.</label>
-    <button disabled={busy||!releaseAcknowledged||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
+    <button disabled={busy||!releaseAcknowledged||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId} className="rounded-lg border px-3 py-2" onClick={()=>void mutation.run(async()=>{
      const [recipientPersonId,recipientEmail]=selectedRecipient.split("|");
      await authorizeAcademicCredentialRelease({data:{
       kind:"transcript",credentialId,recipientPersonId,recipientEmail,
@@ -55,9 +65,9 @@ function CredentialDeliveryPage(){
       consentEvidenceReference:consentId,
       expiresAt:new Date(Date.now()+7*86400000).toISOString(),
      }});
-     setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}));
-     setMessage("Secure recipient authorization recorded. The recipient must sign in to access the record.");
-    })}>Authorize seven-day secure access</button>
+    },{successMessage:"Secure recipient authorization recorded. The recipient must sign in to access the record.",
+     commandErrorMessage:"Unable to authorize credential release.",
+     refresh:async()=>setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))})}>Authorize seven-day secure access</button>
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Verified recipient candidates</h2>
@@ -82,11 +92,11 @@ function CredentialDeliveryPage(){
       })}>Review PDF disclosures</button>
       {accessHistory[row.id]?.length===0&&<p>No successfully prepared PDF disclosures recorded.</p>}
       {accessHistory[row.id]?.map(entry=><p key={entry.id}>PDF prepared: {new Date(entry.occurredAt).toLocaleString()} · Recipient ID: {entry.actorPersonId}</p>)}
-      {status==="Authorized"&&<button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
-       await revokeAcademicCredentialRelease({data:{authorizationId:row.id}});
-       setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}));
-       setMessage("Release revoked.");
-      })}>Revoke access</button>}
+      {status==="Authorized"&&<button disabled={busy} className="mt-2 rounded-lg border px-3 py-2" onClick={()=>void mutation.run(
+       ()=>revokeAcademicCredentialRelease({data:{authorizationId:row.id}}),
+       {successMessage:"Release revoked.",commandErrorMessage:"Unable to revoke access.",
+        refresh:async()=>setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))}
+      )}>Revoke access</button>}
      </article>;
     })}
     {!releases.length&&<p className="text-sm text-muted-foreground">No release authorizations loaded.</p>}

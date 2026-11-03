@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getStudent360 } from "@/modules/profiles/directory.functions";
@@ -28,7 +29,7 @@ function Student360Page({ personId }: { personId: string }) {
     getStudent360({ data: { studentPersonId: personId } }).then(result => {
       if (active) setProfile(result);
     }).catch(cause => {
-      if (active) setError(cause instanceof Error ? cause.message : "Unable to open this authorized student profile.");
+      if (active) setError(mutationErrorMessage(cause, "Unable to open this authorized student profile."));
     });
     return () => { active = false; };
   }, [personId]);

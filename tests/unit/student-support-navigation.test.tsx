@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route } from "@/routes/student.support";
+import { Route, supportNextStep, supportServicesReadyForReview } from "@/routes/student.support";
 
 const state=vi.hoisted(()=>({
  actions:[
@@ -69,5 +69,26 @@ describe("student support action navigation",()=>{
    expect(html).not.toContain("Review action");
    expect(html).not.toContain("Review assignment");
   }finally{state.actions=actions;}
+ });
+
+ it("names the support owner and blocks review until every scheduled service is complete",()=>{
+  expect(supportNextStep({stage:"in_service",assignedTo:"Coach",
+   services:[{status:"completed"},{status:"scheduled"}]}))
+   .toBe("Next actor: Coach — complete all scheduled services before requesting review (1 remaining).");
+  expect(supportServicesReadyForReview([])).toBe(false);
+  expect(supportServicesReadyForReview([{status:"completed"}])).toBe(true);
+  expect(supportServicesReadyForReview([{status:"completed"},{status:"scheduled"}])).toBe(false);
+ });
+
+ it("provides an explicit owner and action at each support lifecycle stage",()=>{
+  const expected=[
+   ["submitted","accept the referral"],
+   ["accepted","create the support plan"],
+   ["plan_created","schedule the first support service"],
+   ["review","document the disposition and close"],
+  ] as const;
+  for(const [stage,action] of expected)
+   expect(supportNextStep({stage,assignedTo:"Coach",services:[]})).toContain(`Next actor: Coach — ${action}`);
+  expect(supportNextStep({stage:"closed",assignedTo:"Coach",services:[]})).toContain("No further action");
  });
 });

@@ -40,9 +40,9 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
         <Link to="/profiles" className={`mt-3 block rounded-lg border-t p-3 text-sm underline ${focusRingClass}`}>My profile</Link>
         <Link to="/account/sessions" className={`block rounded-lg p-3 text-sm underline ${focusRingClass}`}>Account sessions</Link>
       </ContextTray>
-      <ContextTray title="Notifications" open={tray === "notifications"} onClose={onCloseTray}>
+      <ContextTray title="Notifications" open={tray === "notifications"} onClose={onCloseTray} keepMounted>
         <Suspense fallback={<p role="status">Loading notifications...</p>}>
-          <NotificationTray onNavigate={onCloseTray} />
+          <NotificationTray onNavigate={onCloseTray} enabled={tray === "notifications"} />
         </Suspense>
       </ContextTray>
       <ContextTray title="Ask CAN" open={tray === "ask"} onClose={onCloseTray}>

@@ -10,6 +10,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { actions, domainEvents } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
@@ -285,7 +286,7 @@ type ClaimedEvent = { id: string; eventType: string };
  * lease. FOR UPDATE SKIP LOCKED lets concurrent workers claim disjoint
  * batches without double-processing.
  */
-async function claimBatch(handledTypes: string[], limit: number): Promise<ClaimedEvent[]> {
+async function claimBatch(handledTypes: string[], limit: number, eventIds?: string[]): Promise<ClaimedEvent[]> {
   return db.transaction(async (tx) => {
     const now = new Date();
     const claimed = await tx
@@ -295,6 +296,7 @@ async function claimBatch(handledTypes: string[], limit: number): Promise<Claime
         and(
           eq(domainEvents.status, "pending"),
           inArray(domainEvents.eventType, handledTypes),
+          eventIds ? inArray(domainEvents.id, eventIds) : undefined,
           or(isNull(domainEvents.nextAttemptAt), lte(domainEvents.nextAttemptAt, now)),
         ),
       )
@@ -319,11 +321,12 @@ async function claimBatch(handledTypes: string[], limit: number): Promise<Claime
 }
 
 /** Reclaim events whose worker crashed mid-processing (lease expired). */
-async function reclaimStaleClaims(): Promise<void> {
+async function reclaimStaleClaims(eventIds?: string[]): Promise<void> {
   await db
     .update(domainEvents)
     .set({ status: "pending", nextAttemptAt: null })
-    .where(and(eq(domainEvents.status, "processing"), lte(domainEvents.nextAttemptAt, new Date())));
+    .where(and(eq(domainEvents.status, "processing"), lte(domainEvents.nextAttemptAt, new Date()),
+      eventIds ? inArray(domainEvents.id, eventIds) : undefined));
 }
 
 async function markSucceeded(eventId: string): Promise<void> {
@@ -395,12 +398,14 @@ async function markFailed(eventId: string, error: unknown): Promise<void> {
  * Outbox processor. Invoked by the scheduled jobs endpoint (see src/routes/api.jobs.ts
  * and netlify/functions/scheduled-jobs.ts) and by integration tests.
  */
-export async function processPendingDomainEvents(limit = 100): Promise<number> {
+export async function processPendingDomainEvents(limit = 100, selection?: { eventIds: string[] }): Promise<number> {
+  const eventIds = selection ? z.array(z.string().uuid()).max(1000).parse(selection.eventIds) : undefined;
+  if (eventIds?.length === 0) return 0;
   const handledTypes = [...registry.keys()];
   if (!handledTypes.length) return 0;
 
-  await reclaimStaleClaims();
-  const claimed = await claimBatch(handledTypes, limit);
+  await reclaimStaleClaims(eventIds);
+  const claimed = await claimBatch(handledTypes, limit, eventIds);
 
   let processed = 0;
 

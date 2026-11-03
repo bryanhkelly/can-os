@@ -4,9 +4,9 @@ import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors
 import { emitEvent } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray } from "drizzle-orm";
+import { and,desc,eq,inArray,or } from "drizzle-orm";
 import { z } from "zod";
-import { isStudentSupportAction } from "./student-action-policy";
+import { canCompleteStudentAction, isStudentSupportAction } from "./student-action-policy";
 import { isStudentGoalPublicReview } from "@/domain/teacher-student-goal";
 
 const studentActor = () => requireActor(["student"]);
@@ -18,7 +18,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" })
   setResponseHeader("Cache-Control", "private, no-store");
   const sites = actorSiteIds(actor);
   if (!process.env.DATABASE_URL) return { connected: false as const, actions: [] };
-  const [{ db }, { actions }] = await Promise.all([
+  const [{ db }, { actions, studentProfiles }] = await Promise.all([
     import("@/db/client"), import("@/db/schema"),
   ]);
   const rows = await db.select({
@@ -27,14 +27,25 @@ export const getQuickWinActions = createServerFn({ method: "GET" })
     resolvedAt: actions.resolvedAt,
     metadata: actions.metadata, type: actions.type,
     subjectType: actions.subjectType, subjectId: actions.subjectId,
-  }).from(actions).where(and(
-    eq(actions.ownerPersonId, actor.actorPersonId),
+    ownerPersonId: actions.ownerPersonId,
+  }).from(actions).leftJoin(
+    studentProfiles, eq(studentProfiles.personId, actor.actorPersonId),
+  ).where(and(
+    or(
+      eq(actions.ownerPersonId, actor.actorPersonId),
+      and(
+        eq(actions.type, "student_support_request"),
+        eq(actions.subjectType, "student_profile"),
+        eq(actions.subjectId, studentProfiles.id),
+      ),
+    ),
     inArray(actions.siteId, sites),
     inArray(actions.programId, actor.scope.programIds ?? []),
     data.actionId ? eq(actions.id, data.actionId) : undefined,
   )).orderBy(desc(actions.createdAt)).limit(data.actionId ? 1 : 100);
-  return { connected: true as const, actions: rows.map(row => ({
+  return { connected: true as const, actions: rows.map(({ ownerPersonId, ...row }) => ({
     ...row,
+    canComplete: ownerPersonId === actor.actorPersonId && canCompleteStudentAction(row),
     // Only the explicitly student-safe teacher review can cross this boundary.
     // No intervention observations, counselor notes or staff-case metadata.
     metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type },

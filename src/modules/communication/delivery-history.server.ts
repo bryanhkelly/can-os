@@ -2,43 +2,9 @@ import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { subscriptionDeliveries, subscriptions } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { deliveryOutcome } from "@/domain/delivery-outcome";
 
 const PAGE_SIZE = 25;
-
-function deliveryOutcome(row: typeof subscriptionDeliveries.$inferSelect) {
-  switch (row.status) {
-    case "delivered":
-      return row.channel === "in_app"
-        ? { label: "Available in CAN", detail: "The in-app notification was created. This does not mean it has been read." }
-        : { label: "Accepted by provider", detail: "The sending provider accepted the request. Inbox or handset delivery and reading are not verified." };
-    case "pending":
-      return { label: "Queued", detail: row.nextAttemptAt ? "Waiting for the next scheduled attempt or the end of quiet hours." : "Waiting for the delivery worker." };
-    case "processing":
-      return { label: "Processing", detail: "A delivery worker has claimed this update. The outcome is not yet recorded." };
-    case "suppressed":
-      return {
-        label: "Not sent",
-        detail: row.lastError === "authorization_failed"
-          ? "Access to the watched record is no longer authorized."
-          : row.lastError === "condition_resolved"
-            ? "The watched condition no longer requires an update."
-            : row.lastError === "watch_inactive"
-              ? "The watch is inactive or expired."
-              : "Delivery was suppressed by the current watch policy.",
-      };
-    case "failed":
-      return {
-        label: row.nextAttemptAt ? "Retry scheduled" : "Failed",
-        detail: row.lastError === "no_active_email"
-          ? "No active account email is available."
-          : row.lastError === "sms_consent_required"
-            ? "SMS requires a verified phone number and current opt-in."
-            : row.lastError === "channel_not_supported"
-              ? "This delivery channel is not supported."
-              : "The delivery attempt failed. Provider details are not exposed here.",
-      };
-  }
-}
 
 /** Personal delivery metadata only; historical watches do not confer resource access. */
 export async function listDeliveryHistory(context: CommandContext, cursor?: string) {

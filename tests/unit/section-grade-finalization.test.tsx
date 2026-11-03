@@ -2,6 +2,7 @@ import { type EffectCallback, type ReactElement, type ReactNode, type SetStateAc
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 vi.mock("@tanstack/react-router",()=>({Link:({to,search,children}:{to:string;search?:Record<string,string>;children:ReactNode})=>
   <a href={to+"?"+new URLSearchParams(search)}>{children}</a>}));
 
@@ -90,8 +91,8 @@ function setField(label: string, value: string) {
 }
 function mount() {
   render();
-  const cleanup = state.effects[0]?.();
-  return typeof cleanup === "function" ? cleanup : () => {};
+  const cleanups = state.effects.map(effect => effect());
+  return () => cleanups.forEach(cleanup => { if (typeof cleanup === "function") cleanup(); });
 }
 async function loaded() {
   mount();
@@ -158,7 +159,8 @@ describe("gradebook section grade finalization panel", () => {
     await vi.waitFor(() => {
       const html = renderToStaticMarkup(render());
       expect(html).toContain('role="alert"');
-      expect(html).toContain("Active school grade scale is required");
+      expect(html).toContain("Unable to finalize grades for this grading period.");
+      expect(html).not.toContain("Active school grade scale is required");
     });
     expect(renderToStaticMarkup(render())).not.toContain("Finalized 1 grade");
     expect(state.read).toHaveBeenCalledTimes(1);
@@ -211,7 +213,8 @@ describe("gradebook section grade finalization panel", () => {
     await vi.waitFor(() => {
       const html = renderToStaticMarkup(render());
       expect(html).toContain('role="alert"');
-      expect(html).toContain("Only finalized grades can be corrected");
+      expect(html).toContain("Unable to record the correction.");
+      expect(html).not.toContain("Only finalized grades can be corrected");
     });
     expect(state.correct).toHaveBeenCalledOnce();
   });
@@ -220,5 +223,33 @@ describe("gradebook section grade finalization panel", () => {
     state.read.mockResolvedValue({ ...model, gradeScaleConfigured: false });
     await loaded();
     expect(renderToStaticMarkup(render())).toContain("no configured grade scale");
+  });
+
+  it("synchronously blocks a second finalization before React rerenders", async () => {
+    await loaded();
+    const finalize = findButton("Finalize grades");
+    finalize?.props.onClick?.();
+    finalize?.props.onClick?.();
+    await vi.waitFor(() => expect(state.read).toHaveBeenCalledTimes(2));
+    expect(state.finalize.mock.calls.filter(([input]) => !input.data.previewOnly)).toHaveLength(1);
+  });
+
+  it("retains a committed finalization and retries only its failed read", async () => {
+    await loaded();
+    state.read.mockRejectedValueOnce(new Error("Database read unavailable"));
+    findButton("Finalize grades")?.props.onClick?.();
+    await vi.waitFor(() => {
+      expect(renderToStaticMarkup(render())).toContain("The command succeeded.");
+      expect(renderToStaticMarkup(render())).toContain("Retry refresh");
+    });
+    expect(findButton("Finalize grades")).toBeUndefined();
+    const feedback = controls(render()).find(node => node.type === MutationFeedback);
+    if (!isValidElement<Parameters<typeof MutationFeedback>[0]>(feedback))
+      throw new Error("Missing mutation recovery control");
+    await feedback.props.state.retryRefresh?.();
+    expect(state.read).toHaveBeenCalledTimes(3);
+    expect(state.finalize).toHaveBeenCalledOnce();
+    expect(findButton("Finalize grades")?.props.disabled).toBe(false);
+    expect(renderToStaticMarkup(render())).toContain("Finalized 1 grade");
   });
 });

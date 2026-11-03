@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { SchoolYearCard } from "@/components/operations/SchoolYearCard";
 import { useState } from "react";
@@ -28,7 +29,13 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
  const [start,setStart]=useState(suggestedYear.startsOn),[end,setEnd]=useState(suggestedYear.endsOn);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
- const busy=mutation.isSubmitting;
+ const busy=mutation.isSubmitting||!!mutation.refreshError;
+ async function retryRefresh(){
+  const outcome=await mutation.retryRefresh();
+  if(outcome.status==="refreshed"){
+   setError("");setNotice("Saved school-year records have been refreshed.");
+  }
+ }
  async function run(operation:()=>Promise<unknown>){
   if(busy)return;
   setError("");setNotice("");
@@ -36,7 +43,7 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
    if(submission.status === "ignored")return;
    if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
    setNotice("Saved to school records.");}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save");}
+  catch(e){setError(mutationErrorMessage(e, "Unable to save"));}
  }
  const scopedPrograms=data.programs.filter(p=>p.siteId===siteId);
  const site=data.sites.find(s=>s.id===siteId);
@@ -48,6 +55,8 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
   subtitle="Configure site-owned school years, terms, grading periods and academic calendars. Activation requires readiness checks."
   actions={<Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+  {mutation.refreshError&&<button type="button" disabled={mutation.isSubmitting} onClick={()=>void retryRefresh()}
+   className="mt-3 rounded border px-3 py-2 text-sm disabled:opacity-50">Retry saved school-year refresh</button>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Create a school year</h2>

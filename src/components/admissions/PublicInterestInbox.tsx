@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { useEffect, useRef, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
   invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
@@ -16,6 +18,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
   const [olderRows,setOlderRows] = useState<Row[]>([]);
   const [nextCursor,setNextCursor] = useState<string|null>(initialPage.nextCursor);
   const [loadingMore,setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
   const [loadError,setLoadError] = useState("");
   useEffect(() => {
     setOlderRows([]);
@@ -29,46 +32,34 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
     return true;
   });
   async function loadMore() {
-    if (!nextCursor || loadingMore) return;
+    if (!nextCursor || loadingMoreRef.current) return;
+    loadingMoreRef.current=true;
     setLoadingMore(true);setLoadError("");
     try {
       const page=await listPublicAdmissionsInterests({data:{cursor:nextCursor}});
       setOlderRows(current=>[...current,...page.items]);
       setNextCursor(page.nextCursor);
     } catch (cause) {
-      setLoadError(cause instanceof Error ? cause.message : "Unable to load older inquiries.");
-    } finally {setLoadingMore(false);}
+      setLoadError(mutationErrorMessage(cause, "Unable to load older inquiries."));
+    } finally {loadingMoreRef.current=false;setLoadingMore(false);}
   }
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   async function changeStatus(row: Row, status: "contacted" | "closed") {
-    setBusyId(row.id); setError(""); setNotice("");
-    try {
-      await setPublicAdmissionsInterestStatus({
+    await mutation.run(() => setPublicAdmissionsInterestStatus({
         data: { interestId: row.id, status },
-      });
-      setNotice(status === "contacted"
+      }), {
+      successMessage: status === "contacted"
         ? "Contact recorded. This does not verify a guardian or create an Application."
-        : "Interest request closed.");
-      await router.invalidate();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not update interest.");
-    } finally {
-      setBusyId(null);
-    }
+        : "Interest request closed.",
+      commandErrorMessage: "Could not update interest.",
+    });
   }
   async function inviteToApply(row: Row) {
-    setBusyId(row.id); setError(""); setNotice("");
-    try {
-      await invitePublicAdmissionsInterestToApply({data:{interestId:row.id}});
-      setNotice("Verified-email application invitation requested. This does not verify guardianship or create an Application.");
-      await router.invalidate();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not invite family to apply.");
-    } finally {
-      setBusyId(null);
-    }
+    await mutation.run(() => invitePublicAdmissionsInterestToApply({data:{interestId:row.id}}), {
+      successMessage: "Verified-email application invitation requested. This does not verify guardianship or create an Application.",
+      commandErrorMessage: "Could not invite family to apply.",
+    });
   }
 
   return <section className="mt-8 rounded-xl border bg-card p-5">
@@ -79,8 +70,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
       admissions, send a verified-email application invitation or continue reviewed
       registrar intake. An inquiry never proves guardianship or grants school access.
     </p>
-    {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-3 text-sm">{notice}</p>}
+    <MutationFeedback state={mutation} pendingMessage="Saving interest..." className="mt-3"/>
     <div className="mt-4 grid gap-3">
       {items.map(row => <article key={row.id} className="rounded-lg border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -106,17 +96,17 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
             </Link>}
             {!row.applicationId && ["new","contacted"].includes(row.status) &&
               row.canSendApplicationInvitation &&
-              <button type="button" disabled={busyId !== null}
+              <button type="button" disabled={busy}
                 onClick={() => void inviteToApply(row)}
                 className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
                 {row.familyStartRequestId ? "Resend expired application link" : "Invite to apply"}
               </button>}
-            {row.status === "new" && <button type="button" disabled={busyId !== null}
+            {row.status === "new" && <button type="button" disabled={busy}
               onClick={() => void changeStatus(row, "contacted")}
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
               Mark contacted
             </button>}
-            {["new", "contacted"].includes(row.status) && <button type="button" disabled={busyId !== null}
+            {["new", "contacted"].includes(row.status) && <button type="button" disabled={busy}
               onClick={() => void changeStatus(row, "closed")}
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
               Close
@@ -192,7 +182,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
       </p>}
     </div>
     {loadError&&<p role="alert" className="mt-3 text-sm">{loadError}</p>}
-    {nextCursor&&<button type="button" disabled={loadingMore||busyId!==null}
+    {nextCursor&&<button type="button" disabled={loadingMore||busy}
       onClick={()=>void loadMore()} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
       {loadingMore?"Loading older inquiries…":"Load older inquiries"}
     </button>}

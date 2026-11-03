@@ -1,4 +1,6 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useEffect, useState } from "react";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {
   listAffiliationNetworks, listSiteAffiliations, requestSiteAffiliation, withdrawSiteAffiliation,
 } from "@/modules/networks/network-affiliations.functions";
@@ -12,9 +14,7 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
   const [selected, setSelected] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   async function refresh() {
     const [options, current] = await Promise.all([
@@ -23,6 +23,8 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
     setNetworks(options.networks);
     setEntries(current.entries);
   }
+  const mutation=useMutationFeedback(refresh);
+  const busy=mutation.pending||mutation.refreshFailed;
   useEffect(() => {
     let live = true;
     setLoading(true);
@@ -38,29 +40,32 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
 
   async function request(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true); setError(""); setNotice("");
-    try {
+    setError("");
+    const outcome=await mutation.run(async()=>{
       if (!selected) throw new Error("Choose a denomination.");
-      const outcome = await requestSiteAffiliation({ data: {
+      return requestSiteAffiliation({ data: {
         siteId, denominationOrganizationId: selected, note,
       } });
-      await refresh();
+    },{
+      successMessage:result=>result.created?"Affiliation request sent for HQ review.":"This affiliation already exists.",
+      commandErrorMessage:"Request could not be sent.",
+      refreshErrorMessage:"The affiliation request was saved, but current affiliation records could not be loaded. Retry the refresh before submitting another request.",
+    });
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
       setNote(""); setSelected("");
-      setNotice(outcome.created ? "Affiliation request sent for HQ review." : "This affiliation already exists.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Request could not be sent.");
-    } finally { setBusy(false); }
+    }
   }
 
   async function withdraw(affiliationId: string) {
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await withdrawSiteAffiliation({ data: { siteId, affiliationId } });
-      await refresh();
-      setNotice("Affiliation withdrawn.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to withdraw affiliation.");
-    } finally { setBusy(false); }
+    setError("");
+    await mutation.run(
+      ()=>withdrawSiteAffiliation({ data: { siteId, affiliationId } }),
+      {
+        successMessage:"Affiliation withdrawn.",
+        commandErrorMessage:"Unable to withdraw affiliation.",
+        refreshErrorMessage:"The affiliation was withdrawn, but current affiliation records could not be loaded. Retry the refresh before making another change.",
+      },
+    );
   }
 
   return <section className="mt-3 rounded-xl border bg-card p-5" aria-label="Denomination affiliation">
@@ -97,6 +102,6 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
       </form> : <p className="mt-3 text-sm text-muted-foreground">No denomination HQ accounts are currently available for affiliation requests.</p>}
     </>}
     {error && <p className="mt-3 text-sm" role="alert">{error}</p>}
-    {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Updating denomination affiliation…"/>
   </section>;
 }

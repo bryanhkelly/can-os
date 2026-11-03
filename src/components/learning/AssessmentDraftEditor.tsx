@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState } from "react";
 import { manageAssessment } from "@/modules/learning/gradebook.functions";
 
@@ -5,15 +7,13 @@ import { manageAssessment } from "@/modules/learning/gradebook.functions";
 export function AssessmentDraftEditor({assessment,onSaved}:{assessment:{id:string;title:string;instructions:string};onSaved:()=>Promise<unknown>}) {
   const [title,setTitle]=useState(assessment.title);
   const [instructions,setInstructions]=useState(assessment.instructions);
-  const [busy,setBusy]=useState(false),[message,setMessage]=useState("");
+  const mutation=useMutationFeedback(onSaved);
+  const busy=mutation.pending||mutation.refreshFailed;
   async function save(){
-    setBusy(true);setMessage("");
-    try{
-      await manageAssessment({data:{assessmentId:assessment.id,action:"edit_draft",title,instructions}});
-      setMessage("Draft saved. Students receive this work only after you publish it.");
-      await onSaved();
-    }catch(error){setMessage(error instanceof Error?error.message:"Unable to save assignment draft.");}
-    finally{setBusy(false);}
+    await mutation.run(()=>manageAssessment({data:{assessmentId:assessment.id,action:"edit_draft",title,instructions}}),{
+      successMessage:"Draft saved. Students receive this work only after you publish it.",
+      commandErrorMessage:"Unable to save assignment draft.",
+    });
   }
   return <details className="mt-3 text-xs font-normal">
     <summary className="cursor-pointer underline">Edit assignment draft</summary>
@@ -24,6 +24,6 @@ export function AssessmentDraftEditor({assessment,onSaved}:{assessment:{id:strin
       <textarea disabled={busy} rows={5} maxLength={20000} value={instructions} onChange={event=>setInstructions(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/>
     </label>
     <button type="button" disabled={busy||title.trim().length<3} onClick={save} className="mt-2 rounded border px-2 py-1 disabled:opacity-40">Save assignment draft</button>
-    {message&&<p role="status" className="mt-2">{message}</p>}
+    <MutationFeedback state={mutation} className="mt-2" pendingMessage="Saving assignment draft..."/>
   </details>;
 }

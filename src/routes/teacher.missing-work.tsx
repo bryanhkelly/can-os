@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getTeacherMissingWork, createMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
@@ -21,9 +23,9 @@ function TeacherMissingWork() {
 function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof loadMissingWork>> }) {
   const { connected, items } = data;
   const router = useRouter();
-  const [busyItem, setBusyItem] = useState("");
   const [followedUp, setFollowedUp] = useState<Record<string, boolean>>({});
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const studentCount = new Set(items.map(x => x.studentProfileId)).size;
 
   return (
@@ -33,7 +35,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
       subtitle="Overdue missing submissions and returned revisions for actively enrolled students in your classes."
       actions={<p className="mt-2 text-xs"><Link to="/notifications" className="underline">Teacher notifications →</Link></p>}
     >
-      {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
+      <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating follow-up..."/>
       {!connected && <p role="status" className="mt-4 rounded-xl border p-4">Neon is not connected. The queue cannot load.</p>}
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <StatCard value={items.length} label="Overdue student-assignment items" />
@@ -48,22 +50,17 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="mt-1 text-sm">{x.studentName} · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button
-              disabled={Boolean(busyItem) || Boolean(followedUp[x.assessmentId + ":" + x.studentProfileId])}
+              disabled={busy || Boolean(followedUp[x.assessmentId + ":" + x.studentProfileId])}
               className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
               onClick={async () => {
-                setBusyItem(x.assessmentId + ":" + x.studentProfileId);
-                try {
+                await mutation.run(async () => {
                   const result = await createMissingWorkFollowUp({ data: { assessmentId: x.assessmentId, studentProfileId: x.studentProfileId } });
                   setFollowedUp(previous => ({...previous, [x.assessmentId + ":" + x.studentProfileId]: true}));
-                  setNotice(result.created ? "Follow-up added to Operations." : "An open follow-up already exists.");
-                  await router.invalidate();
-                } catch (e) {
-                  setNotice(e instanceof Error ? e.message : "Unable to create follow-up");
-                } finally {
-                  setBusyItem("");
-                }
+                  return result;
+                }, { successMessage: result => result.created ? "Follow-up added to Operations." : "An open follow-up already exists.",
+                  commandErrorMessage: "Unable to create follow-up" });
               }}
-            >{busyItem===x.assessmentId + ":" + x.studentProfileId ? "Creating follow-up…" : followedUp[x.assessmentId + ":" + x.studentProfileId] ? "Follow-up open" : "Create follow-up"}</button>
+            >{followedUp[x.assessmentId + ":" + x.studentProfileId] ? "Follow-up open" : "Create follow-up"}</button>
           </article>
         ))}
         {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}

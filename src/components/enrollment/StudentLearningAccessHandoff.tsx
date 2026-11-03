@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { useEffect,useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -71,7 +72,7 @@ function ApplicationLearningAccessHandoff({
       setNotice("Student access approval is saved. A sign-in link was requested; email delivery is not verified.");
     }
    }
-  }catch(e){setError(e instanceof Error?e.message:"Student access handoff could not be completed");}
+  }catch(e){setError(mutationErrorMessage(e, "Student access handoff could not be completed"));}
   finally{setBusy(false);}
  }
  if(status==="blocked"&&blocker)return <section aria-label="Student learning account" className="mt-4 rounded-lg border p-4 text-sm">
@@ -158,7 +159,11 @@ function ApplicationLearningAccessHandoff({
        className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
        {busy?"Requesting…":"Request student sign-in link again"}
      </button>}
-    </>:<p>School enrollment and classroom access must be ready before an account
+    </>:status==="not_requested"&&hasRegistrarAuthority(role)?
+     <p>Enrollment and classroom placement are ready. A verified managing guardian
+      must authorize the student's separate sign-in request in their enrollment
+      checklist before a registrar can review it. No invitation has been sent.</p>
+    :<p>School enrollment and classroom access must be ready before an account
       invitation can be sent.</p>}
    </form>}
   {notice&&<p role="status" className="mt-2">{notice}</p>}

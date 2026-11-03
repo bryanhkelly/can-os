@@ -1,9 +1,11 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { EmptyState, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
+import { EmptyState, WorkspacePanel } from "@/components/workspace";
 import { resolveOwnedSiteOperationalAction } from "@/modules/operations/action-workspace.functions";
 import { formatTimestamp } from "@/modules/calendar/timezone";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 
 type OwnedFollowUp = {
   id: string;
@@ -29,9 +31,9 @@ const followUpLabels: Record<string, string> = {
 export function SiteOwnedActionResolution({ actions, timezone }: { actions: OwnedFollowUp[]; timezone: string }) {
   const router = useRouter();
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
 
   async function resolve(id: string) {
     const note = (notes[id] ?? "").trim();
@@ -39,27 +41,22 @@ export function SiteOwnedActionResolution({ actions, timezone }: { actions: Owne
       setError("Describe what was actually done (at least 10 characters) before resolving.");
       return;
     }
-    setBusy(id); setError(""); setNotice("");
-    try {
-      await resolveOwnedSiteOperationalAction({ data: { id, resolutionNote: note } });
-      setNotice("Follow-up resolved. The underlying attendance, pickup and duty records are preserved unchanged.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The resolution was not saved.");
-      setBusy("");
-      return;
-    }
-    try {
-      await router.invalidate();
-    } catch {
-      setError("The follow-up was saved, but this page could not refresh. Reopen Site Today before trying again.");
-    } finally { setBusy(""); }
+    setError("");
+    await mutation.run(
+      () => resolveOwnedSiteOperationalAction({ data: { id, resolutionNote: note } }),
+      {
+        successMessage: "Follow-up resolved. The underlying attendance, pickup and duty records are preserved unchanged.",
+        commandErrorMessage: "The resolution was not saved.",
+        refreshErrorMessage: "The follow-up was resolved, but Site Today could not refresh. Retry the refresh before resolving another follow-up.",
+      },
+    );
   }
 
   return <WorkspacePanel title="Your assigned onsite follow-ups"
     description="Coverage gaps and pickup exceptions assigned to you as the named local leader. Record what was actually done before resolving."
     className="mt-6" id="site-owned-follow-ups">
-    {notice && <WorkspaceNotice tone="success" className="mb-3">{notice}</WorkspaceNotice>}
     {error && <p role="alert" className="mb-3 rounded border p-3 text-sm">{error}</p>}
+    <MutationFeedback state={mutation} className="mb-3" pendingMessage="Resolving onsite follow-up…"/>
     {actions.length === 0 ? <EmptyState title="No assigned onsite follow-ups."
       description="New coverage and pickup exceptions assigned to you will appear here." /> :
     <ul className="space-y-3">
@@ -83,7 +80,7 @@ export function SiteOwnedActionResolution({ actions, timezone }: { actions: Owne
         <Button className="mt-2" variant="outline"
           disabled={!!busy || (notes[action.id] ?? "").trim().length < 10}
           onClick={() => void resolve(action.id)}>
-          {busy === action.id ? "Resolving…" : "Resolve follow-up"}
+          {busy ? "Resolving…" : "Resolve follow-up"}
         </Button>
       </li>)}
     </ul>}

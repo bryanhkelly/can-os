@@ -1,6 +1,8 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { OnsiteRoomPlanningPanel } from "./OnsiteRoomPlanningPanel";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Qualifications } from "@/components/profiles/Qualifications";
 import { getOnsiteSupervisionPlan } from "@/modules/operations/onsite-supervision.functions";
 import {
@@ -32,81 +34,78 @@ const labels: Record<string,string> = {
 };
 
 /** Read-only staffing plan. This is NOT a live duty check-in or room sign-off. */
-export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onChanged?: () => void }) {
+export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onChanged?: () => Promise<void> | void }) {
   const [plan,setPlan]=useState<Plan|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [responses,setResponses]=useState<Responses|null>(null);
   const [presence,setPresence]=useState<Presence|null>(null);
-  const [presenceBusy,setPresenceBusy]=useState("");
-  const [dutyBusy,setDutyBusy]=useState("");
-  const [dutyMessage,setDutyMessage]=useState("");
   const [nonce,setNonce]=useState(0);
-  useEffect(()=>{
-    if (!date) return;
-    let active=true;
-    setLoading(true);setPlan(null);setResponses(null);setPresence(null);setError("");setDutyMessage("");
-    void Promise.all([
+  const refresh=useCallback(async()=>{
+    const [result,duties,onsite]=await Promise.all([
       getOnsiteSupervisionPlan({data:{date}}),
       getOnsiteDutyResponses({data:{date}}),
       getOnsitePhysicalPresence({data:{date}}),
-    ]).then(([result,duties,onsite])=>{
+    ]);
+    setPlan(result);setResponses(duties);setPresence(onsite);setError("");
+  },[date]);
+  const mutation=useMutationFeedback(refresh);
+  const busy=mutation.pending||mutation.refreshFailed;
+  useEffect(()=>{
+    if (!date) return;
+    let active=true;
+    setLoading(true);setPlan(null);setResponses(null);setPresence(null);setError("");
+    void refresh().catch(()=>{
       if (!active) return;
-      setPlan(result);setResponses(duties);setPresence(onsite);setError("");setLoading(false);
-    }).catch(()=>{
-      if (!active) return;
-      setPlan(null);setResponses(null);setPresence(null);setLoading(false);
+      setPlan(null);setResponses(null);setPresence(null);
       setError("Staffing coverage or duty responses are unavailable. No confirmed coverage is assumed.");
-    });
+    }).finally(()=>{if(active)setLoading(false);});
     return ()=>{active=false};
-  },[date,nonce]);
+  },[refresh,nonce]);
   async function answerDuty(sectionId:string,periodId:string,response:"accepted"|"cannot_cover") {
-    if(dutyBusy)return;
-    setDutyBusy(sectionId+":"+periodId);setDutyMessage("");setError("");
-    try{
-      await respondToOnsiteDuty({data:{
-        date,sectionId,periodId,response,
-        ...(response==="cannot_cover"?{reason:"unavailable" as const}:{}),
-        confirmed:true as const,
-      }});
-      onChanged?.(); // Persisted staff duty changes invalidate the site review snapshot.
-      setDutyMessage(response==="accepted"
+    if(busy)return;
+    await mutation.run(()=>respondToOnsiteDuty({data:{
+      date,sectionId,periodId,response,
+      ...(response==="cannot_cover"?{reason:"unavailable" as const}:{}),
+      confirmed:true as const,
+    }}),{
+      successMessage:response==="accepted"
         ?"Your availability response was saved. This is not a supervision or student handoff certification."
-        :"Coverage exception recorded. Contact the site leader directly to arrange supervision.");
-      const next=await getOnsiteDutyResponses({data:{date}});
-      setResponses(next);
-    }catch{
-      setError("Duty response could not be saved. Refresh your assignment and contact the site leader.");
-    }finally{setDutyBusy("")}
+        :"Coverage exception recorded. Contact the site leader directly to arrange supervision.",
+      commandErrorMessage:"Duty response could not be saved. Refresh your assignment and contact the site leader.",
+      refresh:async()=>{await refresh();await onChanged?.();},
+      refreshErrorMessage:"The duty response was saved, but updated supervision records could not be loaded. Retry the refresh before responding again.",
+    });
   }
   async function recordPresence(sectionId:string,periodId:string,action:"report"|"witness"){
-    if(presenceBusy)return;
-    setPresenceBusy(sectionId+":"+periodId);setError("");setDutyMessage("");
-    try{
-      if(action==="report")await reportOnsitePhysicalPresence({data:{
+    if(busy)return;
+    await mutation.run(async()=>{
+      if(action==="report")return reportOnsitePhysicalPresence({data:{
         date,sectionId,periodId,physicallyPresent:true,
       }});
-      else await witnessOnsiteBlockPresence({data:{
+      return witnessOnsiteBlockPresence({data:{
         date,sectionId,periodId,witnessedBothAdults:true,
       }});
-      onChanged?.(); // The independent witness or arrival can stale a prior day review.
-      setPresence(await getOnsitePhysicalPresence({data:{date}}));
-      setDutyMessage(action==="report"
+    },{
+      successMessage:action==="report"
         ?"Your physical arrival was recorded. The Site director must independently witness both adults."
-        :"Independent Site director witness recorded. This does not confirm student custody or ongoing coverage.");
-    }catch(e){setError(e instanceof Error?e.message:"Unable to record physical presence");}
-    finally{setPresenceBusy("");}
+        :"Independent Site director witness recorded. This does not confirm student custody or ongoing coverage.",
+      commandErrorMessage:"Unable to record physical presence",
+      refresh:async()=>{await refresh();await onChanged?.();},
+      refreshErrorMessage:"Physical presence was recorded, but current supervision records could not be loaded. Retry the refresh before recording another event.",
+    });
   }
   async function interruptPresence(reportId:string,reason:"early_departure"|"temporary_absence"|"uncovered_handoff"){
-    if(presenceBusy)return;
-    setPresenceBusy(reportId);setDutyMessage("");setError("");
-    try{
-      await reportOnsiteStaffCoverageInterruption({data:{date,presenceReportId:reportId,reason}});
-      setPresence(await getOnsitePhysicalPresence({data:{date}}));
-      onChanged?.();
-      setDutyMessage("Coverage interruption recorded. Your earlier arrival cannot establish continuing supervision. Contact the Site director immediately.");
-    }catch(e){setError(e instanceof Error?e.message:"Could not record coverage interruption");}
-    finally{setPresenceBusy("");}
+    if(busy)return;
+    await mutation.run(
+      ()=>reportOnsiteStaffCoverageInterruption({data:{date,presenceReportId:reportId,reason}}),
+      {
+        successMessage:"Coverage interruption recorded. Your earlier arrival cannot establish continuing supervision. Contact the Site director immediately.",
+        commandErrorMessage:"Could not record coverage interruption",
+        refresh:async()=>{await refresh();await onChanged?.();},
+        refreshErrorMessage:"The coverage interruption was recorded, but current supervision records could not be loaded. Retry the refresh before reporting another event.",
+      },
+    );
   }
   return <section id="supervision" className="mt-10" aria-label="Planned onsite supervision">
     <h2 className="font-serif text-2xl">Instructional supervision plan</h2>
@@ -121,7 +120,7 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
       onClick={()=>{setLoading(true);setError("");setNonce(n=>n+1)}}>
       Refresh supervision plan
     </Button>}
-    {dutyMessage&&<p role="status" className="mt-3 text-sm">{dutyMessage}</p>}
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Updating supervision records…"/>
     {plan&&<>
       {responses&&<p className="mt-3 text-sm">
         {responses.unacknowledged} planned blocks not responded to ·
@@ -190,27 +189,27 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
              onsite.canWitness&&!onsite.witnessedBothAdults)&&
             <div className="mt-2 flex flex-wrap gap-2">
               {onsite.canReport&&!onsite.ownPresenceReported&&<Button type="button" variant="outline" size="sm"
-                disabled={!!presenceBusy}
+                disabled={busy}
                 onClick={()=>void recordPresence(block.sectionId,block.periodId!,"report")}>
                 I am physically present in this room
               </Button>}
               {onsite.canWitness&&!onsite.witnessedBothAdults&&<Button type="button" variant="outline" size="sm"
-                disabled={!!presenceBusy}
+                disabled={busy}
                 onClick={()=>void recordPresence(block.sectionId,block.periodId!,"witness")}>
                 I personally witnessed both named adults here
               </Button>}
             </div>}
           {onsite?.canReportInterruption&&onsite.ownPresenceReportId&&
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={!!presenceBusy}
+              <Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"temporary_absence")}>
                 Report temporary absence from this room
               </Button>
-              <Button type="button" variant="outline" size="sm" disabled={!!presenceBusy}
+              <Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"early_departure")}>
                 Report early departure
               </Button>
-              <Button type="button" variant="outline" size="sm" disabled={!!presenceBusy}
+              <Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={()=>void interruptPresence(onsite.ownPresenceReportId!,"uncovered_handoff")}>
                 Report an uncovered handoff
               </Button>
@@ -224,11 +223,11 @@ export function OnsiteSupervisionPanel({ date, onChanged }: { date:string; onCha
           {duty?.canRespond&&<p className="mt-1 text-xs">Your {block.ownDutyRole??"assigned"} duty response: {duty.ownStatus.replaceAll("_"," ")}</p>}
           {duty?.canRespond&&duty.ownStatus==="not_reported"&&block.periodId&&<>
             <div className="mt-3 flex flex-wrap gap-2">
-              {duty.canAccept&&<Button type="button" variant="outline" size="sm" disabled={!!dutyBusy}
+              {duty.canAccept&&<Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={()=>void answerDuty(block.sectionId,block.periodId!,"accepted")}>
                 I can cover this scheduled block
               </Button>}
-              <Button type="button" variant="outline" size="sm" disabled={!!dutyBusy}
+              <Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={()=>void answerDuty(block.sectionId,block.periodId!,"cannot_cover")}>
                 I cannot cover this block
               </Button>

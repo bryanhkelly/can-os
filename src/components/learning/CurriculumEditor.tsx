@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import type { ClassContent } from "@/domain/class-content";
 import { curriculumReleaseReadiness } from "@/domain/curriculum-release-readiness";
@@ -33,7 +34,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    const result=await saveAuthoredCurriculum({data:{programId,versionId:release.id,expectedRevision:revision,content,teacherGuides}});
    saved.current=JSON.stringify(content);guidesSaved.current=JSON.stringify(teacherGuides);
    setRevision(result.revision);setNotice("Publisher lesson content and protected teacher guides saved as draft.");
-  }catch(cause){setError(cause instanceof Error?cause.message:"Unable to save curriculum");}
+  }catch(cause){setError(mutationErrorMessage(cause, "Unable to save curriculum"));}
   finally{setBusy(false);}
  }
  async function saveOneLesson(moduleId:string,lessonId:string){
@@ -60,7 +61,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    setRevision(result.revision);
    setNotice(result.changed?"Publisher lesson saved within this course draft.":"Lesson was already up to date.");
    await onSaved();
-  }catch(e){setError(e instanceof Error?e.message:"Unable to save this lesson.");}
+  }catch(e){setError(mutationErrorMessage(e, "Unable to save this lesson."));}
   finally{setBusy(false);}
  }
  function moduleChange(index:number,change:Partial<ClassContent["modules"][number]>){
@@ -281,7 +282,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    try{
     await publishAuthoredCurriculum({data:{programId,versionId:release.id,expectedRevision:revision,reason,confirmed:true}});
     await onSaved();
-   }catch(cause){setError(cause instanceof Error?cause.message:"Unable to publish curriculum");}
+   }catch(cause){setError(mutationErrorMessage(cause, "Unable to publish curriculum"));}
    finally{setBusy(false);}
   }}>
    <label className="block text-sm">Release reason<textarea required minLength={10} maxLength={2000}

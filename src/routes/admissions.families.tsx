@@ -8,7 +8,8 @@ import {RegistrarEnrollmentFormReview} from "@/components/enrollment/EnrollmentF
 import {FamilyReadinessOverviewCard} from "@/components/admissions/FamilyReadinessOverviewCard";
 import {familyRequirementKey,isEnrollmentDocumentCandidate} from "@/components/admissions/family-document-state";
 import {createPrivateUploadTask,documentUploadPolicy} from "@/platform/storage/private-upload";
-import {mutationErrorMessage} from "@/lib/mutation-feedback";
+import {mutationErrorMessage,useMutationFeedback} from "@/lib/mutation-feedback";
+import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {z} from "zod";
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
 import {PageNavigation} from "@/components/workspace/page-navigation";
@@ -35,49 +36,49 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
  const router=useRouter();
  const selection=Route.useSearch();
  const visibleApps=apps.filter(app=>!selection.application||app.id===selection.application);
- const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const [reading,setReading]=useState(false),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
+ const busy=reading||mutation.pending||mutation.refreshFailed?"busy":null;
  const families=[...new Set(visibleApps.map(a=>a.householdId))];
  const [files,setFiles]=useState<Record<string,File|null>>({});
  const pendingUploads=useRef(new Map<string,{file:File;task:{run:()=>Promise<unknown>}}>());
- const uploading=useRef(false);
  const [uploadModes,setUploadModes]=useState({live:false,demo:false});
  useEffect(()=>{void getEnrollmentDocumentUploadAvailability().then(setUploadModes)
-  .catch(cause=>setError(cause instanceof Error?cause.message:"Unable to load document upload availability"));},[]);
+  .catch(cause=>setError(mutationErrorMessage(cause, "Unable to load document upload availability")));},[]);
  const [reviewFiles,setReviewFiles]=useState<Record<string,string>>({});
  async function update(applicationId:string,requirementId:string,complete:boolean){
-  setBusy(requirementId);setError("");
-  try{await setFamilyRequirement({data:{applicationId,requirementId,complete}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Requirement update failed");}
-  finally{setBusy(null);}
+  setError("");
+  await mutation.run(()=>setFamilyRequirement({data:{applicationId,requirementId,complete}}),
+   {successMessage:"Requirement updated.",commandErrorMessage:"Requirement update failed"});
  }
  async function addNote(applicationId:string,requirementId:string){
-  setBusy(requirementId);setError("");
-  try{await addRequirementReviewNote({data:{applicationId,requirementId,note:notes[familyRequirementKey(applicationId,requirementId)]??""}});setNotes(previous=>({...previous,[familyRequirementKey(applicationId,requirementId)]:""}));await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Review note failed");}
-  finally{setBusy(null);}
+  setError("");
+  await mutation.run(async()=>{
+   await addRequirementReviewNote({data:{applicationId,requirementId,note:notes[familyRequirementKey(applicationId,requirementId)]??""}});
+   setNotes(previous=>({...previous,[familyRequirementKey(applicationId,requirementId)]:""}));
+  },{successMessage:"Review note saved.",commandErrorMessage:"Review note failed"});
  }
  async function review(applicationId:string,requirementId:string,status:"requested"|"received"|"accepted"|"rejected"){
-  setBusy(requirementId);setError("");
-  try{await reviewRequirementDocument({data:{applicationId,requirementId,status,reason:notes[familyRequirementKey(applicationId,requirementId)]??"",documentId:reviewFiles[familyRequirementKey(applicationId,requirementId)]||undefined}});await router.invalidate();}
-  catch(e){setError(e instanceof Error?e.message:"Document review failed");}
-  finally{setBusy(null);}
+  setError("");
+  await mutation.run(()=>reviewRequirementDocument({data:{applicationId,requirementId,status,reason:notes[familyRequirementKey(applicationId,requirementId)]??"",documentId:reviewFiles[familyRequirementKey(applicationId,requirementId)]||undefined}}),
+   {successMessage:"Document review saved.",commandErrorMessage:"Document review failed"});
  }
  async function openDocument(applicationId:string,requirementId:string,documentId:string){
-  setBusy(requirementId);setError("");
+  if(busy)return;
+  setReading(true);setError("");
   try{
    const result=await getEnrollmentDocumentDownload({data:{applicationId,requirementId,documentId}});
    window.open(result.downloadUrl,"_blank","noopener,noreferrer");
-  }catch(e){setError(e instanceof Error?e.message:"Unable to open document");}
-  finally{setBusy(null);}
+  }catch(e){setError(mutationErrorMessage(e, "Unable to open document"));}
+  finally{setReading(false);}
  }
  async function upload(applicationId:string,requirementId:string){
-  if(uploading.current)return;
   const file=files[familyRequirementKey(applicationId,requirementId)];if(!file)return;
   if(!isEnrollmentDocumentCandidate(file)){
    setError("Choose a nonempty PDF, PNG, or JPEG document of at most 10 MB.");return;
   }
-  uploading.current=true;setBusy(requirementId);setError("");
-  try{
+  setError("");
+  await mutation.run(async()=>{
    const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
    const uploadIdentity=familyRequirementKey(applicationId,requirementId);
    let attempt=pendingUploads.current.get(uploadIdentity);
@@ -91,10 +92,8 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
    await attempt.task.run();
    pendingUploads.current.delete(uploadIdentity);
    setFiles(previous=>({...previous,[uploadIdentity]:null}));
-   try{await router.invalidate();}
-   catch{setError("Document received, but the page could not refresh. Reopen it to review the saved document.");}
-  }catch(e){setError(mutationErrorMessage(e,"Document upload failed. Retry to finish without uploading again."));}
-  finally{uploading.current=false;setBusy(null);}
+  },{successMessage:"Document received and ready for review.",
+   commandErrorMessage:"Document upload failed. Retry to finish without uploading again."});
  }
  return <main className="mx-auto max-w-5xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Enrollment</p>
@@ -103,6 +102,7 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   {selection.application&&<Link to="/admissions/families" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-4 inline-block text-sm underline">View all household readiness</Link>}
   {selection.application&&!visibleApps.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current family readiness view.</p>}
   {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
+  <MutationFeedback state={mutation} pendingMessage="Saving family readiness..." className="mt-4"/>
   <div className="mt-6 rounded-xl border p-5"><p className="text-sm">Households represented</p><p className="font-serif text-3xl">{families.length}</p></div>
   <div className="mt-6 space-y-4">{families.map((id,i)=><section key={id} className="rounded-xl border p-5">
    <h2 className="font-serif text-xl">Household {i+1}</h2>
@@ -114,9 +114,9 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
     <div className="mt-3 space-y-3">{a.requirements.map(r=>{
      if(r.form)return <article key={r.id} className="space-y-3 rounded-lg border p-3">
       <h3 className="font-semibold">{r.title}{r.blocking?" · Required":""}</h3>
-      <RegistrarEnrollmentFormReview key={r.form.submission?.id??r.form.revision} applicationId={a.id} requirementId={r.id}
+      <fieldset disabled={busy!==null}><RegistrarEnrollmentFormReview key={r.form.submission?.id??r.form.revision} applicationId={a.id} requirementId={r.id}
        record={r.form} closed={["active","complete","cancelled"].includes(a.journeyStatus??"")}
-       onChanged={async()=>{await router.invalidate();}}/>
+       onChanged={async()=>{await router.invalidate();}}/></fieldset>
      </article>;
      const latestDocumentReview=[...r.evidence].reverse().find(e=>e.kind==="document_review");
      const documentReviewPending=Boolean(latestDocumentReview&&latestDocumentReview.status!=="accepted");

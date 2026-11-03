@@ -8,6 +8,10 @@ export const studentDisplayPreferences=z.object({
 }).strict();
 export type StudentDisplayPreferences=z.infer<typeof studentDisplayPreferences>;
 export const defaultStudentDisplayPreferences=studentDisplayPreferences.parse({});
+export function studentHomePath(preferences:StudentDisplayPreferences){
+ const paths={today:"/student",courses:"/student/courses",assignments:"/student/assignments",support:"/student/support"} as const;
+ return paths[preferences.defaultStudentTab];
+}
 export function parseStudentDisplayPreferences(value:unknown):StudentDisplayPreferences{
  const result=studentDisplayPreferences.safeParse(value);
  return result.success?result.data:defaultStudentDisplayPreferences;

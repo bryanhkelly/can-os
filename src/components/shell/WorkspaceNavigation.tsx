@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import {useLocation} from "@tanstack/react-router";
 import {useEffect,useState,type ReactNode} from "react";
 import {openPaletteEvent} from "@/lib/workspace-search";
@@ -23,6 +24,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const [accountOpen,setAccountOpen]=useState(false);
  useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
+ const preferences=authenticated?.role==="student"?authenticated.studentPreferences:undefined;
  const grants=authenticated?.grants??[];
  const current=grants.find(g=>g.id===authenticated?.activeGrantId);
  const links=current?(getWorkspaceLinks(current.role)??[]):[];
@@ -32,7 +34,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   if(!target)throw new Error("This membership is unavailable.");
   const response=await fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:id})});
   if(!response.ok)throw new Error("Unable to change membership");
-  window.location.assign(getWorkspaceHome(target.role)??"/");
+  window.location.assign(target.role==="student"?"/":getWorkspaceHome(target.role)??"/");
  };
  const signOut=async()=>{
   const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
@@ -43,12 +45,13 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   setChanging(true);setError("");setSwitcherError("");
   try{await command()}
   catch(error){
-   const message=error instanceof Error?error.message:"Unable to update your session.";
+   const message=mutationErrorMessage(error, "Unable to update your session.");
    if(switching)setSwitcherError(message);else setError(message);
    setChanging(false);
   }
  }
- return <><div className={current?"min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]":"min-h-screen"}>
+ return <div data-density={preferences?.density} data-reduce-motion={preferences?.reduceMotion?"true":undefined}>
+ <div className={current?"min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]":"min-h-screen"}>
  {current&&<WorkspaceSidebar member={current} sites={authenticated?.sites??[]} links={links} activePath={activePath}/>}
  <div className="min-w-0"><WorkspaceTopBar member={current} sites={authenticated?.sites??[]} authenticated={Boolean(authenticated)}
   sessionAvailable={Boolean(session)} sessionError={sessionError} error={error}
@@ -69,5 +72,5 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   onSignOut={()=>void changeSession(signOut)} menuOpen={menuOpen}
   onCloseMenu={()=>setMenuOpen(false)} links={links} activePath={activePath}
   tray={tray} onCloseTray={()=>setTray(null)}/>
- </>;
+ </div>;
 }

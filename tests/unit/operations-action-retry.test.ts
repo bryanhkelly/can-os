@@ -12,7 +12,7 @@ vi.mock("@/db/client",()=>({db:{transaction:async(fn:any)=>fn({
  select:()=>({from(){return this;},where(){return this;},for(){return this;},limit:async()=>[state.record]}),
  update:state.update,
 })}}));
-import { updateOperationsAction } from "@/modules/operations/action-workspace.functions";
+import { assignOperationsAction, updateOperationsAction } from "@/modules/operations/action-workspace.functions";
 beforeEach(()=>{
  vi.clearAllMocks();
  state.actor={role:"registrar",actorPersonId:"operator",scope:{siteIds:["site"],programIds:["program"]}};
@@ -47,5 +47,21 @@ describe("closed school Action resolution retries",()=>{
   state.record.type="support_referral";
   await expect(updateOperationsAction({data:{id:"action",status:"resolved",
    resolutionNote:"The reviewed answer."}})).rejects.toThrow("referral lifecycle");
+ });
+ it.each(["in_progress","waiting","resolved"] as const)("keeps class requests out of generic %s transitions",async status=>{
+   state.record.type="section_creation_request";
+   state.record.status="open";
+   await expect(updateOperationsAction({data:{id:"action",status,
+    resolutionNote:"Reviewed without provisioning."}})).rejects.toThrow("Use academic setup");
+   expect(state.update).not.toHaveBeenCalled();expect(state.audit).not.toHaveBeenCalled();
+   expect(state.event).not.toHaveBeenCalled();
+ });
+ it("preserves the original teacher requester instead of reassigning the request",async()=>{
+   state.record.type="section_creation_request";
+   state.record.status="open";
+   await expect(assignOperationsAction({data:{id:"action",ownerPersonId:"operator",
+    priority:"normal"}})).rejects.toThrow("retain their original requester");
+   expect(state.update).not.toHaveBeenCalled();expect(state.audit).not.toHaveBeenCalled();
+   expect(state.notify).not.toHaveBeenCalled();
  });
 });

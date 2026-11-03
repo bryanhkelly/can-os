@@ -28,7 +28,7 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
     void getGuardianEnrollmentChecklist({ data: { applicationId } }).then(checklist => {
       if (current) setData(checklist);
     }).catch(cause => {
-      if (current) setError(cause instanceof Error ? cause.message : "Unable to load enrollment checklist");
+      if (current) setError(mutationErrorMessage(cause, "Unable to load enrollment checklist"));
     });
     // Upload availability is independent so a storage outage cannot block forms.
     void getEnrollmentDocumentUploadAvailability().then(result => {
@@ -71,7 +71,7 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
     try {
       const { downloadUrl } = await getEnrollmentDocumentDownload({ data: { applicationId, requirementId, documentId } });
       window.open(downloadUrl, "_blank", "noopener,noreferrer");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open enrollment document"); }
+    } catch (cause) { setError(mutationErrorMessage(cause, "Unable to open enrollment document")); }
     finally { setBusy(null); }
   }
   return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">

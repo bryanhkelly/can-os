@@ -200,6 +200,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       <nav aria-label="Next school preparation actions" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
         <a href="#launch-academic-year" className="underline">Prepare recommended year</a>
         <a href="#launch-first-class" className="underline">Prepare first classroom</a>
+        <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+          hash="physical-classrooms" className="underline">Create physical classrooms</Link>
         <a href="#launch-website" className="underline">Prepare website</a>
         <a href="#invite-families" className="underline">Review invitation progress</a>
       </nav>
@@ -300,5 +302,4 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </section>
   </section>;
 }
-
 

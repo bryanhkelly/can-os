@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useState } from "react";
 import { getSubmissionReview, getTeacherSubmissionAttachment } from "@/modules/learning/gradebook.functions";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
@@ -13,7 +14,7 @@ export function SubmissionEvidence({ submissionId, historical = false }: { submi
     getSubmissionReview({ data: { submissionId } }).then(result => {
       if (active) setReview(result);
     }).catch(cause => {
-      if (active) setError(cause instanceof Error ? cause.message : "Unable to load submitted work.");
+      if (active) setError(mutationErrorMessage(cause, "Unable to load submitted work."));
     });
     return () => { active = false; };
   }, [submissionId]);
@@ -23,7 +24,7 @@ export function SubmissionEvidence({ submissionId, historical = false }: { submi
       const result = await getTeacherSubmissionAttachment({ data: { submissionId, documentId } });
       window.location.assign(result.downloadUrl);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to open this attachment.");
+      setError(mutationErrorMessage(cause, "Unable to open this attachment."));
     } finally { setOpening(false); }
   }
   return <section aria-label="Submitted work" className="mb-5 space-y-4 border-b pb-5">

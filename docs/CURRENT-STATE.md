@@ -1,5 +1,569 @@
 # CAN OS — current implementation snapshot
 
+## Authorized main demo reconciliation (2026-11-02)
+
+- At source commit `8d4494789241137c0b15ad1350d7b4d595d9b186`, applied only
+  migration `0061_demo_school_tenants` to attested main with explicit operator
+  authorization, branch/ledger guards, bounded locks and one atomic transaction.
+  Exact ledger hash and registry schema postflight passed; see
+  [identity and demo access](./identity-and-demo-access.md).
+- Browser verification created a separate synthetic `.demo` tenant and signed
+  its initial Site Admin into normal Launch Studio without email delivery.
+- A separately authorized, exact-identity Valor fixture reconciliation restored
+  the missing parent Program enrollment for eight historical active Section
+  memberships, the existing guardian relationship's explicitly simulated
+  verification, a shared synthetic Household, missing institution memberships
+  and Riley's scoped teacher role. Fixed Valor account verification timestamps
+  were reconciled with explicit audit evidence that no email was delivered and
+  no actual email ownership was verified. No authentic identity was adopted.
+  These are operator-reconciled fixture facts, not real admissions, consent or
+  credential-review evidence. An identical retry added no duplicate audit facts.
+- Playwright verified Jordan's Today page with eight classes and coursework,
+  and Morgan's family home with Jordan rather than an empty enrollment list.
+  At that checkpoint Riley still lacked qualification policy and evidence; the
+  subsequent authorized repair and browser evidence below supersede that blocker.
+- Broader school lifecycle, authentic-record use and release readiness remain
+  unverified. These checks do not replace isolated integration acceptance.
+
+### Teacher evidence and connected learning follow-up (2026-11-02)
+
+With subsequent explicit authorization to configure and repair the demo:
+
+- Reconciled only the legacy active Valor Hybrid Program's missing teacher
+  policy, without changing its status or bypassing the pre-opening editor gate.
+  Version `f7300000-0000-4000-8000-000000000002` requires shared catalog entries
+  `teacher-resume`, `bachelors-degree` and `teaching-license`. This is a chosen
+  demonstration school policy, not universal requirements or regulatory advice.
+  Operator reconciliation source is
+  `operator-authorized-valor-qualifications-20261102`; catalog/policy audit and
+  domain events are retained. Identical reconciliation retries create no
+  duplicate policy versions.
+- The configured private R2 bucket accepted `Content-Type`-only preflight but
+  rejected the immutable upload's `If-None-Match` header. After the operator
+  added that header to bucket CORS, the exact local browser preflight returned
+  204. Wildcard origins remain operator-configured; this does not meet the
+  documented production exact-origin hardening recommendation.
+- Enabled `CAN_R2_QUALIFICATION_UPLOADS_ENABLED=true` locally, not on Netlify.
+  Playwright submitted explicitly simulated resume, degree and license PDFs
+  from Riley's profile. Real private objects, signature/size verification,
+  restricted document metadata and immutable submission decisions were
+  independently verified. Alex's separate reviewer identity approved all
+  three through the ordinary review UI with explicitly simulated reasons.
+  These are not real qualifications or an assertion of human-independent review.
+- Riley's class directory and gradebook now expose eight assigned classes.
+  Playwright published `PW Connected Demo Learning 20261102` in Algebra I:
+  assessment `c0668f18-eb50-4937-ad51-d971cae18f21`. Jordan saved and submitted
+  a response with receipt `6839647b-ed18-4fe4-8059-21f8cd6e3272`. Riley saved
+  an unreleased grading draft and then posted 9/10 with feedback. Both Jordan's
+  assignment and Morgan's academics displayed the released feedback; Morgan
+  also displayed the numeric grade. The database independently verified the
+  published assessment, graded/on-time submission, audit and domain events.
+- Jordan sent an assignment discussion message, Morgan replied, and Riley read
+  both in shared thread `f1997d6a-266d-4e77-9c45-567042f8c6ac`. No email
+  delivery was required or claimed.
+- Processed only the exact scenario's 19 qualification/learning/message events through the ordinary worker
+  using its bounded event-ID selection. Guardian notifications displayed the
+  grade and student message; marking the grade notice read succeeded. No
+  queue-wide drain, external delivery worker or unrelated tenant repair ran.
+  An identical worker retry processed zero events and retained exactly six
+  notification rows, including the guardian's persisted read status.
+- Found a coverage-repair UI gap: already-assigned teachers were excluded from
+  the selector even when their historical assignment lacked delivery coverage.
+  Kept those teachers selectable and reused the existing qualification-checked,
+  idempotent assignment command. Playwright reconfirmed all eight existing
+  Riley assignments. Independent database and service evaluation found exactly
+  one teacher relationship and one active full-window arrangement per class;
+  all eight returned staffing `ready: true`.
+  The eight resulting delivery-arrangement events were also processed with the
+  same bounded worker, bringing this scenario to 27 processed events.
+  Four current curriculum classes
+  also showed first-week readiness. Four legacy classes still explicitly lack
+  learner-facing lessons and instructed introductory assessments; their
+  content-readiness blockers were not waived.
+- Validation: TypeScript passed; 85 focused cases across eight files passed,
+  focused worker/coverage lint passed, route inventory passed at 108/108, and
+  whitespace checks passed. Worker-selection cases cover scoped claim/recovery,
+  empty selection, malformed IDs and ordinary default. Isolated database
+  integration and all other golden-flow acceptance remain unverified; staffing
+  recovery is not full school lifecycle or release certification.
+
+### Admissions, attendance and support continuation (2026-11-02)
+
+On the same source commit with local, uncommitted UI fixes, continued Playwright
+walkthroughs against the explicitly authorized synthetic Valor records on main:
+
+- Reconciled only Morgan's missing canonical contact email after exact fixed
+  account/person/grant checks, retaining an operator audit. The sibling-intake
+  email/verified-household guard was not relaxed.
+- Application `dfdf5713-0b51-41bb-a2c0-f145166dbee0`, for
+  `PW Admissions Synthetic 20261102`, reused Morgan and the existing Household.
+  Exercised inquiry, verified guardian relationship, eligibility, waitlist and
+  restoration, registrar readiness, guardian form signature, returned correction,
+  re-signature, approval, offer issue/acceptance and atomic Program/Algebra I
+  activation. All evidence explicitly identifies a simulated walkthrough.
+  Independent database checks retained both signatures and both reviews, one
+  accepted offer and exactly two active enrollments (Program and Section).
+- Fixed guardian verification's unsupported native prompts with an inline
+  method/evidence form using the same server command. The new form completed
+  the walkthrough. Fixed a contradictory selected-application empty state and
+  added scoped capacity-setup guidance when no school-year seat pool exists.
+- Configured a 30-seat school-year pool through the ordinary UI. Set only
+  Algebra I's add/drop deadline to November 30, preserving its December 18
+  withdrawal deadline, rather than bypassing registration checks.
+- Morgan's academic view exposes the new child's four Algebra I assignments,
+  with zero released grades. No new student login or shared-code persona was
+  created. Fixed registrar handoff copy to identify missing guardian consent
+  rather than incorrectly reporting missing classroom readiness.
+- Configured one explicitly simulated November 3 instructional day and a
+  Monday-Friday 08:30-15:00 timetable, attached only to Algebra I through the
+  audited lifecycle editor. Direct Alex sign-in verified future first-day
+  preparation, but supervision remains blocked by missing facilitator and room.
+  No attendance, supervision or actual school opening was certified.
+  The staff live attendance view showed no roster for that future day; its
+  relationship to the preparation projection remains unverified.
+- Approved Jordan's existing synthetic October 13 excuse through the staff UI.
+  Independent database checks retain the original absent event and exactly one
+  superseding excused event; original attendance history was not overwritten.
+- Riley referred the new learner for academic coaching, and Casey accepted,
+  saved a plan, scheduled and completed an explicitly simulated service, moved
+  to review and closed the referral. Action
+  `f1ce15a5-76a5-4fe4-baf9-e884cc2db693` resolves to typed referral
+  `e5fea852-2950-47bc-a377-9923d5431581`. Database checks found one plan, one
+  completed service and all six stages retained. Riley sees the closed status;
+  Morgan's direct navigation to the staff support record is denied.
+- Validation: TypeScript passed; 40 focused navigation/handoff cases passed;
+  focused ESLint returned zero errors and five existing warnings; route inventory
+  passed at 108/108 and whitespace checks passed. This continuation did not drain
+  the outbox or verify new notification/email delivery, provision student access,
+  run isolated database integration acceptance or verify Netlify production.
+  Remaining journeys and exceptions are not certified by these bounded checks.
+
+### Physical classroom setup follow-up (2026-11-02)
+
+- Added reusable Site-owned physical classrooms to normal school setup, separate
+  from teaching Sections. The launch portfolio links to the academic setup's
+  `Physical classrooms` panel. Scoped Site Admin/registrar commands create rooms
+  and assign default Section locations, with transactional audit and domain
+  events, stable-ID replay checks and case-insensitive Site/name uniqueness.
+  Rooms are shared across Programs at the same Site. At this walkthrough the
+  catalog was create-only; the later lifecycle follow-up below supersedes that
+  limitation, but is not a complete facilities workflow.
+- New daily onsite coverage plans must select a saved same-Site room. The server
+  rejects another Site's room or client-supplied capacity/name changes, and
+  rechecks canonical room identity at independent approval. The default class
+  location preselects the room when no current plan exists. Existing reviewed
+  legacy documents retain their evidence and expiry; defaults never replace
+  approved daily plans or certify safety, inspection, attendance or opening.
+- Under the operator's standing authorization for necessary demo configuration,
+  applied only additive migration `0062_site_rooms` to exact-attested main in one
+  transaction, after previous migration hash/ledger and table-absence checks.
+  Postflight verified the five columns, primary/foreign/check constraints and
+  indexes; identical retry performed no DDL. No existing business rows were
+  rewritten by the migration.
+- Playwright created `SIMULATED Valor Classroom A`, occupancy limit 30, through
+  Alex's ordinary setup UI and assigned only Algebra I's default location.
+  Reload preserved both. Independent main reads verified room
+  `5089f3d9-60b4-49cb-a15f-958b77bd8477`, Section
+  `7b6eb18e-8191-fbd5-bc2d-cd860e6b26a0`, one `SiteRoomCreated` and one
+  `SectionRoomAssigned` event, and one corresponding audit for each command.
+  No supervised day or new daily plan was approved.
+- TypeScript, production build and 60 focused room/plan/setup cases passed.
+  Route inventory passed at 108/108 and whitespace checks passed. Focused new-code ESLint
+  passed without errors or warnings; the wider touched surfaces retained three
+  existing warnings. Isolated room-plan database integration, the specialized
+  daily plan selector in a browser and Netlify deployment remain unverified.
+
+### Calendar and family conference continuation (2026-11-02)
+
+Using the same authorized synthetic Valor records on main:
+
+- Playwright exercised Alex's private personal calendar create, edit, reschedule
+  and confirmed cancellation. Event `f31ee3bc-f96c-42ce-8284-d4147b2f6758`
+  remains cancelled, with its revised occurrence at Nov 5, 14:00-14:30
+  America/Los_Angeles. Independent reads verified matching scheduled-occurrence
+  times and one audit/domain event per mutation. Morgan's private calendar did
+  not expose Alex's event.
+- Fixed month navigation that previously reset on reload because Next/Prev
+  updated only component state. Month and selected day now derive from the
+  validated search date; navigation retains view/source/Section filters and
+  clears stale event selection. Superseded month loads cannot overwrite newer
+  results. Playwright verified December survives reload with Personal/Agenda
+  retained, Prev returns November, and selecting Nov 17 updates URL and form.
+- Riley published `SIMULATED PW Family Conferences 20261102`, series
+  `545c03b4-ca23-4531-aa89-88e17f98f33a`, with three Nov 5 slots, 16:00-17:00
+  America/Los_Angeles. Morgan booked the new synthetic sibling, moved the
+  appointment from 16:00 to 16:20 and cancelled it. Booking
+  `05e30a97-5c75-433e-81bd-dff4ee63a467` retains its history.
+  Morgan then booked Jordan at 16:40; Riley saw Jordan's appointment, queued
+  one reminder and cancelled booking `e5437c14-9067-4d00-b43f-51d2457fefa2`.
+  The ordinary teacher UI returned to three of three slots open.
+- Fixed missing teacher/series/timezone labels on family availability, bookings
+  and reschedule choices. Playwright verified Riley's name, series title and
+  America/Los_Angeles labels after reload.
+- Source inspection found that outcome recording could overwrite cancelled or
+  completed bookings and record future attendance, while teacher reads dropped
+  ended appointments before no-shows could be recorded. Added locked
+  booked-only transitions, start/end-time guards and recent-booking retrieval
+  independent of future series. Future outcome controls are disabled and
+  reevaluate every 30 seconds; server time remains authoritative. Playwright
+  confirmed future held/no-show controls disabled. No future conference was
+  falsely recorded as held or missed.
+- Independent exact-main verification found exactly two cancelled bookings,
+  three available slots, matching cancelled calendar/occurrence projections,
+  three canonical participants per booking, exactly one audit/event per
+  exercised command and one persisted unread guardian reminder. No email or
+  external delivery was claimed; the existing historical reminder is retained
+  after cancellation. No outbox drain or schema migration ran in this segment.
+- Enrichment's normal catalog showed no open programs. Registration,
+  publication/safety gates, conference outcome/follow-up browser completion,
+  isolated database integration and Netlify deployment remain unverified.
+- Validation: TypeScript and production build passed; 74 focused calendar,
+  authority, family-experience and conference cases across six files passed.
+  Focused ESLint returned zero errors and 19 existing warnings on the calendar
+  and teacher-panel surfaces. Route inventory passed at 108/108 and whitespace
+  checks passed. These bounded results are not all-flow or release certification.
+
+### Study groups, pickup authority and family health review (2026-11-02)
+
+Continued ordinary Playwright commands against only the authorized synthetic
+Valor records on main:
+
+- Jordan created `SIMULATED PW Algebra Collaboration 20261102` from Algebra I
+  and invited the newly enrolled synthetic sibling. Group
+  `bb9ddaea-dc25-44e4-9c45-8affd169d7a8` uses Riley as the existing Section
+  facilitator. Morgan granted permission, then Riley separately approved
+  Jordan's membership. The invitation did not create an approved sibling
+  membership or provision a student account.
+- Riley scheduled session `d0bf2546-0fdf-4d9a-9491-e2c469f41caf` for Nov 6
+  at 15:00 America/Los_Angeles. Jordan RSVP'd going and posted an explicitly
+  simulated, harmless moderation exercise. Reporting the post reproduced
+  `prompt() is not supported`; replaced the native prompt with the standard
+  accessible ActionDialog, bounded reason input and shared mutation feedback.
+  The new report reached Riley's ordinary moderation queue. Riley hid the post
+  and resolved its moderation Action; Jordan's reloaded discussion omitted it.
+- Riley moved the session to 15:30-16:00; Jordan's group view and canonical
+  calendar both showed the new time. Riley cancelled it; Jordan saw an explicit
+  Cancelled label and no RSVP controls. No future attendance was recorded.
+- Jordan left and requested membership again. Fixed guardian permission cards
+  to identify the canonical child by name rather than group title alone;
+  Playwright verified `Student: Jordan Example`. Morgan declined this request.
+  Changed misleading student pending guidance to name both current guardian
+  permission and facilitator approval. Jordan withdrew the pending request.
+  Discussion/session access and the calendar session were absent afterward.
+- Independent exact-main reads verified one group, one final-left membership,
+  both retained approve/decline consent records, one cancelled session with
+  matching calendar/occurrence times, one RSVP with unrecorded attendance,
+  one hidden post and one resolved report/Action. Audit counts matched the
+  exercised create, request/re-request, guardian/facilitator decisions, two
+  leave/withdraw commands, RSVP, post, report, moderation and session mutations.
+- Morgan authorized the explicitly simulated pickup adult
+  `Simulated Pickup Adult 20261102` for the sibling, Nov 2-6, with a government
+  photo-ID requirement, then revoked the authorization through the ordinary
+  family UI. Main retains revoked authorization
+  `29d34504-79ab-4a21-898e-de90ee1165db`; no pickup release was fabricated.
+  Staff-witnessed handoff, custody holds and supervised-day safety gates were
+  not bypassed or accepted by this authorization/revocation check.
+- Delegated Demo Admin health submission was correctly denied. Signed in
+  directly as the approved Morgan fixed account, submitted a clearly simulated
+  nonclinical request for school review, then signed in directly as Alex and
+  declined it with an explicitly simulated explanation. Morgan's health page
+  showed School needs clarification and allowed correction/resubmission.
+  Main verified Action `d0cf1c26-fd50-47d1-a5a3-5265fd118c64` resolved/rejected,
+  no pending proposal, unchanged empty school medical summaries, one request
+  and one rejection audit, and one ActionCreated/ActionResolved event each.
+  No actual clinical instruction, emergency contact, medication authorization
+  or return-to-school clearance was approved.
+- Remaining boundaries: invitation acceptance by the sibling, official
+  attendance, actual pickup handoff, medical approval/clearance and all other
+  unexercised journeys remain unverified. No schema migration, queue-wide
+  worker drain, external delivery or Netlify deployment ran in this segment.
+- Validation: TypeScript, production build and 57 focused navigation,
+  membership and session-projection cases across three files passed. Focused
+  ESLint returned zero errors and two existing student-route effect warnings.
+  Route inventory passed at 108/108 and whitespace checks passed. The updated
+  disposable-database consent-name assertion was not executed; isolated
+  integration acceptance remains unverified.
+
+### Course requests, academic records and trip permissions (2026-11-02)
+
+Continued Playwright walkthroughs using the same authorized synthetic Valor
+records on attested main:
+
+- Jordan requested Algebra I withdrawal. Alex declined through the course
+  approvals queue. Action `0a14a75b-e0bb-4467-9954-36ebfac6421d` remains
+  cancelled; enrollment `e6588006-cabf-3984-b629-a61d56d27bd9` remains active.
+- Through the ordinary course-policy editor, Alex set Digital Photography's
+  add/drop deadline to Nov 30 and required verified guardian permission.
+  Capacity 12, one credit and the seven-credit term limit were not relaxed.
+  Jordan requested addition; Morgan declined, then changed the pending
+  decision to approval. Both immutable consent records remain. Alex's approval
+  correctly failed because the published legacy course lacks an accessible
+  lesson. No enrollment was added and no published curriculum was edited.
+  Alex subsequently declined Action `79492a08-2a7d-4f8d-afa9-4ab69386b053`;
+  Jordan retains eight active classes and neither request remains open.
+- Found that the registrar received only a generic failure instead of the
+  placement blocker. Added explicit safe placement codes, then reproduced a
+  deeper transport defect: Start's shallow Error serializer dropped the
+  middleware's safe code/name/retryability properties. Sanitized failures now
+  cross the wire as plain allowlisted DTOs. Playwright verified the actual
+  response retains `COURSE_CONTENT_REQUIRED` and the page explains that a
+  published student-accessible lesson is required. Private diagnostics remain
+  excluded. Guardian access to the staff approvals route still returns the
+  proper permission-denied presentation.
+- Student registration and guardian course decisions now use shared mutation
+  feedback rather than independent busy/error flags; successful writes and
+  failed refreshes remain distinct and duplicate submissions are synchronously
+  guarded. Removed stale catalog text claiming guardian approval was unfinished.
+- Jordan and Morgan viewed the four pre-existing synthetic Quarter 1 finalized
+  grades. Switching Morgan's report-card selection to the newly admitted
+  sibling showed no finalized grades or transcript rows, not Jordan's records.
+  Alex issued transcript `b612d0e8-00c2-41e1-94ab-434c6f2bb897` with an explicit
+  SIMULATED purpose. Jordan's report card showed its issuance afterward.
+  Independent main reads verified its four-row snapshot against canonical
+  finalized grades, the correct issuer/Alex attribution and one audit/event.
+  All four credit entries honestly remain Not recorded; no credits, grades,
+  graduation status or diploma were fabricated. New grade finalization,
+  corrections and external credential delivery remain unverified.
+- Alex proposed and approved free trip `SIMULATED PW Museum Planning 20261102`,
+  ID `9c901f83-f97d-4347-980e-8a41b93a60be`, for Nov 9, 09:00-14:00
+  America/Los_Angeles, with Nov 6 17:00 permission deadline. Its versioned
+  statement explicitly describes a synthetic walkthrough, not real travel,
+  medical care or transport. Alex invited Jordan; Morgan signed and then
+  withdrew permission through the confirmation UI.
+- Reloaded staff roster shows Guardian declined / NOT authorized to board,
+  with no departure or return recorded. Independent reads verified participant
+  `9dcadda5-8f27-44d1-be32-ba4bd7e1d484` declined, retained original signature
+  with revocation plus a new refusal record, one staff refusal notification,
+  exactly one audit per exercised command, no fee obligation and zero trip
+  attendance rows. Calendar event `ea9af305-1c31-41ee-b575-84ebdf414b1a`
+  and its occurrence match the canonical trip times.
+- No actual boarding, chaperone clearance, safety packet, offline medical
+  access, payment, incident or return was simulated as a real fact. These
+  limited planning/permission checks do not certify the full trip journey.
+- Validation: 84 focused safe-error, first-lesson, navigation, mutation-feedback
+  and loader cases across five files passed, including round trips with the
+  router's actual Seroval plugins. Typecheck and production build passed.
+  Focused ESLint returned zero errors and one existing catalog color warning.
+  Route inventory passed at 108/108 and whitespace checks passed. Exact-main
+  read-only assertions independently verified the course, transcript and trip
+  records above. No schema migration, outbox drain or deployment ran;
+  disposable-database integration and broader journeys remain unverified.
+
+### Student preferences and schoolwork support follow-through (2026-11-02)
+
+Continued local Playwright walkthroughs at source commit
+`8d4494789241137c0b15ad1350d7b4d595d9b186` with uncommitted changes, using the
+same explicitly authorized synthetic Valor records on attested main:
+
+- Found that all four student display preferences persisted without affecting
+  their intended surfaces. The authenticated student workspace now projects only
+  the actor's parsed preference fields and applies density, reduced motion,
+  default home section and completed-assignment visibility. Saving updates the
+  shared session immediately, with duplicate-command prevention and separate
+  saved-but-refresh-failed feedback. Staff and guardian authority is unchanged.
+- Browser verification measured compact page padding at 16px and reduced
+  transitions at `1e-05s`. CAN OS home honored Courses and then Support; a fresh
+  Jordan sign-in also landed in Support. Explicit Today still opened `/student`.
+  Switching to Alex did not retain student density attributes.
+- Hiding completed work reduced the default assignment list from 13 to eight
+  actionable items. Feedback still exposed four entries, and the exact graded
+  assignment `c0668f18-eb50-4937-ad51-d971cae18f21` retained its released
+  feedback. Restored Jordan's original comfortable/Today/no-reduced-motion/
+  show-completed preferences through the ordinary settings UI; CAN OS home
+  returned to Today and the All list again showed 13 assignments.
+- Jordan created explicitly simulated schoolwork-only help Actions
+  `73b2c21b-37d0-4974-9b19-b92e7bddbc9c` and
+  `778a10ac-1d8e-4e96-baad-56f71f161bd5`. Two synchronous Send request
+  clicks for the second produced exactly one Action. Alex followed the first
+  through open, in progress and waiting. Resolve exposed an unsupported native
+  prompt before any resolution write.
+- Replaced the remaining Operations resolution, deadline and enrollment-exit
+  prompts with standard accessible dialogs. Rationale remains required and
+  bounded; institutional exits retain an explicit verified-review acknowledgment
+  and their separate canonical command. Command errors retain the entered note;
+  saved-but-refresh-failed closes the dialog and blocks further writes until
+  reopening the workspace. Resolution now displays a success notice and the
+  selected queue item links to its durable Action detail.
+- Browser-resolved both help requests with clearly simulated completion notes.
+  Jordan's Support list showed both resolved and the exact saved-action link
+  showed Completed. Staff Action detail retained the second resolution note.
+  A temporary deadline on the second request was saved and then removed through
+  the new rationale dialog before resolution. Two synchronous resolution clicks
+  produced one resolution audit and one event.
+- Independent exact-main, read-only assertions verified one creation per unique
+  request, the expected status transitions and actors, one ActionCreated and
+  ActionResolved event per request, two deadline audits/events, restored null
+  deadlines and original student ownership, zero assignment changes, and the
+  restored Person preferences. No queue-wide outbox processing ran.
+- Validation: 76 focused preference, session, navigation, support, Action-retry,
+  mutation-feedback and safe-error cases across eight files passed. Typecheck,
+  production build, route inventory (108/108) and whitespace checks passed.
+  Focused ESLint returned zero errors and 21 warnings in existing hook/render
+  code. No migration or deployment ran. Institutional exits, staff reassignment,
+  real counseling/clinical care and broader golden-flow acceptance remain
+  unverified; these schoolwork requests are not clinical service evidence.
+
+### Learning revision, family follow-up and daily attendance (2026-11-02)
+
+Continued local Playwright walkthroughs at source commit
+`8d4494789241137c0b15ad1350d7b4d595d9b186` with uncommitted changes, using
+the same explicitly authorized synthetic Valor records on attested main:
+
+- Riley returned the existing connected-learning assignment
+  `c0668f18-eb50-4937-ad51-d971cae18f21` for revision. Jordan retained the
+  original feedback, saved a revised response with units, reloaded to verify
+  the draft, inspected the first attempt and submitted attempt two.
+- Found that already-loaded submission history kept showing attempt two as
+  assigned after submission. The lazy history component now invalidates its
+  local cache when canonical attempt summaries change, not only when the
+  selected assessment changes. Browser history showed submitted and later
+  graded status with the original returned attempt preserved.
+- Riley saved a 10/10 grading draft, then signed out. Morgan could see the
+  submission and previous released guidance but not the new draft comment.
+  A fresh Riley session restored the grading draft; posting released the
+  score and feedback to Jordan and Morgan and advanced the teacher review
+  queue to the next submitted assignment without grading that next item.
+- Morgan asked a contextual follow-up, Action
+  `6764cf54-1f32-4ddc-b2a2-714f041c3ba1`. It appeared on Family Home and
+  Teacher Today with the exact attempt-two evidence. Riley answered and
+  resolved it; Morgan saw School responded on academics and Family Home,
+  with the released 10/10 unchanged.
+- Exact-main, read-only assertions verified exactly two attempts: original
+  `6839647b-ed18-4fe4-8059-21f8cd6e3272` returned with its original
+  response, 9/10 and feedback; revision
+  `3210f207-b2ba-4aab-8e14-fbd07e0e4156` graded 10/10 by Riley with the
+  revised response and released comment. Verified separate student/teacher
+  audit actors, one revision submission and grade event, and one question
+  creation/resolution with separate guardian requester and teacher responder.
+- Daily attendance initially showed no expected roster and a truthful missing
+  calendar-date warning. Alex used ordinary School-year studio to add only
+  the November 2 instructional day, explicitly titled simulated walkthrough.
+  No full-year population, opening waiver or direct database repair ran.
+- The daily roster then showed Jordan and the synthetic sibling, both
+  unmarked. Alex marked Jordan absent; Morgan submitted a clearly simulated
+  explanation, which remained pending until Alex independently approved it.
+  Staff showed one of two expected students marked, no pending excuses and
+  the sibling still unmarked. Morgan's exact-child page showed November 2
+  Excuse Approved and explicitly stated that the day now counts as excused.
+- Read-only assertions verified original absent event
+  `3017b886-0edb-40b5-81f4-361a030803db`, approved excuse
+  `c06645e2-5329-45f0-923f-c1a115c2baf1` with distinct submitter/reviewer,
+  and superseding excused event `5bcf55f2-981b-4384-89d6-1e8cc7588fbb`.
+  The original absence remains immutable; the sibling has zero attendance
+  facts for that day. Unmarked was not converted to absent.
+- Validation: 34 focused assignment submission, attempt-policy, attachment,
+  membership-scope and availability cases across five files passed.
+  Typecheck, production build, route inventory (108/108) and whitespace
+  checks passed. Assignment-page ESLint returned zero errors and three
+  existing hook warnings. No migration, deployment or queue-wide outbox
+  processing ran. External notification delivery, academic finalization,
+  actual physical attendance and full golden-flow acceptance remain unverified.
+
+### Cross-workspace reliability consolidation (2026-11-02)
+
+Code-focused follow-up at source commit
+`8d4494789241137c0b15ad1350d7b4d595d9b186`, with cumulative uncommitted changes:
+
+- Every application-router invalidation now checks settled active route outcomes,
+  rather than treating a fulfilled promise as proof of a successful read.
+  Shared mutation coordination also detects resolved safe-loader/query errors,
+  failed workspace sessions and explicitly disconnected read models, including
+  their standard result envelopes. Legitimate successful empty lists are valid.
+- Both shared mutation adapters retain a confirmed command receipt when refresh
+  fails, synchronously block further submissions and provide read-only recovery.
+  Retry refresh never reruns a command or a success callback. Error wording no
+  longer claims an unconfirmed command definitely made no change.
+- Consolidated direct-command feedback across admissions, operations, conferences,
+  student/staff support, discussions, assignment submission, grading and
+  finalization, enrollment forms, family attendance/health/enrichment/enrollment
+  changes, watch settings, account sessions, network administration and site
+  publishing. Critical post-save reads now propagate failures instead of silently
+  marking the page current. Resumable private-upload tasks and existing durable
+  request identities remain intact; a client duplicate guard is not a substitute
+  for server idempotency.
+- UI catches across the application consume the existing allowlisted safe-error
+  normalization, including plain-object transport, rather than relying on
+  `instanceof Error`. Room-name/identifier conflicts, conference timing/status
+  failures and attendance conflicts have explicit domain error codes. Staff
+  offline attendance recognizes the transported conflict code rather than
+  parsing an Error message.
+- A student's own canonical support-request subject remains readable in their
+  authorized Site/Program after assignment to staff. The safe `canComplete`
+  projection separates visibility from ownership; the completion command still
+  enforces exact current ownership and eligible workflow/status. Private case
+  metadata and unrelated requests are not exposed.
+- Conference creation now carries a stable client UUID through the existing
+  command. A transactional advisory lock and exact actor/scope/payload match
+  reuse the original series on replay, without duplicate slots, audits or domain
+  events. No schema migration was needed.
+- Validation: 321 focused regression cases across 30 files passed, including
+  actual installed-router safe-loader failure/recovery, synchronous duplicate
+  blocking, saved finalization recovery, support visibility, conference replay,
+  rooms and attendance. Typecheck and production build passed. ESLint across
+  165 changed/new code files returned zero errors and 142 warnings; it was not
+  warning-clean. Route inventory remained 108/108 with zero issues, and
+  whitespace checks passed.
+- No browser acceptance pass, live database mutation, queue-wide outbox
+  processing, commit or deployment was performed in this consolidation.
+  This is bounded code/regression evidence, not certification of every legacy
+  command, notification delivery or complete golden-flow acceptance.
+
+### Actionable readiness and ownership handoffs (2026-11-02)
+
+Focused code follow-up to the walkthrough's empty attendance roster and
+Photography placement blocker, still based on
+`8d4494789241137c0b15ad1350d7b4d595d9b186` plus uncommitted changes:
+
+- Daily attendance and Site Today now share specific explanations for a missing
+  active school year, calendar dates, onsite schedule, delivery-pattern mismatch
+  or active Program enrollment. The notice identifies the registrar as the next
+  actor and offers scoped school-year, enrollment or Program setup links only
+  when the server projects registrar/Site Admin academic-year authority.
+  Configured/online-only Programs do not receive a false setup warning.
+  Missing dates require explicit instructional/non-instructional classification;
+  no calendar, enrollment or attendance record is generated by the notice.
+- Student catalog, guardian permission and registrar approval reads project
+  content readiness from the class's actual pinned curriculum version. A
+  published shell is not instruction: the existing placement predicate must
+  find a learner-facing lesson. Raw curriculum is not included in these DTOs.
+  Families can still request classes and record permission before school setup
+  is complete, with explicit no-seat/no-enrollment wording.
+- Registrars see the content blocker before approval, with links to authorized
+  curriculum releases and Program class setup. A newer published release does
+  not repin the class automatically. Add approval is disabled for this known
+  blocker; drops/withdrawals remain available under their existing rules.
+  The transactional enrollment service remains authoritative for all placement
+  gates, including staffing, capacity, prerequisites, credit and schedule.
+- Course handoffs distinguish school setup, guardian permission and registrar
+  decision. Qualification records identify pending independent review,
+  unverified submissions and replacement evidence; verified evidence is not
+  described as automatic Program teaching eligibility.
+- This is a focused code change, not renewed all-app browser acceptance.
+  No live database writes, provisioning, migrations or deployment were performed.
+- Validation: 106 focused cases across ten files, typecheck, production build,
+  route inventory (108/108, zero issues) and whitespace checks passed.
+  Focused ESLint on 16 changed/new code files returned zero errors and nine
+  warnings; the touched surfaces are not warning-clean.
+
+### Cross-workflow next-actor handoffs (2026-11-02)
+
+- Admissions intake now states the registrar's next application action for
+  inquiry, application, eligibility, waitlist, offer-ready, accepted and closed
+  states. Guardian verification and sign-in provisioning are shown as a
+  separate family-access track; offer acceptance remains the guardian's
+  authenticated action.
+- Group permission requests identify when the guardian must decide, when the
+  facilitator must still approve a guardian-approved membership, and when a
+  declined or obsolete request has no remaining guardian action. Consent alone
+  is not presented as active membership.
+- Support referrals show the assigned owner's stage-specific next task. The UI
+  now disables the review transition until at least one service exists and all
+  scheduled services are complete, matching the server guard; it explains the
+  blocker before the user submits.
+- Validation: targeted support/admissions/permission and adjacent regression
+  tests, plus TypeScript, passed. Playwright and live data acceptance were not
+  run in this code-focused follow-up.
+
 ## Neon primary branch alignment and migration reconciliation (2026-11-02)
 
 - With explicit operator authorization, renamed the Neon primary production
@@ -306,6 +870,44 @@ order with `processing` appended; this was preserved, not rebuilt or restamped.
 No new DDL, sample seeds, enrollment repairs or counselor grants were executed
 as part of this re-verification. Schema currency is not a claim of application
 deployment or live storage acceptance.
+
+## Classroom lifecycle and delivery recovery follow-up (working tree)
+
+- Added revision-checked physical classroom editing and confirmed retirement
+  to the existing setup panel and canonical scoped commands. Actual changes
+  emit transactional audit/events; exact-response retries are no-ops.
+  Retired names/identities remain reserved. Existing Section defaults remain
+  visible for explicit replacement/clearing. New room assignments, plan
+  submissions and pending plan approvals reject retired rooms. Already approved
+  plan snapshots/expiry are unchanged; retirement is not emergency closure.
+  Daily planning explicitly clears an unavailable room's visual selection and
+  directs pending-plan room mismatches back to school correction rather than
+  offering approval; independent rejection remains available.
+- Generated additive migration `0063_site_room_lifecycle` adds only `revision`,
+  nullable `retired_at` and a positive-revision check. The generated snapshot
+  matches those changes and the migration-file/journal chain was checked.
+  **This migration is not applied.** The updated room code requires it before
+  use against a database. Live lifecycle behavior and isolated database
+  integration are unverified; the earlier room-creation browser walkthrough
+  does not accept editing/retirement.
+- Watch delivery history and individual-watch history share one allowlisted
+  status projection. SMS consent, account email, inactive watch, unsupported
+  channel, scheduled retry and terminal failure now identify the next actor
+  and continuation without raw provider errors or automatic resends.
+  Provider acceptance still does not prove inbox/handset delivery or reading.
+- Notification-center mutations and personal delivery-preference writes use
+  shared synchronous duplicate protection and saved-vs-refresh-failed recovery.
+  Delivery-history refresh reads its own result, independently of notification
+  status mutations. Per-watch reads use separate keyed queries and explicit
+  loading/error recovery, so switching watches cannot show another watch's
+  results. Verification refresh preserves an entered, not-yet-verified phone;
+  verified identity and explicit SMS opt-in remain server requirements.
+- Validation: 170 focused cases across 14 unit files, TypeScript and the
+  production build passed;
+  route inventory checked 108/108 and migration-file chain/whitespace checks
+  passed. Focused lint had zero errors and six existing warnings.
+  No migration, message send, database mutation, deployment or new all-app
+  browser acceptance is implied by these code checks.
 
 ## Watch-delivery history follow-up (2026-10-19 working tree)
 

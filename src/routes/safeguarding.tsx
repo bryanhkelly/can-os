@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -27,7 +28,7 @@ function SafeguardingPage() {
   async function reload() {
     setReloadError("");
     try { setWorkspace(await getMySafeguardingWorkspace()); }
-    catch (cause) { setReloadError(cause instanceof Error ? cause.message : "Unable to refresh. Do not assume a recent change was lost."); }
+    catch (cause) { setReloadError(mutationErrorMessage(cause, "Unable to refresh. Do not assume a recent change was lost.")); }
   }
 
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Restricted child safety" title="Safeguarding"

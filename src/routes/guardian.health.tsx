@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -100,7 +102,9 @@ function GuardianHealthPage() {
           {!child.clearances.length && <p className="mt-3 text-sm">No return-to-school clearance requirement is recorded.</p>}
         </div>
       </div>
-      <GuardianHealthUpdateForm child={child} onSubmitted={() => setRefreshKey(current => current + 1)}/>
+      <GuardianHealthUpdateForm child={child} onSubmitted={async () => {
+        setData(await getGuardianHealthWorkspace({ data: { studentPersonId: student } }));
+      }}/>
       <div className="rounded-lg border p-4">
         <h3 className="font-semibold">Recent health-office visits</h3>
         {child.visits.map((visit, i) => <p key={i} className="mt-2 text-sm">
@@ -115,20 +119,20 @@ function GuardianHealthPage() {
 
 type Child=Workspace["children"][number];
 
-function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:()=>void}){
+function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:()=>Promise<void>}){
  const [allergies,setAllergies]=useState(child.profile?.allergySummary??"");
  const [emergency,setEmergency]=useState(child.profile?.emergencySummary??"");
  const [accommodations,setAccommodations]=useState(child.profile?.accommodationSummary??"");
  const [name,setName]=useState(child.approvedEmergencyContact?.name??"");
  const [phone,setPhone]=useState(child.approvedEmergencyContact?.phone??"");
  const [relationship,setRelationship]=useState(child.approvedEmergencyContact?.relationship??"");
- const [busy,setBusy]=useState(false),[submitted,setSubmitted]=useState(false);
- const [notice,setNotice]=useState(""),[error,setError]=useState("");
+ const [submitted,setSubmitted]=useState(false);
+ const mutation=useMutationFeedback(onSubmitted);
+ const busy=mutation.pending||mutation.refreshFailed;
  async function submit(event:FormEvent){
   event.preventDefault();
   if(busy||submitted||child.awaitingSchoolHealthReview)return;
-  setBusy(true);setNotice("");setError("");
-  try{
+  await mutation.run(async()=>{
    await requestGuardianHealthUpdate({data:{
     studentPersonId:child.studentPersonId,programId:child.programId,
     allergySummary:allergies,emergencySummary:emergency,
@@ -137,10 +141,8 @@ function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:(
     emergencyContactRelationship:relationship,
    }});
    setSubmitted(true);
-   setNotice("Submitted for school review. Your changes are not yet approved emergency or medical instructions.");
-   onSubmitted();
-  }catch(e){setError(e instanceof Error?e.message:"School health information could not be submitted.");}
-  finally{setBusy(false);}
+  },{successMessage:"Submitted for school review. Your changes are not yet approved emergency or medical instructions.",
+    commandErrorMessage:"School health information could not be submitted."});
  }
  return <form onSubmit={event=>void submit(event)} className="space-y-3 rounded-lg border p-4">
   <h3 className="font-semibold">Update emergency and health information</h3>
@@ -171,7 +173,6 @@ function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:(
    </button>
   </>}
   {child.approvedEmergencyContact?.phone&&<p className="text-sm"><strong>Current school-approved contact:</strong> {child.approvedEmergencyContact.name} · {child.approvedEmergencyContact.phone} · {child.approvedEmergencyContact.relationship}</p>}
-  {notice&&<p role="status" className="rounded border p-3 text-sm">{notice}</p>}
-  {error&&<p role="alert" className="rounded border p-3 text-sm">{error}</p>}
+  <MutationFeedback state={mutation} pendingMessage="Submitting for school review..."/>
  </form>;
 }

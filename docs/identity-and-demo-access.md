@@ -61,7 +61,14 @@ synthetic, and shared accounts do not identify individual human visitors.
 
 Deployment requires [migration 0061](../drizzle/0061_demo_school_tenants.sql)
 before serving this code, including for the identity registry queries used by
-ordinary sessions. It has not been applied as part of this implementation.
+ordinary sessions. With explicit operator authorization on November 2, 2026,
+it was applied atomically to the attested primary `main` branch
+(`br-restless-sea-ar9ooo55`) at source commit
+`8d4494789241137c0b15ad1350d7b4d595d9b186`. Postflight verified the exact SQL
+SHA-256 `53be634ef6df7baf5953d1b96c4d67f6e4532fbc22257444614e88e4fe28f13d`
+in the migration ledger, eight registry columns, fourteen constraints and six
+indexes. Browser verification created an isolated synthetic school and signed
+its Site Admin into normal Launch Studio. This is not lifecycle acceptance.
 Unit, build and static contract checks are not database or browser acceptance;
 run the rollback setup integration test against an explicitly attested,
 approved nonproduction branch before claiming end-to-end readiness.

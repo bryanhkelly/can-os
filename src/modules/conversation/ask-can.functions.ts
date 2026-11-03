@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -120,6 +120,7 @@ export const getMyWatchDeliveries = createServerFn({ method: "GET" })
     z.object({ subscriptionId: z.string().uuid() }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
+    setResponseHeader("Cache-Control", "no-store");
     const rows = await db.select({
       id: subscriptionDeliveries.id,
       kind: subscriptionDeliveries.kind,
@@ -127,6 +128,7 @@ export const getMyWatchDeliveries = createServerFn({ method: "GET" })
       status: subscriptionDeliveries.status,
       attempts: subscriptionDeliveries.attempts,
       lastError: subscriptionDeliveries.lastError,
+      nextAttemptAt: subscriptionDeliveries.nextAttemptAt,
       createdAt: subscriptionDeliveries.createdAt,
       deliveredAt: subscriptionDeliveries.deliveredAt,
     }).from(subscriptionDeliveries)
@@ -136,10 +138,12 @@ export const getMyWatchDeliveries = createServerFn({ method: "GET" })
         eq(subscriptions.subscriberPersonId, context.actorPersonId),
       ))
       .orderBy(desc(subscriptionDeliveries.createdAt)).limit(50);
-    return rows.map(row => ({
-      ...row,
+    const { deliveryOutcome } = await import("@/domain/delivery-outcome");
+    return rows.map(({ lastError, nextAttemptAt, ...row }) => ({
+      ...row, ...deliveryOutcome({ ...row, lastError, nextAttemptAt }),
       createdAt: row.createdAt.toISOString(),
       deliveredAt: row.deliveredAt?.toISOString() ?? null,
+      nextAttemptAt: row.status === "pending" || row.status === "failed" ? nextAttemptAt?.toISOString() ?? null : null,
     }));
   });
 

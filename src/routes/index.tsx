@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
+import { defaultStudentDisplayPreferences, studentHomePath } from "@/domain/student-display-preferences";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -8,7 +9,9 @@ export const Route = createFileRoute("/")({ component: HomePage });
 function HomePage() {
   const { session, error } = useWorkspaceSession();
   if (session && !session.authenticated) return <Navigate to="/access" replace />;
-  const destination = session?.authenticated ? getWorkspaceHome(session.role) : undefined;
+  const destination = session?.authenticated ? session.role==="student"
+    ? studentHomePath(session.studentPreferences??defaultStudentDisplayPreferences)
+    : getWorkspaceHome(session.role) : undefined;
   if (destination) return <Navigate to={destination} replace />;
 
   return (

@@ -2,18 +2,18 @@ import { useEffect, useState } from "react";
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
 import {getGuardianStudents} from "@/modules/learning/guardian-academic-queries.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
-import { bookOfficeHour, cancelOfficeHour, rescheduleOfficeHour } from "@/modules/student-experience/school-experiences.functions";
+import { bookOfficeHour, cancelOfficeHour, rescheduleOfficeHour, type getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { readNotification } from "@/modules/communication/notification-center.functions";
 import { StatusBadge } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { ActionDialog } from "@/components/workspace/action-dialog";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { invalidateRouterAndCheck } from "@/lib/router-refresh";
 
-type Data={
- connected:boolean;
- viewerRole:"student"|"guardian"|"registrar"|"teacher";
- events:{id:string;title:string;startsAt:string;timezone:string;status:string}[];
- notices:{id:string;title:string;body:string;acknowledged:boolean}[];
- slots:{id:string;seriesId:string;startsAt:string;endsAt:string;status:string}[];
- bookings:{id:string;slotId:string;studentPersonId:string;seriesId:string;startsAt:string;endsAt:string}[];
-};
+type Data=Awaited<ReturnType<typeof getSchoolExperiences>>;
 type GuardianStudent={studentPersonId:string;firstName:string;lastName:string};
 type GuardianStudentLookup=
  | {status:"loading"}
@@ -23,10 +23,13 @@ const formatStatus=(status:string)=>status.replaceAll("_"," ").replace(/^\w/,let
 export function LiveSchoolExperiences({data}:{data:Data}) {
  const router=useRouter();
  const familySearch=useSearch({strict:false}) as {student?:string};
- const [busy,setBusy]=useState(false);
+ const mutation=useMutationFeedback(()=>invalidateRouterAndCheck(router));
+ const busy=mutation.pending||mutation.refreshFailed;
  const [guardianStudentLookup,setGuardianStudentLookup]=useState<GuardianStudentLookup|null>(()=>data.viewerRole==="guardian"?{status:"loading"}:null);
  const [childSelection,setChildSelection]=useState<{searchStudent?:string;studentPersonId:string}>();
  const [replacementSlots,setReplacementSlots]=useState<Record<string,string>>({});
+ const [cancelTarget,setCancelTarget]=useState<Data["bookings"][number]|null>(null);
+ const [cancelSubmitting,setCancelSubmitting]=useState(false);
  useEffect(()=>{
   if(data.viewerRole!=="guardian")return;
   let active=true;
@@ -47,18 +50,12 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
   ?childSelection.studentPersonId
   :"";
  const selectedChild=selectedChildOverride||(familySearch.student?requestedChild?.studentPersonId??"":children[0]?.studentPersonId??"");
- const [message,setMessage]=useState("");
- const [error,setError]=useState("");
  async function perform(operation:()=>Promise<unknown>,success:string) {
-  setBusy(true);setError("");setMessage("");
-  try {
-   await operation();
-   setMessage(success);
-   try { await router.invalidate(); }
-   catch { setError("Your change was saved, but the calendar could not refresh. Reopen this page before trying again."); }
-  }
-  catch(err){setError(err instanceof Error?err.message:"Unable to save change");}
-  finally{setBusy(false);}
+  return mutation.run(operation,{
+   successMessage:success,
+   commandErrorMessage:"Unable to save change.",
+   refreshErrorMessage:"The calendar could not refresh. Retry refresh before making another change.",
+  });
  }
  const format=(stamp:string,tz="America/Los_Angeles")=>new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZone:tz}).format(new Date(stamp));
  return <section aria-labelledby="school-community-heading" className="mt-6 w-full">
@@ -67,8 +64,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
     <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Student life</p><h2 id="school-community-heading" className="mt-2 font-serif text-3xl">School &amp; community</h2><p className="mt-2 text-sm text-muted-foreground">School calendar updates, announcements and teacher conferences.</p></div>
     {!data.connected&&<span role="status" className="h-fit rounded-full border border-border px-3 py-2 text-xs font-semibold">School updates temporarily unavailable</span>}
    </div>
-   {message&&<p role="status" className="mt-4 rounded-lg border border-success/40 bg-success/5 p-3 text-sm">{message}</p>}
-   {error&&<p role="alert" className="mt-4 rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
+   {!cancelTarget&&<MutationFeedback state={mutation} pendingMessage="Saving change..." className="mt-4" />}
    <div className="mt-7 grid gap-7 lg:grid-cols-3">
     <div className="space-y-3">
      <h3 className="font-semibold">School calendar</h3>
@@ -90,13 +86,18 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
        <StatusBadge tone={notice.acknowledged?"success":"info"}>{notice.acknowledged?"Read":"New"}</StatusBadge>
       </div>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{notice.body}</p>
-      <button type="button" disabled={busy||notice.acknowledged} onClick={()=>perform(()=>readNotification({data:{id:notice.id}}),"Notice marked as read.")} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50">{notice.acknowledged?"Marked as read":"Mark as read"}</button>
+      <Button type="button" disabled={busy||notice.acknowledged} onClick={()=>void perform(()=>readNotification({data:{id:notice.id}}),"Notice marked as read.")} className="mt-3">{notice.acknowledged?"Marked as read":"Mark as read"}</Button>
      </div>)}
      {data.notices.length===0&&<p className="text-xs text-muted-foreground">No announcements yet.</p>}
     </div>
     <div className="space-y-3">
      <h3 className="font-semibold">Teacher conferences</h3>
-     {data.viewerRole==="guardian"&&<label className="block text-xs font-medium">Student for conference<select className="mt-1 block w-full rounded border bg-background p-2 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Student for office-hour booking" value={selectedChild} onChange={e=>setChildSelection({searchStudent:familySearch.student,studentPersonId:e.target.value})}><option value="">Choose student</option>{children.map(child=><option key={child.studentPersonId} value={child.studentPersonId}>{child.firstName} {child.lastName}</option>)}</select></label>}
+     {data.viewerRole==="guardian"&&<Field label="Student for conference">
+      <Select disabled={busy||studentsLoading||!!studentsError} value={selectedChild}
+       onChange={e=>setChildSelection({searchStudent:familySearch.student,studentPersonId:e.target.value})}>
+       <option value="">Choose student</option>{children.map(child=><option key={child.studentPersonId} value={child.studentPersonId}>{child.firstName} {child.lastName}</option>)}
+      </Select>
+     </Field>}
      {data.viewerRole==="guardian"&&studentsLoading&&<p role="status" className="text-xs text-muted-foreground">Loading eligible students…</p>}
      {data.viewerRole==="guardian"&&studentsError&&<p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{studentsError}</p>}
      {data.viewerRole==="guardian"&&!studentsLoading&&!studentsError&&children.length===0&&<p role="status" className="text-xs text-muted-foreground">No eligible students are currently available for conference booking.</p>}
@@ -104,26 +105,62 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
      {data.viewerRole==="guardian"&&data.bookings.length>0&&<div className="space-y-3">
       <h4 className="text-sm font-semibold">Your upcoming appointments</h4>
       {data.bookings.map(booking=><div key={booking.id} className="rounded-xl border p-3">
-       <p className="text-sm font-semibold">{format(booking.startsAt)}</p>
+       <p className="text-sm font-semibold">{booking.seriesTitle}</p>
+       <p className="mt-1 text-xs">{booking.teacherName}</p>
+       <p className="mt-1 text-sm">{format(booking.startsAt,booking.timezone)} – {format(booking.endsAt,booking.timezone)} · {booking.timezone}</p>
        <div className="mt-1 flex flex-wrap items-center gap-2"><p className="text-xs text-muted-foreground">{children.find(x=>x.studentPersonId===booking.studentPersonId)?.firstName??"Student"}</p><StatusBadge tone="success">Confirmed</StatusBadge></div>
-       <label className="mt-2 block text-xs">Reschedule to
-        <select aria-label={`New conference time for ${children.find(x=>x.studentPersonId===booking.studentPersonId)?.firstName??"student"}`} className="mt-1 block w-full rounded border bg-background p-2 focus-visible:outline-2 focus-visible:outline-offset-2" value={replacementSlots[booking.id]??""} onChange={event=>setReplacementSlots(value=>({...value,[booking.id]:event.target.value}))}>
+       <Field className="mt-2" label={`Reschedule appointment for ${children.find(x=>x.studentPersonId===booking.studentPersonId)?.firstName??"student"}`}>
+        <Select disabled={busy} value={replacementSlots[booking.id]??""} onChange={event=>setReplacementSlots(value=>({...value,[booking.id]:event.target.value}))}>
          <option value="">Choose another time</option>
-         {data.slots.filter(slot=>slot.seriesId===booking.seriesId).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt)}</option>)}
-        </select>
-       </label>
-       <button type="button" disabled={busy||!replacementSlots[booking.id]} className="mt-2 inline-flex min-h-11 items-center rounded border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50" onClick={()=>perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</button>
-       <button type="button" disabled={busy} aria-label="Cancel appointment" className="ml-2 mt-2 inline-flex min-h-11 items-center rounded border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50" onClick={()=>{if(!window.confirm("Cancel this appointment? The slot will open for another family."))return;void perform(()=>cancelOfficeHour({data:{bookingId:booking.id}}),"Appointment cancelled.");}}>Cancel appointment</button>
+         {data.slots.filter(slot=>slot.seriesId===booking.seriesId).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt,slot.timezone)} · {slot.timezone}</option>)}
+        </Select>
+       </Field>
+       <Button type="button" variant="outline" size="sm" disabled={busy||!replacementSlots[booking.id]} className="mt-2" onClick={()=>void perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</Button>
+       <Button type="button" variant="outline" size="sm" disabled={busy} aria-label="Cancel appointment" className="ml-2 mt-2" onClick={()=>{setCancelSubmitting(false);setCancelTarget(booking)}}>Cancel appointment</Button>
       </div>)}
+     </div>}
+     {data.viewerRole==="guardian"&&data.recentConferenceNotes.length>0&&<div className="space-y-3">
+      <h4 className="text-sm font-semibold">Recent conference notes</h4>
+      {data.recentConferenceNotes.map(conference=><article key={conference.id} className="rounded-xl border p-3">
+       <p className="text-sm font-semibold">{conference.seriesTitle}</p>
+       <p className="mt-1 text-xs text-muted-foreground">
+        {children.find(child=>child.studentPersonId===conference.studentPersonId)?.firstName??"Student"} · {conference.teacherName} · {format(conference.startsAt,conference.timezone)} · {conference.timezone}
+       </p>
+       <StatusBadge tone={conference.status==="held"?"success":"attention"}>{formatStatus(conference.status)}</StatusBadge>
+       <p className="mt-2 whitespace-pre-wrap text-sm">{conference.note}</p>
+      </article>)}
      </div>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>
      {data.slots.map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
-      <div className="flex-1"><p className="text-sm font-semibold">{format(slot.startsAt)}</p><div className="mt-1"><StatusBadge tone={slot.status==="available"?"success":"neutral"}>{formatStatus(slot.status)}</StatusBadge></div></div>
-      <button type="button" disabled={busy||!selectedChild||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>perform(()=>bookOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")} className="inline-flex min-h-11 items-center rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50">{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</button>
+      <div className="flex-1"><p className="text-sm font-semibold">{slot.seriesTitle}</p>
+       <p className="mt-1 text-xs">{slot.teacherName}</p>
+       <p className="mt-1 text-sm">{format(slot.startsAt,slot.timezone)} – {format(slot.endsAt,slot.timezone)} · {slot.timezone}</p>
+       <div className="mt-1"><StatusBadge tone={slot.status==="available"?"success":"neutral"}>{formatStatus(slot.status)}</StatusBadge></div></div>
+      <Button type="button" disabled={busy||!selectedChild||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>void perform(()=>bookOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")}>{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</Button>
      </div>)}
      {data.slots.length===0&&<p className="text-xs text-muted-foreground">No conference times are available right now. Check back later or message your school.</p>}
     </div>
    </div>
   </div>
+  <ActionDialog open={cancelTarget!==null}
+   title={`Cancel appointment for ${children.find(child=>child.studentPersonId===cancelTarget?.studentPersonId)?.firstName??"this student"}?`}
+   description={cancelTarget
+    ?`Cancel ${cancelTarget.seriesTitle} with ${cancelTarget.teacherName} on ${format(cancelTarget.startsAt,cancelTarget.timezone)} (${cancelTarget.timezone})? The slot will open for another family.`
+    :"Cancel this appointment? The slot will open for another family."}
+   confirmLabel="Cancel appointment" destructive pending={mutation.pending} confirmDisabled={busy}
+   onClose={()=>{setCancelTarget(null);setCancelSubmitting(false)}}
+   onConfirm={()=>{
+    if(!cancelTarget)return;
+    setCancelSubmitting(true);
+    void perform(()=>cancelOfficeHour({data:{bookingId:cancelTarget.id}}),"Appointment cancelled.")
+     .then(result=>{
+      if(result.status==="saved"||result.status==="refresh-failed"){
+       setCancelTarget(null);
+       setCancelSubmitting(false);
+      }else if(result.status!=="failed")setCancelSubmitting(false);
+     });
+   }}>
+   {cancelSubmitting&&<MutationFeedback state={mutation} pendingMessage="Canceling appointment..."/>}
+  </ActionDialog>
  </section>;
 }

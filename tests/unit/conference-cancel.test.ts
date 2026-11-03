@@ -47,7 +47,7 @@ vi.mock("@/platform/scheduling/booking", () => ({
 vi.mock("@/platform/scheduling/reminders", () => ({ scheduleReminder: vi.fn() }));
 vi.mock("@/platform/scheduling/slots", () => ({ materializeSlots: vi.fn() }));
 
-import { cancelConferenceBooking } from "@/modules/conferences/conference-service";
+import { bookConference, cancelConferenceBooking, completeConference, createConferenceSeries } from "@/modules/conferences/conference-service";
 
 const guardian: CommandContext = {
   actorPersonId: "guardian-1",
@@ -68,6 +68,100 @@ const booked = {
   teacherPersonId: "teacher-1",
   siteId: "site-1",
 };
+
+describe("completeConference", () => {
+  const context: CommandContext = {
+    ...teacher,
+    capabilities: new Set(["conference.complete"]),
+  };
+  const input = { bookingId: "booking-1", outcome: "held" as const };
+  const completion = {
+    ...booked,
+    bookingStatus: "booked",
+    startsAt: new Date("2020-01-01T10:00:00Z"),
+    endsAt: new Date("2020-01-01T10:20:00Z"),
+  };
+
+  it("records an elapsed booked appointment with audit and event", async () => {
+    state.booking = completion;
+    await expect(completeConference(context, input)).resolves.toEqual({});
+    expect(state.updates).toHaveLength(1);
+    expect(state.updates[0]).toMatchObject({ status: "held" });
+    expect(state.emitEvent).toHaveBeenCalledOnce();
+    expect(state.writeAudit).toHaveBeenCalledOnce();
+  });
+
+  it.each(["cancelled", "held", "no_show"])("rejects terminal status %s without duplicate evidence", async status => {
+    state.booking = { ...completion, bookingStatus: status };
+    await expect(completeConference(context, input)).rejects.toThrow("Only a booked conference");
+    await expect(completeConference(context, input)).rejects.toMatchObject({ code: "CONFERENCE_NOT_BOOKED" });
+    expect(state.updates).toHaveLength(0);
+    expect(state.emitEvent).not.toHaveBeenCalled();
+    expect(state.writeAudit).not.toHaveBeenCalled();
+  });
+
+  it.each(["held", "no_show"] as const)("rejects a future %s without a mutation", async outcome => {
+    state.booking = {
+      ...completion,
+      startsAt: new Date(Date.now() + 60_000),
+      endsAt: new Date(Date.now() + 120_000),
+    };
+    await expect(completeConference(context, { ...input, outcome })).rejects.toThrow("before the appointment starts");
+    await expect(completeConference(context, { ...input, outcome })).rejects.toMatchObject({ code: "CONFERENCE_NOT_STARTED" });
+    expect(state.updates).toHaveLength(0);
+    expect(state.emitEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not record a no-show while the appointment is still open", async () => {
+    state.booking = { ...completion, endsAt: new Date(Date.now() + 60_000) };
+    await expect(completeConference(context, { ...input, outcome: "no_show" })).rejects.toThrow("before the appointment ends");
+    await expect(completeConference(context, { ...input, outcome: "no_show" })).rejects.toMatchObject({ code: "CONFERENCE_NOT_ENDED" });
+    expect(state.updates).toHaveLength(0);
+  });
+
+  describe("conference window validation", () => {
+    it.each([
+      { startsAt: new Date("invalid"), endsAt: new Date("2027-01-01"), slotMinutes: 20 },
+      { startsAt: new Date("2027-01-02"), endsAt: new Date("2027-01-01"), slotMinutes: 20 },
+      { startsAt: new Date("2027-01-01"), endsAt: new Date("2027-01-02"), slotMinutes: 1 },
+      { startsAt: new Date("2027-01-01"), endsAt: new Date("2027-01-02"), slotMinutes: 121 },
+      { startsAt: new Date("2027-01-01T10:00:00Z"), endsAt: new Date("2027-01-01T10:10:00Z"), slotMinutes: 20 },
+    ])("returns an expected validation code before writing for invalid windows", async window => {
+      await expect(createConferenceSeries(teacher, {
+        siteId: "site-1", teacherPersonId: "teacher-1", title: "Office hours", ...window,
+      })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(state.updates).toHaveLength(0);
+      expect(state.emitEvent).not.toHaveBeenCalled();
+      expect(state.writeAudit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("conference availability conflicts", () => {
+    it.each([
+      null,
+      { status: "booked" },
+      { status: "available", seriesStatus: "cancelled", startsAt: new Date("2027-01-01") },
+      { status: "available", seriesStatus: "published", startsAt: new Date("2020-01-01") },
+    ])("returns an expected conflict for unavailable slots without writes", async slot => {
+      state.booking = slot;
+      await expect(bookConference(guardian, {
+        conferenceSlotId: "slot-1", studentProfileId: "profile-1",
+      })).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(state.updates).toHaveLength(0);
+      expect(state.emitEvent).not.toHaveBeenCalled();
+      expect(state.writeAudit).not.toHaveBeenCalled();
+    });
+  });
+
+  it("preserves owning teacher and site checks", async () => {
+    state.booking = completion;
+    await expect(completeConference({ ...context, actorPersonId: "other-teacher" }, input))
+      .rejects.toThrow("Only the teacher");
+    await expect(completeConference({ ...context, scope: { siteIds: ["other-site"] } }, input))
+      .rejects.toThrow();
+    expect(state.updates).toHaveLength(0);
+  });
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -147,6 +241,8 @@ describe("cancelConferenceBooking", () => {
     state.booking = { ...booked, status: "held" };
     await expect(cancelConferenceBooking(guardian, { bookingId: "booking-1" }))
       .rejects.toThrow("Only a booked conference can be cancelled");
+    await expect(cancelConferenceBooking(guardian, { bookingId: "booking-1" }))
+      .rejects.toMatchObject({ code: "CONFERENCE_NOT_BOOKED" });
     expect(state.updates).toHaveLength(0);
   });
 

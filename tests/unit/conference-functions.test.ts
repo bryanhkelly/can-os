@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthorizationError } from "@/domain/command-context";
 
 const state = vi.hoisted(() => ({
@@ -14,9 +14,22 @@ const state = vi.hoisted(() => ({
   cancelConferenceBooking: vi.fn(),
   rescheduleConferenceBooking: vi.fn(),
   bookConference: vi.fn(),
+  readRows: [] as unknown[][],
 }));
 
-vi.mock("@/db/client", () => ({ db: {} }));
+function readChain(rows: unknown[]) {
+  const self: Record<string, unknown> = {};
+  for (const method of ["from", "innerJoin", "where", "orderBy"]) {
+    self[method] = () => self;
+  }
+  self.limit = async () => rows;
+  self.then = (resolve: (value: unknown[]) => unknown) => Promise.resolve(rows).then(resolve);
+  return self;
+}
+
+vi.mock("@/db/client", () => ({ db: {
+  select: () => readChain(state.readRows.shift() ?? []),
+} }));
 vi.mock("@/modules/identity/command-context.server", () => ({
   getCommandContext: async () => state.actor,
 }));
@@ -29,7 +42,7 @@ vi.mock("@tanstack/react-start", () => ({
     parse: (input: unknown) => input,
     validator(parse: (input: unknown) => unknown) { this.parse = parse; return this; },
     handler(callback: (input: { data: unknown }) => unknown) {
-      return async (input: { data: unknown }) => callback({ data: this.parse(input.data) });
+      return async (input: { data: unknown } = { data: undefined }) => callback({ data: this.parse(input.data) });
     },
   }),
 }));
@@ -47,6 +60,7 @@ import {
   completeTeacherConference,
   createTeacherConferenceSeries,
   queueTeacherConferenceReminder,
+  getTeacherConferences,
 } from "@/modules/conferences/conference.functions";
 import { cancelOfficeHour } from "@/modules/student-experience/school-experiences.functions";
 
@@ -69,9 +83,26 @@ beforeEach(() => {
   state.completeConference.mockResolvedValue({});
   state.queueConferenceReminder.mockResolvedValue(undefined);
   state.cancelConferenceBooking.mockResolvedValue(undefined);
+  state.readRows = [];
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("teacher conference server functions", () => {
+  it("keeps recent bookings visible even without an upcoming series", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://unit.invalid/test");
+    const start = new Date(Date.now() - 3_600_000);
+    state.readRows = [[], [{
+      id: "booking-1", status: "booked", startsAt: start, endsAt: new Date(start.getTime() + 1_200_000),
+      seriesTitle: "Recent conferences", studentFirstName: "Jordan", studentLastName: "Example",
+      studentPreferredName: null,
+    }]];
+    const result = await getTeacherConferences();
+    expect(result.series).toEqual([]);
+    expect(result.bookings).toEqual([expect.objectContaining({
+      id: "booking-1", studentName: "Jordan Example", startsAt: start.toISOString(),
+    })]);
+  });
   it("creates a series owned by the signed-in teacher at their verified site", async () => {
     await expect(createTeacherConferenceSeries({ data: seriesInput }))
       .resolves.toEqual({ seriesId: "series-1" });
@@ -83,6 +114,15 @@ describe("teacher conference server functions", () => {
       endsAt: new Date(seriesInput.endsAt),
       slotMinutes: 20,
     });
+
+  });
+
+  it("passes the optional stable series identity through the validated teacher command", async () => {
+    const seriesId = "a1000000-0000-4000-8000-000000000001";
+    await createTeacherConferenceSeries({ data: { ...seriesInput, seriesId } });
+    expect(state.createConferenceSeries).toHaveBeenCalledWith(state.actor, expect.objectContaining({ seriesId }));
+    await expect(createTeacherConferenceSeries({ data: { ...seriesInput, seriesId: "invalid" } })).rejects.toThrow();
+    expect(state.createConferenceSeries).toHaveBeenCalledOnce();
   });
 
   it.each(["guardian", "student", "registrar"] as const)("denies series creation to role %s", async role => {
@@ -105,7 +145,19 @@ describe("teacher conference server functions", () => {
     await expect(completeTeacherConference({ data: { bookingId, outcome: "held" } })).resolves.toEqual({});
     expect(state.completeConference).toHaveBeenCalledWith(state.actor, {
       bookingId, outcome: "held", note: undefined,
+      noteVisibility: undefined, followUp: undefined,
     });
+    await completeTeacherConference({ data: {
+      bookingId, outcome: "held", note: "Shared reading goal.", noteVisibility: "family_visible",
+      followUp: { title: "Check reading goal", dueAt: "2027-11-24T12:00:00.000Z" },
+    } });
+    expect(state.completeConference).toHaveBeenLastCalledWith(state.actor, {
+      bookingId, outcome: "held", note: "Shared reading goal.", noteVisibility: "family_visible",
+      followUp: { title: "Check reading goal", dueAt: new Date("2027-11-24T12:00:00.000Z") },
+    });
+    await expect(completeTeacherConference({ data: {
+      bookingId, outcome: "held", followUp: { title: "Check reading goal", ownerPersonId: "other-person" },
+    } })).rejects.toThrow();
     await expect(queueTeacherConferenceReminder({ data: { bookingId } })).resolves.toEqual({ queued: true });
     expect(state.queueConferenceReminder).toHaveBeenCalledWith(state.actor, bookingId);
     await expect(cancelTeacherConferenceBooking({ data: { bookingId } })).resolves.toEqual({ cancelled: true });

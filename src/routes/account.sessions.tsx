@@ -1,3 +1,5 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
@@ -21,15 +23,15 @@ export const Route = createFileRoute("/account/sessions")({
 function AccountSessionsPage() {
  const [sessions, setSessions] = useState<SessionView[]>([]);
  const [loading, setLoading] = useState(true);
- const [busy, setBusy] = useState(false);
  const [error, setError] = useState("");
- const [notice, setNotice] = useState("");
+ const mutation = useMutationFeedback(loadSessions);
+ const busy = mutation.pending || mutation.refreshFailed;
 
  async function loadSessions() {
   const response = await fetch("/access/sessions", { credentials: "same-origin", cache: "no-store" });
   if (response.status === 401) {
    window.location.assign("/access");
-   return;
+   throw new Error("Authentication required to load sessions.");
   }
   if (!response.ok) throw new Error("Unable to load active sessions.");
   const value: { sessions: SessionView[] } = await response.json();
@@ -39,7 +41,7 @@ function AccountSessionsPage() {
   let active = true;
   setLoading(true);
   void loadSessions().catch(cause => {
-   if (active) setError(cause instanceof Error ? cause.message : "Unable to load active sessions.");
+   if (active) setError(mutationErrorMessage(cause, "Unable to load active sessions."));
   }).finally(() => { if (active) setLoading(false); });
   return () => { active = false; };
  }, []);
@@ -47,8 +49,9 @@ function AccountSessionsPage() {
  async function revoke(command: {kind:"one"; sessionId:string} | {kind:"all"}) {
   if (busy) return;
   if (command.kind === "all" && !window.confirm("Sign out every session, including this one?")) return;
-  setBusy(true); setError(""); setNotice("");
-  try {
+  setError("");
+  let redirected = false;
+  await mutation.run(async () => {
    const response = await fetch("/access/sessions", {
     method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
@@ -56,19 +59,18 @@ function AccountSessionsPage() {
    });
    if (response.status === 401) {
     window.location.assign("/access");
-    return;
+    throw new Error("Authentication required to revoke sessions.");
    }
    if (!response.ok) throw new Error("Unable to revoke the selected session.");
    const result: { revokedCount:number; currentRevoked:boolean } = await response.json();
    if (result.currentRevoked) {
+    redirected = true;
     window.location.assign("/access");
-    return;
    }
-   await loadSessions();
-   setNotice(result.revokedCount ? "Session revoked.": "That session was already inactive.");
-  } catch (cause) {
-   setError(cause instanceof Error ? cause.message : "Unable to revoke session.");
-  } finally { setBusy(false); }
+   return result;
+  }, { successMessage: result => result.revokedCount ? "Session revoked." : "That session was already inactive.",
+   commandErrorMessage: "Unable to revoke session.",
+   refresh: async () => { if (!redirected) await loadSessions(); } });
  }
 
  return <main className="mx-auto max-w-3xl px-5 py-10">
@@ -82,7 +84,7 @@ function AccountSessionsPage() {
    and when you last interacted with CAN OS.
   </p>
   {error && <p className="mt-5 rounded-lg border p-3 text-sm" role="alert">{error}</p>}
-  {notice && <p className="mt-5 rounded-lg border p-3 text-sm" role="status">{notice}</p>}
+  <MutationFeedback state={mutation} className="mt-5" pendingMessage="Revoking account sessions..."/>
   <section className="mt-7 space-y-3" aria-label="Active sessions">
    {loading && <p role="status">Checking active sessions…</p>}
    {!loading && sessions.length === 0 && <p>No active sessions were found for this account.</p>}

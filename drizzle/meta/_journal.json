@@ -435,6 +435,20 @@
       "when": 1793642171198,
       "tag": "0061_demo_school_tenants",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793651862791,
+      "tag": "0062_site_rooms",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1793663097952,
+      "tag": "0063_site_room_lifecycle",
+      "breakpoints": true
     }
   ]
 }

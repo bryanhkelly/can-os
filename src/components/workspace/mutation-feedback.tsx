@@ -14,7 +14,7 @@ export function MutationFeedback({ state, pendingMessage, successAction, classNa
     {state.refreshFailed && state.notice && <span className="block">{state.notice}</span>}
   </WorkspaceNotice>;
   if (state.error) return <WorkspaceNotice tone="danger" className={className}>
-    {state.refreshFailed ? "The command succeeded. " : "No change was completed. "}
+    {state.refreshFailed ? "The command succeeded. " : "The command could not be confirmed. "}
     {state.error}{state.refreshFailed && <>
       {state.notice && <span className="block">{state.notice}</span>}
       {state.retryRefresh && <Button variant="outline" size="sm" className="mt-2"

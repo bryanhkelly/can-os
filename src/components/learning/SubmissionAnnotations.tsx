@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useRef, useState } from "react";
 import { addSubmissionAnnotation, getSubmissionAnnotations } from "@/modules/learning/submission-annotations.functions";
 
@@ -14,7 +15,7 @@ export function SubmissionAnnotations({ submissionId, responseText }: { submissi
     setLoading(true); setError(""); setAnnotations([]);
     getSubmissionAnnotations({ data: { submissionId } }).then(result => {
       if (active) setAnnotations(result.annotations);
-    }).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Unable to load annotations."); })
+    }).catch(cause => { if (active) setError(mutationErrorMessage(cause, "Unable to load annotations.")); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [submissionId]);
@@ -26,7 +27,7 @@ export function SubmissionAnnotations({ submissionId, responseText }: { submissi
         startOffset: range.start, endOffset: range.end, quote: range.quote, comment } });
       const result = await getSubmissionAnnotations({ data: { submissionId } });
       setAnnotations(result.annotations); setComment(""); setRange(null); requestId.current = null;
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save annotation."); }
+    } catch (cause) { setError(mutationErrorMessage(cause, "Unable to save annotation.")); }
     finally { setBusy(false); }
   }
   return <section aria-label="Teacher annotations" className="mt-5 space-y-3">

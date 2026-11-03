@@ -1,4 +1,5 @@
 import { readClassContent } from "./class-content";
+import { DomainError } from "./errors";
 
 /** Route-only request to open the student's first eligible published lesson.
  * Never treat it as a real curricular lesson ID or an access credential.
@@ -30,5 +31,5 @@ export function hasAccessibleFirstLesson(curriculum:Record<string,unknown>):bool
 }
 export function requireAccessibleFirstLesson(curriculum:Record<string,unknown>):void {
   if(!hasAccessibleFirstLesson(curriculum))
-    throw new Error("Publish at least one student-accessible instructional lesson before placing students into this class");
+    throw new DomainError("COURSE_CONTENT_REQUIRED", "Publish at least one student-accessible instructional lesson before placing students into this class");
 }

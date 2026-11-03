@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useState } from "react";
 import { PersonMark } from "@/components/workspace";
 
@@ -11,7 +12,7 @@ export function ProfilePhoto({ personId, name, revision = 0 }: { personId?: stri
         const { getProfilePhoto } = await import("@/modules/profiles/person-profile.functions");
         const photo = await getProfilePhoto({ data: { personId } });
         if (active) { setUrl(photo.url); setError(""); }
-      } catch (cause) { if (active) { setUrl(null); setError(cause instanceof Error ? cause.message : "Unable to load profile photo."); } }
+      } catch (cause) { if (active) { setUrl(null); setError(mutationErrorMessage(cause, "Unable to load profile photo.")); } }
     }
     setUrl(null);setError("");void refresh();
     const timer = setInterval(() => void refresh(), 240_000);

@@ -1,9 +1,11 @@
 import {createServerFn} from "@tanstack/react-start";
+import {setResponseHeader} from "@tanstack/react-start/server";
 import {eq} from "drizzle-orm";
 import {parseStudentDisplayPreferences,studentDisplayPreferences} from "@/domain/student-display-preferences";
 import {recordAudit,requireActor} from "@/modules/identity/actors.server";
 export const getSyntheticStudentPreferences=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await requireActor(["student"]);
+ setResponseHeader("Cache-Control","private, no-store");
  if(!process.env.DATABASE_URL)return parseStudentDisplayPreferences({});
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const [person]=await db.select({metadata:s.people.metadata}).from(s.people).where(eq(s.people.id,actor.actorPersonId)).limit(1);

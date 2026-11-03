@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -32,7 +33,7 @@ export function EvidenceDocumentLink({
       }
     } catch (cause) {
       try { popup?.close(); } catch { /* Preserve the authorization error. */ }
-      setError(cause instanceof Error ? cause.message : "Unable to open private evidence");
+      setError(mutationErrorMessage(cause, "Unable to open private evidence"));
     } finally { inFlight.current = false; setBusy(false); }
   }
   return <div className="mt-2">

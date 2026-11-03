@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { guardianApplicationSelection } from "@/domain/guardian-application-selection";
 import { LoaderCircle } from "lucide-react";
@@ -176,7 +177,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         setError("Your application was saved, but its status could not be refreshed. Return to Your applications to continue; do not submit another application.");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to submit application");
+      setError(mutationErrorMessage(cause, "Unable to submit application"));
     } finally {
       setBusy(false);
     }

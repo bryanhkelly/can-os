@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getTeacherCourseDiscussions } from "@/modules/learning/discussion-teacher-query.functions";
@@ -30,19 +32,17 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
   const [subject, setSubject] = useState("");
   const [prompt, setPrompt] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
   const selectedLesson = sections.find(item=>item.id===section)?.curriculumLessons.find(item=>item.id===lesson);
   async function run(command: () => Promise<unknown>) {
-    setBusy(true); setError("");
-    try { await command(); await router.invalidate(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update class discussion."); }
-    finally { setBusy(false); }
+    await mutation.run(command, { successMessage: "Class discussion updated.",
+      commandErrorMessage: "Unable to update class discussion." });
   }
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Teacher" title="Class discussions"
     subtitle="Discuss classwork with enrolled students. The assigned teaching team can respond, lock discussions and moderate posts."
     breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
-    {error && <p role="alert" className="mt-5 rounded-lg border p-3 text-sm">{error}</p>}
+    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Updating class discussion..."/>
     {section && !sections.length && <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This class is unavailable in your current teaching membership.</p>}
     {sections.length > 0 && <details className="mt-6 rounded-xl border bg-card p-5" open={lesson?true:undefined}>
       <summary className="cursor-pointer font-semibold">Start a class discussion</summary>

@@ -56,6 +56,15 @@ class authorization remain distinct facts. Launch reviewers require an explicit
 institutional verifier grant and relationship even when their session role is
 registrar; a policy-publication permission does not grant evidence-review access.
 
+The private teacher record documents resumes/work history, degrees, licensure,
+certifications and other evidence without making every item universally
+mandatory. Each school selects its Program's requirements through authorized,
+versioned policy, subject to applicable institutional and jurisdiction rules.
+The same person-owned evidence can satisfy different schools' policies without
+duplicate teacher identities or credential rows. A resume is not a verified
+degree or license. See [qualification design](./adr-profile-compliance-scale.md)
+for the distinction between intended records and current editor support.
+
 Qualification definitions belong to a shared catalog, not a program-specific
 credential store. Initial basic definitions may be created by an explicitly
 granted institutional catalog steward. Their unique stable key, classification
@@ -98,6 +107,26 @@ Examples: CAN, denomination, church, Christian school, consortium, microschool o
 
 ### Site
 A physical or operational location belonging to an Organization.
+
+### SiteRoom
+A reusable physical classroom owned by one Site, with a stable identifier,
+Site-unique name (case-insensitive) and school-recorded occupancy limit. Rooms
+are shared across that Site's Programs, not copied per course or academic year.
+The setup workflow creates room records; it does not certify external inspection
+or establish supervised capacity. A Section may reference a default
+`physicalRoomId` in its metadata. This is a planning location, not a reservation.
+New daily room plans select a canonical same-Site room and preserve its name and
+capacity as evidence snapshots. Existing reviewed plans remain historical
+evidence; changing a class default never silently replaces their reviewed room.
+Independent plan review, named adults, safety and physical presence stay separate.
+Scoped Site Admin/registrar commands may edit the name and occupancy limit using
+an expected revision, or retire the room with a reason and explicit confirmation.
+Each real change preserves transactional audit and a domain event. Retirement
+retains the identity and reserves its name, excludes new assignments and plan
+submissions/approvals, and leaves existing defaults visible for replacement or
+clearing. Already approved plans keep their reviewed snapshots and expiry.
+Catalog retirement is not an emergency closure or an instruction to relocate
+students; it neither revokes approved plans nor controls physical access.
 
 ### Program
 A defined educational offering operated by or at an Organization/Site.
@@ -421,6 +450,15 @@ Open -> In Progress -> Waiting -> Resolved
 
 An Action may have owners, due dates, dependencies, evidence, related entities, and resolution notes.
 
+Ownership and requester visibility are separate. A student can continue to read
+their own `student_support_request` by its canonical student-profile subject,
+within their active Site/Program scope, after staff take ownership. This does
+not expose other students' requests, staff case metadata or private support
+notes. The student-safe projection includes `canComplete`; completion still
+requires exact current ownership, an eligible Action type and the server's
+scope/status checks. Assigning work to staff never delegates completion
+authority back to the requester.
+
 ### Journey
 Reusable readiness/onboarding engine.
 
@@ -502,6 +540,13 @@ Bookable interval within a ConferenceSeries.
 
 ### ConferenceBooking
 Guardian-to-student booking for a specific slot; produces a canonical CalendarEvent and communication/reminder context.
+Only a booked appointment may become held or no-show. Held requires the slot
+to have started; no-show requires it to have ended. Outcome recording locks the
+booking and slot transactionally, preserving terminal cancellations and preventing
+duplicate outcome notes, Actions, audits and events. The teacher workspace includes
+upcoming and recent appointments (past 30 days, up to 50, pending first), even when
+no future availability series remains. Family booking and rescheduling display the
+teacher, series title and canonical Site timezone.
 
 ### ConferenceNote
 Conference note with explicit visibility, separating family-visible summaries from staff-private notes.

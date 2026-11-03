@@ -1,8 +1,8 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { dateTimeInputValue, formatTimestamp } from "@/modules/calendar/timezone";
 import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import { WorkspaceShell } from "@/components/workspace";
@@ -81,7 +81,7 @@ function GroupsView({ data }: { data: Workspace }) {
         if (active) setInviteeLoad({
           groupId: inviteGroup,
           invitees: [],
-          error: error instanceof Error ? error.message : "Unable to load eligible students.",
+          error: mutationErrorMessage(error, "Unable to load eligible students."),
         });
       });
     return () => { active = false; };

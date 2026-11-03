@@ -1,5 +1,6 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StatusBadge, WorkspacePanel } from "@/components/workspace";
+import { MutationFeedback, StatusBadge, WorkspacePanel } from "@/components/workspace";
 import {
   createPickupAuthorization,
   createPickupCustodyHold,
@@ -15,7 +16,6 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const pendingMutationIds = useRef(new Map<string, string>());
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [firstNames, setFirstNames] = useState<Record<string, string>>({});
@@ -34,40 +34,50 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
       setWorkspace(await getGuardianPickupWorkspace({ data: { studentPersonId } }));
     } catch (cause) {
       setWorkspace(null);
-      setError(cause instanceof Error ? cause.message : "Unable to load pickup authority");
+      setError(mutationErrorMessage(cause, "Unable to load pickup authority"));
+      throw cause;
     } finally {
       setLoading(false);
     }
   }, [studentPersonId]);
+  const mutation = useMutationFeedback(load);
+  const busy = mutation.pending || mutation.refreshFailed;
 
   useEffect(() => {
     setNotice("");
     // Different guardian / child selection must not inherit a pending request.
     pendingMutationIds.current.clear();
-    void load();
+    void load().catch(() => {});
   }, [load]);
 
   async function run(key: string, message: string, command: (mutationId: string) => Promise<unknown>) {
     if (busy) return;
     const mutationId = pendingMutationIds.current.get(key) ?? crypto.randomUUID();
     pendingMutationIds.current.set(key, mutationId);
-    setBusy(key);
     setError("");
     setNotice("");
-    try {
-      await command(mutationId);
+    const outcome=await mutation.run(()=>command(mutationId),{
+      successMessage:message,
+      commandErrorMessage:"Pickup change could not be confirmed.",
+      refreshErrorMessage:"The pickup change was saved, but updated pickup authority could not be loaded. Retry the refresh before submitting another change.",
+    });
+    if(outcome.status==="saved"){
       pendingMutationIds.current.delete(key);
-      setNotice(message);
-      await load();
-    } catch (cause) {
+    } else if(outcome.status==="failed"){
       // The server may have committed a guardian authorization, revocation or
       // custody hold before the response was lost. Do not create a new event
       // identity until an unchanged retry has been acknowledged.
-      setError((cause instanceof Error ? cause.message : "Pickup change could not be confirmed") +
+      setError((mutationErrorMessage(outcome.error, "Pickup change could not be confirmed")) +
         " The result may already be saved. Refresh pickup history and retry with the same details; the original request ID will be reused.");
-    } finally {
-      setBusy("");
     }
+  }
+  async function retryRefresh(){
+    const outcome=await mutation.retryRefresh();
+    if(outcome.status==="refreshed"){
+      for(const key of pendingMutationIds.current.keys())pendingMutationIds.current.delete(key);
+      setError("");
+    }
+    return outcome;
   }
 
   return <WorkspacePanel id="pickup" title="Pickup authorization & release history"
@@ -75,6 +85,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
     className="mt-8">
     {notice && <p role="status" className="mb-4 rounded border p-3 text-sm">{notice}</p>}
     {error && <p role="alert" className="mb-4 rounded border p-3 text-sm">{error}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh}} className="mb-4" pendingMessage="Updating pickup authority…"/>
     {loading && <p role="status" className="text-sm">Loading pickup authority…</p>}
     {!loading && workspace && <>
       <p className="mb-5 text-xs text-muted-foreground">{workspace.note}</p>
@@ -107,7 +118,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                         onChange={event => setRevocationReasons(current => ({ ...current, [adult.id]: event.target.value }))}
                         className="mt-1 w-full rounded border bg-background p-2" />
                     </label>
-                    <button type="button" disabled={!!busy}
+                    <button type="button" disabled={busy}
                       className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                       onClick={() => void run(adult.id, `Pickup authorization revoked for ${adult.pickupName}.`, (mutationId) => revokePickupAuthorization({ data: {
                         authorizationId: adult.id,
@@ -157,7 +168,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                 </label>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS. The default start date uses the school's local calendar day, not your device's time zone.</p>
-              <button type="button" disabled={!!busy}
+              <button type="button" disabled={busy}
                 className="mt-3 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 onClick={() => void run(key, `Pickup authorization added for ${student.studentName}.`, (mutationId) => createPickupAuthorization({ data: {
                   studentProfileId: student.studentProfileId,
@@ -181,7 +192,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
                   className="mt-1 w-full rounded border bg-background p-2 text-sm" />
               </label>
-              <button type="button" disabled={!!busy || activeHold}
+              <button type="button" disabled={busy || activeHold}
                 className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 onClick={() => window.confirm("Pause every pickup release for this child until an authorized site leader resolves the custody hold?") && void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, (mutationId) => createPickupCustodyHold({ data: {
                   studentProfileId: student.studentProfileId,

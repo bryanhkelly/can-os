@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { dateTimeInputValue } from "@/modules/calendar/timezone";
 import { unambiguousInstant } from "@/components/operations/launch-orientation-time";
@@ -24,7 +25,7 @@ export function LaunchOrientationTask({ launch, busy, save }: {
       setEndsAt(dateTimeInputValue(end.toISOString(), timezone));
       setTimeError("");
     } catch (error) {
-      setTimeError(error instanceof Error ? error.message : "Unable to suggest an orientation time");
+      setTimeError(mutationErrorMessage(error, "Unable to suggest an orientation time"));
     }
   }
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
@@ -37,7 +38,7 @@ export function LaunchOrientationTask({ launch, busy, save }: {
       setTimeError("");
       void save({ title, startsAt: startIso, endsAt: endIso, timezone });
     } catch (error) {
-      setTimeError(error instanceof Error ? error.message : "Invalid orientation time");
+      setTimeError(mutationErrorMessage(error, "Invalid orientation time"));
     }
   }}>
     <div className="flex flex-wrap items-center justify-between gap-3">

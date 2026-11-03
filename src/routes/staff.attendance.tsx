@@ -1,9 +1,12 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { normalizeClientError } from "@/lib/client-error";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { dateKeyInTimezone, formatTimestamp } from "@/modules/calendar/timezone";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
 import { ExcuseAttachments } from "@/components/operations/ExcuseAttachments";
+import { AttendanceConfigurationNotice } from "@/components/operations/AttendanceConfigurationNotice";
 import {optionalSearchUuid,siteProgramSelectionSchema} from "@/lib/route-search";
 import {
   listExpectedOnsiteRoster, markExpectedOnsiteAttendance,
@@ -47,6 +50,7 @@ function StaffAttendancePage() {
   const [date, setDate] = useState(todayLocal);
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [programs, setPrograms] = useState<Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["programs"]>([]);
+  const [canConfigureAcademicYear, setCanConfigureAcademicYear] = useState(false);
   const [legacyCount, setLegacyCount] = useState(0);
   const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
   const [excusesWarning, setExcusesWarning] = useState("");
@@ -83,10 +87,10 @@ function StaffAttendancePage() {
         try{await markExpectedOnsiteAttendance({data:mark});}
         catch(error){
           remaining.push(...pending.slice(i));
-          if(error instanceof Error&&error.message.includes("Attendance conflict"))
+          if(normalizeClientError(error).code==="ATTENDANCE_CONFLICT")
            setConflicts(previous=>[...previous.filter(x=>x.mutationId!==mark.mutationId),mark]);
           writeQueue(remaining);setQueued(remaining);
-          setError(error instanceof Error?error.message:"Some attendance entries could not be synchronized");
+          setError(mutationErrorMessage(error, "Some attendance entries could not be synchronized"));
           return;
         }
       }
@@ -109,6 +113,7 @@ function StaffAttendancePage() {
       ]);
       setStudents(roster.students);
       setPrograms(roster.programs);
+      setCanConfigureAcademicYear(roster.canConfigureAcademicYear);
       setExcuses(pending?.excuses ?? []);
       setExcusesWarning(pending ? "" :
         "Pending excuse review is unavailable. You can still mark the scheduled attendance roster.");
@@ -124,6 +129,7 @@ function StaffAttendancePage() {
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     (async () => {
       try {
         const [roster, pending] = await Promise.all([
@@ -133,6 +139,7 @@ function StaffAttendancePage() {
         if (!active) return;
         setStudents(roster.students);
         setPrograms(roster.programs);
+        setCanConfigureAcademicYear(roster.canConfigureAcademicYear);
         setExcuses(pending?.excuses ?? []);
         setExcusesWarning(pending ? "" :
           "Pending excuse review is unavailable. You can still mark the scheduled attendance roster.");
@@ -169,7 +176,7 @@ function StaffAttendancePage() {
         savePending(change);
         setNotice("Offline: entry saved locally for synchronization.");
       }else{
-        setError(cause instanceof Error?cause.message:"Unable to record attendance");
+        setError(mutationErrorMessage(cause, "Unable to record attendance"));
       }
     }finally{setBusy("");}
   };
@@ -200,7 +207,7 @@ function StaffAttendancePage() {
       setNotice(`Excuse ${decision} for ${excuse.studentName}.`);
       await load(date);
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Unable to review excuse");
+      setNotice(mutationErrorMessage(cause, "Unable to review excuse"));
     } finally {
       setBusy("");
     }
@@ -259,13 +266,7 @@ function StaffAttendancePage() {
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance roster…</p>}
       {!loading && !error && <>
-        {programs.some(p=>p.configuration!=="configured") && <div role="status" className="mt-4 rounded-xl border border-amber-500 p-4 text-sm">
-          <strong>Onsite attendance configuration needs attention</strong>
-          {programs.filter(p=>p.configuration!=="configured").map(p=><p key={p.id} className="mt-1">
-            {p.name}: {p.configuration.replaceAll("_"," ")}{p.missingCalendarDates?" · "+p.missingCalendarDates+" missing calendar dates":""}.
-            No attendance will be inferred where the school configuration is incomplete.
-          </p>)}
-        </div>}
+        <AttendanceConfigurationNotice programs={programs} canConfigure={canConfigureAcademicYear} date={date}/>
         <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Roster summary">
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Expected onsite</p><p className="mt-1 text-2xl font-semibold">{students.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Marked</p><p className="mt-1 text-2xl font-semibold">{marked}</p></div>

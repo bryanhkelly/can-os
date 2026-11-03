@@ -1,3 +1,6 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { DomainError } from "@/domain/errors";
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -19,16 +22,16 @@ function SitePublishPage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Site publishing"
     title="Public site setup" outcome={outcome}/>;
-  return <DraftPublisher data={outcome.data}/>;
+  return <DraftPublisher key={outcome.data.site.id} data={outcome.data}/>;
 }
 
 function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePublicationDraftView>> }) {
   const router = useRouter();
   const [slug, setSlug] = useState(data.address?.slug ??
     (isPublicSiteSlug(data.site.slug) ? data.site.slug : ""));
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const saving = mutation.pending || mutation.refreshFailed;
   const [reason, setReason] = useState("");
   const [contentReviewed, setContentReviewed] = useState(false);
   const [reachability, setReachability] = useState<"live" | "unreachable" | "hosting_disabled" | "not_published" | null>(null);
@@ -36,40 +39,31 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
 
   async function reserve(event: FormEvent) {
     event.preventDefault();
-    setError(""); setNotice(""); setSaving(true);
-    try {
-      await reserveSitePublicationAddress({ data: { siteId: data.site.id, slug } });
-      await router.invalidate();
-      setNotice("Address reserved. Your site remains private; nothing has been published.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not reserve this address.");
-    } finally {
-      setSaving(false);
-    }
+    setError("");
+    await mutation.run(() => reserveSitePublicationAddress({ data: { siteId: data.site.id, slug } }), {
+      successMessage: "Address reserved. Your site remains private; nothing has been published.",
+      commandErrorMessage: "Could not reserve this address.",
+    });
   }
 
   async function updatePublication(action: "publish" | "unpublish") {
-    if (!data.address) return;
-    setSaving(true); setError(""); setNotice("");
-    try {
+    setError("");
+    await mutation.run(async () => {
+      if (!data.address) throw new DomainError("CONFLICT", "Reserve a public address before changing its publication.");
       const result = await setSitePublicationStatus({ data: {
         siteId: data.site.id, action, expectedRevision: data.address.updatedAt,
         reason, contentReviewed: action === "publish" && contentReviewed,
       } });
-      setNotice(result.changed
+      setReason(""); setContentReviewed(false);
+      return result;
+    }, { successMessage: result => result.changed
         ? (action === "publish"
             ? (data.hostingConfigured
                  ? "Catalog approved. Hosting is configured; verify DNS/TLS and public reachability before announcing the URL."
                  : "Catalog approved. Hosting is disabled until the production hostname and routing configuration is enabled.")
             : "Site catalog unpublished and no longer publicly readable.")
-        : "No change was needed. The site is already in that state.");
-      setReason(""); setContentReviewed(false);
-      await router.invalidate();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to change publication.");
-    } finally {
-      setSaving(false);
-    }
+        : "No change was needed. The site is already in that state.",
+      commandErrorMessage: "Unable to change publication." });
   }
 
   async function verifyPublicWebsite() {
@@ -78,7 +72,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       const result = await verifySitePublicationReachability({ data: { siteId: data.site.id } });
       setReachability(result.status);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to check the public address");
+      setError(mutationErrorMessage(cause, "Unable to check the public address"));
       setReachability("unreachable");
     } finally { setVerifying(false); }
   }
@@ -91,7 +85,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     subtitle="Reserve and publish your school address. Public hosting depends on separate DNS, TLS and deployment configuration."
     breadcrumbs={<><Link to="/sites/$siteId" params={{ siteId: data.site.id }} className="underline">Site Today</Link><span>/</span><span>Public site</span></>}>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving public site change..."/>
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Public address</h2>
       <p className="mt-2 text-sm text-muted-foreground">Addresses must be globally unique. Reserving one does not activate DNS, allow public access, or open applications.</p>

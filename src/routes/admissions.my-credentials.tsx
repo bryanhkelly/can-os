@@ -1,4 +1,5 @@
-import {useEffect,useState} from "react";
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import {useEffect,useRef,useState} from "react";
 import {createFileRoute} from "@tanstack/react-router";
 import {WorkspaceShell} from "@/components/workspace";
 import {listMyAcademicCredentialReleases,downloadAuthorizedAcademicCredential} from "@/modules/learning/academic-credential-delivery.functions";
@@ -8,16 +9,17 @@ type Release=Awaited<ReturnType<typeof listMyAcademicCredentialReleases>>[number
 function MyCredentials(){
  const [releases,setReleases]=useState<Release[]>([]);
  const [busy,setBusy]=useState(false);
+ const inFlight=useRef(false);
  const [error,setError]=useState("");
- async function refresh(){setBusy(true);setError("");try{setReleases(await listMyAcademicCredentialReleases())}catch(e){setError(e instanceof Error?e.message:"Unable to load your records")}finally{setBusy(false)}}
+ async function refresh(){if(inFlight.current)return;inFlight.current=true;setBusy(true);setError("");try{setReleases(await listMyAcademicCredentialReleases())}catch(e){setError(mutationErrorMessage(e, "Unable to load your records"))}finally{inFlight.current=false;setBusy(false)}}
  useEffect(()=>{void refresh()},[]);
- async function download(id:string){setBusy(true);setError("");try{
+ async function download(id:string){if(inFlight.current)return;inFlight.current=true;setBusy(true);setError("");try{
   const doc=await downloadAuthorizedAcademicCredential({data:{authorizationId:id}});
   const bytes=Uint8Array.from(atob(doc.base64),char=>char.charCodeAt(0));
   const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
   const anchor=document.createElement("a");anchor.href=url;anchor.download=doc.filename;anchor.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
- }catch(e){setError(e instanceof Error?e.message:"Download denied")}finally{setBusy(false)}}
+ }catch(e){setError(mutationErrorMessage(e, "Download denied"))}finally{inFlight.current=false;setBusy(false)}}
  return <WorkspaceShell eyebrow="CAN OS · Records" title="My official credentials" subtitle="Secure, time-limited access to records authorized for your verified account.">
   <div className="space-y-4 py-6">
    {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}

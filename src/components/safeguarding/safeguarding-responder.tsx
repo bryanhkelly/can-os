@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
 import { personDisplayName as name } from "@/domain/person-name";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
     setSelectedId(incidentId); setLoading(true); setError(""); setNotice(""); setResolution("");
     setReviewDraftId(crypto.randomUUID());setReviewerId("");setReviewNotes("");
     try { setDetail(await getAssignedSafeguardingCase({ data: { incidentId } })); }
-    catch (cause) { setDetail(null); setError(cause instanceof Error ? cause.message : "This restricted case cannot be opened."); }
+    catch (cause) { setDetail(null); setError(mutationErrorMessage(cause, "This restricted case cannot be opened.")); }
     finally { setLoading(false); }
   }, []);
 
@@ -80,7 +81,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
           : "Currently eligible fallback coverage is already assigned; no duplicate escalation was created.");
       }
       await refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "The response update was not saved."); }
+    } catch (cause) { setError(mutationErrorMessage(cause, "The response update was not saved.")); }
     finally { setBusy(""); }
   }
 
@@ -93,7 +94,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
         " responder for this case. Record your human acknowledgment, then review the facts.");
       await refresh();
       await openCase(incidentId);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "The takeover was not saved."); }
+    } catch (cause) { setError(mutationErrorMessage(cause, "The takeover was not saved.")); }
     finally { setBusy(""); }
   }
 
@@ -106,7 +107,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
       setReviewDraftId(crypto.randomUUID());setReviewNotes("");
       setNotice("Internal review assigned without granting new case access.");
       await refresh();
-    }catch(cause){setError(cause instanceof Error?cause.message:"The review assignment was not saved.");}
+    }catch(cause){setError(mutationErrorMessage(cause, "The review assignment was not saved."));}
     finally{setBusy("");}
   }
 
@@ -117,7 +118,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
       await completeAssignedSafeguardingReview({data:{incidentId:selectedId,reviewId,outcome:reviewOutcomes[reviewId]??""}});
       setNotice("Internal review outcome recorded. External reporting duties remain separate.");
       await refresh();
-    }catch(cause){setError(cause instanceof Error?cause.message:"The review outcome was not saved.");}
+    }catch(cause){setError(mutationErrorMessage(cause, "The review outcome was not saved."));}
     finally{setBusy("");}
   }
 
@@ -131,7 +132,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
         : "Case closed. Every record is preserved, and closure does not complete or replace any external reporting duty.");
       setResolution("");
       await refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "The closure was not saved."); }
+    } catch (cause) { setError(mutationErrorMessage(cause, "The closure was not saved.")); }
     finally { setBusy(""); }
   }
 

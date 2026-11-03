@@ -18,6 +18,11 @@ domain failures, never message-substring classification. Unknown exceptions are
 logged on the server and receive generic client text. Diagnostic messages,
 custom properties and original stacks are not copied across the wire. Router
 redirects, not-found signals and Response control flow remain unchanged.
+Sanitized failures are plain DTOs, not Error instances: Start's shallow Error
+serializer retains only `message` and would discard the safe code and retry
+flag. Serialization checks use the router's actual Seroval plugins. Placement
+blockers use explicit `COURSE_*` codes with fixed remediation text, never raw
+student, prerequisite or database diagnostics.
 
 Loaders and mutation feedback share `normalizeClientError`; serialized error
 objects do not need an Error prototype. Loaders retain context-specific sign-in
@@ -36,6 +41,18 @@ CAN OS begins as a **modular monolith**, not a microservice system.
 - Server-enforced authorization
 - Background workers only where asynchronous work is actually required
 - External services for commodity capabilities such as email, SMS, video, payments, object storage, and AI foundation models
+
+The domain-event worker may receive an explicit list of event IDs for bounded
+operator replay. Both pending claims and stale-lease recovery stay within that
+list; an empty list performs no work. This uses the ordinary handlers, leases,
+retries and subscription processing, not a demo-specific consumer. An omitted
+selection preserves normal queue-wide processing. Callers must establish which
+records they are authorized to affect before invoking this internal worker.
+
+Academic setup keeps already-assigned instructors selectable for coverage
+reconfirmation. The existing assignment command rechecks current authority and
+full-window qualifications, then idempotently creates missing delivery coverage;
+a legacy teaching relationship alone must not make its repair inaccessible.
 
 ### Public school bootstrap and Site Admin
 
@@ -85,6 +102,12 @@ registrar-review checks must not derive a Site policy date from UTC's calendar
 date or the viewer's browser timezone.
 
 ### Learning command context and curriculum import jobs
+
+Teacher class requests retain their original teacher as the Action owner.
+Operations links these requests to academic setup rather than offering generic
+status changes or reassignment. Only the canonical class provisioning or
+recorded-decline commands complete their lifecycle; resolving an operational
+Action must not imply that a Section was provisioned.
 
 Learning server functions reuse `requireActor` for verified role, person and
 capability setup. Each owning command still checks its own Site/Program/Section
@@ -151,6 +174,17 @@ empty states. Directory searches retain their debounce and stale-response cleanu
 a successful retry clears the preceding error. Data loading and authorization
 remain in the existing route/server functions, not a generic form or CRUD engine.
 
+Student display preferences belong to the authenticated actor's canonical Person.
+The verified workspace session projects only the parsed preference fields, never
+the Person's full metadata, and does not apply them to staff or guardian roles.
+Saving refreshes that shared session projection immediately. Density and reduced
+motion are scoped to the student's workspace. The default section resolves
+through a fixed route allowlist on sign-in, workspace entry and CAN OS home;
+explicit Today and direct links retain their destinations. Hiding completed work
+affects only the default All assignment list: returned work, explicit Submitted
+and Feedback views, and exact completed-assignment links remain available.
+Preferences do not change session identity, grants or academic records.
+
 Reusable workflow controls are presentation-only compositions in
 `src/components/workspace`: `SiteProgramFields` renders controlled School/Program
 choices and clears the Program when the School changes, while callers own
@@ -160,12 +194,55 @@ values or choosing a DST policy. `MutationFeedback` presents the shared mutation
 state, distinguishing command rejection from saved-but-refresh-failed and
 retaining real saved-record links where available.
 
+Mutation coordination belongs to `useMutationFeedback` (direct commands) and
+`useWorkspaceMutation` (React Query workspaces). Both synchronously reject
+duplicate submissions and block further commands after a confirmed save whose
+refresh failed. Recovery retries only captured reads, never the command or its
+success callback. This client guard is not durable command idempotency.
+
+A fulfilled invalidation is not evidence that refreshed data is usable:
+`safeLoader` can resolve an error envelope, and query refetches can resolve an
+error result. The application router validates settled active matches after
+every invalidation. Shared mutation helpers also validate explicit safe-loader,
+query, workspace-session and disconnected-read outcomes; successful empty
+results remain valid. Read callbacks must return their awaited result or reject,
+not start a background refresh or swallow a critical read failure. Optional
+decorations must not conceal the canonical workflow.
+
+Server-safe errors cross the client boundary as plain objects. UI consumers use
+the allowlisted `mutationErrorMessage`/`normalizeClientError` helpers rather than
+`instanceof Error` or arbitrary diagnostic messages. An unconfirmed command is
+not described as definitely rolled back: a lost response may follow a commit.
+Conference-series creation additionally accepts a stable request UUID with
+transactional actor/scope/payload replay checks, so retrying the same creation
+does not recreate slots, audit evidence or domain events.
+
+Readiness messages identify a concrete blocker, the responsible actor and the
+existing scoped workspace for the next action. Attendance setup messages
+distinguish missing academic dates, schedules, years, enrollment and delivery
+patterns; only a verified registrar/Site Admin with `academic_year.manage` is
+offered academic setup links. Course catalog and guardian/registrar request
+reads project a content-readiness boolean from the class's pinned version using
+the placement service's accessible-lesson predicate. They never expose raw
+curriculum through registration DTOs or certify full enrollment eligibility.
+Pending requests/guardian permission may precede content readiness; approval
+remains blocked until content is ready and the transactional enrollment command
+rechecks all other guards. New published releases do not silently repin classes.
+Qualification status messages distinguish teacher submission, independent
+evidence review, replacement evidence and school-specific teaching eligibility.
+
 `ActionDialog` uses the browser's modal dialog for focus containment and restores
 the triggering focus on close. Cancel/Escape do not submit; pending commands
 disable cancellation and inputs. Domain callers own rationale constraints,
 consent language, command execution and when to close after success. Insights
 uses a reason dialog and study-group rescheduling uses explicit local datetime
 fields; server authorization and scheduling checks remain authoritative.
+Operations resolution, deadline rationale and institutional enrollment exits also
+use this dialog rather than native prompts. Enrollment exits require an explicit
+institutional-review acknowledgment in addition to the handoff note. A committed
+command closes its dialog even if refresh fails; further operations commands are
+blocked until the workspace is refreshed. These controls reuse the existing
+bounded domain commands and do not grant institutional authority.
 
 Evidence and qualifications share `FileSelectionField` and `UploadedFileNotice`
 for file selection/clearing and stored-bytes retry presentation. They do not
@@ -204,6 +281,21 @@ Program types may include:
 - Hybrid program
 - Homeschool cohort
 - Summer / enrichment program
+
+Physical classrooms are Site-owned `site_rooms`, not teaching Sections or
+free-text-only daily locations. Launch setup creates reusable room identities
+and records default Section locations through scoped, audited domain commands.
+The Section's `physicalRoomId` metadata reference is resolved against its exact
+Site before assignment. New onsite coverage plans select a saved room and check
+its canonical capacity on the server; reviewed documents keep their snapshots.
+Neither catalog creation nor default assignment grants opening, inspection,
+exclusive scheduling, staffing or supervision authority.
+Room editing and retirement use expected revisions, Site-serialized commands,
+and transactional audit/events. Retired identities and names are retained;
+new use is rejected server-side, including independent approval of pending
+plans. Existing defaults require explicit replacement or clearing, while
+approved plan snapshots are not rewritten or revoked by catalog changes.
+Catalog retirement is not emergency closure.
 
 ## Database
 

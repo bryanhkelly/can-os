@@ -1,11 +1,12 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { assertRouterRefresh } from "./lib/router-refresh";
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
 
-  return createRouter({
+  const router = createRouter({
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
@@ -14,4 +15,10 @@ export const getRouter = () => {
     defaultPendingMinMs: 0,
     defaultPreloadStaleTime: 0,
   });
+  const invalidate = router.invalidate;
+  router.invalidate = async options => {
+    await invalidate(options);
+    assertRouterRefresh(router.state.matches);
+  };
+  return router;
 };

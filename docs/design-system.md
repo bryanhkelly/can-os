@@ -59,11 +59,12 @@ Storybook play tests exercise keyboard tab order, required-field validation, sub
 
 - `Checkbox` and `Radio` in `ui/choice.tsx` retain native checked, required, disabled, and form semantics with shared focus and invalid styling.
 - `Field` in `ui/field.tsx` connects one control to its label, description, required state, and error through stable IDs. An explicit control ID is respected; existing description IDs are merged with field help/error IDs, and field errors take precedence over a child's `aria-invalid`. It complements the existing React Hook Form helpers; state-controlled forms do not need a second form framework.
-- `Modal` in `ui/modal.tsx` uses native `dialog.showModal()`, initial focus, Tab/Shift+Tab containment, Escape/backdrop dismissal, and focus restoration. Backdrop dismissal requires a pointer interaction outside the dialog bounds, not internal whitespace; callers may disable backdrop dismissal or all dismissal while saving. `ContextTray`, `WorkspaceSearchDialog`, and `ActionDialog` share this lifecycle.
+- `Modal` in `ui/modal.tsx` uses native `dialog.showModal()`, initial focus, Tab/Shift+Tab containment, Escape/backdrop dismissal, and focus restoration. Backdrop dismissal requires a pointer interaction outside the dialog bounds, not internal whitespace; callers may disable backdrop dismissal or all dismissal while saving. Optional `keepMounted` retains state across close/reopen without exposing closed dialog content. The notification tray uses this to preserve refresh-recovery guards and reloads its data when reopened.
 - `ActionDialog` focuses Cancel on opening, disables dismissal while pending, never dismisses on backdrop clicks, and supports a destructive confirmation variant. Guardian offer declines use this shared confirmation with student/program context and the existing server command. Offer responses use mutation feedback and refresh-only recovery rather than allowing duplicate responses after a failed refresh.
 - `WorkspaceSearchDialog` owns search presentation: labelled combobox, grouped listbox results, active-descendant selection, arrow keys, Enter, and explicit loading/empty/error states. Completed results announce their count; failed record searches have a direct retry action and do not claim no records matched. `CommandPalette` retains authorized search, debounce, stale-response cancellation, retry orchestration, and navigation; the dialog does not fetch or authorize records.
 - `DirectoryTable` owns typed column/row presentation, query states and retry, accessible sort indicators, and optional controlled pagination. Callers own data, sorting, and page boundaries. The teacher directory uses its existing authorized loader and search without inventing server pagination.
 - `Table` accepts an optional `scrollLabel` for a named, keyboard-focusable horizontal scroll region.
+- The notification tray uses `QueryState` for initial-load/retry feedback, `Button` for actions, and `useMutationFeedback` for marking a notice read. A failed post-save refresh blocks repeat commands and offers refresh-only recovery; notification reads are never inferred from opening the tray.
 
 Opening handoffs, obsolete-excuse closure, teacher policy revisions, and the qualification catalog compose canonical fields, choices, and actions. Their server commands and approval boundaries remain unchanged.
 Section lifecycle controls now use the same primitives; pending or unreconciled
@@ -72,6 +73,33 @@ draft clear only after successful reconciliation, including refresh-only retry.
 Admissions inquiry controls use separate labelled fields for household search
 and household selection, linked help/error text, and a disabled fieldset while
 saving. Existing identity, guardian-review, program-lock, and server checks remain.
+Teacher conference scheduling now uses shared fields and actions, disables
+editing while saving or reconciling, and confirms booking cancellation through
+the shared destructive `ActionDialog`; the existing capability-scoped commands
+and mutation refresh guard remain authoritative.
+The family school/community view uses canonical child/time selectors and
+actions, formats conference times in each returned Site timezone, and confirms
+appointment cancellation with the affected child, teacher, time, and released
+slot explained before invoking the existing guardian-authorized command.
+The teacher assessment composer now uses shared fields, choices, and actions
+for draft/publish, assignment metadata, instructions, and rubric criteria.
+Existing parent-owned save/publish callbacks and the explicit publish
+confirmation gate are unchanged; ESLint prevents reintroducing locally styled
+native controls in this surface.
+School-year setup now uses shared fields, weekday choices, and actions for
+term structure, academic-year preparation, grading periods, and calendar days.
+The existing school-year commands, weekday/calendar behavior, and activation
+gate remain unchanged.
+Instructional-schedule setup in school launch uses the same labelled fields,
+weekday choices, and actions while preserving its reviewed schedule command
+and refresh-only recovery behavior.
+Recurring schedule editing now uses shared labelled fields, selects, and
+actions for period timing, order, type, and removal. The existing replace
+command and schedule-period payload remain unchanged.
+School launch requirement completion, evidence statements, and institutional
+evidence decisions now use shared checkbox, field, select, textarea, and button
+primitives. Existing visibility gates, completion callbacks, and evidence-review
+authority remain unchanged.
 
 ## Semantic styling governance
 
@@ -129,11 +157,11 @@ This increment integrates the GF22 **application-entry vertical slice**. It does
 
 ## Current validation evidence
 
-- Typecheck and production application build for the current increment: **passed**.
-- All test runs, including unit and browser/Storybook checks: **skipped for the hardening increment at user request**. Earlier test counts are not validation of these changes.
-- Targeted ESLint completed with **0 errors and 2 pre-existing effect-state warnings** in admissions inquiry and guardian offers. Shared component inventory: **205 files checked**.
-- Route contracts: **107 source routes, 107 recorded, 0 issues**.
-- Previous adoption increment only: Chromium Storybook interaction/axe checks passed **91 tests** across 22 story files, plus **25 mobile checks** at 390 x 844. These were not rerun after primitive hardening.
-- Static Storybook build: **passed**. Representative stories include light/dark/site modes, long labels, invalid/pending controls, saved-but-not-refreshed recovery, explicit control associations, and destructive confirmation. Compilation does not establish browser behavior; those checks remain unverified for this increment.
+- Typecheck and production application build for the latest shell, teacher/family conference, assessment-composer, school-year setup/editor, and launch schedule changes: **passed**.
+- Unit and browser/Storybook test runs for this increment: **not run, per user request**. Earlier test counts are not validation of these changes.
+- Targeted ESLint for the touched shell, conference, assessment, school-year, and launch schedule components completed with **0 errors or warnings**. Shared component inventory: **210 files checked**.
+- Route contracts: **108 source routes, 108 recorded, 0 issues**.
+- Previous adoption increment only: Chromium Storybook interaction/axe checks passed **91 tests** across 22 story files, plus **25 mobile checks** at 390 x 844. These were not rerun for the latest changes.
+- Static Storybook build last passed for the previous adoption increment; it was not rerun for the latest changes. Compilation does not establish browser behavior; those checks remain unverified for this increment.
 - Chromatic upload: **not run**; no project token is configured in this environment. The local static build and Chromatic configuration are ready.
 - Guarded admissions browser preflight: **blocked before execution** because `TEST_DATABASE_URL` is not configured. A disposable Neon child of `test01` is required; production must not be used. No current GF22 or FullFlow browser acceptance is claimed.

@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { startAssignmentConversation } from "@/modules/learning/class-communication.functions";
@@ -14,7 +15,7 @@ export function AssignmentConversation({ assessmentId, studentPersonId }: { asse
     try {
       const result = await startAssignmentConversation({ data: { assessmentId, studentPersonId, body, messageId: requestId.current } });
       setThreadId(result.threadId); setBody(""); requestId.current = null;
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to send this assignment message."); }
+    } catch (cause) { setError(mutationErrorMessage(cause, "Unable to send this assignment message.")); }
     finally { setBusy(false); }
   }
   return <details className="mt-5 rounded-xl border p-4">

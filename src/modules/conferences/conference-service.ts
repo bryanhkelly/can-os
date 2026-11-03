@@ -20,6 +20,7 @@ type CommandContext,
 } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
+import { DomainError } from "@/domain/errors";
 import {
 cancelProjection,
 publishProjection,
@@ -32,14 +33,30 @@ releaseClaimedSlot,
 } from "@/platform/scheduling/booking";
 import { scheduleReminder } from "@/platform/scheduling/reminders";
 import { materializeSlots } from "@/platform/scheduling/slots";
-import { and,eq,inArray } from "drizzle-orm";
-import { conferenceWindowProblem } from "./eligibility";
+import { and,eq,inArray,sql } from "drizzle-orm";
+import { conferenceOutcomeProblem, conferenceWindowProblem } from "./eligibility";
 
 type ConferenceTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function claimConferenceSlot(
+  tx: ConferenceTx,
+  slotId: string,
+  claim: { calendarEventId: string },
+) {
+  try {
+    return await claimAvailableSlot(tx, slotId, claim);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Conference slot is not available") {
+      throw new DomainError("CONFLICT", error.message);
+    }
+    throw error;
+  }
+}
 
 export async function createConferenceSeries(
   context: CommandContext,
   input: {
+    seriesId?: string;
     siteId: string;
     teacherPersonId: string;
     sectionId?: string;
@@ -51,17 +68,46 @@ export async function createConferenceSeries(
 ): Promise<string> {
   assertCapability(context, "conference.manage");
   assertSiteScope(context, input.siteId);
-  if (input.endsAt <= input.startsAt) {
-    throw new Error("Conference series end must be after start");
+  const seriesId = input.seriesId?.toLowerCase();
+  if (seriesId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(seriesId)) {
+    throw new DomainError("VALIDATION_FAILED", "Conference request identifier must be a UUID");
+  }
+  if (!Number.isFinite(input.startsAt.getTime()) || !Number.isFinite(input.endsAt.getTime()) ||
+      input.endsAt <= input.startsAt) {
+    throw new DomainError("VALIDATION_FAILED", "Conference series end must be after start");
   }
 
   const slotMinutes = input.slotMinutes ?? 20;
-  if (slotMinutes < 5) throw new Error("Conference slots are too short");
+  if (!Number.isInteger(slotMinutes) || slotMinutes < 5 || slotMinutes > 120) {
+    throw new DomainError("VALIDATION_FAILED", "Conference slots must be between 5 and 120 minutes");
+  }
+  if (input.endsAt.getTime() - input.startsAt.getTime() < slotMinutes * 60_000) {
+    throw new DomainError("VALIDATION_FAILED", "Conference series has no valid slots");
+  }
 
   return db.transaction(async (tx) => {
+    if (seriesId) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`conference-series:${seriesId}`}))`);
+      const [existing] = await tx.select().from(conferenceSeries)
+        .where(eq(conferenceSeries.id, seriesId)).limit(1);
+      if (existing) {
+        if (existing.siteId !== input.siteId ||
+            existing.sectionId !== (input.sectionId ?? null) ||
+            existing.teacherPersonId !== input.teacherPersonId ||
+            existing.metadata.creationActorPersonId !== (context.actorPersonId ?? null) ||
+            existing.title !== input.title ||
+            existing.startsAt.getTime() !== input.startsAt.getTime() ||
+            existing.endsAt.getTime() !== input.endsAt.getTime() ||
+            existing.slotMinutes !== slotMinutes) {
+          throw new DomainError("CONFLICT", "Conference request identifier was used for different details");
+        }
+        return existing.id;
+      }
+    }
     const [series] = await tx
       .insert(conferenceSeries)
       .values({
+        ...(seriesId ? { id: seriesId, metadata: { creationActorPersonId: context.actorPersonId ?? null } } : {}),
         siteId: input.siteId,
         sectionId: input.sectionId,
         teacherPersonId: input.teacherPersonId,
@@ -86,7 +132,7 @@ export async function createConferenceSeries(
       status: "available" as const,
     }));
 
-    if (slots.length === 0) throw new Error("Conference series has no valid slots");
+    if (slots.length === 0) throw new DomainError("VALIDATION_FAILED", "Conference series has no valid slots");
     await tx.insert(conferenceSlots).values(slots);
 
     await writeAudit(tx, context, {
@@ -235,10 +281,10 @@ export async function bookConference(
       .where(eq(conferenceSlots.id, input.conferenceSlotId))
       .limit(1);
 
-    if (!slot) throw new Error("Conference slot not found");
-    if (slot.status !== "available") throw new Error("Conference slot is not available");
+    if (!slot) throw new DomainError("CONFLICT", "Conference slot not found");
+    if (slot.status !== "available") throw new DomainError("CONFLICT", "Conference slot is not available");
     if (conferenceWindowProblem(slot)) {
-      throw new Error("Office-hour slot not available");
+      throw new DomainError("CONFLICT", "Office-hour slot not available");
     }
     if (!context.scope.siteIds?.includes(slot.siteId)) {
       throw new AuthorizationError("conference site scope");
@@ -303,7 +349,7 @@ export async function bookConference(
       studentPersonId: student.personId,
     });
 
-    await claimAvailableSlot(tx, input.conferenceSlotId, {
+    await claimConferenceSlot(tx, input.conferenceSlotId, {
       calendarEventId: eventId,
     });
 
@@ -386,14 +432,14 @@ export async function rescheduleConferenceBooking(
       .for("update")
       .limit(1);
 
-    if (
-      !current ||
-      conferenceWindowProblem({
+    if (!current) {
+      throw new AuthorizationError("future published guardian booking");
+    }
+    if (conferenceWindowProblem({
         seriesStatus: current.seriesStatus,
         startsAt: current.startsAt,
-      })
-    ) {
-      throw new AuthorizationError("future published guardian booking");
+      })) {
+      throw new DomainError("CONFLICT", "This conference is no longer available for rescheduling");
     }
     if (!context.scope.siteIds?.includes(current.siteId)) {
       throw new AuthorizationError("conference site scope");
@@ -446,7 +492,7 @@ export async function rescheduleConferenceBooking(
       nextSlot.seriesId !== current.seriesId ||
       nextSlot.startsAt <= new Date()
     ) {
-      throw new Error("Replacement slot is no longer available");
+      throw new DomainError("CONFLICT", "Replacement slot is no longer available");
     }
 
     const rescheduledEventId = await rescheduleProjection(tx, {
@@ -481,7 +527,7 @@ export async function rescheduleConferenceBooking(
       });
     }
 
-    await claimAvailableSlot(tx, input.newSlotId, { calendarEventId });
+    await claimConferenceSlot(tx, input.newSlotId, { calendarEventId });
 
     await tx
       .update(conferenceBookings)
@@ -524,9 +570,8 @@ export async function rescheduleConferenceBooking(
  * Cancel an active booking and free its slot. The booking guardian cancels
  * with the same "conference.book" capability used to book; the owning teacher
  * cancels with "conference.manage". Cancelling an already-cancelled booking
- * is an idempotent no-op so retries and double-clicks stay safe; completing a
- * cancelled booking is unchanged. Deferred reminder delivery is a documented
- * schema limitation, so cancellation only stops the slot and calendar
+ * is an idempotent no-op so retries and double-clicks stay safe. Deferred
+ * reminder delivery is a documented schema limitation, so cancellation only stops the slot and calendar
  * projection (see the TODO on the reminders platform).
  */
 export async function cancelConferenceBooking(
@@ -576,7 +621,7 @@ export async function cancelConferenceBooking(
 
     if (current.status === "cancelled") return;
     if (current.status !== "booked") {
-      throw new Error("Only a booked conference can be cancelled");
+      throw new DomainError("CONFERENCE_NOT_BOOKED", "Only a booked conference can be cancelled");
     }
 
     await tx
@@ -684,7 +729,6 @@ export async function completeConference(
     followUp?: {
       title: string;
       description?: string;
-      ownerPersonId?: string;
       dueAt?: Date;
     };
   },
@@ -697,6 +741,9 @@ export async function completeConference(
         bookingId: conferenceBookings.id,
         studentProfileId: conferenceBookings.studentProfileId,
         bookingStatus: conferenceBookings.status,
+        studentPersonId: studentProfiles.personId,
+        startsAt: conferenceSlots.startsAt,
+        endsAt: conferenceSlots.endsAt,
         teacherPersonId: conferenceSeries.teacherPersonId,
         siteId: conferenceSeries.siteId,
       })
@@ -709,7 +756,12 @@ export async function completeConference(
         conferenceSeries,
         eq(conferenceSeries.id, conferenceSlots.conferenceSeriesId),
       )
+      .innerJoin(
+        studentProfiles,
+        eq(studentProfiles.id, conferenceBookings.studentProfileId),
+      )
       .where(eq(conferenceBookings.id, input.bookingId))
+      .for("update")
       .limit(1);
 
     if (!record) throw new Error("Conference booking not found");
@@ -719,7 +771,20 @@ export async function completeConference(
       context.actorPersonId !== record.teacherPersonId &&
       !context.capabilities.has("conference.complete.any")
     ) {
-      throw new Error("Only the teacher or authorized staff may complete this conference");
+      throw new AuthorizationError("Only the teacher or authorized staff may complete this conference");
+    }
+    const now = new Date();
+    const problem = conferenceOutcomeProblem({
+      status: record.bookingStatus,
+      outcome: input.outcome,
+      startsAt: record.startsAt,
+      endsAt: record.endsAt,
+      now,
+    });
+    if (problem) {
+      const code = record.bookingStatus !== "booked" ? "CONFERENCE_NOT_BOOKED"
+        : record.startsAt > now ? "CONFERENCE_NOT_STARTED" : "CONFERENCE_NOT_ENDED";
+      throw new DomainError(code, problem);
     }
 
     await tx
@@ -748,7 +813,7 @@ export async function completeConference(
           type: "conference_follow_up",
           title: input.followUp.title,
           description: input.followUp.description,
-          ownerPersonId: input.followUp.ownerPersonId,
+          ownerPersonId: record.studentPersonId,
           siteId: record.siteId,
           subjectType: "student_profile",
           subjectId: record.studentProfileId,

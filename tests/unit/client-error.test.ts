@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fromJSON, toJSON } from "seroval";
-import { DomainError } from "@/domain/errors";
+import { defaultSerovalPlugins } from "@tanstack/router-core/ssr/client";
+import { clientErrorCodes, clientErrorMessages, DomainError } from "@/domain/errors";
 import { AuthorizationError } from "@/domain/command-context";
 import { normalizeClientError } from "@/lib/client-error";
 import { sanitizeServerError, withSafeServerErrors } from "@/lib/server-error-middleware";
@@ -32,9 +33,29 @@ describe("client-safe error contract",()=>{
     const error=new DomainError("CONFLICT","private diagnostic");
     Object.assign(error,{query:"sensitive SQL"});
     const safe=sanitizeServerError(error);
-    const serialized=toJSON(safe);
+    const serialized=toJSON(safe,{plugins:defaultSerovalPlugins});
     expect(JSON.stringify(serialized)).not.toMatch(/sensitive SQL|private diagnostic/);
-    expect(normalizeClientError(fromJSON(serialized))).toMatchObject({code:"CONFLICT",kind:"conflict"});
+    expect(normalizeClientError(fromJSON(serialized,{plugins:defaultSerovalPlugins}))).toMatchObject({code:"CONFLICT",kind:"conflict"});
+  });
+  it.each(clientErrorCodes.filter(code => code.startsWith("COURSE_")))(
+    "preserves actionable %s placement feedback without exposing diagnostics", code => {
+      const error = fromJSON(toJSON(sanitizeServerError(new DomainError(code, "private student or database details")), {plugins:defaultSerovalPlugins}), {plugins:defaultSerovalPlugins});
+      expect(normalizeClientError(error)).toMatchObject({
+        code, kind: "validation", message: clientErrorMessages[code],
+      });
+      expect(mutationErrorMessage(error, "Unable to complete registration decision.")).toBe(clientErrorMessages[code]);
+      expect(JSON.stringify(toJSON(error))).not.toContain("private student");
+    },
+  );
+  it.each([
+    "SITE_ROOM_NAME_CONFLICT", "SITE_ROOM_IDENTIFIER_CONFLICT",
+    "CONFERENCE_NOT_BOOKED", "CONFERENCE_NOT_STARTED", "CONFERENCE_NOT_ENDED",
+    "ATTENDANCE_CONFLICT",
+  ] as const)("preserves actionable %s errors across the server transport", code => {
+    const error = fromJSON(toJSON(sanitizeServerError(new DomainError(code, "private record details")),
+      { plugins: defaultSerovalPlugins }), { plugins: defaultSerovalPlugins });
+    expect(mutationErrorMessage(error, "Unable to save.")).toBe(clientErrorMessages[code]);
+    expect(JSON.stringify(error)).not.toContain("private record");
   });
   it("logs unknown diagnostics on the server and emits only safe information",()=>{
     const log=vi.spyOn(console,"error").mockImplementation(()=>{});
@@ -61,7 +82,7 @@ describe("client-safe error contract",()=>{
       await expect(withSafeServerErrors(async()=>{throw new Error("secret query");})).rejects.toMatchObject({
         code:"UNEXPECTED",message:normalizeClientError(null).message,
       });
-      const error=fromJSON(toJSON(sanitizeServerError(new RetryableLoaderError("private retry diagnostic"))));
+      const error=fromJSON(toJSON(sanitizeServerError(new RetryableLoaderError("private retry diagnostic")),{plugins:defaultSerovalPlugins}),{plugins:defaultSerovalPlugins});
       expect(normalizeClientError(error)).toMatchObject({kind:"unexpected",retryable:true});
     } finally { log.mockRestore(); }
   });

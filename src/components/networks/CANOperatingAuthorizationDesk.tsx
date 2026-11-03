@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { OnsiteRoomPlanningPanel } from "@/components/operations/OnsiteRoomPlanningPanel";
 import { OperatingAgreementEvidencePicker } from "./OperatingAgreementEvidencePicker";
 import { useCallback, useEffect, useState } from "react";
@@ -19,7 +20,7 @@ export function CANOperatingAuthorizationDesk() {
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const load=useCallback(async()=>{setDesk(await listCANOperatingAuthorizationDeskFn());},[]);
-  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:"Unable to load operating authorizations"));},[load]);
+  useEffect(()=>{void load().catch(e=>setError(mutationErrorMessage(e, "Unable to load operating authorizations")));},[load]);
   const update=(id:string,key:"evidence"|"from"|"through"|"reason",value:string)=>
     setInputs(rows=>({...rows,[id]:{evidence:"",from:"",through:"",reason:"",...rows[id],[key]:value,...(key==="through"?{evidence:""}:{})}}));
   async function decide(id:string,decision:"approved"|"denied"|"revoked"|"suspended"|"resumed"|"renewed") {
@@ -47,7 +48,7 @@ export function CANOperatingAuthorizationDesk() {
           }:{}),
         }});
       await load();setNotice("Independent operating authorization decision recorded.");
-    }catch(e){setError(e instanceof Error?e.message:"Unable to record decision");}
+    }catch(e){setError(mutationErrorMessage(e, "Unable to record decision"));}
     finally{setBusy(false);}
   }
   return <section className="mt-6 rounded-xl border bg-card p-5">

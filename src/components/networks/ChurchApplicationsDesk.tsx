@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useState } from "react";
 import {
   approveChurchOnboardingRequest, declineChurchOnboardingRequest,
@@ -57,7 +58,7 @@ export function ChurchApplicationsDesk() {
       setDeclineNote(previous => ({...previous, [id]: ""})); setFollowupNote(previous => ({...previous, [id]: ""})); setReviewChecklist(previous => { const next = { ...previous }; delete next[id]; return next; });
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to complete church review.");
+      setError(mutationErrorMessage(cause, "Unable to complete church review."));
     } finally { setWorking(null); }
   }
 
@@ -88,7 +89,7 @@ export function ChurchApplicationsDesk() {
               setWorking(request.id); setError(""); setNotice("");
               try { const result = await resendChurchEvidenceNotice({ data: request.id });
                 setNotice(result.providerAccepted ? "Evidence reminder accepted by the provider; delivery not confirmed." : "Evidence reminder not accepted by the provider. Follow up through an established channel.");
-              } catch(cause) { setError(cause instanceof Error ? cause.message : "Unable to resend evidence reminder."); }
+              } catch(cause) { setError(mutationErrorMessage(cause, "Unable to resend evidence reminder.")); }
               finally { setWorking(null); }
             }}>Retry evidence follow-up notice</button>}
             <p className="text-xs text-muted-foreground">Review church records and contact an independently established church authority. Do not rely solely on this application, its email address, or its website.</p>
@@ -189,7 +190,7 @@ export function ChurchApplicationsDesk() {
             onClick={async ()=>{
               setWorking(x.id);setError("");setNotice("");
               try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender; leader acceptance is still pending." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : result.deliveryStatus==="already_accepted" ? "The leader has already accepted access; refresh the desk." : "Access link not sent; review the account and pending invitation."); }
-              catch(cause){setError(cause instanceof Error?cause.message:"Unable to request access email.");}
+              catch(cause){setError(mutationErrorMessage(cause, "Unable to request access email."));}
               finally{setWorking(null);}
             }}>Resend access link</button>}
         </li>)}

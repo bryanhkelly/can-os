@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { approveGraduationRequirements, classifyLegacyGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listTranscriptDiplomas, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
@@ -35,10 +37,14 @@ function GraduationCloseout(){
  const [audit,setAudit]=useState<Awaited<ReturnType<typeof auditIssuedTranscript>>|null>(null);
  const [sets,setSets]=useState<Awaited<ReturnType<typeof listGraduationRequirements>>>([]);
  const [message,setMessage]=useState("");
- const [busy,setBusy]=useState(false);
+ const [reading,setReading]=useState(false);
+ const readingRef=useRef(false);
+ const mutation=useMutationFeedback(async()=>undefined);
+ const busy=reading||mutation.pending||mutation.refreshFailed;
  async function perform(action:()=>Promise<void>){
-  setBusy(true);setMessage("");
-  try{await action()}catch(error){setMessage(error instanceof Error?error.message:"Request failed")}finally{setBusy(false)}
+  if(readingRef.current||busy)return;
+  readingRef.current=true;setReading(true);setMessage("");
+  try{await action()}catch(error){setMessage(mutationErrorMessage(error, "Request failed"))}finally{readingRef.current=false;setReading(false)}
  }
  const field=(title:string,value:string,change:(value:string)=>void)=><label className="block text-sm font-medium">{title}<input className="mt-1 block w-full rounded-lg border bg-background p-2" value={value} onChange={e=>change(e.target.value)}/></label>;
  return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Institutional graduation closeout" subtitle="Approve institutional requirements, audit issued transcripts, decide graduation, and issue diplomas. Each action requires an authorized issuer registrar.">
@@ -46,6 +52,7 @@ function GraduationCloseout(){
    <Link to="/admissions/credential-delivery" className="inline-block rounded-lg border px-3 py-2 text-sm">Download official credentials</Link>
    <p className="rounded-lg border p-3 text-sm">An issued transcript does not automatically certify graduation. Only institution-approved requirements and a passing credit audit permit graduation approval. Diploma issuance is a separate recorded action.</p>
    {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}
+   <MutationFeedback state={mutation} pendingMessage="Recording graduation changes..."/>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">1. Institution-approved requirements</h2>
     <p className="text-sm">Select an institution you are authorized to administer. Its policies remain institution-owned and versioned.</p>
@@ -58,7 +65,7 @@ function GraduationCloseout(){
     <label className="block text-sm">Supersedes approved policy (optional)<select className="mt-1 block w-full rounded border bg-background p-2" value={supersedesRequirementSetId} onChange={e=>setSupersedesRequirementSetId(e.target.value)}><option value="">New cohort policy</option>{sets.map(set=><option key={set.id} value={set.id}>{set.academicYear} · {set.version}</option>)}</select></label>
     <div className="space-y-2"><p className="text-sm font-medium">Required credits by subject</p>{requirements.map((rule,index)=><div key={index} className="flex flex-wrap items-center gap-2"><input aria-label={"Subject "+(index+1)} className="rounded border bg-background p-2" value={rule.subject} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,subject:e.target.value}:item))}/><input aria-label={"Minimum units for "+rule.subject} type="number" min="0.01" step="0.01" className="w-28 rounded border bg-background p-2" value={rule.minimumUnits} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,minimumUnits:e.target.value}:item))}/><button type="button" disabled={requirements.length===1} className="rounded border px-2 py-1" onClick={()=>setRequirements(previous=>previous.filter((_,i)=>i!==index))}>Remove</button></div>)}<button type="button" className="rounded border px-3 py-2" onClick={()=>setRequirements(previous=>[...previous,{subject:"",minimumUnits:""}])}>Add subject</button></div>
     <div className="flex flex-wrap gap-2">
-     <button disabled={busy||!issuerId||!academicYear.trim()||!cohortStart||!cohortEnd||applicabilityReason.trim().length<12||requirements.some(rule=>!rule.subject.trim()||!(Number(rule.minimumUnits)>0))} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await approveGraduationRequirements({data:{issuerId,academicYear,version,cohortStart,cohortEnd,applicabilityReason,supersedesRequirementSetId:supersedesRequirementSetId||undefined,requirements:requirements.map(rule=>({subject:rule.subject.trim(),minimumUnits:Number(rule.minimumUnits)}))}});setRequirementSetId(result.requirementSetId);setSets(await listGraduationRequirements({data:{issuerId}}));setAudit(null);setDecisionId("");setMessage("Requirements version approved.")})}>Approve requirements</button>
+     <button disabled={busy||!issuerId||!academicYear.trim()||!cohortStart||!cohortEnd||applicabilityReason.trim().length<12||requirements.some(rule=>!rule.subject.trim()||!(Number(rule.minimumUnits)>0))} className="rounded-lg border px-3 py-2" onClick={()=>void mutation.run(async()=>{const result=await approveGraduationRequirements({data:{issuerId,academicYear,version,cohortStart,cohortEnd,applicabilityReason,supersedesRequirementSetId:supersedesRequirementSetId||undefined,requirements:requirements.map(rule=>({subject:rule.subject.trim(),minimumUnits:Number(rule.minimumUnits)}))}});setRequirementSetId(result.requirementSetId);setAudit(null);setDecisionId("");},{successMessage:"Requirements version approved.",commandErrorMessage:"Unable to approve requirements.",refresh:async()=>setSets(await listGraduationRequirements({data:{issuerId}}))})}>Approve requirements</button>
      <button disabled={busy||!issuerId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setSets(await listGraduationRequirements({data:{issuerId}}))})}>Load approved versions</button>
     </div>
 
@@ -71,10 +78,10 @@ function GraduationCloseout(){
       {field("Attested entry cohort end (YYYY)",legacyCohortEnd,setLegacyCohortEnd)}
       {field("Registrar evidence reference",legacyEvidenceReference,setLegacyEvidenceReference)}
       {field("Institutional classification justification",legacyJustification,setLegacyJustification)}
-      <button type="button" className="rounded-lg border px-3 py-2 disabled:opacity-50" disabled={busy||!issuerId||!legacyPolicyId||!/^[0-9]{4}$/.test(legacyCohortStart)||!/^[0-9]{4}$/.test(legacyCohortEnd)||legacyCohortStart>legacyCohortEnd||legacyEvidenceReference.trim().length<12||legacyJustification.trim().length<20} onClick={()=>void perform(async()=>{
+      <button type="button" className="rounded-lg border px-3 py-2 disabled:opacity-50" disabled={busy||!issuerId||!legacyPolicyId||!/^[0-9]{4}$/.test(legacyCohortStart)||!/^[0-9]{4}$/.test(legacyCohortEnd)||legacyCohortStart>legacyCohortEnd||legacyEvidenceReference.trim().length<12||legacyJustification.trim().length<20} onClick={()=>void mutation.run(async()=>{
        await classifyLegacyGraduationRequirements({data:{issuerId,requirementSetId:legacyPolicyId,cohortStart:legacyCohortStart,cohortEnd:legacyCohortEnd,evidenceReference:legacyEvidenceReference,applicabilityReason:legacyJustification}});
-       setSets(await listGraduationRequirements({data:{issuerId}}));setLegacyPolicyId("");setLegacyCohortStart("");setLegacyCohortEnd("");setLegacyEvidenceReference("");setLegacyJustification("");setMessage("Legacy policy cohort classified and audited. Review any remaining unclassified active policies.");
-      })}>Attest and classify legacy policy</button>
+       setLegacyPolicyId("");setLegacyCohortStart("");setLegacyCohortEnd("");setLegacyEvidenceReference("");setLegacyJustification("");
+      },{successMessage:"Legacy policy cohort classified and audited. Review any remaining unclassified active policies.",commandErrorMessage:"Unable to classify legacy policy.",refresh:async()=>setSets(await listGraduationRequirements({data:{issuerId}}))})}>Attest and classify legacy policy</button>
      </div>}
 
    </section>
@@ -93,15 +100,15 @@ function GraduationCloseout(){
       {audit.audit.deficiencies.map(row=><p key={row.subject}>{row.subject}: {row.earned} of {row.required} ({row.missing} missing)</p>)}
       {audit.audit.blockers.map((blocker,i)=><p key={i} className="text-red-700">{blocker}</p>)}
       <div className="flex gap-2">
-       <button disabled={busy||audit.audit.status!=="requirements_met"||decisionRationale.trim().length<12} className="rounded-lg border px-3 py-2 disabled:opacity-50" onClick={()=>void perform(async()=>{const result=await decideGraduation({data:{transcriptId,requirementSetId,decision:"approved",rationale:decisionRationale}});setDecisionId(result.decisionId);setMessage("Graduation approved and recorded.")})}>Approve graduation</button>
-       <button disabled={busy||decisionRationale.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await decideGraduation({data:{transcriptId,requirementSetId,decision:"denied",rationale:decisionRationale}});setDecisionId("");setAudit(null);setMessage("Graduation denial recorded.")})}>Record denial</button>
+       <button disabled={busy||audit.audit.status!=="requirements_met"||decisionRationale.trim().length<12} className="rounded-lg border px-3 py-2 disabled:opacity-50" onClick={()=>void mutation.run(async()=>{const result=await decideGraduation({data:{transcriptId,requirementSetId,decision:"approved",rationale:decisionRationale}});setDecisionId(result.decisionId);},{successMessage:"Graduation approved and recorded.",commandErrorMessage:"Unable to approve graduation."})}>Approve graduation</button>
+       <button disabled={busy||decisionRationale.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void mutation.run(async()=>{await decideGraduation({data:{transcriptId,requirementSetId,decision:"denied",rationale:decisionRationale}});setDecisionId("");setAudit(null);},{successMessage:"Graduation denial recorded.",commandErrorMessage:"Unable to record graduation denial."})}>Record denial</button>
       </div>
      </div>}
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">3. Diploma issuance</h2>
     <p className="text-sm">{decisionId?"Graduation decision recorded. Diploma issuance is available below.":"Record an eligible graduation approval above before issuing a diploma."}</p>
-    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setIssuedDiplomaId(result.diplomaId);setDiplomaStatus("current");setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}));setDecisionId("");setMessage("Diploma credential recorded.")})}>Issue diploma</button>
+    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void mutation.run(async()=>{const result=await issueDiploma({data:{decisionId}});setIssuedDiplomaId(result.diplomaId);setDiplomaStatus("current");setDecisionId("");},{successMessage:"Diploma credential recorded.",commandErrorMessage:"Unable to issue diploma.",refresh:async()=>setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}))})}>Issue diploma</button>
     {transcriptId&&<div className="space-y-2 rounded-lg border p-3">
       <p className="text-sm font-semibold">Recorded diplomas for selected transcript</p>
       <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>setDiplomas(await listTranscriptDiplomas({data:{transcriptId}})))}>Refresh diploma history</button>
@@ -111,7 +118,7 @@ function GraduationCloseout(){
       <p className="text-sm">Issued diploma status: <strong>{diplomaStatus||"Review required"}</strong></p>
       <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await getDiplomaFreshness({data:{diplomaId:issuedDiplomaId}});setDiplomaStatus(result.status)})}>Inspect diploma status</button>
       {field("Revocation reason (required)",revocationReason,setRevocationReason)}
-      <button type="button" disabled={busy||diplomaStatus==="revoked"||revocationReason.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await revokeDiploma({data:{diplomaId:issuedDiplomaId,reason:revocationReason}});setDiplomaStatus("revoked");setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}));setMessage("Diploma revoked and audited.")})}>Revoke diploma</button>
+      <button type="button" disabled={busy||diplomaStatus==="revoked"||revocationReason.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void mutation.run(async()=>{await revokeDiploma({data:{diplomaId:issuedDiplomaId,reason:revocationReason}});setDiplomaStatus("revoked");},{successMessage:"Diploma revoked and audited.",commandErrorMessage:"Unable to revoke diploma.",refresh:async()=>setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}))})}>Revoke diploma</button>
     </div>}
    </section>
   </div>

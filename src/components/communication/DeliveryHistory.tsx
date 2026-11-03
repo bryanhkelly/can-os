@@ -26,9 +26,15 @@ export function DeliveryHistory({ history, cursor, notification, refreshing, onR
           <span className="rounded border px-2 py-1 text-xs font-semibold">{item.label}</span>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>
+        <p className="mt-2 text-sm"><strong>Next: </strong>{item.nextStep}</p>
+        {item.recovery && <Link to="/guardian/watching" hash={item.recovery === "preferences" ? "notification-preferences" : undefined}
+          className="mt-2 inline-block text-sm font-semibold underline">
+          {item.recovery === "preferences" ? "Review notification preferences" : "Review watch settings"}
+        </Link>}
         <dl className="mt-3 space-y-1 text-xs text-muted-foreground">
           <div><dt className="inline font-semibold">Queued: </dt><dd className="inline"><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></dd></div>
           <div><dt className="inline font-semibold">Provider attempts: </dt><dd className="inline">{item.attempts}</dd></div>
+          <div><dt className="inline font-semibold">Delivery ID: </dt><dd className="inline">{item.id}</dd></div>
           {item.acceptedAt && <div><dt className="inline font-semibold">{item.channel === "in_app" ? "Created in CAN: " : "Provider accepted: "}</dt><dd className="inline"><time dateTime={item.acceptedAt}>{new Date(item.acceptedAt).toLocaleString()}</time></dd></div>}
           {item.nextAttemptAt && <div><dt className="inline font-semibold">Next attempt: </dt><dd className="inline"><time dateTime={item.nextAttemptAt}>{new Date(item.nextAttemptAt).toLocaleString()}</time></dd></div>}
         </dl>

@@ -22,3 +22,23 @@ export function conferenceWindowProblem(
   if (window.startsAt <= (window.now ?? new Date())) return "slot_in_past";
   return null;
 }
+
+export function conferenceOutcomeProblem(input: {
+  status: string;
+  outcome: "held" | "no_show";
+  startsAt: Date;
+  endsAt: Date;
+  now?: Date;
+}): string | null {
+  if (input.status !== "booked") {
+    return "Only a booked conference can have an outcome recorded";
+  }
+  const now = input.now ?? new Date();
+  if (input.startsAt > now) {
+    return "A conference outcome cannot be recorded before the appointment starts";
+  }
+  if (input.outcome === "no_show" && input.endsAt > now) {
+    return "A no-show cannot be recorded before the appointment ends";
+  }
+  return null;
+}

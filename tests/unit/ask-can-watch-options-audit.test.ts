@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auditEvents } from "@/db/schema";
-import { updateWatchOptions } from "@/modules/conversation/ask-can.functions";
+import { getMyWatchDeliveries, updateWatchOptions } from "@/modules/conversation/ask-can.functions";
+import { db } from "@/db/client";
+import { setResponseHeader } from "@tanstack/react-start/server";
 
 const state = vi.hoisted(() => ({
   updated: true as boolean,
@@ -96,6 +98,7 @@ describe("updateWatchOptions audit", () => {
       resourceId: subscriptionId,
       after: { channel: "email", reminderPolicy: { remindAfterHours: 24, maxReminders: 3 } },
     });
+
   });
 
   it("writes no audit row when the watch is not active or not owned", async () => {
@@ -111,6 +114,27 @@ describe("updateWatchOptions audit", () => {
         },
       } as never),
     ).rejects.toThrow("active watch");
+    expect(state.inserted).toEqual([]);
+  });
+});
+
+describe("individual watch delivery projection", () => {
+  it("uses safe explanations and serialized retry timing without leaking provider diagnostics", async () => {
+    const now = new Date("2030-01-01T12:00:00.000Z");
+    const rows = [{
+      id: "delivery", kind: "initial", channel: "sms", status: "failed", attempts: 1,
+      lastError: "private provider diagnostic", nextAttemptAt: now, createdAt: now, deliveredAt: null,
+    }];
+    const query = { from: () => query, innerJoin: () => query, where: () => query,
+      orderBy: () => query, limit: async () => rows };
+    vi.mocked(db.select).mockReturnValueOnce(query as never);
+    const result = await getMyWatchDeliveries({ data: { subscriptionId } });
+    expect(result[0]).toMatchObject({
+      label: "Retry scheduled", nextAttemptAt: now.toISOString(), createdAt: now.toISOString(),
+    });
+    expect(result[0]?.nextStep).toContain("worker will retry");
+    expect(JSON.stringify(result)).not.toMatch(/lastError|private provider diagnostic/);
+    expect(setResponseHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
     expect(state.inserted).toEqual([]);
   });
 });

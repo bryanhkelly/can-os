@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import {useState} from "react";
 import {getWorkspaceSession} from "@/modules/identity/workspace-session.functions";
 import {launchWebsiteHandoffGrant} from "@/domain/launch-website-handoff";
@@ -25,7 +26,7 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
    }
    // A full navigation clears the previous membership's mounted state/caches.
    window.location.assign(`${destination==="editor"?"/site-website":"/operations/launch"}?${query.toString()}`);
-  }catch(cause){setError(cause instanceof Error?cause.message:"The website workspace could not be opened.");setBusy(false);}
+  }catch(cause){setError(mutationErrorMessage(cause, "The website workspace could not be opened."));setBusy(false);}
  }
  return <span className="inline-block">
   <button type="button" disabled={busy} onClick={()=>void open()} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Opening verified workspace…":destination==="editor"?"Edit church-owned website content":"Return to school setup"}</button>

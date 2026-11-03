@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { AdmissionsApplicantCard } from "@/components/admissions/AdmissionsApplicantCard";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
@@ -83,20 +85,19 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
  const [guardianFirstName,setGuardianFirstName]=useState(convertibleInterest?.firstName??""),[guardianLastName,setGuardianLastName]=useState(convertibleInterest?.lastName??"");
  const [guardianEmail,setGuardianEmail]=useState(convertibleInterest?.email??""),[gradeLevel,setGradeLevel]=useState(convertibleInterest?"":"9"),[source,setSource]=useState(convertibleInterest?"published_site":"school_direct");
- const [notes,setNotes]=useState(convertibleInterest?.message??""),[contactReviewed,setContactReviewed]=useState(false),[saving,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [notes,setNotes]=useState(convertibleInterest?.message??""),[contactReviewed,setContactReviewed]=useState(false);
+ const mutation=useMutationFeedback(()=>router.invalidate());
  const [interactive,setInteractive]=useState(false);
  useEffect(()=>setInteractive(true),[]);
- const busy=saving||!interactive;
- async function perform(fn:()=>Promise<unknown>,message:string){
-  setBusy(true);setError("");setNotice("");
-  try{await fn();await router.invalidate();setNotice(message);}catch(e){setError(e instanceof Error?e.message:"Unable to save");}finally{setBusy(false);}
+ const busy=mutation.pending||mutation.refreshFailed||!interactive;
+ async function perform(fn:()=>Promise<unknown>,message:string,refresh?:()=>Promise<unknown>){
+  await mutation.run(fn,{successMessage:message,commandErrorMessage:"Unable to save",refresh});
  }
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
   <WorkflowIntro eyebrow="Verified admissions workflow" title="Every applicant, a clear next step." description="Start with a family inquiry, review identity and eligibility, then record decisions in the canonical admissions workflow. A public inquiry never proves guardianship." actions={<a href="#new-inquiry" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">New inquiry <ArrowUpRight className="size-4" /></a>} />
-  {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
-  {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+  <MutationFeedback state={mutation} pendingMessage="Saving admissions records..." className="mt-5"/>
   <PublicInterestInbox initialPage={data.publicInterests}
     siteId={selected.siteId} programId={selected.programId}/>
   <section className="mt-8 rounded-xl border bg-card p-5">
@@ -129,7 +130,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      </label>
    </div>}
    {(!selected.interest||!!convertibleInterest)&&<AdmissionsInquiryForm
-    onSubmit={e=>{e.preventDefault();void perform(
+    onSubmit={e=>{e.preventDefault();let createdApplicationId="";void perform(
     async()=>{
      if(existingStudentKey&&!existingStudent)throw new Error("The selected student is no longer available. Choose a student again.");
      if(existingStudent&&!existingStudent.householdId&&!createHouseholdConfirmed)
@@ -143,12 +144,16 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      }:{requestId,programId,...(existingApplicationId?{existingApplicationId}:{}),studentFirstName,studentLastName,
       guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes,
       ...(convertibleInterest?{publicInterestId:convertibleInterest.id,contactReviewed:true as const}:{})}});
+     createdApplicationId=created.applicationId;
+     setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);
+    },"Inquiry created; continue the normal admissions and enrollment checklist.",async()=>{
      const selectedProgram=data.programs.find(program=>program.id===programId);
      await router.navigate({to:"/admissions/intake",search:{
        siteId:convertibleInterest?.siteId??selectedProgram?.siteId??undefined,
-       programId,application:created.applicationId,interest:undefined,
+       programId,application:createdApplicationId,interest:undefined,
      }});
-     setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}
+     await router.invalidate();
+    });}}
     programs={programs} programId={programId} setProgramId={setProgramId}
     convertibleInterest={!!convertibleInterest} contactReviewed={contactReviewed} busy={busy}
     existingStudentKey={existingStudentKey} setExistingStudentKey={setExistingStudentKey}
@@ -168,13 +173,9 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
    {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
    {records.map(r=><AdmissionsApplicantCard key={r.id} r={r} busy={busy}
-    onVerify={applicationId=>{
-     const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
-     if(!evidenceNote)return;
-     const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
-     if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
+    onVerify={(applicationId,verification)=>{
      void perform(()=>verifyAdmissionsGuardianRelationship({data:{
-      applicationId,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
+      applicationId,...verification,
      }}),"Guardian relationship verified and family permissions enabled.");
     }}
     onProvision={applicationId=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),

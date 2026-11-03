@@ -207,7 +207,9 @@ describe("canonical study group commands", () => {
     ));
     state.actor = actor("guardian", guardian!.id);
     expect(await listCanonicalGuardianGroupConsents()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: consent!.id })]),
+      expect.arrayContaining([expect.objectContaining({
+        id: consent!.id, studentName: `Student ${suffix}`,
+      })]),
     );
     await db.update(s.guardianRelationships).set({ canManageEnrollment: false }).where(relationship);
     expect(await listCanonicalGuardianGroupConsents()).toEqual([]);

@@ -1,3 +1,5 @@
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
@@ -27,8 +29,8 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
   const [loading, setLoading] = useState(true);
   const [readError, setReadError] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const previewInFlight = useRef(false);
   const [periodId, setPeriodId] = useState("");
   const [correctingId, setCorrectingId] = useState("");
   const [correctionPercentage, setCorrectionPercentage] = useState("");
@@ -49,13 +51,17 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
             ? selected
             : current.gradingPeriods[0]?.id ?? "");
       }
+      return current;
     } catch (cause) {
       if (request === requestSequence.current) setReadError(
-        cause instanceof Error ? cause.message : "Unable to load grading periods for this section.");
+        mutationErrorMessage(cause, "Unable to load grading periods for this section."));
+      return { ok: false as const };
     } finally {
       if (request === requestSequence.current) setLoading(false);
     }
   }, [sectionId]);
+  const mutation=useMutationFeedback(refresh);
+  const busy=mutation.pending||mutation.refreshFailed||previewBusy;
   useEffect(() => {
     void refresh();
     return () => { requestSequence.current++; };
@@ -63,40 +69,36 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
 
   const finalize = async () => {
     if (busy || loading || !periodId) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
+    setError("");
+    const outcome=await mutation.run(async()=>{
       const result = await finalizeSectionGrades({ data: { sectionId, gradingPeriodId: periodId } });
       if(result.finalized===undefined || result.skipped===undefined)
         throw new Error("Finalization did not return a grade receipt. Reload the period before continuing.");
       setPreview(null);
-      setNotice(`Finalized ${result.finalized} grade${result.finalized === 1 ? "" : "s"}; ` +
+      return {finalized:result.finalized,skipped:result.skipped};
+    },{successMessage:result=>`Finalized ${result.finalized} grade${result.finalized === 1 ? "" : "s"}; ` +
         `${result.skipped} enrolled student${result.skipped === 1 ? "" : "s"} skipped ` +
-        "(already finalized or unfinished scoreable work in the period window). Finalized grades now appear on student and guardian report cards and transcripts.");
-      // A refresh error is shown separately; it must not imply finalization failed.
-      await refresh();
-      // Keep the remaining unfinished work visible after a partial closeout.
-      // The server preview excludes grades already finalized in this period.
-      if (result.skipped > 0) {
+        "(already finalized or unfinished scoreable work in the period window). Finalized grades now appear on student and guardian report cards and transcripts.",
+      commandErrorMessage:"Unable to finalize grades for this grading period."});
+      if (outcome.status==="saved"&&outcome.value.skipped > 0) {
         try {
           const remaining = await finalizeSectionGrades({ data: { sectionId, gradingPeriodId: periodId, previewOnly: true } });
           if ("preview" in remaining && remaining.preview) setPreview(remaining);
         } catch {
-          // The successful finalization receipt remains authoritative.
+          setReadError("Grades were finalized, but unfinished-work details could not refresh. Review unfinished work again.");
         }
       }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to finalize grades for this grading period.");
-    } finally { setBusy(false); }
   };
 
   const reviewBlockers = async () => {
-    if(busy||loading||!periodId)return;
-    setBusy(true);setError("");setNotice("");setPreview(null);
+    if(busy||loading||!periodId||previewInFlight.current)return;
+    previewInFlight.current=true;
+    setPreviewBusy(true);setError("");setPreview(null);
     try{
       const result=await finalizeSectionGrades({data:{sectionId,gradingPeriodId:periodId,previewOnly:true}});
       if("preview" in result && result.preview)setPreview(result);
-    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to review grading-period work.");}
-    finally{setBusy(false);}
+    }catch(cause){setError(mutationErrorMessage(cause, "Unable to review grading-period work."));}
+    finally{previewInFlight.current=false;setPreviewBusy(false);}
   };
 
   const correct = async (grade: FinalizedGrade) => {
@@ -116,25 +118,23 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
       setError("Enter a percentage between 0 and 100.");
       return;
     }
-    setBusy(true); setError(""); setNotice("");
-    try {
+    setError("");
+    await mutation.run(async()=>{
       const result = await correctSectionGrade({ data: {
         sectionGradeId: grade.id,
         ...(percentage ? { percentage: Number(percentage) } : {}),
         ...(letter ? { letterGrade: letter } : {}),
         reason,
       } });
-      setNotice(result.corrected
-        ? `Corrected the finalized grade for ${grade.studentName}. The correction is recorded in the grade history and the student and guardians are notified; already-issued transcripts keep their original snapshot.`
-        : "The finalized grade already has these values. No new correction or notifications were created.");
       setCorrectingId("");
       setCorrectionPercentage("");
       setCorrectionLetter("");
       setCorrectionReason("");
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to record the correction.");
-    } finally { setBusy(false); }
+      return result;
+    },{successMessage:result=>result.corrected
+        ? `Corrected the finalized grade for ${grade.studentName}. The correction is recorded in the grade history and the student and guardians are notified; already-issued transcripts keep their original snapshot.`
+        : "The finalized grade already has these values. No new correction or notifications were created.",
+      commandErrorMessage:"Unable to record the correction."});
   };
 
   const periods = model?.gradingPeriods ?? [];
@@ -155,7 +155,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
       finalization never recomputes them, and later changes go through a recorded correction instead.
     </p>
     {error && <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving grading-period changes..."/>
     <QueryState loading={loading ? "Loading grading periods…" : undefined}
       error={readError || undefined} onRetry={() => void refresh()} retrying={busy || loading}>
       {model?.connected && model.section && <>
@@ -213,7 +213,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                   {grade.corrections > 0 && ` · ${grade.corrections} recorded correction${grade.corrections === 1 ? "" : "s"}`}
                 </p>
                 {!correcting && <button type="button" disabled={busy}
-                  onClick={() => { setCorrectingId(grade.id); setError(""); setNotice(""); }}
+                  onClick={() => { setCorrectingId(grade.id); setError(""); }}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
                   Correct grade
                 </button>}

@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
 import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
@@ -7,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
+import { AttendanceConfigurationNotice } from "@/components/operations/AttendanceConfigurationNotice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,7 +107,7 @@ export function SiteDayPage() {
       setNotes(current => ({ ...current, [key]: "" }));
       await load(date);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to record attendance. Refresh and verify.");
+      setError(mutationErrorMessage(cause, "Unable to record attendance. Refresh and verify."));
     } finally { setBusy(""); }
   }
 
@@ -182,11 +184,8 @@ export function SiteDayPage() {
         of physical presence until a staff member records the observation. Corrections are limited
         to the previous 30 days and must include a reason.
       </p>
-      {roster.programs.some(program => program.configuration !== "configured") &&
-        <p role="status" className="mt-5 rounded border p-4 text-sm">
-          One or more onsite calendars or schedules are incomplete. No presence is inferred
-          from missing configuration; ask the school registrar to correct the schedule.
-        </p>}
+      <AttendanceConfigurationNotice programs={roster.programs}
+        canConfigure={roster.canConfigureAcademicYear} date={date}/>
       <section aria-label="Onsite day summary" className="mt-8">
         <h2 className="font-serif text-2xl font-semibold">Who's here</h2>
         <p className="mt-2 text-sm text-muted-foreground">Counts are student-program roster entries, not unique students. Only staff observations count as recorded attendance.</p>

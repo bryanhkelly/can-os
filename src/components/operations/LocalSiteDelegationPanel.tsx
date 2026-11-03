@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryState } from "@/components/workspace";
@@ -37,7 +38,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
     });
   }
   const error = validationError || (mutation.isError
-    ? mutation.error instanceof Error ? mutation.error.message : "Unable to update delegation."
+    ? mutationErrorMessage(mutation.error, "Unable to update delegation.")
     : "");
   const notice = mutation.data ? mutation.variables?.action === "appoint"
     ? "Local staff responsibility recorded with an expiry. School opening and safeguarding still require independent verification."
@@ -85,7 +86,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
       <button type="button" onClick={retry} disabled={busy} className="ml-3 underline disabled:opacity-50">Refresh staffing</button>
     </p>}
     <QueryState loading={query.isPending ? "Loading Site staff assignments…" : undefined}
-      error={query.isError ? query.error.message : undefined}
+      error={query.isError ? mutationErrorMessage(query.error, "Unable to load Site staff assignments.") : undefined}
       onRetry={retry} retrying={busy}>
     {data && <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {!data.hasConfiguration && <p role="status" className="rounded border p-4 text-sm lg:col-span-2">

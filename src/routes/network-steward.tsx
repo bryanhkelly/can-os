@@ -1,3 +1,5 @@
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -34,46 +36,34 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
   const [email, setEmail] = useState("");
   const [firstName, setFirst] = useState("");
   const [lastName, setLast] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const busy = mutation.pending || mutation.refreshFailed;
 
   const saveAgreement = async (event: React.FormEvent) => {
-    event.preventDefault(); setBusy(true); setNotice(""); setError("");
-    try {
-      const result = await verifyNetworkAgreement({ data: {
+    event.preventDefault();
+    await mutation.run(() => verifyNetworkAgreement({ data: {
         denominationOrganizationId, agreementReference, evidenceDocumentId,
         validFrom: new Date(validFrom).toISOString(), validThrough: new Date(validThrough).toISOString(),
-      } });
-      await router.invalidate();
-      setNotice(result.created ? "Agreement verification recorded." : "Identical agreement already recorded.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to verify agreement.");
-    } finally { setBusy(false); }
+      } }), { successMessage: result => result.created ? "Agreement verification recorded." : "Identical agreement already recorded.",
+      commandErrorMessage: "Unable to verify agreement." });
   };
 
   const provision = async (event: React.FormEvent) => {
-    event.preventDefault(); setBusy(true); setNotice(""); setError("");
-    try {
-      const result = await provisionDenominationHQOfficer({ data: {
+    event.preventDefault();
+    await mutation.run(() => provisionDenominationHQOfficer({ data: {
         denominationOrganizationId: officerOrganizationId, authorityDocumentId,
         email, firstName, lastName,
-      } });
-      await router.invalidate();
-      setNotice(result.created
+      } }), { successMessage: result => result.created
         ? "HQ membership recorded. Send the officer through the ordinary verified-email access flow."
-        : "This officer already holds the authorized membership.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to provision HQ officer.");
-    } finally { setBusy(false); }
+        : "This officer already holds the authorized membership.",
+      commandErrorMessage: "Unable to provision HQ officer." });
   };
   const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
   return <WorkspaceShell eyebrow="CAN OS · Network partnerships" title="Church onboarding and partner contracts"
     subtitle="Review new church requests, verify church authority, invite leaders, and manage partner contracts. School opening remains separately authorized.">
     <ChurchApplicationsDesk/>
     <p className="mt-5 text-sm text-muted-foreground">Denomination agreements and HQ officer appointments below require an already verified Document with the appropriate subject and category. Church applications above do not require anyone to assemble a document UUID manually.</p>
-    {error && <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+    <MutationFeedback state={mutation} className="mt-4" pendingMessage="Recording partner authority..."/>
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="font-serif text-2xl">Record independently verified agreement</h2>
       <form onSubmit={saveAgreement} className="mt-4 grid gap-3 sm:grid-cols-2">

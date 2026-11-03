@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueryState } from "@/components/workspace";
 import { getOutboxHealthSummary } from "@/modules/operations/outbox-health.functions";
@@ -25,7 +26,7 @@ export function OutboxHealthPanel() {
       if (request === requestSequence.current) setHealth(current);
     } catch (cause) {
       if (request === requestSequence.current) setReadError(
-        cause instanceof Error ? cause.message : "Unable to load outbox health.");
+        mutationErrorMessage(cause, "Unable to load outbox health."));
     } finally {
       if (request === requestSequence.current) setLoading(false);
     }

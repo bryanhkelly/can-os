@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
@@ -42,7 +43,7 @@ export function AcademicProgramMarketingEditor({
       setReason(""); setReviewed(false);
       await router.invalidate();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to change marketing approval.");
+      setError(mutationErrorMessage(caught, "Unable to change marketing approval."));
     } finally {
       setPending(false);
     }

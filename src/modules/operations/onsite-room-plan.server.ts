@@ -18,6 +18,7 @@ import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator
 import { requireCurrentOnsiteAdultSafety, verifiedAdultSafetyEvidence, verifiedAdultCoversBlock } from "./onsite-block-safety.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import type { z } from "zod";
+import { listSiteRooms, requireSiteRoom } from "./site-rooms.server";
 
 type Reader = Pick<typeof db, "select">;
 type BlockInput = z.infer<typeof roomPlanBlockSchema>;
@@ -29,6 +30,7 @@ export async function scheduledRoomBlocks(tx: Reader, input: Pick<BlockInput,"pr
   const blocks = await tx.select({ sectionId: sections.id, periodId: scheduleTemplatePeriods.id,
     periodLabel: scheduleTemplatePeriods.label, startsAtLocal: scheduleTemplatePeriods.startsAtLocal,
     endsAtLocal: scheduleTemplatePeriods.endsAtLocal, title: sections.title,
+    assignedRoomId: sql<string|null>`${sections.metadata}->>'physicalRoomId'`,
   }).from(sections)
     .innerJoin(terms, eq(terms.id, sections.termId))
     .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
@@ -105,6 +107,9 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
     await tx.select({ id: programs.id }).from(programs).where(eq(programs.id, input.programId)).for("update");
     const { school, block } = await scheduledRoomBlock(tx, input);
     await authorizeRoomPlanHost(tx, actor, school);
+    const room = await requireSiteRoom(tx, school.siteId, input.roomId);
+    if (room.name !== input.roomLabel || room.capacity !== input.roomCapacity)
+      throw new Error("Room details changed; refresh and select the saved physical classroom");
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-presence:"+school.siteId+":"+input.date+":"+input.sectionId+":"+input.periodId}))`);
     const [site] = await tx.select({ timezone: sites.timezone }).from(sites).where(eq(sites.id, school.siteId)).limit(1);
     const timezone = site!.timezone;
@@ -118,7 +123,8 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
     await checkPlannedPrimary(tx,input,block,timezone,input.primaryPersonId,input.substitutesForPersonId);
     const metadata = { siteId: school.siteId, programId: input.programId, sectionId: input.sectionId,
       periodId: input.periodId, date: input.date, primaryPersonId: input.primaryPersonId,
-      backupPersonId: input.backupPersonId, substitutesForPersonId:input.substitutesForPersonId??null, roomLabel: input.roomLabel, roomCapacity: input.roomCapacity,
+      backupPersonId: input.backupPersonId, substitutesForPersonId:input.substitutesForPersonId??null,
+      roomId: room.id, roomLabel: room.name, roomCapacity: room.capacity,
       startsAtLocal: block.startsAtLocal, endsAtLocal: block.endsAtLocal,
       rationale: input.rationale, source: "staff_room_plan", reviewStatus: "pending", isCurrent: true };
     const [replay] = await tx.select().from(documents).where(eq(documents.id, input.documentId)).limit(1);
@@ -175,6 +181,12 @@ export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<
       const [site] = await tx.select({ timezone: sites.timezone }).from(sites).where(eq(sites.id, school.siteId)).limit(1);
       const scope = { date: input.date, timeZone: site!.timezone, ...block };
       const m = document.metadata;
+      if (m.roomId !== undefined) {
+        if (typeof m.roomId !== "string") throw new Error("Invalid physical classroom reference");
+        const room = await requireSiteRoom(tx, school.siteId, m.roomId);
+        if (room.name !== m.roomLabel || room.capacity !== m.roomCapacity)
+          throw new Error("Saved room details no longer match this plan; submit a corrected version");
+      }
       if (m.startsAtLocal !== block.startsAtLocal || m.endsAtLocal !== block.endsAtLocal ||
           !coversLocalSupervisionBlock({ ...scope, effectiveFrom: new Date(), effectiveThrough: document.expiresAt }))
         throw new Error("The current schedule and full-block plan validity must match before approval");
@@ -253,7 +265,8 @@ export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<Bl
     verifiedScheduledSectionFacilitators(db,{siteId:school.siteId,organizationId:school.organizationId},candidates),
     verifiedAdultSafetyEvidence(db,candidates.map(row=>row.personId)),
   ]);
-  return { programId:input.programId,date:input.date,timezone:site!.timezone,canSubmit:!canReview,canReview,
+  const rooms = await listSiteRooms(db, school.siteId);
+  return { programId:input.programId,siteId:school.siteId,rooms,date:input.date,timezone:site!.timezone,canSubmit:!canReview,canReview,
     blocks:blocks.map(block=>{
       const scope={date:input.date,timeZone:site!.timezone,...block};
       const staff=[...new Map(candidates.filter(row=>row.sectionId===block.sectionId&&
@@ -269,6 +282,7 @@ export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<Bl
         current:document?{id:document.id,submittedByPersonId:document.uploadedByPersonId,
           primaryPersonId:String(document.metadata.primaryPersonId??""),backupPersonId:String(document.metadata.backupPersonId??""),
           roomLabel:String(document.metadata.roomLabel??""),roomCapacity:Number(document.metadata.roomCapacity??0),
+          roomId:typeof document.metadata.roomId==="string"?document.metadata.roomId:null,
           rationale:String(document.metadata.rationale??""),
           substitutesForPersonId:typeof document.metadata.substitutesForPersonId==="string"?document.metadata.substitutesForPersonId:null,expiresAt:document.expiresAt?.toISOString()??null,
           status:document.metadata.isCurrent===false?"superseded":String(document.metadata.reviewStatus??"legacy"),

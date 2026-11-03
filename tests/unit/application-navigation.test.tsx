@@ -11,11 +11,14 @@ import { Route as Capacity } from "@/routes/admissions.capacity";
 import { Route as Families } from "@/routes/admissions.families";
 import { Route as Support } from "@/routes/student.support";
 import { Route as CourseRequests } from "@/routes/operations.course-requests";
+import { Route as CourseApprovals } from "@/routes/guardian.course-approvals";
 import { Route as Offers } from "@/routes/guardian.admission-offers";
 import { Route as Permissions } from "@/routes/guardian.group-permissions";
 import { Route as StudentGroups } from "@/routes/student.study-groups";
 import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
 import { readinessFromSnapshot } from "@/domain/program-readiness";
+import { admissionsNextStep } from "@/components/admissions/AdmissionsApplicantCard";
+import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGuardianActions";
 
 const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
 // Static presentation tests never open a database connection.
@@ -88,6 +91,9 @@ vi.mock("@/modules/support/support-referrals.functions",()=>({
 }));
 vi.mock("@/modules/actions/student-actions.functions",()=>({getQuickWinActions:vi.fn(),requestQuickWinHelp:vi.fn()}));
 vi.mock("@/modules/learning/registrar-course-requests.functions",()=>({listRegistrarCourseRequests:vi.fn()}));
+vi.mock("@/modules/learning/guardian-course-approval.functions",()=>({
+  listGuardianCourseApprovals:vi.fn(),decideGuardianCourseApproval:vi.fn(),
+}));
 vi.mock("@/modules/enrollment/guardian-admission-offers.functions",()=>({getGuardianAdmissionOffers:vi.fn()}));
 vi.mock("@/modules/enrollment/guardian-enrollment-checklist.functions",()=>({getGuardianEnrollmentChecklist:vi.fn()}));
 vi.mock("@/modules/enrollment/enrollment-form.functions",()=>({submitGuardianEnrollmentForm:vi.fn(),decideEnrollmentForm:vi.fn()}));
@@ -269,6 +275,21 @@ describe("application contextual navigation",()=>{
     expect(html).not.toContain("Unrelated application");
   });
 
+  it("does not show a list empty state alongside a selected application",()=>{
+    state.search={siteId:"school",application:"application"};
+    successful({
+      rows:[],
+      detail:{id:"application",studentName:"Selected applicant",programId:"program",program:"Academy",
+        stage:"eligibility",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]},
+      options:[],
+    });
+    const html=render(Admissions);
+    expect(html).toContain("Selected applicant");
+    expect(html).not.toContain("No applications are available");
+    expect(html).toContain("No school-year seat pool is configured for this application.");
+    expect(html).toContain('href="/admissions/capacity?siteId=school&amp;programId=program"');
+  });
+
     it("uses whole-scope aggregates and shows the final bounded stage page",()=>{
       state.search={siteId:"school",programId:"program",stage:"application",page:3};
       successful({
@@ -407,6 +428,51 @@ describe("application contextual navigation",()=>{
     expect(html).not.toContain("Loading authorized support workspace");
   });
 
+  it("explains the review blocker and next owner for scheduled support services",()=>{
+    state.search={referral:"referral"};
+    successful({viewerRole:"specialist",referrals:[{
+      id:"referral",title:"Academic coaching",category:"academic",stage:"in_service",priority:"normal",
+      description:"Read evidence",assignedTo:"Coach",plan:{goal:"Improve attendance",intervention:"Weekly coaching",targetDate:"2030-01-01"},
+      services:[{id:"service",kind:"coaching",scheduledAt:"2030-01-01T10:00:00.000Z",status:"scheduled",outcome:""}],
+    }]});
+    const html=render(Support);
+    expect(html).toContain("Next actor: Coach");
+    expect(html).toContain("complete all scheduled services before requesting review (1 remaining)");
+    expect(html).toContain("The review transition requires at least one completed service.");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Move to review<\/button>/);
+  });
+
+  it("identifies the next admissions actor for each intake state",()=>{
+    expect(admissionsNextStep("inquiry",null)).toContain("registrar: begin the application");
+    expect(admissionsNextStep("application",null)).toContain("begin eligibility review");
+    expect(admissionsNextStep("eligibility","ready_for_offer")).toContain("issue the enrollment offer");
+    expect(admissionsNextStep("eligibility","waitlisted")).toContain("restore this application");
+    expect(admissionsNextStep("accepted",null)).toContain("activation and class-placement checklist");
+    expect(admissionsNextStep("withdrawn",null)).toContain("application is closed");
+  });
+
+  it("keeps family-access steps separate from admissions decisions",()=>{
+    const renderGuardianStep=(verified:boolean,loginProvisioned:boolean)=>renderToStaticMarkup(
+      <AdmissionsGuardianActions applicationId="application" verified={verified} loginProvisioned={loginProvisioned}
+        busy={false} onVerify={vi.fn()} onProvision={vi.fn()} onInvite={vi.fn()}/>);
+    expect(renderGuardianStep(false,false)).toContain("registrar verifies the guardian relationship");
+    expect(renderGuardianStep(true,false)).toContain("provisions verified guardian sign-in");
+    expect(renderGuardianStep(true,true)).toContain("offer decisions remain with the guardian");
+  });
+
+  it("shows guardian and facilitator ownership after a study-group permission decision",()=>{
+    successful([
+      {id:"open",groupTitle:"Science circle",studentName:"Jordan",status:"open",decision:null,obsolete:false},
+      {id:"approved",groupTitle:"Math circle",studentName:"Riley",status:"resolved",decision:"approve",obsolete:false},
+      {id:"declined",groupTitle:"Reading circle",studentName:"Casey",status:"resolved",decision:"decline",obsolete:false},
+    ]);
+    const html=render(Permissions);
+    expect(html).toContain("Next actor: you — allow or decline participation");
+    expect(html).toContain("Next actor: the group facilitator");
+    expect(html).toContain("membership is not active until the facilitator approves");
+    expect(html).toContain("No further action: permission was declined");
+  });
+
   it("sends readiness shortcuts to operational owners, not student pages",()=>{
     const links=Object.fromEntries(readinessFromSnapshot({}).map(item=>[item.key,item.href]));
     expect(links).toMatchObject({
@@ -419,7 +485,7 @@ describe("application contextual navigation",()=>{
   it("retains delivery scope in course request queues and return links",()=>{
     state.search={siteId:"school",programId:"program"};
     successful([
-      {id:"request",siteId:"school",programId:"program",studentName:"Jordan",sectionTitle:"English Literature",operation:"add",createdAt:"2030-01-01",deadline:"2030-02-01",programActive:true,canApprove:true},
+      {id:"request",siteId:"school",programId:"program",studentName:"Jordan",sectionTitle:"English Literature",operation:"add",createdAt:"2030-01-01",deadline:"2030-02-01",programActive:true,canApprove:true,contentReady:true},
       {id:"other",siteId:"other-school",programId:"other-program",sectionTitle:"Unrelated course"},
     ]);
     const html=render(CourseRequests);
@@ -427,6 +493,51 @@ describe("application contextual navigation",()=>{
     expect(html).not.toContain("Unrelated course");
     expect(html).toContain('href="/operations/course-policies?siteId=school&amp;programId=program"');
     expect(html).toContain('href="/operations?siteId=school&amp;programId=program"');
+  });
+
+  it("explains the content blocker before approval and preserves the pinned-version handoff",()=>{
+    successful([{id:"request",siteId:"school",programId:"program",studentName:"Jordan",
+      sectionTitle:"Photography",operation:"add",createdAt:"2030-01-01",deadline:"2030-02-01",
+      programActive:true,deadlinePassed:false,guardianState:"approved",canApprove:false,contentReady:false}]);
+    const html=render(CourseRequests);
+    expect(html).toContain("Next: school curriculum setup");
+    expect(html).toContain("published release with at least one student-accessible lesson");
+    expect(html).toContain("does not update the class&#x27;s pinned version");
+    expect(html).toContain('href="/operations/curriculum?programId=program"');
+    expect(html).toContain('href="/operations/launch/program"');
+    expect(html).toMatch(/disabled=""[^>]*>Approve change/);
+    expect(html).not.toMatch(/disabled=""[^>]*>Decline/);
+  });
+
+  it("distinguishes a guardian handoff from a registrar-ready request",()=>{
+    const request={id:"request",siteId:"school",programId:"program",studentName:"Jordan",
+      sectionTitle:"Photography",operation:"add",createdAt:"2030-01-01",deadline:"2030-02-01",
+      programActive:true,deadlinePassed:false,contentReady:true,canApprove:false};
+    successful([{...request,guardianState:"pending"}]);
+    expect(render(CourseRequests)).toContain("Next: an authorized guardian");
+    successful([{...request,guardianState:"approved",canApprove:true}]);
+    const html=render(CourseRequests);
+    expect(html).toContain("Next: registrar reviews this request");
+    expect(html).not.toContain("Next: school curriculum setup");
+  });
+
+  it("shows families the content blocker without treating permission as enrollment",()=>{
+    successful([{id:"request",sectionTitle:"Photography",studentName:"Jordan",sectionCode:"PHOTO",
+      deadline:"2030-02-01",contentReady:false,myDecision:null}]);
+    const html=render(CourseApprovals);
+    expect(html).toContain("School content setup is pending");
+    expect(html).toContain("You may record your permission now");
+    expect(html).toContain("does not reserve a seat or complete enrollment");
+    expect(html).toContain("Next: review the class request");
+  });
+
+  it("shows the registrar handoff after guardian permission is already recorded",()=>{
+    successful([{id:"request",sectionTitle:"Photography",studentName:"Jordan",sectionCode:"PHOTO",
+      deadline:"2030-02-01",contentReady:true,myDecision:"approve"}]);
+    const html=render(CourseApprovals);
+    expect(html).toContain("Next: the school registrar reviews the request");
+    expect(html).not.toContain("School content setup is pending");
+    expect(html).not.toContain("Next: review the class request");
   });
 
   it("opens only the requested offer for the selected child",()=>{
@@ -523,6 +634,16 @@ describe("application contextual navigation",()=>{
     const html=render(Permissions);
     expect(html).toContain("This permission request is unavailable");
     expect(html).not.toContain("Unrelated group");
+  });
+
+  it("identifies each child on guardian study-group permission requests",()=>{
+    successful([
+      {id:"first",groupTitle:"Shared algebra group",studentName:"Jordan Example",status:"open"},
+      {id:"second",groupTitle:"Shared algebra group",studentName:"Synthetic Sibling",status:"open"},
+    ]);
+    const html=render(Permissions);
+    expect(html).toContain("Student: Jordan Example");
+    expect(html).toContain("Student: Synthetic Sibling");
   });
 
   it("uses the same URL for student group titles and Open controls",()=>{
