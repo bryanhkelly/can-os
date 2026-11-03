@@ -77,13 +77,22 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState(selection.siteId??"");
-  useEffect(()=>{
-    if(selection.siteId)setSiteId(selection.siteId);
-  },[selection.siteId]);
   const [newSiteName,setNewSiteName]=useState("");
   const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  useEffect(()=>{
+    // Route selection is authoritative. Do not carry a campus or unsaved launch
+    // identity into a different Program's setup when navigating within the wizard.
+    setSiteId(selection.siteId??"");
+    const selected=options?.sites.find(site=>site.id===selection.siteId);
+    if(selected)setHostOrganizationId(selected.organizationId);
+    setCreated(null);
+    setCreatedSiteDraft(null);
+    setName("");
+    setSlug("");
+    setSlugEdited(false);
+  },[selection.siteId,selection.programId]);
   const emptySiteAddress: LaunchSiteAddressDraft = {street1:"",street2:"",city:"",state:"",postalCode:"",country:"US",county:""};
   const [newSiteAddress,setNewSiteAddress]=useState<LaunchSiteAddressDraft>(emptySiteAddress);
   async function retrySiteRefresh(){
