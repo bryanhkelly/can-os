@@ -12,6 +12,7 @@ import { requirePartnerWebsiteEditor } from "./site-website-authorization.server
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { publishPartnerLocalContentWithinTransaction, readLocalContentHistory, readCurrentLocalContent } from "./site-local-content.server";
 import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
+import { deriveChurchBrandProposal } from "@/domain/church-brand-suggestions";
 
 /**
  * User-submitted or boundedly fetched public church excerpts, never verified
@@ -308,6 +309,10 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
     return { status: blocked ? "blocked" as const : "failed" as const, count: 0,
       message: "The website could not be read safely. Use the manual church-story editor instead." };
   }
+  const brandProposal = deriveChurchBrandProposal(
+    reference.normalizedUrl, new Date().toISOString(),
+    pages.flatMap(page => page.brandEvidence ?? []),
+  );
   return db.transaction(async tx => {
     const checked = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
     const [current] = await tx.select().from(churchSourceReferences)
@@ -372,7 +377,7 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       organizationId: checked.organizationId, siteId: checked.id,
       payload: { count: distinct.length },
     });
-    return { status: "ready" as const, count: distinct.length,
+    return { status: "ready" as const, count: distinct.length, brandProposal,
       message: "Public church website excerpts are ready for individual review. Nothing was published." };
   });
 }
