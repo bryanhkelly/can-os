@@ -167,10 +167,11 @@ describe("family and student profiles", () => {
       studentPersonId: "jordan-person", priority: "high", dueAt: null, createdAt: "",
     }]} enrollmentApplications={application} loading={false} error=""/>);
     expect(html).toContain("Jordan Example");
-    expect(html).toContain("Accepted · enrollment checklist");
+    // Application stage accepted without an actual accepted offer must not imply enrollment.
+    expect(html).toContain("Admissions · accepted");
     expect(html).toContain("Enrollment consent form · awaiting submission");
     expect(html).toContain('href="/guardian/admission-offers?student=jordan-person&amp;application=application-1"');
-    expect(html).toContain("Open enrollment checklist →");
+    expect(html).toContain("Open Jordan&#x27;s admissions and enrollment →");
     expect(html).not.toContain("No active enrollments to show yet");
   });
   it("filters the family home by the selected child and retains action context", () => {
