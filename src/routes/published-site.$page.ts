@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
 import { isPublicSitePagePath, isPublicSiteReadPath } from "@/domain/public-site-paths";
-import { availablePublicSitePaths, isIndexablePublicSite, renderPublicSiteHtml } from "@/domain/public-site-html";
+import { availablePublicSitePaths, isIndexablePublicSite, renderPublicSiteHtml, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 
 const headers = {
   "Content-Type": "text/html; charset=utf-8",
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/published-site/$page")({
           const catalog = await readPublishedSiteCatalog(slug);
           if (!catalog) return unavailable(404);
           const localPreview = new URL(request.url).searchParams.has("site");
+          const presentation = localPreview ? withIllustrativeLocalPreview(catalog) : catalog;
           const indexable = !localPreview && isIndexablePublicSite(catalog);
           if (path === "/robots.txt") return new Response(
             indexable
@@ -57,8 +58,8 @@ export const Route = createFileRoute("/published-site/$page")({
                 status: 200, headers: { ...headers, "Content-Type": "application/xml; charset=utf-8" },
               });
           }
-          if (!isPublicSitePagePath(path) || !availablePublicSitePaths(catalog).includes(path)) return unavailable(404);
-          return new Response(renderPublicSiteHtml(catalog, {
+          if (!isPublicSitePagePath(path) || !availablePublicSitePaths(presentation).includes(path)) return unavailable(404);
+          return new Response(renderPublicSiteHtml(presentation, {
             path, makeRequestId: () => crypto.randomUUID(), localPreview,
             localPreviewSlug: localPreview ? slug : undefined,
           }), { status: 200, headers: indexable ? headers :
