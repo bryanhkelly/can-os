@@ -205,7 +205,7 @@ export async function readApprovedSchoolSitePhotos(
     siteMediaKeyPattern.test(row.storageKey)&&
     row.storageKey.startsWith(`school-site-media/${siteId}/`)&&
     row.mimeType!==null&&["image/png","image/jpeg"].includes(row.mimeType)
-  ).map(row=>({
+  ).map((row):SiteMediaPhoto=>({
     id:row.id,siteId,
     width:typeof row.metadata.width==="number"?row.metadata.width:0,
     height:typeof row.metadata.height==="number"?row.metadata.height:0,
