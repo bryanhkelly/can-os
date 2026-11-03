@@ -35,7 +35,7 @@ export type WebsitePageEvidence = {
     "leadership_intro" | "ministries";
 };
 
-function plainHtmlText(html: string) {
+export function plainHtmlText(html: string) {
   let fragment = html.replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<(?:script|style|noscript|template|svg|form|iframe)\b[^>]*>[\s\S]*?<\/\s*(?:script|style|noscript|template|svg|form|iframe)\s*>/gi, " ");
   const main = /<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(fragment);
@@ -168,7 +168,7 @@ async function requestPublicPage(
         response.resume(); agent.destroy(); reject(new Error("Church website did not return a public page")); return;
       }
       const mime = String(response.headers["content-type"] ?? "").toLowerCase();
-      const allowedMime = limit === MAX_ROBOTS_BYTES ? mime.startsWith("text/plain") : mime.startsWith("text/html");
+      const allowedMime = limit === MAX_ROBOTS_BYTES ? /^text\/plain(?:;|$)/.test(mime) : /^text\/html(?:;|$)/.test(mime);
       if (!allowedMime || response.headers["content-encoding"] ||
           Number(response.headers["content-length"] ?? 0) > limit) {
         response.destroy();
