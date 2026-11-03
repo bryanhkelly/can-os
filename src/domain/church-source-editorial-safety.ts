@@ -10,9 +10,11 @@ import {
  * conservative limits around factual school marketing.
  */
 const schoolMarketingClaims = [
-  /\b(?:school|academy|campus|academic program)\b.{0,100}\b(?:enroll(?:ment)?|admissions?|apply|tuition|fees?|licensed|accredited|state[- ]approved|funding|eligible|qualified teachers?|certified staff|background.checked|guaranteed safety|safe campus|secure campus)\b/i,
+  /\b(?:school|academy|campus|academic program)\b.{0,140}\b(?:enroll\w*|admission\w*|appl(?:y|ication\w*|icants?)|tuition|fees?|licensed|accredited|state[- ]approved|funding|eligible|qualified teachers?|certified staff|background.checked|guaranteed safety|safe campus|secure campus)\b/i,
   /\b(?:guaranteed|certified|background.checked|fully licensed|state[- ]approved|accredited)\b.{0,70}\b(?:school|academy|campus|teachers?|school staff|instructors?|enrollment|students?)\b/i,
   /\b(?:eligible for|qualifies? for|accepts?)\s+(?:state |federal )?(?:voucher|education savings account|esa funding|scholarship|school funding|financial aid)\b/i,
+  /\b(?:admissions?|enrollment|enrolling|tuition|school fees?|student applications?)\s+(?:are|is|open|now|available|starting|accepted|begins|has begun)\b/i,
+  /\b(?:enrolling|admitting|accepting applications?\s+for)\s+(?:students?|children|learners|grades?|families)\b/i,
 ];
 
 export function assertChurchSourceEditorialCopy(text: string, target: SiteLocalTextField) {
