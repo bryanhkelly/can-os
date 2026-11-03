@@ -57,24 +57,44 @@ function plainHtmlText(html: string) {
   return [...new Set(parts)].slice(0, 5).join("\n").slice(0, 1200).trim();
 }
 
-function robotsAllows(robots: string, pathname: string) {
-  let relevant = false;
-  let active = false;
+export function robotsAllows(robots: string, pathname: string): boolean {
+  // Apply wildcard and explicit CAN rules conservatively. If a path matches
+  // competing rules, prefer the more specific match (Allow wins a tie).
+  const rules: Array<{ allow: boolean; length: number; pattern: RegExp }> = [];
+  let agents: string[] = [];
+  let hasRules = false;
   for (const raw of robots.split(/\r?\n/)) {
     const line = raw.replace(/#.*/, "").trim();
-    const split = /^([\w-]+)\s*:\s*(.*)$/i.exec(line);
-    if (!split) continue;
-    const directive = split[1]!.toLowerCase(), value = split[2]!.trim();
+    const parsed = /^([\w-]+)\s*:\s*(.*)$/i.exec(line);
+    if (!parsed) continue;
+    const directive = parsed[1]!.toLowerCase();
+    const value = parsed[2]!.trim();
     if (directive === "user-agent") {
-      // Conservative: honor wildcard and CAN OS-specific disallow groups.
-      active = value === "*" || value.toLowerCase().includes("can");
-      relevant ||= active;
-    } else if (active && directive === "disallow" && value &&
-        (pathname === value || pathname.startsWith(value.endsWith("/") ? value : value + "/") ||
-         value === "/")) return false;
+      if (hasRules) { agents = []; hasRules = false; }
+      agents.push(value.toLowerCase());
+      continue;
+    }
+    if (directive !== "allow" && directive !== "disallow") continue;
+    hasRules = true;
+    if (!agents.some(agent => agent === "*" || agent.includes("canos") || agent.includes("can-os"))) continue;
+    if (!value) continue;
+    const anchored = value.endsWith("$");
+    const source = (anchored ? value.slice(0, -1) : value)
+      .split("*").map(part => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+    try {
+      rules.push({
+        allow: directive === "allow",
+        length: value.replace(/[*$]/g, "").length,
+        pattern: new RegExp("^" + source + (anchored ? "$" : "")),
+      });
+    } catch {
+      // Fail closed on an unparseable disallow rather than ignore it.
+      if (directive === "disallow") return false;
+    }
   }
-  void relevant;
-  return true;
+  const matched = rules.filter(rule => rule.pattern.test(pathname))
+    .sort((a,b) => b.length - a.length || Number(b.allow) - Number(a.allow));
+  return matched[0]?.allow ?? true;
 }
 
 async function publicAddress(hostname: string): Promise<string> {
@@ -88,10 +108,14 @@ async function publicAddress(hostname: string): Promise<string> {
 
 async function requestPublicPage(
   pageUrl: string, expectedOrigin: string, limit: number, redirects = 0,
+  robotsText?: string,
 ): Promise<{ status: number; text: string; url: string }> {
   const safeUrl = normalizeChurchReferenceUrl("website", pageUrl);
   const url = new URL(safeUrl);
   if (url.origin !== expectedOrigin) throw new Error("Cross-origin church website redirects are unavailable");
+  if (robotsText && !robotsAllows(robotsText, url.pathname)) {
+    throw new Error("Church website robots instructions prohibit this path");
+  }
   if (redirects > 2) throw new Error("Too many church website redirects");
   const ip = await publicAddress(url.hostname);
   return new Promise((resolve, reject) => {
@@ -117,7 +141,7 @@ async function requestPublicPage(
         let next: string;
         try { next = new URL(location, url).toString(); }
         catch { reject(new Error("Invalid church website redirect")); return; }
-        void requestPublicPage(next, expectedOrigin, limit, redirects + 1).then(resolve, reject);
+        void requestPublicPage(next, expectedOrigin, limit, redirects + 1, robotsText).then(resolve, reject);
         return;
       }
       if (status === 404) {
@@ -183,7 +207,8 @@ export async function extractChurchPublicWebsite(
     dedup.add(url.pathname);
     if (robots.status === 200 && !robotsAllows(robots.text, url.pathname)) continue;
     try {
-      const response = await requestPublicPage(url.toString(), origin, MAX_HTML_BYTES);
+      const response = await requestPublicPage(url.toString(), origin, MAX_HTML_BYTES, 0,
+        robots.status === 200 ? robots.text : undefined);
       if (response.status !== 200) continue;
       const pageText = plainHtmlText(response.text);
       if (pageText.length >= 45) results.push({
