@@ -245,6 +245,9 @@ describe("standalone public site HTML", () => {
       expect(hosted).toContain(shared);
     }
     expect(draft).not.toContain("<form");
+    expect(availablePublicSitePaths(page)).toContain("/school-day");
+    expect(availablePublicSitePaths(page)).toContain("/admissions");
+    expect(availablePublicSitePaths(page)).not.toContain("/student-life");
     expect(draft).not.toContain('name="contactEmail"');
     expect(draft).not.toContain('action="/inquiry"');
     expect(draft).not.toContain("<script");
