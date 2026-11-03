@@ -118,6 +118,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       linkedApplicationIds.length ? db.select({
         applicationId: admissionOffers.applicationId,
         status: admissionOffers.status,
+        schoolYearId: admissionOffers.schoolYearId,
         issuedAt: admissionOffers.issuedAt,
         respondedAt: admissionOffers.respondedAt,
       }).from(admissionOffers).where(inArray(admissionOffers.applicationId, linkedApplicationIds))
@@ -158,10 +159,14 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       catch { authorized.set(programId, false); }
     }));
     return {items:pageRows.map(row => {
+      // The offer and enrollment must refer to the same school year.
+      // An active record from another year cannot complete this application.
+      const offerYearId = row.applicationId
+        ? latestOffers.get(row.applicationId)?.schoolYearId : null;
       const programEnrollmentYears = new Set(activeEnrollments.filter(enrollment =>
         enrollment.studentProfileId === row.studentProfileId &&
         enrollment.programId === row.programId && enrollment.kind === "program" &&
-        enrollment.schoolYearId,
+        !!offerYearId && enrollment.schoolYearId === offerYearId,
       ).map(enrollment => enrollment.schoolYearId));
       const activeEnrollment = programEnrollmentYears.size > 0;
       const placedInClass = activeEnrollment && activeEnrollments.some(enrollment =>
