@@ -85,7 +85,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
  const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["site_admin","registrar","teacher","specialist","counselor","site_leader"])));
  const [siteChoices,programChoices]=await Promise.all([
   db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
-  actor.scope.programIds?.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,actor.scope.programIds),isNotNull(programs.siteId),...(data.siteId?[eq(programs.siteId,data.siteId)]:[]))) : Promise.resolve([]),
+  scoped.programIds.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,scoped.programIds),isNotNull(programs.siteId))) : Promise.resolve([]),
  ]);
  return {items:scopedItems,assignees,sites:siteChoices,programs:programChoices,selected:data,summary:{...notificationSummary(items),...schoolActionBacklog(scopedItems)}};
 });
