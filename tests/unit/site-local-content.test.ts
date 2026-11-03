@@ -29,7 +29,7 @@ describe("PUB-18: distributed church website ownership", () => {
       demonstration: true,
       localContent: normalized,
       offerings: [],
-    });
+    }, {path:"/about"});
     expect(html).toContain("A community with a story to tell");
     expect(html).toContain("Content provided by the local church");
     expect(html).toContain("fictional demonstration school");
@@ -96,7 +96,7 @@ describe("PUB-18: distributed church website ownership", () => {
         ...churchCopy,
         statementOfFaith: "We believe & worship with <b>faith</b>.",
       },
-    });
+    }, {path:"/about"});
     expect(html).toContain("Content provided by the local church");
     expect(html).toContain("Denominational identity");
     expect(html).toContain("Church of God in Christ");
@@ -143,7 +143,7 @@ describe("PUB-18: distributed church website ownership", () => {
       host: "fellowship.can-os.com",
       site: { name: "Academy", organizationName: "Church" },
       offerings: [], localContent: story,
-    });
+    }, {path:"/about"});
     expect(html).toContain("Founded in 1987 &amp; serving our neighbors.");
     expect(html).toContain("Why we started a school");
     expect(html).not.toContain("<h3>Local traditions</h3>");
