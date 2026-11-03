@@ -34,6 +34,11 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
         Your church Site and school Program are different saved records. Start by confirming the existing church
         and its physical location. You can return to either record without creating a second school.
       </p>
+      {hasSchoolPreparation&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+        Your existing school setup is saved in the preparation workspace above. This blank form is for
+        creating an additional Program; it does not edit, replace, or erase an existing Program.
+        To resume academics, calendars, website or family outreach, use the saved school controls above.
+      </p>}
       <div className="mt-5 space-y-5">
         <section aria-label="Step 1 · Church and school location" className="rounded-xl border p-4">
           <h3 className="mb-3 text-base font-semibold">1. Confirm the church and school location</h3>
