@@ -7,7 +7,7 @@
 /* CAN OS — Precision Operator + Warm Stone + Serif Accents */
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Instrument Serif", "Tiempos Headline", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
@@ -58,7 +58,7 @@
 }
 
 :root {
-  --radius: 0.75rem;
+  --radius: 0px;
   --shell-pad: 1.5rem;
   --topbar-height: 3.5rem;
   --workspace-accent: var(--primary);
@@ -312,3 +312,22 @@
 @media (prefers-reduced-motion: reduce) {
   .student-day-hero a { transition: none; }
 }
+
+/* CAN OS V5 — institutional geometry, restrained enterprise surfaces.
+ * Tokens cascade across existing components; status colors retain their meaning.
+ * Campaign art is the only expressive surface. */
+@layer base {
+  *, *::before, *::after { border-radius: 0 !important; }
+  body { font-family: var(--font-sans); }
+}
+.can-entity-card { display:block; border:1px solid var(--border); background:var(--card); transition:border-color 150ms ease,background-color 150ms ease; }
+.can-entity-card:hover { border-color:var(--primary); background:var(--card); }
+.can-entity-card:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+.can-editorial-canvas { box-shadow:none; }
+.can-editorial-canvas[data-safety="true"] { box-shadow:none; }
+.can-editorial-canvas .student-day-hero-landscape { filter:saturate(.84); }
+.can-editorial-canvas .can-editorial-label { letter-spacing:.17em; }
+/* Keep the actionable workspace first on record pages; editorial belongs on home views. */
+.can-workspace-header { margin-bottom:1.25rem; padding-bottom:1.1rem; }
+.can-workspace-header h1 { font-size:clamp(1.75rem,2.1vw,2.5rem); line-height:1.15; }
+@media(prefers-reduced-motion:reduce) { .can-entity-card {transition:none;} }
