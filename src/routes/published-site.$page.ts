@@ -11,7 +11,7 @@ const headers = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
   "X-Robots-Tag": "index, follow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
 };
 
 const unavailable = (status: number) => new Response(
