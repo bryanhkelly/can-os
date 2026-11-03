@@ -8,6 +8,8 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
+import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 
 /**
  * Public Site projection, independently gated by an approved Site publication
@@ -41,6 +43,8 @@ export async function readPublishedSiteCatalog(slug: string) {
     const offerings = await readEnrichmentCatalog(site.id, tx);
     const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
+    const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
+    const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
     const publicOfferings = offerings.map(toPublicSiteEnrichment);
     const localContent = locallyPublished?.content ?? null;
     // Same publication-locked, independently approved fragments used by
@@ -63,6 +67,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms:authorizedPrograms,
       localContent,
+      media,
       offerings: publicOfferings,
     };
   });
