@@ -134,9 +134,24 @@ describe("daily operations attention", () => {
       programs: [program],
     });
 
-    expect(items.map(item => item.id)).toEqual(["action:assigned", "action:opening"]);
+    expect(items.map(item => item.id)).toEqual(["action:opening", "action:assigned"]);
     expect(items.some(item => item.title.includes("Private student"))).toBe(false);
     expect(items.some(item => ["admissions", "documents", "academic", "staffing"].includes(item.category))).toBe(false);
+  });
+
+  it("puts staffing and opening ahead of student and routine actions for site leaders", () => {
+    const items = buildDailyOperationsAttention({role:"site_leader",actorPersonId:"leader-1",actions:[
+      action("essay",{type:"academic_intervention",ownerPersonId:"leader-1",priority:"critical",dueAt:"2026-10-01T00:00:00Z"}),
+      action("routine",{ownerPersonId:"leader-1",priority:"critical"}),
+      action("coverage",{type:"onsite_coverage_gap",ownerPersonId:null,priority:"normal"}),
+      action("opening",{type:"program_opening_handoff",ownerPersonId:null,priority:"normal"}),
+      action("student",{type:"student_recovery",ownerPersonId:"leader-1",priority:"critical"}),
+    ]});
+    expect(items.map(item=>item.id)).toEqual([
+      "action:opening","action:coverage","action:routine",
+    ]);
+    expect(items.some(item=>item.id==="action:student")).toBe(false);
+    expect(items.some(item=>item.id==="action:essay")).toBe(false);
   });
 
   it("shows unassigned coverage escalations to local leaders without exposing unrelated unowned work", () => {

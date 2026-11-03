@@ -8,6 +8,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
 import { SiteTodayPriorities } from "@/components/operations/SiteTodayPriorities";
+import type { DailyAttentionItem } from "@/domain/daily-operations";
 import { SiteOwnedActionResolution } from "@/components/operations/SiteOwnedActionResolution";
 
 export const Route = createFileRoute("/sites/$siteId/")({
@@ -47,6 +48,16 @@ function SiteTodayPage() {
     student.healthVisitCount>0||student.incidentCount>0||student.activeEmergencyHold||
     student.activeCustodyHold||student.deniedPickupAttempts>0||!!student.uncollectedActionId);
   const blockedOpenings=data.schoolOpenings.filter(opening=>opening.blocked);
+  // Derived attention is guidance, never a new source of operating approval.
+  const decision=data.operatingDecision;
+  const operatingAlerts: DailyAttentionItem[] = decision.status==="evidence_present" ? [] : [{
+    id:"site-operating-decision",
+    category:decision.status==="coverage_review"?"staffing":"opening",
+    title:decision.title,detail:decision.detail,href:decision.href,
+    nextStep:decision.nextStep,ownerName:decision.owner,dueAt:null,
+    priority:"critical",
+  }];
+  const leaderAttention=[...operatingAlerts,...data.attentionItems];
   const ownedFollowUps=data.actions.filter(action=>
     action.ownerPersonId===data.viewerPersonId&&ownerResolvableTypes.has(action.type));
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
@@ -66,8 +77,17 @@ function SiteTodayPage() {
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
+    <section id="school-day-operating-decision" aria-label="School-day operating decision"
+      role={decision.status==="opening_blocked"?"alert":"status"}
+      className="mt-6 rounded-xl border p-5">
+      <h2 className="font-semibold">Can this site receive students today?</h2>
+      <p className="mt-2 font-semibold">{decision.title}</p>
+      <p className="mt-2 text-sm">{decision.detail}</p>
+      <p className="mt-2 text-sm">Responsible: {decision.owner}. <a className="underline" href={decision.href}>{decision.nextStep}</a></p>
+      <p className="mt-2 text-xs text-muted-foreground">Evaluated {new Date(data.asOf).toLocaleString()} in the site timezone. Program activity and attendance alone never authorize opening.</p>
+    </section>
     {blockedOpenings.length>0&&
-      <section role="alert" aria-label="School opening authorization"
+      <section id="school-opening-authorization" role="alert" aria-label="School opening authorization"
         className="mt-6 border-l-4 border-destructive bg-muted/40 px-5 py-4">
         <h2 className="font-semibold">School opening is not currently authorized</h2>
         <p className="mt-1 text-sm">
@@ -90,7 +110,7 @@ function SiteTodayPage() {
           })}
         </ul>
       </section>}
-    <SiteTodayPriorities items={data.attentionItems} siteId={data.site.id} siteTimezone={data.site.timezone}
+    <SiteTodayPriorities items={leaderAttention} siteId={data.site.id} siteTimezone={data.site.timezone}
       ownedActionIds={ownedFollowUps.map(action => `action:${action.id}`)}
       staffingExceptionCount={staffingExceptions.length}
       studentExceptionCount={studentExceptions.length}/>

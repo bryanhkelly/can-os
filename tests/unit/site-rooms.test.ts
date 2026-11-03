@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { assertSiteRoomManager, createSiteRoomSchema, retireSiteRoomSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
-import { assignSchoolSectionRoom, createSchoolRoom, requireSiteRoom, retireSchoolRoom, updateSchoolRoom } from "@/modules/operations/site-rooms.server";
+import { assertSiteRoomReader, assertSiteRoomManager, createSiteRoomSchema, retireSiteRoomSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
+import { assignSchoolSectionRoom, createSchoolRoom, getSchoolRooms, requireSiteRoom, retireSchoolRoom, updateSchoolRoom } from "@/modules/operations/site-rooms.server";
 import { db } from "@/db/client";
 
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], insert: vi.fn(), update: vi.fn(), audit: vi.fn(), event: vi.fn() }));
@@ -9,7 +9,7 @@ vi.mock("@/platform/mutation", () => ({ writeAudit: state.audit, emitEvent: stat
 vi.mock("@/db/client", () => {
   const tx = {
     select: () => ({ from() { return this; }, innerJoin() { return this; }, where() { return this; },
-      for() { return this; }, limit() { return this; },
+      for() { return this; }, orderBy() { return this; }, limit() { return this; },
       then(resolve: (rows: unknown[]) => unknown) { return Promise.resolve(state.rows.shift() ?? []).then(resolve); },
     }),
     insert: () => ({ values: state.insert }),
@@ -50,6 +50,20 @@ describe("Site-owned physical classrooms", () => {
     { ...actor, capabilities: new Set<string>() },
   ])("denies missing role, capability or exact resource scope", value => {
     expect(() => assertSiteRoomManager(value, school)).toThrow();
+  });
+  it("allows a scoped church leader to read rooms without granting room mutations", async () => {
+    const leader={...actor,role:"site_leader",capabilities:new Set<string>()};
+    expect(()=>assertSiteRoomReader(leader,school)).not.toThrow();
+    expect(()=>assertSiteRoomManager(leader,school)).toThrow();
+    state.rows=[[school],[],[{id:input.roomId,name:input.name,capacity:20,revision:1,retiredAt:null}]];
+    const directory=await getSchoolRooms(leader,{programId:school.programId});
+    expect(directory.canManage).toBe(false);
+    expect(directory.rooms).toHaveLength(1);
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+  it("rejects foreign or missing program scope in the read-only room directory",()=>{
+    expect(()=>assertSiteRoomReader({...actor,role:"site_leader",scope:{...actor.scope,siteIds:[id(9)]}},school)).toThrow();
+    expect(()=>assertSiteRoomReader({...actor,role:"teacher"},school)).toThrow();
   });
   it("creates a room with atomic audit and domain event, not an opening approval", async () => {
     expect(await createSchoolRoom(actor, input)).toEqual({ id: input.roomId, created: true });

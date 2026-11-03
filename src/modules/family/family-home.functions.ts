@@ -6,10 +6,9 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
-import { guardianWorkNeedsAction } from "@/domain/guardian-academics";
+import { guardianWorkNeedsAction, latestGuardianAttempts, guardianAssignmentSummary } from "@/domain/guardian-academics";
 import { assessmentAvailability } from "@/domain/assessment-availability";
 import { assessmentAttemptLimit } from "@/domain/assessment-attempt-policy";
-import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-section-readiness.server";
 
 /**
  * Family Home is a read model over canonical domain state.
@@ -91,8 +90,8 @@ async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: st
    row.enrollmentProgramId===row.programId &&
    row.yearId===row.termYearId &&
    validYears.has(`${row.programId}:${row.yearId}`)).map(row=>row.sectionId))];
- const ready=await staffedPublishedSectionIds(matching,db);
- return matching.filter(id=>ready.has(id));
+ // Enrollment defines class membership; staffing readiness is a separate operating signal.
+ return matching;
 }
 
 export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () => {
@@ -139,17 +138,16 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
      inArray(s.assessments.sectionId, sectionIds),
      inArray(s.assessments.status, ["published", "closed"]),
     ));
-   const newest = new Map<string, typeof published[number]>();
-   for (const row of published) {
-    const existing = newest.get(row.assessmentId);
-    // Use the latest attempt. An older submitted response must not hide
-    // a newly assigned revision that still needs the student's attention.
-    if (!existing || (row.submissionId && !existing.submissionId) ||
-        (row.submissionId && existing.submissionId &&
-         (row.attemptNumber ?? 0) > (existing.attemptNumber ?? 0)))
-      newest.set(row.assessmentId, row);
-   }
-   for (const row of newest.values()) {
+   const current = latestGuardianAttempts(published);
+   // Family Home and Guardian Academics must share the same unfinished/overdue
+   // definition over the latest attempt in every actively enrolled section.
+   missingCount = guardianAssignmentSummary(current.map(row=>({
+     status:row.submissionStatus??"assigned",
+     dueAt:row.dueAt?.toISOString()??null,
+     score:null,
+     availableAt:row.availableAt?.toISOString()??null,
+   })),now).overdue;
+   for (const row of current) {
     const status = row.submissionStatus ?? "assigned";
     // Parents must not be told to complete work the student cannot open.
     // Use the same availability policy as the authenticated student workspace.

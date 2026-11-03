@@ -171,7 +171,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={student?"Selected child":"Your children"} value={childCount}/>
     <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":visibleNeeds.length+visibleApprovals.length+schoolworkCount}/>
-    <StatCard label="Overdue unfinished work" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
+    <StatCard label="Overdue enrolled-class assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <div className="mt-6">
     {needsWarning && <p role="status" className="mb-3 rounded-xl border p-4 text-sm">{needsWarning}</p>}

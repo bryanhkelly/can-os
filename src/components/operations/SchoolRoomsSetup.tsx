@@ -31,7 +31,7 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
         {rooms.data.rooms.map(room => <li key={room.id+":"+room.revision} className="rounded-lg border p-3">
           <strong>{room.name}</strong> · occupancy limit {room.capacity}
           {room.retiredAt ? <p className="mt-1">Retired - unavailable for new assignments or room-plan approvals. Historical records are retained.</p>
-            : <RoomEditor room={room} busy={busy}
+            : rooms.data.canManage ? <RoomEditor room={room} busy={busy}
                 update={(name, capacity, reason) => feedback.run(() => updateSchoolRoomFn({
                   data: { programId, roomId: room.id, expectedRevision: room.revision, name, capacity, reason },
                 }), { successMessage: "Classroom details updated. Approved daily plans retain their reviewed snapshot.",
@@ -39,10 +39,11 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
                 retire={reason => feedback.run(() => retireSchoolRoomFn({
                   data: { programId, roomId: room.id, expectedRevision: room.revision, reason, confirmed: true },
                 }), { successMessage: "Classroom retired. Review defaults that still reference it; approved plans and history were not rewritten.",
-                  commandErrorMessage: "Unable to retire this classroom." })}/>}
+                  commandErrorMessage: "Unable to retire this classroom." })}/> : null}
         </li>)}
       </ul> : <p role="status" className="mt-4 text-sm">No physical classrooms have been created for this Site.</p>}
-      <form className="mt-4 grid gap-3 sm:grid-cols-3" onSubmit={event => {
+      {!rooms.data.canManage && <p className="mt-4 text-sm" role="status">Room configuration is managed by the school registrar. You may review this physical directory, but cannot edit rooms or class locations.</p>}
+      {rooms.data.canManage && <form className="mt-4 grid gap-3 sm:grid-cols-3" onSubmit={event => {
         event.preventDefault();
         void feedback.run(async () => {
           const result = await createSchoolRoomFn({ data: { programId, roomId, name, capacity: Number(capacity) } });
@@ -62,8 +63,8 @@ export function SchoolRoomsSetup({ programId }: { programId: string }) {
         <Button type="submit" className="self-end" disabled={busy || name.trim().length < 2 || !capacity}>
           {feedback.pending ? "Saving room…" : "Create physical classroom"}
         </Button>
-      </form>
-      {!!rooms.data.rooms.length && <div className="mt-5 space-y-3">
+      </form>}
+      {rooms.data.canManage && !!rooms.data.rooms.length && <div className="mt-5 space-y-3">
         <h3 className="font-semibold">Classroom locations</h3>
         <p className="text-sm text-muted-foreground">Assign each teaching class a default physical room.
           This is planning, not an exclusive reservation or approved adult coverage. Daily plans retain

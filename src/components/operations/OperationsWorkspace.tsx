@@ -4,7 +4,6 @@ import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import { type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
-import { OutboxHealthPanel } from "@/components/operations/OutboxHealthPanel";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
 import {useRef,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
@@ -162,8 +161,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     </label>
    </div>
   </section>
-  {health ? <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p> : <p className="mt-4 text-xs text-muted-foreground">Release health is temporarily unavailable; core operations remain accessible.</p>}
-  <OutboxHealthPanel/>
+  {(!health || health.schemaStatus !== "aligned") && <p className="mt-4 rounded-xl border p-3 text-sm" role="status">Some operational information may be temporarily unavailable. Contact CAN support if this continues.</p>}
   {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<button type="button" disabled={mutation.isSubmitting}
    onClick={()=>void retryActionRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">

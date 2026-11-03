@@ -11,6 +11,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { mayShowPrivatePickupAction, privatePickupActionTypes } from "@/domain/private-pickup-action";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { buildDailyOperationsAttention } from "@/domain/daily-operations";
+import { deriveSiteOperatingDecision } from "@/domain/site-operating-decision";
 import { readFullFlowOperations } from "./full-flow-dashboard.server";
 import { getSchoolOperationsCommandCenter } from "./command-center-service";
 import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/opening-handoff.server";
@@ -173,6 +174,13 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const observations = snapshot.operational.students.filter(row=>
       !["unmarked","expected"].includes(row.status));
     const enrollmentCount = new Set(enrolledRows.map(row => row.studentProfileId)).size;
+    const operatingDecision = deriveSiteOperatingDecision({
+      programIds,
+      openings: schoolOpenings,
+      handoffs,
+      staffing: snapshot.operational.staffing,
+      projectionTruncated: snapshot.operational.projectionTruncated,
+    });
     return {
       site, asOf: now.toISOString(), localDate: dayText,
       canOpenOnsiteDay:actor.role==="site_leader",
@@ -180,6 +188,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
       schoolDay:snapshot.operational,
       programs: scopedPrograms,
       schoolOpenings,
+      operatingDecision,
       attentionItems,
       openingHandoffs:handoffs.map(row=>({...row,createdAt:row.createdAt.toISOString(),
         resolvedAt:row.resolvedAt?.toISOString()??null,
