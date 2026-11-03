@@ -87,7 +87,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                         "Physical address supplied by the church, not independently approved"}
                       {" · "}{selectedSite.timezone}
                     </p>
-                    <Link to="/site-website" className="mt-2 inline-block underline">
+                    <Link to="/site-website" search={{siteId:selectedSite.id}} className="mt-2 inline-block underline">
                       Optional: add existing church website, social and YouTube references
                     </Link>
                     <p className="mt-1 text-xs text-muted-foreground">Church reference links are managed in the separate Site-scoped website editor; no public content is automatically imported or approved.</p>
