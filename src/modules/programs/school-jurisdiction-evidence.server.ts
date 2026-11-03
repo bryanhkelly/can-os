@@ -33,7 +33,8 @@ async function lockRequirement(tx:Tx,actionId:string){
 
 function requireSubmittedDocument(document:typeof documents.$inferSelect | undefined,
   programId:string,siteId:string,organizationId:string,now:Date){
-  if(!document || document.subjectType!=="program"||document.subjectId!==programId ||
+  if(!document || document.category!=="jurisdiction_requirement_evidence" ||
+    document.subjectType!=="program"||document.subjectId!==programId ||
     document.metadata.siteId!==siteId||document.metadata.organizationId!==organizationId||
     document.storageProvider!=="cloudflare_r2" ||
     document.metadata.storageVerified!==true ||
