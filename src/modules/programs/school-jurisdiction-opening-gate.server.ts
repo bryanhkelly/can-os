@@ -1,12 +1,13 @@
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions,jurisdictionProfileVerificationDecisions,jurisdictionProfileVersions,
+import { actions,documents,jurisdictionProfileVerificationDecisions,jurisdictionProfileVersions,
   jurisdictions,programs,schoolYears,sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { evaluateSiteJurisdictionIdentity } from "@/domain/site-jurisdiction-identity";
 import { jurisdictionReviewScopeFingerprint } from "@/domain/school-jurisdiction-readiness";
 import {
-  hasCurrentIndependentJurisdictionReview,isSiteLocationChangePending,
+  hasCurrentIndependentJurisdictionReview,hasCurrentJurisdictionRequirementEvidence,
+  isSiteLocationChangePending,
   openingApprovalPredatesLocationChange,
 } from "@/domain/school-jurisdiction-approval";
 import {
@@ -14,7 +15,7 @@ import {
 } from "@/domain/jurisdiction-applicability";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { launchOpeningDate } from "@/domain/launch-opening-date";
-import { isJurisdictionProfileVerificationEvidenceCurrent } from "@/domain/jurisdiction-profile";
+import { isJurisdictionProfileVerificationEvidenceCurrent,jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
 
 /**
  * C-owned fail-closed guard for Integration I to insert into the canonical
@@ -137,6 +138,46 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   if(!hasCurrentIndependentJurisdictionReview(legal,stamp,now) ||
     isSiteLocationChangePending(locationChange,stamp,now))
     throw new AuthorizationError("current independent CAN school and location legal review");
+  const parsedPolicy=jurisdictionProfileSchema.safeParse({
+    ...policy.profile,summary:policy.summary,evidence:policy.evidence,
+  });
+  if(!parsedPolicy.success)
+    throw new AuthorizationError("valid current jurisdiction requirements");
+  const requirementActions=await executor.select({
+    status:actions.status,metadata:actions.metadata,
+  }).from(actions).where(and(
+    eq(actions.type,"school_jurisdiction_requirement"),
+    eq(actions.subjectType,"program"),eq(actions.subjectId,programId),
+    eq(actions.organizationId,school.organizationId),eq(actions.siteId,school.siteId),
+    eq(actions.programId,programId),
+  ));
+  const openingDuties=parsedPolicy.data.requirements.filter(requirement=>
+    requirement.phase==="before_opening" &&
+    evaluation.decisions.some(decision=>
+      decision.id===requirement.id && decision.status==="applicable"));
+  for(const duty of openingDuties){
+    const action=requirementActions.find(row=>
+      row.metadata.requirementId===duty.id)??null;
+    if(!hasCurrentJurisdictionRequirementEvidence(action,{
+      ...stamp,requirementId:duty.id,
+    },now))
+      throw new AuthorizationError("independently reviewed opening requirement: "+duty.id);
+    const documentId=action?.metadata.evidenceDocumentId;
+    const [evidence]=typeof documentId==="string"
+      ? await executor.select().from(documents).where(eq(documents.id,documentId)).limit(1)
+      : [];
+    if(!evidence || evidence.subjectType!=="program" ||
+      evidence.subjectId!==programId ||
+      evidence.metadata.siteId!==school.siteId ||
+      evidence.metadata.organizationId!==school.organizationId ||
+      evidence.metadata.storageVerified!==true ||
+      evidence.storageProvider!=="cloudflare_r2" ||
+      !evidence.verifiedAt || evidence.verifiedAt>now ||
+      !evidence.verifiedByPersonId ||
+      evidence.uploadedByPersonId===evidence.verifiedByPersonId ||
+      (evidence.expiresAt && evidence.expiresAt<=now))
+      throw new AuthorizationError("current independently verified opening document: "+duty.id);
+  }
   const physicalRevision=typeof locationChange?.metadata.siteAddressRevision==="string"
     ? locationChange.metadata.siteAddressRevision : null;
   // Fresh opening/safety approval must follow the address change; a legal review
