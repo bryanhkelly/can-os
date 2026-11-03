@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateSchoolJurisdictionRequirements,
+  expandKnownSchoolGradeRange,
   isCurrentVerifiedJurisdictionProfileVersion,
   requiresFutureJurisdictionPolicyReview,
 } from "@/domain/jurisdiction-applicability";
@@ -77,6 +78,18 @@ const profile = {
 };
 
 describe("school-specific jurisdiction and funding readiness", () => {
+  it("evaluates canonical elementary and high-school grade ranges conservatively", () => {
+    expect(expandKnownSchoolGradeRange({min:"K",max:"5"}))
+      .toEqual(["K","1","2","3","4","5"]);
+    expect(expandKnownSchoolGradeRange({min:"9",max:"12"}))
+      .toEqual(["9","10","11","12"]);
+    expect(expandKnownSchoolGradeRange({min:"5",max:"K"})).toEqual([]);
+    expect(expandKnownSchoolGradeRange({min:"other",max:"12"})).toEqual([]);
+    const rangeSchool={...school,gradeLevels:expandKnownSchoolGradeRange({min:"K",max:"5"})};
+    expect(evaluateSchoolJurisdictionRequirements(profile,version,rangeSchool,now)
+      .decisions[0]?.status).toBe("applicable");
+  });
+
   it("projects a verified, exactly matching requirement and linked sources", () => {
     const evaluation = evaluateSchoolJurisdictionRequirements(profile,version,school,now);
     expect(evaluation.reviewRequired).toBe(false);
