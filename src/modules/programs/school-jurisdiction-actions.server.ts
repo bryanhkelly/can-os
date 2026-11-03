@@ -7,6 +7,8 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
+import { jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
+import { reconcileSchoolJurisdictionRequirementActions } from "./school-jurisdiction-requirements.server";
 
 export const schoolJurisdictionReviewActionType="school_jurisdiction_legal_review";
 
@@ -147,7 +149,13 @@ export async function decideSchoolJurisdictionLegalReview(
       throw new AuthorizationError("reviewer must be independent of requester");
     if(input.decision==="verify" && !review.reviewRequired &&
       legal.status==="resolved" && legal.metadata.reviewState==="independently_verified")
-      return {programId:input.programId,verified:true,actionId:legal.id};
+      const reconciliation=await reconcileSchoolJurisdictionRequirementActions(tx,actor,{
+        programId:input.programId,siteId:target.siteId,
+        organizationId:program.organizationId,profileVersionId:policy.id,
+        scopeFingerprint:review.scopeFingerprint,profile:parsed.data,
+        decisions:review.decisions,
+      });
+      return {programId:input.programId,verified:true,actionId:legal.id,reconciliation};
     const [location]=await tx.select().from(actions).where(and(
       eq(actions.type,"site_location_change_review"),
       eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
@@ -161,11 +169,17 @@ export async function decideSchoolJurisdictionLegalReview(
       if(!review.policyReady || !review.policyVersionId)
         throw new Error("Current policy and school-specific scope still require review");
       const [policy]=await tx.select({id:jurisdictionProfileVersions.id,
-        evidence:jurisdictionProfileVersions.evidence})
+        evidence:jurisdictionProfileVersions.evidence,
+        profile:jurisdictionProfileVersions.profile,
+        summary:jurisdictionProfileVersions.summary})
         .from(jurisdictionProfileVersions)
         .where(and(eq(jurisdictionProfileVersions.id,review.policyVersionId),
           eq(jurisdictionProfileVersions.status,"published"))).limit(1);
       if(!policy)throw new Error("Verified jurisdiction policy is no longer published");
+      const parsed=jurisdictionProfileSchema.safeParse({
+        ...policy.profile,summary:policy.summary,evidence:policy.evidence,
+      });
+      if(!parsed.success)throw new Error("Published policy no longer has valid source-backed requirements");
       const official=new Set(policy.evidence.flatMap(source=>
         typeof source.url==="string" && source.url.startsWith("https://")
           ? [source.url] : []));
