@@ -32,9 +32,14 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent) : null;
+  const parentInformation = projectApprovedParentInformation({
+    site: { name: site.name, organizationName: site.organizationName },
+    academicPrograms, offerings, localContent: local?.content ?? null,
+  });
   const previewPage = host ? {
     host, site: { name: site.name, organizationName: site.organizationName },
     academicPrograms, offerings, localContent: local?.content ?? null,
+    parentInformation,
   } : null;
   const previewPages = previewPage
     ? Object.fromEntries(availablePublicSitePaths(previewPage).map(path => [
@@ -50,10 +55,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     approvedAcademicCount: academicPrograms.length,
     // Same canonical, approved-only parent DTO as the live Site projection.
     // Draft copy and internal review history remain separate editor-only fields.
-    parentInformation: projectApprovedParentInformation({
-      site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms, offerings, localContent: local?.content ?? null,
-    }),
+    parentInformation,
     approvedEnrichmentCount: offerings.length,
     editingContent,
     currentRevision: history[0]?.revision ?? 0,
