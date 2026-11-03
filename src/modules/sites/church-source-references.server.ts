@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { churchSourceReferences } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -17,7 +17,7 @@ import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-pol
 export async function readChurchSourceReferences(actor: AccessContext) {
   const site = await requirePartnerWebsiteEditor(actor);
   return db.select().from(churchSourceReferences)
-    .where(eq(churchSourceReferences.siteId, site.id))
+    .where(and(eq(churchSourceReferences.siteId, site.id), isNull(churchSourceReferences.revokedAt)))
     .orderBy(asc(churchSourceReferences.kind));
 }
 
@@ -36,7 +36,7 @@ export async function saveChurchSourceReference(actor: AccessContext, input: {
     const [before] = await tx.select().from(churchSourceReferences)
       .where(and(eq(churchSourceReferences.siteId, site.id),
         eq(churchSourceReferences.kind, input.kind))).for("update").limit(1);
-    if (before?.normalizedUrl === normalizedUrl) return { changed: false };
+    if (before?.normalizedUrl === normalizedUrl && !before.revokedAt) return { changed: false };
     // A changed URL invalidates its old extraction state. Extraction is
     // deliberately unsupported until a separately audited egress service exists.
     const state = initialChurchReferenceState(input.kind);
@@ -46,7 +46,7 @@ export async function saveChurchSourceReference(actor: AccessContext, input: {
     }).onConflictDoUpdate({
       target: [churchSourceReferences.siteId, churchSourceReferences.kind],
       set: { normalizedUrl, referenceState: state,
-        addedByPersonId: actor.actorPersonId!, lastAttemptAt: null,
+        addedByPersonId: actor.actorPersonId!, lastAttemptAt: null, revokedAt: null,
         updatedAt: new Date() },
     }).returning({ id: churchSourceReferences.id });
     if (!saved) throw new Error("Unable to save this church reference");
@@ -77,7 +77,9 @@ export async function removeChurchSourceReference(actor: AccessContext, input: {
       .where(and(eq(churchSourceReferences.siteId, site.id),
         eq(churchSourceReferences.kind, input.kind))).for("update").limit(1);
     if (!existing) return { changed: false };
-    await tx.delete(churchSourceReferences).where(eq(churchSourceReferences.id, existing.id));
+    if (existing.revokedAt) return { changed: false };
+    await tx.update(churchSourceReferences).set({ revokedAt: new Date(), updatedAt: new Date() })
+      .where(eq(churchSourceReferences.id, existing.id));
     await writeAudit(tx, actor, {
       action: "site.website.source_reference.removed",
       entityType: "church_source_reference", entityId: existing.id,
