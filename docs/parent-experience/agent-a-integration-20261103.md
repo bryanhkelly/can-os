@@ -13,8 +13,8 @@ Private editor previews call the same pure DTO adapter and the same extras reade
 | Public claim | Canonical source | Owner / approval | Publication and invalidation | Current state |
 | --- | --- | --- | --- | --- |
 | School/partner names | `sites.name`, `organizations.name` | Site/Organization, Site publication | Published slug, locked row; live identity | Connected |
-| Public physical address | `sites.address` | S setup; **I-owned public display review** | Current exact source SHA-256 + signed review metadata, expiry, Site publication; private legal address never implicit | Read-only gate; **I writer needed** |
-| Public contact | `sites.metadata.setupContact` | S draft; **I-owned school-controlled channel review** | Exact source digest, review revision/expiry, Site publication; never pull HR/guardian contacts | Read-only gate; **I writer needed** |
+| Public physical address | `sites.address` | S setup; separate institutional Site publisher review | Current exact source SHA-256 + signed review metadata, expiry, Site publication; private legal address never implicit | **Writer + reader implemented; I review/acceptance pending** |
+| Public contact | `sites.metadata.setupContact` | S draft; separate institutional Site publisher review | Exact source digest, review revision/expiry, Site publication; never pull HR/guardian contacts | **Writer + reader implemented; I review/acceptance pending** |
 | Local church, faith, formation | Published `siteLocalContent` revision | P/editor content publication | Read current approved revision; no draft copy | Existing |
 | Academic names, grade ranges and delivery | Program + `programPublications` approved parity | Institutional Program publisher | Live agreement + Site/Program status; stale identity/delivery withdrawn | Existing |
 | Per-Program instructional hours incl. Sunday | Approved `scheduleTemplates` + `scheduleTemplatePeriods` via C | Academic schedule reviewer | Site + Program published, active year, exact review signature, current timeframe; no Site-wide flattening | Connected to legacy; varied hours after C #255 |
@@ -37,9 +37,9 @@ Additive fields on `PublicParentSchoolProfile`:
 
 The legacy `schoolDay` field remains for **one** published academic Program and only when an approved uniform range exists. For two Programs it is intentionally withheld. No numbered migration or new database table is introduced.
 
-## I-controlled approval record request
+## Implemented institutional approval record (I review and acceptance required)
 
-Add an **authorized publisher command** (not a general metadata editor) that records an audited, versioned envelope under existing `sites.metadata.publicParentIdentityReview`:
+Agent A implements an **authorized publisher command** (not a general metadata editor) that records an audited, versioned envelope under existing `sites.metadata.publicParentIdentityReview`. Writer: `src/modules/sites/site-parent-identity-review.server.ts`, authenticated endpoint: `site-parent-identity-review.functions.ts`, editor: `/sites/$siteId/parent-information`:
 
 ```ts
 {
@@ -50,6 +50,7 @@ Add an **authorized publisher command** (not a general metadata editor) that rec
   expiresOn: ISODate | null,
   addressDigest: SHA256Hex | null,
   contactDigest: SHA256Hex | null,
+  evidenceReference?: string, // private reviewer reference
 }
 ```
 
@@ -70,7 +71,7 @@ I must enforce real reviewer authority, explicit public-display consent/rights, 
 npm ci
 npm run typecheck
 npm run build
-npx vitest run src/domain/parent-information.test.ts tests/unit/parent-packet-readiness.test.ts
+npx vitest run src/domain/parent-information.test.ts src/domain/public-parent-identity.test.ts src/modules/sites/site-parent-identity-review.server.test.ts tests/unit/public-parent-extras.test.ts tests/unit/parent-packet-readiness.test.ts
 git diff main...agent-a/approved-parent-projection-20261103 -- src/domain/parent-information.ts src/domain/public-information-readiness.ts src/modules/sites/public-parent-extras.server.ts src/modules/sites/site-public-catalog.server.ts
 ```
 
