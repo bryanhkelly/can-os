@@ -12,6 +12,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-review.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import {
   schoolOpeningEvidenceCategories, schoolOpeningEvidenceLabels, schoolOpeningEvidenceNextAction,
@@ -192,6 +193,12 @@ export async function requireCurrentChurchSchoolOpening(
     (school.programStatus!=="active" &&
      !(options.allowPendingActivation && school.programStatus==="launching")))
     throw new AuthorizationError("currently approved church school configuration");
+  const jurisdiction=await requireCurrentSchoolJurisdictionForOpening(tx,programId,now);
+  const approvedJurisdiction=configuration.config.jurisdictionOpeningApproval;
+  if(!approvedJurisdiction ||
+     approvedJurisdiction.scopeFingerprint!==jurisdiction.scopeFingerprint ||
+     approvedJurisdiction.profileVersionId!==jurisdiction.profileVersionId)
+    throw new AuthorizationError("opening approval predates current Site and jurisdiction review");
   await requireChurchHostedOperatingServices(tx,programId,[
     "school_of_record","academic_instruction","onsite_supervision",
   ]);
@@ -219,8 +226,17 @@ export async function decideChurchSchoolOpening(
       throw new Error("School configuration changed. Reload the review before recording a decision.");
     const now=new Date();
     if(input.decision==="approve"){
-      if(configuration.status==="approved"&&configuration.approvedByPersonId===actor.actorPersonId)
+      // Re-evaluate independent state law and actual school scope under the
+      // same Program lock; the prior approver cannot bypass later amendments.
+      const jurisdiction=await requireCurrentSchoolJurisdictionForOpening(
+        tx,input.programId,now);
+      if(configuration.status==="approved"&&configuration.approvedByPersonId===actor.actorPersonId) {
+        const prior=configuration.config.jurisdictionOpeningApproval;
+        if(!prior || prior.scopeFingerprint!==jurisdiction.scopeFingerprint ||
+           prior.profileVersionId!==jurisdiction.profileVersionId)
+          throw new AuthorizationError("opening approval requires renewed jurisdiction review");
         return {configurationId:configuration.id,status:"approved" as const};
+      }
       if(configuration.status!=="draft")
         throw new AuthorizationError("only the latest drafted school configuration can be approved");
       await requireChurchHostedOperatingServices(tx,input.programId,[
@@ -230,20 +246,26 @@ export async function decideChurchSchoolOpening(
       await requireVerifiedChurchSiteDirector(tx,school,configuration.id,now);
       await tx.update(schoolConfigurationVersions).set({
         status:"approved",approvedByPersonId:actor.actorPersonId,
-        approvedAt:now,effectiveFrom:now,updatedAt:now,
+        approvedAt:now,effectiveFrom:now,
+        config:{...configuration.config,jurisdictionOpeningApproval:jurisdiction},
+        updatedAt:now,
       }).where(eq(schoolConfigurationVersions.id,configuration.id));
       await writeAudit(tx,actor,{
         action:"school.opening.approved",entityType:"school_configuration_version",
         entityId:configuration.id,
         scope:{organizationId:school.institutionId,siteId:school.siteId,
           programId:input.programId},
-        after:{version:configuration.version,status:"approved",reason,evidence},
+        after:{version:configuration.version,status:"approved",reason,evidence,
+          jurisdictionScopeFingerprint:jurisdiction.scopeFingerprint,
+          jurisdictionProfileVersionId:jurisdiction.profileVersionId},
       });
       await emitEvent(tx,{
         eventType:EventTypes.ChurchSchoolOpeningApproved,aggregateType:"school_configuration_version",
         aggregateId:configuration.id,actorPersonId:actor.actorPersonId,
         organizationId:school.institutionId,siteId:school.siteId,programId:input.programId,
-        payload:{version:configuration.version,evidence},
+        payload:{version:configuration.version,evidence,
+          jurisdictionScopeFingerprint:jurisdiction.scopeFingerprint,
+          jurisdictionProfileVersionId:jurisdiction.profileVersionId},
       });
       return {configurationId:configuration.id,status:"approved" as const};
     }
@@ -279,6 +301,22 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
   const config=await latestConfiguration(db,programId);
   const now=new Date();
   let agreementReady=false;
+  let jurisdictionReady=false;
+  let jurisdictionIssue:string|null=null;
+  try{
+    const jurisdiction=await requireCurrentSchoolJurisdictionForOpening(db,programId,now);
+    const stamp=config.config.jurisdictionOpeningApproval;
+    // Before approval, verify legal readiness without requiring the opening
+    // attestation that the CAN officer has yet to record.
+    jurisdictionReady=config.status==="draft" || Boolean(stamp &&
+      stamp.scopeFingerprint===jurisdiction.scopeFingerprint &&
+      stamp.profileVersionId===jurisdiction.profileVersionId);
+    if(!jurisdictionReady)
+      jurisdictionIssue="School location, Program or policy changed after opening approval";
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+    jurisdictionIssue=error.message;
+  }
   let directorReady=false;
   let evidence:Awaited<ReturnType<typeof requireSchoolOpeningEvidence>>=[];
   let evidenceIssue:string|null=null;
@@ -339,6 +377,10 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
     };
   });
   const prerequisites=[
+    {id:"jurisdiction",title:"Independent school-specific legal review",
+      satisfied:jurisdictionReady,
+      detail:jurisdictionReady?"Current Site and Program have independently verified jurisdiction approval."
+        :jurisdictionIssue??"CAN must independently review the current school location and model."},
     {id:"evidence",title:"Independent opening evidence",satisfied:evidenceIssue===null,
       detail:evidenceIssue??"All required categories have current independently verified evidence."},
     {id:"agreement",title:"CAN–church service agreement",satisfied:agreementReady,
@@ -390,6 +432,16 @@ export async function readLocalSchoolOpeningStatus(actor:AccessContext,programId
       approvedAt:null};
   const now=new Date();
   const blockers:string[]=[];
+  try{
+    const jurisdiction=await requireCurrentSchoolJurisdictionForOpening(db,programId,now);
+    const stamp=configuration.config.jurisdictionOpeningApproval;
+    if(!stamp || stamp.scopeFingerprint!==jurisdiction.scopeFingerprint ||
+       stamp.profileVersionId!==jurisdiction.profileVersionId)
+      throw new AuthorizationError("current jurisdiction-bound opening approval");
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+    blockers.push("jurisdiction");
+  }
   try{
     await requireChurchHostedOperatingServices(db,programId,[
       "school_of_record","academic_instruction","onsite_supervision",
