@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { checkPublishedSiteReachability } from "@/modules/sites/public-host-reachability";
 
 const host = "vineyard.can-os.com";
-const goodHtml = `<!doctype html><html><body><footer>${host} · Powered by CAN OS</footer></body></html>`;
+const goodHtml = `<!doctype html><html><body><footer><strong>Vineyard School</strong><span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer></body></html>`;
 const response = (body: string, status = 200, type = "text/html") =>
   new Response(body, { status, headers: { "content-type": type, "cache-control": "private, no-store", vary: "Host" } });
 const fetcher = (result: Response) => vi.fn(async () => result) as unknown as typeof fetch;
@@ -57,7 +57,7 @@ describe("published Site HTTPS verification", () => {
     }
   });
   it("rejects HTML where a tenant name appears outside the canonical footer", async () => {
-    const forged = `<!doctype html><html><body>${host}<footer>other.can-os.com · Powered by CAN OS</footer></body></html>`;
+    const forged = `<!doctype html><html><body>${host}<footer><span class="platform-credit"> · Supported by CAN Academy · other.can-os.com</span></footer></body></html>`;
     const result = await checkPublishedSiteReachability({
       host, published: true, hostingConfigured: true, fetcher: fetcher(response(forged)),
     });
