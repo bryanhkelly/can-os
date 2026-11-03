@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { programs, scheduleTemplates, scheduleTemplatePeriods, schoolYears } from "@/db/schema";
+import { programs, scheduleTemplates, scheduleTemplatePeriods, schoolYears, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { publicSchoolDayScheduleSignature } from "@/domain/public-school-day";
 import { writeAudit } from "@/platform/mutation";
@@ -21,14 +21,27 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
     const site = await requireSitePublisher(actor, input.siteId, tx);
     if (!actor.scope.programIds?.includes(input.programId))
       throw new Error("Program not in authorized publication scope");
+    // Serialize against the authoritative Site address/timezone editor.
+    const [siteRecord]=await tx.select({
+      timezone:sites.timezone,updatedAt:sites.updatedAt,
+    }).from(sites).where(eq(sites.id,site.id)).for("update").limit(1);
+    if(!siteRecord)throw new Error("Approved schedule Site is unavailable");
     const [schedule] = await tx.select({
       id:scheduleTemplates.id, active:scheduleTemplates.active,
+      templateUpdatedAt:scheduleTemplates.updatedAt,
       siteId:scheduleTemplates.siteId, programId:scheduleTemplates.programId,
+      schoolYearId:scheduleTemplates.schoolYearId,
+      effectiveFrom:scheduleTemplates.effectiveFrom,
+      effectiveThrough:scheduleTemplates.effectiveThrough,
       metadata:scheduleTemplates.metadata,
       yearStatus:schoolYears.status, yearSiteId:schoolYears.siteId,
       yearProgramId:schoolYears.programId, yearOrgId:schoolYears.organizationId,
+      yearTimezone:schoolYears.timezone,yearUpdatedAt:schoolYears.updatedAt,
+      yearKey:schoolYears.key,yearName:schoolYears.name,
+      startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
       programSiteId:programs.siteId, programOrgId:programs.organizationId,
-      programStatus:programs.status,
+      programStatus:programs.status,programUpdatedAt:programs.updatedAt,
+      programType:programs.type,gradeRange:programs.gradeRange,
     }).from(scheduleTemplates)
       .innerJoin(schoolYears,eq(schoolYears.id,scheduleTemplates.schoolYearId))
       .innerJoin(programs,eq(programs.id,scheduleTemplates.programId))
@@ -39,6 +52,7 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       schedule.yearSiteId !== site.id ||
       (schedule.yearProgramId && schedule.yearProgramId !== input.programId) ||
       schedule.yearOrgId !== site.organizationId ||
+      schedule.yearTimezone!==siteRecord.timezone ||
       schedule.programSiteId !== site.id || schedule.programOrgId !== site.organizationId ||
       !["ready","active"].includes(schedule.programStatus))
       throw new Error("Only the matching active academic schedule may be approved");
@@ -49,6 +63,8 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       throw new Error("Schedule approval changed. Refresh before reviewing.");
     const periods = await tx.select({
       dayOfWeek:scheduleTemplatePeriods.dayOfWeek,
+      sequence:scheduleTemplatePeriods.sequence,
+      label:scheduleTemplatePeriods.label,
       startsAtLocal:scheduleTemplatePeriods.startsAtLocal,
       endsAtLocal:scheduleTemplatePeriods.endsAtLocal,
       type:scheduleTemplatePeriods.type,
@@ -58,22 +74,37 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       item.dayOfWeek>=0 && item.dayOfWeek<=6 &&
       item.startsAtLocal<item.endsAtLocal))
       throw new Error("Add valid instructional periods before publishing");
+    const approvalTime=new Date();
+    const approvalScope={
+      siteId:site.id,programId:input.programId,
+      schoolYearId:schedule.schoolYearId,scheduleTemplateId:schedule.id,
+      siteTimezone:siteRecord.timezone,schoolYearTimezone:schedule.yearTimezone,
+      schoolYearStartsOn:schedule.startsOn,schoolYearEndsOn:schedule.endsOn,
+      effectiveFrom:schedule.effectiveFrom,effectiveThrough:schedule.effectiveThrough,
+      schoolYearKey:schedule.yearKey,schoolYearName:schedule.yearName,
+      gradeRange:schedule.gradeRange,programType:schedule.programType,
+      siteRevision:siteRecord.updatedAt.toISOString(),
+      programRevision:schedule.programUpdatedAt.toISOString(),
+      yearRevision:schedule.yearUpdatedAt.toISOString(),
+      templateRevision:approvalTime.toISOString(),
+    };
     const approval={
       status:"approved" as const,revision:oldRevision+1,
       reviewedByPersonId:actor.actorPersonId,
-      reviewedAt:new Date().toISOString(),
-      signature:publicSchoolDayScheduleSignature(periods),
+      reviewedAt:approvalTime.toISOString(),
+      signature:publicSchoolDayScheduleSignature(periods,approvalScope),
     };
     await tx.update(scheduleTemplates).set({
       metadata:{...schedule.metadata,publicScheduleApproval:approval},
-      updatedAt:new Date(),
+      updatedAt:approvalTime,
     }).where(eq(scheduleTemplates.id,schedule.id));
     await writeAudit(tx,actor,{
       action:"academic_schedule.public_review",
       entityType:"schedule_template",entityId:schedule.id,
       scope:{organizationId:site.organizationId,siteId:site.id,programId:input.programId},
       before:{revision:oldRevision},
-      after:{revision:approval.revision,periodCount:periods.length,reviewed:true},
+      after:{revision:approval.revision,periodCount:periods.length,reviewed:true,
+        schoolYearId:schedule.schoolYearId,signatureVersion:2},
     });
     return {scheduleTemplateId:schedule.id,revision:approval.revision};
   });
