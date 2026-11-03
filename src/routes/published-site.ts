@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
 import { publicSiteDomain } from "@/domain/public-site-address";
-import { renderPublicSiteHtml } from "@/domain/public-site-html";
+import { isIndexablePublicSite, renderPublicSiteHtml } from "@/domain/public-site-html";
 
 const headers = {
   "Content-Type": "text/html; charset=utf-8",
@@ -40,10 +40,11 @@ export const Route = createFileRoute("/published-site")({
             status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
           });
           const localPreview = new URL(request.url).searchParams.has("site");
+          const indexable = !localPreview && isIndexablePublicSite(catalog);
           return new Response(renderPublicSiteHtml(catalog, {
             makeRequestId: () => crypto.randomUUID(), localPreview,
-          }), { status: 200, headers: localPreview
-            ? { ...headers, "X-Robots-Tag": "noindex, nofollow" } : headers });
+          }), { status: 200, headers: indexable
+            ? headers : { ...headers, "X-Robots-Tag": "noindex, nofollow" } });
         } catch {
           // Fail closed on a missing migration, database error or unexpected data.
           return new Response("Site temporarily unavailable", {
