@@ -10,6 +10,9 @@ on:
       - 'src/routes/published-site*'
       - 'src/routes/site-website.tsx'
       - 'src/modules/sites/site-website-preview*'
+      - 'src/modules/programs/launch-website.functions.ts'
+      - 'src/components/operations/LaunchWebsiteStep.tsx'
+      - 'tests/unit/launch-website-*.test*'
       - 'src/modules/sites/site-public-catalog.server.ts'
       - 'src/modules/sites/site-local-content.server.ts'
       - 'netlify/edge-functions/site-host-gate.ts'
@@ -37,6 +40,8 @@ jobs:
             tests/unit/public-site-html.test.ts \
             tests/unit/site-local-content.test.ts \
             tests/unit/site-website-preview.server.test.ts \
+            tests/unit/launch-website-preparation.test.ts \
+            tests/unit/launch-website-step.test.tsx \
             tests/unit/public-netlify-edge-function.test.ts \
             tests/unit/public-tenant-edge-origin-isolation.test.ts
       - name: Verify production build and route generation
