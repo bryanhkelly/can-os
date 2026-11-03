@@ -317,7 +317,6 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <div className="mt-4 flex flex-wrap gap-3">
             <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
               className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations →</Link>
-            <Link to="/site/day" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Site Today (site staff)</Link>
           </div>
         </section>}
         {currentSchool&&currentSchool.status!=="active"&&<section aria-label="Launch progress and next workspace" className="mt-5 rounded-2xl border bg-card p-5">
