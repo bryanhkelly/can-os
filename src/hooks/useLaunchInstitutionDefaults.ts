@@ -4,7 +4,7 @@ import { suggestedLaunchInstitutions } from "@/domain/launch-institution-default
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 
 type Options = Awaited<ReturnType<typeof listLaunchOptions>> | null;
-export function useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,hostSites,type,creditMode,academicProviderOrganizationId,creditIssuingOrganizationId,jurisdictionId,setHostOrganizationId,setSiteId,setAcademicProviderOrganizationId,setCreditIssuingOrganizationId,setJurisdictionId}:{
+export function useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,hostSites,type,creditMode,academicProviderOrganizationId,creditIssuingOrganizationId,jurisdictionId,setHostOrganizationId,setSiteId,setAcademicProviderOrganizationId,setCreditIssuingOrganizationId,setJurisdictionId,strictSelection}:{
  options:Options;
  siteId:string;
  hostOrganizationId:string;
@@ -19,6 +19,7 @@ export function useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,
  setAcademicProviderOrganizationId:(value:string)=>void;
  setCreditIssuingOrganizationId:(value:string)=>void;
  setJurisdictionId:(value:string)=>void;
+ strictSelection?:boolean;
 }) {
   // When an address-backed Site is selected, use its state for initial guidance.
   // A registrar may correct it manually. Do not reapply a default on every render.
@@ -58,11 +59,13 @@ export function useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,
     if (!hostOrganizationId) return;
     // Never carry a campus from a different host into a new launch.
     if (siteId && !hostSites.some(site => site.id === siteId)) {
+      // Explicit URLs must be rejected by the page, never rebound to a sibling Site.
+      if (strictSelection) return;
       setSiteId(hostSites.length === 1 && onlySite ? onlySite.id : "");
       return;
     }
-    if (!siteId && hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
-  }, [hostSites, hostOrganizationId, siteId]);
+    if (!siteId && !strictSelection && hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
+  }, [hostSites, hostOrganizationId, siteId, strictSelection]);
 
   useEffect(() => {
     if (!options) return;
