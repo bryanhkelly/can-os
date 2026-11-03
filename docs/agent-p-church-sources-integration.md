@@ -6,7 +6,7 @@
 
 - The church editor owns references under `src/modules/sites/church-source-references.server.ts` and `church-content-suggestions.server.ts`. References and suggestions are private, Site-scoped and audited.
 - Only a church website can be optionally fetched, using `CAN_CHURCH_WEBSITE_DISCOVERY_ENABLED=true`. The flag stays **disabled** until separately authorized egress acceptance. Social and YouTube URLs are references only.
-- The existing `publishPartnerLocalContent` command, not P, controls versioned publication and institutional claim review.
+- The existing canonical publisher implementation, not P extraction, controls versioned publication and institutional claim review. Agent P now calls its shared transaction-executor variant for atomic accepted/edited decisions.
 - Public Site and Program DTOs never consume unscreened source references, and no source import can establish program approval, funding eligibility, tuition, admissions, opening status or authorization.
 - Church brand token IDs are defined in `src/domain/site-theme.ts`; P must not introduce arbitrary CSS, scripts, remote font binaries or unapproved font families.
 
@@ -14,7 +14,7 @@
 
 `getChurchSourceReviewContextView({data:{}})` provides the current editor revision, its publication/review status, the last published revision, and a limited church-owned-text projection from each. The component compares this with each pending source proposal.
 
-`getChurchContentSuggestionView({data:{}})` returns the Site's current pending proposals and source URLs; `reviewChurchSourceExcerptCommand` accepts `suggestionId`, `decision` (`accepted`, `edited`, `discarded`), `expectedRevision` when saving, optional `editedText`, and explicit `rightsConfirmed:true` for acceptance/editing. Discard needs no rights statement. Canonical publication remains separate from source collection.
+`getChurchContentSuggestionView({data:{}})` returns the Site's current pending proposals and source URLs; `reviewChurchSourceExcerptCommand` accepts `suggestionId`, `decision` (`accepted`, `edited`, `discarded`), `expectedRevision` when saving, optional `editedText`, and explicit `rightsConfirmed:true` for acceptance/editing. Discard needs no rights statement. Accepted/edited review now commits canonically versioned church copy and the proposal decision atomically, but collection/fetch remains wholly private.
 
 A refresh cannot replace pending editorial work. It returns `review_pending` until prior suggestions have been individually reviewed or discarded. A saved source URL change/revocation invalidates pending suggestions. A fetch completion must still match the recorded URL and attempt timestamp before changing source state.
 
@@ -56,13 +56,43 @@ type ProposedChurchBrandV1 = {
 
 **S integration rule:** if launch setup asks for a church website or social reference, S must save to the same canonical Site-scoped source-reference command and never make source entry a blocking extra setup step. Avoid storing church website URLs in a second independent settings JSON.
 
-## P0 interface request to Integration I — publication atomicity
+## Implemented P0 atomic publication interface — I approval requested
 
-The current `reviewChurchSourceExcerpt` checks that the source is active, calls `publishPartnerLocalContent` (a separate transaction), then records the review decision in another transaction. This prevents accidental publication from a fetch and preserves canonical version/claim checks, **but is not fully atomic** with concurrent source revocation or proposal discard. If revocation occurs between the check and canonical publish, copy can be published before the later decision write rejects. The existing handler documents this partial-state risk; do not claim a fully serialized guarantee.
+**Source code completed on PR #257, not yet independently DB race-certified.** The canonical publisher in `src/modules/sites/site-local-content.server.ts` now exposes:
 
-For full acceptance, I should approve a single transactional command or a shared transaction-executor interface that holds the Site/source/proposal locks through canonical publish and review-decision/audit writes, with deterministic lock order. P must not fork publication policy or copy CAN authority. Before I approval, require a focused concurrency review and forbid automatic acceptance.
+```ts
+export type PartnerLocalContentTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type PartnerLocalContentCommand = {
+  expectedRevision: number;
+  operation: "save" | "restore";
+  content?: SiteLocalContent;
+  restoreRevision?: number;
+};
+export async function publishPartnerLocalContentWithinTransaction(
+  actor: AccessContext, input: PartnerLocalContentCommand, tx: PartnerLocalContentTx,
+): Promise<{ changed: boolean; revision: number; status: string; flaggedFields: string[] }>;
+```
 
-## Proposed provenance migration request to I (not yet made)
+`publishPartnerLocalContent(actor,input)` remains the existing transaction-opening entry point for all other editors. The in-transaction variant is the **same** implementation, including permissions, version checks, protected claim scanner, immutable content version, CAN review Action, audit and domain outbox. It never creates a nested transaction.
+
+`reviewChurchSourceExcerpt` now owns a single `db.transaction` with the documented lock order:
+
+1. Authorize Site-specific editor in the transaction.
+2. Lock that Site's `site_publications` row `FOR UPDATE` to serialize the canonical local revision; a missing reserved address blocks acceptance/editing, but discard can still proceed.
+3. Read the proposal identity only to determine source key. Lock `church_source_references` row `FOR UPDATE`, then `church_content_suggestions` row `FOR UPDATE`, and revalidate Site, URL-source activity, decision, rights and expected revision.
+4. Read latest local content, call `publishPartnerLocalContentWithinTransaction` with the **same tx**, then commit the proposal review decision, attribution audit and outbox within that tx. The canonical publisher re-acquires the same `site_publications` lock in the owning transaction; no additional lock order is introduced.
+
+Source URL update and removal lock only the source reference and never then acquire `site_publications`; this avoids a reverse lock path. Manual proposal creation and refresh also lock the source row. The same-decision retry returns `alreadyReviewed:true` with no second publication, event or audit. Any thrown failure rolls back the entire accepted/edited transaction.
+
+**Source removal after a previously accepted/edited copy:** no unprompted rollback. The removal/replacement operation flags a `site_website_source_provenance_review` Action (no raw source content in action metadata), preserves church-reviewed content and immutable review rows, and invalidates outstanding pending proposals. Institutional screening stays canonical.
+
+**Integration I owns cross-file approval** of this shared publisher interface and the final merge. The guarded `tests/integration/church-source-review.integration.test.ts` tests real Postgres concurrency for accept/accept, revoke/accept, stale revision, permissions and no-partial-publish. They must be run against a disposable Neon branch with `APP_ENV=test NODE_ENV=test CAN_TEST_DB_WRITES_ENABLED=true`. No DB secret or production flag has been modified. The test code is not evidence that the disposable DB run has passed.
+
+## Implemented brand evidence and provisional private UI
+
+`src/domain/church-brand-suggestions.ts` extracts only bounded theme-color metadata and inline color/font declarations from permitted downloaded HTML, without executing CSS or fetching stylesheets. It scores maintained CAN palettes, includes WCAG text contrast ratios, suggests only maintained typography IDs and marks assets `not_authorized`. The private review UI can show these advisory proposals after an explicitly requested fetch. **No theme is applied**, no arbitrary font/CSS/color is published, and the proposal currently lives only in that single request's authorized editor state. Durable provenance and optional re-review require I-approved schema/API work.
+
+## Proposed provenance migration request to I (submitted in Issue #258)
 
 Existing columns store `source_reference_id`, `source_page_url`, `retrieved_at`, `proposed_text`, low-confidence status and review decision. They do **not** distinguish manual versus fetched origin or record a source content digest, extractor version, observed source span, or publication revision on the proposal itself. Request I approval for:
 
