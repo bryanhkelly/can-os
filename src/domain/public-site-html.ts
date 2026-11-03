@@ -1,3 +1,4 @@
+import { resolveSiteTheme } from "./site-theme";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
@@ -59,6 +60,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const host = escapePublicHtml(page.host);
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
+  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId);
+  const visualCss = `--site-ink:${visual.ink};--site-paper:${visual.canvas};--site-accent:${visual.accent};--site-secondary:${visual.secondary};--site-muted:${visual.muted};--site-display:${visual.displayFont};--site-body:${visual.bodyFont};`;
   const localItems = local ? [
     ["Our story", local.churchHistory],
     ["Serving our community", local.communityOutreach],
@@ -175,21 +178,21 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     </article>`;
   }).join("\n");
   const hasOpenApplications = (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
-  const hero = `<div id="welcome" class="public-hero"><p class="tag">Welcome to our school</p><h1>${school}</h1>
+  const hero = `<div id="welcome" class="public-hero${image ? " has-image" : ""}"${image ? ` style="background-image:linear-gradient(95deg,rgba(13,34,40,.93),rgba(13,34,40,.54)),url(&quot;${escapePublicHtml(image.dataUrl)}&quot;)"` : ""}><p class="tag">Welcome to our school</p><h1>${school}</h1>
     ${local?.welcomeMessage ? `<p class="intro">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
     <p class="intro">Explore the local community and reviewed educational programs.
     ${hasOpenApplications ? "Applications are available for eligible approved programs, subject to verification." :
       "Request information about our programs. Applications are not currently open through this website."}</p>
     <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
     ${availablePaths.includes("/about") ? `<a class="hero-text-link" href="/about">Our story →</a>` : ""}</div></div>`;
-  const academicSection = academicCards ? `<section aria-labelledby="academic-title">
+  const academicSection = academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
     <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : "";
-  const enrichmentSection = `<section aria-labelledby="programs-title" style="margin-top:40px">
+  const enrichmentSection = `<section aria-labelledby="programs-title" class="editorial-section">
     <h2 id="programs-title">Enrichment and student experiences</h2>
     ${cards ? `<div class="grid">${cards}</div>` : academicCards
       ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
       : '<p class="empty">There are no programs to display at this time.</p>'}</section>`;
-  const contactSection = `<section id="contact" aria-labelledby="contact-title" class="church-section" style="margin-top:40px">
+  const contactSection = `<section id="contact" aria-labelledby="contact-title" class="church-section">
     <h2 id="contact-title">Connect with our school</h2>
     <p>${academicCards ? "For program questions, use the request-information form on the academic listing." :
       "Academic inquiries become available when an approved program is published."}
@@ -222,7 +225,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero"><p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   const pageContent: Record<PublicSitePath, string> = {
-    "/": hero + localSection + academicSection + enrichmentSection + contactSection,
+    "/": hero + (local?.schoolVision || local?.localDescription ? `<section class="mission-split editorial-section" aria-labelledby="mission-title"><div><p class="tag">Rooted in this community</p><h2 id="mission-title">An education with a sense of place</h2></div><p>${escapePublicHtml(local.schoolVision || local.localDescription)}</p></section>` : "") + academicSection + (page.offerings.length ? enrichmentSection : "") + localSection + (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p><h2>Discover the right learning path</h2><p>Explore published programs and request details before making an enrollment decision.</p><a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") + contactSection,
     "/about": secondaryHero("Our community", "A school rooted in community",
       "Learn about the church and local people behind this school.") + localSection,
     "/academics": secondaryHero("Learning", "Academic programs",
@@ -245,7 +248,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       `<section class="church-section" aria-labelledby="faq-admissions"><h2 id="faq-admissions">How does admissions work?</h2>
       <p>${admissionExplanation}</p></section>`,
     "/contact": secondaryHero("Get in touch", "Connect with our school",
-      "Start with an approved program inquiry when available.") + academicSection + contactSection,
+      "Start with an approved program inquiry when available.") + contactSection + academicSection,
   };
   const pageTitle = path === "/" ? `${school} | Programs` :
     `${escapePublicHtml(pageLabels[path])} | ${school}`;
@@ -263,17 +266,17 @@ ${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
 <title>${pageTitle}</title>
 <meta name="description" content="${pageDescription}"/>
 <style>
-:root{font-family:ui-sans-serif,system-ui,sans-serif;color:#193047;background:#f6f8fa;line-height:1.5}
-body.theme-warm{color:#422f28;background:#fbf6ef}body.theme-light{color:#24313b;background:#fff}
-*{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1160px;margin:auto;padding-left:clamp(20px,5vw,64px);padding-right:clamp(20px,5vw,64px)}
+:root{font-family:var(--site-body);color:var(--site-ink);background:var(--site-paper);line-height:1.65}
+body.theme-warm,body.theme-light{color:var(--site-ink);background:var(--site-paper)}
+*{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1240px;margin:auto;padding-left:clamp(20px,4vw,52px);padding-right:clamp(20px,4vw,52px)}
 header{padding-top:24px;padding-bottom:22px;border-bottom:1px solid #dce2e8;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
 .brand{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:#3b5365;line-height:1.6}
-h1{font-family:Georgia,serif;font-size:clamp(2.8rem,6vw,5.3rem);letter-spacing:-.055em;margin:18px 0 14px;line-height:1.07;max-width:850px}
-h2{font-family:Georgia,Cambria,serif;font-size:clamp(1.7rem,3.5vw,2.65rem);font-weight:500;letter-spacing:-.038em;margin:0 0 18px}.intro{color:#475467;max-width:700px;line-height:1.6}
-main{padding-top:38px;padding-bottom:100px}main>section+section{margin-top:64px}
+h1{font-family:var(--site-display);font-size:clamp(2.8rem,7vw,6.25rem);letter-spacing:-.055em;margin:18px 0 14px;line-height:1.07;max-width:850px}
+h2{font-family:var(--site-display);font-size:clamp(1.7rem,3.5vw,2.65rem);font-weight:500;letter-spacing:-.038em;margin:0 0 18px}.intro{color:#475467;max-width:700px;line-height:1.6}
+main{padding-top:38px;padding-bottom:112px}main>section+section{margin-top:clamp(48px,8vw,112px)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:28px}
 .card{border:1px solid #e6e2d9;border-radius:18px;padding:clamp(24px,3vw,34px);background:#fff;box-shadow:0 12px 40px rgba(22,43,66,.055)}
-.card h3{font-family:Georgia,Cambria,serif;font-size:1.45rem;font-weight:500;line-height:1.22;margin:12px 0}
+.card h3{font-family:var(--site-display);font-size:1.45rem;font-weight:500;line-height:1.22;margin:12px 0}
 .tag{font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:#475467;font-weight:700}
 .season,.availability{font-size:.9rem;color:#475467;line-height:1.5}
 .price{font-weight:700;font-size:1.16rem;margin-top:20px}
@@ -290,20 +293,21 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .inquiry-form button{background:#173c60;color:white;border:none;border-radius:10px;padding:14px;font-weight:700;cursor:pointer;min-height:44px}
 .inquiry-form button:hover{background:#245b88}
 :focus-visible{outline:3px solid #e7a84e;outline-offset:3px}
-.public-hero{min-height:330px;position:relative;isolation:isolate;overflow:hidden;border-radius:28px;background:linear-gradient(100deg,rgba(9,32,55,.9),rgba(14,51,78,.58)),radial-gradient(ellipse at 85% 35%,#e5ac7b,transparent 55%),linear-gradient(160deg,#5f879b,#203b60);padding:clamp(30px,6vw,70px);color:white;margin-bottom:52px}
+.public-hero{min-height:440px;position:relative;isolation:isolate;overflow:hidden;border-radius:28px;background:linear-gradient(110deg,var(--site-ink),var(--site-secondary));padding:clamp(30px,6vw,70px);color:white;margin-bottom:52px}
 .public-hero h1{color:white}.public-hero .intro{color:#edf3f8;max-width:670px}
-.public-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:#153b55;opacity:.45;clip-path:polygon(0 100%,0 89%,18% 75%,30% 88%,51% 55%,65% 80%,81% 49%,100% 76%,100% 100%)}
-.public-hero .tag{color:#e7d7bd}.hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:20px;margin-top:30px}.hero-button{display:inline-flex;align-items:center;min-height:46px;border-radius:10px;padding:12px 19px;background:#f6eee0;color:#17364d;text-decoration:none;font-weight:700}.hero-text-link{color:#fff;text-underline-offset:5px;font-weight:700}.hero-button:hover{background:#fff}.hero-button:focus-visible,.hero-text-link:focus-visible{outline:3px solid #ffda90;outline-offset:4px}body.theme-warm .public-hero{background:linear-gradient(108deg,#563b34,#846550 75%,#b49a7d)}body.theme-light .public-hero{background:linear-gradient(108deg,#193b46,#376474)}
-@media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px;min-height:0}.card{padding:22px}header{align-items:flex-start}header nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;padding-top:12px}main{padding-top:24px;padding-bottom:60px}}
+.public-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:var(--site-accent);opacity:.18;clip-path:polygon(0 100%,0 88%,32% 70%,56% 90%,78% 53%,100% 66%,100% 100%)}.public-hero.has-image{background-position:center;background-size:cover}.public-hero.has-image::after{display:none}
+.public-hero .tag{color:#e7d7bd}.hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:20px;margin-top:30px}.hero-button{display:inline-flex;align-items:center;min-height:48px;border-radius:10px;padding:12px 19px;background:#f6eee0;color:#17364d;text-decoration:none;font-weight:700}.hero-text-link{color:#fff;text-underline-offset:5px;font-weight:700}.hero-button:hover{background:#fff}.hero-button:focus-visible,.hero-text-link:focus-visible{outline:3px solid #ffda90;outline-offset:4px}
+.skip-link{position:absolute;left:12px;top:-100px;z-index:10;padding:12px;background:#fff;color:#112d34}.skip-link:focus{top:12px}.mission-split{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:clamp(24px,5vw,80px);padding:clamp(20px,4vw,42px) 0}.mission-split p:last-child{font-size:clamp(1.05rem,1.6vw,1.3rem);line-height:1.75}.editorial-section>.grid{gap:20px}.closing-action{background:var(--site-ink);color:#fff;padding:clamp(30px,6vw,70px);border-radius:12px}.closing-action .tag,.closing-action p{color:#fff}.closing-action h2{max-width:700px}.closing-action .hero-button{margin-top:15px}header nav a{min-height:44px;display:inline-flex;align-items:center}header .brand{color:var(--site-ink)}header{position:relative}header nav{gap:clamp(8px,1.4vw,20px)}.card{border-radius:8px}.card p{overflow-wrap:anywhere}.public-hero{border-radius:12px}.church-section{border-radius:8px}.public-hero h1{overflow-wrap:anywhere} .mobile-menu{display:none} .mobile-menu summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 14px;border:1px solid var(--site-ink);border-radius:6px}.mobile-menu a{display:block;padding:11px 4px;min-height:44px} .mobile-menu[open]{width:100%} .mobile-menu[open] .mobile-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px} @media(max-width:800px){header>.desktop-nav{display:none}.mobile-menu{display:block} .mission-split{grid-template-columns:1fr} .public-hero{min-height:350px}} @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px;min-height:0}.card{padding:22px}header{align-items:flex-start}header nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;padding-top:12px}main{padding-top:24px;padding-bottom:60px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
 </style>
 </head>
-<body class="theme-${theme}">
-<header><p class="brand">CAN Academy · Local partner site</p><nav aria-label="School website navigation">${navigation}</nav><p>${org}</p></header>
-<main>\n  ${pageContent[path]}\n</main>
-<footer>${host} · Powered by CAN OS</footer>
+<body class="theme-${theme}" style="${visualCss}">
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}</nav></details></header>
+<main id="main-content">\n  ${pageContent[path]}\n</main>
+<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy</span></footer>
 </body>
 </html>`;
 }
