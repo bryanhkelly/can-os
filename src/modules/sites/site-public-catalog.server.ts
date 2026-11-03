@@ -53,6 +53,7 @@ export async function readPublishedSiteCatalog(slug: string) {
         academicPrograms, offerings: publicOfferings, localContent,
         ...parentExtras,
       }),
+      demonstration: site.metadata?.synthetic === true,
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms,
