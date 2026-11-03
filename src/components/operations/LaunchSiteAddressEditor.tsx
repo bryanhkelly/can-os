@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { readSitePhysicalAddress, siteAddressEditorDraft } from "@/domain/site-setup-configuration";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -19,12 +20,8 @@ export function LaunchSiteAddressEditor({
   busy:boolean;
   save:(address:LaunchSiteAddressDraft,revision:string,reason:string)=>Promise<void>;
 }){
-  const [address,setAddress]=useState<LaunchSiteAddressDraft>({
-    street1:String(initial?.street1??""),street2:String(initial?.street2??""),
-    city:String(initial?.city??""),state:String(initial?.state??""),
-    postalCode:String(initial?.postalCode??""),country:String(initial?.country??"US"),
-    county:String(initial?.county??""),
-  });
+  const savedStatus=readSitePhysicalAddress(initial).status;
+  const [address,setAddress]=useState<LaunchSiteAddressDraft>(()=>siteAddressEditorDraft(initial));
   const [reason,setReason]=useState("");
   const [editing,setEditing]=useState(false);
   const [error,setError]=useState("");
@@ -42,8 +39,12 @@ export function LaunchSiteAddressEditor({
       {initial?.street1 ? [initial.street1,initial.city,initial.state,initial.postalCode].filter(Boolean).join(", ") :
         "Address not configured. Add the physical location for accurate setup guidance."}
     </p>}
+    {(savedStatus==="legacy_needs_review"||savedStatus==="invalid_needs_correction")&&
+      <p role="alert" className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+        This location was saved in an older or incomplete format. Review and save the full physical address before relying on state guidance; independent legal review has not been established.
+      </p>}
     {editing && <div className="mt-3 space-y-3">
-      <p className="text-xs text-muted-foreground">Changing a location may require independent jurisdiction review. An approved school or published Site needs a controlled amendment.</p>
+      <p className="text-xs text-muted-foreground">This location is church-provided, not independently verified. Changing an operating or published school's location requires a CAN-coordinated amendment; direct edits are blocked.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {fields.map(([key,label])=><Field key={key} label={label}>
           <Input value={address[key]} onChange={e=>setAddress({...address,[key]:e.target.value})}/>
