@@ -67,6 +67,9 @@ vi.mock("@/modules/sites/public-parent-extras.server", () => ({
   }),
 }));
 
+vi.mock("@/modules/sites/site-media-folder.server", () => ({
+  readApprovedSchoolSitePhotos: async () => [],
+}));
 vi.mock("@/modules/sites/site-local-content.server", () => ({
   readCurrentLocalContent: async () => null,
   readLocalContentHistory: async () => [],
