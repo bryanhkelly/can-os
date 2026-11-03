@@ -1,5 +1,6 @@
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
+import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
@@ -71,6 +72,10 @@ export function LaunchProgramIdentityFields({ type, setType, summerCreditBearing
                       </select>
                     </label>
                   </div>
+                  {!launchGradeRangeIsOrdered({min:gradeMin,max:gradeMax})&&
+                    <p role="alert" className="text-sm text-destructive">
+                      Minimum grade cannot come after maximum grade.
+                    </p>}
                 </div>
               </fieldset>
   );
