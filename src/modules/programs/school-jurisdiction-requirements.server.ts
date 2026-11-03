@@ -96,5 +96,31 @@ export async function reconcileSchoolJurisdictionRequirementActions(
       created++;
     }
   }
-  return {created,reopened};
+  // The policy is immutable, but its applicability may change after a
+  // reviewed Site/Program amendment. Preserve evidence and the historic Action;
+  // no longer applicable duties must not remain misleadingly open.
+  const applicable=new Set(input.profile.requirements.filter(requirement=>
+    decisionById.get(requirement.id)?.status==="applicable").map(item=>item.id));
+  let superseded=0;
+  for(const prior of current){
+    const requirementId=prior.metadata.requirementId;
+    if(typeof requirementId!=="string"||applicable.has(requirementId) ||
+      prior.status==="cancelled")continue;
+    await tx.update(actions).set({
+      status:"cancelled",resolvedAt:null,resolutionNote:null,
+      metadata:{...prior.metadata,reviewState:"superseded_by_verified_policy",
+        supersededByProfileVersionId:input.profileVersionId,
+        supersededAt:new Date().toISOString(),historicalEvidenceRetained:true},
+      updatedAt:new Date(),
+    }).where(eq(actions.id,prior.id));
+    await writeAudit(tx,actor,{
+      action:"program.jurisdiction.requirement.superseded",
+      entityType:"action",entityId:prior.id,
+      scope:{organizationId:input.organizationId,siteId:input.siteId,programId:input.programId},
+      before:{status:prior.status,profileVersionId:prior.metadata.profileVersionId},
+      after:{status:"cancelled",profileVersionId:input.profileVersionId},
+    });
+    superseded++;
+  }
+  return {created,reopened,superseded};
 }
