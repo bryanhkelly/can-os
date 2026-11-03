@@ -89,7 +89,7 @@ export async function readSchoolJurisdictionReview(
     decisions:[],candidateDisclosures:[],
   };
   if (!version) return {programId,siteId:school.siteId,revision:null,
-    reviewRequired:true,decisions:[],candidateDisclosures:[]};
+    reviewRequired:true,locationReviewReason:null,decisions:[],candidateDisclosures:[]};
   const [decision] = await executor.select({
     reviewerPersonId:jurisdictionProfileVerificationDecisions.reviewerPersonId,
     evidence:jurisdictionProfileVerificationDecisions.evidence,
@@ -141,6 +141,7 @@ export async function readSchoolJurisdictionReview(
   return {
     programId,siteId:school.siteId,revision:version.revision,
     reviewRequired:evaluated.reviewRequired,
+    locationReviewReason:null,
     decisions:evaluated.decisions,
     // Candidates only: requires separate institution-approved public DTO gate.
     candidateDisclosures:evaluated.publicDisclosures,
