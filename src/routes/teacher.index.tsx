@@ -91,7 +91,7 @@ function TeacherTodayPage() {
       {data.ungraded.length>0 ? <div className="mt-3">
         <p className="font-semibold">{data.ungraded.length} submitted work item{data.ungraded.length===1?"":"s"} to review</p>
         <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
-        <Link to="/teacher/gradebook" search={{section:data.ungraded[0].sectionId,assessment:data.ungraded[0].assessmentId}}
+        <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId}}
           className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Grade next submission <ArrowUpRight className="ml-2 size-4"/></Link>
       </div> : data.missingWork.length>0 ? <div className="mt-3">
         <p className="font-semibold">{data.missingWork.length} missing-work follow-up{data.missingWork.length===1?"":"s"}</p>
