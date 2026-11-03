@@ -477,6 +477,13 @@
       "when": 1793710000000,
       "tag": "0067_church_source_references",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1793713600000,
+      "tag": "0068_church_content_suggestions",
+      "breakpoints": true
     }
   ]
 }
