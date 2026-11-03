@@ -332,7 +332,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
   const nextHref = !currentProgram ? "#new-school-launch"
     : !currentLaunch ? "#launch-website"
-    : "#launch-services";
+    : "#launch-requirements";
 
   return (
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
