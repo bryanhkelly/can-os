@@ -83,6 +83,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
       openingConfirmed: false,
     }),
     approvedEnrichmentCount: offerings.length,
+    mediaUploadsEnabled: process.env.CAN_R2_SITE_MEDIA_UPLOADS_ENABLED === "true",
     editingContent,
     currentRevision: history[0]?.revision ?? 0,
     localContentStatus: history[0]?.status ?? null,
