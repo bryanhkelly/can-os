@@ -6,6 +6,7 @@ import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {hasRegistrarAuthority} from "@/domain/school-roles";
 import {writeAudit,emitEvent} from "@/platform/mutation";
 import {EventTypes} from "@/domain/event-types";
+import {isJurisdictionRenewalDocumentCurrent} from "@/domain/school-jurisdiction-approval";
 import {readSchoolJurisdictionReview} from "./school-jurisdiction-review.server";
 import {jurisdictionRequirementActionType} from "./school-jurisdiction-requirements.server";
 
@@ -33,13 +34,15 @@ async function lockRequirement(tx:Tx,actionId:string){
 }
 
 function requireSubmittedDocument(document:typeof documents.$inferSelect | undefined,
-  programId:string,siteId:string,organizationId:string,now:Date){
+  programId:string,siteId:string,organizationId:string,now:Date,
+  requirementMetadata:Record<string,unknown>){
   if(!document || document.category!=="jurisdiction_requirement_evidence" ||
     document.subjectType!=="program"||document.subjectId!==programId ||
     document.metadata.siteId!==siteId||document.metadata.organizationId!==organizationId||
     document.storageProvider!=="cloudflare_r2" ||
     document.metadata.storageVerified!==true ||
-    (document.expiresAt && document.expiresAt<=now))
+    (document.expiresAt && document.expiresAt<=now) ||
+    !isJurisdictionRenewalDocumentCurrent(document.createdAt,requirementMetadata,now))
     throw new AuthorizationError("current scoped verified-storage Program evidence document");
 }
 
@@ -99,7 +102,8 @@ export async function submitSchoolJurisdictionRequirementEvidence(
     const [document]=await tx.select().from(documents)
       .where(eq(documents.id,input.documentId)).limit(1);
     const now=new Date();
-    requireSubmittedDocument(document,program.id,site.id,program.organizationId,now);
+    requireSubmittedDocument(document,program.id,site.id,program.organizationId,now,
+      action.metadata);
     await requireDocumentAfterPhysicalSiteChange(tx,site,document);
     if(!document || document.uploadedByPersonId!==actor.actorPersonId)
       throw new AuthorizationError("evidence uploaded by the authorized submitter");
@@ -161,7 +165,8 @@ export async function decideSchoolJurisdictionRequirementEvidence(
     const [document]=await tx.select().from(documents)
       .where(eq(documents.id,prior.documentId)).limit(1);
     const now=new Date();
-    requireSubmittedDocument(document,program.id,site.id,program.organizationId,now);
+    requireSubmittedDocument(document,program.id,site.id,program.organizationId,now,
+      action.metadata);
     await requireDocumentAfterPhysicalSiteChange(tx,site,document);
     const scope={organizationId:program.organizationId,siteId:site.id,programId:program.id};
     if(input.decision==="verify"){
