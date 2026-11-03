@@ -43,12 +43,12 @@ try {
     WHERE a.academic_purpose='general_instruction'
     AND a.course_template_version_id=ANY($1::uuid[])
     AND a.jurisdiction_id=ANY($2::uuid[])
-    AND a.status='in_review'`,[courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id)]);
+    AND a.status='under_review'`,[courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id)]);
   if(!apply){await client.query("ROLLBACK");console.log(JSON.stringify({publisherId:publisher.rows[0].id,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,expectedApprovals:expected,currentlyInReview:existing.rows[0].n,apply:false},null,2));}
   else {
     await client.query(`INSERT INTO curriculum_jurisdiction_approvals
       (course_template_version_id,jurisdiction_id,academic_purpose,status,authority_organization_id,evidence,effective_at)
-      SELECT c.id,j.id,'general_instruction','in_review',$1,
+      SELECT c.id,j.id,'general_instruction','under_review',$1,
         '{"scope":"internal_demo_only","externalAuthorization":false}'::jsonb,now()
       FROM (SELECT DISTINCT i.course_template_version_id AS id FROM curriculum_pack_items i
         JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
