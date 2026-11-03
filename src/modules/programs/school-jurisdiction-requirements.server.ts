@@ -44,6 +44,8 @@ export async function reconcileSchoolJurisdictionRequirementActions(
       scopeFingerprint:input.scopeFingerprint,policyRevisionState:"verified_current",
       responsibleParty:requirement.responsibleParty,phase:requirement.phase,
       category:requirement.category??"other",
+      filingDeadline:requirement.filingDeadline??null,
+      renewalDeadline:requirement.renewalDeadline??null,
       sources:officialSources.map(source=>({
         url:source.url,title:source.title,authority:source.authority,checkedAt:source.checkedAt,
       })),
