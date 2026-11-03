@@ -31,7 +31,7 @@ export function assertSiteLocationProgramScope(
 
 /** A scoped registrar must not interpret an absent Program projection as all
  * sibling Programs. Empty projections mean no Program reads, not unrestricted. */
-export function siteSetupReadableProgramIds(actor:AccessContext):readonly string[]|null {
+export function siteSetupReadableProgramIds(actor:AccessContext):string[]|null {
   const ids=actor.scope.programIds;
   if(actor.grantSiteId!==null && !ids)
     throw new AuthorizationError("verified Program projection for this Site");
