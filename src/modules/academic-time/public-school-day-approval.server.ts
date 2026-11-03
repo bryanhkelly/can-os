@@ -2,7 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { auditEvents, programs, scheduleTemplates, scheduleTemplatePeriods, schoolYears, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
-import { publicSchoolDayScheduleSignature } from "@/domain/public-school-day";
+import { publicSchoolDayScheduleSignature, isIndependentPublicScheduleReviewer } from "@/domain/public-school-day";
 import { writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "@/modules/sites/site-publication.server";
 import { publicSchoolDaySiteRevision } from "./public-school-day-site-revision.server";
@@ -73,7 +73,8 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       eq(auditEvents.resourceId,schedule.id),
       inArray(auditEvents.action,["schedule_template.create","schedule.periods.replace"]),
     )).orderBy(desc(auditEvents.occurredAt)).limit(1);
-    if(!authoring?.actorPersonId || authoring.actorPersonId===actor.actorPersonId)
+    if(!isIndependentPublicScheduleReviewer(actor.actorPersonId,
+      authoring?.actorPersonId??null))
       throw new Error("Independent academic schedule reviewer required; last schedule editor cannot approve their own timetable");
     const overlapping=await tx.select({
       id:scheduleTemplates.id,active:scheduleTemplates.active,
