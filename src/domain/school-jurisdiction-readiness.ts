@@ -45,6 +45,29 @@ export type SchoolJurisdictionReadiness = {
   }>;
 };
 
+/**
+ * Non-authoritative change detector for existing legal-review Actions.
+ * Store only this fingerprint, not an extra copy of the school's street address.
+ * The evaluator still re-reads canonical Site/Program/policy records every time.
+ */
+export function jurisdictionReviewScopeFingerprint(value: unknown): string {
+  function stable(input: unknown): unknown {
+    if (Array.isArray(input)) return input.map(stable);
+    if (input && typeof input === "object") return Object.fromEntries(
+      Object.entries(input).filter(([,v])=>v!==undefined)
+        .sort(([a],[b])=>a.localeCompare(b))
+        .map(([k,v])=>[k,stable(v)]),
+    );
+    return input ?? null;
+  }
+  const serialized = JSON.stringify(stable(value));
+  let hash = 2166136261;
+  for (let i = 0; i < serialized.length; i++) {
+    hash = Math.imul(hash ^ serialized.charCodeAt(i), 16777619);
+  }
+  return "jurisdiction-scope-v1:" + (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 export function unavailableSchoolJurisdictionReadiness(
   reason: string,
   profileVersionId: string | null = null,
