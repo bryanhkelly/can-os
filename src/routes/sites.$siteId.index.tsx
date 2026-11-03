@@ -49,25 +49,14 @@ function SiteTodayPage() {
     student.activeCustodyHold||student.deniedPickupAttempts>0||!!student.uncollectedActionId);
   const blockedOpenings=data.schoolOpenings.filter(opening=>opening.blocked);
   // Derived attention is guidance, never a new source of operating approval.
-  const operatingAlerts: DailyAttentionItem[] = [
-    ...blockedOpenings.map(opening=>{
-      const program=data.programs.find(item=>item.id===opening.programId);
-      return {
-        id:"opening-status:"+opening.programId,category:"opening" as const,
-        title:(program?.name??"School program")+" — opening not authorized",
-        detail:"CAN opening approval or current prerequisites are missing. Program activity is not authorization to receive children.",
-        href:"/operations/launch",nextStep:"Review launch and contact the CAN opening officer",
-        ownerName:"CAN school-opening officer",dueAt:null,priority:"critical" as const,
-      };
-    }),
-    ...(staffingExceptions.length ? [{
-      id:"school-day-staffing",category:"staffing" as const,
-      title:staffingExceptions.length+" supervised block"+(staffingExceptions.length===1?"":"s")+" need coverage review",
-      detail:"Resolve missing schedules, adult assignments and independently witnessed coverage before treating the day as ready.",
-      href:"#staffing-exceptions",nextStep:"Review staffed blocks and responsible adults",
-      ownerName:"Local site director",dueAt:null,priority:"high" as const,
-    }] : []),
-  ];
+  const decision=data.operatingDecision;
+  const operatingAlerts: DailyAttentionItem[] = decision.status==="evidence_present" ? [] : [{
+    id:"site-operating-decision",
+    category:decision.status==="coverage_review"?"staffing":"opening",
+    title:decision.title,detail:decision.detail,href:decision.href,
+    nextStep:decision.nextStep,ownerName:decision.owner,dueAt:null,
+    priority:"critical",
+  }];
   const leaderAttention=[...operatingAlerts,...data.attentionItems];
   const ownedFollowUps=data.actions.filter(action=>
     action.ownerPersonId===data.viewerPersonId&&ownerResolvableTypes.has(action.type));
@@ -88,13 +77,17 @@ function SiteTodayPage() {
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
-    <section aria-label="School-day operating decision" role="status" className="mt-6 rounded-xl border p-5">
+    <section id="school-day-operating-decision" aria-label="School-day operating decision"
+      role={decision.status==="opening_blocked"?"alert":"status"}
+      className="mt-6 rounded-xl border p-5">
       <h2 className="font-semibold">Can this site receive students today?</h2>
-      <p className="mt-2 text-sm">{blockedOpenings.length>0 ? "Not authorized — an opening approval or required evidence is missing." : data.schoolDay.projectionTruncated ? "Not verified — source records are incomplete." : staffingExceptions.length>0 ? "Coverage review required — operating readiness is not established." : "Opening blockers were not identified in the visible records. Confirm the required daily handoff and current coverage before receiving students."}</p>
-      <p className="mt-2 text-xs text-muted-foreground">Academic program status and attendance records do not authorize school opening or certify daily coverage.</p>
+      <p className="mt-2 font-semibold">{decision.title}</p>
+      <p className="mt-2 text-sm">{decision.detail}</p>
+      <p className="mt-2 text-sm">Responsible: {decision.owner}. <a className="underline" href={decision.href}>{decision.nextStep}</a></p>
+      <p className="mt-2 text-xs text-muted-foreground">Evaluated {new Date(data.asOf).toLocaleString()} in the site timezone. Program activity and attendance alone never authorize opening.</p>
     </section>
     {blockedOpenings.length>0&&
-      <section role="alert" aria-label="School opening authorization"
+      <section id="school-opening-authorization" role="alert" aria-label="School opening authorization"
         className="mt-6 border-l-4 border-destructive bg-muted/40 px-5 py-4">
         <h2 className="font-semibold">School opening is not currently authorized</h2>
         <p className="mt-1 text-sm">
