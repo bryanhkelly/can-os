@@ -9,7 +9,7 @@ import { isAcademicMarketingType, publishableAcademicProgram } from "@/domain/ac
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { familyInvitationBatchMetadataSchema } from "@/domain/family-invitations";
 import { invitedFamilyInterestInput, type InvitedFamilyInterestInput } from "@/domain/family-recruitment-interest";
-import { publicAdmissionsInterestInput, publicInterestRateLimitKeys, type PublicInterestRoute, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
+import { publicAdmissionsInterestInput, publicInterestMessage, publicInterestRateLimitKeys, type PublicInterestRoute, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -132,6 +132,11 @@ export async function recordPublicAdmissionsInterest(
         eq(publicAdmissionsInterests.programId, input.programId),
         eq(publicAdmissionsInterests.emailDigest, emailDigest),
         gt(publicAdmissionsInterests.createdAt, cutoff),
+        // A school visit request should not be swallowed by an ordinary
+        // information request made by the same parent earlier that day.
+        data.purpose === "visit_interest"
+          ? sql`${publicAdmissionsInterests.message} LIKE 'School visit interest (not scheduled)%'`
+          : sql`${publicAdmissionsInterests.message} NOT LIKE 'School visit interest (not scheduled)%'`,
       )).orderBy(desc(publicAdmissionsInterests.createdAt)).limit(1);
     if (recent) return;
 
@@ -143,7 +148,7 @@ export async function recordPublicAdmissionsInterest(
       contactLastName: data.lastName,
       contactEmail: data.email,
       emailDigest,
-      message: data.message,
+      message: publicInterestMessage(data),
       source: "published_site",
       contactConsentAt: new Date(),
       status: "new",
@@ -158,7 +163,7 @@ export async function recordPublicAdmissionsInterest(
       siteId: matched.siteId,
       organizationId: matched.organizationId,
       programId: input.programId,
-      payload: { source: "published_site", status: "new" },
+      payload: { source: "published_site", status: "new", purpose:data.purpose },
     });
     await writeAudit(tx, {
       action: "admissions.public_interest.receive",
