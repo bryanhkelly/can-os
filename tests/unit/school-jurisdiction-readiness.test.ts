@@ -119,6 +119,18 @@ describe("school-specific jurisdiction and funding readiness", () => {
       governmentApproval:"not_verified",
     });
   });
+  it("does not conclude local regulation is inapplicable from an unverified county spelling", () => {
+    const inScope=profile.requirements[0]!;
+    const countyScoped={...inScope,applicability:{
+      ...inScope.applicability!,localities:["Alameda"],
+    }};
+    const changed=evaluateSchoolJurisdictionRequirements({
+      ...profile,requirements:[countyScoped],
+    },version,{...school,locality:"Alameda County"},now);
+    expect(changed.reviewRequired).toBe(true);
+    expect(changed.decisions[0]?.status).toBe("legal_review_required");
+    expect(changed.publicDisclosures).toHaveLength(0);
+  });
   it("requires human legal review for incomplete school location", () => {
     const result = evaluateSchoolJurisdictionRequirements(
       profile,version,{...school,locality:null},now,
