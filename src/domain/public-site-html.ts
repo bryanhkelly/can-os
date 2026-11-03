@@ -254,6 +254,23 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
     ${availablePaths.includes("/about") ? `<a class="hero-text-link" href="/about">Our story →</a>` : ""}
     ${!availablePaths.includes("/academics") && availablePaths.includes("/contact") ? `<a class="hero-text-link" href="/contact">School information →</a>` : ""}</div><div class="hero-art" aria-hidden="true"><span class="art-ring"></span><span class="art-line"></span><span class="art-dot"></span></div></div>`;
+  // The homepage introduces the school; detailed church content belongs on
+  // About. No invented academic facts or unapproved identity records are used.
+  const homeStory = local && availablePaths.includes("/about") ? `<section class="home-story editorial-section" aria-labelledby="home-story-title">
+    <div class="home-story-heading"><p class="tag">Our community</p>
+      <h2 id="home-story-title">${local.schoolVision ? "A school with a purpose" : "More than a place to learn"}</h2></div>
+    <div class="home-story-copy"><p>${escapePublicHtml(local.localDescription || local.schoolVision ||
+      local.churchHistory || local.leadershipWelcome || "Learn about the people and purpose behind this community.")}</p>
+      <a class="text-action" href="/about">Get to know our school →</a></div>
+  </section>` : "";
+  const programOverview = academicCards ? `<section class="program-overview editorial-section" aria-labelledby="academic-title">
+    <div class="program-overview-heading"><div><p class="tag">Learning pathways</p>
+      <h2 id="academic-title">An education built around possibility</h2></div>
+      <p>Explore published programs and delivery options for this school.
+        Exact schedules and application availability are reviewed separately.</p></div>
+    <div class="grid">${academicCards}</div>
+    <a class="text-action" href="/academics">Explore all academic programs →</a>
+  </section>` : "";
   const academicSection = academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
     <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : "";
   const illustrativeExperiences = demo && !page.offerings.length && local ? `<div class="demo-experience-grid">
@@ -412,7 +429,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <span class="explore-arrow" aria-hidden="true">→</span></a>`).join("")}</div></section>`
     : "";
   const pageContent: Record<PublicSitePath, string> = {
-    "/": hero + (local?.schoolVision ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Learning with purpose. Growing together.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "") + exploreSection + (local?.schoolVision || local?.localDescription ? `<section class="mission-split editorial-section" aria-labelledby="mission-title"><div><p class="tag">Rooted in this community</p><h2 id="mission-title">An education with a sense of place</h2></div><p>${escapePublicHtml(local.schoolVision || local.localDescription)}</p></section>` : "") + academicSection + (page.offerings.length || (demo && local) ? enrichmentSection : (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) + localSection + (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p><h2>Discover the right learning path</h2><p>Explore published programs and request details before making an enrollment decision.</p><a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") + contactSection,
+    "/": hero + homeStory + exploreSection + programOverview +
+      (page.offerings.length || (demo && local) ? enrichmentSection :
+        (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) +
+      (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
+        <h2>Discover the right learning path</h2>
+        <p>Explore published programs and request details before making an enrollment decision.</p>
+        <a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") +
+      (reviewedContact || reviewedAddress ? contactSection : ""),
     "/about": secondaryHero("Our community", "A school rooted in community",
       "Learn about the church and local people behind this school.") + localSection,
     "/academics": secondaryHero("Learning", "Academic programs",
@@ -514,6 +538,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .inquiry-form h4{font-size:1.1rem;line-height:1.3;margin:0}
 @media(prefers-reduced-motion:reduce){.inquiry-form button{transition:none}}
  .demo-banner{padding:9px 22px;background:#162e39;color:#f9f5ed;text-align:center;font-size:.78rem;line-height:1.5;letter-spacing:.01em}.demo-banner strong{font-weight:700}.vision-feature{display:grid;grid-template-columns:minmax(90px, .3fr) minmax(0,1fr);gap:clamp(20px,5vw,80px);background:var(--site-ink);color:#fff;padding:clamp(28px,5vw,72px);border-radius:5px;margin:clamp(24px,5vw,64px) 0}.vision-feature h2{max-width:800px;font-size:clamp(2.1rem,4.5vw,4.3rem);line-height:1.13;letter-spacing:-.045em}.vision-feature p:not(.tag){color:#e3e6e0;max-width:800px;font-size:1.1rem;line-height:1.8}.vision-feature .tag{color:#e8c996}.vision-number{font-family:var(--site-display);font-size:clamp(4rem,11vw,10rem);line-height:1;color:#d5ac69}.hero-art{pointer-events:none;position:absolute;right:-3%;bottom:-24%;width:min(52%,580px);aspect-ratio:1;border:1px solid rgba(255,255,255,.32);border-radius:50%;opacity:.55;z-index:-1}.hero-art .art-ring{position:absolute;inset:15%;border:1px solid rgba(255,255,255,.45);border-radius:50%}.hero-art .art-line{position:absolute;top:6%;left:45%;width:1px;height:90%;background:rgba(255,255,255,.35);transform:rotate(34deg)}.hero-art .art-dot{position:absolute;top:18%;left:12%;height:12px;width:12px;border-radius:50%;background:#f2d19b}.public-hero.has-image .hero-art{display:none}@media(max-width:700px){.vision-feature{grid-template-columns:1fr}.vision-number{font-size:4rem}.hero-art{width:75%;right:-30%;bottom:-18%;opacity:.3}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+.home-story{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(30px,6vw,110px);padding:clamp(38px,6vw,84px) 0;border-block:1px solid #cdd2cd}.home-story-heading h2{max-width:660px;font-size:clamp(2.8rem,5.5vw,5.8rem);line-height:1.03}.home-story-copy{max-width:570px;align-self:center}.home-story-copy>p{font-size:clamp(1.12rem,1.65vw,1.4rem);line-height:1.72;color:var(--site-muted);white-space:pre-line}.home-story-copy .text-action{margin-top:22px}.program-overview-heading{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(220px,.8fr);gap:clamp(24px,5vw,88px);align-items:end;margin-bottom:26px}.program-overview-heading>p{font-size:1.06rem;line-height:1.7;color:var(--site-muted)}.program-overview .grid{margin-top:0}.program-overview>.text-action{margin-top:26px}.editorial-section .tag{color:var(--site-secondary)}@media(max-width:760px){.home-story,.program-overview-heading{grid-template-columns:1fr}.home-story{gap:14px;padding:42px 0}.program-overview-heading{gap:12px}}
 .demo-experience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(18px,3vw,42px);margin:36px 0 20px}.demo-experience-grid article{min-width:0;border-top:2px solid var(--site-ink);padding-top:24px}.demo-experience-grid h3{font-family:var(--site-display);font-size:clamp(1.6rem,2.4vw,2.35rem);line-height:1.18;letter-spacing:-.035em;font-weight:500}.demo-experience-grid p:last-child{color:var(--site-muted);line-height:1.7}@media(max-width:760px){.demo-experience-grid{grid-template-columns:1fr}.demo-experience-grid article{padding-top:18px}}
  .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
