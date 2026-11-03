@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
-import { renderPublicSiteHtml } from "@/domain/public-site-html";
+import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { normalizeSiteLocalContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
@@ -32,6 +32,14 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent) : null;
+  const previewPage = host ? {
+    host, site: { name: site.name, organizationName: site.organizationName },
+    academicPrograms, offerings, localContent: local?.content ?? null,
+  } : null;
+  const previewPages = previewPage
+    ? Object.fromEntries(availablePublicSitePaths(previewPage).map(path => [
+      path, renderPublicSiteHtml(previewPage, { path }),
+    ])) : {};
   return {
     siteId:site.id,
     siteName: site.name,
@@ -53,10 +61,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     localHistory: history.map(item => ({ revision: item.revision, status: item.status,
       createdAt: item.createdAt.toISOString(), flaggedFields: item.flaggedFields,
       restoredFromRevision: item.restoredFromRevision })),
-    previewHtml: host ? renderPublicSiteHtml({
-      host,
-      site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms, offerings, localContent: local?.content ?? null,
-    }) : null,
+    previewHtml: previewPages["/"] ?? null,
+    previewPages,
   };
 }
