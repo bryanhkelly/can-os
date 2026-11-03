@@ -93,8 +93,8 @@ export function projectPublicInformationReadiness(input: {
       "Financial assistance eligibility or availability is not yet approved; offer an information request.",
       "/admissions",false);
   if (!p.services.some(item => visible(item.description)))
-    missing("family_services","operations","Confirm optional meals, transportation, or care services.",
-      "/operations",false);
+    missing("family_services","institutional_publisher","Review available meals, transportation, care and family visit services.",
+      institutionalPublisher,false);
   if (!visible(p.churchStory))
     missing("church_story","church_editor","Publish the church's reviewed local story.",
       "/site-website",false);
