@@ -22,8 +22,21 @@ export type PublicSitePage = {
 
 /** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
 export function withIllustrativeLocalPreview(page: PublicSitePage): PublicSitePage {
-  return page.demonstration && !page.localContent
-    ? {...page, localContent: createIllustrativeSchoolContent(page.site.name)} : page;
+  if (!page.demonstration || page.localContent) return page;
+  const sample = createIllustrativeSchoolContent(page.site.name);
+  // Valor is an explicitly fictional, existing reference-school fixture. This
+  // variant exists only for local/private previews; it is neither a CMS write
+  // nor a substitute for approved institution-owned program information.
+  const isValor = page.host === "valorschool.can-os.com" &&
+    page.site.name === "Valor School";
+  return {...page, localContent: isValor ? {...sample,
+    welcomeMessage:"Small-school connection. Big-world possibility.",
+    localDescription:"At Valor, imagine a school where students are known by name, ideas are taken seriously, and learning reaches beyond the screen. This fictional campus brings neighborhood connection together with a thoughtfully designed hybrid high-school experience.",
+    schoolVision:"Curious minds. Courageous hearts. A community that sees what each student can become. Our sample vision pairs purposeful academic learning with meaningful relationships and room for discovery.",
+    churchHistory:"Valor began as a design question: what would a school feel like if every young person had a place to belong, room to think independently, and adults who noticed their potential? This is a fictional origin story, not a real church history.",
+    communityOutreach:"Imagine student projects connecting design, technology, local history, and service—from mapping neighborhood resources to exploring science in everyday problems. These are illustrative possibilities, not scheduled activities.",
+    localTraditions:"Picture student-led exhibitions, robotics showcases, arts gatherings, and service Saturdays. These are sample traditions, not actual calendar events.",
+  } : sample};
 }
 
 /** A published synthetic school is a demonstration, never an indexed institution. */
