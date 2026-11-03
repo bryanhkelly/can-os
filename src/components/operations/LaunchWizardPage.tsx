@@ -80,12 +80,16 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [newSiteName,setNewSiteName]=useState("");
   const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
-  const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  const [newSiteTimezone,setNewSiteTimezone]=useState("");
   useEffect(()=>{
-    // Route selection is authoritative. Do not carry a campus or unsaved launch
-    // identity into a different Program's setup when navigating within the wizard.
-    setSiteId(selection.siteId??"");
-    const selected=options?.sites.find(site=>site.id===selection.siteId);
+    // Resume by exact Program when URL contains only programId; never carry a
+    // different school Site forward from the previous screen.
+    const program=selection.programId
+      ? [...(launches?.launches??[]),...(preparationPrograms??[])]
+          .find(item=>item.id===selection.programId) : undefined;
+    const nextSiteId=selection.siteId??program?.siteId??"";
+    setSiteId(nextSiteId);
+    const selected=options?.sites.find(site=>site.id===nextSiteId);
     if(selected)setHostOrganizationId(selected.organizationId);
     setCreated(null);
     setCreatedSiteDraft(null);
@@ -113,6 +117,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   }
   async function addSite(){
     if(!hostOrganizationId)return;
+    if(!newSiteTimezone){setError("Choose the school location's time zone before saving.");return;}
     const hasAddress=hasEnteredSiteAddress(newSiteAddress);
     if(hasAddress && (!newSiteAddress.street1.trim()||!newSiteAddress.city.trim()||!newSiteAddress.state.trim()||!newSiteAddress.postalCode.trim())) {
       setError("Complete street, city, state and postal code, or leave the location address blank for later.");
