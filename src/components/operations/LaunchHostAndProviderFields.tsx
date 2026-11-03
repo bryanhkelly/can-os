@@ -77,7 +77,21 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                     busy={busy} save={saveSiteAddress}/>}
                   {selectedSite && <LaunchSiteContactEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
-                    busy={busy} save={saveSiteContact}/>}
+                    busy={busy} save={saveSiteContact}/>
+                  {selectedSite && <div className="rounded-lg border px-4 py-3 text-sm">
+                    <p className="font-semibold">Saved Site · {selectedSite.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {selectedSite.addressStatus==="missing"?"Physical address not yet configured":
+                        selectedSite.addressStatus==="legacy_needs_review"?"Older physical address needs correction and review":
+                        selectedSite.addressStatus==="invalid_needs_correction"?"Saved physical address needs correction":
+                        "Physical address supplied by the church, not independently approved"}
+                      {" · "}{selectedSite.timezone}
+                    </p>
+                    <Link to="/site-website" className="mt-2 inline-block underline">
+                      Optional: add existing church website, social and YouTube references
+                    </Link>
+                    <p className="mt-1 text-xs text-muted-foreground">Church reference links are managed in the separate Site-scoped website editor; no public content is automatically imported or approved.</p>
+                  </div>}
                   <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
                     <summary className="cursor-pointer text-sm font-semibold">
                       {hostSites.length ? "Add another school location" : "Create your school location"}
@@ -121,8 +135,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {createdSiteDraft.status==="published"?"This Site already has a published website. Publication is separate from admissions and authorization.":"Private website draft only. The host is reserved, but no public school site, admissions,"}
-                        and registration remain independently gated. An explicitly authorized Site publisher must
-                        review and approve marketing before publication.
+                        Family enrollment and legal opening remain independently gated. Any new public claims require review by an authorized Site publisher.
                       </p>
                       <Link to="/sites/$siteId/publish" params={{siteId:createdSiteDraft.siteId}}
                         className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
@@ -138,7 +151,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                   </Field>
                   {selectedSite&&siteJurisdictionId&&jurisdictionId&&siteJurisdictionId!==jurisdictionId&&
                     <p role="alert" className="rounded-lg border border-amber-600/50 p-3 text-sm">
-                      The selected jurisdiction differs from this school's saved address. Confirm the legal state and correct either the Site address or the jurisdiction before proceeding.
+                      The selected jurisdiction differs from the Site address. Correct the location or jurisdiction before launch, or ask the CAN jurisdiction reviewer to document an authorized exception. A mismatched draft cannot establish legal applicability.
                     </p>}
                   {selectedSite&&!siteJurisdictionId&&
                     <p className="text-xs text-muted-foreground">This Site has no recognized state in its saved address. Confirm the jurisdiction manually; a timezone is not evidence of a school's legal location.</p>}
