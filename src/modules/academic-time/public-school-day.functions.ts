@@ -85,7 +85,7 @@ export const listPublicSchoolDayReviews=createServerFn({method:"GET"})
         periods:schedulePeriods,
         revision:typeof approved.revision==="number"?approved.revision:0,
         currentApproval:!truncated && !competingActiveSchoolDaySchedules(templates.map(item=>({
-          ...item,schoolYearStatus:item.yearStatus,
+          ...item,templateActive:item.active,schoolYearStatus:item.yearStatus,
           programMatches:true,siteMatches:true,
           startsOn:item.yearStartsOn,endsOn:item.yearEndsOn,
           effectiveFrom:item.effectiveFrom,effectiveThrough:item.effectiveThrough,
