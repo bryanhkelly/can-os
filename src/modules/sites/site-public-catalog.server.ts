@@ -7,6 +7,7 @@ import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
+import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 
 /**
  * Public Site projection, independently gated by an approved Site publication
@@ -21,6 +22,7 @@ export async function readPublishedSiteCatalog(slug: string) {
     const [site] = await tx.select({
       id: sites.id,
       name: sites.name,
+      metadata: sites.metadata,
       organizationName: organizations.name,
       status: sitePublications.status,
       publishedAt: sitePublications.publishedAt,
@@ -41,10 +43,15 @@ export async function readPublishedSiteCatalog(slug: string) {
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
     const publicOfferings = offerings.map(toPublicSiteEnrichment);
     const localContent = locallyPublished?.content ?? null;
+    // Same publication-locked, independently approved fragments used by
+    // the authorized private editor; no draft services or invented weekday defaults.
+    const parentExtras = await readApprovedPublicParentExtras(site.id,
+      academicPrograms.map(program => program.programId), site.metadata, tx);
     return {
       parentInformation: projectApprovedParentInformation({
         site: { name: site.name, organizationName: site.organizationName },
         academicPrograms, offerings: publicOfferings, localContent,
+        ...parentExtras,
       }),
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
