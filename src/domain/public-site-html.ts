@@ -81,7 +81,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const parent = page.parentInformation;
   const tuition = Boolean(parent?.tuition.description.canDisplay && parent.tuition.description.value);
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
-  const faq = Boolean(parent?.admissions.description.canDisplay && parent.admissions.description.value);
+  const faq = Boolean(academic || tuition ||
+    (parent?.admissions.description.canDisplay && parent.admissions.description.value));
   const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
     (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
   return ["/", ...(hasStory || hasReviewedPeople ? ["/about"] as const : []),
