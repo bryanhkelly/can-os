@@ -10,6 +10,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
+import { familyInterestNextStep } from "./family-interest-next-step";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -205,6 +206,32 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
             row.applicationLinkExpiresAt.getTime() <= Date.now())),
       applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
       admissionsAuthorized: authorized.get(row.programId) === true,
+      nextStep: familyInterestNextStep({
+        interestStatus: row.status,
+        consented: Boolean(row.consentAt),
+        admissionsAuthorized: authorized.get(row.programId) === true,
+        canInvite: authorized.get(row.programId) === true &&
+          Boolean(row.consentAt) && !row.applicationId &&
+          ["new","contacted"].includes(row.status) &&
+          (!row.familyStartRequestId ||
+            (!row.emailVerifiedAt && !!row.applicationLinkExpiresAt &&
+              row.applicationLinkExpiresAt.getTime() <= Date.now())),
+        hasFamilyStartRequest: Boolean(row.familyStartRequestId),
+        emailVerified: Boolean(row.emailVerifiedAt),
+        hasApplication: Boolean(row.applicationId),
+        latestOfferStatus: row.applicationId
+          ? latestOffers.get(row.applicationId)?.status ?? null : null,
+        activeEnrollment,
+        placedInClass,
+        studentAccessStatus: row.applicationId
+          ? accessByApplication.get(row.applicationId)==="approved" &&
+            !currentGrants.some(grant=>grant.applicationId===row.applicationId &&
+              grant.programId===row.programId && grant.siteId===row.siteId &&
+              grant.studentProfileId===row.studentProfileId)
+              ? "access_unavailable"
+              : accessByApplication.get(row.applicationId)??"not_requested"
+          : null,
+      }),
       };
     }),nextCursor};
   });
