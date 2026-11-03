@@ -4,6 +4,7 @@ import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
+import type {PublicSchoolSiteMedia} from "./school-site-media-public";
 import { createIllustrativeSchoolContent, normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
@@ -19,6 +20,8 @@ export type PublicSitePage = {
   parentInformation?: PublicParentSchoolProfile;
   /** Locally authored church copy, separately versioned and safety screened. */
   localContent?: SiteLocalContent | null;
+  /** Site-scoped, rights-reviewed media, selected automatically by the shared engine. */
+  media?: PublicSchoolSiteMedia;
 };
 
 /** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
@@ -126,6 +129,21 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const image = local?.branding.heroImage;
   const fallbackFamily = canFallbackFamilyForPalette(local?.branding.paletteId);
   const fallbackHero = canFallbackArtwork(fallbackFamily,"hero");
+  const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
+    const candidate=page.media?.[slot];
+    if(!candidate)return null;
+    try{
+      const url=new URL(candidate.src);
+      if(url.protocol!=="https:" || url.host!==host ||
+        !/^\/media\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(url.pathname) ||
+        url.search || url.hash)return null;
+      return candidate;
+    }catch{return null;}
+  };
+  const approvedHero=ownedMedia("hero");
+  const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src ?? fallbackHero.src;
+  const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
+  const heroHasPhoto=Boolean(image||approvedHero);
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "School day",
@@ -248,7 +266,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     foundingFamilies ? "Founding families" :
     availablePaths.includes("/academics") ? "Explore programs" :
     availablePaths.includes("/contact") ? "Contact" : "Home";
-  const hero = `<div id="welcome" class="public-hero has-image${image ? "" : " original-artwork"}${page.site.name.length > 28 ? " long-name" : ""}"><img class="hero-background-image" src="${escapePublicHtml(image?.dataUrl ?? fallbackHero.src)}" alt="${image ? escapePublicHtml(image.altText) : ""}"${image ? "" : ' aria-hidden="true"'} decoding="async"/><p class="tag">${foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${school}</h1>
+  const hero = `<div id="welcome" class="public-hero has-image${heroHasPhoto ? "" : " original-artwork"}${page.site.name.length > 28 ? " long-name" : ""}"><img class="hero-background-image" src="${escapePublicHtml(heroPhotoSrc)}" alt="${escapePublicHtml(heroPhotoAlt)}"${heroHasPhoto ? "" : ' aria-hidden="true"'} decoding="async"/><p class="tag">${foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${school}</h1>
     ${local?.welcomeMessage ? `<p class="hero-subtitle">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
     <p class="intro">${academicCards ? "Explore reviewed educational programs and the local community." :
       "This school site is preparing to share verified program information."}
@@ -462,9 +480,13 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     path === "/admissions" || path === "/faq" ? "reflection" :
     path === "/contact" ? "campus" : "details";
   const interiorArt = canFallbackArtwork(fallbackFamily,interiorSlot);
+  const interiorMediaSlot = interiorSlot==="student-life" ? "studentLife" :
+    interiorSlot==="reflection"||interiorSlot==="details" ? "academics" : interiorSlot;
+  const approvedInterior = ownedMedia(interiorMediaSlot);
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
-    `<div class="public-hero compact-hero has-image original-artwork">
-      <img class="hero-background-image" src="${escapePublicHtml(interiorArt.src)}" alt="" aria-hidden="true" decoding="async"/>
+    `<div class="public-hero compact-hero has-image${approvedInterior?"":" original-artwork"}">
+      <img class="hero-background-image" src="${escapePublicHtml(approvedInterior?.src ?? interiorArt.src)}"
+        alt="${escapePublicHtml(approvedInterior?.altText ?? "")}"${approvedInterior?"":' aria-hidden="true"'} decoding="async"/>
       <p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   // The parent journey uses only pages backed by approved public projections.
   // This navigation is shared by all schools and never fabricates availability.
