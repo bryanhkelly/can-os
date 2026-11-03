@@ -68,7 +68,12 @@ export function isCurrentVerifiedJurisdictionProfileVersion(
   const today = isoDay(now);
   if (!today || version.status !== "published" ||
     version.verificationStatus !== "verified" || !version.verifiedByPersonId ||
-    !version.publishedAt || !version.effectiveAt || !version.nextReviewAt)
+    !version.publishedAt || !version.effectiveAt || !version.nextReviewAt ||
+    !Array.isArray(version.evidence) || version.evidence.length === 0 ||
+    !version.evidence.every(source =>
+      source !== null && typeof source === "object" &&
+      typeof (source as {url?:unknown}).url === "string" &&
+      (source as {url:string}).url.startsWith("https://")))
     return false;
   const published = isoDay(version.publishedAt);
   const effective = isoDay(version.effectiveAt);
