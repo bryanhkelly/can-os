@@ -17,6 +17,7 @@ import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-di
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
+import { hasEnteredSiteAddress } from "@/domain/site-setup-configuration";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -103,7 +104,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   }
   async function addSite(){
     if(!hostOrganizationId)return;
-    const hasAddress=Object.entries(newSiteAddress).some(([key,value])=>key!=="country"&&value.trim().length>0);
+    const hasAddress=hasEnteredSiteAddress(newSiteAddress);
     if(hasAddress && (!newSiteAddress.street1.trim()||!newSiteAddress.city.trim()||!newSiteAddress.state.trim()||!newSiteAddress.postalCode.trim())) {
       setError("Complete street, city, state and postal code, or leave the location address blank for later.");
       return;
