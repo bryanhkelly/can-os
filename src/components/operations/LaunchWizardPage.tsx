@@ -13,6 +13,7 @@ import type { listFamilyInvitations } from "@/modules/enrollment/family-invitati
 import type { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admissions-counts.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import {resolveLaunchResume} from "@/domain/launch-resume";
+import {buildLaunchGuidance, launchResponsibility} from "@/domain/launch-guidance";
 import {launchSiteSelectionIssue} from "@/domain/launch-site-selection";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
@@ -304,27 +305,42 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const currentProgram=currentSchool??currentLaunch;
   const schoolSelection={siteId:selection.siteId??currentProgram?.siteId??undefined,programId:selection.programId??currentProgram?.id};
   const hasSchoolPreparation=schools.length>0||launches.launches.length>0;
+  // All school-readiness recommendations derive from persisted Journey evidence.
+  // Never promote Site publication, invitations, or Program status to opening authority.
+  const readiness = currentLaunch ? buildLaunchGuidance(currentLaunch) : null;
+  const nextTask = readiness?.nextTask ?? null;
+  const awaitingCan = nextTask?.state==="needs_can";
+  const waitingExternal = nextTask?.state==="waiting_third_party";
+  const pendingSchoolAction = nextTask?.state==="needs_you";
+  const blockedTask = nextTask?.state==="blocked";
+  const openingReview = nextTask?.action==="opening";
+  const nextTitle = currentSchool?.status==="active"
+    ? "Continue school operations"
+    : !currentProgram ? "Save your first school Program"
+    : !currentLaunch ? "Review your saved school's preparation"
+    : awaitingCan ? "Waiting for CAN: "+nextTask.title
+    : waitingExternal ? "Waiting for an external requirement: "+nextTask.title
+    : blockedTask ? "Resolve this opening blocker: "+nextTask.title
+    : pendingSchoolAction ? nextTask.title
+    : "Review the current school launch record";
+  const nextDescription = currentSchool?.status==="active"
+    ? "This Program is active. Current onsite opening, staffing, supervision, and custody are checked separately in Operations."
+    : !currentProgram ? "Save the church Site and academic Program once; return to this same school to continue."
+    : !currentLaunch ? "This Program has no available pre-opening Journey here. Review the saved academic and school context; do not infer readiness."
+    : nextTask
+      ? nextTask.description+" Responsible: "+launchResponsibility(nextTask.state)+"."
+      : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
+  const nextHref = currentSchool?.status==="active" ? null
+    : !currentProgram ? "#new-school-launch"
+    : !currentLaunch ? "#launch-website"
+    : "#launch-services";
+
   return (
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
       breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Button asChild variant="outline" size="sm"><Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}}>Connected workflows</Link></Button>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
-        {currentSchool?.status==="active"&&<section aria-label="Transition from launch to operations" className="mt-5 rounded-2xl border border-primary/30 bg-card p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">Launch → Run</p>
-          <h2 className="mt-2 font-serif text-2xl font-semibold">Continue running {currentSchool.name}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Your school Program is active. Use the operations workspace for current work, including staffing and enrollment follow-ups. Keep setup here for website content, invitations and additional preparation. Daily opening authority and physical site readiness are checked separately.</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
-              className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations →</Link>
-          </div>
-        </section>}
-        {currentSchool&&currentSchool.status!=="active"&&<section aria-label="Launch progress and next workspace" className="mt-5 rounded-2xl border bg-card p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">Launch · Preparing</p>
-          <h2 className="mt-2 font-serif text-xl font-semibold">Continue setting up {currentSchool.name}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Use the steps below for academics, family outreach, website and opening evidence. Finishing these steps does not independently authorize receiving students. Operations is available for separately permitted work without ending setup.</p>
-          <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">View operations and pending actions →</Link>
-        </section>}
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
@@ -349,24 +365,35 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           Retry launch refresh
         </Button>}
         <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next step</p>
-          <h2 className="mt-2 font-serif text-2xl font-semibold">{currentSchool?.status==="active"
-            ? "Continue operating your school"
-            : currentProgram ? "Prepare your school's public website"
-            : "Save your first school Program"}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{currentSchool?.status==="active"
-            ? "Your Program is active. Daily staffing, opening and student custody still have their own authorization checks."
-            : currentProgram
-              ? "Your school context is saved. Review its approved content and family-facing website while academic and legal readiness continue independently."
-              : "Start with the church and physical Site, then save the academic Program once. Return here to complete website, family outreach and opening requirements."}</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
+          <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p>
+          {currentLaunch && readiness && <p className="mt-3 text-sm">
+            <strong>{readiness.pendingBlocking.length} opening blockers</strong> · {readiness.pending.length} incomplete Journey requirements
+            {readiness.ready ? " · Journey ready for independent activation checks" : " · Opening is not authorized by this checklist"}
+          </p>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {currentSchool?.status==="active"
-              ? <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}} className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
-              : <a href={currentProgram?"#launch-website":"#new-school-launch"} className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{currentProgram?"Review and prepare website":"Set up school and Program"}</a>}
-            {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<a href="#invite-families" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Prepare family outreach</a>}
-            {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<a href="#launch-services" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Review opening requirements</a>}
+              ? <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
+              : currentLaunch && pendingSchoolAction && !openingReview && nextTask?.action==="admissions"
+                ? <Link to="/admissions/intake" search={{siteId:currentLaunch.siteId??undefined,programId:currentLaunch.id}}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review authorized family intake</Link>
+              : currentLaunch && pendingSchoolAction && !openingReview && nextTask?.action==="academics"
+                ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
+                    search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Continue academic preparation</Link>
+              : <a href={nextHref??"#launch-services"}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+                  {!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
+                </a>}
+            {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#launch-website" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Prepare website in parallel</a>}
+            {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#invite-families" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Family outreach</a>}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">Configured, approved, published, reachable and authorized to operate are distinct states. No action on this page bypasses the owning service.</p>
+          {(awaitingCan || waitingExternal) && <p className="mt-3 text-xs text-muted-foreground">
+            This requirement is not a school-owned approval. Continue permitted preparation while the responsible reviewer or external party acts.
+          </p>}
+          <p className="mt-3 text-xs text-muted-foreground">This guidance reflects saved Journey requirements, not a live authorization decision. The server separately checks whether the school may open.</p>
         </section>
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
         <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
