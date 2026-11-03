@@ -41,12 +41,14 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const tuition = Boolean(parent?.tuition.description.canDisplay && parent.tuition.description.value);
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
   const faq = Boolean(parent?.admissions.description.canDisplay && parent.admissions.description.value);
+  const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
+    (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
   return ["/", ...(hasStory ? ["/about"] as const : []),
     ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
     ...(page.offerings.length ? ["/student-life"] as const : []),
     ...(tuition ? ["/tuition"] as const : []),
     ...(services ? ["/families"] as const : []),
-    ...(faq ? ["/faq"] as const : []), "/contact"];
+    ...(faq ? ["/faq"] as const : []), ...(contact ? ["/contact"] as const : [])];
 }
 
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
@@ -191,15 +193,21 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     </article>`;
   }).join("\n");
   const hasOpenApplications = (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
+  const foundingFamilies = !hasOpenApplications && (page.academicPrograms ?? []).some(program =>
+    program.availability === "planned");
   const navigationCtaPath = availablePaths.includes("/admissions") && hasOpenApplications ? "/admissions" :
-    availablePaths.includes("/academics") ? "/academics" : "/contact";
+    availablePaths.includes("/academics") ? "/academics" :
+    availablePaths.includes("/contact") ? "/contact" : "/";
   const navigationCtaLabel = hasOpenApplications ? "Applications" :
-    availablePaths.includes("/academics") ? "Explore programs" : "Contact";
-  const hero = `<div id="welcome" class="public-hero${image ? " has-image" : ""}${page.site.name.length > 28 ? " long-name" : ""}">${image ? `<img class="hero-background-image" src="${escapePublicHtml(image.dataUrl)}" alt="${escapePublicHtml(image.altText)}" decoding="async"/>` : ""}<p class="tag">Welcome to our school</p><h1>${school}</h1>
+    foundingFamilies ? "Founding families" :
+    availablePaths.includes("/academics") ? "Explore programs" :
+    availablePaths.includes("/contact") ? "Contact" : "Home";
+  const hero = `<div id="welcome" class="public-hero${image ? " has-image" : ""}${page.site.name.length > 28 ? " long-name" : ""}">${image ? `<img class="hero-background-image" src="${escapePublicHtml(image.dataUrl)}" alt="${escapePublicHtml(image.altText)}" decoding="async"/>` : ""}<p class="tag">${foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${school}</h1>
     ${local?.welcomeMessage ? `<p class="hero-subtitle">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
     <p class="intro">${academicCards ? "Explore reviewed educational programs and the local community." :
       "This school site is preparing to share verified program information."}
     ${hasOpenApplications ? "Applications are available for eligible approved programs, subject to verification." :
+      foundingFamilies ? "We are gathering interest from founding families. A request for information is not an application or an enrollment offer." :
       academicCards ? "Inquire about published programs; applications are not currently open through this website." :
       "Check back for published educational opportunities."}</p>
     <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
@@ -346,9 +354,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "Start with an approved program inquiry when available.") + contactSection + academicSection +
       (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : ""),
   };
-  const pageTitle = path === "/" ? `${school} | Programs` :
+  const pageTitle = path === "/" ? `${school} | ${foundingFamilies ? "Founding families" : "Programs"}` :
     `${escapePublicHtml(pageLabels[path])} | ${school}`;
-  const pageDescription = path === "/" ? `Explore programs offered through ${school}.` :
+  const pageDescription = path === "/" ? (foundingFamilies
+    ? `Learn about planned programs at ${school} and request founding-family information. Applications are not open.`
+    : `Explore programs offered through ${school}.`) :
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
   const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
   const canonical = `https://${host}${path}`;
