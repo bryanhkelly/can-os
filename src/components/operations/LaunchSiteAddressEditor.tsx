@@ -4,13 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { LaunchSiteAddressDraft } from "./LaunchHostAndProviderFields";
+import {LaunchSiteAddressFields} from "./LaunchSiteAddressFields";
 
-type AddressField = keyof LaunchSiteAddressDraft;
-const fields: ReadonlyArray<readonly [AddressField,string]> = [
-  ["street1","Street address"],["street2","Suite or building (optional)"],
-  ["city","City"],["state","State or region"],
-  ["postalCode","Postal code"],["country","Country"],["county","County (optional)"],
-];
 
 export function LaunchSiteAddressEditor({
   initial, revision, busy, save
@@ -21,6 +16,7 @@ export function LaunchSiteAddressEditor({
   save:(address:LaunchSiteAddressDraft,revision:string,reason:string)=>Promise<void>;
 }){
   const savedStatus=readSitePhysicalAddress(initial).status;
+  const savedDraft=siteAddressEditorDraft(initial);
   const [address,setAddress]=useState<LaunchSiteAddressDraft>(()=>siteAddressEditorDraft(initial));
   const [reason,setReason]=useState("");
   const [editing,setEditing]=useState(false);
@@ -36,7 +32,7 @@ export function LaunchSiteAddressEditor({
       </Button>
     </div>
     {!editing && <p className="mt-2 text-xs text-muted-foreground">
-      {initial?.street1 ? [initial.street1,initial.city,initial.state,initial.postalCode].filter(Boolean).join(", ") :
+      {savedDraft.street1 ? [savedDraft.street1,savedDraft.city,savedDraft.state,savedDraft.postalCode,savedDraft.country].filter(Boolean).join(", ") :
         "Address not configured. Add the physical location for accurate setup guidance."}
     </p>}
     {(savedStatus==="legacy_needs_review"||savedStatus==="invalid_needs_correction")&&
@@ -45,11 +41,7 @@ export function LaunchSiteAddressEditor({
       </p>}
     {editing && <div className="mt-3 space-y-3">
       <p className="text-xs text-muted-foreground">This location is church-provided, not independently verified. Changing an operating or published school's location requires a CAN-coordinated amendment; direct edits are blocked.</p>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {fields.map(([key,label])=><Field key={key} label={label}>
-          <Input value={address[key]} onChange={e=>setAddress({...address,[key]:e.target.value})}/>
-        </Field>)}
-      </div>
+      <LaunchSiteAddressFields address={address} onChange={setAddress}/>
       <Field label="Reason for changing this location" required>
         <Input value={reason} onChange={e=>setReason(e.target.value)}
           placeholder="E.g., corrected street address"/>
