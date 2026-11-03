@@ -67,7 +67,7 @@ function withRouter(content: ReactNode) {
 export const BlockingRequirements: Story = {
   render: () => withRouter(
     <LaunchPortfolio launches={launches} sites={[
-      { id: "synthetic-site", name: "Synthetic Site", organizationId: "synthetic-organization", slug: "synthetic-site", timezone: "America/Los_Angeles" },
+      { id: "synthetic-site", name: "Synthetic Site", organizationId: "synthetic-organization", slug: "synthetic-site", timezone: "America/Los_Angeles", address: null },
     ]}/>,
   ),
   play: async ({ canvasElement }) => {
