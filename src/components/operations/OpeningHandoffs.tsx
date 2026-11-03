@@ -14,7 +14,7 @@ import { acknowledgeLaunchHandoff,transferLaunchHandoff } from "@/modules/progra
 type Handoff = Awaited<ReturnType<typeof getSiteToday>>["openingHandoffs"][number];
 
 export function OpeningHandoffs({ handoffs }: { handoffs: Handoff[] }) {
-  return <section className="mt-7 rounded-xl border bg-card p-5">
+  return <section id="opening-handoffs" className="mt-7 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Opening handoff</h2>
     <p className="mt-2 text-sm text-muted-foreground">Opening and receipt are separate facts.
       Acknowledgment confirms the named operator received the handoff; it is not regulatory approval or a guarantee of ongoing readiness.</p>
