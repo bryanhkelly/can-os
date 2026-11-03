@@ -3,7 +3,7 @@ import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
-import { normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
+import { createIllustrativeSchoolContent, normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
@@ -19,6 +19,12 @@ export type PublicSitePage = {
   /** Locally authored church copy, separately versioned and safety screened. */
   localContent?: SiteLocalContent | null;
 };
+
+/** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
+export function withIllustrativeLocalPreview(page: PublicSitePage): PublicSitePage {
+  return page.demonstration && !page.localContent
+    ? {...page, localContent: createIllustrativeSchoolContent(page.site.name)} : page;
+}
 
 /** A published synthetic school is a demonstration, never an indexed institution. */
 export function isIndexablePublicSite(page: PublicSitePage): boolean {
@@ -65,9 +71,9 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
   return ["/", ...(hasStory ? ["/about"] as const : []),
     ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
-    ...(page.offerings.length ? ["/student-life"] as const : []),
+    ...(page.offerings.length || (page.demonstration && hasStory) ? ["/student-life"] as const : []),
     ...(tuition ? ["/tuition"] as const : []),
-    ...(services ? ["/families"] as const : []),
+    ...(services || (page.demonstration && hasStory) ? ["/families"] as const : []),
     ...(faq ? ["/faq"] as const : []), ...(contact ? ["/contact"] as const : [])];
 }
 
@@ -237,9 +243,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ${!availablePaths.includes("/academics") && availablePaths.includes("/contact") ? `<a class="hero-text-link" href="/contact">School information →</a>` : ""}</div><div class="hero-art" aria-hidden="true"><span class="art-ring"></span><span class="art-line"></span><span class="art-dot"></span></div></div>`;
   const academicSection = academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
     <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : "";
+  const illustrativeExperiences = demo && !page.offerings.length && local ? `<div class="demo-experience-grid">
+    <article><p class="tag">Illustrative STEM studio</p><h3>Robotics &amp; Design Lab</h3><p>Imagine students prototyping ideas, testing designs, and presenting what they discover.</p></article>
+    <article><p class="tag">Illustrative arts experience</p><h3>The Creative Collective</h3><p>A sample space for writing, visual expression, collaboration and performance.</p></article>
+    <article><p class="tag">Illustrative community project</p><h3>Neighborhood Impact</h3><p>Explore the possibility of student-led projects connecting learning and service.</p></article>
+  </div><p class="availability">Fictional examples only. No activities, schedules, fees, or registrations are being offered.</p>` : "";
   const enrichmentSection = `<section aria-labelledby="programs-title" class="editorial-section">
     <h2 id="programs-title">Enrichment and student experiences</h2>
-    ${cards ? `<div class="grid">${cards}</div>` : academicCards
+    ${cards ? `<div class="grid">${cards}</div>` : illustrativeExperiences ? illustrativeExperiences : academicCards
       ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
       : '<p class="empty">There are no programs to display at this time.</p>'}</section>`;
   const parentContact = page.parentInformation?.site.contact;
@@ -388,7 +399,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <span class="explore-arrow" aria-hidden="true">→</span></a>`).join("")}</div></section>`
     : "";
   const pageContent: Record<PublicSitePath, string> = {
-    "/": hero + (local?.schoolVision ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Learning with purpose. Growing together.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "") + exploreSection + (local?.schoolVision || local?.localDescription ? `<section class="mission-split editorial-section" aria-labelledby="mission-title"><div><p class="tag">Rooted in this community</p><h2 id="mission-title">An education with a sense of place</h2></div><p>${escapePublicHtml(local.schoolVision || local.localDescription)}</p></section>` : "") + academicSection + (page.offerings.length ? enrichmentSection : (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) + localSection + (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p><h2>Discover the right learning path</h2><p>Explore published programs and request details before making an enrollment decision.</p><a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") + contactSection,
+    "/": hero + (local?.schoolVision ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Learning with purpose. Growing together.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "") + exploreSection + (local?.schoolVision || local?.localDescription ? `<section class="mission-split editorial-section" aria-labelledby="mission-title"><div><p class="tag">Rooted in this community</p><h2 id="mission-title">An education with a sense of place</h2></div><p>${escapePublicHtml(local.schoolVision || local.localDescription)}</p></section>` : "") + academicSection + (page.offerings.length || (demo && local) ? enrichmentSection : (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) + localSection + (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p><h2>Discover the right learning path</h2><p>Explore published programs and request details before making an enrollment decision.</p><a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") + contactSection,
     "/about": secondaryHero("Our community", "A school rooted in community",
       "Learn about the church and local people behind this school.") + localSection,
     "/academics": secondaryHero("Learning", "Academic programs",
@@ -406,7 +417,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "Only officially approved tuition information appears here.") + tuitionSection,
     "/families": secondaryHero("Supporting families", "Family services",
       "Services shown here have been reviewed for public description.") +
-      `<section aria-label="Verified family services" class="grid">${serviceCards}</section>`,
+      (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
+        demo ? `<section class="mission-split editorial-section"><div><p class="tag">Illustrative family experience</p><h2>Known by name. Connected by purpose.</h2></div><p>The Valor reference experience imagines meaningful communication, shared exhibitions and a connected school community. Actual services require separate configuration and approval.</p></section>` : ""),
     "/faq": secondaryHero("Common questions", "Questions about joining",
       "Verified guidance from the school.") +
       `<section class="church-section" aria-labelledby="faq-admissions"><h2 id="faq-admissions">How does admissions work?</h2>
@@ -489,7 +501,8 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .inquiry-form h4{font-size:1.1rem;line-height:1.3;margin:0}
 @media(prefers-reduced-motion:reduce){.inquiry-form button{transition:none}}
  .demo-banner{padding:9px 22px;background:#162e39;color:#f9f5ed;text-align:center;font-size:.78rem;line-height:1.5;letter-spacing:.01em}.demo-banner strong{font-weight:700}.vision-feature{display:grid;grid-template-columns:minmax(90px, .3fr) minmax(0,1fr);gap:clamp(20px,5vw,80px);background:var(--site-ink);color:#fff;padding:clamp(28px,5vw,72px);border-radius:5px;margin:clamp(24px,5vw,64px) 0}.vision-feature h2{max-width:800px;font-size:clamp(2.1rem,4.5vw,4.3rem);line-height:1.13;letter-spacing:-.045em}.vision-feature p:not(.tag){color:#e3e6e0;max-width:800px;font-size:1.1rem;line-height:1.8}.vision-feature .tag{color:#e8c996}.vision-number{font-family:var(--site-display);font-size:clamp(4rem,11vw,10rem);line-height:1;color:#d5ac69}.hero-art{pointer-events:none;position:absolute;right:-3%;bottom:-24%;width:min(52%,580px);aspect-ratio:1;border:1px solid rgba(255,255,255,.32);border-radius:50%;opacity:.55;z-index:-1}.hero-art .art-ring{position:absolute;inset:15%;border:1px solid rgba(255,255,255,.45);border-radius:50%}.hero-art .art-line{position:absolute;top:6%;left:45%;width:1px;height:90%;background:rgba(255,255,255,.35);transform:rotate(34deg)}.hero-art .art-dot{position:absolute;top:18%;left:12%;height:12px;width:12px;border-radius:50%;background:#f2d19b}.public-hero.has-image .hero-art{display:none}@media(max-width:700px){.vision-feature{grid-template-columns:1fr}.vision-number{font-size:4rem}.hero-art{width:75%;right:-30%;bottom:-18%;opacity:.3}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
-.bot-field{display:none}
+.demo-experience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(18px,3vw,42px);margin:36px 0 20px}.demo-experience-grid article{min-width:0;border-top:2px solid var(--site-ink);padding-top:24px}.demo-experience-grid h3{font-family:var(--site-display);font-size:clamp(1.6rem,2.4vw,2.35rem);line-height:1.18;letter-spacing:-.035em;font-weight:500}.demo-experience-grid p:last-child{color:var(--site-muted);line-height:1.7}@media(max-width:760px){.demo-experience-grid{grid-template-columns:1fr}.demo-experience-grid article{padding-top:18px}}
+ .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
 </style>
 </head>
