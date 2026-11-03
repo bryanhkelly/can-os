@@ -1,3 +1,4 @@
+import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId } from "@/domain/site-theme";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
@@ -224,6 +225,42 @@ function LocalWebsiteCopyEditor({
             <option value="light">Simple light</option>
           </select>
         </label>
+        <div className="rounded-xl border p-4">
+          <p className="font-medium">Choose your school's visual identity</p>
+          <p className="mt-1 text-xs text-muted-foreground">CAN Signature gives you a complete editorial design.
+            Inspired by your church uses approved palette and typography choices; automatic source discovery
+            is not available until the separate church-reference integration is connected.</p>
+          <div role="group" aria-label="School color palettes" className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+            {sitePaletteIds.map(id => {
+              const palette = resolveSiteTheme(id,content.branding.typographyId);
+              return <button type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
+                onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
+                className="min-h-14 rounded-lg border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
+                <span aria-hidden="true" className="mb-2 flex h-5 overflow-hidden rounded">
+                  <span className="flex-1" style={{backgroundColor:palette.ink}}/>
+                  <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
+                  <span className="flex-1" style={{backgroundColor:palette.accent}}/>
+                  <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
+                </span>{id === "signature" ? "CAN Signature" : id}
+              </button>;
+            })}
+          </div>
+          <label className="mt-4 block text-sm">
+            <span className="font-medium">Approved typography pairing</span>
+            <select value={content.branding.typographyId ?? "editorial"}
+              onChange={event=>setContent(old=>({...old,branding:{...old.branding,
+                typographyId:event.target.value as SiteTypographyId}}))}
+              className="mt-2 min-h-11 w-full rounded-lg border bg-background px-3">
+              {siteTypographyIds.map(id=><option key={id} value={id}>
+                {id === "editorial" ? "Editorial serif + modern sans" :
+                  id === "traditional" ? "Heritage serif + clean sans" : "Contemporary humanist sans"}
+              </option>)}
+            </select>
+          </label>
+          <p className="mt-3 text-xs text-muted-foreground">All choices use a maintained, contrast-checked palette
+            and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
+            no logo, third-party font, photograph or CSS is copied automatically.</p>
+        </div>
         <label className="block text-sm">
           <span className="font-medium">Church or community artwork (optional)</span>
           <span className="mt-1 block text-xs text-muted-foreground">
