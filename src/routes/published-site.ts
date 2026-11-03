@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
 import { publicSiteDomain } from "@/domain/public-site-address";
-import { isIndexablePublicSite, renderPublicSiteHtml } from "@/domain/public-site-html";
+import { isIndexablePublicSite, renderPublicSiteHtml, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 
 const headers = {
   "Content-Type": "text/html; charset=utf-8",
@@ -40,8 +40,9 @@ export const Route = createFileRoute("/published-site")({
             status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
           });
           const localPreview = new URL(request.url).searchParams.has("site");
+          const presentation = localPreview ? withIllustrativeLocalPreview(catalog) : catalog;
           const indexable = !localPreview && isIndexablePublicSite(catalog);
-          return new Response(renderPublicSiteHtml(catalog, {
+          return new Response(renderPublicSiteHtml(presentation, {
             makeRequestId: () => crypto.randomUUID(), localPreview,
             localPreviewSlug: localPreview ? slug : undefined,
           }), { status: 200, headers: indexable
