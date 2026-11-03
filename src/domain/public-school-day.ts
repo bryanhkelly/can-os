@@ -45,9 +45,10 @@ export function projectPublicSchoolDay(
     days: unconfiguredClaim("calendar"), startTime: unconfiguredClaim("calendar"),
     endTime: unconfiguredClaim("calendar"), mode: unconfiguredClaim("calendar"),
   });
-  const day = new Intl.DateTimeFormat("en-CA", {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(now);
+  }).formatToParts(now).map(part => [part.type, part.value]));
+  const day = `${parts.year}-${parts.month}-${parts.day}`;
   const eligible = schedules.filter(schedule =>
     schedule.schoolYearStatus === "active" && schedule.templateActive &&
     schedule.programMatches && schedule.siteMatches && schedule.timezoneMatches &&
@@ -77,8 +78,19 @@ export function projectPublicSchoolDay(
   if (!instructional.length || instructional.length !==
     schedule.periods.filter(p => p.type === "instruction").length) return pending();
   const days = [...new Set(instructional.map(p => p.dayOfWeek))].sort((a,b) => a-b);
-  const start = instructional.map(p => p.startsAtLocal).sort()[0]!.slice(0,5);
-  const end = instructional.map(p => p.endsAtLocal).sort().at(-1)!.slice(0,5);
+  const dailyRanges = days.map(dayOfWeek => {
+    const daily = instructional.filter(p => p.dayOfWeek === dayOfWeek);
+    return {
+      start:daily.map(p => p.startsAtLocal).sort()[0]!.slice(0,5),
+      end:daily.map(p => p.endsAtLocal).sort().at(-1)!.slice(0,5),
+    };
+  });
+  // The existing shared parent DTO has one start/end pair. If days vary,
+  // withhold the pair rather than claiming a school-wide uniform timetable.
+  if (dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
+    range.end !== dailyRanges[0]!.end)) return pending();
+  const start = dailyRanges[0]!.start;
+  const end = dailyRanges[0]!.end;
   const revision = schedule.approval!.revision;
   return {
     state: "approved", timezone, days: verifiedPublicClaim(days, "calendar", revision),
