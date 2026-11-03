@@ -82,7 +82,7 @@ describe("church website robots boundaries", () => {
     expect(robotsAllows(robots, "/about")).toBe(true);
   });
   it("never mistakes a different named bot for CANOS and bypasses wildcard denial", () => {
-    const robots = "User-agent: *\\nDisallow: /\\nUser-agent: CANOS-OtherBot\\nAllow: /\\n";
+    const robots = "User-agent: *\nDisallow: /\nUser-agent: CANOS-OtherBot\nAllow: /\n";
     expect(robotsAllows(robots, "/about")).toBe(false);
   });
   it("honors end anchors", () => {
