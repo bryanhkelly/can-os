@@ -95,3 +95,50 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         reviewRequested:attached.length>0};
     });
   });
+
+/**
+ * Registrar-only canonical configuration reader.
+ * Explicitly not an approved public-school DTO: A/B must use their approved projections.
+ */
+export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
+  .validator((v:unknown)=>z.object({siteId:z.string().uuid()}).strict().parse(v))
+  .handler(async ({data})=>{
+    const actor=await getCommandContext(getRequest());
+    assertCapability(actor,"program.read");
+    if(!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
+      throw new AuthorizationError("verified school configuration reader");
+    const [site]=await db.select({
+      id:sites.id,organizationId:sites.organizationId,name:sites.name,
+      slug:sites.slug,address:sites.address,timezone:sites.timezone,
+      updatedAt:sites.updatedAt,
+    }).from(sites).where(eq(sites.id,data.siteId)).limit(1);
+    if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
+      (actor.grantSiteId!==null && actor.grantSiteId!==site.id) ||
+      (actor.scope.siteIds?.length && !actor.scope.siteIds.includes(site.id)))
+      throw new AuthorizationError("Site configuration read scope");
+    const attached=await db.select({
+      id:programs.id,name:programs.name,type:programs.type,
+      status:programs.status,jurisdictionId:programs.jurisdictionId,
+      gradeRange:programs.gradeRange,deliveryModel:programs.deliveryModel,
+      academicProviderOrganizationId:programs.academicProviderOrganizationId,
+      creditIssuingOrganizationId:programs.creditIssuingOrganizationId,
+    }).from(programs).where(eq(programs.siteId,site.id));
+    const [publication]=await db.select({status:sitePublications.status})
+      .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
+    const {address,...identity}=site;
+    return {
+      ...identity,revision:site.updatedAt.toISOString(),
+      updatedAt:site.updatedAt.toISOString(),
+      physicalLocation:{value:address??null,source:"church_site_record" as const,
+        reviewStatus:"unverified" as const,publicClaimApproved:false},
+      programs:attached.map(program=>({
+        ...program,
+        academicProviderApprovalStatus:"not_asserted" as const,
+        jurisdictionApprovalStatus:"not_asserted" as const,
+      })),
+      publication:{status:publication?.status??"unconfigured",
+        publicReachability:"not_asserted" as const},
+      contact:{status:"unconfigured" as const},
+      calendar:{status:"read_from_academic_program_calendar" as const},
+    };
+  });
