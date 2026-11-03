@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertChurchProposalSourceIdentity,
   initialChurchReferenceState,
   churchSuggestionTargetFields,
   normalizeChurchReferenceUrl,
@@ -52,5 +53,32 @@ describe("church reference URLs", () => {
     expect(initialChurchReferenceState("facebook")).toBe("unsupported");
     expect(initialChurchReferenceState("tiktok")).toBe("unsupported");
     expect(initialChurchReferenceState("website")).toBe("saved");
+  });
+});
+
+describe("private proposal source identity", () => {
+  it("permits church pages on the same origin when source has not changed", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", "https://church.org/about", "https://church.org/",
+    )).not.toThrow();
+  });
+  it("rejects different-origin proposal pages even without a historical source snapshot", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", "https://impostor.church.org/about",
+    )).toThrow(/source changed|invalid/);
+  });
+  it("rejects a source root changed within the same origin", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/new-campus", "https://church.org/about",
+      "https://church.org/old-campus",
+    )).toThrow(/source changed|invalid/);
+  });
+  it("rejects missing or malformed proposal pages rather than accepting unsourced copy", () => {
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", null,
+    )).toThrow(/source changed|invalid/);
+    expect(() => assertChurchProposalSourceIdentity(
+      "https://church.org/", "http://church.org/about",
+    )).toThrow(/source changed|invalid/);
   });
 });
