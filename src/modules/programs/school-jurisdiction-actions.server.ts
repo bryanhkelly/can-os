@@ -23,6 +23,12 @@ export async function ensureSchoolJurisdictionReviewAction(
     throw new AuthorizationError("verified registrar");
   assertCapability(actor,"program.launch.start");
   return db.transaction(async tx=>{
+    const [target]=await tx.select({siteId:programs.siteId}).from(programs)
+      .where(eq(programs.id,programId)).limit(1);
+    if(!target?.siteId)throw new AuthorizationError("canonical school Site");
+    const [lockedSite]=await tx.select({id:sites.id}).from(sites)
+      .where(eq(sites.id,target.siteId)).for("update").limit(1);
+    if(!lockedSite)throw new AuthorizationError("canonical school Site");
     const [program]=await tx.select({
       id:programs.id,siteId:programs.siteId,
       organizationId:programs.organizationId,
@@ -54,6 +60,8 @@ export async function ensureSchoolJurisdictionReviewAction(
           status:"open",resolvedAt:null,resolutionNote:null,
           metadata:{...existing.metadata,
             profileRevision:review.revision,reviewState:"legal_review_requested",
+            requesterPersonId:actor.actorPersonId,
+            requestReceivedAt:new Date().toISOString(),
             locationReviewReason:review.locationReviewReason ?? null,
             scopeFingerprint:review.scopeFingerprint,
             pendingRequirementIds:review.decisions.filter(item=>
