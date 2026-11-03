@@ -59,7 +59,8 @@ export async function readSchoolJurisdictionEvidenceForCAN(
   return {
     actionId:action.id,programId:action.programId,
     status:action.status,
-    responsibleParty:action.metadata.responsibleParty,
+    responsibleParty:typeof action.metadata.responsibleParty==="string"
+      ? action.metadata.responsibleParty : null,
     scopeCurrent:Boolean(scopeCurrent),
     canIndependentlyVerify:Boolean(scopeCurrent && doc &&
       doc.uploadedByPersonId!==actor.actorPersonId &&
