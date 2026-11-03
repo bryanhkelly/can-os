@@ -117,6 +117,11 @@ export async function reviewSiteMediaFolder(
     )).for("update");
     if(entries.length!==input.documentIds.length)
       throw new AuthorizationError("All reviewed images must belong to this Site");
+    // Revoked assets cannot be resurrected by replaying a prior folder review.
+    // A new verified upload produces a new immutable object and explicit review.
+    if(entries.some(entry=>entry.metadata.rightsStatus==="revoked" ||
+      entry.metadata.mediaReviewStatus==="rejected"))
+      throw new AuthorizationError("Previously revoked media must be uploaded as a new reviewed revision");
     const approved=entries.filter(entry=>entry.metadata.mediaReviewStatus!=="approved");
     if(approved.some(entry=>entry.storageProvider!=="cloudflare_r2" ||
       entry.metadata.storageVerified!==true ||
