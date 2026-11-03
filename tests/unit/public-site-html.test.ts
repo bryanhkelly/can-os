@@ -167,7 +167,7 @@ describe("standalone public site HTML", () => {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
     });
     for (const shared of [
-      "<!doctype html>", "<title>Fellowship Academy | Founding families</title>",
+      "<!doctype html>", "<title>Fellowship Academy | Programs</title>",
       "Fellowship Church", "Hybrid Grade 9", "Approved school program information.",
       "Program planned", "fellowship-academy.can-os.com",
     ]) {
