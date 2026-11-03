@@ -130,6 +130,9 @@ export function projectPublicSchoolDay(
     /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(p.endsAtLocal) &&
     p.startsAtLocal < p.endsAtLocal &&
     ["instruction", "chapel", "advisory", "break", "lunch"].includes(p.type));
+  // Do not silently drop malformed/unknown periods from a signed timetable:
+  // it could otherwise publish incomplete hours while the source is ambiguous.
+  if(periods.length!==schedule.periods.length)return pending();
   // Only instruction establishes an instructional day. Sunday is valid.
   const instructional = periods.filter(p => p.type === "instruction");
   if (!instructional.length || instructional.length !==
