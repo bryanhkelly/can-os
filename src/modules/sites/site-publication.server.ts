@@ -11,7 +11,7 @@ import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType, isCurrentAcademicMarketingSnapshot } from "@/domain/academic-program-publication";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
@@ -97,9 +97,11 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   const parentExtras = await readApprovedPublicParentExtras(site.id,
     approvedAcademicListings.map(program => program.programId),
     siteConfiguration?.metadata ?? null);
+  const authorizedPrograms=withVerifiedPublicApplications(approvedAcademicListings,
+    parentExtras.admissions);
   const parentInformation = projectApprovedParentInformation({
     site: {name: site.name, organizationName: site.organizationName},
-    academicPrograms: approvedAcademicListings, offerings: publicOfferings,
+    academicPrograms: authorizedPrograms, offerings: publicOfferings,
     localContent: localCopy?.content ?? null, ...parentExtras,
   });
   return {
@@ -145,7 +147,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     previewHtml: address[0] ? renderPublicSiteHtml({
       host: publicSiteHost(address[0].slug),
       site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms: approvedAcademicListings,
+      academicPrograms: authorizedPrograms,
       localContent: localCopy?.content ?? null,
       offerings: publicOfferings,
       parentInformation,
