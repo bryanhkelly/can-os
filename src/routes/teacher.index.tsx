@@ -1,3 +1,5 @@
+import { DailyCanvas } from "@/components/student/DailyCanvas";
+import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
@@ -63,18 +65,10 @@ function TeacherTodayPage() {
   subtitle="Your sections, grading queue, and missing work across your school today."
  >
   <QueryState loading={loading ? "Loading your day…" : ""} error={error}>
-   <section aria-label="Teaching workspace" className="relative mt-3 overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
-    <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-accent opacity-75 blur-3xl" />
-    <div className="relative max-w-2xl">
-     <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><GraduationCap className="size-4" /> Your teaching day</p>
-     <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Make room for great teaching.</h2>
-     <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">Your classes, student work, and follow-ups are ready when you are.</p>
-     <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
-      <Link to="/classes" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><BookOpen className="size-4" /> My classes <ArrowUpRight className="size-4" /></Link>
-      <Link to="/teacher/gradebook" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><ClipboardCheck className="size-4" /> Gradebook</Link>
-     </div>
-    </div>
-   </section>
+   <DailyCanvas audience="teacher" content={resolveEditorialCanvas("teacher", new Date())}
+     primaryAction={<Link to="/classes" className="inline-flex min-h-11 items-center gap-2 border border-white bg-white px-4 py-2 text-sm font-semibold !text-slate-900">My classes <ArrowUpRight className="size-4" /></Link>}
+     secondaryAction={<Link to="/teacher/gradebook" className="inline-flex min-h-11 items-center gap-2 border border-white/70 px-4 py-2 text-sm font-semibold text-white">Gradebook</Link>}
+    />
    {data && !data.connected && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
    {ready && <>
