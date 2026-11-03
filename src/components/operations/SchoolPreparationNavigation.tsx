@@ -1,5 +1,5 @@
 import {Link} from "@tanstack/react-router";
-type School={id:string;name:string;siteId:string;siteName:string;status:string};
+type School={id:string;name:string;siteId:string|null;siteName:string;status:string};
 export function SchoolPreparationNavigation({schools,selected,onSelect}:{
  schools:School[];selected:School|null;onSelect:(school:School)=>void;
 }){
@@ -15,8 +15,8 @@ export function SchoolPreparationNavigation({schools,selected,onSelect}:{
    <p className="font-semibold">{selected.name} · operating workspace available</p>
    <p className="mt-1">This Program is active. Continue its daily operational work in Operations. Website edits, family invitations and school-year planning remain available here. Active Program status alone does not certify today's opening, staffing or supervision.</p>
    <div className="mt-3 flex flex-wrap items-center gap-3">
-    <Link to="/operations" search={{siteId:selected.siteId,programId:selected.id}} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground">Go to school operations →</Link>
-    <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.id}} className="inline-flex min-h-11 items-center text-sm font-semibold underline">Review saved academic year</Link>
+    <Link to="/operations" search={{siteId:selected.siteId??undefined,programId:selected.id}} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground">Go to school operations →</Link>
+    <Link to="/operations/school-years" search={{siteId:selected.siteId??undefined,programId:selected.id}} className="inline-flex min-h-11 items-center text-sm font-semibold underline">Review saved academic year</Link>
    </div>
   </div>}
  </section>;
