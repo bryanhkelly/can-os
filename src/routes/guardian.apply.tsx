@@ -34,6 +34,10 @@ function GuardianApplyWorkspace({ data }: {
   const router = useRouter();
   const { programId: requestedProgramId, familyStart, application: requestedApplicationId } = Route.useSearch();
 
+  const sameProgramApplications = requestedProgramId
+    ? data.applications.filter(app => app.programId === requestedProgramId)
+    : [];
+
   return <WorkspaceShell eyebrow="CAN OS · Family" title="Apply to a school"
     subtitle="Start a real academic application for an eligible CAN school. An application does not automatically approve enrollment or grant access to a child's records."
     actions={<Button asChild variant="outline"><Link to="/guardian">Family home →</Link></Button>}>
@@ -76,6 +80,12 @@ function GuardianApplyWorkspace({ data }: {
         Verified enrollment checklists and offers →
       </Link></Button>
     </WorkspacePanel>
+    {sameProgramApplications.length > 0 && <WorkspaceNotice tone="info">
+      You already have {sameProgramApplications.length === 1 ? "an application" : "applications"}
+      {" "}for this school. Resume the existing student's application above instead of
+      submitting another one. To apply for a different child in your household,
+      complete the new student form below.
+    </WorkspaceNotice>}
     <div className="mt-6">
       <GuardianApplicationForm key={`${requestedProgramId ?? ""}:${familyStart ?? ""}`} programs={data.programs} households={data.households}
         students={data.students} transferRequests={data.transferRequests} requestedProgramId={requestedProgramId} familyStartRequestId={familyStart}
