@@ -49,8 +49,9 @@ export function projectLaunchJurisdictionResearch(
   // No research details go to a school operator without an authoritative source.
   // A verified publication can still provide its summary if it has been approved.
   if (!verifiedGuidance && profile.evidence.length === 0) return null;
+  const safeSources = profile.evidence.filter(source => source.url.startsWith("https://"));
   const sourceFor = (ids: string[]) =>
-    profile.evidence.filter(source => ids.includes(source.url));
+    safeSources.filter(source => ids.includes(source.url));
   return {
     summary: profile.summary,
     reviewStatus: row.status as LaunchJurisdictionResearch["reviewStatus"],
@@ -76,6 +77,6 @@ export function projectLaunchJurisdictionResearch(
       phase: requirement.phase,
       sources: sourceFor(requirement.evidenceIds),
     })),
-    sources: profile.evidence,
+    sources: safeSources,
   };
 }
