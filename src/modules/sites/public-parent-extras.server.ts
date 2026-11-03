@@ -1,4 +1,6 @@
 import { and, eq, isNotNull } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
@@ -29,6 +31,73 @@ type DetailedSchedule = Awaited<ReturnType<typeof readApprovedPublicSchoolDay>> 
 const isDay = (v:number) => Number.isInteger(v) && v >= 0 && v <= 6;
 const isTime = (v:string) => /^([01]\\d|2[0-3]):[0-5]\\d$/.test(v);
 const isDate = (v:string) => /^\\d{4}-\\d{2}-\\d{2}$/.test(v);
+
+/**
+ * I-owned public-identity approval envelope. Canonical details remain in
+ * sites.address and sites.metadata.setupContact, not a second CMS/config.
+ * I must add an authorized reviewer/writer; missing approval fails closed.
+ */
+const identityReviewSchema=z.object({
+  version:z.literal(1),
+  revision:z.number().int().positive(),
+  reviewedByPersonId:z.string().uuid(),
+  reviewedAt:z.string().datetime(),
+  expiresOn:z.string().date().nullable(),
+  addressDigest:z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  contactDigest:z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+}).strict();
+const addressSchema=z.object({
+  street1:z.string().trim().min(2).max(200),
+  street2:z.string().trim().max(200).optional(),
+  city:z.string().trim().min(2).max(120),
+  state:z.string().trim().min(2).max(80),
+  postalCode:z.string().trim().min(3).max(24),
+  country:z.string().trim().min(2).max(80),
+  county:z.string().trim().max(120).optional(),
+}).passthrough();
+const contactSchema=z.object({
+  displayName:z.string().trim().min(2).max(160),
+  email:z.union([z.string().trim().email().max(254),z.literal("")]),
+  phone:z.string().trim().max(40),
+  website:z.union([z.string().trim().url().max(500),z.literal("")]),
+}).passthrough();
+function sourceDigest(siteId:string,category:"address"|"contact",value:unknown) {
+  return createHash("sha256")
+    .update(JSON.stringify([siteId,category,value])).digest("hex");
+}
+function approvedIdentityFacts(siteId:string,address:unknown,
+  metadata:Record<string,unknown>|null,now=new Date()) {
+  const parsed=identityReviewSchema.safeParse(metadata?.publicParentIdentityReview);
+  const result:{
+    publicAddress?:ReturnType<typeof verifiedPublicClaim<string>>;
+    publicContact?:ReturnType<typeof verifiedPublicClaim<string>>;
+  }={};
+  if(!parsed.success || parsed.data.reviewedAt>now.toISOString() ||
+    (parsed.data.expiresOn && parsed.data.expiresOn<now.toISOString().slice(0,10)))
+    return result;
+  const reviewed=parsed.data;
+  const physical=addressSchema.safeParse(address);
+  if(physical.success){
+    const {street1,street2,city,state,postalCode,country,county}=physical.data;
+    const source={street1,street2:street2??"",city,state,postalCode,country,county:county??""};
+    if(reviewed.addressDigest===sourceDigest(siteId,"address",source)){
+      const display=[street1,street2,city+", "+state+" "+postalCode,country]
+        .filter(Boolean).join(", ");
+      result.publicAddress=verifiedPublicClaim(display,"organization_site",reviewed.revision);
+    }
+  }
+  const contact=contactSchema.safeParse(metadata?.setupContact);
+  if(contact.success){
+    const {displayName,email,phone,website}=contact.data;
+    const source={displayName,email,phone,website};
+    const channels=[email,phone,website].filter(Boolean);
+    if(channels.length && reviewed.contactDigest===sourceDigest(siteId,"contact",source)){
+      result.publicContact=verifiedPublicClaim(
+        channels.join(" · "),"organization_site",reviewed.revision);
+    }
+  }
+  return result;
+}
 
 /** The C reader is the authority: exact schedule signature, current academic
  * year, Site/Program scope, reviewer and timezone are validated there.
@@ -109,9 +178,16 @@ function expectedIntakeRejection(error:unknown):boolean {
 export async function readApprovedPublicParentExtras(
   siteId: string,
   academicProgramIds: readonly string[],
-  siteMetadata: Record<string, unknown> | null,
+  _siteMetadata: Record<string, unknown> | null,
   executor: Reader = db,
 ) {
+  // Lock and re-read current source revisions; do not use stale preview metadata.
+  const [record] = await executor.select({
+    address:sites.address,metadata:sites.metadata,
+  }).from(sites).where(eq(sites.id,siteId))
+    .for("share",{of:sites}).limit(1);
+  const metadata=record?.metadata??null;
+  const identity=approvedIdentityFacts(siteId,record?.address??null,metadata);
   const allowed = new Set(academicProgramIds);
   const programs = (await readAcademicProgramCatalog(siteId, executor))
     .filter(program=>allowed.has(program.programId));
@@ -149,7 +225,7 @@ export async function readApprovedPublicParentExtras(
     })),
   };
   if (published) {
-    const demo = siteMetadata?.synthetic === true ||
+    const demo = metadata?.synthetic === true ||
       await isDemoTenantOrganization(published.organizationId,executor);
     const states: NonNullable<PublicAdmissionsState["programs"]> = [];
     for (const program of programs) {
@@ -189,7 +265,8 @@ export async function readApprovedPublicParentExtras(
     programSchedules,
     people,
     admissions,
-    services:projectPublicFamilyServices(siteMetadata),
+    services:projectPublicFamilyServices(metadata),
+    ...identity,
     // S's physical Site address and setupContact are church-supplied drafts.
     // They are NOT public claims until I supplies signed, current independent
     // review records and a canonical publisher; never surface either here.
