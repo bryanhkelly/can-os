@@ -3,7 +3,7 @@
 **Branch:** `main`  
 **Owner:** Workstream B — experience and publishing  
 **Scope:** PX-010–PX-029  
-**Status:** Code handoff ready for integration; release acceptance **not** complete.
+**Status:** Agent B code and focused CI verified; ready for integration. Full product/release acceptance **not** complete.
 
 ## Implemented
 
@@ -26,7 +26,7 @@
 
 ## Verification and evidence
 
-Focused unit coverage has been added/updated for legacy church fields, protected claims, escaping, page availability, metadata, origin routing, method denial and preview form inactivity. The GitHub workflow `PX B school website contract` runs the affected Vitest suite and a production build on main changes. **Check the latest workflow result before treating this handoff as validated.**
+Focused unit coverage has been added/updated for legacy church fields, protected claims, escaping, page availability, metadata, origin routing, method denial and preview form inactivity. The dedicated [PX B school website contract workflow](https://github.com/bryanhkelly/can-os/actions/runs/41661810751) **passed on SHA `ac63eecd43e4a0f44ba3ae120d0ff8525efd33c0`**: six focused test files / 40 tests passed and the client/server Vite production build completed. This validates the source-level B contract at that SHA, not live hosts, external publication, or the full CI pipeline. Re-run after any integration edits.
 
 The existing generic CI had successful build and its three admissions-specific test files passed (50 tests); it subsequently failed `npm run typecheck` with pre-existing concurrent errors in `enrichment-catalog.server.ts` (nullable `endsAt`) and `teacher.index.tsx` (possible undefined). These are **not evidence** that all B tests passed. All failures should be reconciled at latest HEAD.
 
