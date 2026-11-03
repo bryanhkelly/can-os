@@ -62,37 +62,7 @@ function PartnerSiteWebsitePage() {
     </section>
     {data.host && <LocalWebsiteCopyEditor data={data} />}
     <WebsitePreviewPanel data={data} />
-    {/* Preview controls are isolated so hook ordering is stable across loader failures. */}
-    {/*
-    <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
-      <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" />
-        Private website preview
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        The same public-safe template used for the future Site website.
-        Church-owned published copy can update without routine CAN approval;
-        CAN-owned academic listings remain read-only.
-        {data.approvedAcademicCount + data.approvedEnrichmentCount === 0
-          ? " No program marketing listings have been approved yet." : ""}
-      </p>
-      {data.previewHtml ? <>
-        <iframe
-          title={data.siteName + " read-only website preview"}
-          srcDoc={data.previewHtml}
-          sandbox=""
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          className="mt-4 h-[700px] w-full rounded-lg border bg-white"
-        />
-        <p className="mt-2 text-xs text-muted-foreground">
-          Scripts, form submission and same-origin access are disabled.
-          Your Site draft is not a public enrollment or registration page.
-        </p>
-      </> : <p className="mt-4 rounded-lg border p-4 text-sm">
-        Preview becomes available after the canonical Site receives a draft address.
-      </p>}
-    </section>
-    */}
+
   </WorkspaceShell>;
 }
 
