@@ -55,6 +55,42 @@ describe("standalone public site HTML", () => {
     expect(availablePublicSitePaths(original)).not.toContain("/about");
   });
 
+  it("uses the same editorial page composition for two distinct churches, not only Valor", () => {
+    const makePage = (school: string, host: string) => ({
+      host, site: {name: school, organizationName: school + " Church"}, offerings: [],
+      localContent: {
+        welcomeMessage: "A thoughtful welcome to " + school,
+        localDescription: "Community-defined identity for " + school,
+        schoolVision: "Locally approved purpose for " + school,
+        churchHistory: "A genuine church history supplied by the editor.",
+        branding: {theme: "classic" as const, heroImage: null},
+      },
+      academicPrograms: [{programId:"program-a",title:"Elementary learning",
+        typeLabel:"Elementary school",summary:"Published program facts",
+        grades:{min:"K",max:"5"},
+        delivery:{onsite:true,liveOnline:false,asynchronous:true,onsiteDaysPerWeek:2},
+        availability:"planned" as const}],
+    });
+    for (const [name,host] of [["Valor School","valor.can-os.com"],
+      ["Hillside Learning Academy","hillside.can-os.com"]] as const) {
+      const page=makePage(name,host);
+      const home=renderPublicSiteHtml(page);
+      const about=renderPublicSiteHtml(page,{path:"/about"});
+      const academics=renderPublicSiteHtml(page,{path:"/academics"});
+      expect(home).toContain('class="home-story editorial-section"');
+      expect(home).toContain('class="program-overview editorial-section"');
+      expect(home).toContain("Get to know our school");
+      expect(home).toContain("Explore all academic programs");
+      expect(home).toContain("Community-defined identity for " + name);
+      expect(home).not.toContain("A community with a story to tell.");
+      expect(about).toContain("A community with a story to tell.");
+      expect(about).toContain("A genuine church history supplied by the editor.");
+      expect(academics).toContain("Elementary learning");
+      expect(academics).not.toContain("A genuine church history supplied by the editor.");
+      expect(availablePublicSitePaths(page)).toContain("/about");
+    }
+  });
+
   it("offers real public pages only for approved content and keeps draft pages unindexed", () => {
     const page = {
       host: "vineyard.can-os.com",
