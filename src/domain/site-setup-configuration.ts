@@ -22,6 +22,12 @@ export const draftSiteContactSchema = z.object({
   website: z.union([z.string().trim().url().max(500),z.literal("")]),
 }).strict();
 
+/** The selected IANA time zone is authoritative; never derive it from a state or a browser. */
+export const siteTimezoneSchema = z.string().trim().min(3).max(80).refine(zone=>{
+  try { new Intl.DateTimeFormat("en-US",{timeZone:zone}); return true; }
+  catch { return false; }
+},"Choose a valid school time zone");
+
 export type PhysicalSiteAddress = z.infer<typeof physicalSiteAddressSchema>;
 export type DraftSiteContact = z.infer<typeof draftSiteContactSchema>;
 
