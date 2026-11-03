@@ -5,7 +5,7 @@ import type { AccessContext } from "@/domain/access-context";
 import {
   type ChurchSuggestionField, normalizeChurchReferenceUrl, churchSuggestionTargetFields,
 } from "@/domain/church-source-references";
-import { emptySiteLocalContent, siteLocalContentLimits } from "@/domain/site-local-content";
+import { siteLocalContentLimits, type SiteLocalContent, type SiteLocalTextField } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
@@ -14,11 +14,19 @@ import { publishPartnerLocalContent, readLocalContentHistory, readCurrentLocalCo
 import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
 
 /**
- * These are USER-SUBMITTED excerpts, not fetched or AI-generated claims.
- * The source must be an active church website reference; no untrusted URL is fetched.
- * Branding is deliberately excluded from text imports.
+ * User-submitted or boundedly fetched public church excerpts, never verified
+ * institutional claims. Source identity and review are required for publication.
  */
 const suggestionTargetFields = churchSuggestionTargetFields;
+
+/** Only church-owned text reaches the comparison UI; no image payloads or branding. */
+function reviewableChurchText(content?: SiteLocalContent): Partial<Record<SiteLocalTextField, string>> {
+  const result: Partial<Record<SiteLocalTextField, string>> = {};
+  for (const field of Object.values(churchSuggestionTargetFields)) {
+    if (field) result[field] = content?.[field] ?? "";
+  }
+  return result;
+}
 
 /** Latest editor revision and last published church copy are intentionally distinct. */
 export async function readChurchSourceReviewContext(actor: AccessContext) {
@@ -29,8 +37,8 @@ export async function readChurchSourceReviewContext(actor: AccessContext) {
   return {
     revision: history[0]?.revision ?? 0,
     editorStatus: history[0]?.status ?? null,
-    editorContent: history[0]?.content ?? emptySiteLocalContent,
-    publishedContent: published?.content ?? emptySiteLocalContent,
+    editorContent: reviewableChurchText(history[0]?.content),
+    publishedContent: reviewableChurchText(published?.content),
     publishedRevision: published?.revision ?? 0,
   };
 }
@@ -51,8 +59,9 @@ export async function readChurchContentSuggestions(actor: AccessContext) {
     .innerJoin(churchSourceReferences,
       eq(churchSourceReferences.id, churchContentSuggestions.sourceReferenceId))
     .where(and(eq(churchContentSuggestions.siteId, site.id),
-      eq(churchSourceReferences.siteId, site.id), isNull(churchSourceReferences.revokedAt)))
-    .orderBy(desc(churchContentSuggestions.createdAt)).limit(50);
+      eq(churchSourceReferences.siteId, site.id), isNull(churchSourceReferences.revokedAt),
+      eq(churchContentSuggestions.reviewDecision, "pending")))
+    .orderBy(desc(churchContentSuggestions.createdAt)).limit(200);
 }
 
 export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
