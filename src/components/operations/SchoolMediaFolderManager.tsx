@@ -36,8 +36,8 @@ async function prepareSafeMedia(file:File){
  * rights-cleared, categorized assets alongside its built-in fallback artworks.
  * Every file is private until an authorized editor explicitly attests rights.
  */
-export function SchoolMediaFolderManager({siteId,canPublish}:{
-  siteId:string;canPublish:boolean;
+export function SchoolMediaFolderManager({siteId,canPublish,enabled}:{
+  siteId:string;canPublish:boolean;enabled:boolean;
 }){
   const folderRef=useRef<HTMLInputElement>(null);
   const [items,setItems]=useState<MediaItem[]>([]);
@@ -142,10 +142,11 @@ export function SchoolMediaFolderManager({siteId,canPublish}:{
     <label className="mt-4 block text-sm font-semibold">
       Upload a school media folder (including subfolders)
       <input ref={folderRef} type="file" multiple accept="image/jpeg,image/png"
-        disabled={!canPublish||working} onChange={event=>void stageFolder(event)}
+        disabled={!canPublish||!enabled||working} onChange={event=>void stageFolder(event)}
         className="mt-2 block w-full rounded-lg border p-3 text-sm"/>
     </label>
     {!canPublish&&<p className="mt-2 text-sm">Only a verified Site website editor with publishing authority can import or approve photos.</p>}
+    {!enabled&&<p role="status" className="mt-2 text-sm">Photo folder uploads are not enabled for this deployment. CAN original artwork remains available automatically; ask your administrator to configure the private media service.</p>}
     <p className="mt-3 text-sm" role="status">{status||"No images required: built-in CAN artwork automatically fills empty placements."}</p>
     {error&&<p className="mt-2 text-sm text-destructive" role="alert">{error}</p>}
     <div className="mt-4 grid gap-3 sm:grid-cols-3" aria-label="School media import status">
@@ -153,7 +154,7 @@ export function SchoolMediaFolderManager({siteId,canPublish}:{
       <p className="rounded-lg border p-3 text-sm"><strong>{pending.length}</strong> awaiting rights review</p>
       <p className="rounded-lg border p-3 text-sm"><strong>{revoked.length}</strong> revoked</p>
     </div>
-    {pending.length>0&&<fieldset disabled={working||!canPublish} className="mt-5 space-y-3 rounded-xl border p-4">
+    {pending.length>0&&<fieldset disabled={working||!canPublish||!enabled} className="mt-5 space-y-3 rounded-xl border p-4">
       <legend className="px-2 font-semibold">One review for the imported folder</legend>
       <p className="text-sm">This approval covers {Math.min(pending.length,40)} private photos.
         Check that every included image has appropriate usage rights and subject permissions.</p>
