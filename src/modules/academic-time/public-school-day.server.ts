@@ -58,8 +58,9 @@ export async function readApprovedPublicSchoolDay(
       "status" in approval && approval.status === "approved" &&
       "revision" in approval && typeof approval.revision === "number" &&
       "reviewedByPersonId" in approval && typeof approval.reviewedByPersonId === "string" &&
-      "reviewedAt" in approval && typeof approval.reviewedAt === "string"
-      ? approval as {status:"approved";revision:number;reviewedByPersonId:string;reviewedAt:string}
+      "reviewedAt" in approval && typeof approval.reviewedAt === "string" &&
+      "signature" in approval && typeof approval.signature === "string"
+      ? approval as {status:"approved";revision:number;reviewedByPersonId:string;reviewedAt:string;signature:string}
       : null;
     return {
       schoolYearStatus: row.schoolYearStatus, templateActive: row.active,
