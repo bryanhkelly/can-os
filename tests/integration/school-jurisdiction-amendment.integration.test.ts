@@ -140,10 +140,15 @@ integration("school jurisdiction material-change lifecycle (rollback only)",()=>
       const [doc]=await tx.insert(s.documents).values({
         subjectType:"program",subjectId:program.id,category:"jurisdiction_requirement_evidence",
         fileName:"synthetic-filing.pdf",storageProvider:"cloudflare_r2",
-        storageKey:"synthetic/"+id,uploadedByPersonId:registrarPerson!.id,
+        storageKey:"school-jurisdiction/"+program.id+"/"+requirementAction!.id+
+          "/"+crypto.randomUUID(),uploadedByPersonId:registrarPerson!.id,
         verifiedAt:past,verifiedByPersonId:documentVerifier!.id,
         expiresAt:future,
-        metadata:{siteId:site!.id,organizationId:church!.id,storageVerified:true},
+        metadata:{siteId:site!.id,organizationId:church!.id,
+          actionId:requirementAction!.id,
+          requirementId:requirementAction!.metadata.requirementId,
+          policyVersionId:profile!.id,scopeFingerprint:submitted.scopeFingerprint,
+          storageVerified:true,isCurrent:true,reviewStatus:"approved"},
       }).returning();
       expect((await submitSchoolJurisdictionRequirementEvidence(host,{
         actionId:requirementAction!.id,documentId:doc!.id,
