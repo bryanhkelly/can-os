@@ -50,6 +50,15 @@ export function publicSchoolDayScheduleSignature(
     :JSON.stringify(normalized);
 }
 
+/** Reviewer must be authenticated, different from the last person who
+ * saved academic timetable content, and authorized by the owning publisher. */
+export function isIndependentPublicScheduleReviewer(
+  reviewerPersonId:string|null,lastAuthorPersonId:string|null,
+):boolean {
+  return Boolean(reviewerPersonId && lastAuthorPersonId &&
+    reviewerPersonId!==lastAuthorPersonId);
+}
+
 export type ActiveScheduleWindow = {
   schoolYearStatus:string;
   templateActive:boolean;
