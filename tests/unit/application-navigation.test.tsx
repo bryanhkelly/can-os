@@ -228,6 +228,7 @@ describe("application contextual navigation",()=>{
     successful({
       site:{id:"school",name:"Test school",organizationName:"Test organization",timezone:"America/Los_Angeles"},
       localDate:"2030-01-01",asOf:"2030-01-01T12:00:00Z",
+      operatingDecision:{status:"evidence_present",title:"Operating evidence recorded",detail:"School-day decision remains subject to authorization.",href:"/readiness",nextStep:"Review readiness",owner:"Site administrator"},
       enrollment:{count:1,note:"Active"},attendance:{count:1,present:1,absent:0,tardy:0,note:"Recorded"},
       actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
       attentionItems:[{id:"action:task",category:"staffing",title:"Review staffing",detail:"Review the staffing follow-up.",
