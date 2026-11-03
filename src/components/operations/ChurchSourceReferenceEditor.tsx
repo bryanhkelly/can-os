@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
-  churchReferenceKinds, type ChurchReferenceKind,
+  churchReferenceKinds, churchSourcesChangedEvent, type ChurchReferenceKind,
 } from "@/domain/church-source-references";
 import {
   getChurchSourceReferenceView, removeChurchSourceReferenceCommand,
@@ -62,6 +62,7 @@ export function ChurchSourceReferenceEditor() {
       });
       const items = await getChurchSourceReferenceView({ data: {} });
       setReferences(items);
+      window.dispatchEvent(new Event(churchSourcesChangedEvent));
       setMessage(`${labels[kind]} saved as a private reference. No content was imported or published.`);
       void router.invalidate();
     } catch (e) {
@@ -76,6 +77,7 @@ export function ChurchSourceReferenceEditor() {
       await removeChurchSourceReferenceCommand({ data: { kind } });
       setReferences(old => old.filter(item => item.kind !== kind));
       setUrls(old => ({ ...old, [kind]: "" }));
+      window.dispatchEvent(new Event(churchSourcesChangedEvent));
       setMessage(`${labels[kind]} reference removed.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to remove church reference.");
