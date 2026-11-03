@@ -9,7 +9,12 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export type LaunchSiteAddressDraft = {
+  street1: string; street2: string; city: string; state: string;
+  postalCode: string; country: string; county: string;
+};
+
+export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
   jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   jurisdictionResearch: Record<string,LaunchResearch>;
@@ -20,6 +25,8 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
   newSiteName: string; setNewSiteName: (value: string) => void;
   newSiteSlug: string; setNewSiteSlug: (value: string) => void;
   newSiteTimezone: string; setNewSiteTimezone: (value: string) => void;
+  newSiteAddress: LaunchSiteAddressDraft;
+  setNewSiteAddress: (value: LaunchSiteAddressDraft) => void;
   duplicateNewSite: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"][number] | undefined;
   createdSiteDraft: {siteId:string;host:string} | null;
   busy: boolean; addSite: () => Promise<void>;
@@ -73,6 +80,22 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                         {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
                        </Select>
                       </Field>
+                    </div>
+                    <div className="mt-4 space-y-3 border-t pt-4">
+                      <p className="text-xs font-semibold">Physical location · for state guidance, not legal approval</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {([
+                          ["street1","Street address"],["street2","Suite or building (optional)"],
+                          ["city","City"],["state","State or region"],
+                          ["postalCode","Postal code"],["country","Country"],
+                          ["county","County (optional)"],
+                        ] as const).map(([key,label])=>
+                          <Field key={key} label={label}>
+                            <Input value={newSiteAddress[key]} placeholder={label}
+                              onChange={e=>setNewSiteAddress({...newSiteAddress,[key]:e.target.value})}/>
+                          </Field>)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Enter the actual location of onsite learning. You can leave the address blank and complete it later; partial addresses cannot be saved. The legal jurisdiction must be reviewed separately.</p>
                     </div>
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
                       This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
