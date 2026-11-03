@@ -388,7 +388,7 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[ar
 </style>
 </head>
 <body class="theme-${theme}" style="${visualCss}">
-${demo ? '<div class="demo-banner" role="note"><strong>Valor is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>' : ""}
+${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
 <main id="main-content">\n  ${pageContent[path]}\n</main>
