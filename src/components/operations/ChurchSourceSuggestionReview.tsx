@@ -85,12 +85,14 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     if (!website || busy) return;
     setBusy(true); setError(""); setMessage("");
     try {
-      await submitChurchSourceExcerptCommand({
+      const result = await submitChurchSourceExcerptCommand({
         data: { sourceReferenceId: website.id, field, sourcePageUrl, text },
       });
       setText("");
       await refresh();
-      setMessage("Excerpt added for review. Nothing was published.");
+      setMessage(result.changed === false
+        ? "This church excerpt is already waiting for review. Nothing was published."
+        : "Church excerpt added to the private review queue. Nothing was published.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to add this excerpt."); }
     finally { setBusy(false); }
   }
@@ -107,13 +109,17 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       } });
       await refresh();
       await router.invalidate();
-      setMessage(result.publication
-        ? result.publication.status === "review_required"
-          ? "Church text is held for institutional claim review. Previously published copy remains unchanged."
-          : "Church-owned copy saved as a new published revision. School authorization and institutional claims remain unchanged."
-        : "Source suggestion discarded. Nothing was published.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to review this suggestion."); }
-    finally { setBusy(false); }
+      setMessage(result.alreadyReviewed
+        ? "This suggestion was already reviewed. No second website revision was created."
+        : result.publication
+          ? result.publication.status === "review_required"
+            ? `Church copy saved as revision ${result.publication.revision}, awaiting CAN review. Previously published copy is unchanged.`
+            : `Church copy committed as revision ${result.publication.revision}. School authorization and institutional claims remain unchanged.`
+          : "Source suggestion discarded. Nothing was published.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to review this suggestion.");
+      await refresh().catch(() => setError("Review failed and the latest church editor revision could not be loaded. Reload this page before retrying."));
+    } finally { setBusy(false); }
   }
 
   return <section aria-labelledby="church-source-review" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
@@ -180,12 +186,19 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
         </p>
         <a href={item.sourcePageUrl ?? item.sourceUrl} target="_blank" rel="noopener noreferrer"
           className="mt-1 block break-all text-xs underline">Review original source page</a>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="rounded-lg border bg-background p-3">
-            <p className="text-xs font-semibold text-muted-foreground">Current published church copy
+            <p className="text-xs font-semibold text-muted-foreground">Last published church copy
               {reviewContext?.publishedRevision ? ` · revision ${reviewContext.publishedRevision}` : " · not yet published"}
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm">{publishedText || "No published copy for this field."}</p>
+          </div>
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-xs font-semibold text-muted-foreground">
+              Current editor copy · revision {reviewContext?.revision ?? currentRevision}
+              {reviewContext?.editorStatus === "review_required" ? " · awaiting CAN review" : ""}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{editorText || "No editor copy for this field."}</p>
           </div>
           <div className="rounded-lg border bg-background p-3">
             <p className="text-xs font-semibold text-muted-foreground">Proposed church copy · not yet approved</p>
