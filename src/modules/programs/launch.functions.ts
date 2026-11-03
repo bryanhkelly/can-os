@@ -8,6 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
+import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
@@ -152,6 +153,27 @@ export const startLaunch = createServerFn({ method: "POST" })
     }
     if (data.siteId && !organizationWide && !context.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site scope");
+    }
+    // A state mismatch is not equivalent to a manual legal exception. Reject it
+    // before creation; jurisdiction applicability remains independently reviewed by C.
+    if(data.siteId) {
+      const [{db},schema,{eq}]=await Promise.all([
+        import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
+      ]);
+      const [site]=await db.select({address:schema.sites.address,
+        organizationId:schema.sites.organizationId}).from(schema.sites)
+        .where(eq(schema.sites.id,data.siteId)).limit(1);
+      if(site && site.organizationId===data.hostOrganizationId) {
+        const address=readSitePhysicalAddress(site.address);
+        if(address.value?.country==="US") {
+          const [target]=await db.select({
+            id:schema.jurisdictions.id,code:schema.jurisdictions.code,
+            name:schema.jurisdictions.name,
+          }).from(schema.jurisdictions).where(eq(schema.jurisdictions.id,data.jurisdictionId)).limit(1);
+          if(target && !addressStateJurisdiction(address.value,[target]))
+            throw new Error("The selected Program jurisdiction differs from the saved school's US state. Correct the Site or select the matching jurisdiction; ask CAN for independent review of any exception.");
+        }
+      }
     }
     // Organization-wide grants have no site filter. The domain service checks
     // that the target site belongs to the selected host organization.
