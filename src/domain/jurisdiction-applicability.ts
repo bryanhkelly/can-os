@@ -40,6 +40,26 @@ function isoDay(value: Date | string): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : null;
 }
 
+/**
+ * A policy reviewed through this month does not automatically establish
+ * applicability for a later planned opening or academic year.
+ */
+export function requiresFutureJurisdictionPolicyReview(
+  nextReviewAt: Date | string | null,
+  plannedStartDates: readonly string[],
+  now = new Date(),
+): boolean {
+  const reviewBy = nextReviewAt ? isoDay(nextReviewAt) : null;
+  const today = isoDay(now);
+  if (!reviewBy || !today) return true;
+  return plannedStartDates.some(value => {
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return true;
+    const parsed = isoDay(value);
+    if (parsed !== value) return true;
+    return value > today && value > reviewBy;
+  });
+}
+
 /** Verified editorial policy is not itself a school or funding approval. */
 export function isCurrentVerifiedJurisdictionProfileVersion(
   version: JurisdictionVersionGate,
