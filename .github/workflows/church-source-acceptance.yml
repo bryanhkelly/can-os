@@ -1,0 +1,44 @@
+name: Church source discovery acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/domain/church-source-references*"
+      - "src/modules/sites/church-*"
+      - "src/components/operations/ChurchSource*"
+      - "src/routes/site-website.tsx"
+      - "src/db/schema/church-*"
+      - "drizzle/0067_church_source_references.sql"
+      - "drizzle/0068_church_content_suggestions.sql"
+      - "drizzle/meta/0067_snapshot.json"
+      - "drizzle/meta/0068_snapshot.json"
+      - ".github/workflows/church-source-acceptance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Source safety and URL unit tests
+        run: npx vitest run src/domain/church-source-references.test.ts src/modules/sites/church-public-web-fetch.server.test.ts
+      - name: Migration chain check
+        run: npx drizzle-kit check
+      - name: Detect uncommitted migration delta
+        run: |
+          npm run db:generate
+          git diff --exit-code -- drizzle/
