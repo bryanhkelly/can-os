@@ -59,7 +59,7 @@ export function projectPublicInformationReadiness(input: {
   if (!visible(p.site.address))
     missing("identity_contact","institutional_publisher",
       "Review this Site's public-facing location separately from its private legal/physical address.",
-      institutionalPublisher,false);
+      siteEditor,true);
   if (!visible(p.site.contact))
     missing("identity_contact","institutional_publisher",
       "Approve an explicit school-controlled public contact; the draft Site contact is not public consent.",
@@ -70,12 +70,16 @@ export function projectPublicInformationReadiness(input: {
   for (const program of p.academics) {
     if (!visible(program.title)) continue;
     const approved = p.programSchedules.some(schedule =>
-      schedule.name.value === program.title.value &&
+      schedule.programId === program.programId &&
+      visible(schedule.name) && schedule.name.value === program.title.value &&
+      visible(schedule.grades) &&
+      schedule.grades.value?.min === program.grades.value?.min &&
+      schedule.grades.value?.max === program.grades.value?.max &&
       visible(schedule.weeklyPattern) &&
       schedule.weeklyPattern.value!.length > 0);
     if (!approved) missing("school_day","operations",
       `Review the current instructional days and times for ${program.title.value}; Sunday is permitted.`,
-      scheduleReview,false);
+      scheduleReview,true);
   }
   if (!p.activities.length)
     missing("activities","operations","Add reviewed student activities when offered.",
@@ -83,7 +87,7 @@ export function projectPublicInformationReadiness(input: {
   if (!visible(p.tuition.description))
     missing("tuition","finance",
       "An institutionally approved, current tuition/fee statement is missing; do not invent a price.",
-      "/admissions",false);
+      "/admissions",true);
   if (!visible(p.tuition.financialAid))
     missing("tuition","finance",
       "Financial assistance eligibility or availability is not yet approved; offer an information request.",
@@ -97,7 +101,7 @@ export function projectPublicInformationReadiness(input: {
   if (!p.people.length)
     missing("leadership","institutional_publisher",
       "Optional public introductions require current self-consent, active Site assignment and exact-content institutional review.",
-      siteEditor,false);
+      institutionalPublisher,false);
   if (!p.disclosures.some(item => visible(item.statement)))
     missing("legal_disclosures","compliance",
       "Review applicable public legal statements for this Site's operating model.",
