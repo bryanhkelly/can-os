@@ -1,6 +1,6 @@
 import {useEffect,useState} from "react";
 import {Button} from "@/components/ui/button";
-import {EvidenceDocumentSummary} from "@/components/evidence";
+import {EvidenceDocumentSummary,EvidenceUploadSection} from "@/components/evidence";
 import {
   listCANSchoolJurisdictionReviewQueue,
   getSchoolJurisdictionReview,
@@ -8,12 +8,20 @@ import {
   reviewSchoolLegalRequirementEvidence,
   getSchoolJurisdictionEvidenceForCAN,
   getSchoolJurisdictionEvidenceDownloadForCAN,
+  getSchoolJurisdictionRequirementActions,
+  beginSchoolJurisdictionDocumentUploadFn,finishSchoolJurisdictionDocumentUploadFn,
+  submitSchoolLegalRequirementEvidence,
 } from "@/modules/programs/school-jurisdiction-review.functions";
 
 type Queue=Awaited<ReturnType<typeof listCANSchoolJurisdictionReviewQueue>>;
 type Item=Queue["items"][number];
 type Review=Awaited<ReturnType<typeof getSchoolJurisdictionReview>>;
 type Evidence=Awaited<ReturnType<typeof getSchoolJurisdictionEvidenceForCAN>>;
+type Worklist=Awaited<ReturnType<typeof getSchoolJurisdictionRequirementActions>>;
+type LegalEvidenceUpload={
+  actionId:string;expiresAt:string;fileName:string;
+  mimeType:"application/pdf"|"image/jpeg"|"image/png";size:number;
+};
 
 /**
  * CAN-only reviewer component for Integration I to embed in the established
@@ -26,6 +34,9 @@ export function CANSchoolJurisdictionReviewDesk(){
   const [selected,setSelected]=useState<Item|null>(null);
   const [review,setReview]=useState<Review|null>(null);
   const [evidence,setEvidence]=useState<Evidence|null>(null);
+  const [work,setWork]=useState<Worklist|null>(null);
+  const [documentId,setDocumentId]=useState("");
+  const [evidenceStatement,setEvidenceStatement]=useState("");
   const [sourceUrls,setSourceUrls]=useState<string[]>([]);
   const [note,setNote]=useState("");
   const [loading,setLoading]=useState(true);
@@ -47,18 +58,21 @@ export function CANSchoolJurisdictionReviewDesk(){
     return ()=>{active=false;};
   },[]);
   useEffect(()=>{
-    if(!selected){setReview(null);setEvidence(null);setSourceUrls([]);return;}
+    if(!selected){setReview(null);setEvidence(null);setWork(null);setSourceUrls([]);return;}
     let active=true;
     if(selected.type==="school_jurisdiction_legal_review"){
-      setEvidence(null);
+      setEvidence(null);setWork(null);
       void getSchoolJurisdictionReview({data:{programId:selected.programId}})
         .then(result=>{if(active){setReview(result);setSourceUrls([]);}})
         .catch(()=>{if(active)setError("Current school policy could not be read; no decision recorded.");});
     }else{
       setReview(null);setSourceUrls([]);
-      void getSchoolJurisdictionEvidenceForCAN({data:{actionId:selected.id}})
-        .then(result=>{if(active)setEvidence(result);})
-        .catch(()=>{if(active)setError("Current scoped Program document could not be loaded; no approval recorded.");});
+      void Promise.all([
+        getSchoolJurisdictionEvidenceForCAN({data:{actionId:selected.id}}),
+        getSchoolJurisdictionRequirementActions({data:{programId:selected.programId}}),
+      ]).then(([result,worklist])=>{
+        if(active){setEvidence(result);setWork(worklist);}
+      }).catch(()=>{if(active)setError("Current scoped Program document or worklist could not be loaded; no approval recorded.");});
     }
     return ()=>{active=false;};
   },[selected]);
@@ -83,7 +97,7 @@ export function CANSchoolJurisdictionReviewDesk(){
       setMessage(decision==="verify"
         ?"Independent decision recorded. Site opening, family admissions and funding approvals remain separate."
         :"Correction request recorded in the canonical school Action.");
-      setSelected(null);setNote("");setReview(null);setEvidence(null);setSourceUrls([]);
+      setSelected(null);setNote("");setReview(null);setEvidence(null);setWork(null);setSourceUrls([]);
       await reload();
     }catch(e){
       setError(e instanceof Error?e.message:
@@ -91,6 +105,25 @@ export function CANSchoolJurisdictionReviewDesk(){
     }finally{setSubmitting(false);}
   }
 
+  async function submitCANRequirementEvidence(){
+    if(!selected||!documentId||evidenceStatement.trim().length<10||submitting)return;
+    setSubmitting(true);setError("");setMessage("");
+    try{
+      await submitSchoolLegalRequirementEvidence({data:{
+        actionId:selected.id,documentId,statement:evidenceStatement,
+      }});
+      const [current,updated]=await Promise.all([
+        getSchoolJurisdictionEvidenceForCAN({data:{actionId:selected.id}}),
+        getSchoolJurisdictionRequirementActions({data:{programId:selected.programId}}),
+      ]);
+      setEvidence(current);setWork(updated);
+      setMessage("CAN-owned documentary submission recorded. A different authorized CAN reviewer must independently approve it.");
+      setDocumentId("");setEvidenceStatement("");
+      await reload();
+    }catch{
+      setError("CAN-owned documentary evidence could not be submitted. Verify the Program, current Action, and file scope.");
+    }finally{setSubmitting(false);}
+  }
   return <section className="rounded-xl border bg-card p-4" aria-labelledby="can-school-jurisdiction-desk">
     <h2 id="can-school-jurisdiction-desk" className="font-semibold">School-specific CAN jurisdiction reviews</h2>
     <p className="mt-1 text-sm text-muted-foreground">
@@ -141,6 +174,44 @@ export function CANSchoolJurisdictionReviewDesk(){
           }}/>}
         {evidence&&!evidence.evidence&&<p role="alert" className="text-sm">No submitted, current, private legal evidence is available for this Action. Request corrections or have the responsible party submit documentation.</p>}
         {evidence&&!evidence.scopeCurrent&&<p role="alert" className="text-sm">This evidence cannot be approved for the current policy and school configuration until its legal scope is renewed.</p>}
+        {evidence?.responsibleParty==="can"&&work&&
+          work.items.some(item=>item.id===selected.id&&item.canSubmitEvidence)&&
+          <div className="space-y-2 rounded-lg border p-3">
+            <p className="font-medium">CAN-owned requirement submission</p>
+            <p className="text-xs text-muted-foreground">A CAN reviewer may submit documentation for a CAN-owned obligation, but the submitter cannot independently verify that same evidence.</p>
+            <EvidenceUploadSection<LegalEvidenceUpload>
+              heading="Upload restricted, source-scoped CAN requirement proof"
+              adapter={{
+                begin:async input=>beginSchoolJurisdictionDocumentUploadFn({data:input}),
+                finish:async input=>finishSchoolJurisdictionDocumentUploadFn({data:input}),
+              }}
+              makeInput={(file,expiresAt)=>({
+                actionId:selected.id,expiresAt,fileName:file.name,
+                mimeType:file.type as LegalEvidenceUpload["mimeType"],size:file.size,
+              })}
+              onUploaded={async()=>setWork(await getSchoolJurisdictionRequirementActions({
+                data:{programId:selected.programId},
+              }))}
+              submitLabel="Upload CAN evidence"/>
+            <label className="block text-xs font-medium" htmlFor="can-doc-selected">Select your scoped evidence</label>
+            <select id="can-doc-selected" value={documentId}
+              onChange={event=>setDocumentId(event.target.value)}
+              className="w-full rounded-md border bg-background p-2 text-sm">
+              <option value="">Choose a current document</option>
+              {work.evidenceDocuments.filter(document=>document.actionId===selected.id)
+                .map(document=><option key={document.id} value={document.id}>
+                  {document.fileName}
+                </option>)}
+            </select>
+            <label className="block text-xs font-medium" htmlFor="can-doc-statement">Document submission statement</label>
+            <textarea id="can-doc-statement" value={evidenceStatement}
+              onChange={event=>setEvidenceStatement(event.target.value)} rows={3}
+              className="w-full rounded-md border bg-background p-2 text-sm"/>
+            <Button type="button" disabled={submitting||!documentId||evidenceStatement.trim().length<10}
+              onClick={()=>void submitCANRequirementEvidence()}>
+              Submit for a different CAN reviewer
+            </Button>
+          </div>}
       </>}
       <label className="block text-sm font-medium" htmlFor="can-jurisdiction-note">Independent decision rationale</label>
       <textarea id="can-jurisdiction-note" value={note} rows={4}
@@ -152,7 +223,7 @@ export function CANSchoolJurisdictionReviewDesk(){
           (selected.type==="school_jurisdiction_legal_review"&&
             (!review?.policyReady||sourceUrls.length===0)) ||
           (selected.type==="school_jurisdiction_requirement"&&
-            (!evidence?.scopeCurrent||!evidence.evidence||
+            (!evidence?.canIndependentlyVerify||!evidence.evidence||
               evidence.evidence.reviewStatus==="rejected"))}
           onClick={()=>void decide("verify")}>Verify documented scope</Button>
         <Button type="button" variant="outline" disabled={submitting||note.trim().length<25}
