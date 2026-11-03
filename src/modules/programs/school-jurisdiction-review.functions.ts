@@ -6,6 +6,7 @@ import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {db} from "@/db/client";
 import {actions,documents,organizations,programs,sites} from "@/db/schema";
 import {and,eq,inArray} from "drizzle-orm";
+import {isJurisdictionRequirementRenewalCurrent} from "@/domain/school-jurisdiction-approval";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
 import { ensureSchoolJurisdictionReviewAction, decideSchoolJurisdictionLegalReview } from "./school-jurisdiction-actions.server";
 import {submitSchoolJurisdictionRequirementEvidence,
@@ -162,7 +163,11 @@ export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET
       row.metadata.profileVersionId===review.policyVersionId);
     return {programId:data.programId,reviewRequired:review.reviewRequired,
       evidenceDocuments,items:eligible.map(row=>({
-        id:row.id,status:row.status,title:row.title,
+        id:row.id,status:row.status,
+        effectiveStatus:row.status==="resolved" &&
+          !isJurisdictionRequirementRenewalCurrent(row.metadata)
+          ?"renewal_review_required":row.status,
+        title:row.title,
         description:row.description,ownerPersonId:row.ownerPersonId,
         requirementId:typeof row.metadata.requirementId==="string"
           ? row.metadata.requirementId:null,
