@@ -485,7 +485,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <span class="explore-arrow" aria-hidden="true">→</span></a>`).join("")}</div></section>`
     : "";
   const pageContent: Record<PublicSitePath, string> = {
-    "/": hero + homeStory + exploreSection + programOverview +
+    "/": hero + (local?.schoolVision ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Learning with purpose. Growing together.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "") + homeStory + exploreSection + programOverview +
       (page.offerings.length || (demo && local) ? enrichmentSection :
         (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) +
       (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
