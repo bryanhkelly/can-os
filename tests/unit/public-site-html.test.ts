@@ -91,6 +91,48 @@ describe("standalone public site HTML", () => {
     }
   });
 
+  it("automatically uses original CAN artwork only when a school has no approved photo",()=>{
+    const page={host:"example.can-os.com",site:{name:"School",organizationName:"Church"},offerings:[],
+      localContent:{welcomeMessage:"Welcome",localDescription:"Our community",
+        churchHistory:"Our story",schoolVision:"Our purpose",
+        branding:{theme:"classic" as const,paletteId:"forest" as const,
+          typographyId:"editorial" as const,heroImage:null}}};
+    const html=renderPublicSiteHtml(page);
+    expect(html).toContain("original-artwork");
+    expect(html).toContain("data:image/svg+xml,");
+    expect(html).toContain("aria-hidden=\"true\"");
+    const about=renderPublicSiteHtml(page,{path:"/about"});
+    expect(about).toContain("original-artwork");
+    expect(about).toContain("data:image/svg+xml,");
+  });
+
+  it("renders independently approved staff identities and a grounded FAQ, without raw roster details",()=>{
+    const base={host:"test.can-os.com",site:{name:"Community School",organizationName:"Community"},offerings:[],
+      academicPrograms:[{programId:"program1",title:"Learning Program",typeLabel:"School",
+        summary:"A reviewed program",grades:{min:"K",max:"5"},
+        delivery:{onsite:true,liveOnline:false,asynchronous:true,onsiteDaysPerWeek:2},
+        availability:"planned" as const}],
+      localContent:{welcomeMessage:"Welcome",localDescription:"Our story",
+        churchHistory:"An authentic story",branding:{theme:"classic" as const,heroImage:null}}};
+    const profile=projectApprovedParentInformation({site:base.site,
+      academicPrograms:base.academicPrograms,offerings:[],localContent:base.localContent,
+      people:[{displayName:"Ms. <River>",publicTitle:"School Director",biography:"A reviewed, consented public introduction."}],
+      admissions:{applicationOpen:false,description:verifiedPublicClaim("Application details are being reviewed.","admissions")},
+    });
+    const about=renderPublicSiteHtml({...base,parentInformation:profile},{path:"/about"});
+    expect(about).toContain("Meet our school community");
+    expect(about).toContain("Ms. &lt;River&gt;");
+    expect(about).not.toContain("personId");
+    const faq=renderPublicSiteHtml({...base,parentInformation:profile},{path:"/faq"});
+    expect(faq).toContain("Frequently asked questions");
+    expect(faq).toContain("Which programs and grades are available?");
+    expect(faq).toContain("Applications are not currently open");
+    expect(faq).not.toContain("Tuition is free");
+    const academics=renderPublicSiteHtml({...base,parentInformation:profile},{path:"/academics"});
+    expect(academics).toContain("How learning is organized");
+    expect(academics).toContain("Self-paced online learning");
+  });
+
   it("offers real public pages only for approved content and keeps draft pages unindexed", () => {
     const page = {
       host: "vineyard.can-os.com",
