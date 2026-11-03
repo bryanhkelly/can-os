@@ -96,6 +96,51 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
     });
   });
 
+const draftSiteContactSchema = z.object({
+  displayName: z.string().trim().min(2).max(160),
+  email: z.union([z.string().trim().email().max(254),z.literal("")]),
+  phone: z.string().trim().max(40),
+  website: z.union([z.string().trim().url().max(500),z.literal("")]),
+}).strict();
+
+/** Save a draft school contact without giving it public-disclosure authority. */
+export const updateLaunchSiteContact = createServerFn({method:"POST"})
+  .validator((v:unknown)=>z.object({
+    siteId:z.string().uuid(),
+    expectedRevision:z.string().datetime({offset:true}),
+    contact:draftSiteContactSchema,
+  }).strict().parse(v))
+  .handler(async ({data})=>{
+    const actor=await getCommandContext(getRequest());
+    assertCapability(actor,"program.launch.start");
+    if(!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
+      throw new AuthorizationError("verified school contact editor");
+    return db.transaction(async tx=>{
+      const [site]=await tx.select().from(sites).where(eq(sites.id,data.siteId))
+        .for("update").limit(1);
+      if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
+        (actor.grantSiteId!==null && actor.grantSiteId!==site.id) ||
+        (actor.scope.siteIds?.length && !actor.scope.siteIds.includes(site.id)))
+        throw new AuthorizationError("Site contact scope");
+      if(site.updatedAt.toISOString()!==data.expectedRevision)
+        throw new Error("School configuration changed. Refresh and review the latest information before saving.");
+      const before=site.metadata.setupContact??null;
+      if(JSON.stringify(before)===JSON.stringify(data.contact))
+        return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString()};
+      const [saved]=await tx.update(sites).set({
+        metadata:{...site.metadata,setupContact:data.contact},
+        updatedAt:new Date(),
+      }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
+      if(!saved)throw new Error("Could not save school contact");
+      await writeAudit(tx,actor,{
+        action:"site.contact.draft.update",entityType:"site",entityId:site.id,
+        scope:{siteId:site.id,organizationId:site.organizationId},
+        before:{contact:before},after:{contact:data.contact,publicApproved:false},
+      });
+      return {siteId:site.id,updated:true,revision:saved.updatedAt.toISOString()};
+    });
+  });
+
 /**
  * Registrar-only canonical configuration reader.
  * Explicitly not an approved public-school DTO: A/B must use their approved projections.
@@ -110,7 +155,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     const [site]=await db.select({
       id:sites.id,organizationId:sites.organizationId,name:sites.name,
       slug:sites.slug,address:sites.address,timezone:sites.timezone,
-      updatedAt:sites.updatedAt,
+      updatedAt:sites.updatedAt,metadata:sites.metadata,
     }).from(sites).where(eq(sites.id,data.siteId)).limit(1);
     if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
       (actor.grantSiteId!==null && actor.grantSiteId!==site.id) ||
@@ -125,7 +170,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     }).from(programs).where(eq(programs.siteId,site.id));
     const [publication]=await db.select({status:sitePublications.status})
       .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
-    const {address,...identity}=site;
+    const {address,metadata,...identity}=site;
     return {
       ...identity,revision:site.updatedAt.toISOString(),
       updatedAt:site.updatedAt.toISOString(),
@@ -138,7 +183,8 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       })),
       publication:{status:publication?.status??"unconfigured",
         publicReachability:"not_asserted" as const},
-      contact:{status:"unconfigured" as const},
+      contact:{value:metadata.setupContact??null,source:"church_site_draft" as const,
+        reviewStatus:"unverified" as const,publicClaimApproved:false},
       calendar:{status:"read_from_academic_program_calendar" as const},
     };
   });
