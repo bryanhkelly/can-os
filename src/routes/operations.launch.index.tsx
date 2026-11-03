@@ -8,6 +8,7 @@ import { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admission
 import { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listExtendedSeasonPlanning } from "@/modules/activities/extended-learning.functions";
 import { listPublishedJurisdictionGuidance } from "@/modules/programs/jurisdiction-profile.functions";
+import { listLaunchJurisdictionResearch } from "@/modules/programs/jurisdiction-launch-research.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -35,14 +36,15 @@ export const Route = createFileRoute("/operations/launch/")({
         search: { siteId: selected.siteId ?? undefined, programId: selected.id } });
     }
     return safeLoader(async () => {
-      const [familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance] = await Promise.all([
+      const [familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch] = await Promise.all([
         listFamilyInvitations().catch(() => null),
         getLaunchAdmissionsCounts({ data: deps }).catch(() => null),
         getActiveEnrollmentCounts({ data: deps }).catch(() => null),
         listExtendedSeasonPlanning().catch(() => null),
         listPublishedJurisdictionGuidance().catch(() => ({})),
+        listLaunchJurisdictionResearch().catch(() => ({})),
       ]);
-      return { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, authError: "" };
+      return { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch, authError: "" };
     })();
   },
   component: LaunchPage,
