@@ -40,6 +40,26 @@ function isoDay(value: Date | string): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : null;
 }
 
+/** Verified editorial policy is not itself a school or funding approval. */
+export function isCurrentVerifiedJurisdictionProfileVersion(
+  version: JurisdictionVersionGate,
+  now = new Date(),
+): boolean {
+  const today = isoDay(now);
+  if (!today || version.status !== "published" ||
+    version.verificationStatus !== "verified" || !version.verifiedByPersonId ||
+    !version.publishedAt || !version.effectiveAt || !version.nextReviewAt)
+    return false;
+  const published = isoDay(version.publishedAt);
+  const effective = isoDay(version.effectiveAt);
+  const review = isoDay(version.nextReviewAt);
+  return published !== null && effective !== null && review !== null &&
+    published <= today && effective <= today && review >= today &&
+    isJurisdictionProfileVerificationEvidenceCurrent(
+      version.verificationEvidence, version.evidence,
+    );
+}
+
 /**
  * No requirement becomes applicable simply because a school is in the same
  * state. Unknown scope is a legal-review task, not a negative legal finding.
@@ -57,17 +77,7 @@ export function evaluateSchoolJurisdictionRequirements(
   if (!parsed.success) return { reviewRequired: true, decisions: [], publicDisclosures: [] };
   const profile: JurisdictionProfile = parsed.data;
   const today = isoDay(now);
-  const published = version.status === "published" &&
-    version.verificationStatus === "verified" && Boolean(version.verifiedByPersonId) &&
-    Boolean(version.publishedAt) && Boolean(version.effectiveAt) &&
-    Boolean(version.nextReviewAt) && Boolean(today) &&
-    isoDay(version.publishedAt!) !== null && isoDay(version.publishedAt!)! <= today! &&
-    isoDay(version.effectiveAt!) !== null && isoDay(version.effectiveAt!)! <= today! &&
-    isoDay(version.nextReviewAt!) !== null &&
-    isoDay(version.nextReviewAt!)! >= today! &&
-    isJurisdictionProfileVerificationEvidenceCurrent(
-      version.verificationEvidence, version.evidence,
-    );
+  const published = isCurrentVerifiedJurisdictionProfileVersion(version, now);
   const knownUrls = new Set(profile.evidence.map(source => source.url));
   const decisions: RequirementDecision[] = profile.requirements.map(requirement => {
     const result = (status: RequirementDecision["status"], reason: string): RequirementDecision => ({
