@@ -27,10 +27,10 @@ describe("canonical church Site configuration input",()=>{
   });
   it("keeps school contact drafts validated and distinct from public approval",()=>{
     expect(draftSiteContactSchema.parse({
-      displayName:"School Office",email:"office@example.org",phone:"",website:"",
+      displayName:"School Office",email:"office@example.org",phone:"",
     }).email).toBe("office@example.org");
     expect(draftSiteContactSchema.safeParse({
-      displayName:"School Office",email:"invalid",phone:"",website:"",
+      displayName:"School Office",email:"invalid",phone:"",
     }).success).toBe(false);
   });
   it("requires an explicit real time zone and does not pretend that state identifies it",()=>{
@@ -54,9 +54,10 @@ describe("canonical church Site configuration input",()=>{
       {street1:"100 Main Street",city:"Oakland",state:"NV",postalCode:"94612",country:"US"},
     )).toBe(false);
     expect(sameDraftSiteContact(
-      {website:"",phone:"",email:"office@example.org",displayName:"School Office"},
+      {phone:"",email:"office@example.org",displayName:"School Office"},
       {displayName:"School Office",email:"office@example.org",phone:"",website:""},
     )).toBe(true);
+    expect(sameDraftSiteContact(null,null)).toBe(true);
   });
   it("accepts US states, DC and supported territories; normalizes aliases and ZIP+4",()=>{
     expect(physicalSiteAddressSchema.parse({
