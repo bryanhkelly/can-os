@@ -12,7 +12,7 @@ import {
 } from "./school-jurisdiction-document-upload.server";
 import {
   readSchoolJurisdictionEvidenceForCAN,
-  getSchoolJurisdictionEvidenceDownloadForCAN,
+  getSchoolJurisdictionEvidenceDownloadForCAN as issueSchoolJurisdictionEvidenceDownloadForCAN,
 } from "./school-jurisdiction-document-review.server";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
 import { ensureSchoolJurisdictionReviewAction, decideSchoolJurisdictionLegalReview } from "./school-jurisdiction-actions.server";
@@ -241,5 +241,5 @@ export const getSchoolJurisdictionEvidenceDownloadForCAN=createServerFn({method:
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
-    return getSchoolJurisdictionEvidenceDownloadForCAN(actor,data);
+    return issueSchoolJurisdictionEvidenceDownloadForCAN(actor,data);
   });
