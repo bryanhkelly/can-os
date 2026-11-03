@@ -86,7 +86,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const localSection = localItems.length || image ? `<section aria-labelledby="church-identity-title" class="church-section">
     <p class="tag">Content provided by the local church</p>
     <h2 id="church-identity-title">Our church and community</h2>
-    ${image ? `<img class="local-hero-image" src="${escapePublicHtml(image.dataUrl)}"
+    ${image && path !== "/" ? `<img class="local-hero-image" src="${escapePublicHtml(image.dataUrl)}"
       alt="${escapePublicHtml(image.altText)}" loading="lazy" decoding="async"/>` : ""}
     ${localItems.map(([label, value]) => `<div class="local-field">
       <h3>${escapePublicHtml(label)}</h3>
@@ -178,11 +178,17 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     </article>`;
   }).join("\n");
   const hasOpenApplications = (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
+  const navigationCtaPath = availablePaths.includes("/admissions") && hasOpenApplications ? "/admissions" :
+    availablePaths.includes("/academics") ? "/academics" : "/contact";
+  const navigationCtaLabel = hasOpenApplications ? "Applications" :
+    availablePaths.includes("/academics") ? "Explore programs" : "Contact";
   const hero = `<div id="welcome" class="public-hero${image ? " has-image" : ""}"${image ? ` style="background-image:linear-gradient(95deg,rgba(13,34,40,.93),rgba(13,34,40,.54)),url(&quot;${escapePublicHtml(image.dataUrl)}&quot;)"` : ""}><p class="tag">Welcome to our school</p><h1>${school}</h1>
     ${local?.welcomeMessage ? `<p class="intro">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
-    <p class="intro">Explore the local community and reviewed educational programs.
+    <p class="intro">${academicCards ? "Explore reviewed educational programs and the local community." :
+      "This school site is preparing to share verified program information."}
     ${hasOpenApplications ? "Applications are available for eligible approved programs, subject to verification." :
-      "Request information about our programs. Applications are not currently open through this website."}</p>
+      academicCards ? "Inquire about published programs; applications are not currently open through this website." :
+      "Check back for published educational opportunities."}</p>
     <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
     ${availablePaths.includes("/about") ? `<a class="hero-text-link" href="/about">Our story →</a>` : ""}</div></div>`;
   const academicSection = academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
@@ -297,7 +303,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .public-hero h1{color:white}.public-hero .intro{color:#edf3f8;max-width:670px}
 .public-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:var(--site-accent);opacity:.18;clip-path:polygon(0 100%,0 88%,32% 70%,56% 90%,78% 53%,100% 66%,100% 100%)}.public-hero.has-image{background-position:center;background-size:cover}.public-hero.has-image::after{display:none}
 .public-hero .tag{color:#e7d7bd}.hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:20px;margin-top:30px}.hero-button{display:inline-flex;align-items:center;min-height:48px;border-radius:10px;padding:12px 19px;background:#f6eee0;color:#17364d;text-decoration:none;font-weight:700}.hero-text-link{color:#fff;text-underline-offset:5px;font-weight:700}.hero-button:hover{background:#fff}.hero-button:focus-visible,.hero-text-link:focus-visible{outline:3px solid #ffda90;outline-offset:4px}
-.skip-link{position:absolute;left:12px;top:-100px;z-index:10;padding:12px;background:#fff;color:#112d34}.skip-link:focus{top:12px}.mission-split{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:clamp(24px,5vw,80px);padding:clamp(20px,4vw,42px) 0}.mission-split p:last-child{font-size:clamp(1.05rem,1.6vw,1.3rem);line-height:1.75}.editorial-section>.grid{gap:20px}.closing-action{background:var(--site-ink);color:#fff;padding:clamp(30px,6vw,70px);border-radius:12px}.closing-action .tag,.closing-action p{color:#fff}.closing-action h2{max-width:700px}.closing-action .hero-button{margin-top:15px}header nav a{min-height:44px;display:inline-flex;align-items:center}header .brand{color:var(--site-ink)}header{position:relative}header nav{gap:clamp(8px,1.4vw,20px)}.card{border-radius:8px}.card p{overflow-wrap:anywhere}.public-hero{border-radius:12px}.church-section{border-radius:8px}.public-hero h1{overflow-wrap:anywhere} .mobile-menu{display:none} .mobile-menu summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 14px;border:1px solid var(--site-ink);border-radius:6px}.mobile-menu a{display:block;padding:11px 4px;min-height:44px} .mobile-menu[open]{width:100%} .mobile-menu[open] .mobile-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px} @media(max-width:800px){header>.desktop-nav{display:none}.mobile-menu{display:block} .mission-split{grid-template-columns:1fr} .public-hero{min-height:350px}} @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px;min-height:0}.card{padding:22px}header{align-items:flex-start}header nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;padding-top:12px}main{padding-top:24px;padding-bottom:60px}}
+.skip-link{position:absolute;left:12px;top:-100px;z-index:10;padding:12px;background:#fff;color:#112d34}.skip-link:focus{top:12px}.mission-split{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:clamp(24px,5vw,80px);padding:clamp(20px,4vw,42px) 0}.mission-split p:last-child{font-size:clamp(1.05rem,1.6vw,1.3rem);line-height:1.75}.editorial-section>.grid{gap:20px}.closing-action{background:var(--site-ink);color:#fff;padding:clamp(30px,6vw,70px);border-radius:12px}.closing-action .tag,.closing-action p{color:#fff}.closing-action h2{max-width:700px}.closing-action .hero-button{margin-top:15px}header nav a{min-height:44px;display:inline-flex;align-items:center}.site-nav-cta{min-height:44px;display:inline-flex;align-items:center;justify-content:center;background:var(--site-ink);color:#fff;padding:10px 17px;border-radius:5px;text-decoration:none;font-weight:700;font-size:.85rem}.site-nav-cta:hover{background:var(--site-secondary)}header .brand{color:var(--site-ink)}header{position:relative}header nav{gap:clamp(8px,1.4vw,20px)}.card{border-radius:8px}.card p{overflow-wrap:anywhere}.public-hero{border-radius:12px}.church-section{border-radius:8px}.public-hero h1{overflow-wrap:anywhere} .mobile-menu{display:none} .mobile-menu summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 14px;border:1px solid var(--site-ink);border-radius:6px}.mobile-menu a{display:block;padding:11px 4px;min-height:44px} .mobile-menu[open]{width:100%} .mobile-menu[open] .mobile-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px} @media(max-width:800px){header>.desktop-nav,header>.site-nav-cta{display:none}.mobile-menu{display:block} .mission-split{grid-template-columns:1fr} .public-hero{min-height:350px}} @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px;min-height:0}.card{padding:22px}header{align-items:flex-start}header nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;padding-top:12px}main{padding-top:24px;padding-bottom:60px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
@@ -305,7 +311,7 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[ar
 </head>
 <body class="theme-${theme}" style="${visualCss}">
 <a class="skip-link" href="#main-content">Skip to main content</a>
-<header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}</nav></details></header>
+<header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
 <main id="main-content">\n  ${pageContent[path]}\n</main>
 <footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>
 </body>
