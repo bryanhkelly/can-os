@@ -71,6 +71,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     // host reachability, admission authorization or opening authority from a
     // reserved/publication row, even for a synthetic reference school.
     publicInformationReadiness: projectPublicInformationReadiness({
+      siteId: site.id,
       profile: parentInformation,
       marketingPublished: address?.status === "published",
       externalHostReachable: false,
