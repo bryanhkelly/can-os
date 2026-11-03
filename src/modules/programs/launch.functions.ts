@@ -109,8 +109,11 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
           address: s.sites.address,
           metadata: s.sites.metadata,
           updatedAt: s.sites.updatedAt,
+          websiteSlug:s.sitePublications.slug,
+          websiteStatus:s.sitePublications.status,
         })
         .from(s.sites)
+        .leftJoin(s.sitePublications,eq(s.sitePublications.siteId,s.sites.id))
         .where(and(inArray(s.sites.organizationId, organizationIds),
           ...(context.grantSiteId === null ? [] : [eq(s.sites.id, context.grantSiteId)])))
         .orderBy(asc(s.sites.name)),
@@ -133,7 +136,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(({metadata,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, contactDraft:safeJson(metadata.setupContact??null) })),
+      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, contactDraft:safeJson(metadata.setupContact??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
       jurisdictions: jurisdictionRows,
       schoolSetupAdministrator: context.role === "site_admin",
     };
