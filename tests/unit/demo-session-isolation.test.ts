@@ -11,7 +11,7 @@ const studentGrant = {
   organizationId: LOCAL_DEMO_ADMIN.organizationId, siteId: LOCAL_DEMO_ADMIN.siteId,
 };
 const adminGrant = {
-  ...LOCAL_DEMO_ADMIN, id: LOCAL_DEMO_ADMIN.grantId, role: "registrar", active: true,
+  ...LOCAL_DEMO_ADMIN, id: LOCAL_DEMO_ADMIN.grantId, role: "site_admin", active: true,
 };
 beforeEach(() => {
   state.rows = [];

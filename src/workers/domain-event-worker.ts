@@ -242,6 +242,7 @@ for (const eventType of [
   EventTypes.LocalSiteResponsibilityAppointed,
   EventTypes.LocalSiteResponsibilityRevoked,
   EventTypes.SitePublicAddressReserved,
+  EventTypes.SitePublicIdentityChanged,
   EventTypes.SitePublished,
   EventTypes.SiteUnpublished,
   EventTypes.SiteLocalWebsiteContentPublished,

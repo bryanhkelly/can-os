@@ -37,7 +37,13 @@ describe("email-link global admission at HTTP boundary",()=>{
   const response=await state.handler!({request:request({email:"user@example.test"})});
   expect(response.status).toBe(200);
   expect(state.admit).toHaveBeenCalledWith("request");
-  expect(state.requestLink).toHaveBeenCalledWith("user@example.test");
+  expect(state.requestLink).toHaveBeenCalledWith("user@example.test",undefined,undefined);
+ });
+ it("passes only a safe internal return path to the email-link service",async()=>{
+  await state.handler!({request:request({email:"user@example.test",returnTo:"/sites/site-1/publish"})});
+  expect(state.requestLink).toHaveBeenLastCalledWith("user@example.test",undefined,"/sites/site-1/publish");
+  await state.handler!({request:request({email:"user@example.test",returnTo:"https://attacker.example"})});
+  expect(state.requestLink).toHaveBeenLastCalledWith("user@example.test",undefined,undefined);
  });
  it("rejects budget-exhausted requests before account lookup without revealing existence",async()=>{
   state.admit.mockResolvedValue({allowed:false,retryAfterSeconds:45});

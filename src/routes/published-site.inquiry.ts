@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
+import { publicSiteDomain } from "@/domain/public-site-address";
 import {
   readSmallUrlEncodedBody, parsePublicAdmissionsInterest,
 } from "@/domain/public-admissions-interest";
@@ -19,7 +20,10 @@ export const Route = createFileRoute("/published-site/inquiry")({
   server: { handlers: {
     POST: async ({ request }) => {
       const slug = slugForPublicSiteOrigin(
-        request, process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
+        request,
+        process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
+        false,
+        publicSiteDomain(),
       );
       const origin = new URL(request.url).origin;
       if (!slug || request.headers.get("origin") !== origin) {

@@ -1,5 +1,32 @@
 # CAN OS — current implementation snapshot
 
+## Valor localhost publication and Main data verification (2026-11-03)
+
+- Read-only Neon identity checks matched the explicitly authorized Main project
+  `sweet-hall-62441909`, branch `br-restless-sea-ar9ooo55`.
+  All 67 current migration journal entries have matching timestamps and SQL
+  hashes in the 68-row ledger, allowing existing LF/CRLF variants. No migration
+  or ledger rewrite was needed for these website changes.
+- Canonical Site `f1000000-0000-4000-8000-000000000003` is now **Valor School**,
+  with Site/public slug `valorschool` and retained published status. The
+  authenticated Site Admin used the reviewed name/address command; its
+  `SitePublicIdentityChanged` event persisted. Organization and Program names
+  were not silently renamed.
+- The fixed Demo Admin has an active canonical `site_admin` grant and an active
+  same-Site institutional `site.publication.manage` assignment. Alex remains an
+  active registrar. The existing Synthetic Hybrid High School marketing listing
+  is published. These are persisted Main records, not copied test fixtures.
+- Anonymous localhost GET `/published-site?site=valorschool` returned 200 with
+  Valor School and the approved academic listing. The prior `synthetic-bay`
+  address returned 404. Local preview omits forms and labels applications as
+  available on the live website only; this does not prove DNS/TLS or delivery.
+- Full non-database validation passed: 480 test files / 3,192 tests. The new
+  isolated browser regression was attempted but could not complete because the
+  configured test branch lacks the current school-identity schema. Its fixture
+  now fails explicitly before writes when that prerequisite is absent.
+  Repeatable isolated browser acceptance remains **unverified**; no test
+  fixture was run against Main.
+
 ## Authorized main rollout through migration 0063 (2026-11-02)
 
 - At source commit `4a67f74d60d8079e75f5696f01ab5e8edefc60ef`, the operator

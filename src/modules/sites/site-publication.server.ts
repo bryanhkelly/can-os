@@ -2,7 +2,8 @@ import { db } from "@/db/client";
 import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
-import { publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
+import { DomainError } from "@/domain/errors";
+import { publicSiteDomain, publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -15,7 +16,7 @@ import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
-import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
@@ -103,6 +104,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   });
   return {
     site,
+    canRename: actor.role === "site_admin" && actor.capabilities.has("school.setup.manage"),
+    publicSiteDomain: publicSiteDomain(),
+    localPreviewEnabled: process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_ENABLED === "true",
     hostingConfigured: process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
     address: address[0] ? {
       host: publicSiteHost(address[0].slug),
@@ -147,6 +151,63 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       parentInformation,
     }) : null,
   };
+}
+
+/** Reviewed canonical rename, retaining publication approval and tenant identity. */
+export async function changeSitePublicIdentity(
+  actor: AccessContext,
+  input: {
+    siteId: string; name: string; slug: string; expectedName: string;
+    expectedRevision: string; reason: string; contentReviewed: boolean;
+  },
+) {
+  if (actor.role !== "site_admin" || !actor.capabilities.has("school.setup.manage")) {
+    throw new AuthorizationError("Site Admin identity management");
+  }
+  const name = input.name.trim();
+  const slug = requirePublicSiteSlug(input.slug);
+  const reason = input.reason.trim();
+  if (name.length < 2 || name.length > 120 ||
+      Array.from(name).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127) ||
+      reason.length < 10 || reason.length > 500 || !input.contentReviewed) {
+    throw new DomainError("VALIDATION_FAILED", "Review the school name, address and rename reason.");
+  }
+  return db.transaction(async tx => {
+    const authorized = await requireSitePublisher(actor, input.siteId, tx);
+    const [site] = await tx.select().from(sites).where(eq(sites.id, authorized.id)).for("update");
+    const [address] = await tx.select().from(sitePublications)
+      .where(eq(sitePublications.siteId, authorized.id)).for("update");
+    if (!site || !address) throw new DomainError("CONFLICT", "Reserve the Site address before renaming it.");
+    if (site.name === name && site.slug === slug && address.slug === slug) {
+      return { changed: false, siteId: site.id, name, slug };
+    }
+    if (site.name !== input.expectedName || address.updatedAt.toISOString() !== input.expectedRevision) {
+      throw new DomainError("CONFLICT", "The Site identity or publication changed. Refresh before renaming.");
+    }
+    // Serialize competing rename commands; unique constraints also arbitrate reservations.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`site-public-address:${slug}`}))`);
+    const [publicConflict] = await tx.select({ siteId: sitePublications.siteId })
+      .from(sitePublications).where(and(eq(sitePublications.slug, slug), ne(sitePublications.siteId, site.id))).limit(1);
+    const [siteConflict] = await tx.select({ id: sites.id }).from(sites).where(and(
+      eq(sites.organizationId, site.organizationId), eq(sites.slug, slug), ne(sites.id, site.id),
+    )).limit(1);
+    if (publicConflict || siteConflict) throw new DomainError("CONFLICT", "The requested school address is already reserved.");
+    const updatedAt = new Date(Math.max(Date.now(), address.updatedAt.getTime() + 1));
+    await tx.update(sites).set({ name, slug, updatedAt }).where(eq(sites.id, site.id));
+    await tx.update(sitePublications).set({ slug, updatedAt }).where(eq(sitePublications.siteId, site.id));
+    const scope = { organizationId: site.organizationId, siteId: site.id };
+    await writeAudit(tx, actor, {
+      action: "site.public_identity.change", entityType: "site", entityId: site.id, scope,
+      before: { name: site.name, siteSlug: site.slug, publicSlug: address.slug },
+      after: { name, siteSlug: slug, publicSlug: slug, reason, contentReviewed: true },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.SitePublicIdentityChanged, aggregateType: "site", aggregateId: site.id,
+      actorPersonId: actor.actorPersonId, ...scope,
+      payload: { name, slug, previousSlug: address.slug, status: address.status },
+    });
+    return { changed: true, siteId: site.id, name, slug };
+  });
 }
 
 /**

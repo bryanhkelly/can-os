@@ -15,6 +15,7 @@ import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
+import { safeAccessReturnTo } from "@/domain/access-navigation";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -33,7 +34,7 @@ function publicOrigin():string {
 /** Internal server-only dispatch outcome. Never expose eligibility/cooldown
  * distinctions through the public passwordless request endpoint. */
 type AccessDispatchOutcome = "dispatched" | "cooldown" | "ineligible";
-async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender):Promise<AccessDispatchOutcome> {
+async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, returnTo?:string):Promise<AccessDispatchOutcome> {
  const email=normalizeAccessEmail(rawEmail);
  if(isDemoAccountEmail(email))return "ineligible";
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
@@ -64,7 +65,11 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender):Pro
  });
  if(!issued)return "cooldown";
  try {
-  await sender({to:email,accessUrl:accessOrigin+"/access/verify#token="+encodeURIComponent(issued)});
+  const accessUrl=new URL("/access/verify",accessOrigin);
+  const safeReturnTo=safeAccessReturnTo(returnTo);
+  if(safeReturnTo)accessUrl.searchParams.set("returnTo",safeReturnTo);
+  accessUrl.hash="token="+encodeURIComponent(issued);
+  await sender({to:email,accessUrl:accessUrl.toString()});
  }catch(error){
   // Preserve the issued challenge and cooldown on delivery failure; a rapid retry
   // must not turn a mail-provider outage into unbounded request generation.
@@ -75,8 +80,8 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender):Pro
 }
 /** Public API remains deliberately indistinguishable for unknown accounts,
  * ineligible users, throttled retries and successfully dispatched mail. */
-export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
- await issueOneTimeAccess(rawEmail,sender);
+export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend, returnTo?:string):Promise<typeof genericResult> {
+ await issueOneTimeAccess(rawEmail,sender,returnTo);
  return genericResult;
 }
 /** This privileged status is for already-authorized onboarding staff only.

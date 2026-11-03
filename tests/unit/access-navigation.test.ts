@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import { accessLandingPath, safeAccessReturnTo } from "@/domain/access-navigation";
+
+describe("access navigation", () => {
+  it("preserves safe internal paths with their query and fragment", () => {
+    expect(safeAccessReturnTo("/operations/teacher-marketplace?programId=123#matches"))
+      .toBe("/operations/teacher-marketplace?programId=123#matches");
+  });
+
+  it.each([
+    "https://evil.example/path",
+    "//evil.example/path",
+    "/\\evil.example/path",
+    "/access",
+    "/access/verify",
+    "",
+    null,
+  ])("rejects unsafe return path %s", value => {
+    expect(safeAccessReturnTo(value)).toBeUndefined();
+  });
+
+  it("uses the role landing page when there is no safe return path", () => {
+    expect(accessLandingPath("teacher", undefined, "https://evil.example"))
+      .toBe("/teacher/missing-work");
+  });
+
+  it("returns to the requested internal page after sign-in", () => {
+    expect(accessLandingPath("teacher", undefined, "/messages?thread=123"))
+      .toBe("/messages?thread=123");
+  });
+});

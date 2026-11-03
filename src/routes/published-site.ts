@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
+import { publicSiteDomain } from "@/domain/public-site-address";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 
 const headers = {
@@ -24,7 +25,10 @@ export const Route = createFileRoute("/published-site")({
     handlers: {
       GET: async ({ request }) => {
         const slug = slugForPublicSiteOrigin(
-          request, process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
+          request,
+          process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
+          process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_ENABLED === "true",
+          publicSiteDomain(),
         );
         if (!slug) return new Response("Not found", {
           status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
@@ -35,7 +39,11 @@ export const Route = createFileRoute("/published-site")({
           if (!catalog) return new Response("Not found", {
             status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
           });
-          return new Response(renderPublicSiteHtml(catalog, { makeRequestId: () => crypto.randomUUID() }), { status: 200, headers });
+          const localPreview = new URL(request.url).searchParams.has("site");
+          return new Response(renderPublicSiteHtml(catalog, {
+            makeRequestId: () => crypto.randomUUID(), localPreview,
+          }), { status: 200, headers: localPreview
+            ? { ...headers, "X-Robots-Tag": "noindex, nofollow" } : headers });
         } catch {
           // Fail closed on a missing migration, database error or unexpected data.
           return new Response("Site temporarily unavailable", {

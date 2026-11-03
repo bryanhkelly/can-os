@@ -19,7 +19,7 @@ vi.mock("@/modules/identity/session-grants.server", () => ({
       ? [{ ...grant, email: account.emailNormalized }] : [];
   }),
 }));
-import { provisionDemoSchoolAccess, demoRegistrar, demoRegistrarInstitutionalCapabilities } from "@/modules/_demo/provision-demo-registrar";
+import { provisionDemoSchoolAccess, provisionDemoSiteAdmin, demoRegistrar, demoRegistrarInstitutionalCapabilities } from "@/modules/_demo/provision-demo-registrar";
 import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 
 const dialect = new PgDialect();
@@ -114,18 +114,61 @@ beforeEach(() => {
 });
 const env = { NODE_ENV: "test", CAN_DEMO_FIXED_ACCESS_ENABLED: "true" };
 describe("explicit legacy demo source convergence", () => {
+  it("can repair only the administrator without touching registrar or source identities", async () => {
+    const accounts = structuredClone(state.tables.access_accounts);
+    const registrarGrant = structuredClone(state.tables.account_person_grants![0]);
+    const result = await provisionDemoSiteAdmin(database, env);
+    expect(result.changes).toEqual(["site_admin_role", "institutional_capabilities"]);
+    expect(state.tables.access_accounts).toEqual(accounts);
+    expect(state.tables.account_person_grants![0]).toEqual(registrarGrant);
+    expect(state.tables.account_person_grants!.slice(2).map(row => row.role))
+      .toEqual(roles);
+  });
+  it.each(["inactive", "wrong-person", "wrong-tenant"])("refuses a conflicting administrator grant: %s", async scenario => {
+    const grant = state.tables.account_person_grants![1]!;
+    if (scenario === "inactive") grant.active = false;
+    if (scenario === "wrong-person") grant.personId = demoRegistrar.personId;
+    if (scenario === "wrong-tenant") grant.siteId = "foreign-site";
+    const before = structuredClone(state.tables);
+    await expect(provisionDemoSiteAdmin(database, env)).rejects.toThrow("conflict");
+    expect(state.tables).toEqual(before);
+  });
   it("normalizes all four known source addresses without replacing identity or grants", async () => {
     const grants = structuredClone(state.tables.account_person_grants);
     const result = await provisionDemoSchoolAccess(database, env);
     expect(result.changedAccounts).toHaveLength(4);
     expect(state.tables.access_accounts!.slice(2).map(row => row.emailNormalized))
       .toEqual(emails.map(email => `${email}@valorschool.demo`));
-    expect(state.tables.account_person_grants).toEqual(grants);
+    expect(state.tables.account_person_grants).toEqual(grants?.map(grant =>
+      grant.id === LOCAL_DEMO_ADMIN.grantId ? expect.objectContaining({
+        ...grant, role: "site_admin", updatedAt: expect.any(Date),
+      }) : grant));
     expect(state.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       action: "demo.account.switching.provision",
       context: expect.objectContaining({ normalizedAccountIds: result.changedAccounts }),
     }));
     expect((await provisionDemoSchoolAccess(database, env)).changedAccounts).toEqual([]);
+  });
+  it("reconciles only the fixed administrator role and records the change once", async () => {
+    const result = await provisionDemoSchoolAccess(database, env);
+    expect(result.admin.changes).toContain("site_admin_role");
+    const assignment = state.tables.role_assignments!.find(row => row.id === LOCAL_DEMO_ADMIN.roleAssignmentId)!;
+    expect(assignment.roleKey).toBe("site_admin");
+    expect(assignment.capabilities).toContain("site.publication.manage");
+    expect(state.tables.account_person_grants!.find(row => row.id === demoRegistrar.grantId)?.role)
+      .toBe("registrar");
+    state.audit.mockClear();
+    state.event.mockClear();
+    expect((await provisionDemoSchoolAccess(database, env)).admin.changes).toEqual([]);
+    expect(state.audit).not.toHaveBeenCalled();
+    expect(state.event).not.toHaveBeenCalled();
+  });
+  it.each(["2026-11-03T00:00:00Z", ""])("does not restore a revoked administrator appointment (%j)", async revokedAt => {
+    state.tables.role_assignments!.find(row => row.id === LOCAL_DEMO_ADMIN.roleAssignmentId)!
+      .metadata = { synthetic: true, revokedAt };
+    const before = structuredClone(state.tables);
+    await expect(provisionDemoSchoolAccess(database, env)).rejects.toThrow();
+    expect(state.tables).toEqual(before);
   });
   it.each(["disabled", "revoked", "wrong-person", "wrong-tenant", "address-collision", "wrong-address"])(
     "fails closed and rolls back earlier address updates for %s", async scenario => {

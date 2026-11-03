@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import tls from "node:tls";
 
 const domain=process.env.CAN_PUBLIC_SMOKE_DOMAIN;
+const configuredDomain=(process.env.CAN_PUBLIC_SITE_DOMAIN??"can-os.com").trim().toLowerCase();
 const first=process.env.CAN_PUBLIC_SMOKE_TENANT_A;
 const second=process.env.CAN_PUBLIC_SMOKE_TENANT_B;
 const unpublished=process.env.CAN_PUBLIC_SMOKE_UNPUBLISHED;
@@ -18,7 +19,10 @@ const expectedB=process.env.CAN_PUBLIC_SMOKE_NAME_B;
 if (![domain,first,second,unpublished,unknown,expectedA,expectedB].every(Boolean))
  throw new Error("Set CAN_PUBLIC_SMOKE_DOMAIN, TENANT_A, TENANT_B, UNPUBLISHED, UNKNOWN, NAME_A and NAME_B.");
 const slug=/^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/;
-assert.equal(domain,"can-os.com","Current origin handler only supports the configured canonical can-os.com domain; never run acceptance against an unrelated domain");
+assert.equal(domain?.toLowerCase(),configuredDomain,
+ "Smoke-test domain must exactly match CAN_PUBLIC_SITE_DOMAIN (or its can-os.com default)");
+assert.match(configuredDomain,/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$/,
+ "CAN_PUBLIC_SITE_DOMAIN must be a DNS domain without a scheme, port, or wildcard");
 for(const name of [first,second,unpublished,unknown])assert.match(name,slug);
 assert.equal(new Set([first,second,unpublished,unknown]).size,4,"Use four distinct slugs");
 assert.notEqual(expectedA,expectedB,"Published tenants must have distinct school identities");

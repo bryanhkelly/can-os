@@ -1,5 +1,6 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {logAuthenticationUnavailable} from "@/domain/access-errors";
+import {safeAccessReturnTo} from "@/domain/access-navigation";
 export const Route=createFileRoute("/access/request")({
  server:{handlers:{
   POST:async({request})=>{
@@ -19,9 +20,11 @@ export const Route=createFileRoute("/access/request")({
    try{payload=await request.json();}catch{return Response.json({error:"Invalid request"},{status:400});}
    const email=(payload && typeof payload==="object" && "email" in payload)?(payload as {email:unknown}).email:null;
    if(typeof email!=="string")return Response.json({error:"Invalid request"},{status:400});
+   const returnTo=payload&&typeof payload==="object"&&"returnTo" in payload
+    ?safeAccessReturnTo(payload.returnTo):undefined;
    try{
     const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
-    await requestOneTimeAccess(email);
+    await requestOneTimeAccess(email,undefined,returnTo);
     return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     if(error instanceof Error && error.message==="Invalid email address")return Response.json({error:"Invalid email"},{status:400});

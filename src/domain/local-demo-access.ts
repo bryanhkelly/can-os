@@ -45,7 +45,7 @@ export function isApprovedDemoGrant(grant: {
   const account = LOCAL_DEMO_ACCOUNTS.find(candidate => candidate.email === email.trim().toLowerCase());
   return Boolean(account && account.accountId === grant.accountId &&
     account.personId === grant.personId &&
-    grant.role === (account.email === LOCAL_DEMO_ADMIN.email ? "registrar" : account.role.toLowerCase()) &&
+    grant.role === (account.email === LOCAL_DEMO_ADMIN.email ? "site_admin" : account.role.toLowerCase()) &&
     isDemoSchoolGrant(grant));
 }
 

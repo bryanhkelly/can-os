@@ -42,6 +42,18 @@ describe("CAN OS partner hostname router", () => {
       expect(classify("https://vineyard.can-os.com" + bad)).toEqual({kind:"deny"});
     }
   });
+  it("uses the configured root domain for tenant isolation", () => {
+    expect(classifyPublicSiteRequest("https://vineyard.schools.example.org/", "GET", true, "schools.example.org"))
+      .toEqual({ kind: "site", slug: "vineyard", rewrite: true });
+    expect(slugForPublicSiteOrigin(
+      new Request("https://vineyard.schools.example.org/published-site"),
+      true,
+      false,
+      "schools.example.org",
+    )).toBe("vineyard");
+    expect(classifyPublicSiteRequest("https://other.example.org/", "GET", true, "schools.example.org"))
+      .toEqual({ kind: "platform" });
+  });
   it("blocks all tenant workspace and RPC paths", () => {
     for (const path of ["/access", "/guardian", "/operations", "/sites", "/_serverFn/sensitive",
       "/api", "/published-site/other", "/assets/main.js", "/?test=1"]) {
@@ -116,5 +128,28 @@ describe("CAN OS partner hostname router", () => {
       .toBeNull();
     expect(slugForPublicSiteOrigin(new Request("https://vineyard.can-os.com/operations"), true))
       .toBeNull();
+  });
+  it("allows explicit localhost previews only when development enables them", () => {
+    const localPreview = (url: string, allowLocalPreview = true) =>
+      slugForPublicSiteOrigin(new Request(url), false, allowLocalPreview);
+
+    expect(localPreview("http://127.0.0.1:4173/published-site?site=vineyard"))
+      .toBe("vineyard");
+    expect(localPreview("http://localhost:4173/published-site?site=vineyard"))
+      .toBe("vineyard");
+    expect(localPreview("http://[::1]:4173/published-site?site=vineyard"))
+      .toBe("vineyard");
+    expect(localPreview("http://127.0.0.1:4173/published-site?site=vineyard", false))
+      .toBeNull();
+    expect(localPreview("https://attacker.test/published-site?site=vineyard"))
+      .toBeNull();
+    expect(localPreview("http://127.0.0.1:4173/published-site?site=vineyard&site=other"))
+      .toBeNull();
+    expect(localPreview("http://127.0.0.1:4173/published-site?site=admin"))
+      .toBeNull();
+    expect(slugForPublicSiteOrigin(new Request(
+      "http://127.0.0.1:4173/published-site?site=vineyard", {
+        headers: { host: "attacker.test" },
+      }), false, true)).toBeNull();
   });
 });

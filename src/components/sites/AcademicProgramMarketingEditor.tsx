@@ -1,4 +1,5 @@
-import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
@@ -19,34 +20,30 @@ export function AcademicProgramMarketingEditor({
   const [summary, setSummary] = useState(program.marketing?.summary ?? "");
   const [reason, setReason] = useState("");
   const [reviewed, setReviewed] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const mutation = useMutationFeedback(() => router.invalidate());
+  const pending = mutation.pending || mutation.refreshFailed;
   const published = program.marketing?.status === "published";
   const eligible = !["closed", "paused"].includes(program.status);
   const action = published ? "unpublish" : "publish";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setPending(true); setNotice(""); setError("");
-    try {
+    await mutation.run(async () => {
       const result = await setAcademicProgramMarketingStatus({ data: {
         siteId, programId: program.id, action,
         expectedRevision: program.marketing?.updatedAt ?? null,
         summary: published ? "" : summary,
         reason, contentReviewed: !published && reviewed,
       } });
-      setNotice(result.changed ? (published
+      setReason(""); setReviewed(false);
+      return result;
+    }, {
+      successMessage: result => result.changed ? (published
         ? "Academic program withdrawn from the public catalog."
         : "Academic marketing approved. The Site must also be published to appear publicly.")
-        : "No publication change was needed.");
-      setReason(""); setReviewed(false);
-      await router.invalidate();
-    } catch (caught) {
-      setError(mutationErrorMessage(caught, "Unable to change marketing approval."));
-    } finally {
-      setPending(false);
-    }
+        : "No publication change was needed.",
+      commandErrorMessage: "Unable to change marketing approval.",
+    });
   }
 
   return <article className="rounded-xl border bg-card p-5">
@@ -103,8 +100,7 @@ export function AcademicProgramMarketingEditor({
       {!eligible && !published && <p className="text-sm text-muted-foreground">
         Paused or closed Programs cannot be newly published.
       </p>}
-      {error && <p role="alert" className="text-sm">{error}</p>}
-      {notice && <p role="status" className="text-sm">{notice}</p>}
+      <MutationFeedback state={mutation} pendingMessage="Saving academic marketing decision..."/>
     </form>
   </article>;
 }

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { developmentEnvironment } from "../../scripts/dev.mjs";
+import { assertDevelopmentNeonIdentity, developmentEnvironment } from "../../scripts/dev.mjs";
 
 let directory;
 const key = "synthetic-dev-startup-key-at-least-32-characters";
@@ -11,6 +11,15 @@ beforeEach(() => { directory = mkdtempSync(join(tmpdir(), "can-os-dev-startup-")
 afterEach(() => { rmSync(directory, { recursive: true }); });
 
 describe("Local development startup", () => {
+  it("accepts only the explicitly configured database-attested development identity", () => {
+    const env = { CAN_DEV_NEON_PROJECT_ID: "approved-project", CAN_DEV_NEON_BRANCH_ID: "br-approved-main" };
+    const identity = { project_id: "approved-project", branch_id: "br-approved-main" };
+    expect(() => assertDevelopmentNeonIdentity(identity, env)).not.toThrow();
+    expect(() => assertDevelopmentNeonIdentity(identity, {})).toThrow("Configure");
+    expect(() => assertDevelopmentNeonIdentity({ ...identity, branch_id: "br-other" }, env)).toThrow("refused");
+    expect(() => assertDevelopmentNeonIdentity({ ...identity, project_id: "foreign" }, env)).toThrow("refused");
+    expect(() => assertDevelopmentNeonIdentity(null, env)).toThrow("refused");
+  });
   it("loads the checkout's local database and stable session key without login flags", () => {
     writeFileSync(join(directory, ".env.local"), `DATABASE_URL=${database}\nCAN_ACCESS_TOKEN_PEPPER=${key}\n`);
     const env = developmentEnvironment(directory, {});

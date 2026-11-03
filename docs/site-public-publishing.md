@@ -15,6 +15,28 @@ registration entry points. The public portal must reuse CAN OS operational
 programs, guardian identity, admissions, consent, season/seat and financial
 records; it must not become a separate SIS, admissions system, or CMS database.
 
+## Reviewed school name and address changes
+
+The existing publishing page exposes a name/address form only to a Site Admin
+with `school.setup.manage` and the ordinary explicit institutional publication
+assignment. The server independently rechecks those permissions and tenant scope.
+Renaming requires the expected school name/publication revision, review
+confirmation and a decision reason. It atomically changes the canonical Site name,
+Site slug and public address, retaining Site identity and existing publication
+approval. It records audit evidence and `SitePublicIdentityChanged`; identical
+retries are no-ops and occupied addresses conflict.
+
+The previous address stops resolving to this Site; it is not a permanent
+redirect or a held alias. Organization names, program descriptions, DNS,
+certificates and deployment settings are not changed. Review those separately
+when the rename affects previously approved copy.
+
+`tests/e2e/school-website.spec.ts` uses the ordinary school bootstrap/sign-in,
+separately approved listing, Site publication, rename, anonymous rendering and
+registrar-denial paths. Run it through `playwright.config.ts` against an attested
+disposable database; never run its synthetic fixture on Main. Immutable fixture
+evidence remains on that disposable branch.
+
 ## Bite 1 committed: reservation foundation, NOT a live site
 
 - `site_publications` maps one canonical Site to at most one globally unique

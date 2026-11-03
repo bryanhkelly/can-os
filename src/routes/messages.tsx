@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -35,6 +35,8 @@ function relativeTime(iso: string): string {
 function MessagesPage() {
   const { thread } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const location=useLocation();
+  const returnTo=`${location.pathname}${location.searchStr}${location.hash}`;
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const selectedId = thread ?? threads[0]?.id ?? "";
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
@@ -56,6 +58,12 @@ function MessagesPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [contactError, setContactError] = useState("");
   const [loadingContacts, setLoadingContacts] = useState(true);
+
+  useEffect(() => {
+    if (needsSignIn) {
+      void navigate({ to: "/access", search: { returnTo }, replace: true });
+    }
+  }, [needsSignIn, navigate, returnTo]);
 
   function retryLoading() {
     setLoading(true); setError(""); setCanRetry(false); setNeedsSignIn(false);
@@ -175,7 +183,7 @@ function MessagesPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Messages</p>
           <h1 className="mt-2 font-serif text-4xl">Messages</h1>
           <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>
-          {needsSignIn && <Link to="/access" className="mt-4 inline-block underline">Sign in or request access →</Link>}
+          {needsSignIn && <Link to="/access" search={{returnTo}} className="mt-4 inline-block underline">Sign in or request access →</Link>}
           {canRetry && <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={retryLoading}>Retry loading messages</button>}
         </div>
       </main>

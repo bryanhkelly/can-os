@@ -2,11 +2,23 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { changeSitePublication, getSitePublicationDraft, reserveSitePublicAddress } from "./site-publication.server";
+import { changeSitePublication, changeSitePublicIdentity, getSitePublicationDraft, reserveSitePublicAddress } from "./site-publication.server";
 import { changeAcademicProgramPublication } from "./academic-program-publication.server";
 import { checkPublishedSiteReachability } from "./public-host-reachability";
 
 const uuid = z.string().uuid();
+
+export const renameSitePublicIdentity = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    siteId: uuid, name: z.string().trim().min(2).max(120),
+    slug: z.string().min(3).max(48), expectedName: z.string(),
+    expectedRevision: z.string().datetime({ offset: true }),
+    reason: z.string().trim().min(10).max(500), contentReviewed: z.boolean(),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    return changeSitePublicIdentity(await getCommandContext(getRequest()), data);
+  });
 
 export const getSitePublicationDraftView = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ siteId: uuid }).strict().parse(value))

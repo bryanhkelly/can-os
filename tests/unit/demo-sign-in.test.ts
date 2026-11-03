@@ -29,7 +29,7 @@ const grant = {
   personId: LOCAL_DEMO_ADMIN.personId,
   organizationId: LOCAL_DEMO_ADMIN.organizationId,
   siteId: LOCAL_DEMO_ADMIN.siteId,
-  role: "registrar",
+  role: "site_admin",
 };
 
 beforeEach(() => {
@@ -126,7 +126,7 @@ describe("shared demo sign-in", () => {
     vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", "false");
     vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", "false");
     const result = await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000");
-    expect(result).toMatchObject({ accountId: LOCAL_DEMO_ADMIN.accountId, role: "registrar" });
+    expect(result).toMatchObject({ accountId: LOCAL_DEMO_ADMIN.accountId, role: "site_admin" });
     expect(result.setCookie).toContain("HttpOnly");
     expect(result.setCookie).toContain("SameSite=Lax");
     expect(state.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
@@ -139,7 +139,7 @@ describe("shared demo sign-in", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("CAN_DEMO_FIXED_ACCESS_ENABLED", undefined);
     vi.stubEnv("CAN_DEMO_PUBLIC_ACCESS_ENABLED", undefined);
-    expect((await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000")).role).toBe("registrar");
+    expect((await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000")).role).toBe("site_admin");
   });
 
   it.each([

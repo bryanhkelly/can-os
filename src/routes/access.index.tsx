@@ -1,10 +1,11 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {useState} from "react";
-import { accessFormErrors } from "@/domain/access-navigation";
+import { accessFormErrors, safeAccessReturnTo } from "@/domain/access-navigation";
 import {isDemoAccountEmail} from "@/domain/local-demo-access";
 export const Route=createFileRoute("/access/")({
- validateSearch:(search:Record<string,unknown>):{email?:string;error?:keyof typeof accessFormErrors}=>({
+ validateSearch:(search:Record<string,unknown>):{email?:string;error?:keyof typeof accessFormErrors;returnTo?:string}=>({
   email:typeof search.email==="string"?search.email:undefined,
+  returnTo:safeAccessReturnTo(search.returnTo),
   error:typeof search.error==="string"&&Object.hasOwn(accessFormErrors,search.error)?search.error as keyof typeof accessFormErrors:undefined,
  }),
  component:AccessPage,
@@ -16,11 +17,13 @@ function AccessPage(){
  const[status,setStatus]=useState("");
  const[busy,setBusy]=useState(false);
  const isDemoEmail=isDemoAccountEmail(email);
+ const verifyAction=search.returnTo
+ ?`/access/verify?returnTo=${encodeURIComponent(search.returnTo)}`:"/access/verify";
  async function submit(e:React.FormEvent<HTMLFormElement>){
   if(isDemoEmail){setBusy(true);return;}
   e.preventDefault();setBusy(true);setStatus("");
   try{
-   const response=await fetch("/access/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+   const response=await fetch("/access/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,returnTo:search.returnTo})});
    if(response.status===429){setStatus("Too many sign-in requests right now. Please try again shortly.");return;}
    if(response.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
    if(!response.ok){setStatus("Unable to send a link. Please check your email address or try again.");return;}
@@ -30,7 +33,8 @@ function AccessPage(){
  return <main className="mx-auto max-w-md space-y-6 px-6 py-16">
   <h1 className="font-serif text-4xl">Access CAN OS</h1>
   <p>Enter the email address associated with your invited CAN OS account.</p>
-  <form action="/access/verify" method="post" onSubmit={submit} className="space-y-4">
+  <form action={verifyAction} method="post" onSubmit={submit} className="space-y-4">
+   <input type="hidden" name="returnTo" value={search.returnTo??""}/>
    <label className="block space-y-1"><span>Email</span><input name="email" required type="email" autoComplete="email" value={email} onChange={e=>{setEmail(e.target.value);setCode("");}} className="w-full rounded-lg border bg-background p-3"/></label>
    {isDemoEmail&&<label className="block space-y-1"><span>Demo access code (000000)</span><input name="code" required type="password" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value)} className="w-full rounded-lg border bg-background p-3"/></label>}
    <button disabled={busy} type="submit" className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">{isDemoEmail?"Sign in":"Email me an access link"}</button>

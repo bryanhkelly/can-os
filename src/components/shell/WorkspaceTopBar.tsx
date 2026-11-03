@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Bell, ChevronDown, Menu, MessageCircle, Search, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceNotice } from "@/components/workspace";
@@ -26,6 +26,8 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   onOpenNotifications: () => void;
   onOpenAccount: () => void;
 }) {
+  const location=useLocation();
+  const returnTo=`${location.pathname}${location.searchStr}${location.hash}`;
   return <header aria-label="Workspace top bar" className="sticky top-0 z-30 border-b bg-card px-4 py-3 sm:px-6">
     <div className="flex min-w-0 flex-wrap items-center gap-3">
       {member && <Button variant="outline" size="icon"
@@ -66,7 +68,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
       {authenticated
         ? <Button variant="ghost" size="icon" aria-label="Account menu" aria-haspopup="dialog" aria-expanded={accountOpen}
           onClick={onOpenAccount} className="rounded-full border bg-muted"><UserRound aria-hidden="true" /></Button>
-        : sessionAvailable && <Link to="/access" className="rounded-lg px-2 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Sign in</Link>}
+        : sessionAvailable && <Link to="/access" search={{returnTo}} className="rounded-lg px-2 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Sign in</Link>}
       {(error || sessionError) && <WorkspaceNotice tone="danger" className="w-full">{error || sessionError}</WorkspaceNotice>}
       {demoAccountSwitching && <WorkspaceNotice className="w-full">
         Demo admin session: acting as {member?.firstName} {member?.lastName} ({member?.role}). Changes affect shared demo data. User switches are audited.

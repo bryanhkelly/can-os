@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
+import { safeAccessReturnTo } from "@/domain/access-navigation";
 import type { LoaderFailureKind } from "./safe-loader";
 
 export interface LoaderErrorStateProps {
@@ -20,12 +21,14 @@ export interface LoaderErrorStateProps {
  * The shell is deliberately supplied by the consumer.
  */
 export function LoaderErrorState({ outcome, onRetry, retrying, fallback }: LoaderErrorStateProps) {
+  const location = useLocation();
+  const returnTo = safeAccessReturnTo(`${location.pathname}${location.searchStr}${location.hash}`);
   const needsSignIn = outcome.kind === "authentication" ||
     (outcome.kind === undefined && Boolean(outcome.authError));
   const error = needsSignIn ? (
     <>
       {outcome.authError ?? outcome.message}{" "}
-      <Link to="/access" className="font-semibold underline">
+      <Link to="/access" search={{ returnTo }} className="font-semibold underline">
         Sign in or request access →
       </Link>
     </>

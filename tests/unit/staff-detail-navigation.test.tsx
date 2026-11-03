@@ -10,6 +10,7 @@ vi.mock("@tanstack/react-router",()=>({
     options,useSearch:()=>state.search,useLoaderData:()=>state.data,
   }),
   useRouter:()=>({invalidate:vi.fn()}),
+  useLocation:()=>({pathname:"/actions/action-1",searchStr:"",hash:""}),
   Link:({to,search,params,children,...props}:{
     to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode;
   })=>{
@@ -116,7 +117,8 @@ describe("read-only staff Action detail",()=>{
     expect(action(true,"resolved")).not.toContain("Open owning operations workflow");
   });
   it("renders unavailable records explicitly instead of displaying other Actions",()=>{
-    state.data={ok:false,authError:"This action is unavailable in your current staff workspace.",message:"Denied"};
+    state.data={ok:false,kind:"authorization",authError:"This action is unavailable in your current staff workspace.",
+      message:"This action is unavailable in your current staff workspace."};
     const html=render(Action);
     expect(html).toContain("This action is unavailable");
     expect(html).not.toContain("Meet the student");

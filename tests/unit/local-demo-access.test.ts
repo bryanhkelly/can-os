@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {
- isDemoAccountEmail,isLocalDemoProvisioningEnabled,
- LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,
+ isDemoAccountEmail,isLocalDemoProvisioningEnabled,isApprovedDemoGrant,
+ LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
 } from "@/domain/local-demo-access";
 
 describe("tenant demo provisioning and identities",()=>{
@@ -11,6 +11,14 @@ describe("tenant demo provisioning and identities",()=>{
   expect(isLocalDemoProvisioningEnabled({NODE_ENV:"development"})).toBe(false);
   expect(isLocalDemoProvisioningEnabled({NODE_ENV:"test",CAN_DEMO_FIXED_ACCESS_ENABLED:"false"})).toBe(false);
   expect(isLocalDemoProvisioningEnabled({NODE_ENV:"production",CAN_DEMO_FIXED_ACCESS_ENABLED:"true"})).toBe(false);
+ });
+ it("binds the fixed administrator to its canonical Site Admin identity and scope",()=>{
+  const grant={...LOCAL_DEMO_ADMIN,role:"site_admin"};
+  expect(isApprovedDemoGrant(grant,LOCAL_DEMO_ADMIN.email)).toBe(true);
+  for(const changed of [
+   {role:"registrar"},{accountId:"foreign"},{personId:"foreign"},
+   {organizationId:"foreign"},{siteId:"foreign"},
+  ]) expect(isApprovedDemoGrant({...grant,...changed},LOCAL_DEMO_ADMIN.email)).toBe(false);
  });
 
  it("uses the tenant demo domain, fixed code and exact approved identities",()=>{

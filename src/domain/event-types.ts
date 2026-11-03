@@ -209,6 +209,7 @@ export const EventTypes = {
   LocalSiteResponsibilityAppointed: "LocalSiteResponsibilityAppointed",
   LocalSiteResponsibilityRevoked: "LocalSiteResponsibilityRevoked",
   SitePublicAddressReserved: "SitePublicAddressReserved",
+  SitePublicIdentityChanged: "SitePublicIdentityChanged",
   SitePublished: "SitePublished",
   SiteUnpublished: "SiteUnpublished",
   SiteLocalWebsiteContentPublished: "SiteLocalWebsiteContentPublished",

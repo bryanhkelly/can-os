@@ -37,6 +37,10 @@ export async function provisionDemoRegistrar(database: Pick<Database, "transacti
   return provisionScopedRegistrar(database, env, demoRegistrar);
 }
 
+export async function provisionDemoSiteAdmin(database: Pick<Database, "transaction">, env: DemoEnvironment) {
+  return provisionScopedRegistrar(database, env, LOCAL_DEMO_ADMIN);
+}
+
 async function provisionScopedRegistrar(
   database: Pick<Database, "transaction">, env: DemoEnvironment,
   fixture: { personId: string; accountId: string; grantId: string; roleAssignmentId: string;
@@ -46,6 +50,10 @@ async function provisionScopedRegistrar(
     throw new Error("Registrar provisioning requires local/test mode and CAN_DEMO_FIXED_ACCESS_ENABLED=true");
   }
   const isAdmin = fixture.accountId === LOCAL_DEMO_ADMIN.accountId;
+  const expectedRole = isAdmin ? "site_admin" : "registrar";
+  const requiredCapabilities = isAdmin
+    ? [...demoRegistrarInstitutionalCapabilities, "site.publication.manage"]
+    : [...demoRegistrarInstitutionalCapabilities];
   return database.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('can-os:demo-registrar'))`);
     const [organization] = await tx.select().from(organizations)
@@ -62,7 +70,7 @@ async function provisionScopedRegistrar(
     const personRows = await tx.insert(people).values({
       id: fixture.personId, legalFirstName: isAdmin ? "Demo" : "Alex",
       legalLastName: isAdmin ? "Admin" : "Example", preferredName: isAdmin ? "Demo" : "Alex",
-      metadata: { synthetic: true, role: "registrar" },
+      metadata: { synthetic: true, role: expectedRole },
     }).onConflictDoNothing().returning({ id: people.id });
     if (personRows.length) changes.push("person");
     const [person] = await tx.select().from(people).where(eq(people.id, fixture.personId)).for("update");
@@ -93,21 +101,31 @@ async function provisionScopedRegistrar(
     }
     const grantRows = await tx.insert(accountPersonGrants).values({
       id: fixture.grantId, accountId: fixture.accountId, personId: fixture.personId,
-      role: "registrar", organizationId: fixture.organizationId, siteId: fixture.siteId,
+      role: expectedRole, organizationId: fixture.organizationId, siteId: fixture.siteId,
     }).onConflictDoNothing().returning({ id: accountPersonGrants.id });
     if (grantRows.length) changes.push("access_grant");
     const accountGrants = await tx.select().from(accountPersonGrants)
       .where(eq(accountPersonGrants.accountId, fixture.accountId)).for("update");
+    const canonicalGrant = accountGrants.find(grant => grant.id === fixture.grantId);
+    if (isAdmin && canonicalGrant?.active && canonicalGrant.role === "registrar" &&
+      canonicalGrant.accountId === fixture.accountId && canonicalGrant.personId === fixture.personId &&
+      canonicalGrant.organizationId === fixture.organizationId && canonicalGrant.siteId === fixture.siteId) {
+      await tx.update(accountPersonGrants).set({ role: expectedRole, updatedAt: new Date() })
+        .where(eq(accountPersonGrants.id, canonicalGrant.id));
+      canonicalGrant.role = expectedRole;
+      changes.push("site_admin_role");
+    }
     if ((!isAdmin && accountGrants.filter(grant => grant.active).length !== 1) || !accountGrants.some(grant =>
       grant.id === fixture.grantId && grant.active &&
-      grant.role === "registrar" && grant.personId === fixture.personId &&
+      grant.role === expectedRole && grant.personId === fixture.personId &&
       grant.organizationId === fixture.organizationId && grant.siteId === fixture.siteId)) {
       throw new Error("Demo registrar access grants conflict; no existing authority will be replaced");
     }
 
     const membershipRows = await tx.insert(memberships).values({
       personId: fixture.personId, organizationId: fixture.organizationId,
-      title: "Demo school registrar", metadata: { synthetic: true, source: "demo-registrar-bootstrap" },
+      title: isAdmin ? "Demo school Site Admin" : "Demo school registrar",
+      metadata: { synthetic: true, source: "demo-registrar-bootstrap" },
     }).onConflictDoNothing().returning({ id: memberships.id });
     if (membershipRows.length) changes.push("membership");
     const [membership] = await tx.select().from(memberships).where(and(
@@ -116,23 +134,25 @@ async function provisionScopedRegistrar(
     if (membership?.metadata.synthetic !== true) throw new Error("Existing membership is not synthetic");
 
     const roleRows = await tx.insert(roleAssignments).values({
-      id: fixture.roleAssignmentId, personId: fixture.personId, roleKey: "registrar",
+      id: fixture.roleAssignmentId, personId: fixture.personId, roleKey: expectedRole,
       organizationId: fixture.organizationId, siteId: fixture.siteId,
-      capabilities: [...demoRegistrarInstitutionalCapabilities],
+      capabilities: requiredCapabilities,
       metadata: { synthetic: true, source: "demo-registrar-bootstrap" },
     }).onConflictDoNothing().returning({ id: roleAssignments.id });
     if (roleRows.length) changes.push("institutional_grant");
     const [role] = await tx.select().from(roleAssignments)
       .where(eq(roleAssignments.id, fixture.roleAssignmentId)).for("update");
     if (!role || role.personId !== fixture.personId || role.organizationId !== fixture.organizationId ||
-      role.siteId !== fixture.siteId || role.programId !== null || role.roleKey !== "registrar" ||
-      role.metadata.synthetic !== true) {
+      role.siteId !== fixture.siteId || role.programId !== null ||
+      (role.roleKey !== expectedRole && !(isAdmin && role.roleKey === "registrar")) ||
+      role.metadata.synthetic !== true || role.metadata.revokedAt != null) {
       throw new Error("Existing institutional grant conflicts with the demo school scope");
     }
-    const capabilities = [...new Set([...role.capabilities, ...demoRegistrarInstitutionalCapabilities])];
-    if (demoRegistrarInstitutionalCapabilities.some(capability => !role.capabilities.includes(capability))) {
+    const capabilities = [...new Set([...role.capabilities, ...requiredCapabilities])];
+    if (role.roleKey !== expectedRole ||
+      requiredCapabilities.some(capability => !role.capabilities.includes(capability))) {
       await tx.update(roleAssignments).set({
-        capabilities,
+        capabilities, roleKey: expectedRole,
         updatedAt: new Date(),
       }).where(eq(roleAssignments.id, role.id));
       changes.push("institutional_capabilities");
@@ -143,7 +163,7 @@ async function provisionScopedRegistrar(
       await writeAudit(tx, {
         actorPersonId: null, action: "demo.registrar.provision", resourceType: "person",
         resourceId: fixture.personId, scope,
-        after: { changes, roleAssignmentId: role.id, capabilities },
+        after: { changes, role: expectedRole, roleAssignmentId: role.id, capabilities },
         context: { method: "operator_bootstrap", synthetic: true },
       });
       await emitEvent(tx, {
@@ -158,7 +178,7 @@ async function provisionScopedRegistrar(
 export async function provisionDemoSchoolAccess(database: Pick<Database, "transaction">, env: DemoEnvironment) {
   return database.transaction(async tx => {
     const registrar = await provisionDemoRegistrar(tx, env);
-    const admin = await provisionScopedRegistrar(tx, env, LOCAL_DEMO_ADMIN);
+    const admin = await provisionDemoSiteAdmin(tx, env);
     const changedAccounts: string[] = [];
     const sourceFixtures = [
       { suffix: "1", email: "jordan.student@valorschool.demo", role: "student", personId: "f1000000-0000-4000-8000-000000000005" },

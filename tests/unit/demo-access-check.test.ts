@@ -10,7 +10,7 @@ vi.mock("@neondatabase/serverless", () => ({ Pool: class {
 const rows = () => LOCAL_DEMO_ACCOUNTS.map((account, index) => ({
   id: account.accountId === LOCAL_DEMO_ADMIN.accountId ? LOCAL_DEMO_ADMIN.grantId : `grant-${index}`,
   email: account.email, accountId: account.accountId, personId: account.personId,
-  role: account.email === LOCAL_DEMO_ADMIN.email ? "registrar" : account.role.toLowerCase(),
+  role: account.email === LOCAL_DEMO_ADMIN.email ? "site_admin" : account.role.toLowerCase(),
   organizationId: LOCAL_DEMO_ADMIN.organizationId, siteId: LOCAL_DEMO_ADMIN.siteId,
 }));
 

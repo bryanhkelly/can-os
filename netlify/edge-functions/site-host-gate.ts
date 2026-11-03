@@ -1,4 +1,5 @@
 import { classifyPublicSiteRequest } from "../../src/domain/public-site-host-routing.ts";
+import { PUBLIC_SITE_DOMAIN, publicSiteDomain } from "../../src/domain/public-site-address.ts";
 
 // Netlify supplies the environment at the edge, independently of Vite build
 // variables. The rollout flag is deliberately OFF unless explicitly enabled.
@@ -24,7 +25,15 @@ export default function siteHostGate(request: Request): Response | URL | undefin
     if (hostHeader && hostHeader.toLowerCase() !== requestHost) {
       return new Response("Not found", {status: 404, headers: {"Cache-Control": "no-store"}});
     }
-    decision = classifyPublicSiteRequest(request.url, request.method, enabled);
+    const configuredDomain = typeof Netlify === "undefined"
+      ? PUBLIC_SITE_DOMAIN
+      : Netlify.env.get("CAN_PUBLIC_SITE_DOMAIN") ?? PUBLIC_SITE_DOMAIN;
+    decision = classifyPublicSiteRequest(
+      request.url,
+      request.method,
+      enabled,
+      publicSiteDomain(configuredDomain),
+    );
   } catch {
     return new Response("Not found", {
       status: 404, headers: { "Cache-Control": "no-store" },

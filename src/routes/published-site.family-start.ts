@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
+import { publicSiteDomain } from "@/domain/public-site-address";
 import { parsePublicFamilyStart } from "@/domain/public-family-start";
 import { readSmallUrlEncodedBody } from "@/domain/public-admissions-interest";
 
@@ -13,7 +14,12 @@ const headers={
 
 export const Route=createFileRoute("/published-site/family-start")({
  server:{handlers:{POST:async({request})=>{
-  const slug=slugForPublicSiteOrigin(request,process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true");
+  const slug=slugForPublicSiteOrigin(
+    request,
+    process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true",
+    false,
+    publicSiteDomain(),
+  );
   if(!slug || request.headers.get("origin")!==new URL(request.url).origin)
     return new Response("Not found",{status:404,headers:{"Cache-Control":"no-store"}});
   try{

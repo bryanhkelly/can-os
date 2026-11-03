@@ -1,14 +1,20 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
-import { accessLandingPath } from "@/domain/access-navigation";
+import { accessLandingPath, safeAccessReturnTo } from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
 export const Route=createFileRoute("/access/verify")({
+ validateSearch:(search:Record<string,unknown>)=>({returnTo:safeAccessReturnTo(search.returnTo)}),
  server:{handlers:{
   POST:async({request})=>{
    const nativeForm=request.headers.get("content-type")?.split(";")[0]?.trim()==="application/x-www-form-urlencoded";
-   const formFailure=(error:"invalid"|"unavailable"|"rate_limited")=>new Response(null,{status:303,
-    headers:{Location:"/access?error="+error,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
+   const requestReturnTo=safeAccessReturnTo(new URL(request.url).searchParams.get("returnTo"));
+   const formFailure=(error:"invalid"|"unavailable"|"rate_limited",returnTo=requestReturnTo)=>{
+    const query=new URLSearchParams({error});
+    if(returnTo)query.set("returnTo",returnTo);
+    return new Response(null,{status:303,
+     headers:{Location:"/access?"+query.toString(),"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
+   };
    if(new URL(request.url).origin!==request.headers.get("origin"))return Response.json({error:"Invalid request origin"},{status:403});
    // Enforce the shared global admission ceiling before parsing credentials.
    // Do not derive rate keys from untrusted forwarded headers, email or tokens.
@@ -24,10 +30,11 @@ export const Route=createFileRoute("/access/verify")({
    }
    let value:unknown;
    try{
-    if(nativeForm){const form=await request.formData();value={email:form.get("email"),code:form.get("code"),token:form.get("token")};}
+    if(nativeForm){const form=await request.formData();value={email:form.get("email"),code:form.get("code"),token:form.get("token"),returnTo:form.get("returnTo")};}
     else value=await request.json();
    }catch{return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});}
    const payload=value&&typeof value==="object"?value:null;
+   const returnTo=payload&&"returnTo" in payload?safeAccessReturnTo(payload.returnTo)??requestReturnTo:requestReturnTo;
    try{
     const {redeemLocalDemoAccess,redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
     const result=payload&&"email" in payload&&typeof payload.email==="string"&&"code" in payload&&typeof payload.code==="string"
@@ -37,14 +44,14 @@ export const Route=createFileRoute("/access/verify")({
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
     if(nativeForm)return new Response(null,{status:303,headers:{
-     Location:accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined),
+     Location:accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo),
      "Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer",
     }});
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch(error){
     if(!(error instanceof InvalidAccessCredentialError)&&!(error instanceof AuthorizationError)){
      logAuthenticationUnavailable("verification",error);
-     if(nativeForm)return formFailure("unavailable");
+     if(nativeForm)return formFailure("unavailable",returnTo);
      return Response.json({error:"Authentication temporarily unavailable."},
       {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
     }
@@ -59,7 +66,7 @@ export const Route=createFileRoute("/access/verify")({
     }catch{
      logAuthenticationUnavailable("rejection_audit");
     }
-    if(nativeForm)return formFailure("invalid");
+    if(nativeForm)return formFailure("invalid",returnTo);
     return Response.json({error:"Invalid or expired access link"},
      {status:401,headers:{"Cache-Control":"no-store"}});
    }
@@ -68,9 +75,12 @@ export const Route=createFileRoute("/access/verify")({
  component:VerifyAccess,
 });
 function VerifyAccess(){
+ const search=Route.useSearch();
  const [working,setWorking]=useState(false);
  const [token,setToken]=useState<string|null>(null);
  const [ready,setReady]=useState(false);
+ const verifyAction=search.returnTo
+  ?`/access/verify?returnTo=${encodeURIComponent(search.returnTo)}`:"/access/verify";
  useEffect(()=>{
   const fragment=new URLSearchParams(window.location.hash.slice(1)).get("token");
   const legacy=new URLSearchParams(window.location.search).get("token");
@@ -84,8 +94,9 @@ function VerifyAccess(){
  return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
   <h1 className="font-serif text-3xl">Confirm your CAN OS access</h1>
   <p role="status">{ready&&!token?"The access link is missing. Request a new sign-in link to continue.":"Use the button to complete your sign-in."}</p>
-  <form action="/access/verify" method="post" onSubmit={()=>setWorking(true)}>
+  <form action={verifyAction} method="post" onSubmit={()=>setWorking(true)}>
   <input type="hidden" name="token" value={token??""}/>
+  <input type="hidden" name="returnTo" value={search.returnTo??""}/>
   <button type="submit" disabled={working||!ready||!token} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>
   </form>
  </main>;

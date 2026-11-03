@@ -7,7 +7,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
-import { getSitePublicationDraftView, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
+import { getSitePublicationDraftView, renameSitePublicIdentity, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
 import { AcademicProgramMarketingEditor } from "@/components/sites/AcademicProgramMarketingEditor";
 
 export const Route = createFileRoute("/sites/$siteId/publish")({
@@ -36,6 +36,27 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [contentReviewed, setContentReviewed] = useState(false);
   const [reachability, setReachability] = useState<"live" | "unreachable" | "hosting_disabled" | "not_published" | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [schoolName, setSchoolName] = useState(data.site.name);
+  const [newSlug, setNewSlug] = useState(data.address?.slug ?? "");
+  const [renameReason, setRenameReason] = useState("");
+  const [renameReviewed, setRenameReviewed] = useState(false);
+
+  async function rename(event: FormEvent) {
+    event.preventDefault();
+    await mutation.run(async () => {
+      if (!data.address) throw new DomainError("CONFLICT");
+      const result = await renameSitePublicIdentity({ data: {
+        siteId: data.site.id, name: schoolName, slug: newSlug,
+        expectedName: data.site.name, expectedRevision: data.address.updatedAt,
+        reason: renameReason, contentReviewed: renameReviewed,
+      } });
+      setRenameReason(""); setRenameReviewed(false); setReachability(null);
+      return result;
+    }, {
+      successMessage: "School name and public address saved. The old address no longer serves this Site; external hosting is not configured by this change.",
+      commandErrorMessage: "Unable to change the school name or address.",
+    });
+  }
 
   async function reserve(event: FormEvent) {
     event.preventDefault();
@@ -78,9 +99,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   }
 
   const hasApprovedPublicContent = data.catalogPreview.length > 0 ||
-    data.academicPrograms.some(program => program.marketing?.status === "published" &&
-      !["paused", "closed"].includes(program.status));
-  const candidate = isPublicSiteSlug(slug) ? publicSiteHost(slug) : null;
+    data.academicPrograms.some(program => program.marketing?.catalogEligible);
+  const candidate = isPublicSiteSlug(slug)
+    ? publicSiteHost(slug, data.publicSiteDomain) : null;
   return <WorkspaceShell eyebrow="CAN OS · Site publishing" title={data.site.name + " · public site"}
     subtitle="Reserve and publish your school address. Public hosting depends on separate DNS, TLS and deployment configuration."
     breadcrumbs={<><Link to="/sites/$siteId" params={{ siteId: data.site.id }} className="underline">Site Today</Link><span>/</span><span>Public site</span></>}>
@@ -95,6 +116,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           ? "Approved " + new Date(data.address.publishedAt).toLocaleString()
           : "Not published"}. Address changes require separate approval.</p>
         {data.address.status === "published" && <div className="mt-3 flex flex-wrap items-center gap-3">
+          {data.localPreviewEnabled &&
+            <a href={`/published-site?site=${encodeURIComponent(data.address.slug)}`}
+              className="text-sm font-semibold underline">Open local public preview</a>}
           <button type="button" disabled={verifying || saving} onClick={() => void verifyPublicWebsite()}
             className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
             {verifying ? "Checking HTTPS site…" : "Check live website"}
@@ -115,11 +139,43 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
             value={slug} onChange={event => setSlug(event.target.value)} minLength={3} maxLength={48}
             required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="vineyard-academy"/>
         </label>
-        <span className="pb-2 text-sm text-muted-foreground">.can-os.com</span>
+        <span className="pb-2 text-sm text-muted-foreground">.{data.publicSiteDomain}</span>
         <button className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           disabled={saving || !candidate} type="submit">{saving ? "Reserving…" : "Reserve address"}</button>
       </form>}
     </section>
+    {data.canRename && data.address && <section className="mt-6 rounded-xl border bg-card p-5">
+      <h2 className="text-xl font-semibold">School name and address</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        A reviewed rename keeps this Site, its people and existing publication approval.
+        The previous public address stops resolving to this Site. Organization legal names,
+        program descriptions, DNS and certificates are not changed.
+      </p>
+      <form className="mt-4 space-y-3" onSubmit={rename}>
+        <label className="block text-sm">School name
+          <input value={schoolName} onChange={event => setSchoolName(event.target.value)}
+            required minLength={2} maxLength={120} className="mt-1 block w-full rounded-lg border bg-background p-2"/>
+        </label>
+        <label className="block text-sm">New public subdomain
+          <input value={newSlug} onChange={event => setNewSlug(event.target.value)}
+            required minLength={3} maxLength={48} pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            className="mt-1 block w-full rounded-lg border bg-background p-2"/>
+        </label>
+        <label className="block text-sm">Name and address change reason
+          <textarea value={renameReason} onChange={event => setRenameReason(event.target.value)}
+            required minLength={10} maxLength={500} className="mt-1 block w-full rounded-lg border bg-background p-2"/>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={renameReviewed} onChange={event => setRenameReviewed(event.target.checked)}/>
+          <span>I reviewed the school name and new address and understand that the previous address will stop working.</span>
+        </label>
+        <button type="submit" disabled={saving || !renameReviewed || renameReason.trim().length < 10 ||
+          schoolName.trim().length < 2 || !isPublicSiteSlug(newSlug)}
+          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          Save school name and address
+        </button>
+      </form>
+    </section>}
     <section aria-labelledby="website-preview" className="mt-6 rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -224,8 +280,8 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Site publication decision</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Approving this Site controls its public-safe enrichment catalog.
-        It does not publish academic Programs or open registration.
+        Approving this Site displays its separately approved academic and enrichment listings.
+        It does not approve academic listings or open registration.
         Deploying the public hostname remains a separate step.
       </p>
       {!data.address ? <p className="mt-4 text-sm">
@@ -250,8 +306,8 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         {data.address.status === "draft" && <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={contentReviewed}
             onChange={event => setContentReviewed(event.target.checked)}/>
-          <span>I reviewed this Site's identity and eligible enrichment offerings,
-            including program titles, dates, pricing, and disclosures.</span>
+          <span>I reviewed this Site's identity and eligible academic and enrichment listings,
+            including program titles, descriptions, dates, pricing, and disclosures.</span>
         </label>}
         <button type="button"
           onClick={() => void updatePublication(data.address!.status === "published" ? "unpublish" : "publish")}

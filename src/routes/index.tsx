@@ -8,7 +8,7 @@ export const Route = createFileRoute("/")({ component: HomePage });
 /** Authenticated application entry, never a synthetic-feature showcase. */
 function HomePage() {
   const { session, error } = useWorkspaceSession();
-  if (session && !session.authenticated) return <Navigate to="/access" replace />;
+  if (session && !session.authenticated) return <Navigate to="/access" search={{returnTo:"/"}} replace />;
   const destination = session?.authenticated ? session.role==="student"
     ? studentHomePath(session.studentPreferences??defaultStudentDisplayPreferences)
     : getWorkspaceHome(session.role) : undefined;
@@ -21,7 +21,7 @@ function HomePage() {
       <p role={error ? "alert" : "status"} className="mt-5 text-sm text-muted-foreground">
         {error ?? "Your account has no active CAN OS workspace. Contact your school administrator."}
       </p>
-      <Link to="/access" className="mt-6 inline-block rounded-lg border px-4 py-2 text-sm">Sign in</Link>
+      <Link to="/access" search={{returnTo:"/"}} className="mt-6 inline-block rounded-lg border px-4 py-2 text-sm">Sign in</Link>
     </main>
   );
 }

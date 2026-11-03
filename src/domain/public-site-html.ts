@@ -53,6 +53,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   /** Caller supplies one server-generated random request ID per form. */
   makeRequestId?: () => string;
   path?: PublicSitePath;
+  localPreview?: boolean;
 }): string {
   const path = options?.path ?? "/";
   const availablePaths = availablePublicSitePaths(page);
@@ -111,8 +112,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       program.delivery.asynchronous ? "Self-paced online" : null,
     ].filter(Boolean).join(" · ");
     const onsiteDays = program.delivery.onsiteDaysPerWeek;
-    const requestId = options?.makeRequestId?.();
-    const applyRequestId = program.applicationOpen === true ? options?.makeRequestId?.() : undefined;
+    const requestId = options?.localPreview ? undefined : options?.makeRequestId?.();
+    const applyRequestId = !options?.localPreview && program.applicationOpen === true
+      ? options?.makeRequestId?.() : undefined;
     // Only the separately authorized school-of-record/admissions projection
     // can expose Apply. A live Program is NOT automatically an open school.
     // The receiving command rechecks operating authority at submission.
@@ -158,7 +160,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         ${onsiteDays !== null && program.delivery.onsite ? ` · ${onsiteDays} onsite days per week` : ""}
       </p>
       <p class="availability">${program.applicationOpen === true
-        ? "Applications available · identity verification required"
+        ? options?.localPreview
+          ? "Applications available on the live website only · identity verification required"
+          : "Applications available · identity verification required"
         : program.availability === "planned"
           ? "Program planned · admissions not open on this page"
           : "Current program · applications not currently available"}</p>
@@ -222,12 +226,15 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ${reviewedAddress ? `<div><h3>Published location</h3><p>${reviewedAddress}</p>
         <p class="availability">A published address is not confirmation that the site is open for visits.</p></div>` : ""}
       </div>` : ""}
-    <p>${academicCards
-      ? "For academic program questions, use the request-information form for a published program below."
-      : reviewedContact
-        ? "Use the school's published contact information for current next steps."
-        : "No public inquiry channel is currently available. The school has not published a verified contact method."}
-    ${academicCards ? "An inquiry does not guarantee admission or enrollment." : ""}</p></section>`;
+    <p>${options?.localPreview
+      ? "Inquiry and application submission is disabled in this local preview."
+      : academicCards
+        ? "For academic program questions, use the request-information form for a published program below."
+        : reviewedContact
+          ? "Use the school's published contact information for current next steps."
+          : "No public inquiry channel is currently available. The school has not published a verified contact method."}
+    ${!options?.localPreview && academicCards
+      ? "An inquiry does not guarantee admission or enrollment." : ""}</p></section>`;
   const schoolDay = (page.academicPrograms ?? []).map(program => {
     const days = program.delivery.onsiteDaysPerWeek;
     const modes = [
@@ -343,7 +350,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     `${escapePublicHtml(pageLabels[path])} | ${school}`;
   const pageDescription = path === "/" ? `Explore programs offered through ${school}.` :
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
-  const isLive = Boolean(options?.makeRequestId);
+  const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
   const canonical = `https://${host}${path}`;
   return `<!doctype html>
 <html lang="en">
@@ -399,7 +406,7 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[ar
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
-<main id="main-content">\n  ${pageContent[path]}\n</main>
+<main id="main-content">\n  ${options?.localPreview ? '<p role="status">Local read-only preview. Inquiry and application forms are available only on the configured live school website.</p>' : ""}\n  ${pageContent[path]}\n</main>
 <footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>
 </body>
 </html>`;

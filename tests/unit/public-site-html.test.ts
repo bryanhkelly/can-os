@@ -193,6 +193,19 @@ describe("standalone public site HTML", () => {
     }, opts);
     expect(authorized).toContain('action="/apply" method="post"');
     expect(authorized).toContain("Verify email to apply");
+    const localPreview = renderPublicSiteHtml({
+      ...page,
+      academicPrograms: page.academicPrograms.map(program => ({
+        ...program, applicationOpen: true,
+      })),
+    }, { ...opts, localPreview: true });
+    expect(localPreview).toContain("Hybrid Academy");
+    expect(localPreview).toContain("Local read-only preview");
+    expect(localPreview).toContain("Applications available on the live website only");
+    expect(localPreview).not.toContain("<form");
+    expect(localPreview).not.toContain('action="/apply"');
+    expect(localPreview).not.toContain('action="/inquiry"');
+    expect(localPreview).not.toContain("use the request-information form");
   });
 
 

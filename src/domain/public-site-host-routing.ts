@@ -1,17 +1,25 @@
 import { isPublicSiteReadPath } from "./public-site-paths.ts";
-import { PUBLIC_SITE_DOMAIN, slugFromPublicSiteHost } from "./public-site-address.ts";
+import {
+  isPublicSiteSlug,
+  publicSiteDomain,
+  slugFromPublicSiteHost,
+} from "./public-site-address.ts";
 
-/** Only these known platform hosts can serve CAN OS, never a partner site. */
-const platformHosts = new Set([
-  PUBLIC_SITE_DOMAIN,
-  ...["www", "app", "api", "auth", "admin", "portal", "dashboard", "static", "cdn", "mail", "docs", "help", "support", "staging", "demo", "test", "internal", "login", "files", "enrichment"]
-    .map(label => `${label}.${PUBLIC_SITE_DOMAIN}`),
-]);
+const platformLabels = [
+  "www", "app", "api", "auth", "admin", "portal", "dashboard", "static",
+  "cdn", "mail", "docs", "help", "support", "staging", "demo", "test",
+  "internal", "login", "files", "enrichment",
+];
 
 export type PublicSiteHostDecision =
   | { kind: "platform" }
   | { kind: "deny" }
   | { kind: "site"; slug: string; rewrite: boolean };
+
+function isLocalhost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
 
 /**
  * Source-of-truth edge decision. Do not trust X-Forwarded-Host.
@@ -25,13 +33,19 @@ export function classifyPublicSiteRequest(
   requestUrl: string,
   method: string,
   enabled: boolean,
+  configuredDomain?: string,
 ): PublicSiteHostDecision {
   const url = new URL(requestUrl);
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (platformHosts.has(host) || !host.endsWith(`.${PUBLIC_SITE_DOMAIN}`)) {
+  const domain = publicSiteDomain(configuredDomain);
+  const platformHosts = new Set([
+    domain,
+    ...platformLabels.map(label => `${label}.${domain}`),
+  ]);
+  if (platformHosts.has(host) || !host.endsWith(`.${domain}`)) {
     return { kind: "platform" };
   }
-  const slug = slugFromPublicSiteHost(host);
+  const slug = slugFromPublicSiteHost(host, domain);
   if (!slug || !enabled || url.protocol !== "https:" || url.search || url.hash) {
     return { kind: "deny" };
   }
@@ -63,9 +77,23 @@ function isRewrittenSitePage(path: string): boolean {
 export function slugForPublicSiteOrigin(
   request: Request,
   enabled: boolean,
+  allowLocalPreview = false,
+  configuredDomain?: string,
 ): string | null {
-  if (!enabled) return null;
+  if (!enabled && !allowLocalPreview) return null;
   const url = new URL(request.url);
+  const hostHeader = request.headers.get("host");
+  if (hostHeader && hostHeader.toLowerCase().replace(/\.$/, "") !== url.host.toLowerCase()) {
+    return null;
+  }
+  if (allowLocalPreview && request.method === "GET" &&
+      url.pathname === "/published-site" && isLocalhost(url.hostname)) {
+    const siteValues = url.searchParams.getAll("site");
+    if (siteValues.length !== 1 || url.searchParams.size !== 1) return null;
+    const slug = siteValues[0];
+    return slug && isPublicSiteSlug(slug) ? slug : null;
+  }
+  if (!enabled) return null;
   const routeAllowed =
     (request.method === "GET" &&
       (url.pathname === "/published-site" || isRewrittenSitePage(url.pathname))) ||
@@ -73,9 +101,5 @@ export function slugForPublicSiteOrigin(
       (url.pathname === "/published-site/inquiry" || url.pathname === "/published-site/family-start"));
   if (!routeAllowed || url.protocol !== "https:" || url.search || url.hash)
     return null;
-  const hostHeader = request.headers.get("host");
-  if (hostHeader && hostHeader.toLowerCase().replace(/\.$/, "") !== url.host.toLowerCase()) {
-    return null;
-  }
-  return slugFromPublicSiteHost(url.hostname);
+  return slugFromPublicSiteHost(url.hostname, publicSiteDomain(configuredDomain));
 }

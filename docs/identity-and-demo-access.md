@@ -11,12 +11,19 @@ Valor is an ordinary canonical Organization/Site tenant, not a separate workflow
 3. **Membership/grant**: verified account-to-person relationship, scoped site/organization/section access and capability grants. No grant is derived from a browser-selected persona.
 4. **Session**: server-created, opaque, random, expiring and revocable credential, stored only as a hash at rest. Send cookie as HttpOnly, Secure, SameSite=Lax, scoped to the application origin. Regenerate on login. Protect mutations from cross-site requests with same-origin and CSRF checks.
 5. **Active context**: choose only from the session's assigned roles/people/scopes; server resolves this from DB on every request (or short-lived cache with invalidation). Role switching never grants new capabilities.
-6. **Demo account switching**: the canonical Valor admin registrar membership may select only enabled, active, supported Valor account/person grants. Recheck admin and target authority on every request; no facilitator or mirrored grants.
+6. **Demo account switching**: the canonical Valor Site Admin membership may select only enabled, active, supported Valor account/person grants. Recheck admin and target authority on every request; no facilitator or mirrored grants.
 7. **Authorization**: one server-only `getCommandContext(request)` and `withAuth(capability, resourceResolver)` boundary for reads and writes. Validate relationship to each resource, not just capabilities.
 8. **Data protection**: prohibit real person, medical, legal, payment and student records until authentication, scoping, auditing and privacy review are complete. In shared public demo, explicitly label all synthetic data and expect visitors' changes to be visible to others.
 9. **Audit**: log effective account/person/grant/role, session owner when delegated, resource, action, correlation ID, timestamp and outcome on consequential mutations; enforce append-only history at DB level. A shared demo code does not identify the individual human visitor.
 10. **Demo identity access**: the approved `@valorschool.demo` accounts sign in with `000000` locally or on Netlify production, without demo-access flags. These shared accounts are intentionally public and must remain confined to Valor's synthetic tenant; they do not identify the human visitor. The database must already contain their active canonical grants, and `CAN_ACCESS_TOKEN_PEPPER` must be configured to issue sessions. Operator provisioning still requires literal `CAN_DEMO_FIXED_ACCESS_ENABLED=true` and development/test mode. `CAN_DEMO_WRITES_ENABLED` is retired; domain authorization, business invariants and transactional evidence apply to every tenant. External email/SMS is suppressed for Valor; R2 retains separate tenant-classified deployment switches.
 11. **Future authentication**: interface `verifyIdentityCredential(request): Promise<{ accountId: string } | null>` is replaceable by a future auth provider. Services depend on account/person/context, never on Resend or provider-specific claims.
+
+When a protected page detects a missing or expired session, sign-in preserves that
+page's local path, query and fragment and returns there after successful
+verification. Return paths are restricted to same-origin application paths and
+cannot target the sign-in flow; server-side authorization is still evaluated on
+the destination request. Without a valid return path, sign-in uses the normal
+role-specific landing page.
 
 ## Public `.demo` school setup
 
@@ -75,18 +82,26 @@ approved nonproduction branch before claiming end-to-end readiness.
 
 ## Local startup and checkout authority
 
-FullFlow is the authoritative connected checkout. Its `npm run dev` command
+The guarded `npm run dev` command
 loads its own ignored `.env.local`, preserves explicit shell overrides, checks
-the database and stable session key, and verifies the dedicated nonproduction
-FullFlow Neon branch before starting. An explicitly pinned `APP_ENV=test`
-admissions run instead verifies its configured nonproduction Neon branch.
+the database and stable session key, and compares database-reported Neon identity
+against explicit `CAN_DEV_NEON_PROJECT_ID` and `CAN_DEV_NEON_BRANCH_ID` in
+development mode. These declarations must identify the operator-approved target;
+they are not inferred from a URL or a branch name. Main requires explicit
+authorization because ordinary UI changes persist there.
+`APP_ENV=test` retains the isolated admissions/E2E branch verification, or the
+dedicated FullFlow guard when no admissions/E2E branch is declared. Development
+target declarations cannot authorize test fixtures against Main.
 `npm run dev -- --check` performs the applicable checks without starting a
 server. Startup never provisions accounts on login or automatically repairs
 data. Netlify production configuration remains separate.
 
-The older sibling checkout has a different applicant model; it is not an
-alternate source for FullFlow identity code. FullFlow's prospective-family
-email verification and guardian-application workflow remain unchanged.
+For explicitly authorized localhost work against Main, `npm run build` followed
+by `npm run preview -- --port 4173 --strictPort` loads `.env.local` (explicit
+shell values take precedence) and binds to loopback. It does not attest or
+isolate the configured database: ordinary UI writes persist there. Do not run
+mutation test fixtures against Main. Preview is a compiled production build;
+use the attested development server for hot reload.
 
 Approved demo grants must match the canonical account ID, person ID, expected
 role, Valor organization and Valor site, not merely an email ending in `.demo`.
@@ -341,7 +356,12 @@ $env:NODE_ENV = "development"
 npm run demo:provision-registrar -- --apply
 ```
 
-The command provisions Alex and Demo Admin under explicit environment gates. It
+The command provisions Alex as registrar and the existing Demo Admin as Site
+Admin under explicit environment gates. `--admin-only --apply` reconciles only
+the fixed Demo Admin identity. Its active legacy registrar grant is upgraded in
+place, retaining account, person and grant IDs; its same-Site institutional
+assignment adds publication authority. Revoked or conflicting authority is
+never restored. It
 normalizes the four recognized legacy source-account addresses in the same
 transaction, after checking their fixed account/person/grant IDs, active status
 and canonical tenant scope. It never replaces identities, reactivates revoked
@@ -365,15 +385,15 @@ acceptance still require an authorized guardian context, not registrar authority
 ### Demo Admin user switching
 
 Sign in as `admin.demo@valorschool.demo` with the same demo code. Demo Admin
-starts in a site-scoped registrar workspace. The top-bar **Demo user** selector
+starts in a site-scoped Site Admin workspace. The top-bar **Demo user** selector
 can switch to Jordan, Riley, Casey, Morgan or Alex and back to Demo Admin without
 signing out. A persistent banner identifies the effective person and role.
 Each switch performs a document navigation to discard the previous user's
 mounted state and caches.
 
 This is restricted tenant account delegation, not arbitrary production
-impersonation. The canonical active admin registrar membership authorizes the
-selector; every request rechecks admin authority, enabled target account,
+impersonation. The canonical active Site Admin membership authorizes the
+selector; every request rechecks the canonical Site Admin authority, enabled target account,
 active person and approved canonical exact-tenant membership. Revocation,
 disabling an account or changing its identity binding denies existing delegated
 sessions as well as new selections.
