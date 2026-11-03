@@ -7,7 +7,7 @@ import {organizations,programs,sitePublications,sites} from "@/db/schema";
 import {AuthorizationError} from "@/domain/command-context";
 import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
-import {renderPublicSiteHtml} from "@/domain/public-site-html";
+import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
 import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-program-publication";
 import {emptySiteLocalContent} from "@/domain/site-local-content";
 import {launchOpeningDate} from "@/domain/launch-opening-date";
@@ -45,7 +45,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const {status:publicAvailability,checkedAt,diagnostic:hostingDiagnostic}=availability;
   const base={siteId:school.siteId,programId:school.programId,programName:school.programName,
    host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt,hostingDiagnostic};
-  if(!address)return {...base,previewHtml:null,includesSuggestions:false};
+  if(!address)return {...base,previewHtml:null,previewPages:{} as Record<string,string>,includesSuggestions:false};
   const [approved,local,enrichment]=await Promise.all([
    readAcademicProgramCatalog(school.siteId),readCurrentLocalContent(school.siteId),readEnrichmentCatalog(school.siteId),
   ]);
@@ -58,12 +58,20 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
     asynchronous:school.deliveryModel.asynchronous===true,liveOnline:school.deliveryModel.liveOnline===true,
     onsiteDaysPerWeek:school.deliveryModel.onsiteDaysPerWeek??null},
   })]:[];
-  return {...base,includesSuggestions:needsPlanningCard||!local,
-   previewHtml:renderPublicSiteHtml({host:base.host!,site:{name:school.siteName,organizationName:school.organizationName},
-    offerings:enrichment.map(toPublicSiteEnrichment),academicPrograms:[...approved,...planning],localContent:local?.content??{
-     ...emptySiteLocalContent,welcomeMessage:`Welcome to ${school.programName}.`,
-     localDescription:`Our church is preparing a local learning community. Contact the church to learn more about plans for ${school.programName}.`,
+  const page = {host:base.host!,site:{name:school.siteName,organizationName:school.organizationName},
+    offerings:enrichment.map(toPublicSiteEnrichment),
+    academicPrograms:[...approved,...planning],
+    localContent:local?.content??{
+      ...emptySiteLocalContent,welcomeMessage:`Welcome to ${school.programName}.`,
+      localDescription:`Our church is preparing a local learning community. Contact the church to learn more about plans for ${school.programName}.`,
     },
-   }),
+  };
+  // The launch preview is private and intentionally form-inactive, even if
+  // the school has other programs with independently authorized applications.
+  const previewPages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
+    path, renderPublicSiteHtml(page,{path}),
+  ]));
+  return {...base,includesSuggestions:needsPlanningCard||!local,
+    previewHtml:previewPages["/"] ?? null, previewPages,
   };
  });
