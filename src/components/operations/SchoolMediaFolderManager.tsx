@@ -157,6 +157,14 @@ export function SchoolMediaFolderManager({siteId,canPublish}:{
       <legend className="px-2 font-semibold">One review for the imported folder</legend>
       <p className="text-sm">This approval covers {Math.min(pending.length,40)} private photos.
         Check that every included image has appropriate usage rights and subject permissions.</p>
+      <details className="rounded-lg border p-3">
+        <summary className="cursor-pointer text-sm font-semibold">Review imported file names ({Math.min(pending.length,40)})</summary>
+        <ul className="mt-2 max-h-44 list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+          {pending.slice(0,40).map(item=><li key={item.documentId}>{item.fileName}
+            <span className="text-muted-foreground"> · {item.width} × {item.height}</span>
+          </li>)}
+        </ul>
+      </details>
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={rights}
         onChange={event=>setRights(event.target.checked)}/>
         I have the rights or permission to publish each included photograph on our school's public website.
