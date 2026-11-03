@@ -58,7 +58,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         attachedIds.length?tx.select({id:schoolConfigurationVersions.id})
           .from(schoolConfigurationVersions)
           .where(and(inArray(schoolConfigurationVersions.programId,attachedIds),
-            eq(schoolConfigurationVersions.status,"approved"))).limit(1):Promise.resolve([]),
+            inArray(schoolConfigurationVersions.status,["approved","suspended"]))).limit(1):Promise.resolve([]),
         attachedIds.length?tx.select({programId:programPublications.programId})
           .from(programPublications)
           .where(and(inArray(programPublications.programId,attachedIds),
@@ -199,7 +199,7 @@ export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
         const [approved,published,authorized]=await Promise.all([
           tx.select({id:schoolConfigurationVersions.id}).from(schoolConfigurationVersions)
             .where(and(inArray(schoolConfigurationVersions.programId,programIds),
-              eq(schoolConfigurationVersions.status,"approved"))).limit(1),
+              inArray(schoolConfigurationVersions.status,["approved","suspended"]))).limit(1),
           tx.select({id:programPublications.programId}).from(programPublications)
             .where(and(inArray(programPublications.programId,programIds),
               eq(programPublications.status,"published"))).limit(1),
