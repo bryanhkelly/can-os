@@ -19,7 +19,8 @@ export const Route = createFileRoute("/operations/teacher-marketplace")({
   loaderDeps: ({ search }) => ({ programId: search.programId }),
   loader: ({ deps }) => safeLoader(async () => ({
     programs: await getCurriculumAdopterPrograms(),
-    market: deps.programId ? await getTeacherMarketplace({ data: { programId: deps.programId } }) : null,\n    previews: deps.programId ? await getDemoTeacherPreviews({data:{programId:deps.programId}}) : null,
+    market: deps.programId ? await getTeacherMarketplace({ data: { programId: deps.programId } }) : null,
+    previews: deps.programId ? await getDemoTeacherPreviews({data:{programId:deps.programId}}) : null,
   }), { authMessage: "An authorized school registrar is required." })(),
   component: TeacherMarketplacePage,
 });
