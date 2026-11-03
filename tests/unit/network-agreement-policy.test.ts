@@ -34,6 +34,15 @@ describe("CAN network stewardship policy", () => {
     expect(() => assertCANSteward(actor({siteId:"campus"}), can, "network.agreements.verify")).toThrow();
     expect(() => assertCANSteward(actor(), denom, "network.agreements.verify")).toThrow();
   });
+  it("keeps jurisdiction verification in a distinct reviewer role", () => {
+    const reviewer = resolveAccessContext(
+      { accountId: "account", sessionId: "session", activeGrantId: "grant" },
+      [{ ...grant, role: "can_jurisdiction_reviewer" }],
+    );
+    expect([...reviewer.capabilities]).toEqual(["jurisdiction.profile.verify"]);
+    expect(reviewer.capabilities.has("jurisdiction.profile.manage")).toBe(false);
+    expect(actor().capabilities.has("jurisdiction.profile.verify")).toBe(false);
+  });
   it("checks agreement effective window, exclusive end and revocation", () => {
     const term = { validFrom: at, validThrough: new Date(at.getTime()+86400000), revokedAt: null };
     expect(isNetworkAgreementActive(term, at)).toBe(true);

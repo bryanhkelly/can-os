@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS jurisdiction_profile_versions (
  summary text NOT NULL,
  profile jsonb NOT NULL DEFAULT '{}'::jsonb,
  review_owner_person_id uuid,
+ last_edited_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT,
+ verified_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT,
+ verification_evidence jsonb NOT NULL DEFAULT '{}'::jsonb,
  reviewed_at timestamptz,
  next_review_at timestamptz,
  source_updated_at timestamptz,
@@ -19,8 +22,12 @@ CREATE TABLE IF NOT EXISTS jurisdiction_profile_versions (
  created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now(),
  CONSTRAINT jurisdiction_profile_revision_uq UNIQUE (jurisdiction_id, revision),
- CONSTRAINT jurisdiction_profile_status_check CHECK (status IN ('draft','in_review','published','archived'))
+ CONSTRAINT jurisdiction_profile_status_check CHECK (status IN ('draft','in_review','published','archived')),
+ CONSTRAINT jurisdiction_profile_verification_status_check CHECK (verification_status IN ('unverified','verified'))
 );
+ALTER TABLE jurisdiction_profile_versions ADD COLUMN IF NOT EXISTS last_edited_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT;
+ALTER TABLE jurisdiction_profile_versions ADD COLUMN IF NOT EXISTS verified_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT;
+ALTER TABLE jurisdiction_profile_versions ADD COLUMN IF NOT EXISTS verification_evidence jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS jurisdiction_profile_status_idx ON jurisdiction_profile_versions (jurisdiction_id,status);
 CREATE TABLE IF NOT EXISTS curriculum_jurisdiction_approvals (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

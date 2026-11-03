@@ -5,6 +5,7 @@
  * Requires existing approval tables and DEMO_CURRICULUM_ALLOW_WRITE=1.
  */
 import { Pool } from "@neondatabase/serverless";
+import { demoCurriculumReviewStatus } from "./lib/demo-curriculum-import.mjs";
 const apply=process.argv.includes("--apply");
 if(!process.env.DATABASE_URL) throw Error("DATABASE_URL required");
 if(apply && (process.env.DEMO_CURRICULUM_ALLOW_WRITE!=="1" || !process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)) throw Error("Explicit write opt-in and confirmed database name required");
@@ -43,21 +44,30 @@ try {
     WHERE a.academic_purpose='general_instruction'
     AND a.course_template_version_id=ANY($1::uuid[])
     AND a.jurisdiction_id=ANY($2::uuid[])
-    AND a.status='under_review'`,[courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id)]);
-  if(!apply){await client.query("ROLLBACK");console.log(JSON.stringify({publisherId:publisher.rows[0].id,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,expectedApprovals:expected,currentlyInReview:existing.rows[0].n,apply:false},null,2));}
+    AND a.status=$3`,[courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id),demoCurriculumReviewStatus]);
+  if(!apply){await client.query("ROLLBACK");console.log(JSON.stringify({publisherId:publisher.rows[0].id,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,expectedApprovals:expected,currentlyUnderReview:existing.rows[0].n,apply:false},null,2));}
   else {
     await client.query(`INSERT INTO curriculum_jurisdiction_approvals
       (course_template_version_id,jurisdiction_id,academic_purpose,status,authority_organization_id,evidence,effective_at)
-      SELECT c.id,j.id,'general_instruction','under_review',$1,
+      SELECT c.id,j.id,'general_instruction',$3,$1,
         '{"scope":"internal_demo_only","externalAuthorization":false}'::jsonb,now()
       FROM (SELECT DISTINCT i.course_template_version_id AS id FROM curriculum_pack_items i
         JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
         WHERE pv.pack_id=$2 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$2)) c
       CROSS JOIN (SELECT id FROM jurisdictions WHERE code IN ('US-TX','US-FL','US-AZ','US-WV','US-AR','US-IA','US-OK','US-WI')) j
       ON CONFLICT (course_template_version_id,jurisdiction_id,academic_purpose)
-      DO NOTHING`,[publisher.rows[0].id,pack.rows[0].id]);
+      DO NOTHING`,[publisher.rows[0].id,pack.rows[0].id,demoCurriculumReviewStatus]);
+    const statusRows=await client.query(`SELECT status,count(*)::int AS count
+      FROM curriculum_jurisdiction_approvals
+      WHERE academic_purpose='general_instruction'
+        AND course_template_version_id=ANY($1::uuid[])
+        AND jurisdiction_id=ANY($2::uuid[])
+      GROUP BY status`,[courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id)]);
+    const statusCounts=Object.fromEntries(statusRows.rows.map(row=>[row.status,row.count]));
+    const recordCount=Object.values(statusCounts).reduce((total,count)=>total+count,0);
+    if(recordCount!==expected)throw Error(`Expected ${expected} scoped review records after reconciliation; found ${recordCount}`);
     await client.query("COMMIT");
-    console.log(JSON.stringify({inReview:expected,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,scope:"internal_demo_only"},null,2));
+    console.log(JSON.stringify({records:recordCount,underReview:statusCounts[demoCurriculumReviewStatus]??0,statusCounts,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,scope:"internal_demo_only"},null,2));
   }
 }catch(error){await client.query("ROLLBACK");throw error;}
 finally{client.release();await pool.end();}
