@@ -115,7 +115,7 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
  */
 export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
   suggestionId: string; decision: "accepted"|"edited"|"discarded";
-  editedText?: string; expectedRevision?: number;
+  editedText?: string; expectedRevision?: number; rightsConfirmed?: boolean;
 }) {
   const site = await requirePartnerWebsiteEditor(actor, db, siteWebsiteLocalPublishCapability);
   const [proposal] = await db.select({
@@ -134,6 +134,9 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
   }
   let publication: Awaited<ReturnType<typeof publishPartnerLocalContent>> | null = null;
   if (input.decision !== "discarded") {
+    if (input.rightsConfirmed !== true) {
+      throw new Error("Confirm your church has the rights to publish the selected text");
+    }
     const target = suggestionTargetFields[proposal.field];
     if (!target) throw new Error("This suggestion needs a manual branding review");
     if (input.expectedRevision === undefined || !Number.isSafeInteger(input.expectedRevision)) {
@@ -177,7 +180,8 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
       scope: { organizationId: checked.organizationId, siteId: checked.id },
       before: { decision: "pending" },
       after: { decision: input.decision, publicationRevision: publication?.revision ?? null,
-        publicationStatus: publication?.status ?? null },
+        publicationStatus: publication?.status ?? null,
+        rightsConfirmed: input.decision !== "discarded" && input.rightsConfirmed === true },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ChurchContentSuggestionReviewed,
