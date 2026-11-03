@@ -1,6 +1,6 @@
 import { and,eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions,programs } from "@/db/schema";
+import { actions,jurisdictionProfileVersions,programs,sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
@@ -98,5 +98,132 @@ export async function ensureSchoolJurisdictionReviewAction(
         programId:program.id,profileRevision:review.revision},
     });
     return {programId,created:true,needed:true,actionId:created.id};
+  });
+}
+
+/**
+ * CAN reviewer attestation for one persisted school scope.
+ * Explicitly separate from policy publication, public legal disclosure,
+ * operating approval, safety evidence, admissions and state funding approval.
+ * The Site row lock serializes with Agent S's physical-address editor.
+ */
+export async function decideSchoolJurisdictionLegalReview(
+  actor:AccessContext,input:{
+    programId:string;expectedScopeFingerprint:string;expectedSiteRevision:string;
+    decision:"verify"|"request_changes";note:string;sourceUrls:string[];
+  },
+) {
+  if(!actor.actorPersonId || actor.role!=="can_jurisdiction_reviewer" ||
+    actor.grantSiteId!==null || actor.sessionAccountId)
+    throw new AuthorizationError("independent CAN jurisdiction reviewer");
+  assertCapability(actor,"jurisdiction.profile.verify");
+  if(input.note.trim().length<25 || input.note.length>2000)
+    throw new Error("A substantive current-review rationale is required");
+  return db.transaction(async tx=>{
+    const [target]=await tx.select({siteId:programs.siteId}).from(programs)
+      .where(eq(programs.id,input.programId)).limit(1);
+    if(!target?.siteId)throw new AuthorizationError("existing Program Site");
+    const [site]=await tx.select({id:sites.id,updatedAt:sites.updatedAt})
+      .from(sites).where(eq(sites.id,target.siteId)).for("update").limit(1);
+    if(!site)throw new AuthorizationError("canonical Site record");
+    const [program]=await tx.select({id:programs.id}).from(programs)
+      .where(eq(programs.id,input.programId)).for("update").limit(1);
+    if(!program)throw new AuthorizationError("canonical Program record");
+    const review=await readSchoolJurisdictionReview(actor,input.programId,tx);
+    if(review.scopeFingerprint!==input.expectedScopeFingerprint ||
+      review.siteAddressRevision!==input.expectedSiteRevision)
+      throw new Error("Site or Program configuration changed; refresh current review");
+    if(review.locationReviewReason)
+      throw new Error("Physical Site address requires correction before independent review");
+    const [legal]=await tx.select().from(actions).where(and(
+      eq(actions.type,schoolJurisdictionReviewActionType),
+      eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
+      eq(actions.siteId,target.siteId),eq(actions.programId,input.programId),
+    )).for("update").limit(1);
+    if(!legal || typeof legal.metadata.requesterPersonId!=="string")
+      throw new Error("Church registrar must request the legal review first");
+    if(legal.metadata.requesterPersonId===actor.actorPersonId)
+      throw new AuthorizationError("reviewer must be independent of requester");
+    const [location]=await tx.select().from(actions).where(and(
+      eq(actions.type,"site_location_change_review"),
+      eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
+      eq(actions.siteId,target.siteId),eq(actions.programId,input.programId),
+    )).for("update").limit(1);
+    if(location?.metadata.requestedByPersonId===actor.actorPersonId)
+      throw new AuthorizationError("reviewer must be independent of Site editor");
+    const now=new Date();
+    const reviewedAt=now.toISOString();
+    if(input.decision==="verify"){
+      if(!review.policyReady || !review.policyVersionId)
+        throw new Error("Current policy and school-specific scope still require review");
+      const [policy]=await tx.select({id:jurisdictionProfileVersions.id,
+        evidence:jurisdictionProfileVersions.evidence})
+        .from(jurisdictionProfileVersions)
+        .where(and(eq(jurisdictionProfileVersions.id,review.policyVersionId),
+          eq(jurisdictionProfileVersions.status,"published"))).limit(1);
+      if(!policy)throw new Error("Verified jurisdiction policy is no longer published");
+      const official=new Set(policy.evidence.flatMap(source=>
+        typeof source.url==="string" && source.url.startsWith("https://")
+          ? [source.url] : []));
+      const cited=[...new Set(input.sourceUrls)];
+      if(!cited.length || cited.some(url=>!official.has(url)))
+        throw new Error("Select source URLs from the currently verified policy");
+      const metadata={
+        reviewState:"independently_verified",
+        reviewedByPersonId:actor.actorPersonId,reviewedAt,
+        reviewNote:input.note,reviewedSourceUrls:cited,
+        scopeFingerprint:review.scopeFingerprint,profileVersionId:policy.id,
+        profileRevision:review.revision,
+      };
+      const evidence={
+        kind:"school_jurisdiction_independent_review",decision:"verified",
+        scopeFingerprint:review.scopeFingerprint,profileVersionId:policy.id,
+        siteRevision:review.siteAddressRevision,reviewedByPersonId:actor.actorPersonId,
+        reviewedAt,note:input.note,sourceUrls:cited,
+      };
+      await tx.update(actions).set({
+        status:"resolved",resolvedAt:now,
+        resolutionNote:"CAN jurisdiction reviewer attested current school scope",
+        metadata:{...legal.metadata,...metadata},
+        evidence:[...legal.evidence,evidence],updatedAt:now,
+      }).where(eq(actions.id,legal.id));
+      if(location){
+        await tx.update(actions).set({
+          status:"resolved",resolvedAt:now,
+          resolutionNote:"Site change independently reviewed; opening approval still required",
+          metadata:{...location.metadata,...metadata,
+            requesterPersonId:location.metadata.requestedByPersonId},
+          evidence:[...location.evidence,evidence],updatedAt:now,
+        }).where(eq(actions.id,location.id));
+      }
+      await writeAudit(tx,actor,{
+        action:"program.jurisdiction.independently_verified",
+        entityType:"action",entityId:legal.id,
+        scope:{organizationId:legal.organizationId,
+          siteId:target.siteId,programId:input.programId},
+        before:{status:legal.status,scopeFingerprint:legal.metadata.scopeFingerprint},
+        after:{status:"resolved",scopeFingerprint:review.scopeFingerprint,
+          policyVersionId:policy.id,siteRevision:review.siteAddressRevision,
+          sourceCount:cited.length},
+      });
+      return {programId:input.programId,verified:true,actionId:legal.id};
+    }
+    await tx.update(actions).set({
+      status:"open",resolvedAt:null,resolutionNote:null,
+      metadata:{...legal.metadata,reviewState:"changes_requested",
+        reviewedByPersonId:actor.actorPersonId,reviewedAt},
+      evidence:[...legal.evidence,{
+        kind:"school_jurisdiction_independent_review",decision:"changes_requested",
+        note:input.note,reviewedAt,reviewedByPersonId:actor.actorPersonId,
+      }],updatedAt:now,
+    }).where(eq(actions.id,legal.id));
+    await writeAudit(tx,actor,{
+      action:"program.jurisdiction.changes_requested",
+      entityType:"action",entityId:legal.id,
+      scope:{organizationId:legal.organizationId,
+        siteId:target.siteId,programId:input.programId},
+      after:{status:"open",reviewedAt},
+    });
+    return {programId:input.programId,verified:false,actionId:legal.id};
   });
 }
