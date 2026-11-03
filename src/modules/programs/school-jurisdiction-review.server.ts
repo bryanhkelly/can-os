@@ -134,6 +134,7 @@ export async function readSchoolJurisdictionReview(
     programId,siteId:school.siteId,revision:version?.revision ?? null,
     reviewRequired:true,locationReviewReason,plannedOpeningReviewReason:null,scopeFingerprint,
     siteAddressRevision,addressChangeRevision,policyReady:false,
+    policyVersionId:version?.id ?? null,
     schoolReviewReason:locationReviewReason,decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness(locationReviewReason,
       version?.id ?? null,version?.revision ?? null),
@@ -142,7 +143,7 @@ export async function readSchoolJurisdictionReview(
     reviewRequired:true,locationReviewReason:null,plannedOpeningReviewReason:null,scopeFingerprint,
     siteAddressRevision,addressChangeRevision,policyReady:false,
     schoolReviewReason:"No verified jurisdiction profile for this Program",
-    decisions:[],candidateDisclosures:[],
+    policyVersionId:null,decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness("No published jurisdiction policy is available")};
   const [decision] = await executor.select({
     reviewerPersonId:jurisdictionProfileVerificationDecisions.reviewerPersonId,
@@ -224,7 +225,8 @@ export async function readSchoolJurisdictionReview(
   return {
     programId,siteId:school.siteId,revision:version.revision,
     reviewRequired:!schoolReviewReady,
-    policyReady,schoolReviewReason,siteAddressRevision,addressChangeRevision,
+    policyReady,policyVersionId:version.id,
+    schoolReviewReason,siteAddressRevision,addressChangeRevision,
     locationReviewReason:null,plannedOpeningReviewReason,scopeFingerprint,
     decisions:evaluated.decisions,
     readiness,
