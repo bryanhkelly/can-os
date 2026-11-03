@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ rows: [] as unknown[], lock: vi.fn(), authority: vi.fn() }));
+const state = vi.hoisted(() => ({ rows: [] as unknown[], intakeRows: [{id:"year"}] as unknown[], lock: vi.fn(), authority: vi.fn() }));
 vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@/db/schema", () => Object.fromEntries([
-  "programs", "programPublications", "publicFamilyStartRequests", "sitePublications", "sites",
-].map(name => [name, Object.fromEntries(["id", "siteId", "programId", "organizationId", "name", "slug", "type", "status", "publishedAt", "title", "summary", "gradeRange", "deliveryModel"].map(key => [key, name + "." + key]))])));
+  "admissionSeatPools", "schoolYears", "programs", "programPublications", "publicFamilyStartRequests", "sitePublications", "sites",
+].map(name => [name, Object.fromEntries(["id", "siteId", "programId", "organizationId", "name", "slug", "type", "status", "publishedAt", "title", "summary", "gradeRange", "deliveryModel", "capacity"].map(key => [key, name + "." + key]))])));
 vi.mock("@/domain/access-tokens", () => ({ hashAccessSecret: vi.fn(), issueOpaqueSecret: vi.fn() }));
 vi.mock("@/domain/public-family-start", () => ({ publicFamilyStartInput: {}, verifiedFamilyStartEmail: vi.fn() }));
 vi.mock("@/modules/identity/resend-access-mail.server", () => ({ sendAccessLinkViaResend: vi.fn() }));
@@ -21,13 +21,16 @@ const row = { siteId: "site", organizationId: "church", programId: "program", pr
   currentName:"School",currentGrades:{min:"K",max:"8"},
   currentDelivery:{onsite:true,asynchronous:false,liveOnline:false,onsiteDaysPerWeek:5} };
 function reader() {
+  let selects = 0;
   const chain = { from: () => chain, innerJoin: () => chain, where: () => chain,
-    for: (...args: unknown[]) => { state.lock(...args); return chain; }, limit: async () => state.rows };
-  return { select: () => chain } as unknown as Parameters<typeof resolvePublishedFamilyStartDestination>[0];
+    for: (...args: unknown[]) => { state.lock(...args); return chain; },
+    limit: async () => selects === 1 ? state.rows : state.intakeRows };
+  return { select: () => { selects++; return chain; } } as unknown as Parameters<typeof resolvePublishedFamilyStartDestination>[0];
 }
 beforeEach(() => {
   vi.clearAllMocks();
   state.rows = [row];
+  state.intakeRows = [{id:"year"}];
   state.authority.mockResolvedValue("authorization");
 });
 describe("published family application destination", () => {
@@ -63,6 +66,12 @@ describe("published family application destination", () => {
     await expect(resolvePublishedFamilyStartDestination(reader(), "program"))
       .rejects.toThrow("renewed approval");
     expect(state.authority).not.toHaveBeenCalled();
+  });
+  it("rejects a Program with no active configured academic intake year", async () => {
+    state.intakeRows = [];
+    await expect(resolvePublishedFamilyStartDestination(reader(), "program"))
+      .rejects.toThrow("no active configured application year");
+    expect(state.authority).toHaveBeenCalled();
   });
   it("retains the current institutional service check after marketing publication", async () => {
     state.authority.mockRejectedValue(new Error("Operating authorization revoked"));
