@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions,documents,jurisdictionProfileVerificationDecisions,jurisdictionProfileVersions,
+import { actions,auditEvents,documents,jurisdictionProfileVerificationDecisions,jurisdictionProfileVersions,
   jurisdictions,programs,schoolYears,sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { evaluateSiteJurisdictionIdentity } from "@/domain/site-jurisdiction-identity";
@@ -143,8 +143,22 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   });
   if(!parsedPolicy.success)
     throw new AuthorizationError("valid current jurisdiction requirements");
-  const physicalRevision=typeof locationChange?.metadata.siteAddressRevision==="string"
+  // Do not depend solely on an Action being created: the durable canonical
+  // Site-location mutation audit is a second fail-closed source of revision.
+  const [lastLocationUpdate]=await executor.select({
+    occurredAt:auditEvents.occurredAt,
+  }).from(auditEvents).where(and(
+    eq(auditEvents.action,"site.location.update"),
+    eq(auditEvents.resourceType,"site"),
+    eq(auditEvents.resourceId,school.siteId),
+  )).orderBy(desc(auditEvents.occurredAt)).limit(1);
+  const actionRevision=typeof locationChange?.metadata.siteAddressRevision==="string"
     ? locationChange.metadata.siteAddressRevision : null;
+  const auditRevision=lastLocationUpdate?.occurredAt?.toISOString()??null;
+  const physicalRevision=actionRevision && auditRevision
+    ? (Date.parse(actionRevision)>=Date.parse(auditRevision)
+      ? actionRevision:auditRevision)
+    : actionRevision??auditRevision;
   const requirementActions=await executor.select({
     status:actions.status,metadata:actions.metadata,
   }).from(actions).where(and(
