@@ -154,14 +154,12 @@ export async function decideSchoolJurisdictionLegalReview(
        legal.metadata.profileRevision!==review.revision))
       throw new Error("Church registrar must reopen legal review for the amended school configuration");
     if(input.decision==="verify" && !review.reviewRequired &&
-      legal.status==="resolved" && legal.metadata.reviewState==="independently_verified")
-      const reconciliation=await reconcileSchoolJurisdictionRequirementActions(tx,actor,{
-        programId:input.programId,siteId:target.siteId,
-        organizationId:program.organizationId,profileVersionId:policy.id,
-        scopeFingerprint:review.scopeFingerprint,profile:parsed.data,
-        decisions:review.decisions,
-      });
-      return {programId:input.programId,verified:true,actionId:legal.id,reconciliation};
+      legal.status==="resolved" && legal.metadata.reviewState==="independently_verified") {
+      if(legal.metadata.scopeFingerprint!==review.scopeFingerprint ||
+         legal.metadata.profileVersionId!==review.policyVersionId)
+        throw new Error("Previously reviewed Site or policy scope is no longer current");
+      return {programId:input.programId,verified:true,actionId:legal.id};
+    }
     const [location]=await tx.select().from(actions).where(and(
       eq(actions.type,"site_location_change_review"),
       eq(actions.subjectType,"program"),eq(actions.subjectId,input.programId),
@@ -230,7 +228,13 @@ export async function decideSchoolJurisdictionLegalReview(
           policyVersionId:policy.id,siteRevision:review.siteAddressRevision,
           sourceCount:cited.length},
       });
-      return {programId:input.programId,verified:true,actionId:legal.id};
+      const reconciliation=await reconcileSchoolJurisdictionRequirementActions(tx,actor,{
+        programId:input.programId,siteId:target.siteId,
+        organizationId:program.organizationId,profileVersionId:policy.id,
+        scopeFingerprint:review.scopeFingerprint,profile:parsed.data,
+        decisions:review.decisions,
+      });
+      return {programId:input.programId,verified:true,actionId:legal.id,reconciliation};
     }
     await tx.update(actions).set({
       status:"open",resolvedAt:null,resolutionNote:null,
