@@ -112,6 +112,58 @@ describe("canonical Site parent extras",()=>{
     expect(readApprovedPublicSchoolDay).toHaveBeenCalledTimes(2);
   });
 
+  it("uses C's independently signed Program/year source with actual separated Sunday instructional intervals",async()=>{
+    const base=reviewed("program-one",[0]);
+    const weekly=[
+      {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"10:00",timezone:"America/Los_Angeles"},
+      {dayOfWeek:0,startsAtLocal:"11:00",endsAtLocal:"12:00",timezone:"America/Los_Angeles"},
+      {dayOfWeek:3,startsAtLocal:"09:30",endsAtLocal:"13:00",timezone:"America/Los_Angeles"},
+    ];
+    vi.mocked(readApprovedPublicSchoolDay).mockResolvedValue({
+      ...base,state:"pending",approvedProgramSchoolDays:[{
+        siteId,programId:"program-one",gradeRange:{min:"K",max:"5"},
+        timezone:"America/Los_Angeles",schoolYearStartsOn:"2026-08-01",
+        schoolYearEndsOn:"2027-06-30",effectiveFrom:"2026-09-01",
+        effectiveThrough:null,weeklyPattern:[weekly[0]!],
+        instructionalIntervals:weekly,scheduleApprovalStatus:"approved",
+        scheduleApprovalRevision:9,scheduleReviewedAt:"2026-10-01T00:00:00.000Z",
+      }],
+    } as never);
+    const result=await readApprovedPublicParentExtras(siteId,["program-one"],metadata);
+    expect(result.programSchedules).toHaveLength(1);
+    expect(result.schoolDay).toBeUndefined();
+    expect(result.programSchedules[0]?.effectiveFrom.value).toBe("2026-09-01");
+    expect(result.programSchedules[0]?.effectiveThrough.value).toBe("2027-06-30");
+    expect(result.programSchedules[0]?.weeklyPattern.revision).toBe(9);
+    expect(result.programSchedules[0]?.weeklyPattern.value).toEqual(weekly);
+  });
+
+  it("does not fall back to legacy Site times when C's reviewed v2 source is missing or conflicted",async()=>{
+    const base=reviewed("program-one",[0]);
+    vi.mocked(readApprovedPublicSchoolDay).mockResolvedValue({
+      ...base,approvedProgramSchoolDays:[],
+    } as never);
+    const missing=await readApprovedPublicParentExtras(siteId,["program-one"],metadata);
+    expect(missing.programSchedules).toHaveLength(0);
+    expect(missing.schoolDay).toBeUndefined();
+    vi.mocked(readApprovedPublicSchoolDay).mockResolvedValue({
+      ...base,approvedProgramSchoolDays:[{
+        siteId,programId:"program-one",gradeRange:{min:"K",max:"5"},
+        timezone:"America/Los_Angeles",schoolYearStartsOn:"2026-08-01",
+        schoolYearEndsOn:"2027-06-30",effectiveFrom:"2026-09-01",
+        effectiveThrough:null,weeklyPattern:[],
+        instructionalIntervals:[
+          {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"11:00",timezone:"America/Los_Angeles"},
+          {dayOfWeek:0,startsAtLocal:"10:00",endsAtLocal:"12:00",timezone:"America/Los_Angeles"},
+        ],scheduleApprovalStatus:"approved",scheduleApprovalRevision:9,
+        scheduleReviewedAt:"2026-10-01T00:00:00.000Z",
+      }],
+    } as never);
+    const conflict=await readApprovedPublicParentExtras(siteId,["program-one"],metadata);
+    expect(conflict.programSchedules).toEqual([]);
+    expect(conflict.schoolDay).toBeUndefined();
+  });
+
   it("withholds unapproved/mismatched schedule and never reads unpublished Program",async()=>{
     vi.mocked(readApprovedPublicSchoolDay).mockResolvedValue({
       ...reviewed("other-program",[0]),programScope:{
