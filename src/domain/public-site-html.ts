@@ -225,7 +225,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero"><p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   const pageContent: Record<PublicSitePath, string> = {
-    "/": hero + (local?.schoolVision || local?.localDescription ? `<section class="mission-split editorial-section" aria-labelledby="mission-title"><div><p class="tag">Rooted in this community</p><h2 id="mission-title">An education with a sense of place</h2></div><p>${escapePublicHtml(local.schoolVision || local.localDescription)}</p></section>` : "") + academicSection + (page.offerings.length ? enrichmentSection : "") + localSection + (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p><h2>Discover the right learning path</h2><p>Explore published programs and request details before making an enrollment decision.</p><a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") + contactSection,
+    "/": hero + (local?.schoolVision || local?.localDescription ? `<section class="mission-split editorial-section" aria-labelledby="mission-title"><div><p class="tag">Rooted in this community</p><h2 id="mission-title">An education with a sense of place</h2></div><p>${escapePublicHtml(local.schoolVision || local.localDescription)}</p></section>` : "") + academicSection + (page.offerings.length ? enrichmentSection : (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) + localSection + (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p><h2>Discover the right learning path</h2><p>Explore published programs and request details before making an enrollment decision.</p><a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") + contactSection,
     "/about": secondaryHero("Our community", "A school rooted in community",
       "Learn about the church and local people behind this school.") + localSection,
     "/academics": secondaryHero("Learning", "Academic programs",
@@ -307,7 +307,7 @@ header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[ar
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}</nav></details></header>
 <main id="main-content">\n  ${pageContent[path]}\n</main>
-<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy</span></footer>
+<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>
 </body>
 </html>`;
 }
