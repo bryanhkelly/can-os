@@ -359,7 +359,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "Start with an approved program inquiry when available.") + contactSection + academicSection +
       (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : ""),
   };
-  const pageTitle = path === "/" ? `${school} | ${foundingFamilies ? "Founding families" : "Programs"}` :
+  const pageTitle = path === "/" ? `${school} | Programs` :
     `${escapePublicHtml(pageLabels[path])} | ${school}`;
   const pageDescription = path === "/" ? (foundingFamilies
     ? `Learn about planned programs at ${school} and request founding-family information. Applications are not open.`
