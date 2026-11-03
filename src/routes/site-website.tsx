@@ -134,6 +134,11 @@ async function prepareWebsiteArtwork(file: File): Promise<string> {
 
 const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help: string; multi: boolean }> = [
   { key: "welcomeMessage", label: "Welcome", help: "A message from your local church.", multi: true },
+  { key: "churchHistory", label: "Tell us about your church", help: "When did your church begin? Share its history and important milestones.", multi: true },
+  { key: "communityOutreach", label: "Who does your church serve?", help: "Describe the people, neighborhoods and outreach efforts central to your community.", multi: true },
+  { key: "schoolVision", label: "Why did your church start a school?", help: "Share your vision without making promises about unapproved academic services.", multi: true },
+  { key: "leadershipWelcome", label: "A welcome from your pastor or school leader", help: "Optional words approved by your church leader for families.", multi: true },
+  { key: "localTraditions", label: "Local traditions and experiences", help: "Share real local traditions, service projects and community experiences.", multi: true },
   { key: "localDescription", label: "Local community and school vision", help: "Local vision, history, activities and community information; do not promise official academic services.", multi: true },
   { key: "denomination", label: "Denominational affiliation", help: "Describe your church's identity. Do not claim an endorsement that has not been granted.", multi: false },
   { key: "statementOfFaith", label: "Statement of faith", help: "Your church's own theological statement, not CAN's academic policies.", multi: true },
@@ -194,9 +199,9 @@ function LocalWebsiteCopyEditor({
   }
 
   return <section aria-labelledby="local-copy-title" className="mt-6 rounded-xl border bg-card p-5">
-    <h2 id="local-copy-title" className="text-xl font-semibold">Your church's website content</h2>
+    <h2 id="local-copy-title" className="text-xl font-semibold">Tell your school's story</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      You control these fields. Local community, denominational and theological
+      Share what you know now; optional questions can be left blank and revisited later. Local community, denominational and theological
       updates publish directly when basic safety checks pass, without CAN editorial
       approval. Official curriculum, admissions, tuition, accreditation and
       school-of-record information comes from CAN OS and cannot be edited here.
@@ -267,17 +272,18 @@ function LocalWebsiteCopyEditor({
           }))} className="rounded-lg border px-3 py-1 text-xs">Remove artwork</button>
         </div>}
       </fieldset>
+      <div className="rounded-xl border bg-muted/30 p-4"><h3 className="font-serif text-lg font-semibold">Your church, in your own words</h3><p className="mt-1 text-sm text-muted-foreground">Answer the prompts below. Save when ready; unanswered sections remain hidden on the public website.</p></div>
       {churchFields.map(field => <label key={field.key} className="block text-sm">
         <span className="font-medium">{field.label}</span>
         <span className="mt-1 block text-xs text-muted-foreground">{field.help}</span>
         {field.multi
           ? <textarea rows={field.key === "statementOfFaith" ? 6 : 3}
               maxLength={siteLocalContentLimits[field.key]}
-              value={content[field.key]} onChange={e => setContent(old =>
+              value={content[field.key] ?? ""} onChange={e => setContent(old =>
                 ({ ...old, [field.key]: e.target.value }))}
               className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
           : <input type="text" maxLength={siteLocalContentLimits[field.key]}
-              value={content[field.key]} onChange={e => setContent(old =>
+              value={content[field.key] ?? ""} onChange={e => setContent(old =>
                 ({ ...old, [field.key]: e.target.value }))}
               className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />}
       </label>)}
