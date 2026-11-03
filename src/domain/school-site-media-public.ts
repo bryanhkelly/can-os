@@ -1,5 +1,6 @@
 import {planSchoolSiteMedia,type SiteMediaPhoto,type SchoolSiteMediaSlot}
   from "./school-site-media-selection";
+import {slugFromPublicSiteHost} from "./public-site-address";
 
 export type PublicSchoolSiteMedia=Partial<Record<SchoolSiteMediaSlot,{
   src:string;altText:string;assetId:string;sourceRevision:string;
@@ -11,9 +12,7 @@ export type PublicSchoolSiteMedia=Partial<Record<SchoolSiteMediaSlot,{
 export function projectApprovedSchoolSiteMedia(
   siteId:string,schoolHost:string,photos:readonly SiteMediaPhoto[],
 ):PublicSchoolSiteMedia {
-  if(!/^[a-z0-9.-]+\.can-os\.com$/i.test(schoolHost) &&
-    !/^[a-z0-9.-]+\.schools\.example\.org$/i.test(schoolHost))
-    return {};
+  if(!slugFromPublicSiteHost(schoolHost))return {};
   const byId=new Map(photos.map(photo=>[photo.id,photo]));
   const plan=planSchoolSiteMedia(siteId,photos);
   const result:PublicSchoolSiteMedia={};
