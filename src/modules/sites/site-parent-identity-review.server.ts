@@ -7,7 +7,7 @@ import { DomainError } from "@/domain/errors";
 import { writeAudit } from "@/platform/mutation";
 import {
   approvedIdentityFacts, canonicalPublicAddress, canonicalPublicContact,
-  identityReviewSchema, sourceDigest,
+  identityReviewSchema, publicIdentityReviewStatuses, sourceDigest,
 } from "@/domain/public-parent-identity";
 import { requireSitePublisher } from "./site-publication.server";
 
@@ -61,18 +61,22 @@ export async function getSiteParentIdentityReview(actor:AccessContext,siteId:str
   const contact=canonicalPublicContact(row.metadata.setupContact);
   const previous=identityReviewSchema.safeParse(row.metadata.publicParentIdentityReview);
   const current=approvedIdentityFacts(site.id,row.address,row.metadata);
+  const statuses=publicIdentityReviewStatuses(site.id,row.address,row.metadata);
   return {
     siteId:site.id,
     siteRevision:row.updatedAt.toISOString(),
     reviewRevision:previous.success?previous.data.revision:0,
     reviewedAt:previous.success?previous.data.reviewedAt:null,
+    evidenceReference:previous.success?previous.data.evidenceReference??null:null,
     expiresOn:previous.success?previous.data.expiresOn:null,
     /** Sources are displayed privately to an authorized publisher for review;
      * browser never decides the public canDisplay flag. */
     address:{value:address,digest:address?sourceDigest(site.id,"address",address):null,
-      publicApproved:current.publicAddress?.canDisplay===true},
+      publicApproved:current.publicAddress?.canDisplay===true,
+      status:statuses.address},
     contact:{value:contact,digest:contact?sourceDigest(site.id,"contact",contact):null,
-      publicApproved:current.publicContact?.canDisplay===true},
+      publicApproved:current.publicContact?.canDisplay===true,
+      status:statuses.contact},
   };
 }
 
