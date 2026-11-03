@@ -285,5 +285,31 @@ describe("standalone public site HTML", () => {
     expect(reviewed).toContain("Official &lt;state&gt; information.");
     expect(reviewed).not.toContain("<h3>Accreditation</h3>");
     expect(reviewed).not.toContain('action="/apply"');
+    expect(reviewed).toContain("Applications are not currently open through this website");
+  });
+
+  it("only renders independently reviewed Site address and contact details", () => {
+    const site = { name: "Example Academy", organizationName: "Example Partner" };
+    const parentInformation = projectApprovedParentInformation({
+      site, academicPrograms: [], offerings: [], localContent: null,
+    });
+    const page = { host: "example.can-os.com", site, offerings: [], parentInformation };
+    const withheld = renderPublicSiteHtml(page, { path: "/contact" });
+    expect(withheld).toContain("No public inquiry channel is currently available");
+    expect(withheld).not.toContain("Published contact information");
+
+    parentInformation.site.contact = verifiedPublicClaim(
+      "Office: family@example.org <please call>", "institutional_record", 4);
+    parentInformation.site.address = verifiedPublicClaim(
+      "123 School Road\\nSample City", "organization_site", 4);
+    const approved = renderPublicSiteHtml(page, { path: "/contact" });
+    expect(approved).toContain("Office: family@example.org &lt;please call&gt;");
+    expect(approved).toContain("123 School Road");
+    expect(approved).toContain("not confirmation that the site is open for visits");
+    expect(approved).not.toContain("No public inquiry channel is currently available");
+
+    parentInformation.site.contact = unconfiguredClaim("institutional_record");
+    const addressOnly = renderPublicSiteHtml(page, { path: "/contact" });
+    expect(addressOnly).not.toContain("Published contact information");
   });
 });
