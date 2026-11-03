@@ -102,7 +102,7 @@ export function robotsAllows(robots: string, pathname: string): boolean {
     }
   }
 
-  const ourAgent = "canos-churchreference";
+  const ourAgent = "canos-churchreference/1.0";
   const matchingNames = groups.flatMap(g => g.agents)
     .filter(agent => agent !== "*" && ourAgent.startsWith(agent));
   const longestAgent = matchingNames.reduce((max, name) => Math.max(max, name.length), 0);
