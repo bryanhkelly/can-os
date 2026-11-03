@@ -4,6 +4,16 @@ import {
   type JurisdictionProfile,
 } from "./jurisdiction-profile";
 
+/** Only the canonical US K–12 grade ordering is expanded. Unknown labels
+ * remain unconfirmed and require legal review rather than guessed grades. */
+export function expandKnownSchoolGradeRange(range:{min:string;max:string}):string[] {
+  const levels=["PK","TK","K",...Array.from({length:12},(_,i)=>String(i+1))];
+  const low=levels.indexOf(range.min.trim().toUpperCase());
+  const high=levels.indexOf(range.max.trim().toUpperCase());
+  if(low<0||high<low)return [];
+  return levels.slice(low,high+1);
+}
+
 /** A Site/Program context assembled from authoritative setup records, not a website form. */
 export type SchoolJurisdictionContext = {
   state: string;
