@@ -90,7 +90,7 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
         eq(scheduleTemplates.siteId,site.id),eq(scheduleTemplates.active,true),
         eq(schoolYears.status,"active"))).limit(101);
     if(overlapping.length>100 || competingActiveSchoolDaySchedules(overlapping.map(item=>({
-      ...item,programMatches:item.programId===input.programId &&
+      ...item,templateActive:item.active,programMatches:item.programId===input.programId &&
         (!item.schoolYearProgramId||item.schoolYearProgramId===input.programId),
       siteMatches:item.siteId===site.id && item.schoolYearSiteId===site.id,
     })),{
