@@ -58,8 +58,11 @@ jobs:
         run: |
           npm run db:generate
           git diff --exit-code -- drizzle/
-      - name: FullFlow migration review (read-only)
-        run: npm run db:review:fullflow
+      - name: FullFlow migration artifact integrity (no Neon connection)
+        run: node --test scripts/fullflow-post0051-artifacts.check.mjs
+      # npm run db:review:fullflow is intentionally NOT run on PR runners.
+      # It requires CAN_TEST_DB_WRITES_ENABLED=true and an isolated, verified
+      # TEST_DATABASE_URL. Integration I owns that separately gated DB review.
       - name: Lint and design system checks
         run: npm run lint
       - name: Typecheck (whole-repository gate)
