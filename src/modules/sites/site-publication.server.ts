@@ -90,6 +90,17 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     readAcademicProgramCatalog(site.id),
     readCurrentLocalContent(site.id),
   ]);
+  const publicOfferings = publishedOfferings.map(toPublicSiteEnrichment);
+  const [siteConfiguration] = await db.select({metadata: sites.metadata})
+    .from(sites).where(eq(sites.id, site.id)).limit(1);
+  const parentExtras = await readApprovedPublicParentExtras(site.id,
+    approvedAcademicListings.map(program => program.programId),
+    siteConfiguration?.metadata ?? null);
+  const parentInformation = projectApprovedParentInformation({
+    site: {name: site.name, organizationName: site.organizationName},
+    academicPrograms: approvedAcademicListings, offerings: publicOfferings,
+    localContent: localCopy?.content ?? null, ...parentExtras,
+  });
   return {
     site,
     hostingConfigured: process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
@@ -123,7 +134,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
         updatedAt: program.marketingUpdatedAt?.toISOString() ?? null,
       } : null,
     })),
-    catalogPreview: publishedOfferings.map(toPublicSiteEnrichment),
+    catalogPreview: publicOfferings,
     // Identical standalone HTML renderer to /published-site. No request ID
     // generator: this authenticated draft is read-only, not an inquiry form.
     // The client displays it inside an origin-isolated sandboxed iframe.
@@ -132,7 +143,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms: approvedAcademicListings,
       localContent: localCopy?.content ?? null,
-      offerings: publishedOfferings.map(toPublicSiteEnrichment),
+      offerings: publicOfferings,
+      parentInformation,
     }) : null,
   };
 }
