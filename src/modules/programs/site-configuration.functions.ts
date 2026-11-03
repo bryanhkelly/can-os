@@ -43,7 +43,8 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       const oldAddress=site.address??null;
       const address=data.address;
       const same=samePhysicalSiteAddress(oldAddress,address);
-      if(same)return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString(),reviewRequested:false};
+      if(same && typeof site.metadata.sitePhysicalAddressRevision==="string")
+        return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString(),reviewRequested:false};
       if(site.updatedAt.toISOString()!==data.expectedRevision)
         throw new Error("This Site changed since you opened it. Refresh before saving to avoid overwriting another editor.");
       const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
