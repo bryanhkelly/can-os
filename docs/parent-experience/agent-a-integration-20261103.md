@@ -6,7 +6,7 @@
 
 `readPublishedParentInformation(slug)` → `readPublishedSiteCatalog(slug)` (published Site row shared lock) → published academic catalog + current reviewed church copy + `readApprovedPublicParentExtras` → `projectApprovedParentInformation`.
 
-Private editor previews call the same pure DTO adapter and the same extras reader, but shared HTML previews still need I to align Program-level Apply flags. Public `site-public-catalog.server.ts` already aligns its Program cards to canonical family-start eligibility.
+Private editor previews call the same pure DTO adapter and extras reader; publisher and church preview academic cards now use the same Program-level verified Apply decision as the live catalog. Integration I must review these shared-file changes and validate the final published rendering.
 
 ## Claim/source provenance and gates
 
@@ -17,8 +17,8 @@ Private editor previews call the same pure DTO adapter and the same extras reade
 | Public contact | `sites.metadata.setupContact` | S draft; separate institutional Site publisher review | Exact source digest, review revision/expiry, Site publication; never pull HR/guardian contacts | **Writer + reader implemented; I review/acceptance pending** |
 | Local church, faith, formation | Published `siteLocalContent` revision | P/editor content publication | Read current approved revision; no draft copy | Existing |
 | Academic names, grade ranges and delivery | Program + `programPublications` approved parity | Institutional Program publisher | Live agreement + Site/Program status; stale identity/delivery withdrawn | Existing |
-| Per-Program instructional hours incl. Sunday | Approved `scheduleTemplates` + `scheduleTemplatePeriods` via C | Academic schedule reviewer | Site + Program published, active year, exact review signature, current timeframe; no Site-wide flattening | Connected to legacy; varied hours after C #255 |
-| Schedule approval revision and effective dates | Same C schedule | C | Require approved template revision and exact effective range | **C reader extension needed** |
+| Per-Program instructional hours incl. Sunday | Approved `scheduleTemplates` + `scheduleTemplatePeriods` via C | Academic schedule reviewer | Site + Program published, active year, exact review signature, current timeframe; preserve separated instructional intervals | Legacy supported; C #255 signed v2 adapter implemented, pending merge |
+| Schedule approval revision and effective dates | C `approvedProgramSchoolDays` | C | Restrict effective interval to canonical school-year dates; reject missing/ambiguous v2 source; exact Program ID/grade matching | **Adapter implemented; C #255 merge and acceptance needed** |
 | Services/transport/care/safety | `sites.metadata.familyServices` | Site publisher, evidence, expiration | Live revision + expiry; status marks planned vs available | Existing |
 | Public leaders/staff | `sites.metadata.publicStaffApprovals` + `personProfileDetails.metadata.publicBioConsents` + active staff assignment | Person consent + institutional Site publisher | Same-content signature, current consent/expiry and staff assignment; no private person ID | Connected |
 | Activities | Approved enrichment Season/Activity projection | Enrichment publisher | Existing registration and season gates | Existing |
@@ -31,11 +31,11 @@ Private editor previews call the same pure DTO adapter and the same extras reade
 ## Public DTO migration
 
 Additive fields on `PublicParentSchoolProfile`:
-- `programSchedules: PublicProgramSchoolDay[]` — keyed by **already-public published academic Program ID**; includes reviewed name, grades, timezone and structured weekly periods. `effectiveFrom/Through` remain non-displayable until C supplies exact authoritative dates.
+- `programSchedules: PublicProgramSchoolDay[]` — keyed by **already-public published academic Program ID**; includes reviewed name, grades, timezone and structured weekly periods. C `approvedProgramSchoolDays` supplies revision/effective range and separate instruction intervals when #255 is merged; legacy schedules fail closed if C v2 is explicitly empty or mismatched.
 - `people: PublicSitePerson[]` — display name, title, consented bio only.
 - `admissions.programs?: PublicProgramAdmissions[]` — each is `verified_application` or `information_only`; no site-wide inference from `availability`.
 
-The legacy `schoolDay` field remains for **one** published academic Program and only when an approved uniform range exists. For two Programs it is intentionally withheld. No numbered migration or new database table is introduced.
+The legacy `schoolDay` field remains for **one** published academic Program and only when an approved uniform range exists with an accepted Program-scoped source. For two Programs it is intentionally withheld. No numbered migration or new database table is introduced.
 
 ## Implemented institutional approval record (I review and acceptance required)
 
@@ -47,7 +47,7 @@ Agent A implements an **authorized publisher command** (not a general metadata e
   revision: number, // positive, monotonic
   reviewedByPersonId: UUID,
   reviewedAt: ISODateTime,
-  expiresOn: ISODate | null,
+  expiresOn: ISODate | null, // null permitted for legacy metadata but not publicly displayable
   addressDigest: SHA256Hex | null,
   contactDigest: SHA256Hex | null,
   evidenceReference?: string, // private reviewer reference
@@ -56,13 +56,13 @@ Agent A implements an **authorized publisher command** (not a general metadata e
 
 The digest is exactly SHA-256 of `JSON.stringify([siteId, "address"|"contact", canonicalSourceValue])`. Address source fields in order: `street1, street2, city, state, postalCode, country, county` (optional strings canonicalized to `""`). Contact fields in order: `displayName, email, phone, website`.
 
-I must enforce real reviewer authority, explicit public-display consent/rights, scope, audit, optimistic concurrency and prevention of publishing private legal or personal staff channels. A validates exact current source digest and expiry at anonymous read time, not the approval actor's role. A signer field alone is **not** authorization.
+A writer now enforces the live scoped institutional publisher grant, separate address/contact review attestations, evidence and audit, optimistic source/review revisions and withdrawal. A validates exact current source digest and a **non-null, unexpired** expiry at anonymous read time; a derived reviewer status distinguishes never reviewed, source changed, expired and withdrawn. Integration I must independently review and browser/DB-accept this implementation. A signer field alone is **not** authorization.
 
 ## Required follow-on wiring
 
-- **I:** Merge C #255 and S #256 before expanding A's public claims. Update both shared publisher preview loaders to use `parentExtras.admissions.programs` for their returned/rendered academic Program `applicationOpen` booleans. Do not let preview render Apply when live D gate refuses it.
+- **I:** Merge C #255 and S #256 before expanding A's public claims. Review A's changes to both shared publisher preview loaders; they now consume the same verified Program-level application-start projection as live. Re-run anonymous, publisher and church preview parity and ensure the POST still rechecks.
 - **B:** Render `programSchedules` grouped by published Program title/grades with day name and school-local timezone; never infer site-wide weekdays. Add a public tuition/on-request fallback even when there is no approved price. Render staff only from `people`. Use `admissions.programs` to distinguish Apply, request information and optional visit interest; no confirmed tour language.
-- **C:** Extend schedule projection with approval revision and effective dates; maintain revision parity and Sunday support. Supply candidate legal facts only to an independently reviewed public claim publisher.
+- **C:** Merge #255 signed `approvedProgramSchoolDays` output unchanged, then verify its effective dates, review revision, Sunday and split-day intervals on I branch. Supply candidate legal facts only to an independently reviewed public claim publisher.
 - **D/Finance:** Publish canonical and current Site/Program scoped tuition/fee and aid facts; avoid anonymous cost fields from family balances or enrollment contracts.
 
 ## Acceptance commands and evidence
@@ -76,3 +76,10 @@ git diff main...agent-a/approved-parent-projection-20261103 -- src/domain/parent
 ```
 
 Integration I must run anonymous browser and isolated DB acceptance for one and two published academic Programs, variable-day Sunday, stale schedule approval, current public staff revocation, Site address/contact edit after approval, empty legal/finance sources and denied/authorized intake. Tests are not a substitute for these live authorization checks. No claim of production readiness.
+
+## Final Agent A correctness patch
+
+- Public academic summaries retain the **already-public Program ID** to prevent readiness from matching two identically titled Programs.
+- The information-complete calculation now requires current public location, institutionally approved tuition/fees and per-Program schedules, as well as existing identity/legal requirements. Optional aid, leadership, activities and services remain separate gaps.
+- Parent packet shows current reviewed address, consented staff biographies and separately timed Program weekly intervals with effective dates and a non-holiday-calendar caveat; it never manufactures a Monday–Friday schedule.
+- The publisher review page now shows derived current/expired/source-changed/withdrawn statuses and prior evidence dates. Application wording refers to **verified application starts**, not seat guarantees or school-opening authorization.
