@@ -318,10 +318,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     ? "Continue school operations"
     : !currentProgram ? "Save your first school Program"
     : !currentLaunch ? "Review your saved school's preparation"
-    : awaitingCan ? "Waiting for CAN: "+nextTask.title
-    : waitingExternal ? "Waiting for an external requirement: "+nextTask.title
-    : blockedTask ? "Resolve this opening blocker: "+nextTask.title
-    : pendingSchoolAction ? nextTask.title
+    : awaitingCan ? "Waiting for CAN: "+nextTask?.title
+    : waitingExternal ? "Waiting for an external requirement: "+nextTask?.title
+    : blockedTask ? "Resolve this opening blocker: "+nextTask?.title
+    : pendingSchoolAction ? nextTask?.title
     : "Review the current school launch record";
   const nextDescription = currentSchool?.status==="active"
     ? "This Program is active. Current onsite opening, staffing, supervision, and custody are checked separately in Operations."
