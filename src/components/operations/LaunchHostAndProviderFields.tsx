@@ -88,10 +88,22 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                         "Physical address supplied by the church, not independently approved"}
                       {" · "}{selectedSite.timezone}
                     </p>
-                    <Link to="/site-website" search={{siteId:selectedSite.id}} className="mt-2 inline-block underline">
-                      Optional: add existing church website, social and YouTube references
-                    </Link>
-                    <p className="mt-1 text-xs text-muted-foreground">Church reference links are managed in the separate Site-scoped website editor; no public content is automatically imported or approved.</p>
+                    {selectedSite.websiteDraft && <p className="mt-2 text-xs text-muted-foreground">
+                      {selectedSite.websiteDraft.status==="published"?"Recorded Site website publication":"Saved private website draft"}
+                      {" · "}<span className="font-mono">{selectedSite.websiteDraft.host}</span>
+                    </p>}
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Website and social references require a separate, verified Site website-editor role.
+                      This registrar session does not confer editor access, and no links are imported or published automatically.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      <Link to="/admin" search={{siteId:selectedSite.id,inviteRole:"site_website_editor"}} className="underline">
+                        Invite or assign a church website editor
+                      </Link>
+                      <Link to="/site-website" search={{siteId:selectedSite.id}} className="underline">
+                        Open references as the assigned editor (switch role first)
+                      </Link>
+                    </div>
                   </div>}
                   <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
                     <summary className="cursor-pointer text-sm font-semibold">
