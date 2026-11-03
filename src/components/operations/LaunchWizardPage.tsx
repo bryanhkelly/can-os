@@ -4,7 +4,7 @@ import { useLaunchInstitutionDefaults } from "@/hooks/useLaunchInstitutionDefaul
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 import { updateLaunchSiteAddress, updateLaunchSiteContact } from "@/modules/programs/site-configuration.functions";
 import type { LaunchSiteContactDraft } from "@/components/operations/LaunchSiteContactEditor";
-import type { LaunchSiteAddressDraft } from "@/components/operations/LaunchHostAndProviderFields";
+import type { LaunchSiteAddressDraft, SavedLaunchSiteDraft } from "@/components/operations/LaunchHostAndProviderFields";
 import type { LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
 import { useLaunchModelPresets } from "@/hooks/useLaunchModelPresets";
 import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
@@ -79,7 +79,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState(selection.siteId??"");
   const [newSiteName,setNewSiteName]=useState("");
-  const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
+  const [createdSiteDraft,setCreatedSiteDraft]=useState<SavedLaunchSiteDraft|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("");
   useEffect(()=>{
@@ -136,7 +136,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         }} : {})}});
       if (submission.status === "ignored") return;
       const result = submission.value;
-      setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host});
+      setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host,status:result.publicSiteDraft.status,replayed:result.replayed});
       setSiteId(result.siteId);
       if (submission.refreshError) setError("Site created, but the page could not refresh. Reopen launch setup; do not create another Site.");
       setNewSiteName("");setNewSiteSlug("");setNewSiteAddress(emptySiteAddress);
