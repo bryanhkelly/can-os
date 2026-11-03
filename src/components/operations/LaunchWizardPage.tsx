@@ -305,6 +305,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const currentProgram=currentSchool??currentLaunch;
   const schoolSelection={siteId:selection.siteId??currentProgram?.siteId??undefined,programId:selection.programId??currentProgram?.id};
   const hasSchoolPreparation=schools.length>0||launches.launches.length>0;
+  const needsSchoolChoice=hasSchoolPreparation&&!currentProgram;
   // All school-readiness recommendations derive from persisted Journey evidence.
   // Never promote Site publication, invitations, or Program status to opening authority.
   const readiness = currentLaunch ? buildLaunchGuidance(currentLaunch) : null;
@@ -316,6 +317,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const openingReview = nextTask?.action==="opening";
   const nextTitle = currentSchool?.status==="active"
     ? "Continue school operations"
+    : needsSchoolChoice ? "Choose a school to continue"
     : !currentProgram ? "Save your first school Program"
     : !currentLaunch ? "Review your saved school's preparation"
     : awaitingCan ? "Waiting for CAN: "+nextTask?.title
@@ -325,12 +327,14 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     : "Review the current school launch record";
   const nextDescription = currentSchool?.status==="active"
     ? "This Program is active. Current onsite opening, staffing, supervision, and custody are checked separately in Operations."
+    : needsSchoolChoice ? "Your existing schools are saved. Select the exact school above to continue its own preparation, website, and family outreach without creating a duplicate Program."
     : !currentProgram ? "Save the church Site and academic Program once; return to this same school to continue."
     : !currentLaunch ? "This Program has no available pre-opening Journey here. Review the saved academic and school context; do not infer readiness."
     : nextTask
       ? nextTask.description+" Responsible: "+launchResponsibility(nextTask.state)+"."
       : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
-  const nextHref = !currentProgram ? "#new-school-launch"
+  const nextHref = needsSchoolChoice ? "#school-preparation-selection"
+    : !currentProgram ? "#new-school-launch"
     : !currentLaunch ? "#launch-website"
     : "#launch-requirements";
 
@@ -389,7 +393,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Continue academic preparation</Link>
               : <a href={nextHref??"#launch-services"}
                   className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
-                  {!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
+                  {needsSchoolChoice?"Choose a saved school":!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
                 </a>}
             {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#launch-website" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Prepare website in parallel</a>}
             {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#invite-families" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Family outreach</a>}
