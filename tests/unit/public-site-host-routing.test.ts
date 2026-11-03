@@ -20,7 +20,8 @@ describe("CAN OS partner hostname router", () => {
   });
   it("routes only explicitly listed public pages and their exact internal rewrites", () => {
     for (const path of ["/about", "/academics", "/student-life", "/school-day",
-      "/admissions", "/tuition", "/families", "/faq", "/contact"]) {
+      "/admissions", "/tuition", "/families", "/faq", "/contact",
+      "/robots.txt", "/sitemap.xml"]) {
       expect(classify("https://vineyard.can-os.com" + path)).toEqual({
         kind: "site", slug: "vineyard", rewrite: true,
       });
