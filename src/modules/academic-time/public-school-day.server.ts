@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { programs, scheduleTemplatePeriods, scheduleTemplates, schoolYears, sites } from "@/db/schema";
 import { projectPublicSchoolDay } from "@/domain/public-school-day";
+import { publicSchoolDaySiteRevision } from "./public-school-day-site-revision.server";
 
 /**
  * Anonymous-safe projection input for Agent A. Caller MUST first check the
@@ -17,7 +18,7 @@ export async function readApprovedPublicSchoolDay(
     timezone: sites.timezone, siteId: sites.id, siteOrganizationId: sites.organizationId,
     programId: programs.id, programSiteId: programs.siteId,
     programOrganizationId: programs.organizationId, programStatus: programs.status,
-    programUpdatedAt: programs.updatedAt,siteUpdatedAt:sites.updatedAt,
+    programUpdatedAt: programs.updatedAt,siteAddress:sites.address,siteMetadata:sites.metadata,
     gradeRange: programs.gradeRange, programType: programs.type,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
     .where(and(eq(sites.id, siteId), eq(programs.id, programId))).limit(1);
@@ -48,7 +49,10 @@ export async function readApprovedPublicSchoolDay(
       eq(scheduleTemplates.siteId, siteId), eq(scheduleTemplates.programId, programId),
       eq(schoolYears.siteId, siteId), eq(schoolYears.organizationId, scope.programOrganizationId),
       eq(schoolYears.status, "active"),
-    )).limit(30);
+    )).limit(101);
+  // A capped query cannot establish uniqueness when other active templates exist.
+  if(templates.length>100) return {...projectPublicSchoolDay([],scope.timezone,now),
+    programScope:null,approvedProgramSchoolDays:[]};
   const ids = templates.map(row => row.id);
   const periods = ids.length ? await executor.select({
     scheduleTemplateId: scheduleTemplatePeriods.scheduleTemplateId,
@@ -58,7 +62,9 @@ export async function readApprovedPublicSchoolDay(
     endsAtLocal: scheduleTemplatePeriods.endsAtLocal,
     type: scheduleTemplatePeriods.type,
   }).from(scheduleTemplatePeriods)
-    .where(inArray(scheduleTemplatePeriods.scheduleTemplateId, ids)).limit(3000) : [];
+    .where(inArray(scheduleTemplatePeriods.scheduleTemplateId, ids)).limit(3001) : [];
+  if(periods.length>3000) return {...projectPublicSchoolDay([],scope.timezone,now),
+    programScope:null,approvedProgramSchoolDays:[]};
   const projection = projectPublicSchoolDay(templates.map(row => {
     const approval = row.metadata.publicScheduleApproval;
     const verified = approval && typeof approval === "object" &&
@@ -85,7 +91,7 @@ export async function readApprovedPublicSchoolDay(
         effectiveFrom:row.effectiveFrom,effectiveThrough:row.effectiveThrough,
         schoolYearKey:row.schoolYearKey,schoolYearName:row.schoolYearName,
         gradeRange:scope.gradeRange,programType:scope.programType,
-        siteRevision:scope.siteUpdatedAt.toISOString(),
+        siteRevision:publicSchoolDaySiteRevision({address:scope.siteAddress,metadata:scope.siteMetadata}),
         programRevision:scope.programUpdatedAt.toISOString(),
         yearRevision:row.yearUpdatedAt.toISOString(),
         templateRevision:row.templateUpdatedAt.toISOString(),
