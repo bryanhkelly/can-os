@@ -30,7 +30,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
   newSiteSlug: string; setNewSiteSlug: (value: string) => void;
   newSiteTimezone: string; setNewSiteTimezone: (value: string) => void;
   saveSiteAddress: (address:LaunchSiteAddressDraft,revision:string,reason:string)=>Promise<void>;
-  saveSiteContact: (contact:LaunchSiteContactDraft,revision:string)=>Promise<void>;
+  saveSiteContact: (contact:LaunchSiteContactDraft|null,revision:string)=>Promise<void>;
   newSiteAddress: LaunchSiteAddressDraft;
   setNewSiteAddress: (value: LaunchSiteAddressDraft) => void;
   duplicateNewSite: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"][number] | undefined;
