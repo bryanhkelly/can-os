@@ -47,3 +47,7 @@ The existing generic CI had successful build and its three admissions-specific t
 ## Follow-on B slice
 
 The registrar launch preview now supports every populated page rather than home only (PX-017), using the same server-only renderer and preserving sandboxed, inactive forms. Focused CI was expanded to cover the launch preparation and preview component; verify [the latest PX-B run](https://github.com/bryanhkelly/can-os/actions/runs/41662666470) after it completes. This change does not enable live hosting, modify authority, or add a CMS.
+
+## Latest concurrent-build result (follow-on)
+
+The [expanded PX-B workflow at `687e4728`](https://github.com/bryanhkelly/can-os/actions/runs/41662666470) completed **46/46 focused tests passing across 8 files**, including registrar launch preview. Its build failed due to an **unrelated concurrently edited file**, `src/components/operations/OperationsWorkspace.tsx:161`, with a Vite `Unterminated regular expression` around an unmatched JSX `</select>`. This file belongs to the operations workstream; its owner/integration agent must reconcile it on current `main` rather than Agent B overwriting concurrent changes. A previous isolated PX-B build passed at `ac63eecd`. Re-run full build once the operations owner repairs JSX; do not mark the latest build green until then.
