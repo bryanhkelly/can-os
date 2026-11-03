@@ -32,7 +32,22 @@ type Schedule = {
   approval: { status: "approved"; revision: number; reviewedByPersonId: string; reviewedAt: string; signature: string } | null;
   periods: Period[];
 };
-export type PublicSchoolDayProjection = PublicSchoolDay & { state: "pending" | "approved"; timezone: string | null };
+export type PublicWeeklyDayPattern = {
+  dayOfWeek: number;
+  startsAtLocal: string;
+  endsAtLocal: string;
+  timezone: string;
+};
+/**
+ * The legacy parent DTO only represents one uniform time range. Approved weekly
+ * patterns preserve real per-day hours without making up a school-wide schedule.
+ */
+export type PublicSchoolDayProjection = PublicSchoolDay & {
+  state: "pending" | "approved";
+  timezone: string | null;
+  weeklyPatternState: "pending" | "approved";
+  weeklyPattern: PublicWeeklyDayPattern[];
+};
 
 /** No guessed Monday–Friday template or schedule from an inactive school year. */
 export function projectPublicSchoolDay(
@@ -42,6 +57,7 @@ export function projectPublicSchoolDay(
 ): PublicSchoolDayProjection {
   const pending = (): PublicSchoolDayProjection => ({
     state: "pending", timezone: null,
+    weeklyPatternState: "pending", weeklyPattern: [],
     days: unconfiguredClaim("calendar"), startTime: unconfiguredClaim("calendar"),
     endTime: unconfiguredClaim("calendar"), mode: unconfiguredClaim("calendar"),
   });
@@ -85,15 +101,26 @@ export function projectPublicSchoolDay(
       end:daily.map(p => p.endsAtLocal).sort().at(-1)!.slice(0,5),
     };
   });
-  // The existing shared parent DTO has one start/end pair. If days vary,
-  // withhold the pair rather than claiming a school-wide uniform timetable.
+  const weeklyPattern: PublicWeeklyDayPattern[] = days.map((dayOfWeek,index)=>({
+    dayOfWeek,
+    startsAtLocal:dailyRanges[index]!.start,
+    endsAtLocal:dailyRanges[index]!.end,
+    timezone,
+  }));
+  // A varied but independently approved weekly pattern is still safe to show
+  // at the Program level. Only legacy uniform time claims remain withheld.
   if (dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
-    range.end !== dailyRanges[0]!.end)) return pending();
+    range.end !== dailyRanges[0]!.end)) return {
+      ...pending(), timezone,
+      weeklyPatternState:"approved", weeklyPattern,
+    };
   const start = dailyRanges[0]!.start;
   const end = dailyRanges[0]!.end;
   const revision = schedule.approval!.revision;
   return {
-    state: "approved", timezone, days: verifiedPublicClaim(days, "calendar", revision),
+    state: "approved", timezone,
+    weeklyPatternState:"approved", weeklyPattern,
+    days: verifiedPublicClaim(days, "calendar", revision),
     startTime: verifiedPublicClaim(start, "calendar", revision),
     endTime: verifiedPublicClaim(end, "calendar", revision),
     // Delivery mode is an institutional Program attribute, not implied by periods.
