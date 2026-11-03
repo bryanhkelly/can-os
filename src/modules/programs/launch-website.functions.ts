@@ -12,6 +12,8 @@ import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-p
 import {createIllustrativeSchoolContent,emptySiteLocalContent} from "@/domain/site-local-content";
 import {launchOpeningDate} from "@/domain/launch-opening-date";
 import {readAcademicProgramCatalog} from "@/modules/sites/academic-program-catalog.server";
+import {readApprovedPublicParentExtras} from "@/modules/sites/public-parent-extras.server";
+import {projectApprovedParentInformation,withVerifiedPublicApplications} from "@/domain/parent-information";
 import {readCurrentLocalContent} from "@/modules/sites/site-local-content.server";
 import {readEnrichmentCatalog} from "@/modules/activities/enrichment-catalog.server";
 import {toPublicSiteEnrichment} from "@/domain/public-site-catalog";
@@ -60,15 +62,27 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   })]:[];
   const [siteFlags] = await db.select({metadata:sites.metadata}).from(sites)
     .where(eq(sites.id,school.siteId)).limit(1);
-  const page = {host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,site:{name:school.siteName,organizationName:school.organizationName},
-    offerings:enrichment.map(toPublicSiteEnrichment),
-    academicPrograms:[...approved,...planning],
-    localContent:local?.content??(siteFlags?.metadata?.synthetic===true
+  // Use the same independently approved parent-data adapter as the public
+  // school website. A private planning preview must not invent tuition,
+  // authorization, schedules, or family services from draft Site metadata.
+  const parentExtras=await readApprovedPublicParentExtras(school.siteId,
+    approved.map(program=>program.programId),siteFlags?.metadata??null);
+  const approvedPrograms=withVerifiedPublicApplications(approved,parentExtras.admissions);
+  const offerings=enrichment.map(toPublicSiteEnrichment);
+  const localContent=local?.content??(siteFlags?.metadata?.synthetic===true
+
       ? createIllustrativeSchoolContent(school.siteName)
       : {
         ...emptySiteLocalContent,welcomeMessage:`Welcome to ${school.programName}.`,
         localDescription:`Our church is preparing a local learning community. Contact the church to learn more about plans for ${school.programName}.`,
-      }),
+      });
+  const site={name:school.siteName,organizationName:school.organizationName};
+  const academicPrograms=[...approvedPrograms,...planning];
+  const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
+    site,offerings,academicPrograms,localContent,
+    parentInformation:projectApprovedParentInformation({
+      site,academicPrograms,offerings,localContent,...parentExtras,
+    }),
   };
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.
