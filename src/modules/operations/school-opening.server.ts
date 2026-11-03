@@ -13,6 +13,7 @@ import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-review.server";
+import { matchesCurrentOpeningJurisdiction } from "@/domain/school-opening-jurisdiction-guard";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import {
   schoolOpeningEvidenceCategories, schoolOpeningEvidenceLabels, schoolOpeningEvidenceNextAction,
@@ -195,9 +196,7 @@ export async function requireCurrentChurchSchoolOpening(
     throw new AuthorizationError("currently approved church school configuration");
   const jurisdiction=await requireCurrentSchoolJurisdictionForOpening(tx,programId,now);
   const approvedJurisdiction=configuration.config.jurisdictionOpeningApproval;
-  if(!approvedJurisdiction ||
-     approvedJurisdiction.scopeFingerprint!==jurisdiction.scopeFingerprint ||
-     approvedJurisdiction.profileVersionId!==jurisdiction.profileVersionId)
+  if(!matchesCurrentOpeningJurisdiction(approvedJurisdiction,jurisdiction))
     throw new AuthorizationError("opening approval predates current Site and jurisdiction review");
   await requireChurchHostedOperatingServices(tx,programId,[
     "school_of_record","academic_instruction","onsite_supervision",
@@ -232,8 +231,7 @@ export async function decideChurchSchoolOpening(
         tx,input.programId,now);
       if(configuration.status==="approved"&&configuration.approvedByPersonId===actor.actorPersonId) {
         const prior=configuration.config.jurisdictionOpeningApproval;
-        if(!prior || prior.scopeFingerprint!==jurisdiction.scopeFingerprint ||
-           prior.profileVersionId!==jurisdiction.profileVersionId)
+        if(!matchesCurrentOpeningJurisdiction(prior,jurisdiction))
           throw new AuthorizationError("opening approval requires renewed jurisdiction review");
         return {configurationId:configuration.id,status:"approved" as const};
       }
@@ -308,9 +306,8 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
     const stamp=config.config.jurisdictionOpeningApproval;
     // Before approval, verify legal readiness without requiring the opening
     // attestation that the CAN officer has yet to record.
-    jurisdictionReady=config.status==="draft" || Boolean(stamp &&
-      stamp.scopeFingerprint===jurisdiction.scopeFingerprint &&
-      stamp.profileVersionId===jurisdiction.profileVersionId);
+    jurisdictionReady=config.status==="draft" ||
+      matchesCurrentOpeningJurisdiction(stamp,jurisdiction);
     if(!jurisdictionReady)
       jurisdictionIssue="School location, Program or policy changed after opening approval";
   }catch(error){
@@ -435,8 +432,7 @@ export async function readLocalSchoolOpeningStatus(actor:AccessContext,programId
   try{
     const jurisdiction=await requireCurrentSchoolJurisdictionForOpening(db,programId,now);
     const stamp=configuration.config.jurisdictionOpeningApproval;
-    if(!stamp || stamp.scopeFingerprint!==jurisdiction.scopeFingerprint ||
-       stamp.profileVersionId!==jurisdiction.profileVersionId)
+    if(!matchesCurrentOpeningJurisdiction(stamp,jurisdiction))
       throw new AuthorizationError("current jurisdiction-bound opening approval");
   }catch(error){
     if(!(error instanceof AuthorizationError))throw error;
