@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { churchSourceReferences } from "@/db/schema";
+import { churchContentSuggestions, churchSourceReferences } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
   initialChurchReferenceState, normalizeChurchReferenceUrl,
@@ -50,6 +50,15 @@ export async function saveChurchSourceReference(actor: AccessContext, input: {
         updatedAt: new Date() },
     }).returning({ id: churchSourceReferences.id });
     if (!saved) throw new Error("Unable to save this church reference");
+    if (before && before.normalizedUrl !== normalizedUrl) {
+      // Pending proposals are stale as soon as their source identity changes.
+      await tx.update(churchContentSuggestions).set({
+        reviewDecision: "discarded", reviewedAt: new Date(),
+        reviewedByPersonId: actor.actorPersonId!,
+      }).where(and(eq(churchContentSuggestions.siteId, site.id),
+        eq(churchContentSuggestions.sourceReferenceId, before.id),
+        eq(churchContentSuggestions.reviewDecision, "pending")));
+    }
     await writeAudit(tx, actor, {
       action: "site.website.source_reference.saved",
       entityType: "church_source_reference", entityId: saved.id,
