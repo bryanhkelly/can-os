@@ -297,6 +297,14 @@ describe("standalone public site HTML", () => {
     expect(demonstration).toContain('class="demo-banner"');
     expect(demonstration).toContain("Fictional Learning Academy is a fictional demonstration school.");
     expect(demonstration).not.toContain("Valor is a fictional");
+    const hostedDemo = renderPublicSiteHtml({...page, demonstration: true}, {
+      makeRequestId: () => "00000000-0000-4000-8000-000000000001",
+    });
+    expect(hostedDemo).toContain('content="noindex,nofollow"');
+    const hostedOrdinary = renderPublicSiteHtml(page, {
+      makeRequestId: () => "00000000-0000-4000-8000-000000000001",
+    });
+    expect(hostedOrdinary).toContain('content="index,follow"');
   });
 
   it("shows mission storytelling only when local school vision exists", () => {
