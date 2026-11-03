@@ -35,6 +35,8 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
     cursor:z.string().max(80).optional(),
     interestId:z.string().uuid().optional(),
+    siteId:z.string().uuid().optional(),
+    programId:z.string().uuid().optional(),
   }).strict().parse(value ?? {}))
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");
@@ -74,6 +76,8 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
         eq(publicAdmissionsInterests.siteId, programs.siteId),
         ...(data.interestId ? [eq(publicAdmissionsInterests.id,data.interestId)] : []),
+        ...(data.siteId ? [eq(publicAdmissionsInterests.siteId,data.siteId)] : []),
+        ...(data.programId ? [eq(publicAdmissionsInterests.programId,data.programId)] : []),
         ...(!data.interestId && data.cursor ? [(() => {
           const cursor = parseInterestPageCursor(data.cursor!);
           return or(
