@@ -7,6 +7,7 @@ import {
   type ChurchReferenceKind,
 } from "@/domain/church-source-references";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 
@@ -67,7 +68,7 @@ export async function saveChurchSourceReference(actor: AccessContext, input: {
       after: { kind: input.kind, url: normalizedUrl, state },
     });
     await emitEvent(tx, {
-      eventType: "ChurchSourceReferenceSaved",
+      eventType: EventTypes.ChurchSourceReferenceSaved,
       aggregateType: "church_source_reference", aggregateId: saved.id,
       actorPersonId: actor.actorPersonId,
       organizationId: site.organizationId, siteId: site.id,
@@ -103,7 +104,7 @@ export async function removeChurchSourceReference(actor: AccessContext, input: {
       before: { kind: existing.kind, url: existing.normalizedUrl }, after: null,
     });
     await emitEvent(tx, {
-      eventType: "ChurchSourceReferenceRemoved",
+      eventType: EventTypes.ChurchSourceReferenceRemoved,
       aggregateType: "church_source_reference", aggregateId: existing.id,
       actorPersonId: actor.actorPersonId,
       organizationId: site.organizationId, siteId: site.id,
