@@ -15,6 +15,7 @@ import {
 import { launchOpeningDate } from "@/domain/launch-opening-date";
 import {
   evaluateSchoolJurisdictionRequirements,
+  expandKnownSchoolGradeRange,
   isCurrentVerifiedJurisdictionProfileVersion,
   requiresFutureJurisdictionPolicyReview,
   type SchoolJurisdictionContext,
@@ -178,8 +179,7 @@ export async function readSchoolJurisdictionReview(
     deliveryModel: onsite && online ? "hybrid" :
       onsite ? "onsite" : online ? "online" : null,
     // Grade range endpoints cannot safely prove every intervening grade.
-    gradeLevels:school.gradeRange.min === school.gradeRange.max
-      ? [school.gradeRange.min] : [],
+    gradeLevels:expandKnownSchoolGradeRange(school.gradeRange),
     locality:location.county,
   };
   const rawProfile = {
