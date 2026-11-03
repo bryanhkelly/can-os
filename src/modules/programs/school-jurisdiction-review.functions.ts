@@ -162,9 +162,12 @@ export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET
       document.uploadedByPersonId===actor.actorPersonId &&
       document.metadata.siteId===review.siteId &&
       document.metadata.organizationId===program.organizationId &&
+      document.metadata.isCurrent===true &&
       document.metadata.storageVerified===true &&
       (!document.expiresAt || document.expiresAt>new Date()))
-      .map(document=>({id:document.id,fileName:document.fileName}));
+      .map(document=>({id:document.id,fileName:document.fileName,
+        actionId:typeof document.metadata.actionId==="string"
+          ? document.metadata.actionId:null}));
     const eligible=rows.filter(row=>
       row.metadata.scopeFingerprint===review.scopeFingerprint &&
       row.metadata.profileVersionId===review.policyVersionId);
