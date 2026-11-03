@@ -54,6 +54,27 @@ export function openingApprovalPredatesLocationChange(
   return !Number.isFinite(approved) || !Number.isFinite(changed) || approved < changed;
 }
 
+/** A source-reviewed renewal date is a legal review deadline, not an
+ * automatic grant of authority. Evidence predating an elapsed renewal date
+ * must be independently reviewed again. Dates are compared as days because
+ * the underlying policy records supply dates, not authoritative hours. */
+export function isJurisdictionRequirementRenewalCurrent(
+  metadata:Record<string,unknown>,now=new Date(),
+):boolean {
+  const deadline=metadata.renewalDeadline;
+  if(deadline===null||deadline===undefined)return true;
+  if(typeof deadline!=="string"||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(deadline))
+    return false;
+  const parsed=new Date(deadline+"T00:00:00Z");
+  if(!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==deadline)
+    return false;
+  if(now.toISOString().slice(0,10)<=deadline)return true;
+  const reviewed=metadata.reviewedAt;
+  return typeof reviewed==="string" &&
+    Number.isFinite(Date.parse(reviewed)) &&
+    new Date(reviewed).toISOString().slice(0,10)>deadline;
+}
+
 /** A normal Action resolution is never legal evidence. Require the current
  * verified document and independently recorded C-domain attestation. */
 export function hasCurrentJurisdictionRequirementEvidence(
@@ -72,5 +93,6 @@ export function hasCurrentJurisdictionRequirementEvidence(
     typeof m.reviewedByPersonId==="string" && m.reviewedByPersonId.length>0 &&
     typeof m.submittedByPersonId==="string" &&
     m.submittedByPersonId!==m.reviewedByPersonId &&
+    isJurisdictionRequirementRenewalCurrent(m,now) &&
     Number.isFinite(reviewedAt) && reviewedAt<=now.getTime();
 }
