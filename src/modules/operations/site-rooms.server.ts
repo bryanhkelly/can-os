@@ -5,19 +5,20 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { DomainError } from "@/domain/errors";
-import { assertSiteRoomManager, assignSectionRoomSchema, createSiteRoomSchema, retireSiteRoomSchema, siteRoomsScopeSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
+import { assertSiteRoomReader, assertSiteRoomManager, assignSectionRoomSchema, createSiteRoomSchema, retireSiteRoomSchema, siteRoomsScopeSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import type { z } from "zod";
 
 type Reader = Pick<typeof db, "select">;
 
-async function roomSchool(tx: Reader, actor: AccessContext, programId: string) {
+async function roomSchool(tx: Reader, actor: AccessContext, programId: string, access: "read" | "manage" = "manage") {
   const [school] = await tx.select({
     programId: programs.id, organizationId: programs.organizationId, siteId: sites.id,
   }).from(programs).innerJoin(sites, and(eq(sites.id, programs.siteId),
     eq(sites.organizationId, programs.organizationId))).where(eq(programs.id, programId)).limit(1);
   if (!school) throw new AuthorizationError("existing school-owned Site");
-  assertSiteRoomManager(actor, school);
+  if (access === "read") assertSiteRoomReader(actor, school);
+  else assertSiteRoomManager(actor, school);
   return school;
 }
 
@@ -32,14 +33,17 @@ export async function listSiteRooms(tx: Reader, siteId: string, includeRetired =
 
 export async function getSchoolRooms(actor: AccessContext, value: z.infer<typeof siteRoomsScopeSchema>) {
   const input = siteRoomsScopeSchema.parse(value);
-  const school = await roomSchool(db, actor, input.programId);
+  const school = await roomSchool(db, actor, input.programId, "read");
+  let canManage = false;
+  try { assertSiteRoomManager(actor, school); canManage = true; }
+  catch (error) { if (!(error instanceof AuthorizationError)) throw error; }
   const classes = await db.select({ id: sections.id, title: sections.title, code: sections.code,
     roomId: sql<string|null>`${sections.metadata}->>'physicalRoomId'` })
     .from(sections).where(and(eq(sections.programId, school.programId),
       eq(sections.siteId, school.siteId), eq(sections.active, true)))
     .orderBy(asc(sections.title)).limit(1001);
   if (classes.length > 1000) throw new Error("Classroom setup exceeds the supported class limit");
-  return { ...school, rooms: (await listSiteRooms(db, school.siteId, true)).map(room => ({
+  return { ...school, canManage, rooms: (await listSiteRooms(db, school.siteId, true)).map(room => ({
     ...room, retiredAt: room.retiredAt?.toISOString() ?? null,
   })), classes };
 }
