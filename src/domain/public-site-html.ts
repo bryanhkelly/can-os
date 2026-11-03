@@ -33,6 +33,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
   const localItems = local ? [
+    ["Our story", local.churchHistory],
+    ["Serving our community", local.communityOutreach],
+    ["Why we started a school", local.schoolVision],
+    ["A welcome from our leadership", local.leadershipWelcome],
+    ["Local traditions", local.localTraditions],
     ["Our community", local.localDescription],
     ["Denominational identity", local.denomination],
     ["Statement of faith", local.statementOfFaith],
