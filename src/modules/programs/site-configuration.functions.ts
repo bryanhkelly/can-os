@@ -6,6 +6,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { assertSiteSetupScope, assertSiteLocationProgramScope } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
 import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
@@ -38,10 +39,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
     return db.transaction(async tx=>{
       const [site] = await tx.select().from(sites)
         .where(eq(sites.id,data.siteId)).for("update").limit(1);
-      if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
-        (actor.grantSiteId !== null && actor.grantSiteId !== site.id) ||
-        (actor.scope.siteIds?.length && !actor.scope.siteIds.includes(site.id)))
-        throw new AuthorizationError("Site configuration scope");
+      assertSiteSetupScope(actor,site,"program.launch.start");
       const oldAddress=site.address??null;
       const address=data.address;
       const same=samePhysicalSiteAddress(oldAddress,address);
@@ -51,9 +49,11 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
         .where(eq(programs.siteId,site.id));
       const attachedIds=attached.map(item=>item.id);
+      assertSiteLocationProgramScope(actor,attachedIds);
       const [publication,approvedConfigurations,publishedPrograms,approvedServices]=await Promise.all([
         tx.select({status:sitePublications.status})
-          .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1),
+          .from(sitePublications).where(eq(sitePublications.siteId,site.id))
+          .for("update").limit(1),
         attachedIds.length?tx.select({id:schoolConfigurationVersions.id})
           .from(schoolConfigurationVersions)
           .where(and(inArray(schoolConfigurationVersions.programId,attachedIds),
@@ -65,7 +65,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         attachedIds.length?tx.select({id:programSiteAuthorizations.id})
           .from(programSiteAuthorizations)
           .where(and(inArray(programSiteAuthorizations.programId,attachedIds),
-            eq(programSiteAuthorizations.status,"approved"))).limit(1):Promise.resolve([]),
+            inArray(programSiteAuthorizations.status,["approved","suspended"]))).limit(1):Promise.resolve([]),
       ]);
       // Fail closed even if a Program still says "launching". Independent
       // authorization and marketing can already have been approved.
@@ -134,10 +134,7 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
     return db.transaction(async tx=>{
       const [site]=await tx.select().from(sites).where(eq(sites.id,data.siteId))
         .for("update").limit(1);
-      if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
-        (actor.grantSiteId!==null && actor.grantSiteId!==site.id) ||
-        (actor.scope.siteIds?.length && !actor.scope.siteIds.includes(site.id)))
-        throw new AuthorizationError("Site contact scope");
+      assertSiteSetupScope(actor,site,"program.launch.start");
       const before=site.metadata.setupContact??null;
       if(sameDraftSiteContact(before,data.contact))
         return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString()};
@@ -174,10 +171,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       slug:sites.slug,address:sites.address,timezone:sites.timezone,
       updatedAt:sites.updatedAt,metadata:sites.metadata,
     }).from(sites).where(eq(sites.id,data.siteId)).limit(1);
-    if(!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
-      (actor.grantSiteId!==null && actor.grantSiteId!==site.id) ||
-      (actor.scope.siteIds?.length && !actor.scope.siteIds.includes(site.id)))
-      throw new AuthorizationError("Site configuration read scope");
+    assertSiteSetupScope(actor,site,"program.read");
     const attached=await db.select({
       id:programs.id,name:programs.name,type:programs.type,
       status:programs.status,jurisdictionId:programs.jurisdictionId,
