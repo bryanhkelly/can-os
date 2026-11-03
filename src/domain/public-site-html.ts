@@ -452,7 +452,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="tag">Institutionally reviewed information</p>
       <h2 id="disclosure-title">School status and disclosures</h2>
       ${institutionDisclosures}</section>`
-    : "";
+    : `<section class="church-section institutional-disclosures" aria-labelledby="institutional-info-title">
+      <h2 id="institutional-info-title">Institutional information</h2>
+      <p>Reviewed public authorization, licensure, accreditation and jurisdiction statements have not yet been published here. Their absence is not evidence that a school has or lacks a particular status.</p>
+      ${availablePaths.includes("/academics") ? '<p class="public-next-step"><a href="/academics">Select a program to request current institutional information →</a></p>' : ""}
+    </section>`;
   const faqItems = [
     {question:"Which programs and grades are available?",answer:(page.academicPrograms ?? []).map(program =>
       `${escapePublicHtml(program.title)}: grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}`).join("; ")},
@@ -462,6 +466,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     {question:"Are applications open?",answer:hasOpenApplications
       ? "Some approved Programs permit verified application starts. Eligibility and capacity are checked separately."
       : "Applications are not currently open through this website. Inquiries do not constitute applications."},
+    {question:"Where can I find authorization or accreditation information?",answer:institutionDisclosures
+      ? "Reviewed institutional disclosures appear on the Admissions page."
+      : "Reviewed public institutional statements have not yet been published. Request the current documents directly from the school."},
     {question:"What tuition information is available?",answer:tuitionText || (academicCards
       ? "Reviewed tuition and fee details are not yet published. Request current details for your program before applying." : "")},
     {question:"Which family services are offered?",answer:serviceCards
