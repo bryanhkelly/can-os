@@ -125,4 +125,55 @@ describe("PX synthetic Site and offering scenarios", () => {
     expect(profile.tuition.financialAid.canDisplay).toBe(false);
     expect(profile.services.every(service => !service.description.canDisplay)).toBe(true);
   });
+  it("keeps Sunday and different daily hours attributed to separate approved Programs", () => {
+    const makeProgram = (programId:string,title:string,grades:{min:string;max:string})=>({
+      programId,title,summary:"Reviewed instructional summary",
+      typeLabel:"Church-hosted academy",grades,
+      delivery:{onsite:true,asynchronous:false,liveOnline:false,onsiteDaysPerWeek:2},
+      availability:"planned" as const,
+    });
+    const first=makeProgram("public-academic-k5","Early Years",{min:"K",max:"5"});
+    const second=makeProgram("public-academic-6-8","Middle Years",{min:"6",max:"8"});
+    const schedule = (program:typeof first, dayOfWeek:number, start:string, end:string)=>({
+      programId:program.programId,
+      name:verifiedPublicClaim(program.title,"program_publication" as const),
+      grades:verifiedPublicClaim(program.grades,"program_publication" as const),
+      timezone:verifiedPublicClaim("America/Los_Angeles","calendar" as const,7),
+      effectiveFrom:unconfiguredClaim<string>("calendar"),
+      effectiveThrough:unconfiguredClaim<string>("calendar"),
+      weeklyPattern:verifiedPublicClaim([
+        {dayOfWeek,startsAtLocal:start,endsAtLocal:end,
+          timezone:"America/Los_Angeles"},
+      ],"calendar" as const,7),
+    });
+    const firstSchedule=schedule(first,0,"09:00","12:00");
+    const secondSchedule=schedule(second,2,"08:30","16:00");
+    const p=projectApprovedParentInformation({
+      ...base,academicPrograms:[first,second],
+      programSchedules:[firstSchedule,secondSchedule],
+    });
+    expect(p.schoolDay.days.canDisplay).toBe(false);
+    expect(p.programSchedules).toHaveLength(2);
+    expect(p.programSchedules[0]?.weeklyPattern.value?.[0]?.dayOfWeek).toBe(0);
+    expect(p.programSchedules[1]?.weeklyPattern.value?.[0]?.endsAtLocal).toBe("16:00");
+    // Program title and grade changes invalidate even an approved old pattern.
+    const stale=projectApprovedParentInformation({
+      ...base,academicPrograms:[{...first,title:"New Title"},second],
+      programSchedules:[firstSchedule,secondSchedule],
+    });
+    expect(stale.programSchedules.map(s=>s.programId)).toEqual(["public-academic-6-8"]);
+  });
+
+  it("projects only explicit approved public people and never fabricates public contacts", () => {
+    const profile=projectApprovedParentInformation({
+      ...base,people:[{
+        displayName:"Dr. A. Example",publicTitle:"Principal",
+        biography:"A current, independently consented and approved biography.",
+      }],
+    });
+    expect(profile.people[0]?.displayName).toBe("Dr. A. Example");
+    expect(profile.site.contact.canDisplay).toBe(false);
+    expect(profile.site.address.canDisplay).toBe(false);
+  });
+
 });
