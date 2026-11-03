@@ -483,6 +483,8 @@ describe("standalone public site HTML", () => {
     const admissions = renderPublicSiteHtml(page, { path: "/admissions" });
     expect(admissions).toContain("Applications are not currently open");
     expect(admissions).not.toContain("School status and disclosures");
+    expect(admissions).toContain("Reviewed public authorization, licensure, accreditation and jurisdiction statements have not yet been published");
+    expect(admissions).toContain("absence is not evidence");
     expect(admissions).not.toContain('action="/apply"');
 
     profile.admissions.description = verifiedPublicClaim(
