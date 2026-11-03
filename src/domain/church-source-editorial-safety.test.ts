@@ -10,6 +10,11 @@ describe("source excerpt eligibility before church editorial queue", () => {
   });
   it.each([
     "Our school is enrolling students and accepting applications.",
+    "Our academy is now accepting student applications.",
+    "Enrollment is open for children ages 5–18.",
+    "We are enrolling students for next term.",
+    "Student admissions are now available.",
+    "Families can apply to our school and enroll their children.",
     "Our academy has qualified teachers and certified staff.",
     "Our school guarantees a safe campus for all students.",
     "Families are eligible for state voucher funding.",
@@ -18,6 +23,12 @@ describe("source excerpt eligibility before church editorial queue", () => {
     "<script>alert('x')</script>",
   ])("rejects private source proposal before it can imply CAN approval: %s", text => {
     expect(() => assertChurchSourceEditorialCopy(text, "localDescription")).toThrow();
+  });
+  it("does not block references to church ministry, Sunday school, or non-academic service", () => {
+    expect(() => assertChurchSourceEditorialCopy(
+      "Our church hosts Sunday school for adults, food drives, and seasonal neighborhood service.",
+      "localDescription",
+    )).not.toThrow();
   });
   it("blocks direct HTML/JS but not ordinary church-owned faith writing", () => {
     expect(() => assertChurchSourceEditorialCopy(
