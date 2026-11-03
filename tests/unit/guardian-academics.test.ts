@@ -29,6 +29,13 @@ describe("guardian assignment release policy", () => {
   ],now);
   expect(summary).toEqual({needsAction:2,overdue:2,releasedGrades:2});
  });
+ it("does not count unreleased future work as overdue even when dueAt is past",()=>{
+  const now=new Date("2026-11-02T12:00:00Z");
+  expect(guardianAssignmentSummary([
+   {status:"assigned",dueAt:"2026-10-20T12:00:00Z",score:null,availableAt:"2026-11-03T00:00:00Z"},
+   {status:"returned",dueAt:"2026-10-20T12:00:00Z",score:null,availableAt:"2026-10-01T00:00:00Z"},
+  ],now)).toEqual({needsAction:2,overdue:1,releasedGrades:0});
+ });
  it("keeps saved revision drafts on the guardian needs-action list",()=>{
   const now=new Date("2026-10-30T12:00:00Z");
   expect(guardianAssignmentSummary([
