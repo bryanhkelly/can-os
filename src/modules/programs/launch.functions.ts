@@ -126,7 +126,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows,
+      sites: siteRows.map(site => ({ ...site, address: site.address === null ? null : safeJsonObject(site.address) })),
       jurisdictions: jurisdictionRows,
       schoolSetupAdministrator: context.role === "site_admin",
     };
