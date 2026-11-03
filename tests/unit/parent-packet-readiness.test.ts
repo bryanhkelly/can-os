@@ -41,7 +41,7 @@ describe("approved parent packet and independent publishing gates", () => {
     expect(r.admissions).toBe("not_authorized");
     expect(r.opening).toBe("not_confirmed");
     expect(r.information).toBe("incomplete");
-    expect(r.gaps.find(g=>g.category==="tuition")?.required).toBe(false);
+    expect(r.gaps.find(g=>g.category==="tuition")?.required).toBe(true);
     expect(r.gaps.every(g=>g.destination.startsWith("/"))).toBe(true);
   });
   it("requires reviewed address and tuition for an information-complete school profile",()=>{
