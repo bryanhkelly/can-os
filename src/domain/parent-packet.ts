@@ -28,12 +28,35 @@ export function renderParentPacket(profile:PublicParentSchoolProfile, generatedA
     const title=shown(program.title),summary=shown(program.summary),grades=shown(program.grades);
     if(title&&summary) add(title,summary+(grades?`\nGrades ${grades.min}–${grades.max}`:""));
   }
-  const days=shown(profile.schoolDay.days);
-  const start=shown(profile.schoolDay.startTime);
-  const end=shown(profile.schoolDay.endTime);
-  if(days && start && end){
-    const weekday=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-    add("School day",`${days.map(day=>weekday[day]).filter(Boolean).join(", ")} · ${start}–${end}`);
+  // Program-specific, independently approved weekly instructional schedules.
+  // Multiple intervals on one day are rendered distinctly (never flatten
+  // lunch or instruction breaks). Legacy uniform days are fallback only.
+  const weekday=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const sorted=profile.programSchedules.filter(schedule=>
+    shown(schedule.name) && shown(schedule.grades) &&
+    shown(schedule.weeklyPattern)?.length);
+  for(const schedule of sorted){
+    const name=shown(schedule.name)!;
+    const grades=shown(schedule.grades)!;
+    const timezone=shown(schedule.timezone);
+    const periods=shown(schedule.weeklyPattern)!;
+    const from=shown(schedule.effectiveFrom);
+    const through=shown(schedule.effectiveThrough);
+    const lines=periods.map(period=>
+      `${weekday[period.dayOfWeek]??"Day"} · ${period.startsAtLocal}–${period.endsAtLocal}`);
+    add(`${name} · Grades ${grades.min}–${grades.max} schedule`,
+      [`Standard instructional week${timezone?` · ${timezone}`:""}`,
+       from&&through?`Effective ${from} to ${through}`:null,
+       ...lines,"Holidays and one-off calendar changes are not included."]
+        .filter((line):line is string=>Boolean(line)).join("\\n"));
+  }
+  if(!sorted.length){
+    const days=shown(profile.schoolDay.days);
+    const start=shown(profile.schoolDay.startTime);
+    const end=shown(profile.schoolDay.endTime);
+    if(days && start && end)
+      add("School day",
+        `${days.map(day=>weekday[day]).filter(Boolean).join(", ")} · ${start}–${end}`);
   }
   for(const service of profile.services)
     add(service.category.replaceAll("_"," "),shown(service.description));
@@ -44,6 +67,12 @@ export function renderParentPacket(profile:PublicParentSchoolProfile, generatedA
     "Please contact school admissions about current application availability.");
   for(const disclosure of profile.disclosures)
     add(disclosure.category,shown(disclosure.statement));
+  for(const person of profile.people){
+    const name=person.displayName.trim(),title=person.publicTitle.trim();
+    if(name&&title&&person.biography.trim())
+      add(`Meet ${name} · ${title}`,person.biography);
+  }
+  add("Public school location",shown(profile.site.address));
   add("Public contact",shown(profile.site.contact));
   const body=sections.map(section=>`<section><h2>${escape(section.title)}</h2><p>${section.body.replaceAll("\n","<br>")}</p></section>`).join("\n");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
