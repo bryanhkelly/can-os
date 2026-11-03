@@ -1,6 +1,6 @@
 import { and, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { programs, programPublications, publicFamilyStartRequests, sitePublications, sites } from "@/db/schema";
+import { admissionSeatPools, programs, programPublications, publicFamilyStartRequests, schoolYears, sitePublications, sites } from "@/db/schema";
 import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { publicFamilyStartInput, verifiedFamilyStartEmail, type PublicFamilyStartInput } from "@/domain/public-family-start";
 import { assertPublishedFamilyInvitationDestination } from "@/domain/family-invitations";
@@ -73,6 +73,19 @@ export async function resolvePublishedFamilyStartDestination(
  // an admissions-only agreement can establish a valid school listing.
  await requireChurchHostedOperatingServices(tx,programId,
    ["academic_instruction","school_of_record","admissions"]);
+ // Public enrollment requires at least one configured academic-year seat pool.
+ // This does NOT guarantee free seats; offer/activation checks are separate.
+ const [intakeYear]=await tx.select({id:schoolYears.id})
+   .from(admissionSeatPools)
+   .innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId))
+   .where(and(eq(admissionSeatPools.programId,programId),
+     gt(admissionSeatPools.capacity,0),
+     eq(schoolYears.status,"active"),
+     eq(schoolYears.organizationId,school.organizationId),
+     eq(schoolYears.siteId,school.siteId),
+     sql`(${schoolYears.programId} IS NULL OR ${schoolYears.programId} = ${programId})`))
+   .limit(1);
+ if(!intakeYear)throw new Error("School has no active configured application year");
  return {siteId:school.siteId,organizationId:school.organizationId,
    programId:school.programId,programName:school.programName,slug:school.slug};
 }
