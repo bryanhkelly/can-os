@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { churchContentSuggestions, churchSourceReferences } from "@/db/schema";
+import { actions, churchContentSuggestions, churchSourceReferences } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
   initialChurchReferenceState, normalizeChurchReferenceUrl,
@@ -10,6 +10,48 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+
+/**
+ * A church can withdraw a source without silently rolling back church-reviewed
+ * public copy. For accepted/edited excerpts, create an operations review action
+ * while preserving the immutable provenance and published content revision.
+ * No source text, photo or religious content is copied into action metadata.
+ */
+async function flagPreviouslyReviewedSource(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  input: { siteId: string; organizationId: string; sourceId: string; kind: ChurchReferenceKind; reason: "removed" | "replaced" },
+) {
+  const [reviewed] = await tx.select({ id: churchContentSuggestions.id })
+    .from(churchContentSuggestions).where(and(
+      eq(churchContentSuggestions.siteId, input.siteId),
+      eq(churchContentSuggestions.sourceReferenceId, input.sourceId),
+    )).orderBy(asc(churchContentSuggestions.createdAt)).limit(1);
+  if (!reviewed) return;
+  const [accepted] = await tx.select({ id: churchContentSuggestions.id })
+    .from(churchContentSuggestions).where(and(
+      eq(churchContentSuggestions.siteId, input.siteId),
+      eq(churchContentSuggestions.sourceReferenceId, input.sourceId),
+      // Accepted and edited proposals were previously approved by a church editor.
+      // Filtering using SQL avoids placing excerpts in the operations action.
+      eq(churchContentSuggestions.reviewDecision, "accepted"),
+    )).limit(1);
+  const [edited] = accepted ? [] : await tx.select({ id: churchContentSuggestions.id })
+    .from(churchContentSuggestions).where(and(
+      eq(churchContentSuggestions.siteId, input.siteId),
+      eq(churchContentSuggestions.sourceReferenceId, input.sourceId),
+      eq(churchContentSuggestions.reviewDecision, "edited"),
+    )).limit(1);
+  if (!accepted && !edited) return;
+  await tx.insert(actions).values({
+    type: "site_website_source_provenance_review",
+    title: "Review published church copy after source change",
+    description: "An earlier church reference was removed or replaced. Check the attribution and rights of any related previously reviewed church copy. Do not automatically unpublish it.",
+    subjectType: "church_source_reference", subjectId: input.sourceId,
+    siteId: input.siteId, organizationId: input.organizationId,
+    status: "open", priority: "normal",
+    metadata: { reason: input.reason, kind: input.kind },
+  });
+}
 
 /**
  * Only scoped church website editors can read these references.
@@ -52,6 +94,10 @@ export async function saveChurchSourceReference(actor: AccessContext, input: {
     }).returning({ id: churchSourceReferences.id });
     if (!saved) throw new Error("Unable to save this church reference");
     if (before && before.normalizedUrl !== normalizedUrl) {
+      await flagPreviouslyReviewedSource(tx, {
+        siteId: site.id, organizationId: site.organizationId,
+        sourceId: before.id, kind: input.kind, reason: "replaced",
+      });
       // Pending proposals are stale as soon as their source identity changes.
       await tx.update(churchContentSuggestions).set({
         reviewDecision: "discarded", reviewedAt: new Date(),
@@ -90,6 +136,10 @@ export async function removeChurchSourceReference(actor: AccessContext, input: {
     if (existing.revokedAt) return { changed: false };
     await tx.update(churchSourceReferences).set({ revokedAt: new Date(), updatedAt: new Date() })
       .where(eq(churchSourceReferences.id, existing.id));
+    await flagPreviouslyReviewedSource(tx, {
+      siteId: site.id, organizationId: site.organizationId,
+      sourceId: existing.id, kind: existing.kind, reason: "removed",
+    });
     // Re-adding a revoked URL must not resurrect old pending proposals.
     await tx.update(churchContentSuggestions).set({
       reviewDecision: "discarded", reviewedAt: new Date(),
