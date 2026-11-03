@@ -1,4 +1,5 @@
 import { resolveSiteTheme } from "./site-theme";
+import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
@@ -75,6 +76,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   makeRequestId?: () => string;
   path?: PublicSitePath;
   localPreview?: boolean;
+  /** Trusted server-resolved Site slug for local-only, read-only multipage preview. */
+  localPreviewSlug?: string;
 }): string {
   const path = options?.path ?? "/";
   const availablePaths = availablePublicSitePaths(page);
@@ -420,6 +423,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
   const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
   const canonical = `https://${host}${path}`;
+  const previewSlug = options?.localPreview && options.localPreviewSlug &&
+    isPublicSiteSlug(options.localPreviewSlug) ? options.localPreviewSlug : null;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -495,5 +500,11 @@ ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional 
 <main id="main-content">\n  ${options?.localPreview ? '<p role="status">Local read-only preview. Inquiry and application forms are available only on the configured live school website.</p>' : ""}\n  ${pageContent[path]}\n</main>
 <footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>
 </body>
-</html>`;
+</html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
+    // Local previews have distinct, read-only same-origin page endpoints. A bare
+    // /academics href would escape into the CAN OS authenticated application.
+    if (!previewSlug || !availablePaths.includes(destination as PublicSitePath)) return match;
+    const endpoint = destination === "/" ? "/published-site" : "/published-site" + destination;
+    return `href="${endpoint}?site=${encodeURIComponent(previewSlug)}"`;
+  });
 }
