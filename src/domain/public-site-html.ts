@@ -219,6 +219,24 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const parent = page.parentInformation;
   const verifiedText = (claim: { canDisplay: boolean; value: string | null } | undefined) =>
     claim?.canDisplay && claim.value ? escapePublicHtml(claim.value) : "";
+  const schoolDayDays = parent?.schoolDay.days.canDisplay
+    ? parent.schoolDay.days.value : null;
+  const schoolDayStart = verifiedText(parent?.schoolDay.startTime);
+  const schoolDayEnd = verifiedText(parent?.schoolDay.endTime);
+  // A single fully reviewed timetable is shown only when the canonical
+  // projection can truthfully represent the Site. Sunday is never excluded.
+  const approvedDayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const reviewedSchoolDay = schoolDayDays?.length && schoolDayStart && schoolDayEnd
+    ? `<section class="church-section" aria-labelledby="reviewed-day-title">
+      <p class="tag">Institutionally reviewed schedule</p>
+      <h2 id="reviewed-day-title">Published learning days and hours</h2>
+      <p>${escapePublicHtml(schoolDayDays.map(day => approvedDayNames[day] ?? "Unknown day").join(", "))}</p>
+      <p>${schoolDayStart}–${schoolDayEnd} (school-local time)</p>
+      <p class="availability">These are approved instructional times, not confirmation that the school is
+      authorized to receive students on any particular day. Confirm attendance and opening with the school.</p>
+      </section>`
+    : `<p class="availability">A reviewed public timetable is not available for this school.
+      Contact the school for confirmed instructional days and times.</p>`;
   const tuitionText = verifiedText(parent?.tuition.description);
   const aidText = verifiedText(parent?.tuition.financialAid);
   const tuitionSection = tuitionText ? `<section class="church-section" aria-labelledby="tuition-title">
@@ -240,7 +258,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "See currently published enrichment and activities.") + enrichmentSection,
     "/school-day": secondaryHero("Learning together", "A look at the school day",
       "Program-specific delivery patterns, not a promised daily timetable.") +
-      `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>`,
+      reviewedSchoolDay + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>`,
     "/admissions": secondaryHero("For families", "Admissions and next steps",
       "Explore eligible programs. Applications are available only when separately authorized.") +
       academicSection,
