@@ -140,6 +140,21 @@ export type PublicParentSchoolProfile = {
   familyPortal: PublicClaim<string>;
 };
 
+/** The only public Apply CTA source is the per-Program result of the
+ * canonical family-start eligibility check. Marketing publication, active
+ * Program status, and service agreements alone are not sufficient. */
+export function withVerifiedPublicApplications(
+  programs: readonly PublicAcademicProgram[],
+  admissions: PublicAdmissionsState | undefined,
+): PublicAcademicProgram[] {
+  return programs.map(program=>({
+    ...program,
+    applicationOpen: admissions?.programs?.some(item=>
+      item.programId===program.programId &&
+      item.status==="verified_application") === true,
+  }));
+}
+
 /** An unimplemented domain adapter is not permission to synthesize a fact. */
 export function unconfiguredClaim<T>(
   source: PublicClaim<T>["source"] = null,
