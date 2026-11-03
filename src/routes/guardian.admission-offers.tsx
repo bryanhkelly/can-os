@@ -71,7 +71,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     {app.transferOriginExited===true&&<p role="status" className="mt-2 text-sm">
       Origin-school exit completed. Your receiving school still must complete the independent offer and class placement process.
     </p>}
-    {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
+    {app.waitlisted&&!app.offers.some(o=>o.enrollmentActive||o.status==="accepted"||o.status==="issued")&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
     <section aria-label="Your next enrollment step" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
      <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next step</p>
