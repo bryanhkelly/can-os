@@ -3,7 +3,7 @@ const state = vi.hoisted(() => ({ rows: [] as unknown[], lock: vi.fn(), authorit
 vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@/db/schema", () => Object.fromEntries([
   "programs", "programPublications", "publicFamilyStartRequests", "sitePublications", "sites",
-].map(name => [name, Object.fromEntries(["id", "siteId", "programId", "organizationId", "name", "slug", "type", "status", "publishedAt"].map(key => [key, name + "." + key]))])));
+].map(name => [name, Object.fromEntries(["id", "siteId", "programId", "organizationId", "name", "slug", "type", "status", "publishedAt", "title", "summary", "gradeRange", "deliveryModel"].map(key => [key, name + "." + key]))])));
 vi.mock("@/domain/access-tokens", () => ({ hashAccessSecret: vi.fn(), issueOpaqueSecret: vi.fn() }));
 vi.mock("@/domain/public-family-start", () => ({ publicFamilyStartInput: {}, verifiedFamilyStartEmail: vi.fn() }));
 vi.mock("@/modules/identity/resend-access-mail.server", () => ({ sendAccessLinkViaResend: vi.fn() }));
@@ -15,7 +15,11 @@ import { programs, programPublications, sitePublications } from "@/db/schema";
 
 const row = { siteId: "site", organizationId: "church", programId: "program", programName: "School",
   slug: "school", programOrganizationId: "church", programSiteId: "site",
-  type: "church_hosted_academy", status: "active" };
+  type: "church_hosted_academy", status: "active",
+  reviewedTitle:"School", reviewedSummary:"A reviewed academic learning experience for students.",
+  reviewedGrades:{min:"K",max:"8"},reviewedDelivery:{onsite:true,asynchronous:false,liveOnline:false,onsiteDaysPerWeek:5},
+  currentName:"School",currentGrades:{min:"K",max:"8"},
+  currentDelivery:{onsite:true,asynchronous:false,liveOnline:false,onsiteDaysPerWeek:5} };
 function reader() {
   const chain = { from: () => chain, innerJoin: () => chain, where: () => chain,
     for: (...args: unknown[]) => { state.lock(...args); return chain; }, limit: async () => state.rows };
@@ -33,7 +37,7 @@ describe("published family application destination", () => {
       siteId: "site", organizationId: "church", programId: "program",
     });
     expect(state.lock).toHaveBeenCalledWith("share", { of: [sitePublications, programPublications, programs] });
-    expect(state.authority).toHaveBeenCalledWith(tx, "program", ["admissions", "school_of_record"]);
+    expect(state.authority).toHaveBeenCalledWith(tx, "program", ["academic_instruction", "school_of_record", "admissions"]);
   });
   it("denies unpublished or withdrawn destinations returned as no eligible row", async () => {
     state.rows = [];
@@ -52,6 +56,12 @@ describe("published family application destination", () => {
       state.rows = [{ ...row, ...changed }];
       await expect(resolvePublishedFamilyStartDestination(reader(), "program")).rejects.toThrow("not open");
     }
+    expect(state.authority).not.toHaveBeenCalled();
+  });
+  it("rejects an academic Program edited after its public approval", async () => {
+    state.rows = [{...row,currentName:"Changed school name"}];
+    await expect(resolvePublishedFamilyStartDestination(reader(), "program"))
+      .rejects.toThrow("renewed approval");
     expect(state.authority).not.toHaveBeenCalled();
   });
   it("retains the current institutional service check after marketing publication", async () => {
