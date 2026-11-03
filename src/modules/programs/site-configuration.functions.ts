@@ -1,14 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema, draftSiteContactSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
-import { eq, and, inArray } from "drizzle-orm";
+import { physicalSiteAddressSchema, draftSiteContactSchema, siteTimezoneSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
+import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSiteSetupScope, assertSiteLocationProgramScope } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
-import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations } from "@/db/schema";
+import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations, schoolYears, calendarEvents } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | {[key:string]:JsonValue};
@@ -152,6 +152,93 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
         action:"site.contact.draft.update",entityType:"site",entityId:site.id,
         scope:{siteId:site.id,organizationId:site.organizationId},
         before:{contact:before},after:{contact:data.contact,publicApproved:false},
+      });
+      return {siteId:site.id,updated:true,revision:saved.updatedAt.toISOString()};
+    });
+  });
+
+/**
+ * Edit draft Site identity only. Name/zone are canonical setup metadata, NOT
+ * an amendment to independent institutional approval. Public name/host changes
+ * and timezone changes after academic scheduling need coordinated review.
+ */
+export const updateLaunchSiteIdentity=createServerFn({method:"POST"})
+  .validator((v:unknown)=>z.object({
+    siteId:z.string().uuid(),
+    expectedRevision:z.string().datetime({offset:true}),
+    name:z.string().trim().min(2).max(160),
+    timezone:siteTimezoneSchema,
+    changeReason:z.string().trim().min(5).max(1000),
+  }).strict().parse(v))
+  .handler(async({data})=>{
+    const actor=await getCommandContext(getRequest());
+    assertCapability(actor,"program.launch.start");
+    if(!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
+      throw new AuthorizationError("verified Site identity editor");
+    return db.transaction(async tx=>{
+      const [site]=await tx.select().from(sites)
+        .where(eq(sites.id,data.siteId)).for("update").limit(1);
+      assertSiteSetupScope(actor,site,"program.launch.start");
+      const nameChanged=site.name!==data.name;
+      const timezoneChanged=site.timezone!==data.timezone;
+      if(!nameChanged&&!timezoneChanged)
+        return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString()};
+      if(site.updatedAt.toISOString()!==data.expectedRevision)
+        throw new Error("This school Site changed. Reload its saved configuration before editing.");
+      const attached=await tx.select({id:programs.id,status:programs.status})
+        .from(programs).where(eq(programs.siteId,site.id));
+      const programIds=attached.map(program=>program.id);
+      assertSiteLocationProgramScope(actor,programIds);
+      const [sitePublication]=await tx.select({status:sitePublications.status})
+        .from(sitePublications).where(eq(sitePublications.siteId,site.id))
+        .for("update").limit(1);
+      if(sitePublication?.status==="published" || attached.some(program=>
+          program.status==="active" || program.status==="ready"))
+        throw new Error("An active, ready or publicly published Site requires CAN-coordinated identity amendment.");
+      if(programIds.length) {
+        const [approved,published,authorized]=await Promise.all([
+          tx.select({id:schoolConfigurationVersions.id}).from(schoolConfigurationVersions)
+            .where(and(inArray(schoolConfigurationVersions.programId,programIds),
+              eq(schoolConfigurationVersions.status,"approved"))).limit(1),
+          tx.select({id:programPublications.programId}).from(programPublications)
+            .where(and(inArray(programPublications.programId,programIds),
+              eq(programPublications.status,"published"))).limit(1),
+          tx.select({id:programSiteAuthorizations.id}).from(programSiteAuthorizations)
+            .where(and(inArray(programSiteAuthorizations.programId,programIds),
+              inArray(programSiteAuthorizations.status,["approved","suspended"]))).limit(1),
+        ]);
+        if(approved.length || published.length || authorized.length)
+          throw new Error("School identity is institutionally approved or published. Request a controlled CAN amendment.");
+      }
+      if(timezoneChanged) {
+        const [year]=await tx.select({id:schoolYears.id}).from(schoolYears)
+          .where(eq(schoolYears.siteId,site.id)).limit(1);
+        const [calendar]=await tx.select({id:calendarEvents.id}).from(calendarEvents)
+          .where(eq(calendarEvents.siteId,site.id)).limit(1);
+        if(programIds.length || year || calendar)
+          throw new Error("This Site has Program or calendar schedules. Request a coordinated timezone amendment; existing schedules were not changed.");
+      }
+      // Serialize a name correction with Site creation to prevent silent duplicates.
+      if(nameChanged) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:"+site.organizationId+":"+data.name.toLowerCase()}))`);
+        const [duplicate]=await tx.select({id:sites.id}).from(sites)
+          .where(and(eq(sites.organizationId,site.organizationId),ne(sites.id,site.id),
+            sql`lower(${sites.name}) = ${data.name.toLowerCase()}`)).limit(1);
+        if(duplicate)throw new Error("Another school Site already uses this name. Choose its saved record.");
+      }
+      const nextRevision=nextSiteConfigurationRevision(site.updatedAt);
+      const [saved]=await tx.update(sites).set({
+        name:data.name,timezone:data.timezone,
+        metadata:{...site.metadata,siteIdentityRevision:nextRevision.toISOString()},
+        updatedAt:nextRevision,
+      }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
+      if(!saved)throw new Error("School Site identity update failed.");
+      await writeAudit(tx,actor,{
+        action:"site.identity.draft.update",entityType:"site",entityId:site.id,
+        scope:{organizationId:site.organizationId,siteId:site.id},
+        before:{name:site.name,timezone:site.timezone},
+        after:{name:data.name,timezone:data.timezone,reason:data.changeReason,
+          publicApproved:false,physicalLocationRevisionUnchanged:true},
       });
       return {siteId:site.id,updated:true,revision:saved.updatedAt.toISOString()};
     });
