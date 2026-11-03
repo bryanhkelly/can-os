@@ -79,6 +79,10 @@ describe("canonical church Site configuration input",()=>{
     expect(physicalSiteAddressSchema.safeParse({...address,country:"CA",state:"CA"}).success).toBe(false);
     expect(physicalSiteAddressSchema.parse({...address,country:"GB",state:"England",postalCode:"SW1A 1AA"}).country).toBe("GB");
     expect(physicalSiteAddressSchema.safeParse({...address,country:"unknown country"}).success).toBe(false);
+    expect(physicalSiteAddressSchema.safeParse({...address,country:"ZZ"}).success).toBe(false);
+    expect(physicalSiteAddressSchema.safeParse({...address,country:"XA"}).success).toBe(false);
+    expect(physicalSiteAddressSchema.safeParse({...address,country:"PH",state:"Metro Manila",postalCode:"1000"}).success).toBe(true);
+    expect(physicalSiteAddressSchema.safeParse({...address,country:undefined}).success).toBe(false);
   });
   it("preserves optional county, normalizes whitespace, and marks old or invalid records",()=>{
     const valid=physicalSiteAddressSchema.parse({
@@ -97,6 +101,11 @@ describe("canonical church Site configuration input",()=>{
     expect(readSitePhysicalAddress({street1:"100 Main Street",city:"Oakland",state:"??",postalCode:"",country:"US"}).status)
       .toBe("invalid_needs_correction");
     expect(readSitePhysicalAddress(null).status).toBe("missing");
+    const unknownCountry={line1:"100 Main Street",city:"Oakland",state:"CA",zip:"94612"};
+    expect(siteAddressEditorDraft(unknownCountry).country).toBe("");
+    expect(readSitePhysicalAddress(unknownCountry)).toMatchObject({status:"legacy_needs_review",value:null});
+    expect(samePhysicalSiteAddress(unknownCountry,address)).toBe(false);
+    expect(readSitePhysicalAddress({...address,country:undefined}).status).toBe("legacy_needs_review");
   });
   it("accepts one through seven onsite days without automatically excluding Sunday",()=>{
     expect(launchOnsiteDaysPerWeekSchema.safeParse(7).success).toBe(true);
