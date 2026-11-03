@@ -66,7 +66,8 @@ function PartnerSiteWebsitePage() {
     </section>
     <WebsiteInformationChecklist data={data} />
     <WebsiteDesignChecklist data={data} />
-    <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}/>
+    <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
+      enabled={data.mediaUploadsEnabled}/>
     <ChurchSourceReferenceEditor />
     <ChurchSourceSuggestionReview currentRevision={data.currentRevision} />
     {data.host && <LocalWebsiteCopyEditor data={data} />}
