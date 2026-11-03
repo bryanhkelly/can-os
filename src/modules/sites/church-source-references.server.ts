@@ -28,6 +28,15 @@ async function flagPreviouslyReviewedSource(
       inArray(churchContentSuggestions.reviewDecision, ["accepted", "edited"]),
     )).limit(1);
   if (!accepted) return;
+  // Replacing then revoking a previously used link must not generate another
+  // open rights/provenance task for the same withdrawn reference.
+  const [openAction] = await tx.select({ id: actions.id }).from(actions)
+    .where(and(eq(actions.siteId, input.siteId),
+      eq(actions.subjectType, "church_source_reference"),
+      eq(actions.subjectId, input.sourceId),
+      eq(actions.type, "site_website_source_provenance_review"),
+      eq(actions.status, "open"))).limit(1);
+  if (openAction) return;
   await tx.insert(actions).values({
     type: "site_website_source_provenance_review",
     title: "Review published church copy after source change",
@@ -35,7 +44,7 @@ async function flagPreviouslyReviewedSource(
     subjectType: "church_source_reference", subjectId: input.sourceId,
     siteId: input.siteId, organizationId: input.organizationId,
     status: "open", priority: "normal",
-    metadata: { reason: input.reason, kind: input.kind },
+    metadata: { reason: input.reason, kind: input.kind, reviewedSuggestionId: accepted.id },
   });
 }
 
