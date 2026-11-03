@@ -1,3 +1,4 @@
+import { sitePaletteIds, siteTypographyIds, type SitePaletteId, type SiteTypographyId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
  * CAN-owned academic, admissions, tuition and institutional facts are not
@@ -35,6 +36,9 @@ export type SiteLocalImage = {
 export type SiteLocalBranding = {
   theme: SiteLocalTheme;
   heroImage: SiteLocalImage | null;
+  /** Curated, accessible local identity. Optional for historical revisions. */
+  paletteId?: SitePaletteId;
+  typographyId?: SiteTypographyId;
 };
 export type SiteLocalContent = SiteLocalTextContent & {
   branding: SiteLocalBranding;
@@ -44,6 +48,8 @@ export const siteLocalImageMaxBytes = 160 * 1024;
 export const siteLocalImageMaxBase64Length = 4 * Math.ceil(siteLocalImageMaxBytes / 3) + 4;
 export const emptySiteLocalBranding: SiteLocalBranding = Object.freeze({
   theme: "classic",
+  paletteId: "signature",
+  typographyId: "editorial",
   heroImage: null,
 });
 export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
@@ -171,6 +177,11 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   }
   const branding = input.branding ?? emptySiteLocalBranding;
   if (!siteLocalThemes.includes(branding.theme)) throw new Error("Choose an approved website theme");
+  const paletteId = branding.paletteId ?? "signature";
+  const typographyId = branding.typographyId ?? "editorial";
+  if (!sitePaletteIds.includes(paletteId) || !siteTypographyIds.includes(typographyId)) {
+    throw new Error("Choose approved school visual identity options");
+  }
   const image = branding.heroImage;
   if (image) {
     validateInlinePng(image.dataUrl);
@@ -184,12 +195,12 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       throw new Error("Confirm that no identifiable children appear or that guardian consent is documented");
     }
     result.branding = {
-      theme: branding.theme,
+      theme: branding.theme, paletteId, typographyId,
       heroImage: { dataUrl: image.dataUrl, altText, rightsConfirmed: true,
         childImageConsent: image.childImageConsent },
     };
   } else {
-    result.branding = { theme: branding.theme, heroImage: null };
+    result.branding = { theme: branding.theme, paletteId, typographyId, heroImage: null };
   }
   return result;
 }
