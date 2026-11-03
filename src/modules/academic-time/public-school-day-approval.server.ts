@@ -1,10 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { programs, scheduleTemplates, scheduleTemplatePeriods, schoolYears, sites } from "@/db/schema";
+import { auditEvents, programs, scheduleTemplates, scheduleTemplatePeriods, schoolYears, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { publicSchoolDayScheduleSignature } from "@/domain/public-school-day";
 import { writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "@/modules/sites/site-publication.server";
+import { publicSchoolDaySiteRevision } from "./public-school-day-site-revision.server";
+import { competingActiveSchoolDaySchedules } from "@/domain/public-school-day";
 
 /**
  * Explicit institutional marketing review of canonical timetable.
@@ -23,7 +25,7 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       throw new Error("Program not in authorized publication scope");
     // Serialize against the authoritative Site address/timezone editor.
     const [siteRecord]=await tx.select({
-      timezone:sites.timezone,updatedAt:sites.updatedAt,
+      timezone:sites.timezone,address:sites.address,metadata:sites.metadata,
     }).from(sites).where(eq(sites.id,site.id)).for("update").limit(1);
     if(!siteRecord)throw new Error("Approved schedule Site is unavailable");
     const [schedule] = await tx.select({
@@ -61,6 +63,43 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       "revision" in old && typeof old.revision === "number" ? old.revision : 0;
     if (oldRevision !== input.expectedRevision)
       throw new Error("Schedule approval changed. Refresh before reviewing.");
+    // Independent authorization: the person who last authored or edited the
+    // timetable must not approve their own schedule for parents.
+    const [authoring]=await tx.select({
+      actorPersonId:auditEvents.actorPersonId,
+      action:auditEvents.action,
+    }).from(auditEvents).where(and(
+      eq(auditEvents.resourceType,"schedule_template"),
+      eq(auditEvents.resourceId,schedule.id),
+      inArray(auditEvents.action,["schedule_template.create","schedule.periods.replace"]),
+    )).orderBy(desc(auditEvents.occurredAt)).limit(1);
+    if(!authoring?.actorPersonId || authoring.actorPersonId===actor.actorPersonId)
+      throw new Error("Independent academic schedule reviewer required; last schedule editor cannot approve their own timetable");
+    const overlapping=await tx.select({
+      id:scheduleTemplates.id,active:scheduleTemplates.active,
+      startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn,
+      effectiveFrom:scheduleTemplates.effectiveFrom,
+      effectiveThrough:scheduleTemplates.effectiveThrough,
+      schoolYearStatus:schoolYears.status,
+      programId:scheduleTemplates.programId,siteId:scheduleTemplates.siteId,
+      schoolYearSiteId:schoolYears.siteId,
+      schoolYearProgramId:schoolYears.programId,
+    }).from(scheduleTemplates)
+      .innerJoin(schoolYears,eq(schoolYears.id,scheduleTemplates.schoolYearId))
+      .where(and(eq(scheduleTemplates.programId,input.programId),
+        eq(scheduleTemplates.siteId,site.id),eq(scheduleTemplates.active,true),
+        eq(schoolYears.status,"active"))).limit(101);
+    if(overlapping.length>100 || competingActiveSchoolDaySchedules(overlapping.map(item=>({
+      ...item,programMatches:item.programId===input.programId &&
+        (!item.schoolYearProgramId||item.schoolYearProgramId===input.programId),
+      siteMatches:item.siteId===site.id && item.schoolYearSiteId===site.id,
+    })),{
+      schoolYearStartsOn:schedule.startsOn,
+      schoolYearEndsOn:schedule.endsOn,
+      effectiveFrom:schedule.effectiveFrom,
+      effectiveThrough:schedule.effectiveThrough,
+    }))
+      throw new Error("Another active Program timetable overlaps the selected effective dates; resolve it before public approval");
     const periods = await tx.select({
       dayOfWeek:scheduleTemplatePeriods.dayOfWeek,
       sequence:scheduleTemplatePeriods.sequence,
@@ -83,7 +122,7 @@ export async function approvePublicSchoolDay(actor: AccessContext, input: {
       effectiveFrom:schedule.effectiveFrom,effectiveThrough:schedule.effectiveThrough,
       schoolYearKey:schedule.yearKey,schoolYearName:schedule.yearName,
       gradeRange:schedule.gradeRange,programType:schedule.programType,
-      siteRevision:siteRecord.updatedAt.toISOString(),
+      siteRevision:publicSchoolDaySiteRevision(siteRecord),
       programRevision:schedule.programUpdatedAt.toISOString(),
       yearRevision:schedule.yearUpdatedAt.toISOString(),
       templateRevision:approvalTime.toISOString(),
