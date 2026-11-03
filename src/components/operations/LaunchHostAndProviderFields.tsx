@@ -77,7 +77,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                     busy={busy} save={saveSiteAddress}/>}
                   {selectedSite && <LaunchSiteContactEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
-                    busy={busy} save={saveSiteContact}/>
+                    busy={busy} save={saveSiteContact}/> }
                   {selectedSite && <div className="rounded-lg border px-4 py-3 text-sm">
                     <p className="font-semibold">Saved Site · {selectedSite.name}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
