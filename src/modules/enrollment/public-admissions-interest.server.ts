@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  communicationThreads, programPublications, programs, publicAdmissionsInterests,
+  actions, communicationThreads, programPublications, programs, publicAdmissionsInterests,
   sitePublications, sites,
 } from "@/db/schema";
 import { isAcademicMarketingType, publishableAcademicProgram } from "@/domain/academic-program-publication";
@@ -154,6 +154,34 @@ export async function recordPublicAdmissionsInterest(
       status: "new",
     }).onConflictDoNothing().returning({ id: publicAdmissionsInterests.id });
     if (!created) return; // Retry with the same form request ID.
+
+    // Canonical Action, NOT a second website task/CRM. A staff owner and
+    // deadline require a separate authorized registrar decision; do not
+    // fabricate an assignment or service-level promise from anonymous input.
+    const [followup]=await tx.insert(actions).values({
+      type:"public_admissions_interest_followup",
+      subjectType:"public_admissions_interest",subjectId:created.id,
+      title:data.purpose==="visit_interest"?"Follow up on visit interest":"Follow up on school information request",
+      organizationId:matched.organizationId,siteId:matched.siteId,
+      programId:data.programId,
+      status:"open",priority:"normal",
+      metadata:{source:"published_site",purpose:data.purpose},
+    }).returning({id:actions.id});
+    if(!followup)throw new Error("Unable to create admissions follow-up");
+    await emitEvent(tx,{
+      eventType:EventTypes.ActionCreated,aggregateType:"action",
+      aggregateId:followup.id,siteId:matched.siteId,
+      organizationId:matched.organizationId,programId:data.programId,
+      payload:{type:"public_admissions_interest_followup",subjectId:created.id},
+    });
+    await writeAudit(tx,{
+      action:"admissions.public_interest.followup_created",
+      resourceType:"action",resourceId:followup.id,actorPersonId:null,
+      scope:{siteId:matched.siteId,organizationId:matched.organizationId,
+        programId:data.programId},
+      after:{subjectType:"public_admissions_interest",subjectId:created.id,status:"open"},
+      context:{anonymous:true},
+    });
 
     // Events/audit intentionally never include a raw visitor name/email/note.
     await emitEvent(tx, {
