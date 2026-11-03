@@ -13,6 +13,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
+import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
 const websiteSearchSchema=siteProgramSelectionSchema.extend({returnGrantId:optionalSearchString});
@@ -61,6 +62,7 @@ function PartnerSiteWebsitePage() {
         those records or access student information.
       </p>
     </section>
+    <ChurchSourceReferenceEditor />
     {data.host && <LocalWebsiteCopyEditor data={data} />}
     <WebsitePreviewPanel data={data} />
 
