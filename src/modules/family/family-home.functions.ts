@@ -90,8 +90,8 @@ async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: st
    row.enrollmentProgramId===row.programId &&
    row.yearId===row.termYearId &&
    validYears.has(`${row.programId}:${row.yearId}`)).map(row=>row.sectionId))];
- const ready=await staffedPublishedSectionIds(matching,db);
- return matching.filter(id=>ready.has(id));
+ // Enrollment defines class membership; staffing readiness is a separate operating signal.
+ return matching;
 }
 
 export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () => {
