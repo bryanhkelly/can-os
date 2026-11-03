@@ -85,8 +85,8 @@ export async function checkPublishedSiteReachability(input: {
     const html = await readBoundedHtml(response);
     const verified = html !== null &&
       html.toLowerCase().includes("<!doctype html>") &&
-      html.includes("Powered by CAN OS") &&
-      html.includes(`<footer>${input.host} · Powered by CAN OS</footer>`);
+      html.includes("Supported by CAN Academy") &&
+      html.includes(`<span class="platform-credit"> · Supported by CAN Academy · ${input.host}</span>`);
     return { status: verified ? "live" : "unreachable", url, checkedAt,
       diagnostic: verified ? "Public HTTPS returned CAN site HTML for this tenant." :
         "HTTPS responded, but the page did not identify this tenant's CAN public site." };
