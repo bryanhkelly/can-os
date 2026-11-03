@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema, draftSiteContactSchema, nextSiteConfigurationRevision } from "@/domain/site-setup-configuration";
+import { physicalSiteAddressSchema, draftSiteContactSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact } from "@/domain/site-setup-configuration";
 import { eq, and, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -44,7 +44,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         throw new AuthorizationError("Site configuration scope");
       const oldAddress=site.address??null;
       const address=data.address;
-      const same=JSON.stringify(oldAddress)===JSON.stringify(address);
+      const same=samePhysicalSiteAddress(oldAddress,address);
       if(same)return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString(),reviewRequested:false};
       if(site.updatedAt.toISOString()!==data.expectedRevision)
         throw new Error("This Site changed since you opened it. Refresh before saving to avoid overwriting another editor.");
@@ -117,7 +117,7 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
         (actor.scope.siteIds?.length && !actor.scope.siteIds.includes(site.id)))
         throw new AuthorizationError("Site contact scope");
       const before=site.metadata.setupContact??null;
-      if(JSON.stringify(before)===JSON.stringify(data.contact))
+      if(sameDraftSiteContact(before,data.contact))
         return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString()};
       if(site.updatedAt.toISOString()!==data.expectedRevision)
         throw new Error("School configuration changed. Refresh and review the latest information before saving.");
