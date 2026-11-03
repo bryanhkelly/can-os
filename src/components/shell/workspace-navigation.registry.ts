@@ -17,7 +17,7 @@ export const workspaceHome = {
   guardian: "/guardian",
   teacher: "/teacher",
   registrar: "/operations",
-  site_admin: "/operations/launch",
+  site_admin: "/operations",
   specialist: "/coach",
   counselor: "/counselor",
   network_admin: "/network",
