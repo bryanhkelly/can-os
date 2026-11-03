@@ -75,7 +75,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
     <section aria-label="Your next enrollment step" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
      <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next step</p>
-     {app.offers.some(o=>o.enrollmentActive)?<p className="mt-2 text-sm">Enrollment is active. Review your child's student account, attendance, and pickup arrangements before the first onsite day.</p>:
+     {app.offers.some(o=>o.enrollmentActive&&o.sectionCount>0)?<p className="mt-2 text-sm">School-year enrollment and instructional class placement are active. Review separate student sign-in authorization, attendance and pickup arrangements before the first onsite day. This is not confirmation of attendance.</p>:
+      app.offers.some(o=>o.enrollmentActive)?<p className="mt-2 text-sm">Your child's school-year enrollment is active, but a staffed instructional class has not yet been assigned. The school must complete class placement before learning access or onsite attendance can begin.</p>:
       app.offers.some(o=>o.status==="accepted")?<p className="mt-2 text-sm">Your offer is accepted. Complete any requested forms and watch for confirmation from the school that enrollment and class placement are active.</p>:
       app.offers.some(o=>o.progress.canAccept)?<p className="mt-2 text-sm">An offer is ready for your decision. Review the details below and accept or decline before the deadline.</p>:
       app.offers.some(o=>o.progress.state==="requirements_pending")?<p className="mt-2 text-sm">The school needs to review enrollment requirements before this offer can be accepted. Open the checklist below to see outstanding items.</p>:
