@@ -345,7 +345,7 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
         confidence: "low" as const,
         reviewDecision: "pending" as const,
         createdByPersonId: actor.actorPersonId!,
-      }] : [];
+      }];
     });
     // Different source paths can repeat identical text. Present only one
     // bounded proposal per source field/text and keep the first source page.
