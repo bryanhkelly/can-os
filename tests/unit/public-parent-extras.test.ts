@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readApprovedPublicParentExtras } from "@/modules/sites/public-parent-extras.server";
 import { readApprovedPublicSchoolDay } from "@/modules/academic-time/public-school-day.server";
 
+// This is a pure projection test: never open a Neon connection.
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@/modules/academic-time/public-school-day.server", () => ({
   readApprovedPublicSchoolDay: vi.fn(),
 }));
