@@ -7,7 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
-import { sites, programs, actions, sitePublications } from "@/db/schema";
+import { sites, programs, actions, sitePublications, organizations } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | {[key:string]:JsonValue};
@@ -158,11 +158,26 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     const attached=await db.select({
       id:programs.id,name:programs.name,type:programs.type,
       status:programs.status,jurisdictionId:programs.jurisdictionId,
+      hostOrganizationId:programs.hostOrganizationId,
       gradeRange:programs.gradeRange,deliveryModel:programs.deliveryModel,
       academicProviderOrganizationId:programs.academicProviderOrganizationId,
       creditIssuingOrganizationId:programs.creditIssuingOrganizationId,
     }).from(programs).where(and(eq(programs.siteId,site.id),
       ...(actor.scope.programIds ? [inArray(programs.id,actor.scope.programIds)] : [])));
+    const namedIds=[...new Set([
+      site.organizationId,
+      ...attached.flatMap(program=>[
+        program.hostOrganizationId,program.academicProviderOrganizationId,
+        program.creditIssuingOrganizationId,
+      ]).filter((id):id is string=>Boolean(id)),
+    ])];
+    const namedOrganizations=namedIds.length?await db.select({
+      id:organizations.id,name:organizations.name,
+    }).from(organizations).where(inArray(organizations.id,namedIds)):[];
+    const displayName=(organizationId:string|null)=>({
+      id:organizationId,
+      name:organizationId?namedOrganizations.find(org=>org.id===organizationId)?.name??null:null,
+    });
     const [publication]=await db.select({status:sitePublications.status})
       .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
     const {address,metadata,...identity}=site;
@@ -173,12 +188,25 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       programs:attached.map(program=>({
         ...program,
+        proposedResponsibilities:{
+          source:"program_launch_intent" as const,
+          reviewStatus:"unverified" as const,
+          churchHost:displayName(program.hostOrganizationId??site.organizationId),
+          academicProvider:displayName(program.academicProviderOrganizationId),
+          creditIssuer:displayName(program.creditIssuingOrganizationId),
+        },
+        proposedOnsiteSchedule:{
+          onsiteDaysPerWeek:program.deliveryModel.onsiteDaysPerWeek??null,
+          daysOfWeek:null,
+          reviewStatus:"unconfigured" as const,
+          detail:"Approved Program-level academic calendars are owned by academic-time",
+        },
         academicProviderApprovalStatus:"not_asserted" as const,
         jurisdictionApprovalStatus:"not_asserted" as const,
       })),
       publication:{status:publication?.status??"unconfigured",
         publicReachability:"not_asserted" as const},
-      contact:{value:serializableJson(metadata.setupContact??null),source:"church_site_draft" as const,
+      contact:{value:serializableJson(draftSiteContactSchema.safeParse(metadata.setupContact).success ? metadata.setupContact : null),source:"church_site_draft" as const,
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       calendar:{status:"read_from_academic_program_calendar" as const},
     };
