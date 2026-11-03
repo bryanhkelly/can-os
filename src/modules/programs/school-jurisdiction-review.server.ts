@@ -19,7 +19,7 @@ import {
   requiresFutureJurisdictionPolicyReview,
   type SchoolJurisdictionContext,
 } from "@/domain/jurisdiction-applicability";
-import { isJurisdictionProfileVerificationEvidenceCurrent } from "@/domain/jurisdiction-profile";
+import { isJurisdictionProfileVerificationEvidenceCurrent, jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
 import {
   jurisdictionReviewScopeFingerprint,
   projectSchoolJurisdictionReadiness,
@@ -135,7 +135,7 @@ export async function readSchoolJurisdictionReview(
     reviewRequired:true,locationReviewReason,plannedOpeningReviewReason:null,scopeFingerprint,
     siteAddressRevision,addressChangeRevision,policyReady:false,
     policyVersionId:version?.id ?? null,
-    schoolReviewReason:locationReviewReason,decisions:[],candidateDisclosures:[],
+    schoolReviewReason:locationReviewReason,reviewSources:[],decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness(locationReviewReason,
       version?.id ?? null,version?.revision ?? null),
   };
@@ -143,7 +143,7 @@ export async function readSchoolJurisdictionReview(
     reviewRequired:true,locationReviewReason:null,plannedOpeningReviewReason:null,scopeFingerprint,
     siteAddressRevision,addressChangeRevision,policyReady:false,
     schoolReviewReason:"No verified jurisdiction profile for this Program",
-    policyVersionId:null,decisions:[],candidateDisclosures:[],
+    policyVersionId:null,reviewSources:[],decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness("No published jurisdiction policy is available")};
   const [decision] = await executor.select({
     reviewerPersonId:jurisdictionProfileVerificationDecisions.reviewerPersonId,
@@ -203,6 +203,10 @@ export async function readSchoolJurisdictionReview(
         ? [launchOpeningDate(school.programMetadata)!] : []),
     ], now,
   ) ? "Current policy must be re-reviewed before the planned opening or upcoming academic year" : null;
+  const versionVerified=isCurrentVerifiedJurisdictionProfileVersion(versionGate,now);
+  const parsedProfile=jurisdictionProfileSchema.safeParse(rawProfile);
+  const reviewSources=networkReviewer && versionVerified && parsedProfile.success
+    ? parsedProfile.data.evidence.filter(source=>source.url.startsWith("https://")) : [];
   const policyReady=!evaluated.reviewRequired && !plannedOpeningReviewReason;
   const stamp={scopeFingerprint,profileVersionId:version.id};
   const independentlyReviewed=hasCurrentIndependentJurisdictionReview(legalAction,stamp,now);
@@ -228,7 +232,7 @@ export async function readSchoolJurisdictionReview(
     policyReady,policyVersionId:version.id,
     schoolReviewReason,siteAddressRevision,addressChangeRevision,
     locationReviewReason:null,plannedOpeningReviewReason,scopeFingerprint,
-    decisions:evaluated.decisions,
+    reviewSources,decisions:evaluated.decisions,
     readiness,
     // Internal candidate disclosures are not approved for public publication.
     candidateDisclosures:schoolReviewReady?evaluated.publicDisclosures:[],
