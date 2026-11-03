@@ -46,7 +46,7 @@ describe("PX parent public information contract", () => {
     expect(parentClaimAudienceSchema.safeParse("anonymous_private").success).toBe(false);
   });
 
-  it("projects reviewed programs without disclosing transaction/internal identifiers", () => {
+  it("projects only approved public Program identity, never household or transaction identifiers", () => {
     const profile = projectApprovedParentInformation({
       ...base,
       academicPrograms: [{
@@ -68,8 +68,12 @@ describe("PX parent public information contract", () => {
     expect(profile.academics[0]?.availability).toBe("planned");
     expect(profile.admissions.applicationOpen).toBe(false);
     expect(profile.activities[0]?.registrationOpen).toBe(false);
-    expect(JSON.stringify(profile)).not.toContain("protected-program-key");
-    expect(JSON.stringify(profile)).not.toContain("programId");
+    // The Program's public application destination already uses this ID.
+    // Household, applicant and invoice identifiers remain inaccessible.
+    expect(profile.academics[0]?.programId).toBe("protected-program-key");
+    expect(JSON.stringify(profile)).not.toContain("householdId");
+    expect(JSON.stringify(profile)).not.toContain("studentId");
+    expect(JSON.stringify(profile)).not.toContain("invoiceId");
   });
 });
 
