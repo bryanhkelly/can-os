@@ -114,3 +114,55 @@ export const listCANSchoolJurisdictionReviewQueue=createServerFn({method:"GET"})
         ? row.metadata.reviewState:"unreviewed",
     })),truncated:rows.length>100};
   });
+
+/** Canonical role-scoped compliance worklist; no duplicate requirement store.
+ * A church registrar can see what the school must submit; CAN can see what
+ * requires independent documentary review. Family duties remain pending until
+ * the owning family-intake integration supplies separately authorized proof.
+ */
+export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET"})
+  .validator((value:unknown)=>z.object({programId:z.string().uuid()}).strict().parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const review=await readSchoolJurisdictionReview(actor,data.programId);
+    const rows=await db.select({
+      id:actions.id,status:actions.status,ownerPersonId:actions.ownerPersonId,
+      title:actions.title,description:actions.description,
+      metadata:actions.metadata,
+      updatedAt:actions.updatedAt,
+    }).from(actions).where(and(
+      eq(actions.type,"school_jurisdiction_requirement"),
+      eq(actions.subjectType,"program"),eq(actions.subjectId,data.programId),
+      eq(actions.programId,data.programId),eq(actions.siteId,review.siteId),
+      eq(actions.organizationId,
+        // The canonical Program remains the owning organization, not the
+        // CAN reviewer institution or a public Site publisher.
+        db.select({id:programs.organizationId}).from(programs)
+          .where(eq(programs.id,data.programId)),
+      ),
+    )).limit(200);
+    const eligible=rows.filter(row=>
+      row.metadata.scopeFingerprint===review.scopeFingerprint &&
+      row.metadata.profileVersionId===review.policyVersionId);
+    return {programId:data.programId,reviewRequired:review.reviewRequired,
+      items:eligible.map(row=>({
+        id:row.id,status:row.status,title:row.title,
+        description:row.description,ownerPersonId:row.ownerPersonId,
+        requirementId:typeof row.metadata.requirementId==="string"
+          ? row.metadata.requirementId:null,
+        responsibleParty:row.metadata.responsibleParty==="church"?"church":
+          row.metadata.responsibleParty==="can"?"can":"family",
+        responsibleRole:typeof row.metadata.responsibleRole==="string"
+          ? row.metadata.responsibleRole:null,
+        phase:typeof row.metadata.phase==="string"?row.metadata.phase:null,
+        reviewState:typeof row.metadata.reviewState==="string"
+          ? row.metadata.reviewState:"evidence_needed",
+        canSubmitEvidence:!review.reviewRequired &&
+          (row.metadata.responsibleParty==="church" &&
+            (actor.role==="registrar"||actor.role==="site_admin") ||
+           row.metadata.responsibleParty==="can" &&
+            actor.role==="can_jurisdiction_reviewer"),
+        updatedAt:row.updatedAt.toISOString(),
+      }))};
+  });
