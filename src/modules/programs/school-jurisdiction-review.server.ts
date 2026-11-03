@@ -20,7 +20,7 @@ import {
   requiresFutureJurisdictionPolicyReview,
   type SchoolJurisdictionContext,
 } from "@/domain/jurisdiction-applicability";
-import { isJurisdictionProfileVerificationEvidenceCurrent, jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
+import { isJurisdictionProfileVerificationEvidenceCurrent, isOfficialJurisdictionSource, jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
 import {
   jurisdictionReviewScopeFingerprint,
   projectSchoolJurisdictionReadiness,
@@ -206,7 +206,7 @@ export async function readSchoolJurisdictionReview(
   const versionVerified=isCurrentVerifiedJurisdictionProfileVersion(versionGate,now);
   const parsedProfile=jurisdictionProfileSchema.safeParse(rawProfile);
   const reviewSources=networkReviewer && versionVerified && parsedProfile.success
-    ? parsedProfile.data.evidence.filter(source=>source.url.startsWith("https://")) : [];
+    ? parsedProfile.data.evidence.filter(isOfficialJurisdictionSource) : [];
   const policyReady=!evaluated.reviewRequired && !plannedOpeningReviewReason;
   const stamp={scopeFingerprint,profileVersionId:version.id};
   const independentlyReviewed=hasCurrentIndependentJurisdictionReview(legalAction,stamp,now);
