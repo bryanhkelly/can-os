@@ -320,7 +320,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   // Never promote Site publication, invitations, or Program status to opening authority.
   const readiness = currentLaunch ? buildLaunchGuidance(currentLaunch) : null;
   const nextTask = readiness?.nextTask ?? null;
-  const awaitingCan = nextTask?.state==="needs_can";
+  const needsEvidenceCorrection=nextTask?.evidenceReviewCorrectionPending===true;
+  const awaitingCan = !needsEvidenceCorrection && (nextTask?.state==="needs_can" || nextTask?.pendingEvidenceReview===true);
   const waitingExternal = nextTask?.state==="waiting_third_party";
   const pendingSchoolAction = nextTask?.state==="needs_you";
   const blockedTask = nextTask?.state==="blocked";
@@ -330,6 +331,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     : needsSchoolChoice ? "Choose a school to continue"
     : !currentProgram ? "Save your first school Program"
     : !currentLaunch ? "Review your saved school's preparation"
+    : needsEvidenceCorrection ? "Evidence correction needed: "+nextTask?.title
     : awaitingCan ? "Waiting for CAN: "+nextTask?.title
     : waitingExternal ? "Waiting for an external requirement: "+nextTask?.title
     : blockedTask ? "Resolve this opening blocker: "+nextTask?.title
@@ -341,7 +343,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     : !currentProgram ? "Save the church Site and academic Program once; return to this same school to continue."
     : !currentLaunch ? "This Program has no available pre-opening Journey here. Review the saved academic and school context; do not infer readiness."
     : nextTask
-      ? nextTask.description+" Responsible: "+launchResponsibility(nextTask.state)+"."
+      ? nextTask.description+(needsEvidenceCorrection
+          ? " A correction was requested. Review the recorded rejection and resubmit evidence through the authorized workflow."
+          : awaitingCan ? " A submitted requirement awaits institutional review; the school cannot approve it."
+          : " Responsible: "+launchResponsibility(nextTask.state)+".")
       : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
   const nextHref = needsSchoolChoice ? "#school-preparation-selection"
     : !currentProgram ? "#new-school-launch"
@@ -390,20 +395,24 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
             {currentSchool?.status==="active"
               ? <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
                   className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
-              : currentLaunch && pendingSchoolAction && !openingReview && nextTask?.action==="admissions"
+              : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.requiresRegistrarReview
+                ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
+                    search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
+                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review evidence requirement</Link>
+              : currentLaunch && pendingSchoolAction && !awaitingCan && !openingReview && nextTask?.action==="admissions"
                 ? <Link to="/admissions/intake" search={{siteId:currentLaunch.siteId??undefined,programId:currentLaunch.id}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review authorized family intake</Link>
-              : currentLaunch && pendingSchoolAction && nextTask?.action==="orientation"
+              : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.action==="orientation"
                 ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Complete orientation setup</Link>
-              : currentLaunch && pendingSchoolAction && !openingReview && nextTask?.action==="academics"
+              : currentLaunch && pendingSchoolAction && !awaitingCan && !openingReview && nextTask?.action==="academics"
                 ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Continue academic preparation</Link>
               : <a href={nextHref??"#launch-services"}
                   className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
-                  {needsSchoolChoice?"Choose a saved school":!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
+                  {needsSchoolChoice?"Choose a saved school":!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":needsEvidenceCorrection?"Review requested correction":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
                 </a>}
             {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#launch-website" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Prepare website in parallel</a>}
             {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#invite-families" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Family outreach</a>}
