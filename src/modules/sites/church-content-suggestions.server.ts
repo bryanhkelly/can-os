@@ -3,14 +3,14 @@ import { db } from "@/db/client";
 import { churchContentSuggestions, churchSourceReferences } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
-  type ChurchSuggestionField, normalizeChurchReferenceUrl,
+  type ChurchSuggestionField, normalizeChurchReferenceUrl, churchSuggestionTargetFields,
 } from "@/domain/church-source-references";
-import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalTextField } from "@/domain/site-local-content";
+import { emptySiteLocalContent, siteLocalContentLimits } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
-import { publishPartnerLocalContent, readLocalContentHistory } from "./site-local-content.server";
+import { publishPartnerLocalContent, readLocalContentHistory, readCurrentLocalContent } from "./site-local-content.server";
 import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
 
 /**
@@ -18,17 +18,22 @@ import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
  * The source must be an active church website reference; no untrusted URL is fetched.
  * Branding is deliberately excluded from text imports.
  */
-export const suggestionTargetFields: Partial<Record<ChurchSuggestionField, SiteLocalTextField>> = {
-  church_history: "churchHistory",
-  church_mission: "localDescription",
-  church_vision: "localDescription",
-  denomination: "denomination",
-  local_community: "communityOutreach",
-  leadership_intro: "leadershipWelcome",
-  ministries: "localTraditions",
-  welcome_message: "welcomeMessage",
-  faith_and_values: "statementOfFaith",
-};
+const suggestionTargetFields = churchSuggestionTargetFields;
+
+/** Latest editor revision and last published church copy are intentionally distinct. */
+export async function readChurchSourceReviewContext(actor: AccessContext) {
+  const site = await requirePartnerWebsiteEditor(actor);
+  const [history, published] = await Promise.all([
+    readLocalContentHistory(site.id), readCurrentLocalContent(site.id),
+  ]);
+  return {
+    revision: history[0]?.revision ?? 0,
+    editorStatus: history[0]?.status ?? null,
+    editorContent: history[0]?.content ?? emptySiteLocalContent,
+    publishedContent: published?.content ?? emptySiteLocalContent,
+    publishedRevision: published?.revision ?? 0,
+  };
+}
 
 export async function readChurchContentSuggestions(actor: AccessContext) {
   const site = await requirePartnerWebsiteEditor(actor);
