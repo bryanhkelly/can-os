@@ -139,6 +139,10 @@ export function projectApprovedParentInformation(input: {
     title: string; season: string; startsOn: string; endsOn: string;
     registrationOpen: boolean;
   }[];
+  /** Optional CAN-reviewed, single-Program schedule. Never infer a Site-wide timetable. */
+  schoolDay?: PublicSchoolDay;
+  /** Site-owned services must already be institutionally reviewed and public-safe. */
+  services?: PublicSchoolService[];
 }): PublicParentSchoolProfile {
   const copy = input.localContent;
   const story = (copy?.localDescription ?? "").trim();
@@ -163,7 +167,7 @@ export function projectApprovedParentInformation(input: {
       delivery: verifiedPublicClaim(program.delivery, "program_publication"),
       availability: program.availability,
     })),
-    schoolDay: {
+    schoolDay: input.schoolDay ?? {
       days: unconfiguredClaim("calendar"),
       startTime: unconfiguredClaim("calendar"),
       endTime: unconfiguredClaim("calendar"),
@@ -177,7 +181,7 @@ export function projectApprovedParentInformation(input: {
       }, "enrichment_catalog"),
       registrationOpen: activity.registrationOpen,
     })),
-    services: (["meals", "transportation", "before_care", "after_care", "safety_summary"] as const)
+    services: input.services ?? (["meals", "transportation", "before_care", "after_care", "safety_summary"] as const)
       .map(category => ({ category, description: unconfiguredClaim<string>("institutional_record") })),
     tuition: {
       description: unconfiguredClaim("institutional_record"),
