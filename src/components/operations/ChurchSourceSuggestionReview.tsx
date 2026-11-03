@@ -25,7 +25,6 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   const router = useRouter();
   const [references, setReferences] = useState<Ref[]>([]);
   const [items, setItems] = useState<Suggestion[]>([]);
-  const [sourceId, setSourceId] = useState("");
   const [field, setField] = useState<ChurchSuggestionField>("church_history");
   const [sourcePageUrl, setSourcePageUrl] = useState("");
   const [text, setText] = useState("");
@@ -50,11 +49,8 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   }, []);
 
   useEffect(() => {
-    if (website && !sourceId) {
-      setSourceId(website.id);
-      setSourcePageUrl(website.normalizedUrl);
-    }
-  }, [website?.id, website?.normalizedUrl, sourceId]);
+    if (website && !sourcePageUrl) setSourcePageUrl(website.normalizedUrl);
+  }, [website?.id, website?.normalizedUrl, sourcePageUrl]);
 
   async function refresh() {
     const [refs, suggestions] = await Promise.all([
@@ -124,6 +120,8 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     {message && <p role="status" className="mt-3 text-sm">{message}</p>}
     {!loading && !website && <p className="mt-4 rounded-lg border p-4 text-sm">
       Save your church's public website above to add attributed excerpts. You can always write local copy manually.
+      <button type="button" disabled={busy} onClick={() => void refresh().catch(() => setError("Unable to refresh saved sources."))}
+        className="mt-3 block rounded-lg border px-3 py-2 text-sm">Reload saved sources</button>
     </p>}
     {website && <div className="mt-4 rounded-xl border p-4">
       <h3 className="font-semibold">Discover church website suggestions</h3>
