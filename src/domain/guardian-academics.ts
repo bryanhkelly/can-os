@@ -37,7 +37,7 @@ export function guardianWorkNeedsAction(status: string): boolean {
 
 /** A returned attempt may need revision, but is not the same as never submitted. */
 export function guardianAssignmentSummary(
- assignments: readonly {status:string;dueAt:string|null;score:string|null}[],
+ assignments: readonly {status:string;dueAt:string|null;score:string|null;availableAt?:string|null}[],
  now:Date,
 ) {
  // A draft created after a teacher returned an earlier attempt still
@@ -45,7 +45,7 @@ export function guardianAssignmentSummary(
  const needsAction=assignments.filter(item=>guardianWorkNeedsAction(item.status));
  return {
   needsAction:needsAction.length,
-  overdue:needsAction.filter(item=>item.dueAt!==null && !Number.isNaN(Date.parse(item.dueAt)) && Date.parse(item.dueAt)<now.getTime()).length,
+  overdue:needsAction.filter(item=>item.dueAt!==null && !Number.isNaN(Date.parse(item.dueAt)) && Date.parse(item.dueAt)<now.getTime() && (!item.availableAt || (Number.isFinite(Date.parse(item.availableAt)) && Date.parse(item.availableAt)<=now.getTime()))).length,
   releasedGrades:assignments.filter(item=>item.score!==null).length,
  };
 }
