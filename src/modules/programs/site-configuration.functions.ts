@@ -141,9 +141,11 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
         return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString()};
       if(site.updatedAt.toISOString()!==data.expectedRevision)
         throw new Error("School configuration changed. Refresh and review the latest information before saving.");
+      const nextRevision=nextSiteConfigurationRevision(site.updatedAt);
       const [saved]=await tx.update(sites).set({
-        metadata:{...site.metadata,setupContact:data.contact},
-        updatedAt:nextSiteConfigurationRevision(site.updatedAt),
+        metadata:{...site.metadata,setupContact:data.contact,
+          siteContactRevision:nextRevision.toISOString()},
+        updatedAt:nextRevision,
       }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
       if(!saved)throw new Error("Could not save school contact");
       await writeAudit(tx,actor,{
@@ -202,6 +204,8 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     const physical=readSitePhysicalAddress(address);
     const savedLocationRevision=typeof metadata.sitePhysicalAddressRevision==="string"
       ? metadata.sitePhysicalAddressRevision:null;
+    const savedContactRevision=typeof metadata.siteContactRevision==="string"
+      ? metadata.siteContactRevision:null;
     return {
       ...identity,revision:site.updatedAt.toISOString(),
       updatedAt:site.updatedAt.toISOString(),
@@ -230,7 +234,10 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       })),
       publication:{status:publication?.status??"unconfigured",
         publicReachability:"not_asserted" as const},
-      contact:{value:serializableJson(draftSiteContactSchema.safeParse(metadata.setupContact).success ? draftSiteContactSchema.parse(metadata.setupContact) : null),source:"church_site_draft" as const,
+      contact:{value:serializableJson(draftSiteContactSchema.safeParse(metadata.setupContact).success ? draftSiteContactSchema.parse(metadata.setupContact) : null),
+        source:"church_site_draft" as const,revision:savedContactRevision,
+        configurationStatus:metadata.setupContact==null?"unconfigured" as const:
+          draftSiteContactSchema.safeParse(metadata.setupContact).success?"church_supplied" as const:"legacy_needs_review" as const,
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       calendar:{status:"read_from_academic_program_calendar" as const},
     };
