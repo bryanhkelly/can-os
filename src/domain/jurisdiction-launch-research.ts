@@ -9,7 +9,7 @@ export type LaunchJurisdictionResearch = {
   summary: string;
   reviewStatus: "draft" | "in_review" | "published";
   guidanceStatus: "research_only" | "verified_guidance";
-  revision: number;
+  revision: string;
   publishedAt: string | null;
   fundingPrograms: Array<{
     id: string; name: string; summary: string;
@@ -30,7 +30,7 @@ type ProfileRow = {
   summary: string;
   evidence: unknown;
   status: string;
-  revision: number;
+  revision: string;
   publishedAt: Date | string | null;
 };
 
