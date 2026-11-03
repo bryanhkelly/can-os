@@ -9,7 +9,7 @@ import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
 import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
 import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-program-publication";
-import {emptySiteLocalContent} from "@/domain/site-local-content";
+import {createIllustrativeSchoolContent,emptySiteLocalContent} from "@/domain/site-local-content";
 import {launchOpeningDate} from "@/domain/launch-opening-date";
 import {readAcademicProgramCatalog} from "@/modules/sites/academic-program-catalog.server";
 import {readCurrentLocalContent} from "@/modules/sites/site-local-content.server";
@@ -63,10 +63,12 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const page = {host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,site:{name:school.siteName,organizationName:school.organizationName},
     offerings:enrichment.map(toPublicSiteEnrichment),
     academicPrograms:[...approved,...planning],
-    localContent:local?.content??{
-      ...emptySiteLocalContent,welcomeMessage:`Welcome to ${school.programName}.`,
-      localDescription:`Our church is preparing a local learning community. Contact the church to learn more about plans for ${school.programName}.`,
-    },
+    localContent:local?.content??(siteFlags?.metadata?.synthetic===true
+      ? createIllustrativeSchoolContent(school.siteName)
+      : {
+        ...emptySiteLocalContent,welcomeMessage:`Welcome to ${school.programName}.`,
+        localDescription:`Our church is preparing a local learning community. Contact the church to learn more about plans for ${school.programName}.`,
+      }),
   };
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.
