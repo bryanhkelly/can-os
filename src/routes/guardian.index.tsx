@@ -1,3 +1,5 @@
+import { DailyCanvas } from "@/components/student/DailyCanvas";
+import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
@@ -149,23 +151,17 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   </div>}
  >
   <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
-   <section aria-label="Family overview" className="relative overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
-    <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-accent opacity-70 blur-3xl" />
-    <div className="relative max-w-2xl">
-     <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><Sparkles className="size-4" /> Your family, connected</p>
-     <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Every school day, together.</h2>
-     <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">Follow your children’s progress, respond to what needs you, and stay connected with your school.</p>
-     <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
-      <Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2"><BookOpen className="size-4" /> View academics <ArrowUpRight className="size-4" /></Link>
-      <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; conferences <ArrowUpRight className="size-4"/></Link>
-      <Link to="/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2"><Mail className="size-4" /> Family inbox</Link>
-      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2"><CalendarDays className="size-4" /> Attendance</Link>
-      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Pickup &amp; safety</Link>
-      <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Health &amp; clearance</Link>
-      <Link to="/guardian/enrollment-changes" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Transfer &amp; family changes</Link>
-     </div>
-    </div>
-   </section>
+   <DailyCanvas audience="guardian" content={resolveEditorialCanvas("guardian", new Date())}
+    primaryAction={<Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 border border-white bg-white px-4 py-2 text-sm font-semibold !text-slate-900">View academics <ArrowUpRight className="size-4" /></Link>}
+    secondaryAction={<Link to="/messages" className="inline-flex min-h-11 items-center gap-2 border border-white/70 px-4 py-2 text-sm font-semibold text-white">Family inbox</Link>}
+   />
+   <nav aria-label="Family quick links" className="mt-4 flex flex-wrap gap-2">
+     <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">School &amp; conferences</Link>
+     <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Attendance</Link>
+     <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="border bg-card px-3 py-2 text-sm">Pickup &amp; safety</Link>
+     <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Health &amp; clearance</Link>
+     <Link to="/guardian/enrollment-changes" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Transfer &amp; family changes</Link>
+   </nav>
    {(visibleEnrollmentApplications.length>0||enrollmentWarning)&&<section aria-label="Enrollment next steps" className="mt-6 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3">
      <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Getting started</p>
