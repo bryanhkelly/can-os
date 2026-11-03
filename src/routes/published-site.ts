@@ -43,6 +43,7 @@ export const Route = createFileRoute("/published-site")({
           const indexable = !localPreview && isIndexablePublicSite(catalog);
           return new Response(renderPublicSiteHtml(catalog, {
             makeRequestId: () => crypto.randomUUID(), localPreview,
+            localPreviewSlug: localPreview ? slug : undefined,
           }), { status: 200, headers: indexable
             ? headers : { ...headers, "X-Robots-Tag": "noindex, nofollow" } });
         } catch {
