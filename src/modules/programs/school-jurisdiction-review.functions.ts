@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {db} from "@/db/client";
-import {actions,organizations,programs,sites} from "@/db/schema";
+import {actions,documents,organizations,programs,sites} from "@/db/schema";
 import {and,eq,inArray} from "drizzle-orm";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
 import { ensureSchoolJurisdictionReviewAction, decideSchoolJurisdictionLegalReview } from "./school-jurisdiction-actions.server";
@@ -140,11 +140,28 @@ export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET
       eq(actions.programId,data.programId),eq(actions.siteId,review.siteId),
       eq(actions.organizationId,program.organizationId),
     )).limit(200);
+    const candidates=await db.select({
+      id:documents.id,fileName:documents.fileName,
+      metadata:documents.metadata,
+      uploadedByPersonId:documents.uploadedByPersonId,
+      expiresAt:documents.expiresAt,
+    }).from(documents).where(and(
+      eq(documents.subjectType,"program"),
+      eq(documents.subjectId,data.programId),
+      eq(documents.category,"jurisdiction_requirement_evidence"),
+    )).limit(100);
+    const evidenceDocuments=candidates.filter(document=>
+      document.uploadedByPersonId===actor.actorPersonId &&
+      document.metadata.siteId===review.siteId &&
+      document.metadata.organizationId===program.organizationId &&
+      document.metadata.storageVerified===true &&
+      (!document.expiresAt || document.expiresAt>new Date()))
+      .map(document=>({id:document.id,fileName:document.fileName}));
     const eligible=rows.filter(row=>
       row.metadata.scopeFingerprint===review.scopeFingerprint &&
       row.metadata.profileVersionId===review.policyVersionId);
     return {programId:data.programId,reviewRequired:review.reviewRequired,
-      items:eligible.map(row=>({
+      evidenceDocuments,items:eligible.map(row=>({
         id:row.id,status:row.status,title:row.title,
         description:row.description,ownerPersonId:row.ownerPersonId,
         requirementId:typeof row.metadata.requirementId==="string"
