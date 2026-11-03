@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, churchContentSuggestions, churchSourceReferences } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -21,27 +21,13 @@ async function flagPreviouslyReviewedSource(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   input: { siteId: string; organizationId: string; sourceId: string; kind: ChurchReferenceKind; reason: "removed" | "replaced" },
 ) {
-  const [reviewed] = await tx.select({ id: churchContentSuggestions.id })
-    .from(churchContentSuggestions).where(and(
-      eq(churchContentSuggestions.siteId, input.siteId),
-      eq(churchContentSuggestions.sourceReferenceId, input.sourceId),
-    )).orderBy(asc(churchContentSuggestions.createdAt)).limit(1);
-  if (!reviewed) return;
   const [accepted] = await tx.select({ id: churchContentSuggestions.id })
     .from(churchContentSuggestions).where(and(
       eq(churchContentSuggestions.siteId, input.siteId),
       eq(churchContentSuggestions.sourceReferenceId, input.sourceId),
-      // Accepted and edited proposals were previously approved by a church editor.
-      // Filtering using SQL avoids placing excerpts in the operations action.
-      eq(churchContentSuggestions.reviewDecision, "accepted"),
+      inArray(churchContentSuggestions.reviewDecision, ["accepted", "edited"]),
     )).limit(1);
-  const [edited] = accepted ? [] : await tx.select({ id: churchContentSuggestions.id })
-    .from(churchContentSuggestions).where(and(
-      eq(churchContentSuggestions.siteId, input.siteId),
-      eq(churchContentSuggestions.sourceReferenceId, input.sourceId),
-      eq(churchContentSuggestions.reviewDecision, "edited"),
-    )).limit(1);
-  if (!accepted && !edited) return;
+  if (!accepted) return;
   await tx.insert(actions).values({
     type: "site_website_source_provenance_review",
     title: "Review published church copy after source change",
