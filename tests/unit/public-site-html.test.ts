@@ -388,9 +388,8 @@ describe("standalone public site HTML", () => {
       site, academicPrograms: [], offerings: [], localContent: null,
     });
     const page = { host: "example.can-os.com", site, offerings: [], parentInformation };
-    const withheld = renderPublicSiteHtml(page, { path: "/contact" });
-    expect(withheld).toContain("No public inquiry channel is currently available");
-    expect(withheld).not.toContain("Published contact information");
+    expect(() => renderPublicSiteHtml(page, { path: "/contact" }))
+      .toThrow(/not available/);
 
     parentInformation.site.contact = verifiedPublicClaim(
       "Office: family@example.org <please call>", "institutional_record", 4);
