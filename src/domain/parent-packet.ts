@@ -48,7 +48,7 @@ export function renderParentPacket(profile:PublicParentSchoolProfile, generatedA
       [`Standard instructional week${timezone?` · ${timezone}`:""}`,
        from&&through?`Effective ${from} to ${through}`:null,
        ...lines,"Holidays and one-off calendar changes are not included."]
-        .filter((line):line is string=>Boolean(line)).join("\\n"));
+        .filter((line):line is string=>Boolean(line)).join("\n"));
   }
   if(!sorted.length){
     const days=shown(profile.schoolDay.days);
