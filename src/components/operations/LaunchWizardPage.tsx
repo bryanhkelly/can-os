@@ -349,6 +349,26 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
         </Button>}
+        <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next step</p>
+          <h2 className="mt-2 font-serif text-2xl font-semibold">{currentSchool?.status==="active"
+            ? "Continue operating your school"
+            : currentProgram ? "Prepare your school's public website"
+            : "Save your first school Program"}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{currentSchool?.status==="active"
+            ? "Your Program is active. Daily staffing, opening and student custody still have their own authorization checks."
+            : currentProgram
+              ? "Your school context is saved. Review its approved content and family-facing website while academic and legal readiness continue independently."
+              : "Start with the church and physical Site, then save the academic Program once. Return here to complete website, family outreach and opening requirements."}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {currentSchool?.status==="active"
+              ? <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}} className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
+              : <a href={currentProgram?"#launch-website":"#new-school-launch"} className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{currentProgram?"Review and prepare website":"Set up school and Program"}</a>}
+            {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<a href="#invite-families" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Prepare family outreach</a>}
+            {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<a href="#launch-services" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Review opening requirements</a>}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Configured, approved, published, reachable and authorized to operate are distinct states. No action on this page bypasses the owning service.</p>
+        </section>
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
         <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
