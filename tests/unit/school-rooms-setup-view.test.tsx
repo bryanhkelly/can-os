@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
   ],
 }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: { rooms: state.rooms, classes: [
+  useQuery: () => ({ data: { canManage: true, rooms: state.rooms, classes: [
     { id: "class", title: "Science", code: "SCI", roomId: "retired-room" },
   ] }, isPending: false, error: null, refetch: vi.fn() }),
 }));
