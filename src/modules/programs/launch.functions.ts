@@ -136,7 +136,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, contactDraft:safeJson(metadata.setupContact??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
+      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
       jurisdictions: jurisdictionRows,
       schoolSetupAdministrator: context.role === "site_admin",
     };
@@ -562,7 +562,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
    }
    const createdAt=new Date();
    const [site]=await tx.insert(s.sites).values({...data,updatedAt:createdAt,
-     ...(data.address?{metadata:{sitePhysicalAddressRevision:createdAt.toISOString()}}:{})})
+     metadata:{siteIdentityRevision:createdAt.toISOString(),...(data.address?{sitePhysicalAddressRevision:createdAt.toISOString()}:{})}})
      .returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
    await emitEvent(tx,{
