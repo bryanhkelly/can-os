@@ -150,11 +150,13 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
             onChange={event=>setSelectedDocument(event.target.value)}
             className="w-full rounded-md border bg-background p-2">
             <option value="">Choose a document</option>
-            {work.evidenceDocuments.map(document=><option key={document.id} value={document.id}>
+            {work.evidenceDocuments.filter(document=>document.actionId===selectedAction)
+              .map(document=><option key={document.id} value={document.id}>
               {document.fileName}
             </option>)}
           </select>
-          {work.evidenceDocuments.length===0&&<p className="text-xs text-muted-foreground">No eligible documents are available. Upload the correctly scoped file above, then select it for independent CAN review.</p>}
+          {!work.evidenceDocuments.some(document=>document.actionId===selectedAction)&&
+            <p className="text-xs text-muted-foreground">No eligible documents are available. Upload the correctly scoped file above, then select it for independent CAN review.</p>}
           <label className="block text-sm font-medium" htmlFor="legal-evidence-statement">Evidence statement</label>
           <textarea id="legal-evidence-statement" rows={3} value={evidenceStatement}
             onChange={event=>setEvidenceStatement(event.target.value)}
