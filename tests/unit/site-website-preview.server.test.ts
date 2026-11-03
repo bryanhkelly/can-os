@@ -116,8 +116,9 @@ describe("read-only church partner website", () => {
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
       "approvedAcademicCount", "approvedEnrichmentCount", "canPublish",
-      "currentRevision", "editingContent", "host", "localContentStatus",
-      "localHistory", "organizationName", "parentInformation", "previewHtml", "previewPages", "siteId", "siteName", "status",
+      "currentRevision", "demonstration", "editingContent", "host", "localContentStatus",
+      "localHistory", "organizationName", "parentInformation", "previewHtml", "previewPages",
+      "publicInformationReadiness", "siteId", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
   });
