@@ -1,3 +1,4 @@
+import { sitePaletteIds, siteTypographyIds } from "@/domain/site-theme";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -38,6 +39,8 @@ const localContentSchema = z.object({
   ...localFields,
   branding: z.object({
     theme: z.enum(siteLocalThemes),
+    paletteId: z.enum(sitePaletteIds).optional(),
+    typographyId: z.enum(siteTypographyIds).optional(),
     heroImage: z.object({
       dataUrl: z.string().max(siteLocalImageMaxBase64Length + 32),
       altText: z.string().max(180),
