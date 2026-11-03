@@ -8,6 +8,7 @@ CREATE TABLE "church_source_references" (
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now(),
   "last_attempt_at" timestamptz,
+  "revoked_at" timestamptz,
   CONSTRAINT "church_source_kind_ck" CHECK ("kind" IN ('website','youtube','instagram','facebook','tiktok')),
   CONSTRAINT "church_source_state_ck" CHECK ("reference_state" IN ('saved','fetchable','unsupported','blocked','failed'))
 );
