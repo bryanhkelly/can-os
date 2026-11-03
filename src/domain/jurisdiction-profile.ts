@@ -14,7 +14,9 @@ export function isOfficialJurisdictionSource(source:{
   const externallyAttested=source.officialAuthorityVerified===true &&
     typeof source.officialAuthorityVerificationNote==="string" &&
     source.officialAuthorityVerificationNote.trim().length>=25;
-  return Boolean(source.authority.trim()) &&
+  return typeof source.authority==="string" &&
+    Boolean(source.authority.trim()) &&
+    typeof source.checkedAt==="string" &&
     Number.isFinite(Date.parse(source.checkedAt)) &&
     (governmentHost||externallyAttested);
 }
