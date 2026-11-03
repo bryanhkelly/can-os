@@ -89,6 +89,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       </Field>
                       <Field label="Location time zone">
                        <Select value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
+                        <option value="">Choose the school time zone…</option>
                         {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
                        </Select>
                       </Field>
@@ -112,7 +113,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
                       This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
                     </p>}
-                    <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
+                    <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||!newSiteTimezone||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
                       <p className="font-semibold">Your website draft is prepared</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
