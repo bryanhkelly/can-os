@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapePublicHtml, isIndexablePublicSite, renderPublicSiteHtml, availablePublicSitePaths } from "@/domain/public-site-html";
+import { escapePublicHtml, isIndexablePublicSite, renderPublicSiteHtml, availablePublicSitePaths, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
 
 describe("standalone public site HTML", () => {
@@ -31,6 +31,30 @@ describe("standalone public site HTML", () => {
     expect(html).not.toContain("guardian/enrichment");
     expect(html).not.toContain("studentProfileId");
   });
+  it("makes synthetic local previews genuinely navigable without opening public applications", () => {
+    const original={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"Synthetic school"},
+      demonstration:true,offerings:[],academicPrograms:[{programId:"school-a",title:"Hybrid High School",
+      typeLabel:"High school",summary:"A fictional example",grades:{min:"9",max:"12"},
+      delivery:{onsite:true,liveOnline:true,asynchronous:true,onsiteDaysPerWeek:2},
+      availability:"planned" as const}]};
+    const preview=withIllustrativeLocalPreview(original);
+    const paths=availablePublicSitePaths(preview);
+    expect(paths).toContain("/about");
+    expect(paths).toContain("/student-life");
+    expect(paths).toContain("/families");
+    for(const path of paths){
+      const html=renderPublicSiteHtml(preview,{path,localPreview:true,localPreviewSlug:"valorschool"});
+      expect(html).toContain('href="/published-site?site=valorschool"');
+      expect(html).not.toContain('href="/academics"');
+      expect(html).not.toContain('action="/inquiry"');
+      expect(html).not.toContain('action="/apply"');
+      expect(html).toContain('content="noindex,nofollow"');
+    }
+    expect(renderPublicSiteHtml(preview,{path:"/student-life",localPreview:true,
+      localPreviewSlug:"valorschool"})).toContain("Robotics &amp; Design Lab");
+    expect(availablePublicSitePaths(original)).not.toContain("/about");
+  });
+
   it("offers real public pages only for approved content and keeps draft pages unindexed", () => {
     const page = {
       host: "vineyard.can-os.com",
