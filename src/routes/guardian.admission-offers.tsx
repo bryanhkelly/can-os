@@ -73,6 +73,14 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     </p>}
     {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
+    <section aria-label="Your next enrollment step" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
+     <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next step</p>
+     {app.waitlisted?<p className="mt-2 text-sm">Your application is on the waitlist. Contact the school about availability; there is no offer to accept right now.</p>:
+      app.offers.some(o=>o.status==="issued")?<p className="mt-2 text-sm">Review your school's offer below and choose whether to accept it before the deadline. Check the enrollment requirements as well.</p>:
+      app.offers.some(o=>o.status==="accepted"&&!o.enrollmentActive)?<p className="mt-2 text-sm">Your offer is accepted. Complete any requested forms and watch for confirmation from the school that enrollment and class placement are active.</p>:
+      app.offers.some(o=>o.enrollmentActive)?<p className="mt-2 text-sm">Enrollment is active. Review your child's student account, attendance, and pickup arrangements before the first onsite day.</p>:
+      <p className="mt-2 text-sm">Review your application checklist for outstanding forms. Your school will notify you when an offer is available.</p>}
+    </section>
     <Button variant="outline" aria-expanded={checklist===app.applicationId||application===app.applicationId}
       className="mt-3" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</Button>
     {(checklist===app.applicationId||application===app.applicationId)&&<GuardianEnrollmentChecklist key={app.applicationId} applicationId={app.applicationId}/>}
