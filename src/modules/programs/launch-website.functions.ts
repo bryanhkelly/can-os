@@ -58,7 +58,9 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
     asynchronous:school.deliveryModel.asynchronous===true,liveOnline:school.deliveryModel.liveOnline===true,
     onsiteDaysPerWeek:school.deliveryModel.onsiteDaysPerWeek??null},
   })]:[];
-  const page = {host:base.host!,site:{name:school.siteName,organizationName:school.organizationName},
+  const [siteFlags] = await db.select({metadata:sites.metadata}).from(sites)
+    .where(eq(sites.id,school.siteId)).limit(1);
+  const page = {host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,site:{name:school.siteName,organizationName:school.organizationName},
     offerings:enrichment.map(toPublicSiteEnrichment),
     academicPrograms:[...approved,...planning],
     localContent:local?.content??{
