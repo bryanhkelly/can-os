@@ -35,7 +35,15 @@ export function publicSchoolDayScheduleSignature(
     a.type.localeCompare(b.type));
   // Keep the legacy single-argument signature for pure fixtures, but ONLY
   // the scope-bound v2 form may be produced by the production approval service.
-  return scope?JSON.stringify({version:2,scope,periods:normalized}):JSON.stringify(normalized);
+  const canonical=(value:unknown):unknown=>Array.isArray(value)
+    ? value.map(canonical)
+    : value && typeof value==="object"
+      ? Object.fromEntries(Object.entries(value)
+          .sort(([a],[b])=>a.localeCompare(b))
+          .map(([key,item])=>[key,canonical(item)]))
+      : value;
+  return scope?JSON.stringify(canonical({version:2,scope,periods:normalized}))
+    :JSON.stringify(normalized);
 }
 
 type Schedule = {
