@@ -1,0 +1,43 @@
+name: PX B school website contract
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/domain/public-site-html.ts'
+      - 'src/domain/public-site-host-routing.ts'
+      - 'src/domain/public-site-paths.ts'
+      - 'src/domain/site-local-content.ts'
+      - 'src/routes/published-site*'
+      - 'src/routes/site-website.tsx'
+      - 'src/modules/sites/site-website-preview*'
+      - 'src/modules/sites/site-public-catalog.server.ts'
+      - 'src/modules/sites/site-local-content.server.ts'
+      - 'netlify/edge-functions/site-host-gate.ts'
+      - 'tests/unit/public-site*'
+      - 'tests/unit/site-local-content*'
+      - 'tests/unit/site-website-preview.server.test.ts'
+      - '.github/workflows/px-b-school-website.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify scoped tenant and local story contracts
+        run: |
+          npx vitest run tests/unit/public-site-host-routing.test.ts \
+            tests/unit/public-site-html.test.ts \
+            tests/unit/site-local-content.test.ts \
+            tests/unit/site-website-preview.server.test.ts \
+            tests/unit/public-netlify-edge-function.test.ts \
+            tests/unit/public-tenant-edge-origin-isolation.test.ts
+      - name: Verify production build and route generation
+        run: npm run build
