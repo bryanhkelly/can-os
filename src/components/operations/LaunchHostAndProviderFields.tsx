@@ -1,4 +1,5 @@
 import { LaunchSiteContactEditor, type LaunchSiteContactDraft } from "@/components/operations/LaunchSiteContactEditor";
+import { LaunchSiteAddressFields } from "./LaunchSiteAddressFields";
 import { LaunchSiteAddressEditor } from "@/components/operations/LaunchSiteAddressEditor";
 import type { LaunchJurisdictionResearch as LaunchResearch } from "@/domain/jurisdiction-launch-research";
 import { JurisdictionLaunchResearch } from "@/components/operations/JurisdictionLaunchResearch";
@@ -112,18 +113,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                     </div>
                     <div className="mt-4 space-y-3 border-t pt-4">
                       <p className="text-xs font-semibold">Physical location · for state guidance, not legal approval</p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {([
-                          ["street1","Street address"],["street2","Suite or building (optional)"],
-                          ["city","City"],["state","State or region"],
-                          ["postalCode","Postal code"],["country","Country"],
-                          ["county","County (optional)"],
-                        ] as const).map(([key,label])=>
-                          <Field key={key} label={label}>
-                            <Input value={newSiteAddress[key]} placeholder={label}
-                              onChange={e=>setNewSiteAddress({...newSiteAddress,[key]:e.target.value})}/>
-                          </Field>)}
-                      </div>
+                      <LaunchSiteAddressFields address={newSiteAddress} onChange={setNewSiteAddress}/>
                       <p className="text-xs text-muted-foreground">Enter the actual location of onsite learning. You can leave the address blank and complete it later; partial addresses cannot be saved. The legal jurisdiction must be reviewed separately.</p>
                     </div>
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
