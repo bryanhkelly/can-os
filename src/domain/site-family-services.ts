@@ -47,7 +47,8 @@ export function projectPublicFamilyServices(
 ): PublicSchoolService[] {
   const snapshot = readSiteFamilyServices(metadata);
   const today = now.toISOString().slice(0,10);
-  const categories = ["meals","transportation","before_care","after_care","safety_summary"] as const;
+  const categories = ["meals","transportation","before_care","after_care",
+    "communication","family_visits","safety_summary"] as const;
   return categories.map(category => {
     const item = snapshot?.entries.find(entry => entry.category === category);
     if (!item || (item.expiresOn && item.expiresOn < today))
