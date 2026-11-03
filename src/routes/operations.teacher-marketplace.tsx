@@ -5,7 +5,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { uuidProgramSelectionSchema } from "@/lib/route-search";
 import { getCurriculumAdopterPrograms } from "@/modules/learning/curriculum-marketplace.functions";
 import {
-  engageMarketplaceTeacher, getTeacherMarketplace,
+  engageMarketplaceTeacher, getTeacherMarketplace, getDemoTeacherPreviews,
 } from "@/modules/staffing/teacher-marketplace.functions";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/operations/teacher-marketplace")({
   loaderDeps: ({ search }) => ({ programId: search.programId }),
   loader: ({ deps }) => safeLoader(async () => ({
     programs: await getCurriculumAdopterPrograms(),
-    market: deps.programId ? await getTeacherMarketplace({ data: { programId: deps.programId } }) : null,
+    market: deps.programId ? await getTeacherMarketplace({ data: { programId: deps.programId } }) : null,\n    previews: deps.programId ? await getDemoTeacherPreviews({data:{programId:deps.programId}}) : null,
   }), { authMessage: "An authorized school registrar is required." })(),
   component: TeacherMarketplacePage,
 });
@@ -32,7 +32,7 @@ function TeacherMarketplacePage() {
   const [submitting, setSubmitting] = useState<string | null>(null);
   const mutation = useMutationFeedback(() => router.invalidate());
   if (!result.ok) return <LoaderFailure title="CAN teacher marketplace" outcome={result}/>;
-  const { programs, market } = result.data;
+  const { programs, market, previews } = result.data;
   async function engageTeacher(courseVersionId: string, teacherPersonId: string, sectionId?: string) {
     if (!market || submitting || mutation.pending || mutation.refreshFailed) return;
     const selectionKey = `${courseVersionId}:${teacherPersonId}:${sectionId ?? "course"}`;
@@ -145,6 +145,18 @@ function TeacherMarketplacePage() {
           No eligible instructor has reservable capacity for these classes. Confirm each class has an open instructional capacity demand.
         </p>}
       </section>)}
+      <section className="space-y-3 rounded-xl border p-5" aria-label="Sample teacher previews">
+        <h2 className="font-serif text-2xl">Explore sample teachers</h2>
+        <p className="text-sm text-muted-foreground">Synthetic profiles for planning only. No verified credentials or permission to engage these teachers is implied.</p>
+        <p className="text-sm">{previews?.teachers.length ?? 0} sample teachers available to preview</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {previews?.teachers.filter(teacher=>!search || [teacher.name,...teacher.courses.map(course=>course.title),...teacher.courses.map(course=>course.subject)].some(value=>value.toLowerCase().includes(search))).map(teacher=><article key={teacher.personId} className="rounded-lg border p-3">
+            <p className="font-semibold">{teacher.name} · Sample profile</p>
+            <p className="text-sm text-muted-foreground">{teacher.courses.length} illustrative course matches</p>
+            <p className="text-sm">{[...new Set(teacher.courses.map(course=>course.subject))].join(", ")}</p>
+          </article>)}
+        </div>
+      </section>
       {market.courses.length > 0 && courses.length === 0 &&
         <EmptyState title="No courses or teachers match this search."
           description="Try a different course code, subject, course title, or teacher name."/>}
