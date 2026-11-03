@@ -13,6 +13,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
+import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
@@ -63,6 +64,7 @@ function PartnerSiteWebsitePage() {
       </p>
     </section>
     <ChurchSourceReferenceEditor />
+    <ChurchSourceSuggestionReview currentRevision={data.currentRevision} />
     {data.host && <LocalWebsiteCopyEditor data={data} />}
     <WebsitePreviewPanel data={data} />
 
