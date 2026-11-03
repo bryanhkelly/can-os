@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -62,6 +63,16 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     // Same canonical, approved-only parent DTO as the live Site projection.
     // Draft copy and internal review history remain separate editor-only fields.
     parentInformation,
+    // Public information completeness is a diagnostic only. We cannot infer
+    // host reachability, admission authorization or opening authority from a
+    // reserved/publication row, even for a synthetic reference school.
+    publicInformationReadiness: projectPublicInformationReadiness({
+      profile: parentInformation,
+      marketingPublished: address?.status === "published",
+      externalHostReachable: false,
+      admissionsAuthorized: false,
+      openingConfirmed: false,
+    }),
     approvedEnrichmentCount: offerings.length,
     editingContent,
     currentRevision: history[0]?.revision ?? 0,
