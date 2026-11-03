@@ -214,7 +214,11 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
         </label>
         <label className="text-xs">Category
           <select className={inputClass} value={activityType} onChange={e => setActivityType(e.target.value as typeof activityType)}>
-            <option value="other">Other enrichment</option>\n            <option value="stem">STEM / robotics</option>\n            <option value="faith">Faith / discipleship</option>\n            <option value="leadership">Leadership</option>\n            <option value="outings">Outings / field trips</option>
+            <option value="other">Other enrichment</option>
+            <option value="stem">STEM / robotics</option>
+            <option value="faith">Faith / discipleship</option>
+            <option value="leadership">Leadership</option>
+            <option value="outings">Outings / field trips</option>
             <option value="club">Club</option>
             <option value="arts">Arts</option>
             <option value="athletics">Athletics</option>
