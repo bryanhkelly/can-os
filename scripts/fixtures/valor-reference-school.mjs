@@ -1,29 +1,30 @@
 /**
- * Valor's explicit, fictional website-review scenario.
+ * Valor's creative-direction sample: original fictional content and programs.
+ * This file is test/visual-fixture data, not a live Site revision.
+ * The shared renderer displays a visible demo notice for this scenario.
  *
- * This is VISUAL QA DATA, not a live Site edit or an institutional statement.
- * Do not write this file into production Neon or treat its text as approval.
- * The production Site's versioned church content must be published through
- * publishPartnerLocalContent by a verified Site website editor.
+ * Any real publication must go through the canonical Site website editor,
+ * including authorization, revisioning, rights checks and claim screening.
  */
 export const valorReferenceSchool = {
   key: "valor",
+  demonstration: true,
   host: "valorschool.can-os.com",
   site: {
     name: "Valor School",
     organizationName: "CAN Synthetic Demonstration School",
   },
   localContent: {
-    welcomeMessage: "A fictional example of learning rooted in community, curiosity, and purpose.",
-    localDescription: "Valor is a synthetic reference school used to demonstrate how a local partner and CAN Academy might create a thoughtful school experience. This sample describes a possible vision; it is not evidence of an operating campus, a specific church partnership, or actual services.",
+    welcomeMessage: "Small-school connection. Big-world possibility.",
+    localDescription: "At Valor, we imagine a school where students are known by name, ideas are taken seriously, and learning reaches beyond the screen. This fictional campus brings together the energy of a neighborhood learning community with a thoughtfully designed hybrid academic experience.",
     denomination: "",
     statementOfFaith: "",
-    spiritualFormation: "Illustrative concept: space for service, reflection, and community connections, subject to local partner choices and separate program approval.",
-    churchHistory: "No real host-church history is asserted in this demonstration. A participating church would review and publish its own story and traditions.",
-    communityOutreach: "Illustrative concept: learning that connects students to the people and needs of their own neighborhood. Specific service activities would require separate planning and safeguarding review.",
-    schoolVision: "Help families imagine a connected educational experience in which local relationships complement institutionally approved academics.",
-    leadershipWelcome: "This is an illustrative school website. Leadership names, credentials, and welcomes will appear only when approved for publication.",
-    localTraditions: "Sample ideas for discussion include community gatherings, student showcases, and supervised service projects. These are not scheduled events.",
+    spiritualFormation: "Faith and purpose shape our sample community through reflection, meaningful conversation, and opportunities to serve. The activities pictured here are illustrative concepts, not scheduled ministry services.",
+    churchHistory: "Valor began as a design question: what would a school feel like if every young person had a place to belong, room to think independently, and adults who noticed their potential? Our fictional story imagines a school growing from that conviction.",
+    communityOutreach: "Learning comes alive when it meets the community. Sample student projects connect design, technology, local history, and service—from mapping neighborhood resources to exploring the science behind everyday problems.",
+    schoolVision: "Curious minds. Courageous hearts. A community that sees what each student can become. Our vision is a high-school experience that pairs rigorous learning with genuine connection and a sense of purpose.",
+    leadershipWelcome: "Welcome to Valor. We're building a picture of a school experience where curiosity is celebrated, questions matter, and every student has the opportunity to contribute. We're glad you're exploring what that could look like.",
+    localTraditions: "Imagine Friday showcases, student-led exhibitions, service Saturdays, and family gatherings that make learning visible. These are sample traditions for this demonstration, not confirmed calendar events.",
     branding: {
       theme: "classic",
       paletteId: "heritage",
@@ -33,9 +34,9 @@ export const valorReferenceSchool = {
   },
   academicPrograms: [{
     programId: "f1000000-0000-4000-8000-000000000004",
-    title: "Synthetic Hybrid High School",
-    typeLabel: "High school extension",
-    summary: "A synthetic Grade 9–12 hybrid learning example. Publication is for demonstration, not a commitment that the school is authorized to open or enroll students.",
+    title: "Valor Hybrid High School",
+    typeLabel: "Grades 9–12",
+    summary: "A sample high-school pathway combining on-site collaboration, live online teaching, and independent study. Explore how connection and flexibility can work together.",
     grades: { min: "9", max: "12" },
     delivery: {
       onsite: true,
@@ -46,5 +47,23 @@ export const valorReferenceSchool = {
     availability: "planned",
     applicationOpen: false,
   }],
-  offerings: [],
+  // Illustrative, explicitly not registration-open; no production Activity or
+  // Season state is created from these fictional examples.
+  offerings: [
+    { seasonId:"demo-robotics", title:"Robotics & Design Lab",
+      programName:"STEM Studio", season:"Illustrative fall program",
+      startsOn:"2027-09-08", endsOn:"2027-11-17",
+      feeAmountCents:0, seatsRemaining:null, registrationOpen:false,
+      firstMeeting:null, meetingTimezone:null, packages:[] },
+    { seasonId:"demo-arts", title:"The Creative Collective",
+      programName:"Arts & Expression", season:"Illustrative fall program",
+      startsOn:"2027-09-09", endsOn:"2027-11-18",
+      feeAmountCents:0, seatsRemaining:null, registrationOpen:false,
+      firstMeeting:null, meetingTimezone:null, packages:[] },
+    { seasonId:"demo-service", title:"Neighborhood Impact",
+      programName:"Service & Leadership", season:"Illustrative fall program",
+      startsOn:"2027-09-11", endsOn:"2027-11-20",
+      feeAmountCents:0, seatsRemaining:null, registrationOpen:false,
+      firstMeeting:null, meetingTimezone:null, packages:[] },
+  ],
 };
