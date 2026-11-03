@@ -58,6 +58,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     siteName: site.name,
     organizationName: site.organizationName,
     canPublish: site.canPublish,
+    demonstration: siteConfiguration?.metadata?.synthetic === true,
     host,
     status: address?.status ?? null,
     approvedAcademicCount: academicPrograms.length,
