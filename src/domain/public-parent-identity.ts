@@ -14,6 +14,8 @@ export const identityReviewSchema=z.object({
   reviewedByPersonId:z.string().uuid(),
   reviewedAt:z.string().datetime(),
   expiresOn:z.string().date().nullable(),
+  /** Internal audited evidence pointer, never included in anonymous claims. */
+  evidenceReference:z.string().trim().min(10).max(500).optional(),
   addressDigest:z.string().regex(/^[0-9a-f]{64}$/).nullable(),
   contactDigest:z.string().regex(/^[0-9a-f]{64}$/).nullable(),
 }).strict();
