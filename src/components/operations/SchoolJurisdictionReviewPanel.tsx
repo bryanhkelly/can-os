@@ -111,7 +111,7 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
         <p className="mt-2 text-xs text-muted-foreground">These Actions track obligations and independently reviewed evidence. Completing an Action does not authorize opening, enrollment or government funding.</p>
         <ul className="mt-2 space-y-3">{work.items.map(item=><li key={item.id} className="rounded border p-3">
           <p className="font-medium">{item.title}</p>
-          <p className="text-xs text-muted-foreground">{item.responsibleParty.toUpperCase()} responsibility · {item.phase?.replaceAll("_"," ")??"review phase pending"} · {item.status.replaceAll("_"," ")}</p>
+          <p className="text-xs text-muted-foreground">{item.responsibleParty.toUpperCase()} responsibility · {item.phase?.replaceAll("_"," ")??"review phase pending"} · {item.effectiveStatus.replaceAll("_"," ")}</p>
           <p className="text-xs">{item.reviewState.replaceAll("_"," ")}</p>
           {item.responsibleParty==="family"&&<p className="text-xs text-muted-foreground">
             Family-provided proof must follow the separately authorized family intake process. A Site registrar cannot approve this requirement on a family's behalf.
