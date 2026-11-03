@@ -41,6 +41,7 @@ export function SiteDayPage() {
   const [preparing,setPreparing]=useState(false);
   const [preparation,setPreparation]=useState<Awaited<ReturnType<typeof getOnsiteSchoolDayPreparation>>|null>(null);
   const [openings, setOpenings] = useState<OpeningStatuses>([]);
+  const [openingStatusState, setOpeningStatusState] = useState<"loading" | "available" | "unavailable">("loading");
   const [schoolDayRevision, setSchoolDayRevision] = useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -81,8 +82,12 @@ export function SiteDayPage() {
     // Opening status is an advisory banner; a failure here must not block the
     // roster, which reports its own hard failures.
     void getSiteDayOpeningStatuses().then(result => {
-      if (active) setOpenings(result.statuses);
-    }).catch(() => {});
+      if (!active) return;
+      setOpenings(result.statuses);
+      setOpeningStatusState("available");
+    }).catch(() => {
+      if (active) setOpeningStatusState("unavailable");
+    });
     return () => { active = false; };
   }, [load]);
 
@@ -118,6 +123,19 @@ export function SiteDayPage() {
       {context && <span>{context.timeZone}</span>}
       <span>Attendance does not authorize student release.</span>
     </div>
+    {openingStatusState === "loading" && <p role="status" className="mt-4 rounded-xl border p-3 text-sm">Checking current school-opening authorization…</p>}
+    {openingStatusState === "unavailable" && <section role="alert" aria-label="School opening verification unavailable"
+      className="mt-4 border-l-4 border-destructive bg-muted/40 px-5 py-4">
+      <h2 className="font-semibold">School-opening status could not be verified</h2>
+      <p className="mt-1 text-sm">The authorization summary is unavailable. Do not infer that this site is approved to operate. Contact the site director or CAN school-opening officer to verify before receiving students. Existing server-side restrictions still apply.</p>
+      <Button type="button" variant="outline" className="mt-3" onClick={() => {
+        setOpeningStatusState("loading");
+        void getSiteDayOpeningStatuses().then(result => {
+          setOpenings(result.statuses);
+          setOpeningStatusState("available");
+        }).catch(() => setOpeningStatusState("unavailable"));
+      }}>Retry opening-status check</Button>
+    </section>}
     {openings.some(opening => opening.blocked) &&
       <section role="alert" aria-label="School opening status"
         className="mt-4 border-l-4 border-destructive bg-muted/40 px-5 py-4">
