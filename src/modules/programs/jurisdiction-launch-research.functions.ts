@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, desc, inArray } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { jurisdictionProfileVersions } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -24,6 +24,10 @@ export const listLaunchJurisdictionResearch = createServerFn({method:"GET"}).han
     status: jurisdictionProfileVersions.status,
     revision: jurisdictionProfileVersions.revision,
     publishedAt: jurisdictionProfileVersions.publishedAt,
+    effectiveAt: jurisdictionProfileVersions.effectiveAt,
+    nextReviewAt: jurisdictionProfileVersions.nextReviewAt,
+    reviewedAt: jurisdictionProfileVersions.reviewedAt,
+    sourceUpdatedAt: jurisdictionProfileVersions.sourceUpdatedAt,
   }).from(jurisdictionProfileVersions)
     .where(inArray(jurisdictionProfileVersions.status,["draft","in_review","published"]))
     .orderBy(desc(jurisdictionProfileVersions.createdAt));
@@ -32,8 +36,12 @@ export const listLaunchJurisdictionResearch = createServerFn({method:"GET"}).han
     const authorizedPublication = published[row.jurisdictionId];
     // A published row with revoked, stale or missing independent verification
     // is not displayed as current guidance OR as unverified research.
+    const now = new Date();
+    const effectiveAndCurrent = Boolean(row.effectiveAt && row.effectiveAt <= now &&
+      row.nextReviewAt && row.nextReviewAt >= now &&
+      row.reviewedAt && (!row.sourceUpdatedAt || row.sourceUpdatedAt <= row.reviewedAt));
     if(row.status==="published" &&
-       (!authorizedPublication ||
+       (!effectiveAndCurrent || !authorizedPublication ||
         authorizedPublication.summary!==row.summary ||
         authorizedPublication.publishedAt!==row.publishedAt?.toISOString())) continue;
     const current = row.status==="published";
