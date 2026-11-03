@@ -1,6 +1,6 @@
-import {and,eq} from "drizzle-orm";
+import {and,desc,eq} from "drizzle-orm";
 import {db} from "@/db/client";
-import {actions,documents,programs,sites} from "@/db/schema";
+import {actions,auditEvents,documents,programs,sites} from "@/db/schema";
 import type {AccessContext} from "@/domain/access-context";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {hasRegistrarAuthority} from "@/domain/school-roles";
@@ -16,7 +16,7 @@ async function lockRequirement(tx:Tx,actionId:string){
   if(!candidate?.siteId||!candidate.programId)
     throw new AuthorizationError("existing school-specific requirement");
   // Same locking order as Site address editing and school legal attestation.
-  const [site]=await tx.select({id:sites.id}).from(sites)
+  const [site]=await tx.select({id:sites.id,metadata:sites.metadata}).from(sites)
     .where(eq(sites.id,candidate.siteId)).for("update").limit(1);
   const [program]=await tx.select({id:programs.id,organizationId:programs.organizationId,
     academicProviderOrganizationId:programs.academicProviderOrganizationId,
@@ -41,6 +41,29 @@ function requireSubmittedDocument(document:typeof documents.$inferSelect | undef
     document.metadata.storageVerified!==true ||
     (document.expiresAt && document.expiresAt<=now))
     throw new AuthorizationError("current scoped verified-storage Program evidence document");
+}
+
+/** Evidence specific to a physical school may not be recycled across an
+ * audited location amendment, even if its Action was subsequently reopened.
+ * Site editor revisions and immutable audit events both count. */
+async function requireDocumentAfterPhysicalSiteChange(
+  tx:Tx,site:{id:string;metadata:Record<string,unknown>},
+  document:typeof documents.$inferSelect | undefined,
+) {
+  if(!document)return;
+  const revision=site.metadata.sitePhysicalAddressRevision;
+  const [lastAudit]=await tx.select({occurredAt:auditEvents.occurredAt})
+    .from(auditEvents).where(and(
+      eq(auditEvents.action,"site.location.update"),
+      eq(auditEvents.resourceType,"site"),
+      eq(auditEvents.resourceId,site.id),
+    )).orderBy(desc(auditEvents.occurredAt)).limit(1);
+  const candidates=[
+    typeof revision==="string"?Date.parse(revision):NaN,
+    lastAudit?.occurredAt?.getTime()??NaN,
+  ].filter(Number.isFinite);
+  if(candidates.length && document.createdAt.getTime()<Math.max(...candidates))
+    throw new AuthorizationError("new evidence document following the revised physical Site address");
 }
 
 /** Church submission records evidence; it cannot approve the requirement. */
@@ -77,6 +100,7 @@ export async function submitSchoolJurisdictionRequirementEvidence(
       .where(eq(documents.id,input.documentId)).limit(1);
     const now=new Date();
     requireSubmittedDocument(document,program.id,site.id,program.organizationId,now);
+    await requireDocumentAfterPhysicalSiteChange(tx,site,document);
     if(!document || document.uploadedByPersonId!==actor.actorPersonId)
       throw new AuthorizationError("evidence uploaded by the authorized submitter");
     const prior=[...action.evidence].reverse().find(entry=>
@@ -138,6 +162,7 @@ export async function decideSchoolJurisdictionRequirementEvidence(
       .where(eq(documents.id,prior.documentId)).limit(1);
     const now=new Date();
     requireSubmittedDocument(document,program.id,site.id,program.organizationId,now);
+    await requireDocumentAfterPhysicalSiteChange(tx,site,document);
     const scope={organizationId:program.organizationId,siteId:site.id,programId:program.id};
     if(input.decision==="verify"){
       if(!document || !document.verifiedAt||document.verifiedAt>now ||
