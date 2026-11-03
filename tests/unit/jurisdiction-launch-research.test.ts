@@ -7,6 +7,7 @@ const base={
   summary:"Preliminary state education research.",
   evidence,
   profile:{
+    editorial:{launchResearchVisibility:"school_operator"},
     operatingModels:["church-hosted"],
     fundingPrograms:[{
       id:"fund",name:"State choice program",summary:"Eligibility is conditional.",
@@ -31,6 +32,7 @@ describe("launch jurisdiction research projection",()=>{
   });
   it("does not surface unsourced drafts",()=>{
     expect(projectLaunchJurisdictionResearch({...base,evidence:[]},false)).toBeNull();
+    expect(projectLaunchJurisdictionResearch({...base,profile:{...base.profile,editorial:{}}},false)).toBeNull();
   });
   it("preserves published status only when independently verified by caller",()=>{
     expect(projectLaunchJurisdictionResearch({...base,status:"published"},false)?.guidanceStatus).toBe("research_only");
