@@ -121,7 +121,10 @@ export type PublicSchoolDayProjection = PublicSchoolDay & {
   weeklyPatternState: "pending" | "approved";
   weeklyPattern: PublicWeeklyDayPattern[];
   approvedPatternSource: {
-    scope:PublicScheduleApprovalScope;
+    // Only attribution facts enter the public-safe projection. Internal
+    // location/configuration fingerprints are used to sign, never disclosed.
+    scope:Omit<PublicScheduleApprovalScope,
+      "siteRevision"|"programRevision"|"yearRevision"|"templateRevision">;
     approval:{revision:number;reviewedAt:string};
     instructionalIntervals:PublicWeeklyDayPattern[];
     patternKind:"standard_weekly_template_not_holiday_calendar";
@@ -212,8 +215,14 @@ export function projectPublicSchoolDay(
         endsAtLocal:dailyRanges[index]!.end,
         timezone,
       }));
-  const source=schedule.reviewScope?{
-    scope:schedule.reviewScope,
+  const publicScope=schedule.reviewScope?(()=>{
+    const {siteRevision:_siteRevision,programRevision:_programRevision,
+      yearRevision:_yearRevision,templateRevision:_templateRevision,
+      ...safeScope}=schedule.reviewScope;
+    return safeScope;
+  })():null;
+  const source=publicScope?{
+    scope:publicScope,
     approval:{revision:schedule.approval!.revision,reviewedAt:schedule.approval!.reviewedAt},
     instructionalIntervals:instructional.map(period=>({
       dayOfWeek:period.dayOfWeek,startsAtLocal:period.startsAtLocal.slice(0,5),
