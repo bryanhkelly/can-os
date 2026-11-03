@@ -60,10 +60,11 @@ export function evaluateSchoolJurisdictionRequirements(
   const published = version.status === "published" &&
     version.verificationStatus === "verified" && Boolean(version.verifiedByPersonId) &&
     Boolean(version.publishedAt) && Boolean(version.effectiveAt) &&
-    Boolean(today) && isoDay(version.publishedAt!) !== null &&
-    isoDay(version.effectiveAt!)! <= today! &&
-    (!version.nextReviewAt || (isoDay(version.nextReviewAt) !== null &&
-      isoDay(version.nextReviewAt)! >= today!)) &&
+    Boolean(version.nextReviewAt) && Boolean(today) &&
+    isoDay(version.publishedAt!) !== null && isoDay(version.publishedAt!)! <= today! &&
+    isoDay(version.effectiveAt!) !== null && isoDay(version.effectiveAt!)! <= today! &&
+    isoDay(version.nextReviewAt!) !== null &&
+    isoDay(version.nextReviewAt!)! >= today! &&
     isJurisdictionProfileVerificationEvidenceCurrent(
       version.verificationEvidence, version.evidence,
     );
