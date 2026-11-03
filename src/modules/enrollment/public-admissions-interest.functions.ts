@@ -10,8 +10,10 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requestConsentedInterestFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
-import { familyInterestNextStep } from "./family-interest-next-step";
+import { canInviteConsentedFamily, familyInterestNextStep } from "./family-interest-next-step";
+import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { DomainError } from "@/domain/errors";
 
 import { EventTypes } from "@/domain/event-types";
 async function requireAdmissionsIntakeReader() {
@@ -105,6 +107,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         programId: enrollments.programId,
         schoolYearId: enrollments.schoolYearId,
         kind: enrollments.kind,
+        sectionId: enrollments.sectionId,
       }).from(enrollments).where(and(
         inArray(enrollments.studentProfileId, linkedStudentIds),
         eq(enrollments.status, "active"),
@@ -125,6 +128,9 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       }).from(admissionOffers).where(inArray(admissionOffers.applicationId, linkedApplicationIds))
         .orderBy(desc(admissionOffers.createdAt)) : Promise.resolve([]),
     ]);
+    const readySections = await staffedPublishedSectionIds(
+      activeEnrollments.flatMap(enrollment => enrollment.kind === "section" && enrollment.sectionId
+        ? [enrollment.sectionId] : []), db);
     const latestOffers = new Map<string, typeof linkedOffers[number]>();
     for (const offer of linkedOffers) {
       if (!latestOffers.has(offer.applicationId) && offer.status !== "draft")
@@ -152,18 +158,36 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         eq(accessAccounts.disabled,false),
       )) : [];
 
-    // Admissions authority can change without affecting historical interest.
-    // Resolve the canonical operating gate, not just Program status.
-    const authorized = new Map<string, boolean>();
+    // Ineligible admissions and unavailable authorization infrastructure are
+    // different states. Do not report a database or network outage as a denial.
+    const authorization = new Map<string, "authorized" | "not_authorized" | "temporarily_unavailable">();
     await Promise.all([...new Set(pageRows.map(row => row.programId))].map(async programId => {
-      try { await resolvePrivateFamilyStartDestination(db, programId); authorized.set(programId, true); }
-      catch { authorized.set(programId, false); }
+      try {
+        await resolvePrivateFamilyStartDestination(db, programId);
+        authorization.set(programId, "authorized");
+      } catch (error) {
+        authorization.set(programId, error instanceof AuthorizationError ||
+          (error instanceof DomainError && error.code === "FORBIDDEN") ||
+          (error instanceof Error && error.message === "School applications not open")
+          ? "not_authorized" : "temporarily_unavailable");
+      }
     }));
     return {items:pageRows.map(row => {
       // The offer and enrollment must refer to the same school year.
       // An active record from another year cannot complete this application.
-      const offerYearId = row.applicationId
-        ? latestOffers.get(row.applicationId)?.schoolYearId : null;
+      // Prefer the year associated with a valid active enrollment over a
+      // newer withdrawn/declined offer. Never infer current enrollment from
+      // a different school year or a different Program.
+      const applicationOffers = row.applicationId
+        ? linkedOffers.filter(offer => offer.applicationId === row.applicationId) : [];
+      const enrollmentOffer = applicationOffers.find(offer =>
+        offer.status === "accepted" && activeEnrollments.some(enrollment =>
+          enrollment.studentProfileId === row.studentProfileId &&
+          enrollment.programId === row.programId &&
+          enrollment.schoolYearId === offer.schoolYearId &&
+          enrollment.kind === "program"));
+      const offerYearId = enrollmentOffer?.schoolYearId ??
+        (row.applicationId ? latestOffers.get(row.applicationId)?.schoolYearId : null);
       const programEnrollmentYears = new Set(activeEnrollments.filter(enrollment =>
         enrollment.studentProfileId === row.studentProfileId &&
         enrollment.programId === row.programId && enrollment.kind === "program" &&
@@ -173,20 +197,30 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       const placedInClass = activeEnrollment && activeEnrollments.some(enrollment =>
         enrollment.studentProfileId === row.studentProfileId &&
         enrollment.programId === row.programId && enrollment.kind === "section" &&
-        programEnrollmentYears.has(enrollment.schoolYearId),
+        programEnrollmentYears.has(enrollment.schoolYearId) &&
+        !!enrollment.sectionId && readySections.has(enrollment.sectionId),
       );
-      return {
-      ...row,
-      activeEnrollment,
-      placedInClass,
-      studentAccessStatus: row.applicationId
+      const invitationEligible = canInviteConsentedFamily({
+        status:row.status,consented:Boolean(row.consentAt),
+        authorized:authorization.get(row.programId) === "authorized",
+        applicationId:row.applicationId,
+        familyStartRequestId:row.familyStartRequestId,
+        emailVerifiedAt:row.emailVerifiedAt,
+        linkExpiresAt:row.applicationLinkExpiresAt,
+      });
+      const studentAccessStatus = row.applicationId
         ? accessByApplication.get(row.applicationId)==="approved" &&
           !currentGrants.some(grant=>grant.applicationId===row.applicationId &&
             grant.programId===row.programId && grant.siteId===row.siteId &&
             grant.studentProfileId===row.studentProfileId)
             ? "access_unavailable"
             : accessByApplication.get(row.applicationId)??"not_requested"
-        : null,
+        : null;
+      return {
+      ...row,
+      activeEnrollment,
+      placedInClass,
+      studentAccessStatus,
       latestOfferStatus: row.applicationId ? latestOffers.get(row.applicationId)?.status ?? null : null,
       latestOfferIssuedAt: row.applicationId
         ? latestOffers.get(row.applicationId)?.issuedAt?.toISOString() ?? null : null,
@@ -198,24 +232,15 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       consentAt: row.consentAt?.toISOString() ?? null,
       emailVerifiedAt: row.emailVerifiedAt?.toISOString() ?? null,
       applicationLinkExpiresAt: row.applicationLinkExpiresAt?.toISOString() ?? null,
-      canSendApplicationInvitation: authorized.get(row.programId) === true &&
-        Boolean(row.consentAt) && !row.applicationId &&
-        ["new","contacted"].includes(row.status) &&
-        (!row.familyStartRequestId ||
-          (!row.emailVerifiedAt && !!row.applicationLinkExpiresAt &&
-            row.applicationLinkExpiresAt.getTime() <= Date.now())),
+      canSendApplicationInvitation: invitationEligible,
       applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
-      admissionsAuthorized: authorized.get(row.programId) === true,
+      admissionsAuthorized: authorization.get(row.programId) === "authorized",
+      admissionsAuthorizationStatus: authorization.get(row.programId) ?? "temporarily_unavailable",
       nextStep: familyInterestNextStep({
         interestStatus: row.status,
         consented: Boolean(row.consentAt),
-        admissionsAuthorized: authorized.get(row.programId) === true,
-        canInvite: authorized.get(row.programId) === true &&
-          Boolean(row.consentAt) && !row.applicationId &&
-          ["new","contacted"].includes(row.status) &&
-          (!row.familyStartRequestId ||
-            (!row.emailVerifiedAt && !!row.applicationLinkExpiresAt &&
-              row.applicationLinkExpiresAt.getTime() <= Date.now())),
+        admissionsAuthorized: authorization.get(row.programId) === "authorized",
+        canInvite: invitationEligible,
         hasFamilyStartRequest: Boolean(row.familyStartRequestId),
         emailVerified: Boolean(row.emailVerifiedAt),
         hasApplication: Boolean(row.applicationId),
@@ -223,14 +248,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
           ? latestOffers.get(row.applicationId)?.status ?? null : null,
         activeEnrollment,
         placedInClass,
-        studentAccessStatus: row.applicationId
-          ? accessByApplication.get(row.applicationId)==="approved" &&
-            !currentGrants.some(grant=>grant.applicationId===row.applicationId &&
-              grant.programId===row.programId && grant.siteId===row.siteId &&
-              grant.studentProfileId===row.studentProfileId)
-              ? "access_unavailable"
-              : accessByApplication.get(row.applicationId)??"not_requested"
-          : null,
+        studentAccessStatus,
       }),
       };
     }),nextCursor};
