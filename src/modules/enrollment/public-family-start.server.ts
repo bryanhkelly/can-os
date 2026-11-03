@@ -112,6 +112,7 @@ export async function requestPublicFamilyStart(
 export async function requestVerifiedFamilyStart(
  prepare:(tx:FamilyStartTransaction)=>Promise<FamilyStartPreparation>,
  sender:AccessEmailSender=sendAccessLinkViaResend, options:FamilyStartEmailOptions={},
+ onPersisted?:(tx:FamilyStartTransaction,requestId:string)=>Promise<void>,
 ):Promise<{requestId:string;created:boolean}>{
  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
  const configuredOrigin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
@@ -134,13 +135,17 @@ export async function requestVerifiedFamilyStart(
       gt(publicFamilyStartRequests.createdAt,new Date(Date.now()-COOLDOWN_MS)),
       gt(publicFamilyStartRequests.expiresAt,new Date()),
     )).limit(1);
-  if(recent)return {requestId:recent.id,created:false,email};
+  if(recent){
+    await onPersisted?.(tx,recent.id);
+    return {requestId:recent.id,created:false,email};
+  }
   const [entry]=await tx.insert(publicFamilyStartRequests).values({
     siteId:school.siteId,programId:school.programId,emailNormalized:email,
     adultFirstName:contact.firstName,adultLastName:contact.lastName,
     tokenHash,expiresAt:new Date(Date.now()+LIFETIME_MS),
   }).returning({id:publicFamilyStartRequests.id});
   if(!entry)throw new Error("Unable to prepare family verification");
+  await onPersisted?.(tx,entry.id);
   // No child details or recipient email appear in event and audit payloads.
   await emitEvent(tx,{eventType:EventTypes.PublicFamilyStartRequested,
     aggregateType:"public_family_start_request",aggregateId:entry.id,
