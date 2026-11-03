@@ -62,6 +62,8 @@ export async function readSchoolJurisdictionEvidenceForCAN(
     responsibleParty:action.metadata.responsibleParty,
     scopeCurrent:Boolean(scopeCurrent),
     canIndependentlyVerify:Boolean(scopeCurrent && doc &&
+      action.status==="waiting" &&
+      doc.metadata.reviewStatus!=="rejected" &&
       doc.uploadedByPersonId!==actor.actorPersonId &&
       action.metadata.submittedByPersonId!==actor.actorPersonId),
     evidence:current && doc?{
