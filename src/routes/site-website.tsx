@@ -63,12 +63,71 @@ function PartnerSiteWebsitePage() {
         those records or access student information.
       </p>
     </section>
+    <WebsiteInformationChecklist data={data} />
     <ChurchSourceReferenceEditor />
     <ChurchSourceSuggestionReview currentRevision={data.currentRevision} />
     {data.host && <LocalWebsiteCopyEditor data={data} />}
     <WebsitePreviewPanel data={data} />
 
   </WorkspaceShell>;
+}
+
+function WebsiteInformationChecklist({ data }: {
+  data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>
+}) {
+  const readiness = data.publicInformationReadiness;
+  const required = readiness.gaps.filter(gap => gap.required);
+  const optional = readiness.gaps.filter(gap => !gap.required);
+  return <section aria-labelledby="website-readiness-title"
+    className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parent information</p>
+    <h2 id="website-readiness-title" className="mt-2 font-serif text-2xl font-semibold">
+      What families can learn about this school
+    </h2>
+    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+      This checklist is derived from approved public school records and published local
+      content—not from draft copy or invented example data. It does not establish
+      school-opening authority, admissions approval, or live website hosting.
+    </p>
+    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="rounded-lg border p-3 text-sm">
+        <p className="font-semibold">Website marketing</p>
+        <p className="mt-1 text-muted-foreground">{readiness.marketing === "published"
+          ? "Published in the Site registry; public host still needs verification"
+          : "Not published"}</p>
+      </div>
+      <div className="rounded-lg border p-3 text-sm">
+        <p className="font-semibold">Information</p>
+        <p className="mt-1 text-muted-foreground">{required.length === 0
+          ? "Required parent information categories represented"
+          : `${required.length} required information gaps`}</p>
+      </div>
+      <div className="rounded-lg border p-3 text-sm">
+        <p className="font-semibold">Institutional authority</p>
+        <p className="mt-1 text-muted-foreground">Not verified by this preview</p>
+      </div>
+    </div>
+    {readiness.gaps.length ? <div className="mt-5 space-y-5">
+      {[{label:"Needs approval or configuration", gaps:required},
+        {label:"Additional information families value", gaps:optional}]
+        .filter(group => group.gaps.length).map(group =>
+          <div key={group.label}>
+            <h3 className="text-sm font-semibold">{group.label}</h3>
+            <ul className="mt-2 divide-y rounded-lg border">
+              {group.gaps.map(gap => <li key={`${gap.category}:${gap.owner}`}
+                className="flex flex-wrap items-start justify-between gap-2 px-3 py-3 text-sm">
+                <span className="max-w-2xl">{gap.message}</span>
+                <span className="text-xs text-muted-foreground">
+                  Owner: {gap.owner.replace(/_/g, " ")}
+                </span>
+              </li>)}
+            </ul>
+          </div>)}
+    </div> : <p role="status" className="mt-4 text-sm">
+      All represented information categories have reviewed public values. This does
+      not certify school opening or external hosting.
+    </p>}
+  </section>;
 }
 
 function WebsitePreviewPanel({ data }: { data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>> }) {
