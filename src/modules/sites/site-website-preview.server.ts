@@ -44,6 +44,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     ...parentExtras,
   });
   const previewPage = host ? {
+    demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
     academicPrograms, offerings, localContent: local?.content ?? null,
     parentInformation,
