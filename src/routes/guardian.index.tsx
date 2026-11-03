@@ -166,6 +166,36 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      </div>
     </div>
    </section>
+   {(visibleEnrollmentApplications.length>0||enrollmentWarning)&&<section aria-label="Enrollment next steps" className="mt-6 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+     <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Getting started</p>
+      <h2 className="mt-1 font-serif text-2xl font-semibold">School enrollment</h2></div>
+     <Link to="/guardian/admission-offers" search={{student:student||undefined}}
+      className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">View applications and offers</Link>
+    </div>
+    {enrollmentWarning&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">{enrollmentWarning}</p>}
+    {!enrollmentWarning&&visibleEnrollmentApplications.length>0&&<div className="mt-4 grid gap-3">
+     {visibleEnrollmentApplications.map(app=>{
+      const active=app.offers.find(o=>o.enrollmentActive);
+      const issued=app.offers.find(o=>o.status==="issued");
+      const accepted=app.offers.find(o=>o.status==="accepted");
+      const next=app.waitlisted?"Your application is on the waitlist. Contact admissions for an update.":
+       issued?"An enrollment offer is ready for your decision.":
+       accepted&&!active?"Your offer is accepted. The school is completing enrollment and class placement.":
+       active?"Enrollment is active. Review first-day preparation and student access.":
+       app.blockers.length>0?"Review the outstanding enrollment requirements.":
+       "Your application is with the school. Review its status and any requested steps.";
+      return <article key={app.applicationId} className="rounded-xl border p-4">
+       <p className="font-semibold">{app.studentName} <span className="font-normal text-muted-foreground">· {app.program}</span></p>
+       <p className="mt-2 text-sm">{next}</p>
+       <Link to="/guardian/admission-offers" search={{student:app.studentPersonId,application:app.applicationId}}
+        className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">
+        {issued?"Review offer":active?"Prepare for school":"View enrollment steps"} →
+       </Link>
+      </article>;
+     })}
+    </div>}
+   </section>}
    {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Show</span><Link to="/guardian" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/guardian" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -219,7 +249,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        View applications and enrollment offers →
      </Link>
     </div>}
-    {enrollmentWarning&&<p role="status" className="mt-4 rounded-xl border p-4 text-sm">{enrollmentWarning}</p>}
+    
     {visibleEnrollmentApplications.length>0&&<div className="mt-6 space-y-3" aria-label="Admissions and enrollment in progress">
      <h3 className="font-serif text-xl font-semibold">Admissions &amp; enrollment in progress</h3>
      {visibleEnrollmentApplications.map(app=>{
