@@ -45,6 +45,7 @@ export function projectPublicInformationReadiness(input: {
 }): PublicInformationReadiness {
   const p = input.profile;
   const siteEditor = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}/parent-information` : "/sites";
+  const institutionalPublisher = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}/publish` : "/sites";
   const siteSetup = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}` : "/sites";
   const scheduleReview = "/operations/school-years";
   const gaps: PublicInformationGap[] = [];
@@ -58,7 +59,7 @@ export function projectPublicInformationReadiness(input: {
   if (!visible(p.site.address))
     missing("identity_contact","institutional_publisher",
       "Review this Site's public-facing location separately from its private legal/physical address.",
-      siteEditor,false);
+      institutionalPublisher,false);
   if (!visible(p.site.contact))
     missing("identity_contact","institutional_publisher",
       "Approve an explicit school-controlled public contact; the draft Site contact is not public consent.",
