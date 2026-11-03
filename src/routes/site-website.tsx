@@ -61,6 +61,9 @@ function PartnerSiteWebsitePage() {
       </p>
     </section>
     {data.host && <LocalWebsiteCopyEditor data={data} />}
+    <WebsitePreviewPanel data={data} />
+    {/* Preview controls are isolated so hook ordering is stable across loader failures. */}
+    {/*
     <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
       <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" />
         Private website preview
@@ -89,7 +92,28 @@ function PartnerSiteWebsitePage() {
         Preview becomes available after the canonical Site receives a draft address.
       </p>}
     </section>
+    */}
   </WorkspaceShell>;
+}
+
+function WebsitePreviewPanel({ data }: { data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>> }) {
+  const pages = Object.entries(data.previewPages ?? {});
+  const [selected, setSelected] = useState("/");
+  const activeHtml = data.previewPages?.[selected] ?? data.previewHtml;
+  return <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+    <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> Private website preview</h2>
+    <p className="mt-2 text-sm text-muted-foreground">Review every page with the same server-rendered template used by the live website. Forms and scripts stay disabled here.</p>
+    {pages.length > 0 && <div role="group" aria-label="Preview a website page" className="mt-4 flex flex-wrap gap-2">
+      {pages.map(([path]) => <button key={path} type="button" aria-pressed={selected === path}
+        onClick={() => setSelected(path)} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+        {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
+      </button>)}
+    </div>}
+    {activeHtml ? <iframe key={selected} title={`${data.siteName} ${selected} read-only website preview`}
+      srcDoc={activeHtml} sandbox="" referrerPolicy="no-referrer" loading="lazy"
+      className="mt-4 h-[700px] w-full rounded-lg border bg-white" />
+      : <p className="mt-4 rounded-lg border p-4 text-sm">A private website preview becomes available when a Site draft address is reserved by your registrar.</p>}
+  </section>;
 }
 
 function blobDataUrl(blob: Blob): Promise<string> {
