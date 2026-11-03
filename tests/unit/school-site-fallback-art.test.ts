@@ -12,7 +12,7 @@ describe("original CAN School Sites fallback illustrations",()=>{
       expect(asset.src.startsWith("data:image/svg+xml,")).toBe(true);
       const svg=decodeURIComponent(asset.src.slice("data:image/svg+xml,".length));
       expect(svg).toContain('<svg xmlns="http://www.w3.org/2000/svg"');
-      expect(svg).not.toMatch(/<script|<foreignObject|<image|https?:\/\//);
+      expect(svg).not.toMatch(/<script|<foreignObject|<image|(?:src|href)=["\']https?:\/\//);
       expect(svg).not.toContain("onload=");
       expect(asset.alt).toContain("not a photograph");
       expect(asset.src).toBe(canFallbackArtwork(family,slot).src);
