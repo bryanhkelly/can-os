@@ -4,6 +4,7 @@ import {
   isCurrentVerifiedJurisdictionProfileVersion,
 } from "@/domain/jurisdiction-applicability";
 import {
+  jurisdictionReviewScopeFingerprint,
   projectSchoolJurisdictionReadiness,
   unavailableSchoolJurisdictionReadiness,
 } from "@/domain/school-jurisdiction-readiness";
@@ -130,6 +131,26 @@ describe("school-specific jurisdiction and funding readiness", () => {
     expect(isCurrentVerifiedJurisdictionProfileVersion({
       ...version,verificationStatus:"unverified",
     },now)).toBe(false);
+  });
+  it("detects changed legal scope without storing the street address in an Action", () => {
+    const original = {
+      address:{state:"CA",county:"Alameda",line1:"100 Main Street"},
+      schoolYears:[{key:"2026-2027",status:"draft"}],
+      deliveryModel:{onsite:true,liveOnline:false},
+    };
+    const fingerprint = jurisdictionReviewScopeFingerprint(original);
+    expect(fingerprint).toBe(jurisdictionReviewScopeFingerprint({
+      schoolYears:[{status:"draft",key:"2026-2027"}],
+      deliveryModel:{liveOnline:false,onsite:true},
+      address:{line1:"100 Main Street",county:"Alameda",state:"CA"},
+    }));
+    expect(jurisdictionReviewScopeFingerprint({
+      ...original,address:{...original.address,line1:"200 Main Street"},
+    })).not.toBe(fingerprint);
+    expect(jurisdictionReviewScopeFingerprint({
+      ...original,schoolYears:[{key:"2027-2028",status:"draft"}],
+    })).not.toBe(fingerprint);
+    expect(fingerprint).not.toContain("Main Street");
   });
   it("returns no candidate requirements or funding if profile is absent or unverified", () => {
     const unverified = unavailableSchoolJurisdictionReadiness("Site state requires confirmation");
