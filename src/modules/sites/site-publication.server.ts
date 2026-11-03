@@ -4,7 +4,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { publicSiteDomain, publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
-import { renderPublicSiteHtml } from "@/domain/public-site-html";
+import { availablePublicSitePaths, renderPublicSiteHtml, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
@@ -104,6 +104,21 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     academicPrograms: authorizedPrograms, offerings: publicOfferings,
     localContent: localCopy?.content ?? null, ...parentExtras,
   });
+  // Render the same approved-source Site projection for every private page.
+  // Synthetic demo starter copy is display-only and never written to Site CMS.
+  const publisherPreview = address[0] ? withIllustrativeLocalPreview({
+    demonstration: siteConfiguration?.metadata?.synthetic === true,
+    host: publicSiteHost(address[0].slug),
+    site: {name: site.name, organizationName: site.organizationName},
+    academicPrograms: authorizedPrograms,
+    localContent: localCopy?.content ?? null,
+    offerings: publicOfferings,
+    parentInformation,
+  }) : null;
+  const previewPages = publisherPreview ? Object.fromEntries(
+    availablePublicSitePaths(publisherPreview).map(path => [path,
+      renderPublicSiteHtml(publisherPreview, {path, localPreview:true})]),
+  ) : {};
   return {
     site,
     canRename: actor.role === "site_admin" && actor.capabilities.has("school.setup.manage"),
@@ -144,14 +159,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     // Identical standalone HTML renderer to /published-site. No request ID
     // generator: this authenticated draft is read-only, not an inquiry form.
     // The client displays it inside an origin-isolated sandboxed iframe.
-    previewHtml: address[0] ? renderPublicSiteHtml({
-      host: publicSiteHost(address[0].slug),
-      site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms: authorizedPrograms,
-      localContent: localCopy?.content ?? null,
-      offerings: publicOfferings,
-      parentInformation,
-    }) : null,
+    previewHtml: previewPages["/"] ?? null,
+    previewPages,
   };
 }
 
