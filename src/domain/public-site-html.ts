@@ -82,7 +82,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const hasReviewedPeople = Boolean(page.parentInformation?.people.length);
   const academic = Boolean(page.academicPrograms?.length);
   const parent = page.parentInformation;
-  const tuition = Boolean(parent?.tuition.description.canDisplay && parent.tuition.description.value);
+  const tuition = Boolean(academic || (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
+    (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value));
   const services = Boolean(parent?.services.some(service => service.description.canDisplay && service.description.value));
   const faq = Boolean(academic || tuition ||
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
@@ -428,9 +429,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   </section>` : "";
   const tuitionText = verifiedText(parent?.tuition.description);
   const aidText = verifiedText(parent?.tuition.financialAid);
-  const tuitionSection = tuitionText ? `<section class="church-section" aria-labelledby="tuition-title">
-    <h2 id="tuition-title">Tuition and costs</h2><p>${tuitionText}</p>
-    ${aidText ? `<h3>Financial assistance</h3><p>${aidText}</p>` : ""}</section>` : "";
+  const tuitionSection = `<section class="church-section" aria-labelledby="tuition-title">
+    <h2 id="tuition-title">Tuition and costs</h2>
+    <p>${tuitionText || "Reviewed tuition and fee details have not yet been published for these programs. Please request current costs before making an enrollment decision."}</p>
+    <h3>Financial assistance</h3>
+    <p>${aidText || "Reviewed financial assistance details are not yet available on this website. Availability and eligibility have not been established here."}</p>
+    ${availablePaths.includes("/academics")
+      ? '<p class="public-next-step"><a href="/academics">Choose a program to request tuition and assistance details →</a></p>'
+      : availablePaths.includes("/contact")
+        ? '<p class="public-next-step"><a href="/contact">Request current tuition information →</a></p>'
+        : ""}</section>`;
   const serviceCards = parent?.services.filter(item => item.description.canDisplay && item.description.value)
     .map(item => `<article class="card"><h3>${escapePublicHtml(item.category.replace(/_/g, " "))}</h3>
       <p>${verifiedText(item.description)}</p></article>`).join("") ?? "";
@@ -454,7 +462,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     {question:"Are applications open?",answer:hasOpenApplications
       ? "Some approved Programs permit verified application starts. Eligibility and capacity are checked separately."
       : "Applications are not currently open through this website. Inquiries do not constitute applications."},
-    {question:"What tuition information is available?",answer:verifiedText(parent?.tuition.description)},
+    {question:"What tuition information is available?",answer:tuitionText || (academicCards
+      ? "Reviewed tuition and fee details are not yet published. Request current details for your program before applying." : "")},
     {question:"Which family services are offered?",answer:serviceCards
       ? "Reviewed family-service information is available on the Families page." : ""},
     {question:"Where is the school located?",answer:reviewedAddress},
@@ -470,7 +479,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <p class="admissions-status">${hasOpenApplications
       ? "Applications are available for eligible approved programs, subject to identity verification and school review."
       : "Applications are not currently open through this website. Review published programs and inquire about next steps."}</p>
-    ${tuitionText && availablePaths.includes("/tuition") ? '<a class="text-action" href="/tuition">Review published tuition information →</a>' : ""}
+    ${availablePaths.includes("/tuition") ? '<a class="text-action" href="/tuition">Tuition and financial assistance →</a>' : ""}
     ${availablePaths.includes("/faq") ? '<a class="text-action" href="/faq">Read admissions guidance →</a>' : ""}
     ${availablePaths.includes("/contact") ? '<a class="text-action" href="/contact">Contact the school →</a>' : ""}
     </section>`;
@@ -529,7 +538,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "Explore eligible programs. Applications are available only when separately authorized.") +
       admissionsNextSteps + academicSection + disclosureSection,
     "/tuition": secondaryHero("Planning your education", "Tuition and financial information",
-      "Only officially approved tuition information appears here.") + tuitionSection,
+      "Published costs and assistance information, or a clear next step when reviewed details are unavailable.") + tuitionSection,
     "/families": secondaryHero("Supporting families", "Family services",
       "Services shown here have been reviewed for public description.") +
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
