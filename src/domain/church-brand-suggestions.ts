@@ -102,7 +102,13 @@ export function deriveChurchBrandProposal(
     candidate.contrastMutedCanvas >= 4.5 &&
     candidate.contrastWhiteInk >= 4.5)
     .sort((a, b) => a.score - b.score)
-    .slice(0, 2).map(({ score: _score, ...candidate }) => candidate) : [];
+    .slice(0, 2).map(candidate => ({
+      paletteId: candidate.paletteId,
+      contrastInkCanvas: candidate.contrastInkCanvas,
+      contrastMutedCanvas: candidate.contrastMutedCanvas,
+      contrastWhiteInk: candidate.contrastWhiteInk,
+      reason: candidate.reason,
+    })) : [];
   const fontEvidence = evidence.find(item => item.signal === "inline-font-family");
   const preferred = fontEvidence?.value.toLowerCase().includes("trebuchet") ? "contemporary"
     : fontEvidence?.value.toLowerCase().includes("cambria") ? "traditional"
