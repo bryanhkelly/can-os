@@ -36,7 +36,9 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
     loadingMoreRef.current=true;
     setLoadingMore(true);setLoadError("");
     try {
-      const page=await listPublicAdmissionsInterests({data:{cursor:nextCursor}});
+      const page=await listPublicAdmissionsInterests({data:{
+        cursor:nextCursor,siteId,programId,
+      }});
       setOlderRows(current=>[...current,...page.items]);
       setNextCursor(page.nextCursor);
     } catch (cause) {
