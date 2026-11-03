@@ -12,7 +12,7 @@ describe("published HTML identity contract", () => {
       academicPrograms: [],
     });
     expect(html).toContain("<h1>First School</h1>");
-    expect(html).toContain(`<footer>${host} · Powered by CAN OS</footer>`);
+    expect(html).toContain(`<span class="platform-credit"> · Supported by CAN Academy · ${host}</span>`);
     const result = await checkPublishedSiteReachability({
       host, published: true, hostingConfigured: true,
       fetcher: async () => new Response(html, {
