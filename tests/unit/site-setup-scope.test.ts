@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { assertSiteLocationProgramScope, assertSiteSetupScope } from "@/domain/site-setup-scope";
+import { assertSiteLocationProgramScope, assertSiteSetupScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 
 const site={id:"site-one",organizationId:"church-one"};
 const actor:AccessContext={
@@ -33,6 +33,12 @@ describe("Agent S verified Site and Program access",()=>{
     expect(()=>assertSiteLocationProgramScope(actor,["program-one","sibling-program"])).toThrow();
     expect(()=>assertSiteLocationProgramScope(actor,[])).not.toThrow();
     expect(()=>assertSiteLocationProgramScope({...actor,scope:{organizationIds:["church-one"],siteIds:["site-one"]}},["program-one"])).toThrow();
+  });
+  it("fails closed on missing scoped Program projections, including empty or sibling-only grants",()=>{
+    expect(siteSetupReadableProgramIds(actor)).toEqual(["program-one"]);
+    expect(siteSetupReadableProgramIds({...actor,scope:{organizationIds:["church-one"],siteIds:["site-one"],programIds:[]}})).toEqual([]);
+    expect(()=>siteSetupReadableProgramIds({...actor,scope:{organizationIds:["church-one"],siteIds:["site-one"]}})).toThrow();
+    expect(siteSetupReadableProgramIds({...actor,grantSiteId:null,scope:{organizationIds:["church-one"]}})).toBeNull();
   });
   it("honors organization-wide registrar grant without conferring CAN institutional approvals",()=>{
     const orgWide={...actor,role:"registrar",grantSiteId:null,
