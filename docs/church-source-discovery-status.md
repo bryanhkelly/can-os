@@ -45,3 +45,21 @@ Updated 2026-11-03. **Source implementation committed on `main`; deployment and 
 Source commits alone do **not** establish running behavior. The GitHub CI workflows and commit-bound job logs are the evidence for recorded checks; failures must be handed off as failures. The final Integration Owner owns disposable database and browser journey acceptance and can decide when to enable website extraction after a separate safety review.
 
 **Stop condition:** This agent commits Workstream P to `main` and hands off with exact CI evidence. It does not apply production migrations or enable new outbound production fetching.
+
+## Commit-bound verification (2026-11-03)
+
+For exact source commit `2bc302e8c0106018a437c764ea4d0e7c4b1ee112`, GitHub Actions
+[`Church source discovery acceptance` run 41670624291](https://github.com/bryanhkelly/can-os/actions/runs/41670624291)
+reported **success** for:
+- Production Vite build (also generated route types).
+- Focused church URL and safe-egress unit tests.
+- `npx drizzle-kit check`.
+- `npm run db:generate` with zero uncommitted Drizzle delta.
+
+The same workflow's whole-repository TypeScript gate remained running at the time
+of this record, and earlier runs reported TypeScript failures in other workstreams
+(`LaunchPortfolio.stories.tsx`, `enrichment-catalog.server.ts`,
+`launch.functions.ts`, `teacher.index.tsx`). Do not turn this into a
+whole-repository pass claim. CI's Neon admissions workflow separately reports
+missing isolated database secret, unrelated to this feature. No browser or
+database integration run for church source discovery is claimed.
