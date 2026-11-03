@@ -56,6 +56,39 @@ export function canonicalPublicContact(value:unknown) {
   return {displayName,email,phone,website};
 }
 
+export type PublicIdentityReviewStatus =
+  "never_reviewed" | "approved" | "expired" | "source_changed" |
+  "withdrawn" | "invalid_review";
+
+/** Derived from current sources, never a persisted status. A reviewer can
+ * distinguish stale/withdrawn evidence without making it public. */
+export function publicIdentityReviewStatuses(
+  siteId:string,address:unknown,metadata:Record<string,unknown>|null,
+  now=new Date(),
+):{address:PublicIdentityReviewStatus;contact:PublicIdentityReviewStatus} {
+  const raw=metadata?.publicParentIdentityReview;
+  if(raw==null)return {address:"never_reviewed",contact:"never_reviewed"};
+  const parsed=identityReviewSchema.safeParse(raw);
+  if(!parsed.success)return {address:"invalid_review",contact:"invalid_review"};
+  const review=parsed.data;
+  const invalidDate=!review.expiresOn ||
+    review.expiresOn<now.toISOString().slice(0,10) ||
+    review.reviewedAt>now.toISOString();
+  const physical=canonicalPublicAddress(address);
+  const contact=canonicalPublicContact(metadata?.setupContact);
+  const state=(digest:string|null,canonical:object|null,
+    category:"address"|"contact"):PublicIdentityReviewStatus=>{
+    if(!digest)return "withdrawn";
+    if(!canonical || digest!==sourceDigest(siteId,category,canonical))
+      return "source_changed";
+    return invalidDate?"expired":"approved";
+  };
+  return {
+    address:state(review.addressDigest,physical,"address"),
+    contact:state(review.contactDigest,contact,"contact"),
+  };
+}
+
 export function approvedIdentityFacts(siteId:string,address:unknown,
   metadata:Record<string,unknown>|null,now=new Date()) {
   const parsed=identityReviewSchema.safeParse(metadata?.publicParentIdentityReview);
@@ -63,19 +96,20 @@ export function approvedIdentityFacts(siteId:string,address:unknown,
     publicAddress?:PublicClaim<string>;
     publicContact?:PublicClaim<string>;
   }={};
-  if(!parsed.success || parsed.data.reviewedAt>now.toISOString() ||
-    (parsed.data.expiresOn && parsed.data.expiresOn<now.toISOString().slice(0,10)))
-    return result;
+  if(!parsed.success)return result;
+  const statuses=publicIdentityReviewStatuses(siteId,address,metadata,now);
   const reviewed=parsed.data;
   const physical=canonicalPublicAddress(address);
-  if(physical && reviewed.addressDigest===sourceDigest(siteId,"address",physical)){
+  if(physical && statuses.address==="approved" &&
+    reviewed.addressDigest===sourceDigest(siteId,"address",physical)){
     const display=[physical.street1,physical.street2,
       physical.city+", "+physical.state+" "+physical.postalCode,
       physical.country].filter(Boolean).join(", ");
     result.publicAddress=verifiedPublicClaim(display,"organization_site",reviewed.revision);
   }
   const contact=canonicalPublicContact(metadata?.setupContact);
-  if(contact && reviewed.contactDigest===sourceDigest(siteId,"contact",contact)){
+  if(contact && statuses.contact==="approved" &&
+    reviewed.contactDigest===sourceDigest(siteId,"contact",contact)){
     const channels=[contact.email,contact.phone,contact.website].filter(Boolean);
     result.publicContact=verifiedPublicClaim(
       channels.join(" · "),"organization_site",reviewed.revision);
