@@ -28,6 +28,7 @@ export const Route = createFileRoute("/published-site/$page")({
       GET: async ({ request }) => {
         const slug = slugForPublicSiteOrigin(
           request, process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
+          process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_ENABLED === "true",
         );
         if (!slug) return unavailable(404);
         const internalPath = new URL(request.url).pathname;
@@ -37,7 +38,8 @@ export const Route = createFileRoute("/published-site/$page")({
           const { readPublishedSiteCatalog } = await import("@/modules/sites/site-public-catalog.server");
           const catalog = await readPublishedSiteCatalog(slug);
           if (!catalog) return unavailable(404);
-          const indexable = isIndexablePublicSite(catalog);
+          const localPreview = new URL(request.url).searchParams.has("site");
+          const indexable = !localPreview && isIndexablePublicSite(catalog);
           if (path === "/robots.txt") return new Response(
             indexable
               ? `User-agent: *\nAllow: /\nSitemap: https://${catalog.host}/sitemap.xml\n`
@@ -57,7 +59,8 @@ export const Route = createFileRoute("/published-site/$page")({
           }
           if (!isPublicSitePagePath(path) || !availablePublicSitePaths(catalog).includes(path)) return unavailable(404);
           return new Response(renderPublicSiteHtml(catalog, {
-            path, makeRequestId: () => crypto.randomUUID(),
+            path, makeRequestId: () => crypto.randomUUID(), localPreview,
+            localPreviewSlug: localPreview ? slug : undefined,
           }), { status: 200, headers: indexable ? headers :
             { ...headers, "X-Robots-Tag": "noindex, nofollow" } });
         } catch {
