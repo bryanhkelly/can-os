@@ -25,6 +25,8 @@ describe("approved public school-day projection", () => {
     const actual = projectPublicSchoolDay([schedule], "America/Los_Angeles", now);
     expect(actual.state).toBe("approved");
     expect(actual.days.value).toEqual([0,3]);
+    expect(actual.weeklyPatternState).toBe("approved");
+    expect(actual.weeklyPattern.map(item=>item.dayOfWeek)).toEqual([0,3]);
     expect(actual.startTime.value).toBe("09:00");
     expect(actual.endTime.value).toBe("14:00");
     expect(actual.mode.canDisplay).toBe(false);
@@ -38,6 +40,7 @@ describe("approved public school-day projection", () => {
         "America/Los_Angeles", now);
       expect(actual.state).toBe("pending");
       expect(actual.days.canDisplay).toBe(false);
+      expect(actual.weeklyPattern).toHaveLength(0);
     }
     expect(projectPublicSchoolDay([schedule, schedule], "America/Los_Angeles", now).state)
       .toBe("pending");
@@ -47,8 +50,14 @@ describe("approved public school-day projection", () => {
       p.dayOfWeek===0&&p.type==="instruction"?{...p,endsAtLocal:"12:00"}:p)};
     const reapproved={...changed,approval:{...schedule.approval,
       signature:publicSchoolDayScheduleSignature(changed.periods)}};
-    expect(projectPublicSchoolDay([reapproved],"America/Los_Angeles",now).state)
-      .toBe("pending");
+    const result=projectPublicSchoolDay([reapproved],"America/Los_Angeles",now);
+    expect(result.state).toBe("pending");
+    expect(result.days.canDisplay).toBe(false);
+    expect(result.weeklyPatternState).toBe("approved");
+    expect(result.weeklyPattern).toEqual([
+      {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"12:00",timezone:"America/Los_Angeles"},
+      {dayOfWeek:3,startsAtLocal:"09:00",endsAtLocal:"14:00",timezone:"America/Los_Angeles"},
+    ]);
   });
   it("withdraws schedule claims when reviewed periods have changed", () => {
     const changed={...schedule,periods:[...schedule.periods,{dayOfWeek:6,startsAtLocal:"09:00",endsAtLocal:"14:00",type:"instruction"}]};
