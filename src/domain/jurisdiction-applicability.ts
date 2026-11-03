@@ -131,7 +131,11 @@ export function evaluateSchoolJurisdictionRequirements(
       return result("not_applicable", "Different verified operating model or authority");
     if (scope.localities) {
       if (!school.locality) return result("legal_review_required", "Locality not confirmed");
-      if (!scope.localities.includes(school.locality)) return result("not_applicable", "Different locality");
+      // County is an S-entered draft fact, not a separately geocoded or
+      // government-confirmed locality. A textual mismatch cannot establish
+      // the legal conclusion that the requirement does not apply.
+      if (!scope.localities.includes(school.locality))
+        return result("legal_review_required", "Locality differs from reviewed policy scope; confirm with CAN");
     }
     if (scope.programTypes) {
       if (!school.programType) return result("legal_review_required", "Program type not confirmed");
