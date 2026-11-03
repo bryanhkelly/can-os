@@ -13,6 +13,7 @@ import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-pol
 import { publishPartnerLocalContentWithinTransaction, readLocalContentHistory, readCurrentLocalContent } from "./site-local-content.server";
 import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
 import { deriveChurchBrandProposal } from "@/domain/church-brand-suggestions";
+import { assertChurchSourceEditorialCopy } from "@/domain/church-source-editorial-safety";
 
 /**
  * User-submitted or boundedly fetched public church excerpts, never verified
@@ -72,10 +73,7 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
   const target = suggestionTargetFields[input.field];
   if (!target) throw new Error("This suggestion field needs manual branding review");
   const proposedText = input.text.trim();
-  if (!proposedText || proposedText.length > siteLocalContentLimits[target] ||
-      /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(proposedText)) {
-    throw new Error("The proposed church text is empty, too long or contains control characters");
-  }
+  assertChurchSourceEditorialCopy(proposedText, target);
   const normalizedUrl = normalizeChurchReferenceUrl("website", input.sourcePageUrl);
   return db.transaction(async tx => {
     const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
@@ -193,9 +191,7 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
       }
       const revisedText = input.decision === "edited"
         ? input.editedText?.trim() : proposal.proposedText;
-      if (!revisedText || revisedText.length > siteLocalContentLimits[target]) {
-        throw new Error("Suggestion is empty or exceeds the field limit");
-      }
+      assertChurchSourceEditorialCopy(revisedText, target);
       const history = await readLocalContentHistory(site.id, tx);
       if ((history[0]?.revision ?? 0) !== input.expectedRevision) {
         throw new Error("Website content changed. Refresh and review the new version first.");
@@ -337,7 +333,9 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       const target = suggestionTargetFields[page.sourceField];
       if (!target) return [];
       const proposedText = page.pageText.slice(0, siteLocalContentLimits[target]).trim();
-      return proposedText ? [{
+      try { assertChurchSourceEditorialCopy(proposedText, target); }
+      catch { return []; }
+      return [{
         siteId: checked.id,
         sourceReferenceId: reference.id,
         field: page.sourceField,
