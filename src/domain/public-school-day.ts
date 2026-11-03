@@ -147,7 +147,6 @@ export function projectPublicSchoolDay(
   const day = `${parts.year}-${parts.month}-${parts.day}`;
   const candidates = schedules.filter(schedule =>
     schedule.schoolYearStatus === "active" && schedule.templateActive &&
-    schedule.programMatches && schedule.siteMatches && schedule.timezoneMatches &&
     schedule.startsOn <= day && schedule.endsOn >= day &&
     schedule.effectiveFrom <= day &&
     (!schedule.effectiveThrough || schedule.effectiveThrough >= day));
@@ -155,6 +154,7 @@ export function projectPublicSchoolDay(
   // the public projection ambiguous. Never ignore it just because it lacks approval.
   if(candidates.length!==1)return pending();
   const eligible = candidates.filter(schedule =>
+    schedule.programMatches && schedule.siteMatches && schedule.timezoneMatches &&
     schedule.approval?.status === "approved" &&
     Boolean(schedule.approval.reviewedByPersonId) &&
     Number.isSafeInteger(schedule.approval.revision) &&
