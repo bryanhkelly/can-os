@@ -177,13 +177,14 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
     {!enrollmentWarning&&visibleEnrollmentApplications.length>0&&<div className="mt-4 grid gap-3">
      {visibleEnrollmentApplications.map(app=>{
       const active=app.offers.find(o=>o.enrollmentActive);
-      const issued=app.offers.find(o=>o.status==="issued");
+      const issued=app.offers.find(o=>o.status==="issued"&&o.progress.canAccept);
       const accepted=app.offers.find(o=>o.status==="accepted");
       const next=active?"Enrollment is active. Review first-day preparation and student access.":
        accepted?"Your offer is accepted. The school is completing enrollment and class placement.":
        issued?"An enrollment offer is ready for your decision.":
        app.waitlisted?"Your application is on the waitlist. Contact admissions for an update.":
-       app.blockers.length>0?"Review the outstanding enrollment requirements.":
+       app.blockers.length>0||app.offers.some(o=>o.progress.state==="requirements_pending")
+         ?"Review the outstanding enrollment requirements before accepting an offer.":
        "Your application is with the school. Review its status and any requested steps.";
       return <article key={app.applicationId} className="rounded-xl border p-4">
        <p className="font-semibold">{app.studentName} <span className="font-normal text-muted-foreground">· {app.program}</span></p>
