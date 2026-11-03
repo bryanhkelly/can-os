@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { churchContentSuggestions, churchSourceReferences } from "@/db/schema";
+import { churchContentSuggestions, churchSourceReferences, sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
   type ChurchSuggestionField, normalizeChurchReferenceUrl, churchSuggestionTargetFields,
@@ -10,7 +10,7 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
-import { publishPartnerLocalContent, readLocalContentHistory, readCurrentLocalContent } from "./site-local-content.server";
+import { publishPartnerLocalContentWithinTransaction, readLocalContentHistory, readCurrentLocalContent } from "./site-local-content.server";
 import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
 
 /**
@@ -108,91 +108,118 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
   });
 }
 
+
 /**
- * Publication MUST pass through the same canonical versioned editor command.
- * The follow-up decision write is separate; if it fails, publication state is
- * canonical and the proposal remains pending for reconciliation.
+ * A source-derived review is ONE transaction: canonical Site-publication lock,
+ * source lock, proposal lock, then versioned church-content publish and the
+ * proposal decision/audit/outbox. No nested publisher transaction.
+ *
+ * Lock order is Site-publication -> church source -> suggestion -> local
+ * content version. Source save/revoke take only the source lock and never
+ * subsequently request the Site-publication lock.
  */
 export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
   suggestionId: string; decision: "accepted"|"edited"|"discarded";
   editedText?: string; expectedRevision?: number; rightsConfirmed?: boolean;
 }) {
-  const site = await requirePartnerWebsiteEditor(actor, db, siteWebsiteLocalPublishCapability);
-  const [proposal] = await db.select({
-    id: churchContentSuggestions.id, siteId: churchContentSuggestions.siteId,
-    field: churchContentSuggestions.field, proposedText: churchContentSuggestions.proposedText,
-    decision: churchContentSuggestions.reviewDecision,
-    sourceReferenceId: churchContentSuggestions.sourceReferenceId,
-    revokedAt: churchSourceReferences.revokedAt,
-  }).from(churchContentSuggestions).innerJoin(churchSourceReferences,
-    eq(churchSourceReferences.id, churchContentSuggestions.sourceReferenceId))
-    .where(and(eq(churchContentSuggestions.id, input.suggestionId),
+  return db.transaction(async tx => {
+    const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
+    // This is the canonical local-content revision serialization lock. Take
+    // it before the lower-level source lock for deterministic concurrency.
+    const [publicationAddress] = await tx.select({ id: sitePublications.siteId })
+      .from(sitePublications).where(eq(sitePublications.siteId, site.id))
+      .for("update").limit(1);
+    if (!publicationAddress && input.decision !== "discarded") {
+      throw new Error("Reserve a Site public address before reviewing website copy");
+    }
+
+    // Read the source ID without a lock only to determine the next lock key.
+    // Re-read and validate the entire proposal after both locks are held.
+    const [identity] = await tx.select({
+      sourceReferenceId: churchContentSuggestions.sourceReferenceId,
+    }).from(churchContentSuggestions).where(and(
+      eq(churchContentSuggestions.id, input.suggestionId),
       eq(churchContentSuggestions.siteId, site.id),
-      eq(churchSourceReferences.siteId, site.id))).limit(1);
-  if (!proposal || proposal.revokedAt || proposal.decision !== "pending") {
-    throw new Error("Suggestion is not pending or its source is no longer active");
-  }
-  let publication: Awaited<ReturnType<typeof publishPartnerLocalContent>> | null = null;
-  if (input.decision !== "discarded") {
-    if (input.rightsConfirmed !== true) {
-      throw new Error("Confirm your church has the rights to publish the selected text");
-    }
-    const target = suggestionTargetFields[proposal.field];
-    if (!target) throw new Error("This suggestion needs a manual branding review");
-    if (input.expectedRevision === undefined || !Number.isSafeInteger(input.expectedRevision)) {
-      throw new Error("Current website revision is required");
-    }
-    const revisedText = input.decision === "edited" ? input.editedText?.trim() : proposal.proposedText;
-    if (!revisedText || revisedText.length > siteLocalContentLimits[target]) {
-      throw new Error("Suggestion is empty or exceeds the field limit");
-    }
-    const history = await readLocalContentHistory(site.id);
-    if ((history[0]?.revision ?? 0) !== input.expectedRevision) {
-      throw new Error("Website content changed. Refresh and review the new version first.");
-    }
-    const current = history[0]?.content ?? emptySiteLocalContent;
-    // The canonical write checks revision again inside its Site transaction,
-    // and screens the complete merged content for protected claims/markup.
-    publication = await publishPartnerLocalContent(actor, {
-      operation: "save", expectedRevision: input.expectedRevision,
-      content: { ...current, [target]: revisedText },
-    });
-  }
-  await db.transaction(async tx => {
-    const checked = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
-    const [pending] = await tx.select().from(churchContentSuggestions)
+    )).limit(1);
+    if (!identity) throw new Error("Church suggestion was not found for this Site");
+
+    const [source] = await tx.select().from(churchSourceReferences)
+      .where(and(eq(churchSourceReferences.id, identity.sourceReferenceId),
+        eq(churchSourceReferences.siteId, site.id)))
+      .for("update").limit(1);
+    const [proposal] = await tx.select().from(churchContentSuggestions)
       .where(and(eq(churchContentSuggestions.id, input.suggestionId),
-        eq(churchContentSuggestions.siteId, checked.id))).for("update").limit(1);
-    const [activeSource] = await tx.select({ revokedAt: churchSourceReferences.revokedAt })
-      .from(churchSourceReferences)
-      .where(and(eq(churchSourceReferences.id, proposal.sourceReferenceId),
-        eq(churchSourceReferences.siteId, checked.id))).limit(1);
-    if (!pending || pending.reviewDecision !== "pending" || !activeSource || activeSource.revokedAt) {
-      throw new Error("Suggestion was reviewed or its source was removed; refresh");
+        eq(churchContentSuggestions.siteId, site.id)))
+      .for("update").limit(1);
+    if (!source || source.revokedAt || !proposal ||
+        proposal.sourceReferenceId !== source.id) {
+      throw new Error("Church suggestion source was removed or changed; refresh before reviewing");
     }
+    if (proposal.reviewDecision !== "pending") {
+      if (proposal.reviewDecision === input.decision) {
+        // A retried request cannot create a second revision, audit or event.
+        return { decision: input.decision, publication: null, alreadyReviewed: true };
+      }
+      throw new Error("This church suggestion has already been reviewed; refresh first");
+    }
+
+    let publication: Awaited<ReturnType<typeof publishPartnerLocalContentWithinTransaction>> | null = null;
+    if (input.decision !== "discarded") {
+      if (input.rightsConfirmed !== true) {
+        throw new Error("Confirm your church has the rights to publish the selected text");
+      }
+      const target = suggestionTargetFields[proposal.field];
+      if (!target) throw new Error("This suggestion needs a manual branding review");
+      if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision! < 0) {
+        throw new Error("Current website revision is required");
+      }
+      const revisedText = input.decision === "edited"
+        ? input.editedText?.trim() : proposal.proposedText;
+      if (!revisedText || revisedText.length > siteLocalContentLimits[target]) {
+        throw new Error("Suggestion is empty or exceeds the field limit");
+      }
+      const history = await readLocalContentHistory(site.id, tx);
+      if ((history[0]?.revision ?? 0) !== input.expectedRevision) {
+        throw new Error("Website content changed. Refresh and review the new version first.");
+      }
+      const current = history[0]?.content ?? emptySiteLocalContent;
+      // The same canonical publisher applies normalization, unsafe content
+      // checks, protected-claim review, versioning and audit under this tx.
+      publication = await publishPartnerLocalContentWithinTransaction(actor, {
+        operation: "save", expectedRevision: input.expectedRevision!,
+        content: { ...current, [target]: revisedText },
+      }, tx);
+    }
+
     await tx.update(churchContentSuggestions).set({
       reviewDecision: input.decision, reviewedAt: new Date(),
       reviewedByPersonId: actor.actorPersonId!,
-    }).where(eq(churchContentSuggestions.id, pending.id));
+    }).where(and(eq(churchContentSuggestions.id, proposal.id),
+      eq(churchContentSuggestions.siteId, site.id),
+      eq(churchContentSuggestions.reviewDecision, "pending")));
     await writeAudit(tx, actor, {
       action: "site.website.source_excerpt.reviewed",
-      entityType: "church_content_suggestion", entityId: pending.id,
-      scope: { organizationId: checked.organizationId, siteId: checked.id },
+      entityType: "church_content_suggestion", entityId: proposal.id,
+      scope: { organizationId: site.organizationId, siteId: site.id },
       before: { decision: "pending" },
-      after: { decision: input.decision, publicationRevision: publication?.revision ?? null,
+      after: {
+        decision: input.decision,
+        publicationRevision: publication?.revision ?? null,
         publicationStatus: publication?.status ?? null,
-        rightsConfirmed: input.decision !== "discarded" && input.rightsConfirmed === true },
+        rightsConfirmed: input.decision !== "discarded" && input.rightsConfirmed === true,
+      },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ChurchContentSuggestionReviewed,
-      aggregateType: "church_content_suggestion", aggregateId: pending.id,
-      actorPersonId: actor.actorPersonId, organizationId: checked.organizationId,
-      siteId: checked.id, payload: { decision: input.decision },
+      aggregateType: "church_content_suggestion", aggregateId: proposal.id,
+      actorPersonId: actor.actorPersonId, organizationId: site.organizationId,
+      siteId: site.id, payload: {
+        decision: input.decision, publicationRevision: publication?.revision ?? null,
+      },
     });
+    return { decision: input.decision, publication, alreadyReviewed: false };
   });
-  return { decision: input.decision, publication };
 }
-
 
 /**
  * Explicit, rate-limited website-only refresh. This is opt-in and defaults
