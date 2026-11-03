@@ -141,7 +141,7 @@ describe("Site Admin inheritance and scope", () => {
     expect(rolesAllow(["registrar"], context.role)).toBe(true);
     expect(rolesAllow(["site_admin"], "registrar")).toBe(false);
     expect(rolesAllow(["guardian"], context.role)).toBe(false);
-    expect(getWorkspaceHome(context.role)).toBe("/operations/launch");
+    expect(getWorkspaceHome(context.role)).toBe("/operations");
     expect(getWorkspaceLinks(context.role)).toEqual(getWorkspaceLinks("registrar"));
   });
   it.each([
