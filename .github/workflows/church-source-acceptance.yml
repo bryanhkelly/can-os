@@ -32,6 +32,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Generate TanStack route types and verify compilation
+        run: npm run build
       - name: Typecheck
         run: npm run typecheck
       - name: Source safety and URL unit tests
