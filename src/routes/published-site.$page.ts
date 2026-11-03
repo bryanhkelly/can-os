@@ -42,7 +42,8 @@ export const Route = createFileRoute("/published-site/$page")({
             indexable
               ? `User-agent: *\nAllow: /\nSitemap: https://${catalog.host}/sitemap.xml\n`
               : "User-agent: *\nDisallow: /\n", {
-              status: 200, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+              status: 200, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8",
+                "X-Robots-Tag": indexable ? "index, follow" : "noindex, nofollow" },
             });
           // Synthetic schools are deliberately absent from search discovery.
           if (path === "/sitemap.xml" && !indexable) return unavailable(404);
