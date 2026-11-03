@@ -13,6 +13,20 @@ export type FamilyInterestNextStep = {
   message: string;
 };
 
+/** One eligibility decision drives both registrar CTA and next-step text.
+ * A verified challenge or an existing Application cannot be re-invited. */
+export function canInviteConsentedFamily(input: {
+  status: string; consented: boolean; authorized: boolean;
+  applicationId: string | null; familyStartRequestId: string | null;
+  emailVerifiedAt: Date | null; linkExpiresAt: Date | null;
+}, now: Date = new Date()): boolean {
+  return input.authorized && input.consented && !input.applicationId &&
+    ["new","contacted"].includes(input.status) &&
+    (!input.familyStartRequestId ||
+      (!input.emailVerifiedAt && !!input.linkExpiresAt &&
+        input.linkExpiresAt.getTime() <= now.getTime()));
+}
+
 export function familyInterestNextStep(input: {
   interestStatus: string;
   consented: boolean;
@@ -26,6 +40,13 @@ export function familyInterestNextStep(input: {
   placedInClass: boolean;
   studentAccessStatus: string | null;
 }): FamilyInterestNextStep {
+  // A closed interest must not be reopened by the presence of a stale
+  // invitation. A linked application is independently authoritative.
+  if (!input.hasApplication &&
+    (input.interestStatus === "closed" || input.interestStatus === "converted")) return {
+    state: "closed", owner: "registrar",
+    message: "This interest is closed or converted. Review linked records before any further outreach.",
+  };
   if (input.activeEnrollment) {
     if (!input.placedInClass) return {
       state: "assign_class", owner: "school",
@@ -54,10 +75,6 @@ export function familyInterestNextStep(input: {
       message: "Review the actual application stage, eligibility, requirements and offer decision.",
     };
   }
-  if (input.interestStatus === "closed" || input.interestStatus === "converted") return {
-    state: "closed", owner: "registrar",
-    message: "This interest has been closed or converted. Use linked records for any later family actions.",
-  };
   if (!input.consented) return {
     state: "follow_up", owner: "registrar",
     message: "No affirmative adult contact consent is recorded. Do not initiate unsolicited follow-up.",
