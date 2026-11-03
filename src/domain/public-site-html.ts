@@ -19,6 +19,11 @@ export type PublicSitePage = {
   localContent?: SiteLocalContent | null;
 };
 
+/** A published synthetic school is a demonstration, never an indexed institution. */
+export function isIndexablePublicSite(page: PublicSitePage): boolean {
+  return page.demonstration !== true;
+}
+
 export function escapePublicHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
