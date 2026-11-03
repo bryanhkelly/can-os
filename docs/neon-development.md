@@ -357,6 +357,18 @@ rehearsal branches remain retained, and older migration hash mismatches were
 preserved without rewriting history. See [CURRENT-STATE.md](./CURRENT-STATE.md)
 for the exact branch identities and postflight evidence.
 
+On November 2, 2026, a subsequent authorized rollout applied the sole pending
+additive migration `0063_site_room_lifecycle`; production was already through
+`0062_site_rooms`. Management metadata and database identity were re-attested,
+and the exact migration passed a fresh production-copy rehearsal plus focused
+isolated integration tests before production application. Recovery branch
+`br-tiny-hill-arhe41j8` and rehearsal branch `br-falling-mountain-ar0dql74`
+remain retained. Existing room values and prior migration ledger entries were
+preserved. See the migration 0063 rollout entry in
+[CURRENT-STATE.md](./CURRENT-STATE.md) for source identity and validation results.
+This is not authorization to replay migrations, import sample data or run tests
+against production.
+
 ### Calendar scheduled-occurrence rollout
 
 Migration `0023_panoramic_slapstick` is an **expand** migration, not a cleanup

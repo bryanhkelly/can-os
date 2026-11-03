@@ -1,5 +1,35 @@
 # CAN OS — current implementation snapshot
 
+## Authorized main rollout through migration 0063 (2026-11-02)
+
+- At source commit `4a67f74d60d8079e75f5696f01ab5e8edefc60ef`, the operator
+  authorized committing all local work and migrating the production database.
+  Neon management metadata and database-reported identity independently matched
+  project `sweet-hall-62441909`, default branch `main`
+  (`br-restless-sea-ar9ooo55`), endpoint `ep-autumn-glade-ar9r1t5q`.
+- Production already contained migrations through `0062_site_rooms`. Only
+  `0063_site_room_lifecycle` was pending. A fresh recovery branch
+  `main-pre-0063-recovery-1793673745986` (`br-tiny-hill-arhe41j8`) and isolated
+  rehearsal child `main-0063-rehearsal-1793673745986`
+  (`br-falling-mountain-ar0dql74`) were created and retained.
+- Rehearsal applied the exact committed SQL, verified both new columns and the
+  positive-revision constraint, preserved the existing room's prior values and
+  all 64 existing ledger entries, and exercised revision/retirement writes and
+  invalid-revision rejection with rollback-only probes. The attested isolated
+  room-plan, launch-staffing and program-launch integration files all passed
+  (three tests). No integration fixture ran against production.
+- Production applied only that additive migration in one guarded transaction
+  with bounded lock/statement timeouts. Its new ledger hash is
+  `b1b7f1bf4998f1ab147e49183c58519c1bd70775232f6ae9c2383381ce861651`.
+  Postflight verified the schema and ledger; the one existing room's prior
+  values and all 64 earlier ledger entries were unchanged. No seed, sample-data
+  import or business-record repair was performed.
+- At this source state, typecheck, production build, route inventory
+  (110/110), and 474 unit/component files (3,137 tests) passed. Lint completed
+  with zero errors and 20,930 warnings, including generated Netlify output.
+  These checks and the database rollout do not certify a deployed browser
+  journey, external delivery or general production release readiness.
+
 ## Authorized main demo reconciliation (2026-11-02)
 
 - At source commit `8d4494789241137c0b15ad1350d7b4d595d9b186`, applied only
@@ -886,10 +916,10 @@ deployment or live storage acceptance.
 - Generated additive migration `0063_site_room_lifecycle` adds only `revision`,
   nullable `retired_at` and a positive-revision check. The generated snapshot
   matches those changes and the migration-file/journal chain was checked.
-  **This migration is not applied.** The updated room code requires it before
-  use against a database. Live lifecycle behavior and isolated database
-  integration are unverified; the earlier room-creation browser walkthrough
-  does not accept editing/retirement.
+  It was pending at this working-tree checkpoint; the authorized migration
+  0063 rollout above supersedes that status with isolated integration and
+  production schema evidence. The earlier room-creation browser walkthrough
+  still does not accept live editing/retirement behavior.
 - Watch delivery history and individual-watch history share one allowlisted
   status projection. SMS consent, account email, inactive watch, unsupported
   channel, scheduled retry and terminal failure now identify the next actor
