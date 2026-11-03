@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvedIdentityFacts, sourceDigest } from "./public-parent-identity";
+import { approvedIdentityFacts, publicIdentityReviewStatuses, sourceDigest } from "./public-parent-identity";
 
 const siteId="c5831f4e-d62a-4d70-a810-2f8695293a23";
 const now=new Date("2026-11-03T18:00:00.000Z");
@@ -37,6 +37,35 @@ describe("public parent Site identity independent approval gate",()=>{
     expect(projected.publicAddress?.revision).toBe(3);
     expect(projected.publicContact?.value).toContain("admissions@example.edu");
     expect(JSON.stringify(projected)).not.toContain("reviewedByPersonId");
+  });
+  it("requires a finite valid approval expiry, including for historical metadata",()=>{
+    const noExpiry={...current,publicParentIdentityReview:{...approval,expiresOn:null}};
+    expect(approvedIdentityFacts(siteId,address,noExpiry,now)).toEqual({});
+    expect(publicIdentityReviewStatuses(siteId,address,noExpiry,now)).toEqual({
+      address:"expired",contact:"expired",
+    });
+    const futureReview={...current,publicParentIdentityReview:{
+      ...approval,reviewedAt:"2026-12-10T00:00:00.000Z",
+    }};
+    expect(approvedIdentityFacts(siteId,address,futureReview,now)).toEqual({});
+    expect(publicIdentityReviewStatuses(siteId,address,futureReview,now).contact).toBe("expired");
+  });
+  it("distinguishes never reviewed, changed, expired, withdrawn and active approval",()=>{
+    expect(publicIdentityReviewStatuses(siteId,address,null,now).address)
+      .toBe("never_reviewed");
+    expect(publicIdentityReviewStatuses(siteId,address,current,now).contact)
+      .toBe("approved");
+    expect(publicIdentityReviewStatuses(siteId,{...address,street1:"New Road"},current,now).address)
+      .toBe("source_changed");
+    expect(publicIdentityReviewStatuses(siteId,address,{
+      ...current,setupContact:{...contact,email:"new@example.edu"},
+    },now).contact).toBe("source_changed");
+    expect(publicIdentityReviewStatuses(siteId,address,{
+      ...current,publicParentIdentityReview:{...approval,contactDigest:null},
+    },now).contact).toBe("withdrawn");
+    expect(publicIdentityReviewStatuses(siteId,address,{
+      ...current,publicParentIdentityReview:{...approval,expiresOn:"2026-11-01"},
+    },now).address).toBe("expired");
   });
   it("invalidates any changed, expired or revoked source without a refresh flag",()=>{
     expect(approvedIdentityFacts(siteId,{...address,street1:"456 New Street"},current,now)
