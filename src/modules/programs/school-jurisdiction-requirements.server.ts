@@ -2,7 +2,7 @@ import {and,eq} from "drizzle-orm";
 import {db} from "@/db/client";
 import {actions} from "@/db/schema";
 import type {AccessContext} from "@/domain/access-context";
-import type {JurisdictionProfile} from "@/domain/jurisdiction-profile";
+import {isOfficialJurisdictionSource,type JurisdictionProfile} from "@/domain/jurisdiction-profile";
 import type {RequirementDecision} from "@/domain/jurisdiction-applicability";
 import {EventTypes} from "@/domain/event-types";
 import {emitEvent,writeAudit} from "@/platform/mutation";
@@ -35,7 +35,7 @@ export async function reconcileSchoolJurisdictionRequirementActions(
     if(decisionById.get(requirement.id)?.status!=="applicable")continue;
     const officialSources=requirement.evidenceIds.flatMap(url=>{
       const source=sources.get(url);
-      return source?.url.startsWith("https://")?[source]:[];
+      return source && isOfficialJurisdictionSource(source)?[source]:[];
     });
     if(!officialSources.length)continue; // never create a presumed legal obligation without verified evidence
     const prior=current.find(row=>row.metadata.requirementId===requirement.id)??null;
