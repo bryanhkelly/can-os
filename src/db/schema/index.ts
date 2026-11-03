@@ -49,6 +49,7 @@ export * from "./public-admissions-interests";
 export * from "./program-site-authorizations";
 export * from "./site-local-content";
 export * from "./church-source-references";
+export * from "./church-content-suggestions";
 export * from "./public-family-starts";
 export * from "./student-access-consents";
 export * from "./church-onboarding";
