@@ -189,7 +189,7 @@ export async function decideSchoolJurisdictionLegalReview(
         ...policy.profile,summary:policy.summary,evidence:policy.evidence,
       });
       if(!parsed.success)throw new Error("Published policy no longer has valid source-backed requirements");
-      const official=new Set(policy.evidence.flatMap(source=>
+      const official=new Set(parsed.data.evidence.flatMap(source=>
         isOfficialJurisdictionSource(source)
           ? [source.url] : []));
       const cited=[...new Set(input.sourceUrls)];
