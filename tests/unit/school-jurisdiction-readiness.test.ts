@@ -132,6 +132,9 @@ describe("school-specific jurisdiction and funding readiness", () => {
     expect(isCurrentVerifiedJurisdictionProfileVersion({
       ...version,verificationStatus:"unverified",
     },now)).toBe(false);
+    expect(isCurrentVerifiedJurisdictionProfileVersion({
+      ...version,evidence:[],verificationEvidence:{note:version.verificationEvidence.note,sources:[]},
+    },now)).toBe(false);
   });
   it("requires renewed policy review when a future school year starts after the policy review horizon", () => {
     expect(requiresFutureJurisdictionPolicyReview(
