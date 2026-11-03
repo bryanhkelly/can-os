@@ -265,6 +265,30 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
         familyStartRequestId:outcome.requestId,
         contactedAt:current.contactedAt??now,updatedAt:now})
         .where(eq(publicAdmissionsInterests.id,interest.id));
+      // Requesting a verified-email application invitation is a recorded
+      // registrar follow-up. Keep its existing Action synchronized with the
+      // interest rather than showing the same family as untouched in the queue.
+      const followups = await tx.select({id:actions.id,status:actions.status})
+        .from(actions).where(and(
+          eq(actions.type,"public_admissions_interest_followup"),
+          eq(actions.subjectType,"public_admissions_interest"),
+          eq(actions.subjectId,interest.id),
+          eq(actions.organizationId,interest.organizationId),
+          eq(actions.siteId,interest.siteId),
+          eq(actions.programId,interest.programId),
+        )).for("update");
+      for (const followup of followups) {
+        if (["resolved","cancelled","in_progress"].includes(followup.status)) continue;
+        await tx.update(actions).set({status:"in_progress",updatedAt:now})
+          .where(eq(actions.id,followup.id));
+        await writeAudit(tx,actor,{
+          action:"admissions.public_interest.followup_status",
+          entityType:"action",entityId:followup.id,
+          scope:{organizationId:interest.organizationId,siteId:interest.siteId,
+            programId:interest.programId},
+          before:{status:followup.status},after:{status:"in_progress"},
+        });
+      }
       await writeAudit(tx,actor,{action:"admissions.public_interest.family_start_invite",
         entityType:"public_admissions_interest",entityId:interest.id,
         scope:{organizationId:interest.organizationId,siteId:interest.siteId,programId:interest.programId},
