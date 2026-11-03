@@ -1,10 +1,33 @@
 import { z } from "zod";
 
+/** An HTTPS source is not necessarily government-issued guidance. Non-.gov
+ * official agency hosts need an explicit independently reviewed attribution. */
+export function isOfficialJurisdictionSource(source:{
+  url:string;authority:string;checkedAt:string;
+  officialAuthorityVerified?:boolean;officialAuthorityVerificationNote?:string;
+}):boolean {
+  let url:URL;
+  try {url=new URL(source.url);} catch {return false;}
+  if(url.protocol!=="https:"||url.username||url.password||
+    !url.hostname||url.hostname==="localhost")return false;
+  const governmentHost=url.hostname.toLowerCase().endsWith(".gov");
+  const externallyAttested=source.officialAuthorityVerified===true &&
+    typeof source.officialAuthorityVerificationNote==="string" &&
+    source.officialAuthorityVerificationNote.trim().length>=25;
+  return Boolean(source.authority.trim()) &&
+    Number.isFinite(Date.parse(source.checkedAt)) &&
+    (governmentHost||externallyAttested);
+}
+
+
 const evidenceSchema = z.object({
   title: z.string().min(1),
   url: z.string().url(),
   authority: z.string().min(1),
   checkedAt: z.string().datetime(),
+  // Current separately reviewed agency source attribution for non-.gov hosts.
+  officialAuthorityVerified:z.boolean().optional(),
+  officialAuthorityVerificationNote:z.string().trim().min(25).optional(),
 });
 /** Optional scoping metadata; absent dimensions require school-specific legal review,
  * never an assumption that every school in a state is covered. */
@@ -77,7 +100,11 @@ export function isJurisdictionProfileVerificationEvidenceCurrent(
     if(!item||typeof item!=="object"||!source||typeof source!=="object")return false;
     const attested=item as Record<string,unknown>;
     const current=source as Record<string,unknown>;
-    return ["title","url","authority","checkedAt"].every(key=>attested[key]===current[key]);
+    return ["title","url","authority","checkedAt",
+      "officialAuthorityVerified","officialAuthorityVerificationNote"].every(key=>
+      attested[key]===current[key]) && isOfficialJurisdictionSource(
+        current as {url:string;authority:string;checkedAt:string;
+          officialAuthorityVerified?:boolean;officialAuthorityVerificationNote?:string});
   });
 }
 
