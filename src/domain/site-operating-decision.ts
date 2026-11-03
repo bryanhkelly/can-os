@@ -47,7 +47,8 @@ export function deriveSiteOperatingDecision(input: {
   });
   // A registrar may not receive local opening states. A missing projection is
   // unknown, not a tacit approval. Zero visible programs is also unknown.
-  if (!input.programIds.length || !input.openings.length)
+  if (!input.programIds.length || !input.openings.length ||
+      input.programIds.some(programId => !input.openings.some(opening => opening.programId === programId)))
     return decision("opening_unverified", "Opening authorization not verified",
       "This workspace cannot verify an independent opening approval for the visible school. An active academic program is not permission to receive children.",
       "Church registrar and CAN opening officer", "Confirm opening authorization", "#school-day-operating-decision");
