@@ -1,23 +1,36 @@
-import { useRouter } from "@tanstack/react-router";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { listJurisdictionProfileReviews,saveJurisdictionProfileReview,publishJurisdictionProfile } from "@/modules/programs/jurisdiction-profile.functions";
+import { listJurisdictionProfileReviews, saveJurisdictionProfileReview, publishJurisdictionProfile } from "@/modules/programs/jurisdiction-profile.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { WorkspaceShell } from "@/components/workspace";
+import { ActionDialog, EmptyState, MutationFeedback, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 
 export const Route=createFileRoute("/operations/jurisdiction-profiles")({
  loader:()=>safeLoader(()=>listJurisdictionProfileReviews())(),
  component:ReviewPage,
 });
+function utcInputValue(value:string){
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?"":date.toISOString().slice(0,16);
+}
+function utcIsoValue(value:string){
+ return value?new Date(`${value}:00.000Z`).toISOString():"";
+}
 function ReviewPage(){
  const result=Route.useLoaderData();
  if(!result.ok)return <LoaderFailure title="Jurisdiction profiles" eyebrow="CAN OS · Policy review" outcome={result}/>;
- return <WorkspaceShell title="Jurisdiction profiles">
+ return <WorkspaceShell eyebrow="CAN OS · Policy review" title="Jurisdiction profiles"
+  subtitle="Review state operating models, funding, requirements and official sources before publishing guidance. Publication does not authorize a school to open.">
   <div className="space-y-5">
-   <WorkflowIntro eyebrow="CAN OS · Policy review" title="Jurisdiction profiles" description="Review state operating models, funding, requirements and official sources before publishing guidance. Publication does not authorize a school to open." />
-   {result.data.length===0?<p>No jurisdiction profiles have been prepared.</p>:result.data.map(item=><ReviewEditor key={item.id} item={item}/>)}
+   {result.data.length===0
+    ?<EmptyState title="No jurisdiction profiles are ready for review." description="Profiles will appear here after they have been prepared for editorial review."/>
+    :result.data.map(item=><ReviewEditor key={item.id} item={item}/>)}
   </div>
  </WorkspaceShell>;
 }
@@ -33,79 +46,101 @@ function ReviewEditor({item}:{item:Item}){
  function editSource(index:number,field:"title"|"url"|"authority"|"checkedAt",value:string){
   setSources(previous=>previous.map((source,i)=>i===index?{...source,[field]:value}:source));
  }
- const [message,setMessage]=useState("");
- const [saving,setSaving]=useState(false);
+ const [publishDialogOpen,setPublishDialogOpen]=useState(false);
+ const mutation=useMutationFeedback(()=>router.invalidate());
+ const busy=mutation.pending||mutation.refreshFailed;
  const editable=item.status==="draft"||item.status==="in_review";
+ function saveReview(){
+  const parsedProfile={...profile,summary};
+  return saveJurisdictionProfileReview({data:{id:item.id,title,summary,profile:parsedProfile,evidence:sources}});
+ }
  async function save(){
-  setSaving(true);setMessage("");
-  try{
-   const parsedProfile={...profile,summary};
-   const parsedEvidence=sources;
-   if(!parsedProfile||Array.isArray(parsedProfile)||typeof parsedProfile!=="object")throw Error("Profile must be a JSON object");
-
-   await saveJurisdictionProfileReview({data:{id:item.id,title,summary,profile:parsedProfile,evidence:parsedEvidence}});
-   setMessage("Review saved. This content is not published.");
-   await router.invalidate();
-  }catch(error){setMessage(error instanceof Error?error.message:"Unable to save review");}
-  finally{setSaving(false);}
+  await mutation.run(saveReview,{
+   successMessage:"Review saved. This content is not published.",
+   commandErrorMessage:"Unable to save jurisdiction profile review.",
+   refreshErrorMessage:"The review was saved, but the profile could not be refreshed. Retry refresh before continuing.",
+  });
  }
  async function publish(){
-  if(!window.confirm("Publish this state profile as verified guidance? Confirm all sources and requirements have been reviewed."))return;
-  setSaving(true);setMessage("");
-  try{await saveJurisdictionProfileReview({data:{id:item.id,title,summary,profile:{...profile,summary},evidence:sources}});await publishJurisdictionProfile({data:{id:item.id}});setMessage("Saved and published. The state guidance is now available during launch.");await router.invalidate();}
-  catch(error){setMessage(error instanceof Error?error.message:"Unable to publish");}
-  finally{setSaving(false);}
+  const saved=await mutation.run(saveReview,{
+   successMessage:"Review saved and refreshed. Publishing the reviewed profile.",
+   commandErrorMessage:"Unable to save the profile review; it was not published.",
+   refreshErrorMessage:"The review was saved, but the profile could not be refreshed. Retry refresh before publishing.",
+  });
+  if(saved.status!=="saved"){
+   if(saved.status!=="duplicate")setPublishDialogOpen(false);
+   return;
+  }
+  const published=await mutation.run(()=>publishJurisdictionProfile({data:{id:item.id}}),{
+   successMessage:"Saved and published. The state guidance is now available during launch.",
+   commandErrorMessage:"The review was saved, but the profile could not be published.",
+   refreshErrorMessage:"The profile was published, but current review status could not be loaded. Retry refresh before continuing.",
+  });
+  if(published.status!=="duplicate")setPublishDialogOpen(false);
  }
  return <details className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
   <summary className="cursor-pointer font-serif text-lg font-semibold">{item.name} · {item.revision} · {item.status} · {item.verificationStatus}</summary>
   <div className="mt-4 space-y-3">
-   <label className="block text-sm">Title<input className="mt-1 w-full rounded border bg-background p-2" value={title} disabled={!editable} onChange={e=>setTitle(e.target.value)}/></label>
-   <label className="block text-sm">Summary<textarea className="mt-1 w-full rounded border bg-background p-2" rows={3} value={summary} disabled={!editable} onChange={e=>setSummary(e.target.value)}/></label>
+   <Field label="Title"><Input value={title} disabled={!editable||busy} onChange={e=>setTitle(e.target.value)}/></Field>
+   <Field label="Summary"><Textarea rows={3} value={summary} disabled={!editable||busy} onChange={e=>setSummary(e.target.value)}/></Field>
    <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
-    <div className="flex items-center justify-between"><h3 className="font-semibold">Operating models</h3>{editable&&<button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>setProfile(v=>({...v,operatingModels:[...models,""]}))}>Add model</button>}</div>
+    <div className="flex items-center justify-between"><h3 className="font-semibold">Operating models</h3>{editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,operatingModels:[...models,""]}))}>Add model</Button>}</div>
     {models.length===0&&<p className="text-sm text-muted-foreground">Add applicable models after researching state rules.</p>}
-    {models.map((model,i)=><div key={i} className="flex gap-2"><input aria-label={`Operating model ${i+1}`} className="w-full rounded-lg border bg-background p-2 text-sm" disabled={!editable} value={model} onChange={e=>setProfile(v=>({...v,operatingModels:models.map((x,j)=>i===j?e.target.value:x)}))}/>{editable&&<button type="button" className="text-sm underline" onClick={()=>setProfile(v=>({...v,operatingModels:models.filter((_,j)=>i!==j)}))}>Remove</button>}</div>)}
+    {models.map((model,i)=><div key={i} className="flex items-end gap-2"><Field label={`Operating model ${i+1}`} className="flex-1"><Input disabled={!editable||busy} value={model} onChange={e=>setProfile(v=>({...v,operatingModels:models.map((x,j)=>i===j?e.target.value:x)}))}/></Field>{editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,operatingModels:models.filter((_,j)=>i!==j)}))}>Remove</Button>}</div>)}
    </section>
    <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
-    <div className="flex items-center justify-between"><h3 className="font-semibold">Funding programs</h3>{editable&&<button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>setProfile(v=>({...v,fundingPrograms:[...(Array.isArray(v.fundingPrograms)?v.fundingPrograms:[]),{id:crypto.randomUUID(),name:"",summary:"",eligibilityStatus:"unknown",evidenceIds:[]}]}))}>Add funding program</button>}</div>
+    <div className="flex items-center justify-between"><h3 className="font-semibold">Funding programs</h3>{editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,fundingPrograms:[...(Array.isArray(v.fundingPrograms)?v.fundingPrograms:[]),{id:crypto.randomUUID(),name:"",summary:"",eligibilityStatus:"unknown",evidenceIds:[]}]}))}>Add funding program</Button>}</div>
     {(Array.isArray(profile.fundingPrograms)?profile.fundingPrograms:[]).map((entry:unknown,i:number)=>{
      const program=entry as {id:string;name:string;summary:string;eligibilityStatus:string;evidenceIds:string[]};
      const update=(patch:Partial<typeof program>)=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).map((p,j)=>i===j?{...p,...patch}:p)}));
      return <div key={program.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
-      <label className="text-sm">Program name<input className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.name} onChange={e=>update({name:e.target.value})}/></label>
-      <label className="text-sm">Eligibility status<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.eligibilityStatus} onChange={e=>update({eligibilityStatus:e.target.value})}>{["unknown","under_review","conditional","verified"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></label>
-      <label className="text-sm sm:col-span-2">Program summary<textarea className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.summary} onChange={e=>update({summary:e.target.value})}/></label>
-      <label className="text-sm sm:col-span-2">Supporting official source<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={program.evidenceIds?.[0]??""} onChange={e=>update({evidenceIds:e.target.value?[e.target.value]:[]})}><option value="">Not linked yet</option>{sources.map(source=><option key={source.url} value={source.url}>{source.title||source.url}</option>)}</select></label>
-      {editable&&<button type="button" className="text-left text-sm underline" onClick={()=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).filter((_,j)=>i!==j)}))}>Remove program</button>}
+      <Field label="Program name"><Input disabled={!editable||busy} value={program.name} onChange={e=>update({name:e.target.value})}/></Field>
+      <Field label="Eligibility status"><Select disabled={!editable||busy} value={program.eligibilityStatus} onChange={e=>update({eligibilityStatus:e.target.value})}>{["unknown","under_review","conditional","verified"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</Select></Field>
+      <Field label="Program summary" className="sm:col-span-2"><Textarea disabled={!editable||busy} value={program.summary} onChange={e=>update({summary:e.target.value})}/></Field>
+      <Field label="Supporting official source" className="sm:col-span-2"><Select disabled={!editable||busy} value={program.evidenceIds?.[0]??""} onChange={e=>update({evidenceIds:e.target.value?[e.target.value]:[]})}><option value="">Not linked yet</option>{sources.map(source=><option key={source.url} value={source.url}>{source.title||source.url}</option>)}</Select></Field>
+      {editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} className="justify-self-start" onClick={()=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).filter((_,j)=>i!==j)}))}>Remove program</Button>}
      </div>;
     })}
    </section>
    <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
-    <div className="flex items-center justify-between"><h3 className="font-semibold">Requirements & responsibilities</h3>{editable&&<button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>setProfile(v=>({...v,requirements:[...(Array.isArray(v.requirements)?v.requirements:[]),{id:crypto.randomUUID(),title:"",description:"",responsibleParty:"church",phase:"before_opening",evidenceIds:[]}]}))}>Add requirement</button>}</div>
+    <div className="flex items-center justify-between"><h3 className="font-semibold">Requirements & responsibilities</h3>{editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,requirements:[...(Array.isArray(v.requirements)?v.requirements:[]),{id:crypto.randomUUID(),title:"",description:"",responsibleParty:"church",phase:"before_opening",evidenceIds:[]}]}))}>Add requirement</Button>}</div>
     {(Array.isArray(profile.requirements)?profile.requirements:[]).map((entry:unknown,i:number)=>{
      const requirement=entry as {id:string;title:string;description:string;responsibleParty:string;phase:string;evidenceIds:string[]};
      const update=(patch:Partial<typeof requirement>)=>setProfile(v=>({...v,requirements:(v.requirements as typeof requirement[]).map((r,j)=>i===j?{...r,...patch}:r)}));
      return <div key={requirement.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
-      <label className="text-sm sm:col-span-2">Requirement<input className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.title} onChange={e=>update({title:e.target.value})}/></label>
-      <label className="text-sm">Responsible party<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.responsibleParty} onChange={e=>update({responsibleParty:e.target.value})}>{["can","church","family"].map(s=><option key={s} value={s}>{s.toUpperCase()}</option>)}</select></label>
-      <label className="text-sm">When needed<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.phase} onChange={e=>update({phase:e.target.value})}>{["before_opening","before_enrollment","follow_up"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</select></label>
-      <label className="text-sm sm:col-span-2">Description<textarea className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.description} onChange={e=>update({description:e.target.value})}/></label>
-      <label className="text-sm sm:col-span-2">Supporting source<select className="mt-1 w-full rounded-lg border bg-background p-2" disabled={!editable} value={requirement.evidenceIds[0]??""} onChange={e=>update({evidenceIds:e.target.value?[e.target.value]:[]})}><option value="">Not linked yet</option>{sources.map(source=><option key={source.url} value={source.url}>{source.title||source.url}</option>)}</select></label>
-      {editable&&<button type="button" className="text-left text-sm underline" onClick={()=>setProfile(v=>({...v,requirements:(v.requirements as typeof requirement[]).filter((_,j)=>i!==j)}))}>Remove requirement</button>}
+      <Field label="Requirement" className="sm:col-span-2"><Input disabled={!editable||busy} value={requirement.title} onChange={e=>update({title:e.target.value})}/></Field>
+      <Field label="Responsible party"><Select disabled={!editable||busy} value={requirement.responsibleParty} onChange={e=>update({responsibleParty:e.target.value})}>{["can","church","family"].map(s=><option key={s} value={s}>{s.toUpperCase()}</option>)}</Select></Field>
+      <Field label="When needed"><Select disabled={!editable||busy} value={requirement.phase} onChange={e=>update({phase:e.target.value})}>{["before_opening","before_enrollment","follow_up"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</Select></Field>
+      <Field label="Description" className="sm:col-span-2"><Textarea disabled={!editable||busy} value={requirement.description} onChange={e=>update({description:e.target.value})}/></Field>
+      <Field label="Supporting source" className="sm:col-span-2"><Select disabled={!editable||busy} value={requirement.evidenceIds[0]??""} onChange={e=>update({evidenceIds:e.target.value?[e.target.value]:[]})}><option value="">Not linked yet</option>{sources.map(source=><option key={source.url} value={source.url}>{source.title||source.url}</option>)}</Select></Field>
+      {editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} className="justify-self-start" onClick={()=>setProfile(v=>({...v,requirements:(v.requirements as typeof requirement[]).filter((_,j)=>i!==j)}))}>Remove requirement</Button>}
      </div>;
     })}
    </section>
    <section className="space-y-3" aria-label="Evidence sources">
     <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Official source evidence</h3>
-     {editable&&<button type="button" className="rounded border px-3 py-1 text-sm" onClick={()=>setSources(previous=>[...previous,{title:"",url:"",authority:"",checkedAt:new Date().toISOString()}])}>Add source</button>}</div>
+     {editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setSources(previous=>[...previous,{title:"",url:"",authority:"",checkedAt:new Date().toISOString()}])}>Add source</Button>}</div>
     {sources.length===0&&<p className="text-sm text-muted-foreground">No sources yet. Add an official reference before publishing.</p>}
     {sources.map((source,i)=><div key={i} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
-     {(["title","url","authority","checkedAt"] as const).map(field=><label key={field} className="text-xs capitalize">{field==="checkedAt"?"Checked at (ISO date/time)":field}
-      <input className="mt-1 w-full rounded border bg-background p-2 text-sm" value={source[field]} disabled={!editable} onChange={e=>editSource(i,field,e.target.value)} placeholder={field==="url"?"https://...":undefined}/></label>)}
-     {editable&&<button type="button" className="text-left text-xs underline" onClick={()=>setSources(previous=>previous.filter((_,index)=>index!==i))}>Remove source</button>}
+     {(["title","url","authority","checkedAt"] as const).map(field=><Field key={field} label={field==="checkedAt"?"Checked at (UTC)":field}>
+      <Input type={field==="url"?"url":field==="checkedAt"?"datetime-local":"text"}
+       value={field==="checkedAt"?utcInputValue(source.checkedAt):source[field]}
+       disabled={!editable||busy}
+       onChange={e=>editSource(i,field,field==="checkedAt"?utcIsoValue(e.target.value):e.target.value)}
+       placeholder={field==="url"?"https://...":undefined}/>
+     </Field>)}
+     {editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} className="justify-self-start" onClick={()=>setSources(previous=>previous.filter((_,index)=>index!==i))}>Remove source</Button>}
     </div>)}
    </section>
-   <div className="flex items-center gap-3"><button type="button" disabled={!editable||saving} onClick={save} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving?"Saving…":"Save review"}</button>{item.status==="in_review"&&<button type="button" disabled={saving} onClick={publish} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Publish reviewed profile</button>}<p role="status" className="text-sm">{message}</p></div>
+   <div className="flex flex-wrap items-center gap-3">
+    <Button type="button" variant="outline" disabled={!editable||busy} onClick={()=>void save()}>{mutation.pending?"Saving…":"Save review"}</Button>
+    {item.status==="in_review"&&<Button type="button" disabled={busy} onClick={()=>setPublishDialogOpen(true)}>Publish reviewed profile</Button>}
+   </div>
+   <MutationFeedback state={mutation} pendingMessage="Saving jurisdiction profile review."/>
   </div>
+  <ActionDialog open={publishDialogOpen} title="Publish jurisdiction profile?"
+   description="Confirm that the official sources, requirements, and responsibilities have been reviewed. Published guidance does not authorize a school to open."
+   confirmLabel="Publish profile" pending={mutation.pending} confirmDisabled={mutation.refreshFailed}
+   onConfirm={()=>void publish()} onClose={()=>setPublishDialogOpen(false)}/>
  </details>;
 }

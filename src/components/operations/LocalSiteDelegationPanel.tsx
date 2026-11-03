@@ -7,6 +7,8 @@ import {
   localSiteDelegationsQuery, siteStaffingKeys, siteStaffingMutationOptions, refreshSiteStaffing,
 } from "@/modules/operations/site-staffing.queries";
 import { localResponsibilityRoles, type LocalResponsibility } from "@/domain/site-local-delegation-policy";
+import { AppointmentExpiryField } from "./AppointmentExpiryField";
+import { appointmentExpiryToIso } from "./appointment-expiry";
 
 const assignments = [
   { key: "site_director", title: "Local Site director",
@@ -62,7 +64,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
         programId, responsibility: key, action,
         expectedAssignmentId: current?.id ?? null,
         ...(action === "appoint" && personId && through ? {
-          personId, validThrough: new Date(through + "T23:59:59Z").toISOString(),
+          personId, validThrough: appointmentExpiryToIso(through),
         } : {}),
       });
     } catch {
@@ -122,14 +124,9 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
                 </option>)}
               </select>
             </label>
-            <label className="mt-3 block text-sm">
-              Responsibility expires
-              <input type="date" disabled={busy} value={expirations[item.key] ?? ""}
-                onChange={e => setExpirations(old => ({ ...old, [item.key]: e.target.value }))}
-                min={new Date().toISOString().slice(0, 10)}
-                max={new Date(Date.now() + 89 * 86400_000).toISOString().slice(0, 10)}
-                className="mt-1 w-full rounded border bg-background p-2" />
-            </label>
+            <div className="mt-3"><AppointmentExpiryField label="Responsibility expires" disabled={busy}
+              value={expirations[item.key] ?? ""}
+              onChange={value => setExpirations(old => ({ ...old, [item.key]: value }))}/></div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" disabled={busy || !selections[item.key] || !expirations[item.key]}
                 onClick={() => void change(item.key, "appoint")}

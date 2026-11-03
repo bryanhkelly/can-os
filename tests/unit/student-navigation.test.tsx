@@ -36,6 +36,14 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 vi.mock("@/modules/student-experience/assignments.functions", () => ({
   getAssignments: vi.fn(), saveAssignmentResponse: vi.fn(), saveAssignmentDraft: vi.fn(),
 }));
+vi.mock("@/modules/identity/workspace-session.functions", () => ({
+  getWorkspaceSession: vi.fn(),
+}));
+vi.mock("@/components/shell/WorkspaceSession", async original => ({
+  ...await original<typeof import("@/components/shell/WorkspaceSession")>(),
+  useStudentDisplayPreferences: () => defaultStudentDisplayPreferences,
+}));
+import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
 vi.mock("@/modules/learning/submission-annotations.functions",()=>({getSubmissionAnnotations:vi.fn(),addSubmissionAnnotation:vi.fn()}));
 vi.mock("@/modules/learning/class-communication.functions",()=>({startAssignmentConversation:vi.fn()}));
 vi.mock("@/modules/learning/submission-attachments.functions", () => ({

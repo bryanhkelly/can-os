@@ -7,7 +7,7 @@ import {useState} from "react";
 import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
 import {Link,useRouter} from "@tanstack/react-router";
 import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,setLaunchSectionCredits,declineLaunchClassRequest} from "@/modules/programs/launch-academics.functions";
-import {WorkspaceShell} from "@/components/workspace";
+import {WorkspaceNotice,WorkspaceShell} from "@/components/workspace";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import { LocalSiteDelegationPanel } from "@/components/operations/LocalSiteDelegationPanel";
@@ -67,10 +67,10 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   actions={<Button asChild variant="outline" size="sm">
    <Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
   </Button>}>
-  {error&&<p role="alert" className="mt-5 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+  {error&&<WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<Button type="button" variant="outline" className="mt-3"
    disabled={mutation.isSubmitting} onClick={()=>void retryRefresh()}>Retry saved setup refresh</Button>}
-  {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+  {notice&&<WorkspaceNotice tone="success" className="mt-5">{notice}</WorkspaceNotice>}
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    <StatCard label="School years" value={data.years.length}/>
    <StatCard label="Published course versions" value={data.catalog.length}/>
@@ -82,10 +82,11 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       Your curriculum determines which CAN Academy instructors are suggested. Review teachers by course
       or request a specific class assignment after you complete school setup. A request does not appoint an instructor.
     </p>
-    <Link to="/operations/teacher-marketplace" search={{programId:data.program.id}}
-      className="mt-3 inline-flex rounded-lg border px-4 py-2 text-sm font-semibold underline">
+    <Button asChild variant="outline" className="mt-3">
+     <Link to="/operations/teacher-marketplace" search={{programId:data.program.id}}>
       Browse CAN teachers for this school's curriculum
-    </Link>
+     </Link>
+    </Button>
   </section>
   <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
@@ -139,7 +140,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <h3 className="font-semibold">Get your instructor assigned</h3>
    <p className="mt-2">Request an instructor for {data.program.name} from your CAN academic staffing administrator. Include the planned course and term. A local website or registrar invitation does not appoint a CAN teacher.</p>
 
-   <button type="button" disabled={busy} onClick={()=>void router.invalidate()} className="mt-3 rounded border px-3 py-2">Refresh instructor choices</button>
+   <Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>void router.invalidate()} className="mt-3">Refresh instructor choices</Button>
   </section>}
   <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="teacher-class-requests">
    <h2 id="teacher-class-requests" className="font-serif text-2xl">Teacher class requests</h2>

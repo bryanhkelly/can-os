@@ -135,4 +135,34 @@ describe("site staffing query lifecycle", () => {
     expect(transport.local).toHaveBeenCalledTimes(2);
     expect(value.getQueryState(query.queryKey)?.status).toBe("success");
   });
+
+  it("shares the synchronous command guard across both panels of one Program, not other Programs", async () => {
+    const value = client(), saved = deferred<string>();
+    const first = new MutationObserver(value, siteStaffingMutationOptions(value, "a", () => saved.promise));
+    const otherCommand = vi.fn(async () => "other");
+    const sibling = new MutationObserver(value, siteStaffingMutationOptions(value, "a", otherCommand));
+    const otherProgram = new MutationObserver(value, siteStaffingMutationOptions(value, "b", otherCommand));
+    const saving = first.mutate({});
+    await vi.waitFor(() => expect(first.getCurrentResult().isPending).toBe(true));
+    await expect(sibling.mutate({})).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(otherCommand).not.toHaveBeenCalled();
+    await expect(otherProgram.mutate({})).resolves.toEqual({ result: "other", refreshWarning: null });
+    saved.resolve("saved");
+    await saving;
+  });
+
+  it("blocks new commands after a failed refresh until explicit refresh-only recovery", async () => {
+    const value = client();
+    vi.spyOn(value, "invalidateQueries").mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    const command = vi.fn(async () => "saved");
+    const mutation = new MutationObserver(value, siteStaffingMutationOptions(value, "a", command));
+    expect((await mutation.mutate({})).refreshWarning).toContain("change was saved");
+    const sibling = new MutationObserver(value, siteStaffingMutationOptions(value, "a", command));
+    await expect(sibling.mutate({})).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(command).toHaveBeenCalledOnce();
+    await refreshSiteStaffing(value, "a");
+    expect(command).toHaveBeenCalledOnce();
+    await expect(sibling.mutate({})).resolves.toEqual({ result: "saved", refreshWarning: null });
+    expect(command).toHaveBeenCalledTimes(2);
+  });
 });

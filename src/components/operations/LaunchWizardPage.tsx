@@ -17,6 +17,7 @@ import { programTypes, isExtendedLearningType } from "@/domain/program-offerings
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import { ExtendedLearningSeasonPlanner } from "@/components/operations/ExtendedLearningSeasonPlanner";
 import type { listExtendedSeasonPlanning } from "@/modules/activities/extended-learning.functions";
@@ -180,19 +181,19 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
       breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
-      actions={<Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Connected workflows</Link>}>
+      actions={<Button asChild variant="outline" size="sm"><Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}}>Connected workflows</Link></Button>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
-        {siteMutation.refreshError&&<button type="button" disabled={siteMutation.isSubmitting}
-          onClick={()=>void retrySiteRefresh()} className="mt-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+        {siteMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={siteMutation.isSubmitting}
+          onClick={()=>void retrySiteRefresh()} className="mt-2">
           Retry Site refresh
-        </button>}
-        {launchMutation.refreshError&&<button type="button" disabled={launchMutation.isSubmitting}
-          onClick={()=>void retryLaunchRefresh()} className="mt-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+        </Button>}
+        {launchMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={launchMutation.isSubmitting}
+          onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
-        </button>}
+        </Button>}
         <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
         <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>

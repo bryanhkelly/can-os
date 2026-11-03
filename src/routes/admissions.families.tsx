@@ -1,5 +1,6 @@
-import {useEffect,useRef,useState} from "react";
-import {beginEnrollmentDocumentUpload,finishEnrollmentDocumentUpload,getEnrollmentDocumentDownload,getEnrollmentDocumentUploadAvailability} from "@/modules/enrollment/r2-document-upload.functions";
+import {useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {getEnrollmentDocumentDownload} from "@/modules/enrollment/r2-document-upload.functions";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getFamilyReadiness,setFamilyRequirement,addRequirementReviewNote,reviewRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
 import {safeLoader} from "@/lib/safe-loader";
@@ -7,7 +8,9 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {RegistrarEnrollmentFormReview} from "@/components/enrollment/EnrollmentForm";
 import {FamilyReadinessOverviewCard} from "@/components/admissions/FamilyReadinessOverviewCard";
 import {familyRequirementKey,isEnrollmentDocumentCandidate} from "@/components/admissions/family-document-state";
-import {createPrivateUploadTask,documentUploadPolicy} from "@/platform/storage/private-upload";
+import {createEnrollmentDocumentUploads,enrollmentDocumentUploadAvailabilityQuery} from "@/components/enrollment/enrollment-document-upload";
+import {QueryState} from "@/components/workspace/query-state";
+import {EvidenceDocumentLink} from "@/components/evidence/EvidenceDocumentLink";
 import {mutationErrorMessage,useMutationFeedback} from "@/lib/mutation-feedback";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {z} from "zod";
@@ -37,14 +40,13 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
  const selection=Route.useSearch();
  const visibleApps=apps.filter(app=>!selection.application||app.id===selection.application);
  const mutation=useMutationFeedback(()=>router.invalidate());
- const [reading,setReading]=useState(false),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
- const busy=reading||mutation.pending||mutation.refreshFailed?"busy":null;
+ const [error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
+ const busy=mutation.pending||mutation.refreshFailed?"busy":null;
  const families=[...new Set(visibleApps.map(a=>a.householdId))];
  const [files,setFiles]=useState<Record<string,File|null>>({});
- const pendingUploads=useRef(new Map<string,{file:File;task:{run:()=>Promise<unknown>}}>());
- const [uploadModes,setUploadModes]=useState({live:false,demo:false});
- useEffect(()=>{void getEnrollmentDocumentUploadAvailability().then(setUploadModes)
-  .catch(cause=>setError(mutationErrorMessage(cause, "Unable to load document upload availability")));},[]);
+ const [uploads]=useState(createEnrollmentDocumentUploads);
+ const availability=useQuery(enrollmentDocumentUploadAvailabilityQuery());
+ const uploadModes=availability.isError?{live:false,demo:false}:availability.data??{live:false,demo:false};
  const [reviewFiles,setReviewFiles]=useState<Record<string,string>>({});
  async function update(applicationId:string,requirementId:string,complete:boolean){
   setError("");
@@ -63,34 +65,15 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   await mutation.run(()=>reviewRequirementDocument({data:{applicationId,requirementId,status,reason:notes[familyRequirementKey(applicationId,requirementId)]??"",documentId:reviewFiles[familyRequirementKey(applicationId,requirementId)]||undefined}}),
    {successMessage:"Document review saved.",commandErrorMessage:"Document review failed"});
  }
- async function openDocument(applicationId:string,requirementId:string,documentId:string){
-  if(busy)return;
-  setReading(true);setError("");
-  try{
-   const result=await getEnrollmentDocumentDownload({data:{applicationId,requirementId,documentId}});
-   window.open(result.downloadUrl,"_blank","noopener,noreferrer");
-  }catch(e){setError(mutationErrorMessage(e, "Unable to open document"));}
-  finally{setReading(false);}
- }
  async function upload(applicationId:string,requirementId:string){
   const file=files[familyRequirementKey(applicationId,requirementId)];if(!file)return;
   if(!isEnrollmentDocumentCandidate(file)){
-   setError("Choose a nonempty PDF, PNG, or JPEG document of at most 10 MB.");return;
+   setError("Choose a PDF, PNG, or JPEG document between 16 bytes and 10 MB.");return;
   }
   setError("");
   await mutation.run(async()=>{
-   const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
    const uploadIdentity=familyRequirementKey(applicationId,requirementId);
-   let attempt=pendingUploads.current.get(uploadIdentity);
-   if(attempt?.file!==file){
-    attempt={file,task:createPrivateUploadTask({file,policy:documentUploadPolicy,
-     begin:()=>beginEnrollmentDocumentUpload({data:request}),
-     finish:upload=>finishEnrollmentDocumentUpload({data:{...request,key:upload.key}}),
-    })};
-    pendingUploads.current.set(uploadIdentity,attempt);
-   }
-   await attempt.task.run();
-   pendingUploads.current.delete(uploadIdentity);
+   await uploads.upload(applicationId,requirementId,file);
    setFiles(previous=>({...previous,[uploadIdentity]:null}));
   },{successMessage:"Document received and ready for review.",
    commandErrorMessage:"Document upload failed. Retry to finish without uploading again."});
@@ -103,6 +86,9 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   {selection.application&&!visibleApps.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current family readiness view.</p>}
   {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
   <MutationFeedback state={mutation} pendingMessage="Saving family readiness..." className="mt-4"/>
+  <QueryState loading={availability.isPending?"Checking document upload availability...":undefined}
+   error={availability.isError?mutationErrorMessage(availability.error,"Unable to load document upload availability"):undefined}
+   onRetry={()=>void availability.refetch()} retrying={availability.isFetching}/>
   <div className="mt-6 rounded-xl border p-5"><p className="text-sm">Households represented</p><p className="font-serif text-3xl">{families.length}</p></div>
   <div className="mt-6 space-y-4">{families.map((id,i)=><section key={id} className="rounded-xl border p-5">
    <h2 className="font-serif text-xl">Household {i+1}</h2>
@@ -128,7 +114,7 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
     </label>{r.status!=="complete"&&documentReviewPending&&<p className="mt-1 text-xs">Accept the current document using document review; the checklist cannot bypass review.</p>}<div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
     {<div className="mt-2 flex items-center gap-2"><label className="text-xs" htmlFor={"document-"+r.id}>Document being reviewed</label><select id={"document-"+r.id} className="min-w-0 flex-1 rounded border bg-background p-1 text-xs" value={reviewFiles[familyRequirementKey(a.id,r.id)]??""} onChange={e=>setReviewFiles(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.value}))}><option value="">No document selected</option>{r.documents.filter(d=>d.isCurrent).map(d=><option key={d.id} value={d.id}>{d.fileName} · {d.reviewStatus}</option>)}</select></div>}
     {<div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")||(status==="accepted"&&!reviewFiles[familyRequirementKey(a.id,r.id)])} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>}
-    {<div className="mt-2 space-y-2">{r.documents.map(d=><div key={d.id} className="flex items-center justify-between gap-3 rounded border p-2 text-xs"><span className="truncate">{d.fileName} · v{d.version} · {new Date(d.uploadedAt).toLocaleDateString()} · {d.isCurrent?"Current":"Superseded"} · {d.reviewStatus}</span><button type="button" disabled={busy!==null} className="shrink-0 font-semibold underline disabled:opacity-50" onClick={()=>openDocument(a.id,r.id,d.id)}>View private file</button></div>)}{!r.documents.length&&<p className="text-xs text-muted-foreground">No R2 document registered for this requirement.</p>}</div>}
+    {<div className="mt-2 space-y-2">{r.documents.map(d=><div key={d.id} className="flex items-center justify-between gap-3 rounded border p-2 text-xs"><span className="truncate">{d.fileName} · v{d.version} · {new Date(d.uploadedAt).toLocaleDateString()} · {d.isCurrent?"Current":"Superseded"} · {d.reviewStatus}</span><EvidenceDocumentLink label="View private file" disabled={busy!==null} onGetDownloadUrl={async()=>(await getEnrollmentDocumentDownload({data:{applicationId:a.id,requirementId:r.id,documentId:d.id}})).downloadUrl}/></div>)}{!r.documents.length&&<p className="text-xs text-muted-foreground">No R2 document registered for this requirement.</p>}</div>}
     {(a.isFixture?uploadModes.demo:uploadModes.live)&&<div className="mt-2 flex flex-wrap items-center gap-2"><input aria-label={"Select enrollment document for "+r.title} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="max-w-full text-xs" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>setFiles(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.files?.[0]??null}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||!files[familyRequirementKey(a.id,r.id)]} onClick={()=>upload(a.id,r.id)}>Upload to private R2</button></div>}
     {(a.isFixture?uploadModes.demo:uploadModes.live)&&<p className="mt-1 text-xs text-muted-foreground">Restricted private R2 document workflow. PDF, JPG or PNG, maximum 10 MB. Uploaded files require registrar review.</p>}
     <p className="mt-2 text-xs">Document request and rejection reasons are visible to the family. Save note records an internal registrar note only.</p>

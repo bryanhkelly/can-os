@@ -2,7 +2,12 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const state=vi.hoisted(()=>({slots:[] as unknown[],cursor:0,events:[] as string[],submit:vi.fn()}));
 vi.mock("react",async original=>({...await original<typeof import("react")>(),
-  useEffect:()=>{},useRef:(initial:unknown)=>({current:initial}),
+  useEffect:()=>{},useCallback:<T,>(callback:T)=>callback,
+  useRef:(initial:unknown)=>{
+    const index=state.cursor++;
+    if(!(index in state.slots))state.slots[index]={current:initial};
+    return state.slots[index];
+  },
   useState:(initial:unknown)=>{
     const index=state.cursor++;
     if(!(index in state.slots))state.slots[index]=typeof initial==="function"?initial():initial;
@@ -34,6 +39,10 @@ vi.mock("@/modules/learning/submission-attachments.functions",()=>({
 vi.mock("@/components/learning/SubmissionAnnotations",()=>({SubmissionAnnotations:()=>null}));
 vi.mock("@/components/learning/AssignmentConversation",()=>({AssignmentConversation:()=>null}));
 vi.mock("@/components/student/AssignmentAttemptHistory",()=>({AssignmentAttemptHistory:()=>null}));
+vi.mock("@/components/shell/WorkspaceSession",()=>({
+  useStudentDisplayPreferences:()=>defaultStudentDisplayPreferences,
+}));
+import {defaultStudentDisplayPreferences} from "@/domain/student-display-preferences";
 vi.mock("@/lib/use-hydrated",()=>({useHydrated:()=>true}));
 import {Route} from "@/routes/student.assignments";
 type Props={children?:ReactNode;type?:string;disabled?:boolean;onChange?:(event:unknown)=>void;onClick?:()=>Promise<void>};

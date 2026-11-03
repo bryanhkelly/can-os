@@ -89,12 +89,13 @@ describe("operations outbox health panel", () => {
     expect(html).not.toContain("will not drain");
   });
 
-  it("shows the server's rejection instead of fake counts", async () => {
-    state.read.mockRejectedValue(new Error("authorized school operator"));
+  it("shows safe authorization feedback instead of diagnostics or fake counts", async () => {
+    state.read.mockRejectedValue({code:"FORBIDDEN",message:"private operator diagnostic"});
     mount();
     await vi.waitFor(() => {
       const html = renderToStaticMarkup(render());
-      expect(html).toContain("authorized school operator");
+      expect(html).toContain("You do not have permission to perform this operation.");
+      expect(html).not.toContain("private operator diagnostic");
       expect(html).toContain("role=\"alert\"");
     });
     expect(renderToStaticMarkup(render())).not.toContain(">9</p>");

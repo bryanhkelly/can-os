@@ -41,6 +41,12 @@ beforeEach(()=>{
     };
     return query;
   });
+  state.update.mockImplementation(()=>{
+  const query={
+    set:()=>query,where:()=>query,returning:async()=>[{id:actionId}],
+  };
+  return query;
+  });
 });
 afterEach(()=>vi.unstubAllEnvs());
 const actionId="00000000-0000-4000-8000-000000000001";
@@ -59,9 +65,11 @@ describe("exact student Action reads",()=>{
     expect(query.sql).toContain('"actions"."subject_id" = "student_profiles"."id"');
     expect(query.sql).toContain('"actions"."site_id" in');
     expect(query.sql).toContain('"actions"."program_id" in');
+    expect(query.sql).toContain('"actions"."program_id" is null');
     expect(query.params).toEqual([
       "student-owner","student_support_request","student_profile",
-      "authorized-site","authorized-program",actionId,
+      "authorized-site","authorized-program","conference_follow_up",
+      "student_profile",actionId,
     ]);
     const profileJoin = new PgDialect().sqlToQuery(state.join.mock.calls[0]![0]);
     expect(profileJoin.sql).toContain('"student_profiles"."person_id" =');
@@ -74,9 +82,21 @@ describe("exact student Action reads",()=>{
     expect(await getQuickWinActions()).toEqual({connected:true,actions:[]});
     expect(selectedQuery().params).toEqual([
       "student-owner","student_support_request","student_profile",
-      "authorized-site","authorized-program",
+      "authorized-site","authorized-program","conference_follow_up",
+      "student_profile",
     ]);
     expect(state.limit).toHaveBeenCalledWith(100);
+  });
+  it("allows only same-student, site-scoped conference follow-ups without a Program ID",async()=>{
+    await getQuickWinActions();
+    const query=selectedQuery();
+    expect(query.sql).toContain('"actions"."type" =');
+    expect(query.sql).toContain('"actions"."program_id" is null');
+    expect(query.sql).toContain('"actions"."subject_id" = "student_profiles"."id"');
+    expect(query.params).toContain("conference_follow_up");
+    expect(query.params).toContain("authorized-site");
+    const profileJoin = new PgDialect().sqlToQuery(state.join.mock.calls[0]![0]);
+    expect(profileJoin.params).toEqual(["student-owner"]);
   });
   it("returns an explicit empty result for an unavailable ID without a directory fallback",async()=>{
     expect(await getQuickWinActions({data:{actionId}})).toEqual({connected:true,actions:[]});
@@ -111,7 +131,8 @@ describe("exact student Action reads",()=>{
     await getQuickWinActions({data:{actionId,ownerPersonId:"foreign",siteIds:["foreign"]}});
     expect(selectedQuery().params).toEqual([
       "student-owner","student_support_request","student_profile",
-      "authorized-site","authorized-program",actionId,
+      "authorized-site","authorized-program","conference_follow_up",
+      "student_profile",actionId,
     ]);
   });
   it("propagates failed reads instead of treating them as empty detail",async()=>{
@@ -121,6 +142,30 @@ describe("exact student Action reads",()=>{
 });
 
 describe("student Action completion boundary",()=>{
+  it("allows an owner to complete only their site-scoped conference follow-up",async()=>{
+    state.rows=[{
+      id:actionId,type:"conference_follow_up",subjectType:"student_profile",
+      subjectId:"student-profile",programId:null,studentProfileId:"student-profile",
+    }];
+
+    await expect(finishQuickWinAction({data:{actionId}})).resolves.toEqual({id:actionId});
+
+    const query=new PgDialect().sqlToQuery(state.where.mock.calls[0]![0]);
+    expect(query.sql).toContain('"actions"."owner_person_id" =');
+    expect(query.sql).toContain('"actions"."site_id" in');
+    expect(state.join).toHaveBeenCalled();
+    expect(state.update).toHaveBeenCalledOnce();
+  });
+  it("denies completion when an unscoped conference follow-up targets another student",async()=>{
+    state.rows=[{
+      id:actionId,type:"conference_follow_up",subjectType:"student_profile",
+      subjectId:"another-student",programId:null,studentProfileId:"student-profile",
+    }];
+
+    await expect(finishQuickWinAction({data:{actionId}}))
+      .rejects.toThrow("open owned action in authorized program");
+    expect(state.update).not.toHaveBeenCalled();
+  });
   it("does not let subject-based visibility satisfy the owner check for completion",async()=>{
     await expect(finishQuickWinAction({data:{actionId}}))
       .rejects.toThrow("open owned action in authorized program");

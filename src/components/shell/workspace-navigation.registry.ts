@@ -75,7 +75,10 @@ export const workspaceLinks = {
     { title: "Network operations", path: "/network", icon: "home" },
     { title: "Operations", path: "/operations", icon: "clipboard", owns: ["/operations/*"] },
   ],
-  can_network_steward: [{ title: "Network contracts", path: "/network-steward", icon: "clipboard" }],
+  can_network_steward: [
+    { title: "Network contracts", path: "/network-steward", icon: "clipboard" },
+    { title: "Jurisdiction profiles", path: "/operations/jurisdiction-profiles", icon: "clipboard" },
+  ],
   student: [
     { title: "Today", path: "/student", icon: "home", owns: ["/student/settings"] },
     { title: "Learn", path: "/student/courses", icon: "book",

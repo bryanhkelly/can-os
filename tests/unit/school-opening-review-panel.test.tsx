@@ -30,6 +30,7 @@ vi.mock("react",async original=>({
 
 type ControlProps={
   children?:ReactNode;onClick?:()=>void;
+  onRetry?:()=>void;
   onChange?:(event:{target:{value:string}})=>void;value?:string;disabled?:boolean;
 };
 function render(){
@@ -49,7 +50,11 @@ function words(node:ReactNode):string{
   return isValidElement<ControlProps>(node)?words(node.props.children):"";
 }
 function findButton(label:string){
-  return controls(render()).find(node=>node.type==="button"&&words(node.props.children).includes(label));
+  const tree=render();
+  const button=controls(tree).find(node=>node.type==="button"&&words(node.props.children).includes(label));
+  if(button||label!=="Reload review")return button;
+  const retry=controls(tree).find(node=>node.props.onRetry);
+  return retry?{props:{onClick:retry.props.onRetry}}:undefined;
 }
 function reason(value:string){
   const input=controls(render()).find(node=>node.type==="input");
@@ -58,8 +63,8 @@ function reason(value:string){
 }
 function mount(){
   render();
-  const cleanup=state.effects[0]?.();
-  return typeof cleanup==="function"?cleanup:()=>{};
+  const cleanups=state.effects.map(effect=>effect());
+  return ()=>{for(const cleanup of cleanups)if(typeof cleanup==="function")cleanup();};
 }
 const review={
   programId:"11111111-1111-4111-8111-111111111111",
@@ -100,10 +105,11 @@ describe("version-bound school-opening review",()=>{
     expect(findButton("Suspend school")).toBeUndefined();
   });
   it("requires a deliberate reload and a new reason after a stale decision",async()=>{
-    state.decide.mockRejectedValueOnce(new Error("School configuration changed. Reload the review."));
+    state.decide.mockRejectedValueOnce({code:"CONFLICT",message:"private configuration diagnostic"});
     await loaded();reason("Reason about version one only.");
     findButton("Approve independently")?.props.onClick?.();
-    await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("School configuration changed"));
+    await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("This record has changed. Refresh the page before trying again."));
+    expect(renderToStaticMarkup(render())).not.toContain("private configuration diagnostic");
     expect(state.read).toHaveBeenCalledTimes(1);
     state.read.mockResolvedValue({...review,version:2,configurationId:"33333333-3333-4333-8333-333333333333"});
     findButton("Reload review")?.props.onClick?.();
@@ -120,7 +126,8 @@ describe("version-bound school-opening review",()=>{
     await vi.waitFor(()=>{
       const html=renderToStaticMarkup(render());
       expect(html).toContain("Institutional opening approval recorded");
-      expect(html).toContain("Review read unavailable");
+      expect(html).toContain("Unable to load the current opening review");
+      expect(html).not.toContain("Review read unavailable");
     });
     expect(findButton("Approve independently")).toBeUndefined();
     expect(state.decide).toHaveBeenCalledOnce();
@@ -145,7 +152,7 @@ it("renders shared evidence details and hides them on a failed reload",async()=>
   expect(html).toContain("facility approval");
   state.read.mockRejectedValueOnce(new Error("Read unavailable"));
   findButton("Reload review")?.props.onClick?.();
-  await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Read unavailable"));
+  await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Unable to load the current opening review"));
   expect(renderToStaticMarkup(render())).not.toContain("Facility review.pdf");
 });
 

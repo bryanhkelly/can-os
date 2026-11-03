@@ -7,10 +7,10 @@ describe("staff pickup form preserves a request ID after uncertain delivery", ()
   it("holds one UUID per witnessed command until the server confirms it", () => {
     expect(method).toContain("pendingMutationIds.current.get(key) ?? crypto.randomUUID()");
     expect(method.indexOf("pendingMutationIds.current.set(key, mutationId)"))
-      .toBeLessThan(method.indexOf("await command(mutationId)"));
+      .toBeLessThan(method.indexOf("await mutation.run(()=>command(mutationId)"));
     expect(method.indexOf("pendingMutationIds.current.delete(key)"))
-      .toBeGreaterThan(method.indexOf("await command(mutationId)"));
-    const errorBlock=method.slice(method.indexOf("} catch (cause)"));
+      .toBeGreaterThan(method.indexOf('if(outcome.status==="saved"||outcome.status==="refresh-failed")'));
+    const errorBlock=method.slice(method.indexOf('else if(outcome.status==="failed")'),method.indexOf("async function retryRefresh"));
     expect(errorBlock).not.toContain("pendingMutationIds.current.delete(key)");
     expect(errorBlock).toContain("reuse the original request ID");
   });

@@ -72,7 +72,8 @@ describe("role-appropriate opening evidence workspace",()=>{
     await loaded(model);state.read.mockRejectedValueOnce(new Error("Evidence read unavailable"));
     // A new mount represents route reload; no prior model may be reused.
     state.slots=[];state.cursor=0;state.effects=[];render();state.effects[0]?.();
-    await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Evidence read unavailable"));
+    await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Unable to load opening evidence"));
+    expect(renderToStaticMarkup(render())).not.toContain("Evidence read unavailable");
     expect(renderToStaticMarkup(render())).not.toContain("Occupancy.pdf");
   });
 });

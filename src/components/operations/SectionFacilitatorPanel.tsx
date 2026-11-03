@@ -6,6 +6,8 @@ import { updateSectionFacilitator, type SectionFacilitatorInput } from "@/module
 import {
   sectionFacilitatorsQuery, siteStaffingKeys, siteStaffingMutationOptions, refreshSiteStaffing,
 } from "@/modules/operations/site-staffing.queries";
+import { AppointmentExpiryField } from "./AppointmentExpiryField";
+import { appointmentExpiryToIso } from "./appointment-expiry";
 
 /** Local appointments remain separate from verified qualifications and coverage. */
 export function SectionFacilitatorPanel({ programId }: { programId: string }) {
@@ -116,19 +118,14 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
                     </option>)}
                 </select>
               </label>
-              <label className="text-sm">Appointment ends
-                <input type="date" disabled={busy} value={through}
-                  min={new Date().toISOString().slice(0,10)}
-                  max={new Date(Date.now()+89*86400_000).toISOString().slice(0,10)}
-                  onChange={e => setExpires(old => ({ ...old, [key]: e.target.value }))}
-                  className="mt-1 w-full rounded border bg-background p-2"/>
-              </label>
+              <AppointmentExpiryField label="Appointment ends" disabled={busy} value={through}
+                onChange={value => setExpires(old => ({ ...old, [key]: value }))}/>
             </div>
             <button type="button" disabled={busy || !personId || !through}
               onClick={() => void change({
                 sectionId:section.id, personId, action:"appoint",
                 expectedAssignmentId: existing?.id ?? null,
-                validThrough:new Date(through + "T23:59:59Z").toISOString(),
+                validThrough:appointmentExpiryToIso(through),
               })}
               className="mt-3 rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
               {existing ? "Renew Section appointment" : "Add Section facilitator"}

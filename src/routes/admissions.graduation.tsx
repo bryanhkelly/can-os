@@ -1,8 +1,11 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, QueryState } from "@/components/workspace";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { approveGraduationRequirements, classifyLegacyGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listTranscriptDiplomas, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
 
 export const Route=createFileRoute("/admissions/graduation")({component:GraduationCloseout});
@@ -11,8 +14,8 @@ function GraduationCloseout(){
  const [search,setSearch]=useState("");
  const [candidates,setCandidates]=useState<Awaited<ReturnType<typeof listGraduationCandidates>>>([]);
  const [issuerId,setIssuerId]=useState("");
- const [issuers,setIssuers]=useState<Awaited<ReturnType<typeof listGraduationIssuers>>>([]);
- useEffect(()=>{let active=true;void listGraduationIssuers().then(rows=>{if(active)setIssuers(rows)}).catch(()=>{});return()=>{active=false}},[]);
+ const issuersQuery=useQuery({queryKey:["graduation-issuers"],queryFn:()=>listGraduationIssuers(),retry:false,gcTime:0});
+ const issuers=issuersQuery.data??[];
  const [academicYear,setAcademicYear]=useState("");
  const [version,setVersion]=useState("1");
  const [cohortStart,setCohortStart]=useState("");
@@ -46,7 +49,6 @@ function GraduationCloseout(){
   readingRef.current=true;setReading(true);setMessage("");
   try{await action()}catch(error){setMessage(mutationErrorMessage(error, "Request failed"))}finally{readingRef.current=false;setReading(false)}
  }
- const field=(title:string,value:string,change:(value:string)=>void)=><label className="block text-sm font-medium">{title}<input className="mt-1 block w-full rounded-lg border bg-background p-2" value={value} onChange={e=>change(e.target.value)}/></label>;
  return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Institutional graduation closeout" subtitle="Approve institutional requirements, audit issued transcripts, decide graduation, and issue diplomas. Each action requires an authorized issuer registrar.">
   <div className="space-y-6 py-6">
    <Link to="/admissions/credential-delivery" className="inline-block rounded-lg border px-3 py-2 text-sm">Download official credentials</Link>
@@ -56,12 +58,16 @@ function GraduationCloseout(){
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">1. Institution-approved requirements</h2>
     <p className="text-sm">Select an institution you are authorized to administer. Its policies remain institution-owned and versioned.</p>
-    <label className="block text-sm font-medium">Issuing institution<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={issuerId} onChange={e=>{setIssuerId(e.target.value);setSets([]);setRequirementSetId("");setAudit(null);setDecisionId("")}}><option value="">Select authorized institution</option>{issuers.map(issuer=><option key={issuer.id} value={issuer.id}>{issuer.name}</option>)}</select></label>
-    {field("Academic year",academicYear,setAcademicYear)}
-    {field("Requirements version",version,setVersion)}
-    {field("Entry cohort start (YYYY)",cohortStart,setCohortStart)}
-    {field("Entry cohort end (YYYY)",cohortEnd,setCohortEnd)}
-    {field("Institutional applicability justification",applicabilityReason,setApplicabilityReason)}
+    <QueryState loading={issuersQuery.isPending?"Loading authorized institutions...":undefined}
+      error={issuersQuery.isError?mutationErrorMessage(issuersQuery.error,"Unable to load authorized institutions."):undefined}
+      onRetry={()=>void issuersQuery.refetch()} retrying={issuersQuery.isFetching}>
+      <label className="block text-sm font-medium">Issuing institution<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={issuerId} onChange={e=>{setIssuerId(e.target.value);setSets([]);setRequirementSetId("");setAudit(null);setDecisionId("")}}><option value="">Select authorized institution</option>{issuers.map(issuer=><option key={issuer.id} value={issuer.id}>{issuer.name}</option>)}</select></label>
+    </QueryState>
+    <Field label="Academic year"><Input value={academicYear} onChange={event=>setAcademicYear(event.target.value)}/></Field>
+    <Field label="Requirements version"><Input value={version} onChange={event=>setVersion(event.target.value)}/></Field>
+    <Field label="Entry cohort start (YYYY)"><Input value={cohortStart} onChange={event=>setCohortStart(event.target.value)}/></Field>
+    <Field label="Entry cohort end (YYYY)"><Input value={cohortEnd} onChange={event=>setCohortEnd(event.target.value)}/></Field>
+    <Field label="Institutional applicability justification"><Input value={applicabilityReason} onChange={event=>setApplicabilityReason(event.target.value)}/></Field>
     <label className="block text-sm">Supersedes approved policy (optional)<select className="mt-1 block w-full rounded border bg-background p-2" value={supersedesRequirementSetId} onChange={e=>setSupersedesRequirementSetId(e.target.value)}><option value="">New cohort policy</option>{sets.map(set=><option key={set.id} value={set.id}>{set.academicYear} · {set.version}</option>)}</select></label>
     <div className="space-y-2"><p className="text-sm font-medium">Required credits by subject</p>{requirements.map((rule,index)=><div key={index} className="flex flex-wrap items-center gap-2"><input aria-label={"Subject "+(index+1)} className="rounded border bg-background p-2" value={rule.subject} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,subject:e.target.value}:item))}/><input aria-label={"Minimum units for "+rule.subject} type="number" min="0.01" step="0.01" className="w-28 rounded border bg-background p-2" value={rule.minimumUnits} onChange={e=>setRequirements(previous=>previous.map((item,i)=>i===index?{...item,minimumUnits:e.target.value}:item))}/><button type="button" disabled={requirements.length===1} className="rounded border px-2 py-1" onClick={()=>setRequirements(previous=>previous.filter((_,i)=>i!==index))}>Remove</button></div>)}<button type="button" className="rounded border px-3 py-2" onClick={()=>setRequirements(previous=>[...previous,{subject:"",minimumUnits:""}])}>Add subject</button></div>
     <div className="flex flex-wrap gap-2">
@@ -74,10 +80,10 @@ function GraduationCloseout(){
       <h3 className="font-semibold">Classify a legacy graduation policy</h3>
       <p className="text-sm">Legacy policies without attested entry-cohort bounds block graduation. Classify each policy from its institutional evidence. Never infer a cohort from its academic year. This one-time action is audited; approved credit requirements do not change.</p>
       <label className="block text-sm">Unclassified policy<select className="mt-1 block w-full rounded border bg-background p-2" value={legacyPolicyId} onChange={e=>setLegacyPolicyId(e.target.value)}><option value="">Select unclassified policy</option>{sets.filter(set=>!set.cohortStart||!set.cohortEnd).map(set=><option key={set.id} value={set.id}>{set.academicYear} · {set.version}</option>)}</select></label>
-      {field("Attested entry cohort start (YYYY)",legacyCohortStart,setLegacyCohortStart)}
-      {field("Attested entry cohort end (YYYY)",legacyCohortEnd,setLegacyCohortEnd)}
-      {field("Registrar evidence reference",legacyEvidenceReference,setLegacyEvidenceReference)}
-      {field("Institutional classification justification",legacyJustification,setLegacyJustification)}
+      <Field label="Attested entry cohort start (YYYY)"><Input value={legacyCohortStart} onChange={event=>setLegacyCohortStart(event.target.value)}/></Field>
+      <Field label="Attested entry cohort end (YYYY)"><Input value={legacyCohortEnd} onChange={event=>setLegacyCohortEnd(event.target.value)}/></Field>
+      <Field label="Registrar evidence reference"><Input value={legacyEvidenceReference} onChange={event=>setLegacyEvidenceReference(event.target.value)}/></Field>
+      <Field label="Institutional classification justification"><Input value={legacyJustification} onChange={event=>setLegacyJustification(event.target.value)}/></Field>
       <button type="button" className="rounded-lg border px-3 py-2 disabled:opacity-50" disabled={busy||!issuerId||!legacyPolicyId||!/^[0-9]{4}$/.test(legacyCohortStart)||!/^[0-9]{4}$/.test(legacyCohortEnd)||legacyCohortStart>legacyCohortEnd||legacyEvidenceReference.trim().length<12||legacyJustification.trim().length<20} onClick={()=>void mutation.run(async()=>{
        await classifyLegacyGraduationRequirements({data:{issuerId,requirementSetId:legacyPolicyId,cohortStart:legacyCohortStart,cohortEnd:legacyCohortEnd,evidenceReference:legacyEvidenceReference,applicabilityReason:legacyJustification}});
        setLegacyPolicyId("");setLegacyCohortStart("");setLegacyCohortEnd("");setLegacyEvidenceReference("");setLegacyJustification("");
@@ -94,7 +100,7 @@ function GraduationCloseout(){
     {transcriptId&&<p className="text-sm">Selected issued transcript. Choose its applicable approved policy below.</p>}
     {applicablePolicy&&<p className="rounded border p-3 text-sm">Applicable institution policy: <strong>{applicablePolicy}</strong></p>}
 
-    {field("Graduation decision rationale (required)",decisionRationale,setDecisionRationale)}
+    <Field label="Graduation decision rationale (required)"><Input value={decisionRationale} onChange={event=>setDecisionRationale(event.target.value)}/></Field>
     <button disabled={busy||!transcriptId||!requirementSetId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setDecisionId("");setAudit(await auditIssuedTranscript({data:{transcriptId,requirementSetId}}))})}>Run credit audit</button>
     {audit&&<div className="space-y-2 rounded-lg border p-3 text-sm"><p>Audit: <strong>{audit.audit.status}</strong> · Earned credits: {audit.audit.totalEarned}</p>
       {audit.audit.deficiencies.map(row=><p key={row.subject}>{row.subject}: {row.earned} of {row.required} ({row.missing} missing)</p>)}
@@ -117,7 +123,7 @@ function GraduationCloseout(){
     {issuedDiplomaId&&<div className="space-y-2 rounded-lg border p-3">
       <p className="text-sm">Issued diploma status: <strong>{diplomaStatus||"Review required"}</strong></p>
       <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await getDiplomaFreshness({data:{diplomaId:issuedDiplomaId}});setDiplomaStatus(result.status)})}>Inspect diploma status</button>
-      {field("Revocation reason (required)",revocationReason,setRevocationReason)}
+      <Field label="Revocation reason (required)"><Input value={revocationReason} onChange={event=>setRevocationReason(event.target.value)}/></Field>
       <button type="button" disabled={busy||diplomaStatus==="revoked"||revocationReason.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void mutation.run(async()=>{await revokeDiploma({data:{diplomaId:issuedDiplomaId,reason:revocationReason}});setDiplomaStatus("revoked");},{successMessage:"Diploma revoked and audited.",commandErrorMessage:"Unable to revoke diploma.",refresh:async()=>setDiplomas(await listTranscriptDiplomas({data:{transcriptId}}))})}>Revoke diploma</button>
     </div>}
    </section>

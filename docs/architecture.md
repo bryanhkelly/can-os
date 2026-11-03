@@ -29,6 +29,9 @@ objects do not need an Error prototype. Loaders retain context-specific sign-in
 and permission presentation. Mutation feedback distinguishes command rejection
 from a successful command followed by failed refresh and blocks repeat commands
 after the latter. Ordinary Error messages are not approved client-facing text.
+Pickup commands retain their request IDs after uncertain delivery. An acknowledged
+command retires only its own ID, even when its subsequent refresh fails; retrying
+that refresh must not discard IDs belonging to other unconfirmed commands.
 
 ### Application structure
 
@@ -48,6 +51,9 @@ list; an empty list performs no work. This uses the ordinary handlers, leases,
 retries and subscription processing, not a demo-specific consumer. An omitted
 selection preserves normal queue-wide processing. Callers must establish which
 records they are authorized to affect before invoking this internal worker.
+Site room creation, updates, retirement and Section room assignments use the
+same lifecycle pass-through handler and shared subscriptions as other audited
+configuration facts; they must not remain unclaimed in the outbox.
 
 Academic setup keeps already-assigned instructors selectable for coverage
 reconfirmation. The existing assignment command rechecks current authority and

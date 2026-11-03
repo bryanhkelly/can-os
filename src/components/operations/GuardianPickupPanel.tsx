@@ -61,7 +61,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
       commandErrorMessage:"Pickup change could not be confirmed.",
       refreshErrorMessage:"The pickup change was saved, but updated pickup authority could not be loaded. Retry the refresh before submitting another change.",
     });
-    if(outcome.status==="saved"){
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
       pendingMutationIds.current.delete(key);
     } else if(outcome.status==="failed"){
       // The server may have committed a guardian authorization, revocation or
@@ -74,7 +74,6 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
   async function retryRefresh(){
     const outcome=await mutation.retryRefresh();
     if(outcome.status==="refreshed"){
-      for(const key of pendingMutationIds.current.keys())pendingMutationIds.current.delete(key);
       setError("");
     }
     return outcome;

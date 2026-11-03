@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
-import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { createMutationRunner, mutationErrorMessage } from "@/lib/mutation-feedback";
 import { assertRefreshResult } from "@/lib/router-refresh";
 
 export type WorkspaceSubmission<TResult> =
@@ -27,75 +27,66 @@ function asError(error: unknown): Error {
  */
 export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutationOptions<TInput, TResult>) {
   const queryClient = useQueryClient();
-  const inFlight = useRef(false);
-  const failedRefresh = useRef<(() => Promise<void>) | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshError, setRefreshError] = useState<Error | null>(null);
+  const runnerRef = useRef<ReturnType<typeof createMutationRunner> | null>(null);
+  runnerRef.current ??= createMutationRunner({
+    refresh: async () => undefined,
+    update: state => {
+      setIsSubmitting(state.pending);
+      setRefreshError(state.refreshFailed ? new Error(state.error || "Unable to refresh saved changes.") : null);
+    },
+  });
+  const runner = runnerRef.current;
   const mutation = useMutation<TResult, Error, TInput>({
     mutationFn: options.mutationFn,
+    retry: false,
     onError: (error, input) => optionsRef.current.onError?.(error, input),
   });
   const { mutateAsync } = mutation;
 
   const submit = useCallback(async (input: TInput): Promise<WorkspaceSubmission<TResult>> => {
-    if (inFlight.current || failedRefresh.current) return { status: "ignored" };
-    inFlight.current = true;
-    setIsSubmitting(true);
-    setRefreshError(null);
-    try {
-      const value = await mutateAsync(input);
-      const current = optionsRef.current;
-      const refresh = async () => {
-        await Promise.all((current.invalidateQueries ?? []).map(queryKey =>
-          queryClient.invalidateQueries({ queryKey }, { throwOnError: true })));
-        assertRefreshResult(await current.invalidateRouter?.());
-      };
-      let failure: Error | undefined;
-      try {
-        await refresh();
-      } catch (error) {
-        failedRefresh.current = refresh;
-        failure = asError(error);
-        setRefreshError(failure);
-        try { current.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
-      }
-      try {
-        await current.onSuccess?.(value, input);
-      } catch (error) {
-        // Feedback callbacks run after the domain command has committed.
-        // Never turn their failure into a command failure or invite a retry.
-        failure ??= asError(error);
-        failedRefresh.current = refresh;
-        setRefreshError(failure);
-        try { current.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
-      }
-      return { status: "completed", value, ...(failure ? { refreshError: failure } : {}) };
-    } finally {
-      inFlight.current = false;
-      setIsSubmitting(false);
-    }
-  }, [mutateAsync, queryClient]);
+    let current = optionsRef.current;
+    let value: TResult;
+    let notified = false;
+    let refreshFailure: Error | undefined;
+    const outcome = await runner(async () => {
+      value = await mutateAsync(input);
+      current = optionsRef.current;
+      return value;
+    }, {
+      successMessage: "",
+      commandErrorMessage: "Unable to save changes.",
+      refreshErrorMessage: "Unable to refresh saved changes.",
+      refresh: async () => {
+        let failure: Error | undefined;
+        try {
+          await Promise.all((current.invalidateQueries ?? []).map(queryKey =>
+            queryClient.invalidateQueries({ queryKey }, { throwOnError: true })));
+          assertRefreshResult(await current.invalidateRouter?.());
+        } catch (error) {
+          failure = asError(error);
+        }
+        if (!notified) {
+          notified = true;
+          try { await current.onSuccess?.(value, input); }
+          catch (error) { failure ??= asError(error); }
+        }
+        if (failure) {
+          refreshFailure = failure;
+          try { current.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
+          throw failure;
+        }
+      },
+    });
+    if (outcome.status === "failed") throw outcome.error;
+    if (outcome.status === "duplicate" || outcome.status === "refresh-required") return { status: "ignored" };
+    return { status: "completed", value: outcome.value, ...(refreshFailure ? { refreshError: refreshFailure } : {}) };
+  }, [mutateAsync, queryClient, runner]);
 
-  const retryRefresh = useCallback(async () => {
-    if (inFlight.current) return { status: "duplicate" as const };
-    if (!failedRefresh.current) return { status: "not-required" as const };
-    inFlight.current = true;
-    setIsSubmitting(true);
-    try {
-      await failedRefresh.current();
-      failedRefresh.current = null;
-      setRefreshError(null);
-      return { status: "refreshed" as const };
-    } catch (error) {
-      setRefreshError(asError(error));
-      return { status: "refresh-failed" as const };
-    } finally {
-      inFlight.current = false;
-      setIsSubmitting(false);
-    }
-  }, []);
+  const retryRefresh = useCallback(() => runner.retryRefresh(), [runner]);
 
   return { ...mutation, submit, isSubmitting, refreshError, retryRefresh };
 }

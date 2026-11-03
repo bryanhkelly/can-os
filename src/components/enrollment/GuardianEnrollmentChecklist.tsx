@@ -1,97 +1,77 @@
-import { useEffect, useRef, useState } from "react";
-import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
-import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { EvidenceDocumentLink } from "@/components/evidence/EvidenceDocumentLink";
+import { createEnrollmentDocumentUploads, enrollmentDocumentUploadAvailabilityQuery } from "./enrollment-document-upload";
+import { QueryState } from "@/components/workspace/query-state";
 import { useRouter } from "@tanstack/react-router";
 import { getGuardianEnrollmentChecklist } from "@/modules/enrollment/guardian-enrollment-checklist.functions";
-import { beginEnrollmentDocumentUpload, finishEnrollmentDocumentUpload, getEnrollmentDocumentDownload,
-  getEnrollmentDocumentUploadAvailability } from "@/modules/enrollment/r2-document-upload.functions";
+import { getEnrollmentDocumentDownload } from "@/modules/enrollment/r2-document-upload.functions";
 import { GuardianEnrollmentForm } from "./EnrollmentForm";
 
 type Checklist = Awaited<ReturnType<typeof getGuardianEnrollmentChecklist>>;
-type Availability = Awaited<ReturnType<typeof getEnrollmentDocumentUploadAvailability>>;
 
 export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: string }) {
+  return <GuardianEnrollmentChecklistView key={applicationId} applicationId={applicationId}/>;
+}
+
+function GuardianEnrollmentChecklistView({ applicationId }: { applicationId: string }) {
   const router = useRouter();
-  const [data, setData] = useState<Checklist | null>(null);
-  const [availability, setAvailability] = useState<Availability | null>(null);
-  const [availabilityError, setAvailabilityError] = useState(false);
+  const checklistQuery = useQuery({
+    queryKey: ["guardian-enrollment-checklist", applicationId],
+    queryFn: () => getGuardianEnrollmentChecklist({ data: { applicationId } }),
+    retry: false,
+    gcTime: 0,
+  });
+  // Storage availability is independent so an outage cannot block forms.
+  const availabilityQuery = useQuery(enrollmentDocumentUploadAvailabilityQuery());
+  const data = checklistQuery.data;
+  const availability = availabilityQuery.data;
   const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  const [busy, setBusy] = useState<string | null>(null);
   const [files, setFiles] = useState<Record<string, File | null>>({});
-  const [notice, setNotice] = useState("");
-  const pending = useRef(new Map<string, { file: File; task: {run: () => Promise<unknown>} }>());
-  const inFlight = useRef(false);
-  useEffect(() => {
-    let current = true;
-    setData(null); setAvailability(null); setAvailabilityError(false); setError("");
-    void getGuardianEnrollmentChecklist({ data: { applicationId } }).then(checklist => {
-      if (current) setData(checklist);
-    }).catch(cause => {
-      if (current) setError(mutationErrorMessage(cause, "Unable to load enrollment checklist"));
-    });
-    // Upload availability is independent so a storage outage cannot block forms.
-    void getEnrollmentDocumentUploadAvailability().then(result => {
-      if (current) setAvailability(result);
-    }).catch(() => {
-      if (current) setAvailabilityError(true);
-    });
-    return () => { current = false; };
-  }, [applicationId, attempt]);
+  const [uploads] = useState(createEnrollmentDocumentUploads);
+  async function refresh() {
+    await checklistQuery.refetch({ throwOnError: true });
+    await router.invalidate();
+  }
+  const mutation = useMutationFeedback(refresh);
+  const busy = mutation.pending || mutation.refreshFailed || checklistQuery.isFetching ? "upload" : null;
 
   async function upload(requirementId: string) {
-    if(inFlight.current)return;
     const file = files[requirementId];
     if (!file) { setError("Choose a PDF, JPEG or PNG file first."); return; }
-    inFlight.current=true;
-    setBusy(requirementId); setError(""); setNotice("");
-    try {
-      const request = { applicationId, requirementId, fileName: file.name, mimeType: file.type, size: file.size };
-      const taskKey=applicationId+":"+requirementId;
-      let attempt = pending.current.get(taskKey);
-      if(attempt?.file!==file){
-        attempt={file,task:createPrivateUploadTask({file,policy:documentUploadPolicy,
-          begin:()=>beginEnrollmentDocumentUpload({data:request}),
-          finish:upload=>finishEnrollmentDocumentUpload({data:{...request,key:upload.key}}),
-        })};
-        pending.current.set(taskKey,attempt);
-      }
-      await attempt.task.run();
-      pending.current.delete(taskKey);
+    setError("");
+    await mutation.run(async () => {
+      await uploads.upload(applicationId, requirementId, file);
       setFiles(current => ({ ...current, [requirementId]: null }));
-      setNotice("Document received. Admissions must review it before this requirement is complete.");
-      setAttempt(value => value + 1);
-      try { await router.invalidate(); }
-      catch { setError("Document received, but the page could not refresh. Reopen the checklist to review it."); }
-    } catch (cause) { setError(mutationErrorMessage(cause,"Unable to upload enrollment document. Retry to finish without uploading again.")); }
-    finally { inFlight.current=false; setBusy(null); }
+    }, {
+      successMessage: "Document received. Admissions must review it before this requirement is complete.",
+      commandErrorMessage: "Unable to upload enrollment document. Retry to finish without uploading again.",
+    });
   }
   async function openDocument(requirementId: string, documentId: string) {
-    setBusy(requirementId); setError("");
-    try {
-      const { downloadUrl } = await getEnrollmentDocumentDownload({ data: { applicationId, requirementId, documentId } });
-      window.open(downloadUrl, "_blank", "noopener,noreferrer");
-    } catch (cause) { setError(mutationErrorMessage(cause, "Unable to open enrollment document")); }
-    finally { setBusy(null); }
+    const { downloadUrl } = await getEnrollmentDocumentDownload({ data: { applicationId, requirementId, documentId } });
+    return downloadUrl;
   }
   return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">
     <h3 className="text-lg font-semibold">Enrollment checklist</h3>
     <p className="text-sm">Complete the school's requested information here. Uploading a document does not accept an offer,
       sign a form or activate enrollment.</p>
-    {error && <div role="alert"><p>{error}</p>{!data && <button type="button" className="underline"
-      onClick={() => setAttempt(value => value + 1)}>Retry checklist</button>}</div>}
-    {notice && <p role="status">{notice}</p>}
-    {!data && !error && <p role="status">Loading enrollment checklist...</p>}
+    {error && <p role="alert">{error}</p>}
+    <MutationFeedback state={mutation} pendingMessage="Uploading enrollment document..."/>
+    <QueryState loading={checklistQuery.isPending ? "Loading enrollment checklist..." : undefined}
+      error={checklistQuery.isError ? mutationErrorMessage(checklistQuery.error, "Unable to load enrollment checklist") : undefined}
+      onRetry={() => void checklistQuery.refetch()} retrying={checklistQuery.isFetching || busy !== null}>
     {data && <EnrollmentChecklistItems checklist={data}
-      uploadsEnabled={availability
+      uploadsEnabled={availability && !availabilityQuery.isError
         ? data.synthetic ? availability.demo : availability.live
         : false}
-      uploadsAvailabilityPending={!availability && !availabilityError}
-      uploadsAvailabilityError={availabilityError}
+      uploadsAvailabilityPending={availabilityQuery.isPending}
+      uploadsAvailabilityError={availabilityQuery.isError}
       busy={busy} files={files} onFile={(id, file) => setFiles(current => ({ ...current, [id]: file }))}
-      onUpload={upload} onOpen={openDocument} onChanged={async () => {
-        setAttempt(value => value + 1); await router.invalidate();
-      }} />}
+      onUpload={upload} onOpen={openDocument} onChanged={refresh} />}
+    </QueryState>
   </section>;
 }
 
@@ -101,7 +81,7 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAva
   uploadsAvailabilityError?: boolean; busy: string | null; files: Record<string, File | null>;
   onFile: (requirementId: string, file: File | null) => void;
   onUpload: (requirementId: string) => Promise<void>;
-  onOpen: (requirementId: string, documentId: string) => Promise<void>;
+  onOpen: (requirementId: string, documentId: string) => Promise<string>;
   onChanged: () => Promise<void>;
 }) {
   return <div className="space-y-3">
@@ -123,8 +103,8 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAva
       {requirement.reviewStatus === "received" && <p className="text-sm">Received - awaiting admissions review.</p>}
       <ul className="space-y-1 text-sm">{requirement.documents.map(document => <li key={document.id}>
         {document.fileName} · {document.current ? document.reviewStatus : "superseded"}
-        {document.canDownload && <button type="button" disabled={busy !== null} className="ml-3 underline"
-          onClick={() => void onOpen(requirement.id, document.id)}>Open document</button>}
+        {document.canDownload && <EvidenceDocumentLink label="Open document" disabled={busy !== null}
+          onGetDownloadUrl={() => onOpen(requirement.id, document.id)}/>}
       </li>)}</ul>
       {!requirement.form && !checklist.closed && uploadsEnabled && requirement.status !== "complete" && <fieldset disabled={busy !== null}>
         <label className="block text-sm">Supporting document (PDF, JPEG or PNG, up to 10 MB)

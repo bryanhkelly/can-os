@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   tx: undefined as Transaction | undefined, actor: undefined as AccessContext | undefined,
 }));
 vi.mock("@tanstack/react-start", () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => ({
     parse: (value: unknown) => value,
     validator(parse: (value: unknown) => unknown) { this.parse = parse; return this; },
@@ -28,7 +29,11 @@ vi.mock("@/db/client", () => ({
   get db() { if (!state.tx) throw new Error("Launch tests must stay in the rollback transaction"); return state.tx; },
 }));
 vi.mock("@/platform/storage/r2", () => ({
-  createPrivateUploadUrl: vi.fn(() => "https://private.example/upload"),
+  createPrivateUpload: vi.fn((options:{key:string;contentType:string;preventOverwrite?:boolean;expiresSeconds?:number})=>({
+    key:options.key,uploadUrl:"https://private.example/upload",
+    uploadHeaders:{"Content-Type":options.contentType,...(options.preventOverwrite?{"If-None-Match":"*"}:{})},
+    expiresInSeconds:options.expiresSeconds??180,
+  })),
   verifyPrivateObject: vi.fn(),
   signPrivateObjectUrl: vi.fn(() => "https://private.example/evidence"),
 }));
@@ -135,6 +140,8 @@ integration("registrar staffing to launch handoff", () => {
         }).returning());
         const version = first(await tx.insert(s.courseTemplateVersions).values({
           courseTemplateId: template.id, version: 1, status: "published",
+          curriculum:{learning:{version:1,modules:[{id:"intro",title:"Science introduction",
+            lessons:[{id:"first",title:"Observe and compare",body:"Compare the synthetic science observations.",resources:[]}]}]}},
         }).returning());
         const journeyDefinition = first(await tx.insert(s.journeyDefinitions).values({
           key: `launch-handoff-${suffix}`, version: "1", audience: "program", title: "Synthetic launch",
@@ -147,7 +154,7 @@ integration("registrar staffing to launch handoff", () => {
         function act(role: string, personId: string): Actor {
           const actor: Actor = {
             role, actorPersonId: personId, accountId: crypto.randomUUID(), sessionId: crypto.randomUUID(),
-            grantId: crypto.randomUUID(), capabilities: new Set(roleCapabilities[role] ?? []),
+            grantId: crypto.randomUUID(), grantSiteId:site.id, capabilities: new Set(roleCapabilities[role] ?? []),
             scope: { organizationIds: [org.id], siteIds: [site.id], programIds: [program.id] },
           };
           state.actor = actor;
@@ -211,8 +218,17 @@ integration("registrar staffing to launch handoff", () => {
         expect(await tx.select().from(s.compliancePolicyApplicability).where(eq(s.compliancePolicyApplicability.programId,program.id))).toEqual([]);
         expect(await tx.select().from(s.qualificationClaims).where(eq(s.qualificationClaims.definitionId,definition.id))).toEqual([]);
         const provision = { programId: program.id, termId: time.term.id,
-          courseTemplateVersionId: version.id, code: `SCI-${suffix}`, title: "Launch Science" };
-        const section = await launch.provisionLaunchSection({ data: provision });
+          courseTemplateVersionId: version.id, code: `SCI-${suffix}`, title: "Launch Science",
+          scheduleTemplateId:time.scheduleTemplate.id,teacherPersonId:teacher.id };
+        await expect(launch.provisionLaunchSection({data:provision})).rejects.toThrow("policy not configured");
+        expect(await tx.select().from(s.sections).where(eq(s.sections.programId,program.id))).toEqual([]);
+        // Legacy unassigned sections still need eligibility/repair coverage.
+        const legacySection=first(await tx.insert(s.sections).values({
+          programId:program.id,siteId:site.id,termId:time.term.id,
+          courseTemplateVersionId:version.id,code:provision.code,title:provision.title,
+          scheduleTemplateId:time.scheduleTemplate.id,
+        }).returning());
+        const section={sectionId:legacySection.id};
         const assignment = { programId: program.id, sectionId: section.sectionId, teacherPersonId: teacher.id };
         await expect(launch.assignLaunchTeacher({ data: assignment })).rejects.toThrow("policy not configured");
         await expect(activateProgram(registrarActor, program.id)).rejects.toThrow("No assigned instructor");
@@ -575,7 +591,7 @@ integration("registrar staffing to launch handoff", () => {
         const activationEvidence=JSON.stringify(first(audits.filter(row=>row.action==="program.activate")).after);
         for(const ruleId of policyRuleIds) expect(activationEvidence).toContain(ruleId);
         expect(audits.filter(row => row.action === "launch.teacher_policy.publish")).toHaveLength(1);
-        expect(audits.filter(row => row.action === "launch.section.provision")).toHaveLength(2);
+        expect(audits.filter(row => row.action === "launch.section.provision")).toHaveLength(1);
         const arrangements = await tx.select().from(s.deliveryArrangements).where(inArray(s.deliveryArrangements.sectionId,
           [section.sectionId, secondSection.sectionId]));
         const assignmentAudits = await tx.select().from(s.auditEvents).where(inArray(s.auditEvents.resourceId, arrangements.map(row => row.id)));
@@ -597,7 +613,7 @@ integration("registrar staffing to launch handoff", () => {
         expect(storage.verifyPrivateObject).toHaveBeenCalledWith(expect.objectContaining({
           keyPattern: expect.any(RegExp), expectedSize: 128, expectedContentType: "application/pdf", verifySignature: expect.any(Function),
         }));
-        expect(storage.createPrivateUploadUrl).toHaveBeenCalledWith(expect.objectContaining({preventOverwrite:true}));
+        expect(storage.createPrivateUpload).toHaveBeenCalledWith(expect.objectContaining({preventOverwrite:true}));
         expect(storage.signPrivateObjectUrl).toHaveBeenCalledWith(expect.objectContaining({ method: "GET", expiresSeconds: 60 }));
         const evidenceAudits=await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.actorPersonId,registrar.id),
           eq(s.auditEvents.action,"qualification.evidence_read")));

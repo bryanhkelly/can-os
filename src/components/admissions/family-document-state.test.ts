@@ -9,6 +9,10 @@ describe("family document draft isolation",()=>{
   expect(isEnrollmentDocumentCandidate({size:100,type:"application/pdf"})).toBe(true);
   expect(isEnrollmentDocumentCandidate({size:10*1024*1024,type:"image/png"})).toBe(true);
   expect(isEnrollmentDocumentCandidate({size:0,type:"image/jpeg"})).toBe(false);
+  expect(isEnrollmentDocumentCandidate({size:15,type:"application/pdf"})).toBe(false);
+  expect(isEnrollmentDocumentCandidate({size:16,type:"application/pdf"})).toBe(true);
+  expect(isEnrollmentDocumentCandidate({size:16.5,type:"application/pdf"})).toBe(false);
+  expect(isEnrollmentDocumentCandidate({size:NaN,type:"application/pdf"})).toBe(false);
   expect(isEnrollmentDocumentCandidate({size:10*1024*1024+1,type:"application/pdf"})).toBe(false);
   expect(isEnrollmentDocumentCandidate({size:100,type:"text/html"})).toBe(false);
  });

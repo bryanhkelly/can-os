@@ -1,6 +1,8 @@
 import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react-query";
 import { getLocalSiteDelegations } from "./site-local-delegation.functions";
 import { getSectionFacilitatorPlanning } from "./site-section-facilitators.functions";
+import { createMutationRunner } from "@/lib/mutation-feedback";
+import { DomainError } from "@/domain/errors";
 
 /** Related client read models, not new permissions or a staffing record store. */
 export const siteStaffingKeys = {
@@ -29,11 +31,33 @@ export function sectionFacilitatorsQuery(programId: string) {
   });
 }
 
-export function refreshSiteStaffing(client: QueryClient, programId: string) {
+function invalidateSiteStaffing(client: QueryClient, programId: string) {
   return client.invalidateQueries(
     { queryKey: siteStaffingKeys.program(programId) },
     { throwOnError: true },
   );
+}
+
+const runners = new WeakMap<QueryClient, Map<string, ReturnType<typeof createMutationRunner>>>();
+function staffingRunner(client: QueryClient, programId: string) {
+  let programs = runners.get(client);
+  if (!programs) { programs = new Map(); runners.set(client, programs); }
+  let runner = programs.get(programId);
+  if (!runner) {
+    runner = createMutationRunner({
+      refresh: () => invalidateSiteStaffing(client, programId),
+      update: () => {},
+    });
+    programs.set(programId, runner);
+  }
+  return runner;
+}
+
+export async function refreshSiteStaffing(client: QueryClient, programId: string) {
+  const result = await staffingRunner(client, programId).retryRefresh();
+  if (result.status === "not-required") await invalidateSiteStaffing(client, programId);
+  if (result.status === "refresh-failed") throw new DomainError("UNAVAILABLE");
+  if (result.status === "duplicate") throw new DomainError("CONFLICT");
 }
 
 /** A saved command is not failed just because a subsequent read is unavailable.
@@ -50,14 +74,13 @@ export function siteStaffingMutationOptions<Input, Result>(
     mutationKey: siteStaffingKeys.program(programId),
     retry: false,
     mutationFn: async (input: Input) => {
-      const result = await command(input);
-      let refreshWarning: string | null = null;
-      try {
-        await refreshSiteStaffing(client, programId);
-      } catch {
-        refreshWarning = "Your change was saved, but the latest staffing records could not be loaded. Retry loading before making another change.";
-      }
-      return { result, refreshWarning };
+      const refreshWarning = "Your change was saved, but the latest staffing records could not be loaded. Retry loading before making another change.";
+      const outcome = await staffingRunner(client, programId)(() => command(input), {
+        successMessage: "", commandErrorMessage: "Unable to update staffing.", refreshErrorMessage: refreshWarning,
+      });
+      if (outcome.status === "failed") throw outcome.error;
+      if (outcome.status === "duplicate" || outcome.status === "refresh-required") throw new DomainError("CONFLICT");
+      return { result: outcome.value, refreshWarning: outcome.status === "refresh-failed" ? refreshWarning : null };
     },
   });
 }

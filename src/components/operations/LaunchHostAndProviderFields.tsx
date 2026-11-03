@@ -1,10 +1,10 @@
-import { jurisdictionSetupGuidance } from "@/domain/jurisdiction-setup-guidance";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { Link } from "@tanstack/react-router";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
-
-const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
-const selectClass = inputClass;
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
@@ -30,49 +30,48 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hos
                   Organizations & jurisdiction
                 </legend>
                 <div className="mt-2 space-y-3">
-                  <label className="block text-xs">
-                    Host organization
-                    <select
-                      aria-label="Host organization"
-                      className={selectClass}
+                  <Field label="Host organization" required>
+                    <Select
                       value={hostOrganizationId}
                       onChange={(e) => {
                         setHostOrganizationId(e.target.value);
                         setSiteId("");
                         setCreatedSiteDraft(null);
                       }}
-                      required
                     >
                       <option value="">Select host organization…</option>
                       {options.organizations.map((organization) => (
                         <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
-                    </select>
-                  </label>
-                  <label className="block text-xs">
-                    School location
-                    <select aria-label="Site" className={selectClass} value={siteId} onChange={(e) => setSiteId(e.target.value)} disabled={!hostOrganizationId}>
+                    </Select>
+                  </Field>
+                  <Field label="School location">
+                    <Select value={siteId} onChange={(e) => setSiteId(e.target.value)} disabled={!hostOrganizationId}>
                       <option value="">Choose a school location…</option>
                       {hostSites.map((site) => (
                         <option key={site.id} value={site.id}>{site.name} · {site.timezone}</option>
                       ))}
-                    </select>
-                  </label>
+                    </Select>
+                  </Field>
                   <div className="rounded-lg border p-3">
                     <p className="text-xs font-semibold">Add a school location</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <input aria-label="New site name" placeholder="Campus name" className={inputClass} value={newSiteName} onChange={e=>{const value=e.target.value;setNewSiteName(value);if(!newSiteSlug||newSiteSlug===suggestedLaunchSlug(newSiteName))setNewSiteSlug(suggestedLaunchSlug(value));}}/>
-                      <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
-                      <label className="text-xs">Location time zone
-                       <select aria-label="New site timezone" className={selectClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
+                      <Field label="School location name">
+                       <Input placeholder="Campus name" value={newSiteName} onChange={e=>{const value=e.target.value;setNewSiteName(value);if(!newSiteSlug||newSiteSlug===suggestedLaunchSlug(newSiteName))setNewSiteSlug(suggestedLaunchSlug(value));}}/>
+                      </Field>
+                      <Field label="School location slug">
+                       <Input placeholder="campus-slug" value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
+                      </Field>
+                      <Field label="Location time zone">
+                       <Select value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
                         {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
-                       </select>
-                      </label>
+                       </Select>
+                      </Field>
                     </div>
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
                       This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
                     </p>}
-                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Save school location</button>
+                    <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
                       <p className="font-semibold">Your website draft is prepared</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
@@ -85,15 +84,14 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hos
                         className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
                     </div>}
                   </div>
-                  <label className="block text-xs">
-                    Jurisdiction
-                    <select aria-label="Jurisdiction" className={selectClass} value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)} required>
+                  <Field label="Jurisdiction" required>
+                    <Select value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)}>
                       <option value="">Select jurisdiction…</option>
                       {options.jurisdictions.map((jurisdiction) => (
                         <option key={jurisdiction.id} value={jurisdiction.id}>{jurisdiction.name} ({jurisdiction.code})</option>
                       ))}
-                    </select>
-                  </label>
+                    </Select>
+                  </Field>
                   {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4" role="status">
                     <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
                     {jurisdictionGuidance[jurisdictionId]?<>
@@ -104,25 +102,23 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hos
                      <p className="mt-2 text-xs text-muted-foreground">Configuration does not authorize enrollment or operation.</p>
                     </>}
                   </div>}
-                  <label className="block text-xs">
-                    Academic provider
-                    <select aria-label="Academic provider organization" className={selectClass} value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)} required>
+                  <Field label="Academic provider" required>
+                    <Select value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)}>
                       <option value="">Select academic provider…</option>
                       {options.academicProviderOrganizations.map((organization) => (
                         <option key={organization.id} value={organization.id}>{organization.name}{organization.type === "can_network" ? " (CAN academic provider)" : ""}</option>
                       ))}
-                    </select>
-                  </label>
+                    </Select>
+                  </Field>
                   {creditMode === "credit_bearing" ? (
-                    <label className="block text-xs">
-                      Credit-issuing organization
-                      <select aria-label="Credit issuing organization" className={selectClass} value={creditIssuingOrganizationId} onChange={(e) => setCreditIssuingOrganizationId(e.target.value)} required>
+                    <Field label="Credit-issuing organization" required>
+                      <Select value={creditIssuingOrganizationId} onChange={(e) => setCreditIssuingOrganizationId(e.target.value)}>
                         <option value="">Select credit issuer…</option>
                         {options.creditIssuingOrganizations.map((organization) => (
                           <option key={organization.id} value={organization.id}>{organization.name}{organization.type === "can_network" ? " (CAN credit issuer)" : ""}</option>
                         ))}
-                      </select>
-                    </label>
+                      </Select>
+                    </Field>
                   ) : (
                     <p className="text-xs text-muted-foreground">Noncredit offering: no credit issuer required; it does not contribute to official transcripts.</p>
                   )}

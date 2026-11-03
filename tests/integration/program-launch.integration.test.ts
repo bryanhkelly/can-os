@@ -9,6 +9,7 @@ vi.mock("@/db/client", () => ({
   get db() { if (!launchState.tx) throw new Error("GF3 tests must stay in their rollback transaction"); return launchState.tx; },
 }));
 vi.mock("@tanstack/react-start", () => ({
+  createServerOnlyFn: (fn: unknown) => fn,
   createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
 }));
 vi.mock("@tanstack/react-start/server", () => ({ getRequest: () => new Request("http://localhost") }));
@@ -234,7 +235,7 @@ integration("GF3 host / program launch", () => {
         // agreement the Program must NOT be activated, even from draft.
         await expect(
           programsModule.activateProgram(context, launch.programId),
-        ).rejects.toThrow("independently verified Program-Site institutional authorization");
+        ).rejects.toThrow("current independently verified CAN-church operating authority");
       } else {
         await expect(
           programsModule.activateProgram(context, launch.programId),
@@ -247,11 +248,41 @@ integration("GF3 host / program launch", () => {
         .where(eq(schema.journeyRequirements.journeyId, launch.journeyId));
 
       for (const requirement of requirements) {
+        await expect(journeyModule.completeJourneyRequirement(context,requirement.id))
+          .rejects.toThrow("owner-specific workflow");
         await journeyModule.completeJourneyRequirement(
           context,
           requirement.id,
           [{ fact: `${requirement.key}_complete` }],
+          {allowedCurrentStatuses:["needs_you","needs_can"]},
         );
+      }
+
+      const operating=await import("@/modules/programs/program-site-authorization.server");
+      let operatingAuthorizationId:string|undefined;
+      if(scenario.orgType==="church"){
+        const [reviewer,verifier]=await db.insert(schema.people).values([
+          {legalFirstName:"Synthetic",legalLastName:"Independent CAN Reviewer"},
+          {legalFirstName:"Synthetic",legalLastName:"Agreement Verifier"},
+        ]).returning();
+        const services=["academic_instruction","curriculum","onsite_supervision","school_of_record","credit_issuance","academic_records"];
+        const requested=await operating.requestProgramSiteAuthorization(launchContext,{programId:launch.programId,services});
+        operatingAuthorizationId=requested.authorizationId;
+        const through=new Date("2028-07-01T00:00:00Z");
+        const evidence=await operating.registerOperatingAgreementEvidence(launchContext,{
+          programId:launch.programId,siteId:site.id,fileName:"synthetic-operating-agreement.pdf",
+          effectiveThrough:through,expiresAt:through,verifierPersonId:verifier.id,
+          hostSignatureVerified:true,institutionSignatureVerified:true,authorizedServices:services,
+        });
+        await operating.reviewProgramSiteAuthorization({
+          actorPersonId:reviewer.id,role:"can_network_steward",grantSiteId:null,
+          capabilities:new Set(["network.agreements.verify"]),
+          scope:{organizationIds:[canOrg.id]},
+        },{
+          authorizationId:operatingAuthorizationId,decision:"approved",
+          reason:"Independent review of synthetic rollback-only operating evidence.",
+          evidenceDocumentId:evidence.documentId,effectiveFrom:new Date(Date.now()-3600000),effectiveThrough:through,
+        });
       }
 
       // Activation also requires an active school year with at least one
@@ -277,6 +308,8 @@ integration("GF3 host / program launch", () => {
           courseTemplateId: course!.id,
           version: 1,
           status: "published",
+          curriculum:{learning:{version:1,modules:[{id:"intro",title:"Launch readiness",
+            lessons:[{id:"first",title:"Introduction",body:"Read and compare the synthetic examples.",resources:[]}]}]}},
         })
         .returning();
       const [section] = await db
@@ -288,6 +321,7 @@ integration("GF3 host / program launch", () => {
           code: "LAUNCH-1",
           title: "Launch Readiness",
           termId: academicTime.term.id,
+          scheduleTemplateId:academicTime.scheduleTemplate.id,
         })
         .returning();
       const [launchTeacher] = await db.insert(schema.people).values({
@@ -478,7 +512,7 @@ integration("GF3 host / program launch", () => {
             programIds: [launch.programId, extension.programId],
           },
         }, extension.programId)).rejects.toThrow(
-          "independently verified Program-Site institutional authorization",
+          "current independently verified CAN-church operating authority",
         );
       }
       launchState.context = launchContext;
@@ -491,7 +525,12 @@ integration("GF3 host / program launch", () => {
         eq(schema.auditEvents.action, "site.create"),
       ));
       expect(siteAudit.context.requestId).toBe(context.requestId);
-      await (await import("@/workers/domain-event-worker")).processPendingDomainEvents();
+      const fixtureSiteEvents=await db.select({id:schema.domainEvents.id}).from(schema.domainEvents)
+        .where(and(eq(schema.domainEvents.aggregateId,extraSite.siteId),
+          eq(schema.domainEvents.eventType,"SiteCreated")));
+      await (await import("@/workers/domain-event-worker")).processPendingDomainEvents(100,{
+        eventIds:fixtureSiteEvents.map(event=>event.id),
+      });
       const [siteEvent] = await db.select().from(schema.domainEvents).where(and(
         eq(schema.domainEvents.aggregateId, extraSite.siteId),
         eq(schema.domainEvents.eventType, "SiteCreated"),
@@ -500,11 +539,15 @@ integration("GF3 host / program launch", () => {
 
       const {listOpeningHandoffs,acknowledgeOpeningHandoff}=await import("@/modules/programs/opening-handoff.server");
       if (scenario.programType === "church_hosted_academy") {
+        if(!operatingAuthorizationId)throw new Error("Missing synthetic operating authorization");
+        await operating.revokeProgramSiteAuthorization(launchContext,{
+          authorizationId:operatingAuthorizationId,reason:"Withdraw the synthetic operating authorization before activation.",
+        });
         // All local course/staffing and launch checklist work is complete,
-        // yet that evidence cannot silently substitute for CAN authorization.
+        // yet it cannot substitute for a current, non-revoked authorization.
         await expect(
           programsModule.activateProgram(context, launch.programId, {recipientPersonId:operator.id}),
-        ).rejects.toThrow("independently verified Program-Site institutional authorization");
+        ).rejects.toThrow("current independently verified CAN-church operating authority");
         expect(await listOpeningHandoffs([launch.programId])).toHaveLength(0);
         const [blockedProgram] = await db.select().from(schema.programs)
           .where(eq(schema.programs.id, launch.programId));

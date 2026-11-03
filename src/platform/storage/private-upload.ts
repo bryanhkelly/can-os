@@ -31,11 +31,16 @@ export class UploadError extends DomainError {
 }
 
 export function validateUploadFile(file: File, policy: UploadPolicy, contentType = file.type): void {
-  if (!file.name.trim() || !policy.contentTypes.includes(contentType)
+  if (!file.name.trim() || !isUploadFileCandidate({ type: contentType, size: file.size }, policy)
     || (file.type !== "" && file.type !== contentType)
-    || !Number.isSafeInteger(file.size) || file.size < policy.minBytes || file.size > policy.maxBytes) {
+  ) {
     throw new UploadError("invalid-file", "Choose a supported file within the displayed size limits.");
   }
+}
+
+export function isUploadFileCandidate(file: Pick<File, "size" | "type">, policy: UploadPolicy): boolean {
+  return policy.contentTypes.includes(file.type) && Number.isSafeInteger(file.size)
+    && file.size >= policy.minBytes && file.size <= policy.maxBytes;
 }
 
 /** Transport only: the domain still owns authorization, object keys and finalization. */

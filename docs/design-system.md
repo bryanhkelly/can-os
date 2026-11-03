@@ -100,6 +100,19 @@ School launch requirement completion, evidence statements, and institutional
 evidence decisions now use shared checkbox, field, select, textarea, and button
 primitives. Existing visibility gates, completion callbacks, and evidence-review
 authority remain unchanged.
+The teacher marketplace and jurisdiction-profile review pages now compose the
+shared workspace shell and controls. Engagement, review-save, and publish
+mutations keep refresh recovery separate from command execution; publishing
+requires explicit confirmation and a successfully refreshed review save.
+Launch host/provider choices, school-location inputs, wizard retries, and
+launch/class-staffing navigation also use the canonical controls. Scoped ESLint
+enforcement now covers these migrated pages and launch components.
+Jurisdiction-profile review navigation is limited to the CAN network steward,
+matching the route's `jurisdiction.profile.manage` server capability. The
+review page has one shared-shell heading, shared empty states, and explicit
+HTTPS URL/UTC timestamp inputs that retain ISO timestamps in the command data.
+Marketplace selection and no-match states use the shared empty-state pattern;
+academic-setup success and error messages use semantic workspace notices.
 
 ## Semantic styling governance
 
@@ -157,10 +170,10 @@ This increment integrates the GF22 **application-entry vertical slice**. It does
 
 ## Current validation evidence
 
-- Typecheck and production application build for the latest shell, teacher/family conference, assessment-composer, school-year setup/editor, and launch schedule changes: **passed**.
+- Typecheck and production application build for the latest shell, teacher/family conference, assessment-composer, school-year setup/editor, launch schedule, marketplace, and jurisdiction-review changes: **passed**.
 - Unit and browser/Storybook test runs for this increment: **not run, per user request**. Earlier test counts are not validation of these changes.
-- Targeted ESLint for the touched shell, conference, assessment, school-year, and launch schedule components completed with **0 errors or warnings**. Shared component inventory: **210 files checked**.
-- Route contracts: **108 source routes, 108 recorded, 0 issues**.
+- Targeted ESLint for the touched shell, conference, assessment, school-year, launch, marketplace, and jurisdiction-review surfaces completed with **0 errors or warnings**. Shared component inventory: **211 files checked**.
+- Route contracts: **110 source routes, 110 recorded, 0 issues**.
 - Previous adoption increment only: Chromium Storybook interaction/axe checks passed **91 tests** across 22 story files, plus **25 mobile checks** at 390 x 844. These were not rerun for the latest changes.
 - Static Storybook build last passed for the previous adoption increment; it was not rerun for the latest changes. Compilation does not establish browser behavior; those checks remain unverified for this increment.
 - Chromatic upload: **not run**; no project token is configured in this environment. The local static build and Chromatic configuration are ready.

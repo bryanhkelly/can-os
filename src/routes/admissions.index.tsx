@@ -19,6 +19,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import {z} from "zod";
 import {optionalSearchUuid,siteProgramSelectionSchema} from "@/lib/route-search";
 import { PageNavigation } from "@/components/workspace/page-navigation";
+import { SiteProgramFields } from "@/components/workspace/site-program-fields";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const admissionsSearchSchema=siteProgramSelectionSchema.extend({
@@ -76,7 +77,6 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   const selected=Route.useSearch();
   const pageCount=Math.max(1,Math.ceil(filteredTotal/pageSize));
   const activeEnrollmentCount=enrollmentCounts.reduce((total,row)=>total+row.activeStudents,0);
-  const programChoices=programs.filter(program=>!selected.siteId||program.siteId===selected.siteId);
   const openScope=(siteId?:string,programId?:string)=>{
     const query=new URLSearchParams();
     if(siteId)query.set("siteId",siteId);
@@ -107,20 +107,9 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       <WorkflowIntro eyebrow="Admissions & enrollment" title="A thoughtful path from inquiry to enrollment." description="Track each family's progress, review decisions, and hand accepted offers into authorized enrollment. Guardian verification remains independent." actions={<Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Open intake <ArrowUpRight className="size-4" /></Link>} />
       <MutationFeedback state={mutation} pendingMessage="Saving enrollment records..." className="mt-4"/>
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-        <label className="text-sm">School
-          <select aria-label="Admissions school" className="ml-2 rounded border bg-background p-2"
-           value={selected.siteId??""} onChange={event=>openScope(event.target.value||undefined)}>
-           <option value="">All permitted schools</option>
-           {sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm">Program
-          <select aria-label="Admissions program" className="ml-2 rounded border bg-background p-2"
-           value={selected.programId??""} onChange={event=>openScope(selected.siteId,event.target.value||undefined)}>
-           <option value="">All permitted programs</option>
-           {programChoices.map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
-          </select>
-        </label>
+        <SiteProgramFields sites={sites} programs={programs} siteId={selected.siteId??""} programId={selected.programId??""}
+          labelPrefix="Admissions" sitePlaceholder="All permitted schools" programPlaceholder="All permitted programs"
+          onChange={(siteId,programId)=>openScope(siteId||undefined,programId||undefined)}/>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <StatCard label="Applications" value={summary.total} />

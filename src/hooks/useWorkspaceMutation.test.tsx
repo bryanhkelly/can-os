@@ -84,4 +84,51 @@ describe("useWorkspaceMutation", () => {
     expect(mocks.invalidateQueries).toHaveBeenLastCalledWith({ queryKey: ["site"] }, { throwOnError: true });
     expect((await mutation.submit("next")).status).toBe("completed");
   });
+
+  it("never automatically retries domain commands even if the QueryClient enables retries", () => {
+    function Harness() {
+      useWorkspaceMutation({ mutationFn: async () => "saved" });
+      return null;
+    }
+    renderToString(createElement(Harness));
+    expect(mocks.options.current?.retry).toBe(false);
+  });
+
+  it("preserves committed status after a feedback callback fails and never replays that callback", async () => {
+    mocks.mutateAsync.mockReset().mockResolvedValue("saved");
+    mocks.invalidateQueries.mockReset().mockResolvedValue(undefined);
+    const onSuccess = vi.fn().mockRejectedValue(new Error("feedback failed"));
+    const onRefreshError = vi.fn();
+    let mutation!: ReturnType<typeof useWorkspaceMutation<string, string>>;
+    function Harness() {
+      mutation = useWorkspaceMutation({ mutationFn: async (value: string) => value, onSuccess, onRefreshError });
+      return null;
+    }
+    renderToString(createElement(Harness));
+    const result = await mutation.submit("save");
+    expect(result.status).toBe("completed");
+    if (result.status === "completed") expect(result.refreshError).toBeInstanceOf(Error);
+    expect(await mutation.submit("duplicate")).toEqual({ status: "ignored" });
+    expect(await mutation.retryRefresh()).toEqual({ status: "refreshed" });
+    expect(onSuccess).toHaveBeenCalledExactlyOnceWith("saved", "save");
+    expect(onRefreshError).toHaveBeenCalledOnce();
+    expect(mocks.mutateAsync).toHaveBeenCalledOnce();
+  });
+
+  it("runs success feedback even if refresh fails, then recovers without replaying command or feedback", async () => {
+    mocks.mutateAsync.mockReset().mockResolvedValue("saved");
+    mocks.invalidateQueries.mockReset().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    const onSuccess = vi.fn();
+    let mutation!: ReturnType<typeof useWorkspaceMutation<string, string>>;
+    function Harness() {
+      mutation = useWorkspaceMutation({ mutationFn: async (value: string) => value, invalidateQueries: [["site"]], onSuccess });
+      return null;
+    }
+    renderToString(createElement(Harness));
+    await mutation.submit("save");
+    expect(onSuccess).toHaveBeenCalledOnce();
+    expect(await mutation.retryRefresh()).toEqual({ status: "refreshed" });
+    expect(onSuccess).toHaveBeenCalledOnce();
+    expect(mocks.mutateAsync).toHaveBeenCalledOnce();
+  });
 });

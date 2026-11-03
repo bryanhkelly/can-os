@@ -4,18 +4,19 @@ import { Button } from "@/components/ui/button";
 
 export interface EvidenceDocumentLinkProps {
   label?: string;
+  disabled?: boolean;
   onGetDownloadUrl: () => Promise<string>;
 }
 
 /** Retrieves a fresh, authorized private URL at click time; never stores it in the DOM. */
 export function EvidenceDocumentLink({
-  label = "Open private document", onGetDownloadUrl,
+  label = "Open private document", disabled = false, onGetDownloadUrl,
 }: EvidenceDocumentLinkProps) {
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [error, setError] = useState("");
   async function open() {
-    if (inFlight.current) return;
+    if (disabled || inFlight.current) return;
     inFlight.current = true;
     setBusy(true); setError("");
     // Reserve the browsing context synchronously so popup blockers do not
@@ -37,7 +38,7 @@ export function EvidenceDocumentLink({
     } finally { inFlight.current = false; setBusy(false); }
   }
   return <div className="mt-2">
-    <Button variant="ghost" size="sm" disabled={busy} onClick={() => void open()}>
+    <Button variant="ghost" size="sm" disabled={disabled || busy} onClick={() => void open()}>
       {busy ? "Opening…" : label}
     </Button>
     {error && <p role="alert" className="mt-1 text-xs text-danger">{error}</p>}

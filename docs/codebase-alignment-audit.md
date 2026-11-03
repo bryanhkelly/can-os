@@ -615,3 +615,57 @@ fixture coverage, 86-route contracts and mutation hygiene passed. Full
 typecheck retains 47 baseline diagnostics with none in changed files. No live
 database seed, migration, production mutation or authenticated browser journey
 was run.
+
+## Shared client mechanics consolidation (2026-11-02)
+
+The upload transport is already shared in
+`src/platform/storage/private-upload.ts`. This follow-up consolidates the
+remaining identified client mechanics without merging domain commands:
+
+- `useWorkspaceMutation` now adapts `createMutationRunner` instead of maintaining
+  another in-flight/refresh-recovery state machine. It preserves its public
+  result and callback contracts and explicitly disables automatic command
+  retries. Staffing mutation options use that same runner, shared by QueryClient
+  and Program so both appointment panels share the synchronous command guard.
+  Refresh recovery never replays the saved command.
+- Guardian and registrar enrollment documents use `EvidenceDocumentLink` for
+  click-time authorization, synchronous popup reservation, duplicate-click
+  suppression and explicit errors. Disabled callers remain disabled.
+- `createEnrollmentDocumentUploads` shares application/requirement-scoped
+  pending-task bookkeeping, retains uploaded bytes through finalization failure,
+  and replaces the attempt when the selected File changes. Both enrollment
+  screens share upload-availability query options. The client candidate check
+  now uses the transport policy's exact 16-byte minimum and 10-MB maximum.
+- PDF, ZIP and ICS downloads use `src/lib/download.ts` for binary decoding where
+  needed, temporary anchors and delayed object-URL cleanup. Authorization and
+  access logging stay in the existing server endpoints.
+- Credential releases, graduation issuer lookup and the guardian checklist use
+  TanStack Query and `QueryState` for loading/error/empty/retry presentation.
+  Failed reads hide stale actionable content; storage availability remains
+  independent of ordinary enrollment forms.
+- Both staffing panels compose `AppointmentExpiryField` and share the expiry
+  bounds/conversion helper. This intentionally preserves the existing UTC
+  date limits, 89-day offset and `23:59:59.000Z` expiry. Site-local and
+  inclusive/exclusive policy changes remain a separate decision.
+- Admissions composes `SiteProgramFields`; credential and graduation fields
+  compose the existing `Field` and `Input` primitives rather than local field
+  renderers. School changes still clear Program selection and admissions
+  navigation still resets the prior detail/stage/page selection.
+
+Server capability/resource/scope/relationship checks, domain idempotency,
+review rules, transactional audit/events, storage overwrite protection and
+deployment gates are unchanged. This is not a universal workflow engine.
+
+Validation executed for this consolidation:
+- 15 focused unit files / 107 tests passed, including consumer read failures,
+  exact upload boundaries, finalization-only retry, sibling isolation, binary
+  download cleanup, mutation callback contracts and shared staffing guards.
+- 3 Storybook Chromium files / 18 tests passed, including private-document
+  authorization/popup ordering, blocked popups, duplicate clicks, disabled
+  controls, appointment expiry and School/Program selection.
+- Full TypeScript typecheck and production client/server build passed.
+- Route contracts: 110 source routes / 110 records / 0 issues.
+- Focused ESLint completed with no errors and existing warnings; shared
+  component ownership and mutation hygiene checks passed.
+- No live database mutation, migration, deployment or authenticated multi-role
+  end-to-end journey was performed. Those remain unverified by this change.

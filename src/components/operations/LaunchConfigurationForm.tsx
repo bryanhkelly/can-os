@@ -4,6 +4,7 @@ import { LaunchSchoolModelPicker } from "@/components/operations/LaunchSchoolMod
 import { LaunchProgramIdentityFields } from "@/components/operations/LaunchProgramIdentityFields";
 import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliveryModelFields";
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
+import { Button } from "@/components/ui/button";
 
 export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPresets,identity,delivery,hostAndProvider,submitLaunch,busy}:{
  created:LaunchCreatedResult|null;
@@ -28,13 +29,12 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
 
               <LaunchHostAndProviderFields {...hostAndProvider} />
 
-              <button
+              <Button
                 type="submit"
-                className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
                 disabled={busy || Boolean(created) || !options.organizations.length || (delivery.onsite && !hostAndProvider.siteId)}
               >
                 {busy ? "Saving your school…" : created ? "School saved" : "Save school and continue"}
-              </button>
+              </Button>
               {delivery.onsite&&!hostAndProvider.siteId&&<p role="status" className="text-sm text-muted-foreground">Choose or save a school location above before continuing with onsite learning.</p>}
               {!options.organizations.length && (
                 <p className="text-xs text-muted-foreground">

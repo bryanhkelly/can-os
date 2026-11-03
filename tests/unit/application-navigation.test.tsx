@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
 import { Route as Notifications } from "@/routes/notifications";
@@ -139,7 +140,8 @@ function render(route:{options:{component?:unknown}}){
   }
   const Page=route.options.component;
   if(typeof Page!=="function")throw new Error("Missing page component");
-  return renderToStaticMarkup(<Page/>);
+  const queryClient=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
+  return renderToStaticMarkup(<QueryClientProvider client={queryClient}><Page/></QueryClientProvider>);
 }
 function successful(data:unknown){state.data={ok:true,data};}
 

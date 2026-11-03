@@ -7,6 +7,7 @@ import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseO
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
+import { downloadBase64 } from "@/lib/download";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {uuidProgramSelectionSchema} from "@/lib/route-search";
 import { schoolCurriculumNextActions } from "@/domain/curriculum-next-actions";
@@ -319,12 +320,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      <button type="button" disabled={busy} className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
       onClick={()=>void perform(async()=>{
         const archive=await exportOneRosterBulkRoster({data:{programId:market.program.id}});
-        const binary=atob(archive.base64),bytes=new Uint8Array(binary.length);
-        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-        const url=URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer],{type:"application/zip"}));
-        const a=document.createElement("a");a.href=url;a.download=archive.fileName;
-        document.body.appendChild(a);a.click();a.remove();
-        URL.revokeObjectURL(url);
+        downloadBase64(archive.base64,archive.fileName,"application/zip");
       },"OneRoster roster export generated and access logged.")}>Export OneRoster ZIP</button>
      <p className="text-xs text-muted-foreground">
        Only active, explicitly authorized sections and their enrolled students and assigned teachers are included.

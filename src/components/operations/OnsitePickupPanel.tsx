@@ -77,7 +77,7 @@ export function OnsitePickupPanel({ date, onChanged }: {
       commandErrorMessage:"Pickup command could not be confirmed.",
       refreshErrorMessage:"The pickup command was accepted, but the verified roster could not be refreshed. Retry the refresh before recording another event.",
     });
-    if(outcome.status==="saved"){
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
       // Only a confirmed response retires an idempotency identity. A subsequent
       // independent observed event may then receive its own new request ID.
       pendingMutationIds.current.delete(key);
@@ -91,7 +91,6 @@ export function OnsitePickupPanel({ date, onChanged }: {
   async function retryRefresh(){
     const outcome=await mutation.retryRefresh();
     if(outcome.status==="refreshed"){
-      for(const key of pendingMutationIds.current.keys())pendingMutationIds.current.delete(key);
       setError("");
     }
     return outcome;

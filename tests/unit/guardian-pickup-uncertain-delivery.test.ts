@@ -7,10 +7,10 @@ describe("guardian pickup command retry identity", () => {
   it("reuses original UUID after lost response but retires it only after acknowledged server success",()=>{
     expect(run).toContain("pendingMutationIds.current.get(key) ?? crypto.randomUUID()");
     expect(run.indexOf("pendingMutationIds.current.set(key, mutationId)"))
-      .toBeLessThan(run.indexOf("await command(mutationId)"));
+      .toBeLessThan(run.indexOf("await mutation.run(()=>command(mutationId)"));
     expect(run.indexOf("pendingMutationIds.current.delete(key)"))
-      .toBeGreaterThan(run.indexOf("await command(mutationId)"));
-    expect(run.slice(run.indexOf("} catch (cause)"))).not.toContain("pendingMutationIds.current.delete(key)");
+      .toBeGreaterThan(run.indexOf('if(outcome.status==="saved"||outcome.status==="refresh-failed")'));
+    expect(run.slice(run.indexOf('else if(outcome.status==="failed")'),run.indexOf("async function retryRefresh"))).not.toContain("pendingMutationIds.current.delete(key)");
   });
   it("reuses the UUID for family authorization, revocation and a restrictive custody hold",()=>{
     for(const command of ["createPickupAuthorization","revokePickupAuthorization","createPickupCustodyHold"])

@@ -4,7 +4,7 @@ import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors
 import { emitEvent } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,or } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { canCompleteStudentAction, isStudentSupportAction } from "./student-action-policy";
 import { isStudentGoalPublicReview } from "@/domain/teacher-student-goal";
@@ -40,7 +40,15 @@ export const getQuickWinActions = createServerFn({ method: "GET" })
       ),
     ),
     inArray(actions.siteId, sites),
-    inArray(actions.programId, actor.scope.programIds ?? []),
+    or(
+      inArray(actions.programId, actor.scope.programIds ?? []),
+      and(
+        eq(actions.type, "conference_follow_up"),
+        isNull(actions.programId),
+        eq(actions.subjectType, "student_profile"),
+        eq(actions.subjectId, studentProfiles.id),
+      ),
+    ),
     data.actionId ? eq(actions.id, data.actionId) : undefined,
   )).orderBy(desc(actions.createdAt)).limit(data.actionId ? 1 : 100);
   return { connected: true as const, actions: rows.map(({ ownerPersonId, ...row }) => ({
@@ -62,12 +70,34 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
     const actor = await studentActor();
     const sites = actorSiteIds(actor);
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
-    const [{ db }, { actions }] = await Promise.all([
+    const [{ db }, { actions, studentProfiles }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"),
     ]);
     return db.transaction(async tx => {
-      const [current] = await tx.select({id:actions.id,type:actions.type,subjectType:actions.subjectType,subjectId:actions.subjectId,programId:actions.programId}).from(actions).where(and(eq(actions.id,data.actionId),eq(actions.ownerPersonId,actor.actorPersonId),inArray(actions.siteId,sites),eq(actions.status,"open"))).for("update").limit(1);
-      if(!current||!current.programId||!(actor.scope.programIds??[]).includes(current.programId))throw new AuthorizationError("open owned action in authorized program");
+      const [current] = await tx.select({
+        id: actions.id,
+        type: actions.type,
+        subjectType: actions.subjectType,
+        subjectId: actions.subjectId,
+        programId: actions.programId,
+        studentProfileId: studentProfiles.id,
+      }).from(actions).leftJoin(
+        studentProfiles, eq(studentProfiles.personId, actor.actorPersonId),
+      ).where(and(
+        eq(actions.id, data.actionId),
+        eq(actions.ownerPersonId, actor.actorPersonId),
+        inArray(actions.siteId, sites),
+        eq(actions.status, "open"),
+      )).for("update", { of: actions }).limit(1);
+      if (!current) throw new AuthorizationError("open owned action in authorized program");
+      const hasProgramScope = !!current.programId && (actor.scope.programIds ?? []).includes(current.programId);
+      const isOwnedConferenceFollowUp = current.type === "conference_follow_up" &&
+        current.programId === null &&
+        current.subjectType === "student_profile" &&
+        current.subjectId === current.studentProfileId;
+      if (!hasProgramScope && !isOwnedConferenceFollowUp) {
+        throw new AuthorizationError("open owned action in authorized program");
+      }
       if(!isStudentSupportAction(current.type))throw new AuthorizationError("Action requires its owning workflow");
       const [result] = await tx.update(actions).set({
         status: "resolved", resolvedAt: new Date(), resolutionNote: "Completed by owner",
