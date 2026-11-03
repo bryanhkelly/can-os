@@ -116,6 +116,7 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     submissionId: row.submissionId,
     timeliness: row.timeliness,
     dueAt: row.dueAt?.toISOString() ?? null,
+    availableAt: row.availableAt?.toISOString() ?? null,
     status: row.submissionStatus ?? "assigned",
     workAvailabilityReason: availability.reason,
     revisionLimitReached,
