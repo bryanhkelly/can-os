@@ -26,6 +26,18 @@ type DetailedSchedule = Awaited<ReturnType<typeof readApprovedPublicSchoolDay>> 
   approvalRevision?: number | null;
   effectiveFrom?: string | null;
   effectiveThrough?: string | null;
+  /** C-owned v2 canonical reviewed source. Presence (even empty) supersedes
+   * legacy schedule fallback. Each row is already checked against signed
+   * Site/Program/year/template identity and approval by C. */
+  approvedProgramSchoolDays?: Array<{
+    siteId:string;programId:string;gradeRange:{min:string;max:string};
+    timezone:string;schoolYearStartsOn:string;schoolYearEndsOn:string;
+    effectiveFrom:string;effectiveThrough:string|null;
+    weeklyPattern:PublicProgramWeeklyPeriod[];
+    instructionalIntervals:PublicProgramWeeklyPeriod[];
+    scheduleApprovalStatus:"approved";scheduleApprovalRevision:number;
+    scheduleReviewedAt:string;
+  }>;
 };
 const isDay = (v:number) => Number.isInteger(v) && v >= 0 && v <= 6;
 const isTime = (v:string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
@@ -52,27 +64,67 @@ function toProgramSchoolDay(
   catch { return null; }
 
   let pattern: PublicProgramWeeklyPeriod[] = [];
-  if (projection.weeklyPatternState === "approved" && projection.weeklyPattern) {
-    pattern = projection.weeklyPattern;
-  } else if (projection.state === "approved" && projection.days.canDisplay &&
+  let revision:number|null = null;
+  let from:string|null|undefined;
+  let through:string|null|undefined;
+  if (projection.approvedProgramSchoolDays !== undefined) {
+    // C's expanded, scope-signed source cannot be confused with a legacy
+    // uniform clock-time claim. A missing/ambiguous v2 source fails closed.
+    const sources=projection.approvedProgramSchoolDays;
+    if(sources.length!==1 || projection.weeklyPatternState!=="approved")return null;
+    const source=sources[0]!;
+    if(source.scheduleApprovalStatus!=="approved" ||
+      source.siteId!==siteId || source.programId!==program.programId ||
+      source.gradeRange.min!==program.grades.min ||
+      source.gradeRange.max!==program.grades.max ||
+      source.timezone!==timezone ||
+      !Number.isSafeInteger(source.scheduleApprovalRevision) ||
+      source.scheduleApprovalRevision<1 ||
+      !Number.isFinite(Date.parse(source.scheduleReviewedAt)) ||
+      Date.parse(source.scheduleReviewedAt)>Date.now() ||
+      !isDate(source.schoolYearStartsOn) || !isDate(source.schoolYearEndsOn) ||
+      !isDate(source.effectiveFrom) ||
+      (source.effectiveThrough!==null && !isDate(source.effectiveThrough)))
+      return null;
+    from=[source.schoolYearStartsOn,source.effectiveFrom].sort().at(-1)!;
+    through=[source.schoolYearEndsOn,source.effectiveThrough??source.schoolYearEndsOn]
+      .sort()[0]!;
+    if(from>through)return null;
+    // Preserve separately approved instructional intervals rather than
+    // flattening breaks into a false continuous instructional day.
+    pattern=source.instructionalIntervals;
+    revision=source.scheduleApprovalRevision;
+  } else if(projection.weeklyPatternState==="approved" && projection.weeklyPattern) {
+    pattern=projection.weeklyPattern;
+    revision=projection.approvalRevision ??
+      (projection.days.canDisplay?projection.days.revision:null);
+    from=projection.effectiveFrom;
+    through=projection.effectiveThrough;
+  } else if(projection.state==="approved" && projection.days.canDisplay &&
     projection.startTime.canDisplay && projection.endTime.canDisplay) {
-    const days = projection.days.value ?? [];
-    const start = projection.startTime.value;
-    const end = projection.endTime.value;
-    if (start && end) pattern = days.map(dayOfWeek => ({
-      dayOfWeek, startsAtLocal:start, endsAtLocal:end, timezone,
+    const days=projection.days.value??[];
+    const start=projection.startTime.value;
+    const end=projection.endTime.value;
+    if(start&&end)pattern=days.map(dayOfWeek=>({
+      dayOfWeek,startsAtLocal:start,endsAtLocal:end,timezone,
     }));
+    revision=projection.days.revision;
+    from=projection.effectiveFrom;
+    through=projection.effectiveThrough;
   }
-  if (!pattern.length || pattern.length > 7 ||
-    new Set(pattern.map(item=>item.dayOfWeek)).size !== pattern.length ||
+  if(!pattern.length || pattern.length>140 ||
     pattern.some(item=>!isDay(item.dayOfWeek) || !isTime(item.startsAtLocal) ||
-      !isTime(item.endsAtLocal) || item.startsAtLocal >= item.endsAtLocal ||
-      item.timezone !== timezone)) return null;
-
-  const revision = projection.approvalRevision ??
-    (projection.days.canDisplay ? projection.days.revision : null);
-  const from = projection.effectiveFrom;
-  const through = projection.effectiveThrough;
+      !isTime(item.endsAtLocal) || item.startsAtLocal>=item.endsAtLocal ||
+      item.timezone!==timezone))return null;
+  const ordered=[...pattern].sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
+    a.startsAtLocal.localeCompare(b.startsAtLocal));
+  // More than one interval per day is legal, but overlaps, duplicates and
+  // malformed breaks must never be shown as an approved school day.
+  for(let i=1;i<ordered.length;i++){
+    const before=ordered[i-1]!,current=ordered[i]!;
+    if(current.dayOfWeek===before.dayOfWeek &&
+      current.startsAtLocal<before.endsAtLocal)return null;
+  }
   return {
     programId:program.programId,
     name:verifiedPublicClaim(program.title,"program_publication"),
@@ -84,9 +136,7 @@ function toProgramSchoolDay(
     effectiveThrough:through && isDate(through)
       ? verifiedPublicClaim(through,"calendar",revision)
       : unconfiguredClaim("calendar"),
-    weeklyPattern:verifiedPublicClaim(
-      [...pattern].sort((a,b)=>a.dayOfWeek-b.dayOfWeek),
-      "calendar",revision),
+    weeklyPattern:verifiedPublicClaim(ordered,"calendar",revision),
   };
 }
 
