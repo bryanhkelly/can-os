@@ -9,6 +9,16 @@ import { db } from "@/db/client";
 import { sites, programs, actions, sitePublications } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
 
+type JsonValue = string | number | boolean | null | JsonValue[] | {[key:string]:JsonValue};
+function serializableJson(value:unknown):JsonValue {
+  if(value===null || typeof value==="string" || typeof value==="boolean")return value;
+  if(typeof value==="number")return Number.isFinite(value)?value:null;
+  if(Array.isArray(value))return value.map(serializableJson);
+  if(typeof value==="object")return Object.fromEntries(
+    Object.entries(value).map(([key,entry])=>[key,serializableJson(entry)]));
+  return null;
+}
+
 /** Church-entered location, not jurisdiction certification or an approved public claim. */
 export const physicalSiteAddressSchema = z.object({
   street1: z.string().trim().min(2).max(200),
@@ -174,7 +184,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     return {
       ...identity,revision:site.updatedAt.toISOString(),
       updatedAt:site.updatedAt.toISOString(),
-      physicalLocation:{value:address??null,source:"church_site_record" as const,
+      physicalLocation:{value:serializableJson(address??null),source:"church_site_record" as const,
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       programs:attached.map(program=>({
         ...program,
@@ -183,7 +193,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       })),
       publication:{status:publication?.status??"unconfigured",
         publicReachability:"not_asserted" as const},
-      contact:{value:metadata.setupContact??null,source:"church_site_draft" as const,
+      contact:{value:serializableJson(metadata.setupContact??null),source:"church_site_draft" as const,
         reviewStatus:"unverified" as const,publicClaimApproved:false},
       calendar:{status:"read_from_academic_program_calendar" as const},
     };
