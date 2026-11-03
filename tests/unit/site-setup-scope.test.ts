@@ -19,7 +19,7 @@ describe("Agent S verified Site and Program access",()=>{
     expect(permitted({...actor,role:"guardian"})).toThrow();
     expect(permitted({...actor,role:"can_jurisdiction_reviewer"})).toThrow();
     expect(permitted({...actor,role:"site_website_editor"})).toThrow();
-    expect(permitted({...actor,capabilities:new Set(["program.read"])},"program.read")).not.toThrow();
+    expect(permitted({...actor,capabilities:new Set(["program.read"])},site,"program.read")).not.toThrow();
     expect(permitted({...actor,capabilities:new Set(["program.read"])},site,"program.launch.start")).toThrow();
   });
   it("does not use URL identifiers to grant access to sibling Sites or churches",()=>{
