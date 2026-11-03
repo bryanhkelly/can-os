@@ -4,7 +4,7 @@ import { z } from "zod";
 import { churchSuggestionFields } from "@/domain/church-source-references";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
-  readChurchContentSuggestions, reviewChurchSourceExcerpt, submitChurchSourceExcerpt,
+  readChurchContentSuggestions, refreshChurchWebsiteSuggestions, reviewChurchSourceExcerpt, submitChurchSourceExcerpt,
 } from "./church-content-suggestions.server";
 
 function privateResponse() { setResponseHeader("Cache-Control", "private, no-store"); }
@@ -36,4 +36,12 @@ export const reviewChurchSourceExcerptCommand = createServerFn({ method: "POST" 
   .handler(async ({ data }) => {
     privateResponse();
     return reviewChurchSourceExcerpt(await getCommandContext(getRequest()), data);
+  });
+
+
+export const refreshChurchWebsiteSuggestionsCommand = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({}).strict().parse(value ?? {}))
+  .handler(async () => {
+    privateResponse();
+    return refreshChurchWebsiteSuggestions(await getCommandContext(getRequest()));
   });
