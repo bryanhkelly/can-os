@@ -137,9 +137,8 @@ export const draftSiteContactSchema = z.object({
   displayName:z.string().trim().min(2).max(160),
   email:z.union([z.string().trim().email().max(254),z.literal("")]),
   phone:z.string().trim().max(40),
-  website:z.union([z.string().trim().url().max(500),z.literal("")]),
 }).strict().transform(contact=>({...contact,
-  email:contact.email.trim().toLowerCase(),website:contact.website.trim(),
+  email:contact.email.trim().toLowerCase(),
 }));
 
 /** Days are a count, not a Monday–Friday assumption; Sundays may be scheduled by academic-time. */
@@ -203,10 +202,11 @@ export function samePhysicalSiteAddress(current:unknown,next:PhysicalSiteAddress
     .every(key=>(read.value?.[key]??"")===(next[key]??""));
 }
 
-export function sameDraftSiteContact(current:unknown,next:DraftSiteContact):boolean {
+export function sameDraftSiteContact(current:unknown,next:DraftSiteContact|null):boolean {
+  if(next===null)return current===null||current===undefined;
   const parsed=draftSiteContactSchema.safeParse(current);
   if(!parsed.success)return false;
-  return (["displayName","email","phone","website"] as const)
+  return (["displayName","email","phone"] as const)
     .every(key=>parsed.data[key]===next[key]);
 }
 
