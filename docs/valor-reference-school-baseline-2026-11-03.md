@@ -40,3 +40,25 @@ These generic changes must continue to serve all tenants. No production database
 ## Reporting categories
 
 For every Valor gap, distinguish `configured and public-approved`, `configured but unpublished`, `unconfigured`, `product gap`, or `external/unavailable`. Attach canonical owning record, setup location, visitor outcome, staff/guardian outcome and reproducible evidence. Do not mark green from commits alone.
+
+
+## Creative reference-school implementation (same day)
+
+The reference-school experience has moved beyond generic cards and administrative copy:
+
+- Shared Home now has a premium editorial hero treatment, original CSS-only art (no third-party image rights), a vision feature, discoverability links, and a responsive narrative rhythm.
+- About and community stories are composed as editorial articles rather than raw field lists.
+- The clearly fictional Valor visual fixture lives in `scripts/fixtures/valor-reference-school.mjs` with school vision, leadership welcome, community outreach, high-school narrative, and sample robotics, arts and service experiences. Those activities **are not** persisted Activities or registration-open offerings.
+- The synthetic Site marker (`sites.metadata.synthetic=true`) projects an explicit demo notice through all standard renderers, not by checking for a Valor name. Synthetic pages are `noindex,nofollow` even on published hosts.
+- All newly synthetic Site editor sessions without local content receive a **draft-only fictional starter** through `createIllustrativeSchoolContent`; it may be edited and saved only through `publishPartnerLocalContent` by an authorized `site_website_editor`. The registrar's private Launch preview also uses it as a marked suggestion. No public website pulls unsaved sample content.
+- The visual harness uses Valor plus three differently branded fictional schools and checks 1440/1024/768/375/320 widths, mobile-menu-open captures, public links, missing scripts/forms, page headings, and overflow.
+
+### Observed publication/configuration blocker
+
+A read-only inspection found **no `site_website_editor` role assignment** for Valor's canonical Site; the observed Site-bound roles were registrar, site_admin, and teacher. Neither the new visual fixture nor the prepared draft is a published local content revision. The Site Administrator must invite/assign an actual scoped synthetic website editor through the normal administrative workflow, then have that editor review and publish the illustrative content. Do not bypass role enforcement or write a `site_local_content_versions` row directly with SQL.
+
+### Evidence and next acceptance
+
+A Netlify production deploy of `can-os-demo-new` reached `ready` for source `dc79ec41172094c94d7266e8487ea348712f647b`, with no deploy error reported. This is **build/deploy evidence only**; later commits require their own deployed SHA check. Individual targeted Vitest/Playwright runs, visual screenshot review, end-to-end parent journey, live host activation and admissions/legal authorization remain unverified.
+
+**Product release gates are independent:** repository commit; Netlify build; real DNS/TLS/host routing; official program/admissions/safeguarding approvals; and normal editor publication of local copy. Do not collapse these into a single green flag.
