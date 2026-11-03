@@ -112,6 +112,50 @@ describe("standalone public site HTML", () => {
     expect(html).not.toContain("Monday, Tuesday, Wednesday, Thursday, Friday");
   });
 
+  it("renders only the matching approved Program weekly calendar including Sunday", () => {
+    const site = {name: "Two Program School", organizationName: "Church"};
+    const academicPrograms = [
+      {programId: "school-a", title: "Elementary", typeLabel: "School",
+        summary: "Elementary study", grades: {min: "K", max: "5"},
+        delivery: {onsite:true, asynchronous:false, liveOnline:false, onsiteDaysPerWeek:2},
+        availability: "planned" as const},
+      {programId: "school-b", title: "High School", typeLabel: "Hybrid",
+        summary: "Secondary study", grades: {min: "9", max: "12"},
+        delivery: {onsite:true, asynchronous:true, liveOnline:true, onsiteDaysPerWeek:3},
+        availability: "planned" as const},
+    ];
+    const profile = Object.assign(projectApprovedParentInformation({
+      site, academicPrograms, offerings:[],localContent:null,
+    }), {programSchedules: [{
+      programId:"school-a",
+      name:verifiedPublicClaim("Elementary","program_publication"),
+      grades:verifiedPublicClaim({min:"K",max:"5"},"program_publication"),
+      timezone:verifiedPublicClaim("America/Los_Angeles","calendar"),
+      effectiveFrom:verifiedPublicClaim("2027-01-01","calendar"),
+      effectiveThrough:unconfiguredClaim<string>("calendar"),
+      weeklyPattern:verifiedPublicClaim([
+        {dayOfWeek:0,startsAtLocal:"10:00",endsAtLocal:"13:00",timezone:"America/Los_Angeles"},
+        {dayOfWeek:3,startsAtLocal:"09:00",endsAtLocal:"14:00",timezone:"America/Los_Angeles"},
+      ],"calendar"),
+    }]});
+    const html = renderPublicSiteHtml({
+      host:"two.can-os.com",site,offerings:[],academicPrograms,parentInformation:profile,
+    },{path:"/school-day"});
+    expect(html).toContain("Approved weekly learning schedule");
+    expect(html).toContain("<strong>Sunday</strong>");
+    expect(html).toContain("10:00–13:00");
+    expect(html).toContain("Effective from 2027-01-01");
+    expect(html).toContain("America/Los_Angeles");
+    expect(html).toContain("Exact schedules and days are confirmed by the school");
+    expect(html).not.toContain("Published learning days and hours");
+    profile.programSchedules[0]!.weeklyPattern.canDisplay=false;
+    const withdrawn = renderPublicSiteHtml({
+      host:"two.can-os.com",site,offerings:[],academicPrograms,parentInformation:profile,
+    },{path:"/school-day"});
+    expect(withdrawn).not.toContain("<strong>Sunday</strong>");
+    expect(withdrawn).not.toContain("10:00–13:00");
+  });
+
   it("renders an empty published catalog without claiming enrollment is available", () => {
     const html = renderPublicSiteHtml({
       host: "partner.can-os.com",
