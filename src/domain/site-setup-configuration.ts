@@ -63,7 +63,7 @@ export const usStatesAndTerritories = Object.fromEntries([
   [ "VI", "U.S. Virgin Islands" ],
 ] as const) as Record<string,string>;
 
-const canadianProvinces = Object.fromEntries([
+export const canadianProvinces = Object.fromEntries([
   [ "AB", "Alberta" ],
   [ "BC", "British Columbia" ],
   [ "MB", "Manitoba" ],
@@ -78,6 +78,10 @@ const canadianProvinces = Object.fromEntries([
   [ "SK", "Saskatchewan" ],
   [ "YT", "Yukon" ],
 ] as const) as Record<string,string>;
+
+/** ISO 3166-1 alpha-2 country codes; structural address support is not legal jurisdiction approval. */
+export const isoCountryCodes = ("AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW").split(" ");
+const isoCountryCodeSet = new Set(isoCountryCodes);
 
 function normalizedCountry(input:string):string {
   const value=input.trim().toUpperCase().replace(/\./g,"");
@@ -99,7 +103,7 @@ const rawAddressSchema=z.object({
   city:z.string().trim().min(2).max(120),
   state:z.string().trim().min(2).max(80),
   postalCode:z.string().trim().min(3).max(24),
-  country:z.string().trim().min(2).max(80).default("US"),
+  country:z.string().trim().min(2).max(80),
   county:z.string().trim().max(120).optional(),
 }).strict();
 
@@ -117,7 +121,7 @@ export const physicalSiteAddressSchema=rawAddressSchema.superRefine((address,ctx
       ctx.addIssue({code:"custom",path:["state"],message:"Choose a Canadian province or territory."});
     if(!/^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i.test(postal))
       ctx.addIssue({code:"custom",path:["postalCode"],message:"Choose a valid Canadian postal code."});
-  }else if(!/^[A-Z]{2}$/.test(country)||["ZZ","XX","AA"].includes(country)) {
+  }else if(!isoCountryCodeSet.has(country)) {
     ctx.addIssue({code:"custom",path:["country"],message:"Use an ISO two-letter country code (such as GB or PH)."});
   }
 }).transform(address=>{
@@ -171,7 +175,7 @@ export function siteAddressEditorDraft(value:unknown):{
     city:stringFrom(item,"city","locality"),
     state:stringFrom(item,"state","stateCode","regionCode","region"),
     postalCode:stringFrom(item,"postalCode","zipCode","zip","postal"),
-    country:stringFrom(item,"country","countryCode")||"US",
+    country:stringFrom(item,"country","countryCode"),
     county:stringFrom(item,"county"),
   };
 }
@@ -190,8 +194,10 @@ export function readSitePhysicalAddress(value:unknown):{
   const legacyKeys=["line1","address1","streetAddress","addressLine1","zip","zipCode","region","regionCode","stateCode","countryCode"];
   const legacy=legacyKeys.some(key=>item[key]!==undefined);
   const candidate=siteAddressEditorDraft(item);
+  // Missing country is historical uncertainty, never implicit US legal locality.
+  if(!candidate.country)return {value:null,status:"legacy_needs_review"};
   const parsed=physicalSiteAddressSchema.safeParse(candidate);
-  if(!parsed.success)return {value:null,status:"invalid_needs_correction"};
+  if(!parsed.success)return {value:null,status:legacy?"legacy_needs_review":"invalid_needs_correction"};
   return {value:parsed.data,status:legacy?"legacy_needs_review":"church_supplied"};
 }
 
