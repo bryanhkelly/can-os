@@ -1,9 +1,11 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { db } from "@/db/client";
-import { churchContentSuggestions, churchSourceReferences, sitePublications } from "@/db/schema";
+import { auditEvents, churchContentSuggestions, churchSourceReferences, sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import {
   type ChurchSuggestionField, normalizeChurchReferenceUrl, churchSuggestionTargetFields,
+  assertChurchProposalSourceIdentity,
 } from "@/domain/church-source-references";
 import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalContent, type SiteLocalTextField } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -20,6 +22,7 @@ import { assertChurchSourceEditorialCopy } from "@/domain/church-source-editoria
  * institutional claims. Source identity and review are required for publication.
  */
 const suggestionTargetFields = churchSuggestionTargetFields;
+const excerptDigest = (value: string) => createHash("sha256").update(value, "utf8").digest("hex");
 
 /** Only church-owned text reaches the comparison UI; no image payloads or branding. */
 function reviewableChurchText(content?: SiteLocalContent): Partial<Record<SiteLocalTextField, string>> {
@@ -112,7 +115,12 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
       action: "site.website.source_excerpt.submitted",
       entityType: "church_content_suggestion", entityId: created.id,
       scope: { organizationId: site.organizationId, siteId: site.id },
-      after: { field: input.field, sourceReferenceId: reference.id },
+      after: {
+        field: input.field, sourceReferenceId: reference.id,
+        sourceUrlAtCapture: reference.normalizedUrl,
+        sourcePageUrl: normalizedUrl, origin: "manual_summary",
+        excerptDigest: excerptDigest(proposedText),
+      },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ChurchContentSuggestionSubmitted,
@@ -173,11 +181,44 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
     }
     if (proposal.reviewDecision !== "pending") {
       if (proposal.reviewDecision === input.decision) {
-        // A retried request cannot create a second revision, audit or event.
-        return { decision: input.decision, publication: null, alreadyReviewed: true };
+        // The committed review audit is the authoritative receipt until I
+        // approves additive suggestion provenance columns. Never publish again.
+        const [receipt] = await tx.select({ after: auditEvents.after })
+          .from(auditEvents).where(and(
+            eq(auditEvents.resourceType, "church_content_suggestion"),
+            eq(auditEvents.resourceId, proposal.id),
+            eq(auditEvents.action, "site.website.source_excerpt.reviewed"),
+          )).orderBy(desc(auditEvents.occurredAt)).limit(1);
+        const data = receipt?.after;
+        const revision = data?.publicationRevision;
+        const status = data?.publicationStatus;
+        const priorPublication: Awaited<ReturnType<typeof publishPartnerLocalContentWithinTransaction>> | null =
+          typeof revision === "number" && Number.isSafeInteger(revision) &&
+          (status === "published" || status === "review_required")
+            ? { changed: false, revision, status,
+              flaggedFields: Array.isArray(data?.flaggedFields) &&
+                data.flaggedFields.every(item => typeof item === "string")
+                ? data.flaggedFields as string[] : [] }
+            : null;
+        return { decision: input.decision, publication: priorPublication, alreadyReviewed: true };
       }
       throw new Error("This church suggestion has already been reviewed; refresh first");
     }
+
+    const [capture] = await tx.select({ after: auditEvents.after })
+      .from(auditEvents).where(and(
+        eq(auditEvents.resourceType, "church_content_suggestion"),
+        eq(auditEvents.resourceId, proposal.id),
+        inArray(auditEvents.action, [
+          "site.website.source_excerpt.submitted",
+          "site.website.source_excerpt.retrieved",
+        ]),
+      )).orderBy(desc(auditEvents.occurredAt)).limit(1);
+    assertChurchProposalSourceIdentity(
+      source.normalizedUrl, proposal.sourcePageUrl,
+      typeof capture?.after?.sourceUrlAtCapture === "string"
+        ? capture.after.sourceUrlAtCapture : null,
+    );
 
     let publication: Awaited<ReturnType<typeof publishPartnerLocalContentWithinTransaction>> | null = null;
     if (input.decision !== "discarded") {
@@ -220,6 +261,11 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
         decision: input.decision,
         publicationRevision: publication?.revision ?? null,
         publicationStatus: publication?.status ?? null,
+        flaggedFields: publication?.flaggedFields ?? [],
+        reviewedTextDigest: input.decision === "discarded" ? null :
+          excerptDigest(input.decision === "edited"
+            ? (input.editedText?.trim() ?? "") : proposal.proposedText),
+        sourceUrlAtReview: source.normalizedUrl,
         rightsConfirmed: input.decision !== "discarded" && input.rightsConfirmed === true,
       },
     });
@@ -358,7 +404,27 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
     });
     if (!distinct.length) return { status: "failed" as const, count: 0,
       message: "No appropriate church story text was found." };
-    await tx.insert(churchContentSuggestions).values(distinct);
+    const created = await tx.insert(churchContentSuggestions).values(distinct).returning({
+      id: churchContentSuggestions.id,
+      field: churchContentSuggestions.field,
+      proposedText: churchContentSuggestions.proposedText,
+      sourcePageUrl: churchContentSuggestions.sourcePageUrl,
+    });
+    if (created.length !== distinct.length) throw new Error("Incomplete church-source proposal persistence");
+    for (const proposal of created) {
+      await writeAudit(tx, actor, {
+        action: "site.website.source_excerpt.retrieved",
+        entityType: "church_content_suggestion", entityId: proposal.id,
+        scope: { organizationId: checked.organizationId, siteId: checked.id },
+        after: {
+          sourceReferenceId: reference.id, field: proposal.field,
+          sourcePageUrl: proposal.sourcePageUrl,
+          sourceUrlAtCapture: reference.normalizedUrl,
+          origin: "public_html", extractionVersion: "church-html-v1",
+          excerptDigest: excerptDigest(proposal.proposedText),
+        },
+      });
+    }
     await tx.update(churchSourceReferences).set({
       referenceState: "fetchable", updatedAt: new Date(),
     }).where(eq(churchSourceReferences.id, reference.id));
