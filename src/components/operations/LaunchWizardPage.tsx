@@ -2,7 +2,7 @@ import type { LaunchJurisdictionResearch } from "@/domain/jurisdiction-launch-re
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useLaunchInstitutionDefaults } from "@/hooks/useLaunchInstitutionDefaults";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
-import { updateLaunchSiteAddress, updateLaunchSiteContact } from "@/modules/programs/site-configuration.functions";
+import { updateLaunchSiteAddress, updateLaunchSiteContact, updateLaunchSiteIdentity } from "@/modules/programs/site-configuration.functions";
 import type { LaunchSiteContactDraft } from "@/components/operations/LaunchSiteContactEditor";
 import type { LaunchSiteAddressDraft, SavedLaunchSiteDraft } from "@/components/operations/LaunchHostAndProviderFields";
 import type { LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
@@ -56,9 +56,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input), invalidateRouter: () => router.invalidate() });
   const contactMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteContact>[0])=>updateLaunchSiteContact(input),invalidateRouter:()=>router.invalidate()});
   const addressMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteAddress>[0])=>updateLaunchSiteAddress(input),invalidateRouter:()=>router.invalidate()});
+  const identityMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteIdentity>[0])=>updateLaunchSiteIdentity(input),invalidateRouter:()=>router.invalidate()});
   const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input), invalidateRouter: () => router.invalidate() });
-  const busy = siteMutation.isSubmitting || contactMutation.isSubmitting || addressMutation.isSubmitting || launchMutation.isSubmitting ||
-    !!siteMutation.refreshError || !!contactMutation.refreshError || !!addressMutation.refreshError || !!launchMutation.refreshError;
+  const busy = siteMutation.isSubmitting || contactMutation.isSubmitting || addressMutation.isSubmitting || identityMutation.isSubmitting || launchMutation.isSubmitting ||
+    !!siteMutation.refreshError || !!contactMutation.refreshError || !!addressMutation.refreshError || !!identityMutation.refreshError || !!launchMutation.refreshError;
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>(
@@ -166,6 +167,17 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       throw new Error("Contact saved. Refresh to see the updated details.");
     }
     setError("Private school contact saved. Public display requires a separate approval.");
+  }
+
+  async function saveSiteIdentity(identity:{name:string;timezone:string},expectedRevision:string,changeReason:string) {
+    const submission=await identityMutation.submit({data:{siteId,expectedRevision,
+      name:identity.name,timezone:identity.timezone,changeReason}});
+    if(submission.status==="ignored")return;
+    if(submission.refreshError){
+      setError("Site identity saved, but the page could not refresh. Retry refresh instead of saving again.");
+      throw new Error("Identity saved. Refresh to see the updated school Site.");
+    }
+    setError("Draft Site identity saved. No public claim or school opening was approved.");
   }
 
   async function saveSiteAddress(address:LaunchSiteAddressDraft,expectedRevision:string,changeReason:string) {
@@ -329,6 +341,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retryAddressRefresh()} className="mt-2">
           Retry address refresh
         </Button>}
+        {identityMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={identityMutation.isSubmitting}
+          onClick={()=>void identityMutation.retryRefresh()} className="mt-2">
+          Retry Site identity refresh
+        </Button>}
         {launchMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={launchMutation.isSubmitting}
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
@@ -340,7 +356,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>
         <div className="mt-8 grid gap-6">
-          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
+          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
           <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
            {extendedPlanning?<ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId}/>:<p role="status" className="mt-3 text-sm">Additional program planning is temporarily unavailable. You can continue setting up your school.</p>}
