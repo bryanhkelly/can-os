@@ -10,6 +10,8 @@ import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType, isCurrentAcademicMarketingSnapshot } from "@/domain/academic-program-publication";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
+import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
