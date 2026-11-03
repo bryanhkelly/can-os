@@ -43,10 +43,11 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
 }) {
   const router = useRouter();
   const [openingSaving, setOpeningSaving] = useState(false);
+  const [activationNeedsRefresh, setActivationNeedsRefresh] = useState(false);
   const mutation = useMutationFeedback(async () => { await router.invalidate(); });
   const [error, setError] = useState("");
   const [opened, setOpened] = useState<{ name: string; siteId: string | null } | null>(null);
-  const busy = openingSaving || mutation.pending || mutation.refreshFailed || Boolean(opened);
+  const busy = openingSaving || mutation.pending || mutation.refreshFailed || activationNeedsRefresh || Boolean(opened);
   const { launches, launch, unavailable } = resolveLaunchResume(allLaunches, {
     siteId: selectedSiteId, programId: selectedProgramId,
   });
@@ -112,7 +113,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       // Only the canonical server command can establish opening authority.
       await activateLaunch({ data: { programId: activeLaunch.id, recipientPersonId } });
     } catch (cause) {
-      setError(normalizeClientError(cause, "School opening was not confirmed. Refresh its readiness before retrying.").message);
+      setActivationNeedsRefresh(true);
+      setError(normalizeClientError(cause, "Activation response could not be confirmed. Refresh the saved Program status before attempting activation again.").message);
       setOpeningSaving(false);
       return;
     }
@@ -182,7 +184,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     {error && <div role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">
       <p>{error}</p>
       <button type="button" disabled={openingSaving} className="mt-3 min-h-11 rounded-lg border px-4 py-2 font-semibold"
-        onClick={() => { void router.invalidate().then(() => setError("")).catch(() =>
+        onClick={() => { void router.invalidate().then(() => { setError(""); setActivationNeedsRefresh(false); }).catch(() =>
           setError("Unable to refresh the saved launch. Reopen this school from Launch before attempting activation again.")); }}>
         Refresh recorded launch status (do not reactivate)
       </button>
