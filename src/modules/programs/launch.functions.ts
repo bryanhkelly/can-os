@@ -114,6 +114,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
           slug: s.sites.slug,
           timezone: s.sites.timezone,
           address: s.sites.address,
+          metadata: s.sites.metadata,
           updatedAt: s.sites.updatedAt,
         })
         .from(s.sites)
@@ -139,7 +140,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(site => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address) })),
+      sites: siteRows.map(({metadata,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), contactDraft:safeJson(metadata.setupContact??null) })),
       jurisdictions: jurisdictionRows,
       schoolSetupAdministrator: context.role === "site_admin",
     };
