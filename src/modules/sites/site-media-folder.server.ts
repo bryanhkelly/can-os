@@ -1,7 +1,7 @@
 import {randomUUID} from "node:crypto";
-import {and,desc,eq,inArray} from "drizzle-orm";
+import {and,desc,eq,inArray,isNotNull} from "drizzle-orm";
 import {db} from "@/db/client";
-import {documents,sites} from "@/db/schema";
+import {documents,sitePublications,sites} from "@/db/schema";
 import type {AccessContext} from "@/domain/access-context";
 import {AuthorizationError} from "@/domain/command-context";
 import {siteWebsiteLocalPublishCapability} from "@/domain/site-publication-policy";
@@ -220,4 +220,30 @@ export async function readApprovedSchoolSitePhotos(
     visualFamily:typeof row.metadata.visualFamily==="string"
       ?row.metadata.visualFamily:null,
   }));
+}
+
+/** Used only by the tenant-origin read-only image proxy. Independently
+ * rechecks publication, exact Site/Document ownership and current image rights
+ * on EVERY image request. No object key or signed URL is sent to the browser. */
+export async function readPublishedSchoolSitePhoto(slug:string,documentId:string){
+  const [row]=await db.select({document:documents,siteId:sitePublications.siteId})
+    .from(documents)
+    .innerJoin(sitePublications,eq(sitePublications.siteId,documents.subjectId))
+    .where(and(eq(documents.id,documentId),
+      eq(documents.subjectType,"site"),eq(documents.category,siteMediaCategory),
+      eq(sitePublications.slug,slug),eq(sitePublications.status,"published"),
+      isNotNull(sitePublications.publishedAt)))
+    .limit(1);
+  if(!row)return null;
+  const doc=row.document;
+  const m=doc.metadata;
+  if(doc.storageProvider!=="cloudflare_r2"||
+    m.storageVerified!==true||m.rightsStatus!=="approved"||
+    m.mediaReviewStatus!=="approved"||
+    !["cleared","not_required"].includes(String(m.subjectReleaseStatus))||
+    !siteMediaKeyPattern.test(doc.storageKey)||
+    !doc.storageKey.startsWith(`school-site-media/${row.siteId}/`)||
+    !["image/jpeg","image/png"].includes(doc.mimeType??""))
+    return null;
+  return {storageKey:doc.storageKey,mimeType:doc.mimeType as "image/jpeg"|"image/png"};
 }
