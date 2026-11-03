@@ -1,6 +1,5 @@
 import { readPublishedSiteCatalog } from "./site-public-catalog.server";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
-import { projectApprovedParentInformation } from "@/domain/parent-information";
 
 /**
  * PX-005–007. Live anonymous reads go through the existing Site lock,
@@ -11,5 +10,7 @@ export async function readPublishedParentInformation(slug: string) {
   if (!isPublicSiteSlug(slug)) return null;
   const published = await readPublishedSiteCatalog(slug);
   if (!published) return null;
-  return projectApprovedParentInformation(published);
+  // Preserve the publication-locked, owner-approved calendar and service
+  // fragments. Re-projecting here would silently drop their evidence.
+  return published.parentInformation;
 }
