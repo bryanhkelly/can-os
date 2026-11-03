@@ -197,7 +197,8 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
         Date.now() - reference.lastAttemptAt.getTime() < 30 * 60 * 1000) {
       return null;
     }
-    await tx.update(churchSourceReferences).set({ lastAttemptAt: new Date() })
+    const attemptAt = new Date();
+    await tx.update(churchSourceReferences).set({ lastAttemptAt: attemptAt })
       .where(eq(churchSourceReferences.id, reference.id));
     await writeAudit(tx, actor, {
       action: "site.website.source_refresh.requested",
@@ -205,11 +206,11 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       scope: { siteId: site.id, organizationId: site.organizationId },
       after: { kind: "website" },
     });
-    return { site, reference };
+    return { site, reference, attemptAt };
   });
   if (!input) return { status: "throttled" as const, count: 0,
     message: "This website was checked recently. Try again later." };
-  const { site, reference } = input;
+  const { site, reference, attemptAt } = input;
   let pages: Awaited<ReturnType<typeof extractChurchPublicWebsite>>;
   try {
     pages = await extractChurchPublicWebsite(reference.normalizedUrl);
@@ -220,7 +221,8 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       const [current] = await tx.select().from(churchSourceReferences)
         .where(and(eq(churchSourceReferences.id, reference.id),
           eq(churchSourceReferences.siteId, checked.id))).for("update").limit(1);
-      if (current && !current.revokedAt && current.normalizedUrl === reference.normalizedUrl) {
+      if (current && !current.revokedAt && current.normalizedUrl === reference.normalizedUrl &&
+          current.lastAttemptAt?.getTime() === attemptAt.getTime()) {
         await tx.update(churchSourceReferences).set({
           referenceState: blocked ? "blocked" : "failed", updatedAt: new Date(),
         }).where(eq(churchSourceReferences.id, reference.id));
@@ -240,16 +242,11 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
     const [current] = await tx.select().from(churchSourceReferences)
       .where(and(eq(churchSourceReferences.id, reference.id),
         eq(churchSourceReferences.siteId, checked.id))).for("update").limit(1);
-    if (!current || current.revokedAt || current.normalizedUrl !== reference.normalizedUrl) {
+    if (!current || current.revokedAt || current.normalizedUrl !== reference.normalizedUrl ||
+        current.lastAttemptAt?.getTime() !== attemptAt.getTime()) {
       return { status: "stale" as const, count: 0,
         message: "Church website link changed during retrieval. No suggestions were saved." };
     }
-    await tx.update(churchContentSuggestions).set({
-      reviewDecision: "discarded", reviewedAt: new Date(),
-      reviewedByPersonId: actor.actorPersonId!,
-    }).where(and(eq(churchContentSuggestions.siteId, checked.id),
-      eq(churchContentSuggestions.sourceReferenceId, reference.id),
-      eq(churchContentSuggestions.reviewDecision, "pending")));
     const values = pages.flatMap(page => {
       const target = suggestionTargetFields[page.sourceField];
       if (!target) return [];
@@ -268,6 +265,12 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
     });
     if (!values.length) return { status: "failed" as const, count: 0,
       message: "No appropriate church story text was found." };
+    await tx.update(churchContentSuggestions).set({
+      reviewDecision: "discarded", reviewedAt: new Date(),
+      reviewedByPersonId: actor.actorPersonId!,
+    }).where(and(eq(churchContentSuggestions.siteId, checked.id),
+      eq(churchContentSuggestions.sourceReferenceId, reference.id),
+      eq(churchContentSuggestions.reviewDecision, "pending")));
     await tx.insert(churchContentSuggestions).values(values);
     await tx.update(churchSourceReferences).set({
       referenceState: "fetchable", updatedAt: new Date(),
