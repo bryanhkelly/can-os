@@ -143,7 +143,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
          return <TableRow key={row.id} className="align-top hover:bg-muted/40">
           <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
-          <TableCell className="p-4 align-top">{row.program}</TableCell><TableCell className="p-4 align-top"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></TableCell>
+          <TableCell className="p-4 align-top">{row.program}</TableCell><TableCell className="p-4 align-top"><StatusBadge tone={row.enrollments.length>0?"success":row.outstandingRequirements>0?"attention":"neutral"}>{row.enrollments.length>0?"Enrolled":formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></TableCell>
           <TableCell className="p-4 align-top"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{next}</Link></TableCell>
          </TableRow>;
         })}</TableBody>
@@ -160,8 +160,12 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       {selected.application&&!detail&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}
       <div className="mt-4 space-y-3">{detail&&[detail].map(x => {
         const years = options.find(o => o.applicationId === x.id)?.years ?? [];
-        const latest = selectActionableOffer(x.offers);
-        const activated = latest ? x.enrollments.some(e => e.schoolYearId === latest.schoolYearId) : false;
+        // Program enrollment is authoritative even when its original offer is
+        // expired, withdrawn or no longer the first currently actionable offer.
+        const activated = x.enrollments.length > 0;
+        const enrolledOffer = x.offers.find(offer =>
+          x.enrollments.some(enrollment => enrollment.schoolYearId === offer.schoolYearId));
+        const latest = enrolledOffer ?? selectActionableOffer(x.offers);
         return <article key={x.id} className="rounded-xl border p-4">
           <h3 className="mb-2 font-serif text-2xl">{x.studentName??x.id}</h3>
           <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
