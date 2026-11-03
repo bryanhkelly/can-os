@@ -190,7 +190,7 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
         throw new Error("Current website revision is required");
       }
       const revisedText = input.decision === "edited"
-        ? input.editedText?.trim() : proposal.proposedText;
+        ? (input.editedText?.trim() ?? "") : proposal.proposedText;
       assertChurchSourceEditorialCopy(revisedText, target);
       const history = await readLocalContentHistory(site.id, tx);
       if ((history[0]?.revision ?? 0) !== input.expectedRevision) {
