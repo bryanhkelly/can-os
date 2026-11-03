@@ -38,6 +38,7 @@ export const reviewChurchSourceExcerptCommand = createServerFn({ method: "POST" 
     suggestionId: z.string().uuid(),
     decision: z.enum(["accepted", "edited", "discarded"]),
     editedText: z.string().max(2600).optional(),
+    rightsConfirmed: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional(),
   }).strict().parse(value))
   .handler(async ({ data }) => {
