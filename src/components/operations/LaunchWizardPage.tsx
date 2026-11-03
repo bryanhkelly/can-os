@@ -13,6 +13,7 @@ import type { listFamilyInvitations } from "@/modules/enrollment/family-invitati
 import type { getLaunchAdmissionsCounts } from "@/modules/enrollment/launch-admissions-counts.functions";
 import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-dashboard.functions";
 import {resolveLaunchResume} from "@/domain/launch-resume";
+import {launchSiteSelectionIssue} from "@/domain/launch-site-selection";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
@@ -191,7 +192,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     (newSiteSlug.trim().length > 0 && site.slug === newSiteSlug.trim()) ||
     (newSiteName.trim().length >= 2 && site.name.trim().toLowerCase() === newSiteName.trim().toLowerCase()));
 
-  useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,hostSites,type,creditMode,academicProviderOrganizationId,creditIssuingOrganizationId,jurisdictionId,setHostOrganizationId,setSiteId,setAcademicProviderOrganizationId,setCreditIssuingOrganizationId,setJurisdictionId});
+  useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,hostSites,type,creditMode,academicProviderOrganizationId,creditIssuingOrganizationId,jurisdictionId,setHostOrganizationId,setSiteId,setAcademicProviderOrganizationId,setCreditIssuingOrganizationId,setJurisdictionId,strictSelection:Boolean(selection.siteId||selection.programId)});
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
@@ -268,6 +269,23 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     );
   }
 
+  const selectionIssue=launchSiteSelectionIssue(selection,options.sites,[
+    ...launches.launches,...(preparationPrograms??[]),
+  ]);
+  if(selectionIssue)return <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch"
+    title="School selection needs attention"
+    subtitle="Your requested school context was not changed or replaced with another campus.">
+    <p role="alert" className="rounded-lg border p-4 text-sm">
+      {selectionIssue==="site_program_mismatch"
+        ?"The Site and Program in this link belong to different school contexts."
+        :"The saved Site or Program in this link is unavailable to your verified account."}
+      {" "}Open a permitted school from Operations, or start a new setup without carrying over this link.
+    </p>
+    <div className="mt-4 flex flex-wrap gap-4 text-sm">
+      <Link to="/operations" className="underline">Return to Operations</Link>
+      <Link to="/operations/launch" search={{}} className="underline">Start a new school setup</Link>
+    </div>
+  </WorkspaceShell>;
   const currentLaunch=resolveLaunchResume(launches.launches,selection).launch;
   const schools=(preparationPrograms??[]).filter(program=>["draft","launching","ready","active"].includes(program.status));
   const currentSchool=resolveLaunchResume(schools,selection).launch;
