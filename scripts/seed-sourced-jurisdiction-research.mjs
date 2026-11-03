@@ -92,6 +92,7 @@ try{
   const source={title:`${entry.funding} official program information`,url:entry.source,authority:entry.authority,checkedAt};
   const profile={
    summary:`Preliminary research for ${entry.name}. ${entry.fact} CAN school eligibility, legal authority and operating requirements remain under independent review.`,
+   editorial:{launchResearchVisibility:"school_operator",reviewState:"in_review",verificationStatus:"unverified"},
    operatingModels:[],
    fundingPrograms:[{id:`research-${code.toLowerCase()}-funding`,name:entry.funding,summary:entry.fact,eligibilityStatus:"under_review",evidenceIds:[entry.source]}],
    requirements:entry.questions.map((description,i)=>({
