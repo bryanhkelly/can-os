@@ -239,7 +239,7 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
         ]),
       )).orderBy(desc(auditEvents.occurredAt)).limit(1);
     assertChurchProposalSourceIdentity(
-      source.normalizedUrl, proposal.sourcePageUrl,
+      source.normalizedUrl, proposal.sourcePageUrl ?? source.normalizedUrl,
       typeof capture?.after?.sourceUrlAtCapture === "string"
         ? capture.after.sourceUrlAtCapture : null,
     );
