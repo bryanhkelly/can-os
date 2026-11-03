@@ -182,7 +182,8 @@ export async function requireCurrentSchoolJurisdictionForOpening(
     const [evidence]=typeof documentId==="string"
       ? await executor.select().from(documents).where(eq(documents.id,documentId)).limit(1)
       : [];
-    if(!evidence || evidence.subjectType!=="program" ||
+    if(!evidence || evidence.category!=="jurisdiction_requirement_evidence" ||
+      evidence.subjectType!=="program" ||
       evidence.subjectId!==programId ||
       evidence.metadata.siteId!==school.siteId ||
       evidence.metadata.organizationId!==school.organizationId ||
