@@ -64,6 +64,8 @@ const socialHosts: Record<Exclude<ChurchReferenceKind, "website">, readonly stri
   tiktok: ["tiktok.com", "www.tiktok.com"],
 };
 const trackingKeys = new Set(["fbclid", "gclid", "dclid", "mc_cid", "mc_eid", "igshid"]);
+const secretQueryKeys = new Set(["access_token", "id_token", "api_key", "apikey",
+  "authorization", "password", "secret", "session_token", "auth_token", "signature"]);
 
 /**
  * Parse a single optional field. Host-specific matching prevents a website
@@ -100,6 +102,9 @@ export function normalizeChurchReferenceUrl(
   }
   url.hash = "";
   for (const key of [...url.searchParams.keys()]) {
+    if (secretQueryKeys.has(key.toLowerCase())) {
+      throw new Error("Church public reference links must not contain access credentials");
+    }
     if (trackingKeys.has(key.toLowerCase()) || key.toLowerCase().startsWith("utm_")) {
       url.searchParams.delete(key);
     }
