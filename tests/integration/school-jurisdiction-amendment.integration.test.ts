@@ -86,10 +86,10 @@ integration("school jurisdiction material-change lifecycle (rollback only)",()=>
           responsibleEntities:["school_of_record"],programTypes:["full_school"]},
       };
       const [profile]=await tx.insert(s.jurisdictionProfileVersions).values({
-        jurisdictionId:jurisdiction!.id,revision:"synthetic-v1",status:"published",
+        jurisdictionId:jurisdiction!.id,revision:"synthetic-"+id,status:"published",
         title:"Synthetic reviewed policy",summary:"Synthetic policy for acceptance",
         profile:{requirements:[requirement],fundingPrograms:[]},evidence,
-        effectiveAt:past,publishedAt:past,reviewedAt:past,nextReviewAt:future,
+        effectiveAt:past,publishedAt:new Date(now.getTime()-1000),reviewedAt:past,nextReviewAt:future,
         verifiedByPersonId:reviewerPerson!.id,lastEditedByPersonId:editorPerson!.id,
         verificationStatus:"verified",
         verificationEvidence:{note:"Independently reviewed current official sources for the policy.",
