@@ -44,7 +44,7 @@ export function projectPublicInformationReadiness(input: {
   openingConfirmed: boolean;
 }): PublicInformationReadiness {
   const p = input.profile;
-  const siteEditor = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}/publish` : "/site-website";
+  const siteEditor = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}/parent-information` : "/sites";
   const siteSetup = input.siteId ? `/sites/${encodeURIComponent(input.siteId)}` : "/sites";
   const scheduleReview = "/operations/school-years";
   const gaps: PublicInformationGap[] = [];
