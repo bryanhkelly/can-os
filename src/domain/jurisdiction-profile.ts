@@ -6,6 +6,23 @@ const evidenceSchema = z.object({
   authority: z.string().min(1),
   checkedAt: z.string().datetime(),
 });
+/** Optional scoping metadata; absent dimensions require school-specific legal review,
+ * never an assumption that every school in a state is covered. */
+export const jurisdictionRequirementApplicabilitySchema = z.object({
+  states: z.array(z.string().min(2)).min(1),
+  localities: z.array(z.string().min(1)).optional(),
+  operatingModels: z.array(z.string().min(1)).min(1),
+  responsibleEntities: z.array(z.enum(["school_of_record", "host_church"])).min(1),
+  programTypes: z.array(z.string().min(1)).optional(),
+  gradeLevels: z.array(z.string().min(1)).optional(),
+  deliveryModels: z.array(z.enum(["onsite", "online", "hybrid"])).optional(),
+  serviceTypes: z.array(z.enum(["academic", "enrichment", "childcare"])).optional(),
+}).strict();
+
+export const jurisdictionDisclosureAudiences = [
+  "internal_only", "parent_on_request", "authenticated_family",
+  "public_required", "public_optional",
+] as const;
 const requirementSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -13,6 +30,11 @@ const requirementSchema = z.object({
   responsibleParty: z.enum(["can","church","family"]),
   phase: z.enum(["before_opening","before_enrollment","follow_up"]),
   evidenceIds: z.array(z.string()).default([]),
+  category: z.enum(["authorization", "academic", "safety", "staffing", "facilities", "finance", "records", "other"]).optional(),
+  applicability: jurisdictionRequirementApplicabilitySchema.optional(),
+  disclosureAudience: z.enum(jurisdictionDisclosureAudiences).default("internal_only"),
+  effectiveOn: z.string().date().optional(),
+  reviewBy: z.string().date().optional(),
 });
 export const jurisdictionProfileSchema = z.object({
   summary: z.string().min(1),
