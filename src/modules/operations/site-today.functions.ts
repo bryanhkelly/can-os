@@ -18,6 +18,7 @@ import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/ope
 import { openingHandoffManagerCapability } from "@/modules/programs/opening-handoff.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
+import { resolveOperationsSelection } from "@/modules/operations/operations-scope.server";
 import type { Actor } from "@/modules/identity/actors.server";
 
 const requestSchema = z.object({ siteId: z.string().uuid() });
@@ -46,7 +47,9 @@ export const getSiteToday = createServerFn({ method: "GET" })
       id: programs.id, name: programs.name, status: programs.status,
       type: programs.type, gradeRange: programs.gradeRange,
     }).from(programs).where(eq(programs.siteId, site.id)).orderBy(asc(programs.name));
-    const permitted = new Set(actor.scope.programIds ?? []);
+    // Site-wide grants are resolved against server-authorized school membership.
+    // Do not treat the absence of explicit program IDs as an empty program grant.
+    const permitted = new Set((await resolveOperationsSelection(actor, {siteId:data.siteId})).programIds);
     const scopedPrograms = visiblePrograms.filter(p => permitted.has(p.id));
     const programIds = scopedPrograms.map(p => p.id);
     const handoffs=await listOpeningHandoffs(programIds);
