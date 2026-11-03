@@ -135,7 +135,7 @@ describe("read-only church partner website", () => {
     expect(result.previewHtml).not.toContain("studentProfileId");
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
-      "approvedAcademicCount", "approvedEnrichmentCount", "canPublish",
+      "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPublish",
       "currentRevision", "demonstration", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
       "publicInformationReadiness", "siteId", "siteName", "status",
