@@ -32,7 +32,10 @@ export const contactSchema=z.object({
   displayName:z.string().trim().min(2).max(160),
   email:z.union([z.string().trim().email().max(254),z.literal("")]),
   phone:z.string().trim().max(40),
-  website:z.union([z.string().trim().url().max(500),z.literal("")]),
+  // Setup historically saves only displayName/email/phone. Normalize omitted
+  // website to an empty string so review and anonymous read hash identical
+  // canonical fields, including for pre-existing three-field Site records.
+  website:z.union([z.string().trim().url().max(500),z.literal("")]).default(""),
 }).passthrough();
 export function sourceDigest(siteId:string,category:"address"|"contact",value:unknown) {
   return createHash("sha256")
