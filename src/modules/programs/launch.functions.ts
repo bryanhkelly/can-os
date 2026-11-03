@@ -7,7 +7,7 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
+import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress, launchOnsiteDaysPerWeekSchema } from "@/domain/site-setup-configuration";
 import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
@@ -52,7 +52,7 @@ const startLaunchInput = z.object({
       onsite: z.boolean().optional(),
       asynchronous: z.boolean().optional(),
       liveOnline: z.boolean().optional(),
-      onsiteDaysPerWeek: z.number().int().min(1).max(7).optional(),
+      onsiteDaysPerWeek: launchOnsiteDaysPerWeekSchema.optional(),
     })
     .refine(
       (model) => !!(model.onsite || model.asynchronous || model.liveOnline),
