@@ -65,7 +65,10 @@ export function projectLaunchJurisdictionResearch(
       eligibilityStatus: verifiedGuidance ? program.eligibilityStatus : "under_review" as const,
       sources: sourceFor(program.evidenceIds),
     })),
-    investigationItems: profile.requirements.map(requirement => ({
+    investigationItems: profile.requirements.filter(requirement =>
+      requirement.disclosureAudience === "public_required" ||
+      requirement.disclosureAudience === "public_optional"
+    ).map(requirement => ({
       id: requirement.id,
       title: requirement.title,
       description: requirement.description,
