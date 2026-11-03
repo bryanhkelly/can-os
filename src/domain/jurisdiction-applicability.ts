@@ -53,7 +53,7 @@ export function requiresFutureJurisdictionPolicyReview(
   const today = isoDay(now);
   if (!reviewBy || !today) return true;
   return plannedStartDates.some(value => {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return true;
     const parsed = isoDay(value);
     if (parsed !== value) return true;
     return value > today && value > reviewBy;
