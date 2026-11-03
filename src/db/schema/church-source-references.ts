@@ -15,6 +15,7 @@ export const churchSourceReferences = pgTable("church_source_references", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
 }, t => [
   uniqueIndex("church_source_reference_site_kind_uq").on(t.siteId, t.kind),
   index("church_source_reference_site_idx").on(t.siteId),
