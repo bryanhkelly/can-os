@@ -2,13 +2,15 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { getChurchSourceReferenceView } from "@/modules/sites/church-source-references.functions";
 import {
-  getChurchContentSuggestionView, refreshChurchWebsiteSuggestionsCommand, reviewChurchSourceExcerptCommand,
+  getChurchContentSuggestionView, getChurchSourceReviewContextView, refreshChurchWebsiteSuggestionsCommand, reviewChurchSourceExcerptCommand,
   submitChurchSourceExcerptCommand,
 } from "@/modules/sites/church-content-suggestions.functions";
-import { type ChurchSuggestionField } from "@/domain/church-source-references";
+import { churchSuggestionTargetFields, type ChurchSuggestionField } from "@/domain/church-source-references";
+import { siteLocalContentLimits } from "@/domain/site-local-content";
 
 type Ref = Awaited<ReturnType<typeof getChurchSourceReferenceView>>[number];
 type Suggestion = Awaited<ReturnType<typeof getChurchContentSuggestionView>>[number];
+type ReviewContext = Awaited<ReturnType<typeof getChurchSourceReviewContextView>>;
 const fieldOptions: ReadonlyArray<{ value: ChurchSuggestionField; label: string }> = [
   { value: "church_history", label: "Church history" },
   { value: "church_mission", label: "Church mission" },
@@ -25,6 +27,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   const router = useRouter();
   const [references, setReferences] = useState<Ref[]>([]);
   const [items, setItems] = useState<Suggestion[]>([]);
+  const [reviewContext, setReviewContext] = useState<ReviewContext | null>(null);
   const [field, setField] = useState<ChurchSuggestionField>("church_history");
   const [sourcePageUrl, setSourcePageUrl] = useState("");
   const [text, setText] = useState("");
@@ -40,9 +43,10 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
     void Promise.all([
       getChurchSourceReferenceView({ data: {} }),
       getChurchContentSuggestionView({ data: {} }),
-    ]).then(([refs, suggestions]) => {
+      getChurchSourceReviewContextView({ data: {} }),
+    ]).then(([refs, suggestions, context]) => {
       if (!active) return;
-      setReferences(refs); setItems(suggestions);
+      setReferences(refs); setItems(suggestions); setReviewContext(context);
       setLoading(false);
     }).catch(() => { if (active) { setLoading(false); setError("Could not load church source suggestions."); } });
     return () => { active = false; };
@@ -53,11 +57,12 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
   }, [website?.id, website?.normalizedUrl, sourcePageUrl]);
 
   async function refresh() {
-    const [refs, suggestions] = await Promise.all([
+    const [refs, suggestions, context] = await Promise.all([
       getChurchSourceReferenceView({ data: {} }),
       getChurchContentSuggestionView({ data: {} }),
+      getChurchSourceReviewContextView({ data: {} }),
     ]);
-    setReferences(refs); setItems(suggestions);
+    setReferences(refs); setItems(suggestions); setReviewContext(context);
   }
 
   async function discover() {
@@ -94,7 +99,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       const result = await reviewChurchSourceExcerptCommand({ data: {
         suggestionId: item.id, decision,
         ...(decision === "edited" ? { editedText: edits[item.id] ?? item.proposedText } : {}),
-        ...(decision !== "discarded" ? { expectedRevision: currentRevision } : {}),
+        ...(decision !== "discarded" ? { expectedRevision: reviewContext?.revision ?? currentRevision } : {}),
       } });
       await refresh();
       await router.invalidate();
@@ -149,7 +154,7 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
           className="mt-1 block w-full rounded-lg border bg-background p-2" />
       </label>
       <label className="text-sm">Source excerpt or your proposed summary
-        <textarea required value={text} maxLength={1400} rows={4}
+        <textarea required value={text} maxLength={siteLocalContentLimits[churchSuggestionTargetFields[field] ?? "churchHistory"]} rows={4}
           onChange={event => setText(event.target.value)}
           className="mt-1 block w-full rounded-lg border bg-background p-2" />
       </label>
@@ -160,16 +165,36 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       </button>
     </form>}
     <div className="mt-5 grid gap-4">
-      {items.filter(item => item.reviewDecision === "pending").map(item => <article key={item.id} className="rounded-xl border p-4">
+      {items.filter(item => item.reviewDecision === "pending").map(item => {
+        const target = churchSuggestionTargetFields[item.field];
+        const publishedText = target ? reviewContext?.publishedContent[target] ?? "" : "";
+        const editorText = target ? reviewContext?.editorContent[target] ?? "" : "";
+        return <article key={item.id} className="rounded-xl border p-4">
         <h3 className="font-semibold">{fieldOptions.find(option => option.value === item.field)?.label ?? item.field}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Submitted {new Date(item.retrievedAt).toLocaleDateString()} · User-provided, unverified excerpt · Confidence: {item.confidence}
+          Captured {new Date(item.retrievedAt).toLocaleDateString()} · Unverified, manually attributed or website-derived · Confidence: {item.confidence}
         </p>
         <a href={item.sourcePageUrl ?? item.sourceUrl} target="_blank" rel="noopener noreferrer"
           className="mt-1 block break-all text-xs underline">Review original source page</a>
-        <blockquote className="mt-3 whitespace-pre-wrap rounded-lg border-l-2 pl-3 text-sm">{item.proposedText}</blockquote>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-xs font-semibold text-muted-foreground">Current published church copy
+              {reviewContext?.publishedRevision ? ` · revision ${reviewContext.publishedRevision}` : " · not yet published"}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{publishedText || "No published copy for this field."}</p>
+          </div>
+          <div className="rounded-lg border bg-background p-3">
+            <p className="text-xs font-semibold text-muted-foreground">Proposed church copy · not yet approved</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{item.proposedText}</p>
+          </div>
+        </div>
+        {reviewContext?.editorStatus === "review_required" && editorText !== publishedText &&
+          <p className="mt-3 text-sm text-muted-foreground">
+            A more recent editor revision is awaiting institutional review. It may differ from the
+            published copy shown above. Accepting this suggestion requires reviewing that latest revision.
+          </p>}
         <label className="mt-3 block text-sm">Edit before saving
-          <textarea rows={3} maxLength={1400} value={edits[item.id] ?? item.proposedText}
+          <textarea rows={3} maxLength={target ? siteLocalContentLimits[target] : 1400} value={edits[item.id] ?? item.proposedText}
             onChange={event => setEdits(old => ({ ...old, [item.id]: event.target.value }))}
             className="mt-1 block w-full rounded-lg border bg-background p-2" />
         </label>
@@ -187,7 +212,8 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
           <button type="button" disabled={busy} onClick={() => void review(item, "discarded")}
             className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Discard</button>
         </div>
-      </article>)}
+      </article>;
+      })}
       {!loading && items.every(item => item.reviewDecision !== "pending") &&
         <p className="text-sm text-muted-foreground">No source excerpts are waiting for review. Continue with the church story editor below.</p>}
     </div>
