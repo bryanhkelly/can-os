@@ -6,7 +6,7 @@ import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { assertSiteSetupScope, assertSiteLocationProgramScope } from "@/domain/site-setup-scope";
+import { assertSiteSetupScope, assertSiteLocationProgramScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
 import { sites, programs, actions, sitePublications, organizations, schoolConfigurationVersions, programPublications, programSiteAuthorizations, schoolYears, calendarEvents } from "@/db/schema";
 import { writeAudit } from "@/platform/mutation";
@@ -262,6 +262,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       updatedAt:sites.updatedAt,metadata:sites.metadata,
     }).from(sites).where(eq(sites.id,data.siteId)).limit(1);
     assertSiteSetupScope(actor,site,"program.read");
+    const readableProgramIds=siteSetupReadableProgramIds(actor);
     const attached=await db.select({
       id:programs.id,name:programs.name,type:programs.type,
       status:programs.status,jurisdictionId:programs.jurisdictionId,
@@ -270,7 +271,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       academicProviderOrganizationId:programs.academicProviderOrganizationId,
       creditIssuingOrganizationId:programs.creditIssuingOrganizationId,
     }).from(programs).where(and(eq(programs.siteId,site.id),
-      ...(actor.scope.programIds ? [inArray(programs.id,actor.scope.programIds)] : [])));
+      ...(readableProgramIds ? [inArray(programs.id,readableProgramIds)] : [])));
     const namedIds=[...new Set([
       site.organizationId,
       ...attached.flatMap(program=>[
@@ -289,12 +290,14 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
       .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
     const {address,metadata,...identity}=site;
     const physical=readSitePhysicalAddress(address);
+    const savedIdentityRevision=typeof metadata.siteIdentityRevision==="string"
+      ? metadata.siteIdentityRevision:null;
     const savedLocationRevision=typeof metadata.sitePhysicalAddressRevision==="string"
       ? metadata.sitePhysicalAddressRevision:null;
     const savedContactRevision=typeof metadata.siteContactRevision==="string"
       ? metadata.siteContactRevision:null;
     return {
-      ...identity,revision:site.updatedAt.toISOString(),
+      ...identity,revision:site.updatedAt.toISOString(),identityRevision:savedIdentityRevision,
       updatedAt:site.updatedAt.toISOString(),
       physicalLocation:{value:physical.value,source:"church_site_record" as const,
         configurationStatus:physical.status,
