@@ -5,7 +5,7 @@ import type { AccessContext } from "@/domain/access-context";
 import {
   type ChurchSuggestionField, normalizeChurchReferenceUrl, churchSuggestionTargetFields,
 } from "@/domain/church-source-references";
-import { siteLocalContentLimits, type SiteLocalContent, type SiteLocalTextField } from "@/domain/site-local-content";
+import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalContent, type SiteLocalTextField } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
