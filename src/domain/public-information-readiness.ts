@@ -61,10 +61,10 @@ export function projectPublicInformationReadiness(input: {
       "/operations",false);
   if (!p.activities.length)
     missing("activities","operations","Add reviewed student activities when offered.",
-      "/activities",false);
+      "/operations",false);
   if (!visible(p.tuition.description))
     missing("tuition","finance","Approve tuition details, or keep prices hidden and route families to admissions.",
-      "/finance",false);
+      "/admissions",false);
   if (!p.services.some(item => visible(item.description)))
     missing("family_services","operations","Confirm optional meals, transportation, or care services.",
       "/operations",false);
