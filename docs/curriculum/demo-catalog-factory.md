@@ -46,6 +46,26 @@ the IDs/counts of course templates, course versions, packs, pack versions, or
 pack items. This is a mutating acceptance check; do not run it against
 production or an environment containing real curriculum.
 
+### One-time transfer of the existing synthetic dataset
+
+The normal catalog and teacher importers are not production seeders. The
+separate `scripts/migrate-demo-data-to-production.mjs` transfers only the
+validated synthetic publisher/provider, 120 private draft courses, 30
+unverified teacher previews, eight `in_review` jurisdiction profiles, and
+960 `under_review` records marked `internal_demo_only`. It preserves IDs and
+source content, adds the importer ownership marker to the legacy draft course
+versions and pack version, and refuses target ID collisions. It does not
+create access accounts or grants, publish curriculum, verify qualifications,
+or create school staffing assignments.
+
+The command defaults to a read-only preview and verifies the actual Neon
+project and source/target branch IDs. Production execution additionally
+requires `--authorize-production` and the exact
+`DEMO_DATA_PRODUCTION_WRITE_CONFIRMED` value enforced by the script. Rehearse
+on a separately identified nonproduction branch before authorizing a
+production write. This exception is limited to this fixed synthetic dataset;
+do not use it to bypass the normal production data/change process.
+
 Run `scripts/reconcile-demo-curriculum-approvals.mjs` first without
 `--apply` to preview the eight-state review coverage. Its write mode requires
 the same exact database-name, host, and branch-ID confirmations. New records
