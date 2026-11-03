@@ -100,6 +100,40 @@ describe("PUB-18: distributed church website ownership", () => {
     ]).toString("base64");
   }
 
+  it("retains legacy revisions and safely renders optional story prompts", () => {
+    const legacy = {
+      welcomeMessage: "Welcome",
+      localDescription: "",
+      denomination: "",
+      statementOfFaith: "",
+      spiritualFormation: "",
+    };
+    const normalized = normalizeSiteLocalContent(legacy);
+    expect(normalized.churchHistory).toBe("");
+    expect(normalized.schoolVision).toBe("");
+    const story = normalizeSiteLocalContent({
+      ...legacy,
+      churchHistory: "Founded in 1987 & serving our neighbors.",
+      schoolVision: "A place to gather and learn.",
+      communityOutreach: "",
+    });
+    const html = renderPublicSiteHtml({
+      host: "fellowship.can-os.com",
+      site: { name: "Academy", organizationName: "Church" },
+      offerings: [], localContent: story,
+    });
+    expect(html).toContain("Founded in 1987 &amp; serving our neighbors.");
+    expect(html).toContain("Why we started a school");
+    expect(html).not.toContain("<h3>Local traditions</h3>");
+  });
+
+  it("holds protected institutional claims inside new story prompts", () => {
+    const decision = classifySiteLocalContent(normalizeSiteLocalContent({
+      ...churchCopy, schoolVision: "Our academy is accredited.",
+    }));
+    expect(decision).toEqual({ status: "review_required", flaggedFields: ["schoolVision"] });
+  });
+
   it("publishes approved local artwork only with rights and child-consent evidence", () => {
     const content = normalizeSiteLocalContent({
       ...churchCopy,
