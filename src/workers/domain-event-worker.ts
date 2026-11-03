@@ -73,6 +73,13 @@ for (const eventType of [
   EventTypes.SectionCreditConfigured,
   EventTypes.ActionDeadlineChanged,
   EventTypes.SiteCreated,
+  // Church source references and editor suggestions are audited facts only.
+  // They do not automatically publish content or confer institutional authority.
+  EventTypes.ChurchSourceReferenceSaved,
+  EventTypes.ChurchSourceReferenceRemoved,
+  EventTypes.ChurchContentSuggestionSubmitted,
+  EventTypes.ChurchContentSuggestionReviewed,
+  EventTypes.ChurchWebsiteSuggestionsRetrieved,
   EventTypes.SiteRoomCreated,
   EventTypes.SiteRoomUpdated,
   EventTypes.SiteRoomRetired,
