@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   initialChurchReferenceState,
+  churchSuggestionTargetFields,
   normalizeChurchReferenceUrl,
 } from "./church-source-references";
 
@@ -31,6 +32,16 @@ describe("church reference URLs", () => {
     ["website", "javascript:alert(1)"],
   ] as const)("rejects unsupported or nonpublic %s reference %s", (kind, url) => {
     expect(() => normalizeChurchReferenceUrl(kind, url)).toThrow();
+  });
+
+  it("maps source excerpts only into locally editable church-owned fields", () => {
+    expect(churchSuggestionTargetFields.church_history).toBe("churchHistory");
+    expect(churchSuggestionTargetFields.church_mission).toBe("localDescription");
+    expect(churchSuggestionTargetFields.local_community).toBe("communityOutreach");
+    expect(churchSuggestionTargetFields.faith_and_values).toBe("statementOfFaith");
+    expect(churchSuggestionTargetFields.branding_hint).toBeUndefined();
+    expect(Object.values(churchSuggestionTargetFields)).not.toContain("tuition");
+    expect(Object.values(churchSuggestionTargetFields)).not.toContain("admissions");
   });
 
   it("never treats a saved social link as extracted material", () => {
