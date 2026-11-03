@@ -243,4 +243,47 @@ describe("standalone public site HTML", () => {
   });
 
 
+
+  it("connects parent discovery to approved pages without inventing admissions or legal status", () => {
+    const site = { name: "Sample Academy", organizationName: "Sample Church" };
+    const academicPrograms = [{
+      programId: "00000000-0000-4000-8000-000000000002",
+      title: "Community Learning", typeLabel: "Hybrid academy",
+      summary: "An approved program description.",
+      grades: { min: "K", max: "5" },
+      delivery: { onsite: true, liveOnline: false, asynchronous: true, onsiteDaysPerWeek: 2 },
+      availability: "planned" as const,
+    }];
+    const profile = projectApprovedParentInformation({
+      site, academicPrograms, offerings: [], localContent: null,
+    });
+    const page = {
+      host: "sample.can-os.com", site, offerings: [], academicPrograms,
+      parentInformation: profile,
+    };
+    const home = renderPublicSiteHtml(page);
+    expect(home).toContain("Find what matters to your family");
+    expect(home).toContain('href="/school-day"');
+    expect(home).toContain('href="/admissions"');
+    expect(home).not.toContain('href="/student-life"');
+    const admissions = renderPublicSiteHtml(page, { path: "/admissions" });
+    expect(admissions).toContain("Applications are not currently open");
+    expect(admissions).not.toContain("School status and disclosures");
+    expect(admissions).not.toContain('action="/apply"');
+
+    profile.admissions.description = verifiedPublicClaim(
+      "Admission decisions require <verified> school review.", "admissions", 2);
+    profile.disclosures = [{
+      category: "jurisdiction",
+      statement: verifiedPublicClaim("Official <state> information.", "jurisdiction_profile", 3),
+    }, {
+      category: "accreditation",
+      statement: unconfiguredClaim("jurisdiction_profile"),
+    }];
+    const reviewed = renderPublicSiteHtml(page, { path: "/admissions" });
+    expect(reviewed).toContain("Admission decisions require &lt;verified&gt; school review.");
+    expect(reviewed).toContain("Official &lt;state&gt; information.");
+    expect(reviewed).not.toContain("<h3>Accreditation</h3>");
+    expect(reviewed).not.toContain('action="/apply"');
+  });
 });
