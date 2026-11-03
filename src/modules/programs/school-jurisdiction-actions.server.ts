@@ -45,11 +45,13 @@ export async function ensureSchoolJurisdictionReviewAction(
       )).limit(1);
     if(existing){
       const revisionChanged=existing.metadata.profileRevision!==review.revision;
-      if(revisionChanged || existing.status==="resolved" || existing.status==="cancelled"){
+      const locationChanged=existing.metadata.locationReviewReason!==review.locationReviewReason;
+      if(revisionChanged || locationChanged || existing.status==="resolved" || existing.status==="cancelled"){
         await tx.update(actions).set({
           status:"open",resolvedAt:null,resolutionNote:null,
           metadata:{...existing.metadata,
             profileRevision:review.revision,reviewState:"legal_review_requested",
+            locationReviewReason:review.locationReviewReason ?? null,
             pendingRequirementIds:review.decisions.filter(item=>
               item.status==="legal_review_required").map(item=>item.id)},
           updatedAt:new Date(),
@@ -74,6 +76,7 @@ export async function ensureSchoolJurisdictionReviewAction(
       status:"open",priority:"high",...scope,
       metadata:{version:1,reviewState:"legal_review_requested",
         profileRevision:review.revision,requesterPersonId:actor.actorPersonId,
+        locationReviewReason:review.locationReviewReason ?? null,
         pendingRequirementIds:review.decisions.filter(item=>
           item.status==="legal_review_required").map(item=>item.id)},
     }).returning({id:actions.id});
