@@ -40,6 +40,9 @@ describe("v2 versioned, Program-specific public weekly schedules",()=>{
     expect(result.state).toBe("approved");
     expect(result.weeklyPattern.map(x=>x.dayOfWeek)).toEqual([0,6]);
     expect(result.approvedPatternSource?.scope.schoolYearId).toBe("year-2026");
+    expect(result.approvedPatternSource?.scope).not.toHaveProperty("siteRevision");
+    expect(result.approvedPatternSource?.scope).not.toHaveProperty("programRevision");
+    expect(result.approvedPatternSource?.scope).not.toHaveProperty("templateRevision");
   });
   it("preserves differing Tuesday and Friday times without fictitious uniform hours",()=>{
     const periods=[
