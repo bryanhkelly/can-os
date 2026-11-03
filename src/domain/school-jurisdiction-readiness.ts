@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   jurisdictionProfileSchema,
   type JurisdictionProfile,
@@ -65,11 +66,9 @@ export function jurisdictionReviewScopeFingerprint(value: unknown): string {
     return input ?? null;
   }
   const serialized = JSON.stringify(stable(value));
-  let hash = 2166136261;
-  for (let i = 0; i < serialized.length; i++) {
-    hash = Math.imul(hash ^ serialized.charCodeAt(i), 16777619);
-  }
-  return "jurisdiction-scope-v1:" + (hash >>> 0).toString(16).padStart(8, "0");
+  // This stamp carries independent approval authority; a 32-bit hash is not
+  // collision-resistant enough for long-lived jurisdiction decisions.
+  return "jurisdiction-scope-v2:" + createHash("sha256").update(serialized).digest("hex");
 }
 
 export function unavailableSchoolJurisdictionReadiness(
