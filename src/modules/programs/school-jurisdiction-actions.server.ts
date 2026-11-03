@@ -7,7 +7,7 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
-import { jurisdictionProfileSchema } from "@/domain/jurisdiction-profile";
+import { jurisdictionProfileSchema,isOfficialJurisdictionSource } from "@/domain/jurisdiction-profile";
 import { reconcileSchoolJurisdictionRequirementActions } from "./school-jurisdiction-requirements.server";
 
 export const schoolJurisdictionReviewActionType="school_jurisdiction_legal_review";
@@ -182,7 +182,7 @@ export async function decideSchoolJurisdictionLegalReview(
       });
       if(!parsed.success)throw new Error("Published policy no longer has valid source-backed requirements");
       const official=new Set(policy.evidence.flatMap(source=>
-        typeof source.url==="string" && source.url.startsWith("https://")
+        isOfficialJurisdictionSource(source)
           ? [source.url] : []));
       const cited=[...new Set(input.sourceUrls)];
       if(!cited.length || cited.some(url=>!official.has(url)))
