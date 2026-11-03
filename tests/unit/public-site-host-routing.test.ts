@@ -18,6 +18,29 @@ describe("CAN OS partner hostname router", () => {
       kind: "site", slug: "vineyard", rewrite: false,
     });
   });
+  it("routes only explicitly listed public pages and their exact internal rewrites", () => {
+    for (const path of ["/about", "/academics", "/student-life", "/school-day",
+      "/admissions", "/contact"]) {
+      expect(classify("https://vineyard.can-os.com" + path)).toEqual({
+        kind: "site", slug: "vineyard", rewrite: true,
+      });
+      const rewritten = "/published-site" + path;
+      expect(classify("https://vineyard.can-os.com" + rewritten)).toEqual({
+        kind: "site", slug: "vineyard", rewrite: false,
+      });
+      expect(slugForPublicSiteOrigin(new Request(
+        "https://vineyard.can-os.com" + rewritten), true)).toBe("vineyard");
+      for (const invalid of [path + "/", path + "?preview=1", rewritten + "/"]) {
+        expect(classify("https://vineyard.can-os.com" + invalid)).toEqual({kind:"deny"});
+      }
+      expect(classify("https://vineyard.can-os.com" + path, "POST"))
+        .toEqual({kind:"deny"});
+    }
+    for (const bad of ["/dashboard", "/api", "/rpc", "/_app", "/login",
+      "/published-site/published-site/about", "/published-site/faq", "/tuition"]) {
+      expect(classify("https://vineyard.can-os.com" + bad)).toEqual({kind:"deny"});
+    }
+  });
   it("blocks all tenant workspace and RPC paths", () => {
     for (const path of ["/access", "/guardian", "/operations", "/sites", "/_serverFn/sensitive",
       "/api", "/published-site/other", "/assets/main.js", "/?test=1"]) {
