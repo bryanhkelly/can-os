@@ -53,8 +53,12 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       setLoading(false);
     }).catch(() => { if (active) { setLoading(false); setError("Could not load church source suggestions."); } }); };
     reload();
-    window.addEventListener(churchSourcesChangedEvent, reload);
-    return () => { active = false; window.removeEventListener(churchSourcesChangedEvent, reload); };
+    const onSourcesChanged = () => {
+      setBrandProposal(null);
+      reload();
+    };
+    window.addEventListener(churchSourcesChangedEvent, onSourcesChanged);
+    return () => { active = false; window.removeEventListener(churchSourcesChangedEvent, onSourcesChanged); };
   }, []);
 
   useEffect(() => {
@@ -113,7 +117,9 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
       await refresh();
       await router.invalidate();
       setMessage(result.alreadyReviewed
-        ? "This suggestion was already reviewed. No second website revision was created."
+        ? result.publication
+          ? `Already saved as church copy revision ${result.publication.revision} (${result.publication.status === "review_required" ? "awaiting CAN review" : "published"}). No duplicate write occurred.`
+          : "This suggestion was previously reviewed. No duplicate write occurred; historical revision details may be unavailable."
         : result.publication
           ? result.publication.status === "review_required"
             ? `Church copy saved as revision ${result.publication.revision}, awaiting CAN review. Previously published copy is unchanged.`
@@ -214,7 +220,10 @@ export function ChurchSourceSuggestionReview({ currentRevision }: { currentRevis
         return <article key={item.id} className="rounded-xl border p-4">
         <h3 className="font-semibold">{fieldOptions.find(option => option.value === item.field)?.label ?? item.field}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Captured {new Date(item.retrievedAt).toLocaleDateString()} · Unverified, manually attributed or website-derived · Confidence: {item.confidence}
+          Captured {new Date(item.retrievedAt).toLocaleDateString()} ·
+          {" "}{item.origin === "manual_summary" ? "Church-editor summary (manually attributed)"
+            : item.origin === "public_html" ? "Bounded public-website extraction"
+              : "Legacy source (origin not recorded)"} · Unverified · Confidence: {item.confidence}
         </p>
         <a href={item.sourcePageUrl ?? item.sourceUrl} target="_blank" rel="noopener noreferrer"
           className="mt-1 block break-all text-xs underline">Review original source page</a>
