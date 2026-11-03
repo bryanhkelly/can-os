@@ -148,7 +148,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   }
 
-  async function saveSiteContact(contact:LaunchSiteContactDraft,expectedRevision:string) {
+  async function saveSiteContact(contact:LaunchSiteContactDraft|null,expectedRevision:string) {
     const submission=await contactMutation.submit({data:{siteId,expectedRevision,contact}});
     if(submission.status==="ignored")return;
     if(submission.refreshError) {
