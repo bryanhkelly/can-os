@@ -126,6 +126,9 @@ export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     const review=await readSchoolJurisdictionReview(actor,data.programId);
+    const [program]=await db.select({organizationId:programs.organizationId})
+      .from(programs).where(eq(programs.id,data.programId)).limit(1);
+    if(!program)throw new AuthorizationError("canonical legal Program scope");
     const rows=await db.select({
       id:actions.id,status:actions.status,ownerPersonId:actions.ownerPersonId,
       title:actions.title,description:actions.description,
@@ -135,12 +138,7 @@ export const getSchoolJurisdictionRequirementActions=createServerFn({method:"GET
       eq(actions.type,"school_jurisdiction_requirement"),
       eq(actions.subjectType,"program"),eq(actions.subjectId,data.programId),
       eq(actions.programId,data.programId),eq(actions.siteId,review.siteId),
-      eq(actions.organizationId,
-        // The canonical Program remains the owning organization, not the
-        // CAN reviewer institution or a public Site publisher.
-        db.select({id:programs.organizationId}).from(programs)
-          .where(eq(programs.id,data.programId)),
-      ),
+      eq(actions.organizationId,program.organizationId),
     )).limit(200);
     const eligible=rows.filter(row=>
       row.metadata.scopeFingerprint===review.scopeFingerprint &&
