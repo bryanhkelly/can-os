@@ -3,6 +3,13 @@ export function admissionOfferProgress(input: {
   blockers:number; enrollmentActive:boolean; sectionCount:number;
   applicationStage?:string; waitlisted?:boolean;
 }, now=new Date()) {
+  // Current enrollment is authoritative. Historic offer outcomes, expiry and
+  // stale application disposition must never override an active enrollment.
+  if(input.enrollmentActive)return {
+    state:input.sectionCount?"enrolled":"awaiting_classes",
+    message:input.sectionCount?"Enrollment is active and classes are assigned.":"Enrollment is active. Admissions will arrange your classes next.",
+    canAccept:false,
+  };
   if(input.status==="declined"||input.status==="revoked"||input.status==="expired")return {
     state:input.status,message:input.status==="revoked"?"This offer was withdrawn. Contact admissions for next steps.":
       input.status==="declined"?"This offer was declined. Contact admissions if your plans change.":
@@ -16,11 +23,6 @@ export function admissionOfferProgress(input: {
     return {state:"application_unavailable",message:input.waitlisted?
       "This application is waitlisted. Admissions must restore it to review before an offer can be accepted.":
       "This application is not open for offers. Contact admissions before responding to an offer.",canAccept:false};
-  if(input.enrollmentActive)return {
-    state:input.sectionCount?"enrolled":"awaiting_classes",
-    message:input.sectionCount?"Enrollment is active and classes are assigned.":"Enrollment is active. Admissions will arrange your classes next.",
-    canAccept:false,
-  };
   if(input.blockers||input.journeyStatus!=="ready")return {
     state:"requirements_pending",
     message:input.status==="accepted"?"Your acceptance is recorded. Enrollment requirements still need review before activation.":
