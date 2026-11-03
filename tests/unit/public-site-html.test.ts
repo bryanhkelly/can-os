@@ -25,9 +25,47 @@ describe("standalone public site HTML", () => {
     expect(html).toContain("Starting at $15.00");
     expect(html).toContain("4 seats remaining");
     expect(html).not.toContain("<script");
-    expect(html).not.toContain('href="/');
+    expect(html).toContain('href="/" aria-current="page"');
+    expect(html).not.toContain('href="/guardian');
     expect(html).not.toContain("guardian/enrichment");
     expect(html).not.toContain("studentProfileId");
+  });
+  it("offers real public pages only for approved content and keeps draft pages unindexed", () => {
+    const page = {
+      host: "vineyard.can-os.com",
+      site: { name: "Vineyard Academy", organizationName: "Vineyard Church" },
+      offerings: [],
+      localContent: {
+        welcomeMessage: "", localDescription: "", denomination: "",
+        statementOfFaith: "", spiritualFormation: "",
+        churchHistory: "Community rooted in service.",
+        schoolVision: "A welcoming place for families.",
+        branding: { theme: "classic" as const, heroImage: null },
+      },
+      academicPrograms: [{
+        programId: "program-one", title: "Proposed school program",
+        typeLabel: "Hybrid academy", summary: "Program information.",
+        grades: { min: "K", max: "5" },
+        delivery: { onsite: true, liveOnline: false, asynchronous: true,
+          onsiteDaysPerWeek: 2 },
+        availability: "planned" as const,
+      }],
+    };
+    const about = renderPublicSiteHtml(page, { path: "/about" });
+    expect(about).toContain("Community rooted in service.");
+    expect(about).toContain('content="noindex,nofollow"');
+    expect(about).not.toContain("<form");
+    expect(about).not.toContain("Proposed school program");
+    const schoolDay = renderPublicSiteHtml(page, {path: "/school-day"});
+    expect(schoolDay).toContain("2 onsite days per week");
+    expect(schoolDay).not.toContain("Monday–Friday schedule");
+    const live = renderPublicSiteHtml(page, {
+      path: "/academics", makeRequestId: () => "request-a",
+    });
+    expect(live).toContain('rel="canonical" href="https://vineyard.can-os.com/academics"');
+    expect(live).toContain('action="/inquiry"');
+    expect(() => renderPublicSiteHtml({ ...page, academicPrograms: [] },
+      { path: "/academics" })).toThrow(/not available/);
   });
   it("renders an empty published catalog without claiming enrollment is available", () => {
     const html = renderPublicSiteHtml({
