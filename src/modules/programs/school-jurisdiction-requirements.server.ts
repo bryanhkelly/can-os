@@ -43,6 +43,8 @@ export async function reconcileSchoolJurisdictionRequirementActions(
       requirementId:requirement.id,profileVersionId:input.profileVersionId,
       scopeFingerprint:input.scopeFingerprint,policyRevisionState:"verified_current",
       responsibleParty:requirement.responsibleParty,phase:requirement.phase,
+      responsibleRole:requirement.responsibleParty==="church"?"registrar":
+        requirement.responsibleParty==="can"?"can_jurisdiction_reviewer":"family_intake_required",
       category:requirement.category??"other",
       filingDeadline:requirement.filingDeadline??null,
       renewalDeadline:requirement.renewalDeadline??null,
@@ -52,7 +54,9 @@ export async function reconcileSchoolJurisdictionRequirementActions(
     };
     if(prior){
       if(prior.metadata.profileVersionId===input.profileVersionId &&
-        prior.metadata.scopeFingerprint===input.scopeFingerprint)continue;
+        prior.metadata.scopeFingerprint===input.scopeFingerprint &&
+        prior.status!=="cancelled" &&
+        prior.metadata.reviewState!=="superseded_by_verified_policy")continue;
       await tx.update(actions).set({
         status:"open",resolvedAt:null,resolutionNote:null,
         metadata:{...prior.metadata,...stamp,
