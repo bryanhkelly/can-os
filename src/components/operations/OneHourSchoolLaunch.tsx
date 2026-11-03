@@ -179,7 +179,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         {launches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
     </label>}
-    {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {error && <div role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">
+      <p>{error}</p>
+      <button type="button" disabled={openingSaving} className="mt-3 min-h-11 rounded-lg border px-4 py-2 font-semibold"
+        onClick={() => { void router.invalidate().then(() => setError("")).catch(() =>
+          setError("Unable to refresh the saved launch. Reopen this school from Launch before attempting activation again.")); }}>
+        Refresh recorded launch status (do not reactivate)
+      </button>
+    </div>}
     <MutationFeedback state={mutation} pendingMessage="Saving launch progress…"/>
     {launch.status === "active" && launch.siteId && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
       {launch.name} is active. Daily work now lives with the opening handoff, staffing, admissions and academic activity in Site Today.{" "}
