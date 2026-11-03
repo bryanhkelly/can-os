@@ -183,6 +183,22 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Button asChild variant="outline" size="sm"><Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}}>Connected workflows</Link></Button>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
+        {currentSchool?.status==="active"&&<section aria-label="Transition from launch to operations" className="mt-5 rounded-2xl border border-primary/30 bg-card p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">Launch → Run</p>
+          <h2 className="mt-2 font-serif text-2xl font-semibold">Continue running {currentSchool.name}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Your school Program is active. Use the operations workspace for current work, including staffing and enrollment follow-ups. Keep setup here for website content, invitations and additional preparation. Daily opening authority and physical site readiness are checked separately.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
+              className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations →</Link>
+            <Link to="/site/day" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Site Today (site staff)</Link>
+          </div>
+        </section>}
+        {currentSchool&&currentSchool.status!=="active"&&<section aria-label="Launch progress and next workspace" className="mt-5 rounded-2xl border bg-card p-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">Launch · Preparing</p>
+          <h2 className="mt-2 font-serif text-xl font-semibold">Continue setting up {currentSchool.name}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Use the steps below for academics, family outreach, website and opening evidence. Finishing these steps does not independently authorize receiving students. Operations is available for separately permitted work without ending setup.</p>
+          <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">View operations and pending actions →</Link>
+        </section>}
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
