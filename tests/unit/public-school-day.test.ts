@@ -10,12 +10,12 @@ const schedule = {
   approval: { status: "approved" as const, revision: 2,
     reviewedByPersonId: "institutional-reviewer", reviewedAt: "2026-11-02T12:00:00Z",
     signature: publicSchoolDayScheduleSignature([
-      {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"12:00",type:"instruction"},
+      {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"14:00",type:"instruction"},
       {dayOfWeek:0,startsAtLocal:"10:00",endsAtLocal:"10:30",type:"chapel"},
       {dayOfWeek:3,startsAtLocal:"09:00",endsAtLocal:"14:00",type:"instruction"},
     ]) },
   periods: [
-    {dayOfWeek: 0, startsAtLocal: "09:00", endsAtLocal: "12:00", type: "instruction"},
+    {dayOfWeek: 0, startsAtLocal: "09:00", endsAtLocal: "14:00", type: "instruction"},
     {dayOfWeek: 0, startsAtLocal: "10:00", endsAtLocal: "10:30", type: "chapel"},
     {dayOfWeek: 3, startsAtLocal: "09:00", endsAtLocal: "14:00", type: "instruction"},
   ],
@@ -42,8 +42,16 @@ describe("approved public school-day projection", () => {
     expect(projectPublicSchoolDay([schedule, schedule], "America/Los_Angeles", now).state)
       .toBe("pending");
   });
+  it("withholds a mixed-day timetable instead of showing false uniform hours", () => {
+    const changed={...schedule,periods:schedule.periods.map(p=>
+      p.dayOfWeek===0&&p.type==="instruction"?{...p,endsAtLocal:"12:00"}:p)};
+    const reapproved={...changed,approval:{...schedule.approval,
+      signature:publicSchoolDayScheduleSignature(changed.periods)}};
+    expect(projectPublicSchoolDay([reapproved],"America/Los_Angeles",now).state)
+      .toBe("pending");
+  });
   it("withdraws schedule claims when reviewed periods have changed", () => {
-    const changed={...schedule,periods:[...schedule.periods,{dayOfWeek:6,startsAtLocal:"09:00",endsAtLocal:"12:00",type:"instruction"}]};
+    const changed={...schedule,periods:[...schedule.periods,{dayOfWeek:6,startsAtLocal:"09:00",endsAtLocal:"14:00",type:"instruction"}]};
     expect(projectPublicSchoolDay([changed],"America/Los_Angeles",now).state).toBe("pending");
   });
   it("withdraws expired academic schedules", () => {
