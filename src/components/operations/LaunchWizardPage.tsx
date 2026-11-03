@@ -109,7 +109,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       setSiteId(result.siteId);
       if (submission.refreshError) setError("Site created, but the page could not refresh. Reopen launch setup; do not create another Site.");
       setNewSiteName("");setNewSiteSlug("");setNewSiteAddress(emptySiteAddress);
-      if(hasAddress && options) {
+      if(hasAddress && options && ["US","USA","UNITED STATES"].includes(newSiteAddress.country.trim().toUpperCase())) {
         const inferred=options.jurisdictions.find(j=>[j.name.toUpperCase(),j.code.toUpperCase().replace(/^US[-_]/,"")].includes(newSiteAddress.state.trim().toUpperCase()));
         if(inferred)setJurisdictionId(inferred.id);
       }
