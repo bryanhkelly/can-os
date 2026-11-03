@@ -117,6 +117,7 @@ export async function changeSiteParentIdentityReview(
     const reviewed=identityReviewSchema.parse({
       version:1,revision:revision+1,reviewedByPersonId:actor.actorPersonId,
       reviewedAt:now.toISOString(),
+      evidenceReference:input.evidenceReference,
       expiresOn:input.addressDecision==="approve" ||
         input.contactDecision==="approve" ? input.expiresOn : null,
       addressDigest:input.addressDecision==="approve" ? digestAddress : null,
