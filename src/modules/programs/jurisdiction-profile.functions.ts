@@ -105,6 +105,11 @@ export const publishJurisdictionProfile=createServerFn({method:"POST"})
    const [record]=await tx.select().from(jurisdictionProfileVersions)
     .where(eq(jurisdictionProfileVersions.id,data.id)).limit(1);
    if(!record || record.status!=="in_review")throw Error("Profile must be in review before publication");
+   // A separate verified reviewer must attest to this exact revision before publication.
+   if(record.verificationStatus!=="verified" || !record.reviewedAt || !record.reviewOwnerPersonId)
+    throw Error("Independent review and verification are required before publication");
+   if(record.reviewOwnerPersonId===context.personId)
+    throw Error("The verifier cannot publish their own jurisdiction review");
    const sources=record.evidence;
    jurisdictionProfileSchema.parse({...record.profile,summary:record.summary,evidence:sources});
    if(!Array.isArray(sources)||sources.length===0)throw Error("Add authoritative sources before publishing");
@@ -113,7 +118,7 @@ export const publishJurisdictionProfile=createServerFn({method:"POST"})
      throw Error("Each source needs an HTTPS URL, authority, and checked date");
    }
    const [published]=await tx.update(jurisdictionProfileVersions).set({
-    status:"published",verificationStatus:"verified",reviewedAt:new Date(),
+    status:"published",
     publishedAt:new Date(),updatedAt:new Date(),
    }).where(and(eq(jurisdictionProfileVersions.id,data.id),eq(jurisdictionProfileVersions.status,"in_review")))
     .returning({id:jurisdictionProfileVersions.id});
