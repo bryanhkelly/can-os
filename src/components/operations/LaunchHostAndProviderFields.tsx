@@ -76,9 +76,11 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                   {selectedSite && <LaunchSiteContactEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
                     busy={busy} save={saveSiteContact}/>}
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-semibold">Add a school location</p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
+                    <summary className="cursor-pointer text-sm font-semibold">
+                      {hostSites.length ? "Add another school location" : "Create your school location"}
+                    </summary>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <Field label="School location name">
                        <Input placeholder="Campus name" value={newSiteName} onChange={e=>{const value=e.target.value;setNewSiteName(value);if(!newSiteSlug||newSiteSlug===suggestedLaunchSlug(newSiteName))setNewSiteSlug(suggestedLaunchSlug(value));}}/>
                       </Field>
@@ -122,7 +124,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       <Link to="/sites/$siteId/publish" params={{siteId:createdSiteDraft.siteId}}
                         className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
                     </div>}
-                  </div>
+                  </details>
                   <Field label="Jurisdiction" required>
                     <Select value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)}>
                       <option value="">Select jurisdiction…</option>
