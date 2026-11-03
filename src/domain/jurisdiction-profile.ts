@@ -35,6 +35,10 @@ const requirementSchema = z.object({
   disclosureAudience: z.enum(jurisdictionDisclosureAudiences).default("internal_only"),
   effectiveOn: z.string().date().optional(),
   reviewBy: z.string().date().optional(),
+  /** Date-only legal filing/renewal dates are informational until verified
+   * in this immutable, independently reviewed profile version. */
+  filingDeadline: z.string().date().optional(),
+  renewalDeadline: z.string().date().optional(),
 });
 export const jurisdictionProfileSchema = z.object({
   summary: z.string().min(1),
@@ -44,6 +48,8 @@ export const jurisdictionProfileSchema = z.object({
     summary: z.string().min(1),
     eligibilityStatus: z.enum(["verified","conditional","under_review","unknown"]),
     evidenceIds: z.array(z.string()).default([]),
+    applicationDeadline: z.string().date().optional(),
+    renewalDeadline: z.string().date().optional(),
   })).default([]),
   requirements: z.array(requirementSchema).default([]),
   evidence: z.array(evidenceSchema).default([]),
