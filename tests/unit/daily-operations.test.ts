@@ -148,9 +148,10 @@ describe("daily operations attention", () => {
       action("student",{type:"student_recovery",ownerPersonId:"leader-1",priority:"critical"}),
     ]});
     expect(items.map(item=>item.id)).toEqual([
-      "action:opening","action:coverage","action:routine","action:essay",
+      "action:opening","action:coverage","action:routine",
     ]);
     expect(items.some(item=>item.id==="action:student")).toBe(false);
+    expect(items.some(item=>item.id==="action:essay")).toBe(false);
   });
 
   it("shows unassigned coverage escalations to local leaders without exposing unrelated unowned work", () => {
