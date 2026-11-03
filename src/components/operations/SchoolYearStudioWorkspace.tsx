@@ -13,7 +13,9 @@ type Snapshot=Awaited<ReturnType<typeof getSchoolYearStudio>>;
 export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;selection:{siteId?:string;programId?:string}}){
  const router=useRouter();
  const [siteId,setSiteId]=useState(selection.siteId??data.programs.find(p=>p.id===selection.programId)?.siteId??data.sites[0]?.id??"");
- const [programId,setProgramId]=useState(selection.programId??"");
+ const [programId,setProgramId]=useState(()=>
+  data.programs.some(program=>program.id===selection.programId&&program.siteId===siteId)
+    ? selection.programId! : "");
  const [scaleId,setScaleId]=useState(()=>{
   const selectedSite=data.sites.find(site=>site.id===siteId);
   const scales=data.gradeScales.filter(scale=>scale.organizationId===selectedSite?.organizationId);
