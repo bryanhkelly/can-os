@@ -301,6 +301,16 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   </WorkspaceShell>;
   const currentLaunch=resolveLaunchResume(launches.launches,selection).launch;
   const schools=(preparationPrograms??[]).filter(program=>["draft","launching","ready","active"].includes(program.status));
+  // Admissions directory is peripheral to launching a school. Keep its
+  // school picker useful from the canonical launch list if that read failed.
+  const schoolChoices=[
+    ...schools,
+    ...launches.launches.filter(launch=>!schools.some(school=>school.id===launch.id))
+      .map(launch=>({
+        id:launch.id,name:launch.name,siteId:launch.siteId,status:launch.status,
+        siteName:options.sites.find(site=>site.id===launch.siteId)?.name??"Site not yet linked",
+      })),
+  ];
   const currentSchool=resolveLaunchResume(schools,selection).launch;
   const currentProgram=currentSchool??currentLaunch;
   const schoolSelection={siteId:selection.siteId??currentProgram?.siteId??undefined,programId:selection.programId??currentProgram?.id};
@@ -367,7 +377,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
         </Button>}
-        <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
+        <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId??undefined,programId:school.id}})}/>
         <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
           <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>
