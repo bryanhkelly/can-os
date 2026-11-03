@@ -89,7 +89,7 @@ export async function readChurchContentSuggestions(actor: AccessContext) {
   }
   return rows.map(row => ({
     ...row,
-    origin: byId.get(row.id) ?? "legacy_unknown" as const,
+    origin: byId.get(row.id) ?? "legacy_unknown",
   }));
 }
 
