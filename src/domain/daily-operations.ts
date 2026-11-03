@@ -65,9 +65,10 @@ const restrictedBroadActionTypes = new Set([
   "safeguarding_concern",
   "safeguarding_response_required",
   "coach_outreach",
-  // Student academic and recovery cases are not school-leader operating decisions.
-  "student_recovery",
-  "student_support",
+]);
+const excludedLocalLeaderActionTypes = new Set([
+  "student_recovery", "student_support", "academic_intervention",
+  "missing_work_follow_up", "guardian_grade_follow_up",
 ]);
 
 function actionCategory(action: DailyOperationsAction): DailyAttentionCategory {
@@ -144,6 +145,7 @@ export function buildDailyOperationsAttention(input: {
 }): DailyAttentionItem[] {
   const actions = input.actions.filter(action =>
     !restrictedBroadActionTypes.has(action.type ?? "") &&
+    !(input.role === "site_leader" && excludedLocalLeaderActionTypes.has(action.type ?? "")) &&
     (hasRegistrarAuthority(input.role) || action.ownerPersonId === input.actorPersonId ||
       action.type === "program_opening_handoff" || action.openingHandoff ||
       (action.type === "onsite_coverage_gap" && action.ownerPersonId === null)));
