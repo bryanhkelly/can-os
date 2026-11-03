@@ -101,6 +101,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
           name: s.sites.name,
           slug: s.sites.slug,
           timezone: s.sites.timezone,
+          address: s.sites.address,
         })
         .from(s.sites)
         .where(and(inArray(s.sites.organizationId, organizationIds),
