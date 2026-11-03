@@ -26,6 +26,15 @@ function SiteParentInformationReviewPage(){
     data={outcome.data}/>;
 }
 
+const reviewStatusLabels={
+  never_reviewed:"Never reviewed",
+  approved:"Approved and current",
+  expired:"Review expired or lacks a valid expiry",
+  source_changed:"Source changed — reapproval required",
+  withdrawn:"Withdrawn",
+  invalid_review:"Invalid approval record — reapproval required",
+} as const;
+
 function SiteParentInformationEditor({data}:{
   data:Awaited<ReturnType<typeof getPublicParentIdentityReview>>
 }){
@@ -78,6 +87,27 @@ function SiteParentInformationEditor({data}:{
     </p>
     <MutationFeedback state={mutation} className="mt-5"
       pendingMessage="Saving the institutional review…"/>
+    <section className="mt-5 rounded-xl border bg-card p-4" aria-label="Review provenance">
+      <h2 className="text-sm font-semibold">Institutional review history</h2>
+      <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+        <div><dt className="text-muted-foreground">Most recent review</dt>
+          <dd>{data.reviewedAt?new Date(data.reviewedAt).toLocaleDateString():"Never reviewed"}</dd></div>
+        <div><dt className="text-muted-foreground">Current review expiry</dt>
+          <dd>{data.expiresOn??"No valid expiry on file"}</dd></div>
+        <div><dt className="text-muted-foreground">Address</dt>
+          <dd>{reviewStatusLabels[data.address.status]}</dd></div>
+        <div><dt className="text-muted-foreground">Contact</dt>
+          <dd>{reviewStatusLabels[data.contact.status]}</dd></div>
+      </dl>
+      {data.evidenceReference&&<p className="mt-2 text-xs text-muted-foreground">
+        Previous institutional evidence: {data.evidenceReference}
+      </p>}
+      <p className="mt-2 text-xs text-muted-foreground">
+        Approval status is recalculated from current canonical Site facts; editing the
+        Site location or contact can invalidate a previous publication decision.
+      </p>
+    </section>
+
     <form onSubmit={save} className="mt-6 space-y-5">
       <fieldset className="rounded-xl border bg-card p-5">
         <legend className="px-2 text-lg font-semibold">Public school location</legend>
@@ -85,7 +115,7 @@ function SiteParentInformationEditor({data}:{
           {location.street2?", "+location.street2:""}, {location.city}, {location.state} {location.postalCode}, {location.country}</p>:
           <p className="text-sm">No valid current physical location; public address approval is unavailable.</p>}
         <p className="mt-1 text-xs text-muted-foreground">
-          Current public review: {data.address.publicApproved?"Approved":"Not approved"}.
+          Current public review: {reviewStatusLabels[data.address.status]}.
           A legal or billing address is not necessarily an address to show families.
         </p>
         <label className="mt-3 block text-sm">Publication decision
@@ -111,7 +141,7 @@ function SiteParentInformationEditor({data}:{
           <p>Website: {contact.website||"Not supplied"}</p>
         </div>:<p className="text-sm">No valid current Site contact; public approval is unavailable.</p>}
         <p className="mt-1 text-xs text-muted-foreground">
-          Current public review: {data.contact.publicApproved?"Approved":"Not approved"}.
+          Current public review: {reviewStatusLabels[data.contact.status]}.
           Never publish an employee's private contact details without the right to do so.
         </p>
         <label className="mt-3 block text-sm">Publication decision
