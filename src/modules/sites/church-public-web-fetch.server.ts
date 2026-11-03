@@ -58,43 +58,60 @@ function plainHtmlText(html: string) {
 }
 
 export function robotsAllows(robots: string, pathname: string): boolean {
-  // Apply wildcard and explicit CAN rules conservatively. If a path matches
-  // competing rules, prefer the more specific match (Allow wins a tie).
-  const rules: Array<{ allow: boolean; length: number; pattern: RegExp }> = [];
-  let agents: string[] = [];
+  // A group may have several consecutive User-agent lines. The first
+  // Allow/Disallow starts its rules; the next User-agent starts a new group.
+  // Explicit matching groups take precedence over the generic "*" group.
+  type Rule = { allow: boolean; length: number; pattern: RegExp };
+  type Group = { agents: string[]; rules: Rule[] };
+  const groups: Group[] = [];
+  let group: Group | undefined;
   let hasRules = false;
+
   for (const raw of robots.split(/\r?\n/)) {
     const line = raw.replace(/#.*/, "").trim();
+    if (!line) continue;
     const parsed = /^([\w-]+)\s*:\s*(.*)$/i.exec(line);
     if (!parsed) continue;
     const directive = parsed[1]!.toLowerCase();
     const value = parsed[2]!.trim();
     if (directive === "user-agent") {
-      if (hasRules) { agents = []; hasRules = false; }
-      agents.push(value.toLowerCase());
+      if (!group || hasRules) {
+        group = { agents: [], rules: [] };
+        groups.push(group);
+        hasRules = false;
+      }
+      group.agents.push(value.toLowerCase());
       continue;
     }
-    if (directive !== "allow" && directive !== "disallow") continue;
+    if (!group || (directive !== "allow" && directive !== "disallow")) continue;
     hasRules = true;
-    if (!agents.some(agent => agent === "*" || agent.includes("canos") || agent.includes("can-os"))) continue;
     if (!value) continue;
     const anchored = value.endsWith("$");
     const source = (anchored ? value.slice(0, -1) : value)
-      .split("*").map(part => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+      .split("*").map(part => part.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")).join(".*");
     try {
-      rules.push({
+      group.rules.push({
         allow: directive === "allow",
         length: value.replace(/[*$]/g, "").length,
         pattern: new RegExp("^" + source + (anchored ? "$" : "")),
       });
     } catch {
-      // Fail closed on an unparseable disallow rather than ignore it.
       if (directive === "disallow") return false;
     }
   }
-  const matched = rules.filter(rule => rule.pattern.test(pathname))
-    .sort((a,b) => b.length - a.length || Number(b.allow) - Number(a.allow));
-  return matched[0]?.allow ?? true;
+
+  const ourAgent = "canos-churchreference";
+  const matchingNames = groups.flatMap(g => g.agents)
+    .filter(agent => agent !== "*" && ourAgent.startsWith(agent));
+  const longestAgent = matchingNames.reduce((max, name) => Math.max(max, name.length), 0);
+  const selected = longestAgent
+    ? groups.filter(g => g.agents.some(a => a !== "*" &&
+      a.length === longestAgent && ourAgent.startsWith(a)))
+    : groups.filter(g => g.agents.includes("*"));
+  const matches = selected.flatMap(g => g.rules)
+    .filter(rule => rule.pattern.test(pathname))
+    .sort((a, b) => b.length - a.length || Number(b.allow) - Number(a.allow));
+  return matches[0]?.allow ?? true;
 }
 
 async function publicAddress(hostname: string): Promise<string> {
