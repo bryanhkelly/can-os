@@ -34,7 +34,7 @@ export async function ensureSchoolJurisdictionReviewAction(
     const review=await readSchoolJurisdictionReview(actor,programId,tx);
     if(!review.reviewRequired)
       return {programId,created:false,needed:false,actionId:null};
-    const [existing]=await tx.select({id:actions.id}).from(actions)
+    const [existing]=await tx.select({id:actions.id,status:actions.status,metadata:actions.metadata}).from(actions)
       .where(and(
         eq(actions.type,schoolJurisdictionReviewActionType),
         eq(actions.subjectType,"program"),
@@ -43,8 +43,27 @@ export async function ensureSchoolJurisdictionReviewAction(
         eq(actions.siteId,program.siteId),
         eq(actions.programId,program.id),
       )).limit(1);
-    if(existing)
+    if(existing){
+      const revisionChanged=existing.metadata.profileRevision!==review.revision;
+      if(revisionChanged || existing.status==="done" || existing.status==="cancelled"){
+        await tx.update(actions).set({
+          status:"open",resolvedAt:null,resolutionNote:null,
+          metadata:{...existing.metadata,
+            profileRevision:review.revision,reviewState:"legal_review_requested",
+            pendingRequirementIds:review.decisions.filter(item=>
+              item.status==="legal_review_required").map(item=>item.id)},
+          updatedAt:new Date(),
+        }).where(eq(actions.id,existing.id));
+        const scope={organizationId:program.organizationId,siteId:program.siteId,programId:program.id};
+        await writeAudit(tx,actor,{
+          action:"program.jurisdiction.legal_review.reopened",
+          entityType:"action",entityId:existing.id,scope,
+          before:{status:existing.status,profileRevision:existing.metadata.profileRevision},
+          after:{status:"open",profileRevision:review.revision},
+        });
+      }
       return {programId,created:false,needed:true,actionId:existing.id};
+    }
     const scope={organizationId:program.organizationId,
       siteId:program.siteId,programId:program.id};
     const [created]=await tx.insert(actions).values({
