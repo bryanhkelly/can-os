@@ -236,6 +236,19 @@ export async function decideSchoolJurisdictionRequirementEvidence(
       });
       return {actionId:action.id,verified:true,duplicate:false};
     }
+    if(document.metadata.reviewStatus==="pending"){
+      await tx.update(documents).set({
+        metadata:{...document.metadata,reviewStatus:"rejected",
+          reviewNote:input.note,reviewedAt:now.toISOString(),
+          reviewedByPersonId:actor.actorPersonId},
+        updatedAt:now,
+      }).where(eq(documents.id,document.id));
+      await writeAudit(tx,actor,{
+        action:"program.jurisdiction.document.corrections_requested",
+        entityType:"document",entityId:document.id,scope,
+        after:{actionId:action.id,reviewStatus:"rejected"},
+      });
+    }
     await tx.update(actions).set({
       status:"open",resolvedAt:null,resolutionNote:null,
       metadata:{...action.metadata,reviewState:"evidence_rejected",
