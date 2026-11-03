@@ -121,7 +121,7 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
       actorPersonId: actor.actorPersonId, organizationId: site.organizationId,
       siteId: site.id, payload: { field: input.field },
     });
-    return { id: created.id };
+    return { id: created.id, changed: true };
   });
 }
 
