@@ -255,9 +255,11 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      <h3 className="font-serif text-xl font-semibold">Admissions &amp; enrollment in progress</h3>
      {visibleEnrollmentApplications.map(app=>{
       const activeOffer=app.offers.find(offer=>offer.enrollmentActive);
-      const issuedOffer=app.offers.find(offer=>offer.status==="issued");
-      const stage=activeOffer?"Enrollment active":app.waitlisted?"Waitlisted":
-       issuedOffer?"Offer issued":app.applicationStage==="accepted"?"Accepted · enrollment checklist":
+      const issuedOffer=app.offers.find(offer=>offer.progress.canAccept);
+      const acceptedOffer=app.offers.find(offer=>offer.status==="accepted");
+      const stage=activeOffer?"Enrollment active":acceptedOffer?"Accepted · enrollment checklist":
+       issuedOffer?"Offer ready for response":app.waitlisted?"Waitlisted":
+       app.offers.some(offer=>offer.progress.state==="requirements_pending")?"Enrollment requirements pending":
        `Admissions · ${app.applicationStage.replaceAll("_"," ")}`;
       return <article key={app.applicationId} className="rounded-xl border bg-card p-4">
        <div className="flex flex-wrap items-start justify-between gap-3">
