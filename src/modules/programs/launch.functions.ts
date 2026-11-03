@@ -8,6 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, siteTimezoneSchema } from "@/domain/site-setup-configuration";
+import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
@@ -44,7 +45,7 @@ const startLaunchInput = z.object({
   gradeRange: z.object({
     min: z.string().trim().min(1).max(10),
     max: z.string().trim().min(1).max(10),
-  }),
+  }).refine(launchGradeRangeIsOrdered,"Minimum grade cannot come after maximum grade"),
   deliveryModel: z
     .object({
       onsite: z.boolean().optional(),
