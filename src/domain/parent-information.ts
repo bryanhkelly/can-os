@@ -58,6 +58,8 @@ export type PublicSchoolIdentity = {
   contact: PublicClaim<string>;
 };
 export type PublicAcademicSummary = {
+  /** Published public Program identity already used by application destinations. */
+  programId: string;
   title: PublicClaim<string>;
   summary: PublicClaim<string>;
   grades: PublicClaim<{ min: string; max: string }>;
@@ -219,6 +221,7 @@ export function projectApprovedParentInformation(input: {
     faith: faith ? verifiedPublicClaim(faith, "site_local_content") : unconfiguredClaim("site_local_content"),
     spiritualFormation: formation ? verifiedPublicClaim(formation, "site_local_content") : unconfiguredClaim("site_local_content"),
     academics: input.academicPrograms.map(program => ({
+      programId:program.programId,
       title: verifiedPublicClaim(program.title, "program_publication"),
       summary: verifiedPublicClaim(program.summary, "program_publication"),
       grades: verifiedPublicClaim(program.grades, "program_publication"),
