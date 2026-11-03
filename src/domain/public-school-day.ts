@@ -32,7 +32,11 @@ export function publicSchoolDayScheduleSignature(
   })).sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
     a.startsAtLocal.localeCompare(b.startsAtLocal) ||
     a.endsAtLocal.localeCompare(b.endsAtLocal) ||
-    a.type.localeCompare(b.type));
+    a.type.localeCompare(b.type) ||
+    (("sequence" in a ? a.sequence : 0)??0) -
+      (("sequence" in b ? b.sequence : 0)??0) ||
+    (("label" in a ? a.label : "")??"").localeCompare(
+      ("label" in b ? b.label : "")??""));
   // Keep the legacy single-argument signature for pure fixtures, but ONLY
   // the scope-bound v2 form may be produced by the production approval service.
   const canonical=(value:unknown):unknown=>Array.isArray(value)
