@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectPublicSchoolDay } from "@/domain/public-school-day";
+import { projectPublicSchoolDay, publicSchoolDayScheduleSignature } from "@/domain/public-school-day";
 
 const now = new Date("2026-11-03T18:00:00Z");
 const schedule = {
@@ -8,7 +8,12 @@ const schedule = {
   startsOn: "2026-08-01", endsOn: "2027-06-30",
   effectiveFrom: "2026-08-01", effectiveThrough: null,
   approval: { status: "approved" as const, revision: 2,
-    reviewedByPersonId: "institutional-reviewer", reviewedAt: "2026-11-02T12:00:00Z" },
+    reviewedByPersonId: "institutional-reviewer", reviewedAt: "2026-11-02T12:00:00Z",
+    signature: publicSchoolDayScheduleSignature([
+      {dayOfWeek:0,startsAtLocal:"09:00",endsAtLocal:"12:00",type:"instruction"},
+      {dayOfWeek:0,startsAtLocal:"10:00",endsAtLocal:"10:30",type:"chapel"},
+      {dayOfWeek:3,startsAtLocal:"09:00",endsAtLocal:"14:00",type:"instruction"},
+    ]) },
   periods: [
     {dayOfWeek: 0, startsAtLocal: "09:00", endsAtLocal: "12:00", type: "instruction"},
     {dayOfWeek: 0, startsAtLocal: "10:00", endsAtLocal: "10:30", type: "chapel"},
@@ -36,6 +41,10 @@ describe("approved public school-day projection", () => {
     }
     expect(projectPublicSchoolDay([schedule, schedule], "America/Los_Angeles", now).state)
       .toBe("pending");
+  });
+  it("withdraws schedule claims when reviewed periods have changed", () => {
+    const changed={...schedule,periods:[...schedule.periods,{dayOfWeek:6,startsAtLocal:"09:00",endsAtLocal:"12:00",type:"instruction"}]};
+    expect(projectPublicSchoolDay([changed],"America/Los_Angeles",now).state).toBe("pending");
   });
   it("withdraws expired academic schedules", () => {
     expect(projectPublicSchoolDay([{...schedule,endsOn:"2026-10-01"}],
