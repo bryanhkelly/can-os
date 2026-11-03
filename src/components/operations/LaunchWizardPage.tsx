@@ -2,7 +2,8 @@ import type { LaunchJurisdictionResearch } from "@/domain/jurisdiction-launch-re
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useLaunchInstitutionDefaults } from "@/hooks/useLaunchInstitutionDefaults";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
-import { updateLaunchSiteAddress } from "@/modules/programs/site-configuration.functions";
+import { updateLaunchSiteAddress, updateLaunchSiteContact } from "@/modules/programs/site-configuration.functions";
+import type { LaunchSiteContactDraft } from "@/components/operations/LaunchSiteContactEditor";
 import type { LaunchSiteAddressDraft } from "@/components/operations/LaunchHostAndProviderFields";
 import type { LaunchCreatedResult } from "@/components/operations/LaunchCreatedHandoff";
 import { useLaunchModelPresets } from "@/hooks/useLaunchModelPresets";
@@ -49,10 +50,11 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch, authError } = data;
   const router = useRouter();
   const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input), invalidateRouter: () => router.invalidate() });
+  const contactMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteContact>[0])=>updateLaunchSiteContact(input),invalidateRouter:()=>router.invalidate()});
   const addressMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteAddress>[0])=>updateLaunchSiteAddress(input),invalidateRouter:()=>router.invalidate()});
   const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input), invalidateRouter: () => router.invalidate() });
-  const busy = siteMutation.isSubmitting || addressMutation.isSubmitting || launchMutation.isSubmitting ||
-    !!siteMutation.refreshError || !!addressMutation.refreshError || !!launchMutation.refreshError;
+  const busy = siteMutation.isSubmitting || contactMutation.isSubmitting || addressMutation.isSubmitting || launchMutation.isSubmitting ||
+    !!siteMutation.refreshError || !!contactMutation.refreshError || !!addressMutation.refreshError || !!launchMutation.refreshError;
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>(
@@ -85,6 +87,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [newSiteAddress,setNewSiteAddress]=useState<LaunchSiteAddressDraft>(emptySiteAddress);
   async function retrySiteRefresh(){
     const outcome=await siteMutation.retryRefresh();
+    if(outcome.status==="refreshed")setError("");
+  }
+  async function retryContactRefresh(){
+    const outcome=await contactMutation.retryRefresh();
     if(outcome.status==="refreshed")setError("");
   }
   async function retryAddressRefresh(){
@@ -124,6 +130,16 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       }
     }catch(e){setError(mutationErrorMessage(e, "Unable to create site"));}
 
+  }
+
+  async function saveSiteContact(contact:LaunchSiteContactDraft,expectedRevision:string) {
+    const submission=await contactMutation.submit({data:{siteId,expectedRevision,contact}});
+    if(submission.status==="ignored")return;
+    if(submission.refreshError) {
+      setError("Contact saved, but refresh failed. Retry refresh without saving again.");
+      throw new Error("Contact saved. Refresh to see the updated details.");
+    }
+    setError("Private school contact saved. Public display requires a separate approval.");
   }
 
   async function saveSiteAddress(address:LaunchSiteAddressDraft,expectedRevision:string,changeReason:string) {
@@ -253,6 +269,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retrySiteRefresh()} className="mt-2">
           Retry Site refresh
         </Button>}
+        {contactMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={contactMutation.isSubmitting}
+          onClick={()=>void retryContactRefresh()} className="mt-2">
+          Retry contact refresh
+        </Button>}
         {addressMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={addressMutation.isSubmitting}
           onClick={()=>void retryAddressRefresh()} className="mt-2">
           Retry address refresh
@@ -268,7 +288,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>
         <div className="mt-8 grid gap-6">
-          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
+          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
           <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
            {extendedPlanning?<ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId}/>:<p role="status" className="mt-3 text-sm">Additional program planning is temporarily unavailable. You can continue setting up your school.</p>}
