@@ -14,11 +14,22 @@ export const publicAdmissionsInterestInput = z.object({
   lastName: name,
   email: z.string().trim().toLowerCase().email().max(254),
   message: z.string().trim().max(500).default(""),
+  /** A visit request is interest only; a date is never confirmed here. */
+  purpose: z.enum(["information", "visit_interest"]).default("information"),
   contactConsent: z.literal("yes"),
   website: z.string().max(150).default(""), // invisible honeypot
 }).strict();
 
 export type PublicAdmissionsInterestInput = z.infer<typeof publicAdmissionsInterestInput>;
+
+/** Preserve purpose inside the existing scoped lead record. No tour, calendar
+ * booking, second CRM or new child/household record is created. */
+export function publicInterestMessage(input:PublicAdmissionsInterestInput):string {
+  return input.purpose === "visit_interest"
+    ? "School visit interest (not scheduled)"+(input.message?" — "+input.message:"")
+    : input.message;
+}
+
 
 export type PublicInterestRoute = "public_site_inquiry" | "public_site_family_start" | "invited_family_interest";
 
