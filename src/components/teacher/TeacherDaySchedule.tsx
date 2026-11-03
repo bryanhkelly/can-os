@@ -30,7 +30,7 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
 }) {
   const available = data?.connected && !error;
   const upcomingClass=data?.connected && !error
-    ? data.items.filter(item=>!item.cancelled && item.sectionId && sections.some(section=>section.id===item.sectionId) &&
+    ? data.items.filter(item=>item.source==="section" && !item.cancelled && item.sectionId && sections.some(section=>section.id===item.sectionId) &&
         Number.isFinite(Date.parse(item.startsAt)) && Date.parse(item.startsAt)>=Date.now())
         .sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt))[0]
     : undefined;
