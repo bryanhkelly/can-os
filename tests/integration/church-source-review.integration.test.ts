@@ -189,6 +189,25 @@ integration("church source review real transaction races", () => {
     expect(flags).toHaveLength(1);
   });
 
+  it("returns the committed receipt after source withdrawal without a second publication", async () => {
+    const f = await fixture();
+    const p = await f.propose();
+    const input = {
+      suggestionId: p.id, decision: "accepted" as const,
+      expectedRevision: 0, rightsConfirmed: true,
+    };
+    const first = await f.review.reviewChurchSourceExcerpt(f.actor, input);
+    expect(first.publication?.revision).toBe(1);
+    await f.sources.removeChurchSourceReference(f.actor, { kind: "website" });
+    const replay = await f.review.reviewChurchSourceExcerpt(f.actor, input);
+    expect(replay.alreadyReviewed).toBe(true);
+    expect(replay.publication?.revision).toBe(1);
+    expect(await f.versions()).toHaveLength(1);
+    const events = await f.db.select().from(f.schema.domainEvents)
+      .where(eq(f.schema.domainEvents.aggregateId, p.id));
+    expect(events.filter(x => x.eventType === EventTypes.ChurchContentSuggestionReviewed)).toHaveLength(1);
+  });
+
   it("rejects source-derived admissions promises before suggestion persistence", async () => {
     const f = await fixture();
     await expect(f.propose("Our school is enrolling students and accepting applications."))
