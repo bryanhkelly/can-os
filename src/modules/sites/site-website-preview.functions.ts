@@ -22,12 +22,18 @@ import {
 } from "@/domain/site-local-content";
 import { publishPartnerLocalContent } from "./site-local-content.server";
 
-const localFields = Object.fromEntries(
-  Object.entries(siteLocalContentLimits).map(([name, max]) => [
-    name, ["churchHistory", "communityOutreach", "schoolVision", "leadershipWelcome", "localTraditions"].includes(name)
-      ? z.string().max(max).optional() : z.string().max(max),
-  ]),
-) as Record<keyof typeof siteLocalContentLimits, z.ZodType<string | undefined>>;
+const localFields = {
+  welcomeMessage: z.string().max(siteLocalContentLimits.welcomeMessage),
+  localDescription: z.string().max(siteLocalContentLimits.localDescription),
+  denomination: z.string().max(siteLocalContentLimits.denomination),
+  statementOfFaith: z.string().max(siteLocalContentLimits.statementOfFaith),
+  spiritualFormation: z.string().max(siteLocalContentLimits.spiritualFormation),
+  churchHistory: z.string().max(siteLocalContentLimits.churchHistory).optional(),
+  communityOutreach: z.string().max(siteLocalContentLimits.communityOutreach).optional(),
+  schoolVision: z.string().max(siteLocalContentLimits.schoolVision).optional(),
+  leadershipWelcome: z.string().max(siteLocalContentLimits.leadershipWelcome).optional(),
+  localTraditions: z.string().max(siteLocalContentLimits.localTraditions).optional(),
+};
 const localContentSchema = z.object({
   ...localFields,
   branding: z.object({
