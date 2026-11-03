@@ -181,7 +181,8 @@ export async function readApprovedPublicParentExtras(
       siteId, program.programId, executor) as DetailedSchedule;
     const schedule = toProgramSchoolDay(program, day, siteId);
     if (schedule) programSchedules.push(schedule);
-    if (programs.length === 1 && day.state === "approved") {
+    if (programs.length === 1 && schedule && day.state === "approved" &&
+      day.days.canDisplay && day.startTime.canDisplay && day.endTime.canDisplay) {
       // Legacy Site-wide field is populated only for one unambiguous Program.
       legacySchoolDay = day;
     }
@@ -229,7 +230,7 @@ export async function readApprovedPublicParentExtras(
         informationSessionInterestAvailable:false,
         description:eligible
           ? verifiedPublicClaim(
-            "Applications can begin after adult email verification. Admission and enrollment are subject to school review.",
+            "Verified application starts are available after adult email verification. This does not promise admission, enrollment, or an available seat.",
             "admissions")
           : unconfiguredClaim("admissions"),
       });
@@ -239,7 +240,7 @@ export async function readApprovedPublicParentExtras(
       applicationOpen:anyOpen,
       description:anyOpen
         ? verifiedPublicClaim(
-          "At least one academic Program is accepting verified application starts. Check each Program for availability.",
+          "At least one academic Program permits verified application starts. Check each Program; this does not establish a vacant seat or authorization to open.",
           "admissions")
         : unconfiguredClaim("admissions"),
       programs:states,
