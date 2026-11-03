@@ -10,6 +10,10 @@ import {isJurisdictionRequirementRenewalCurrent} from "@/domain/school-jurisdict
 import {
   beginSchoolJurisdictionDocumentUpload,finishSchoolJurisdictionDocumentUpload,
 } from "./school-jurisdiction-document-upload.server";
+import {
+  readSchoolJurisdictionEvidenceForCAN,
+  getSchoolJurisdictionEvidenceDownloadForCAN,
+} from "./school-jurisdiction-document-review.server";
 import { readSchoolJurisdictionReview } from "./school-jurisdiction-review.server";
 import { ensureSchoolJurisdictionReviewAction, decideSchoolJurisdictionLegalReview } from "./school-jurisdiction-actions.server";
 import {submitSchoolJurisdictionRequirementEvidence,
@@ -216,4 +220,23 @@ export const finishSchoolJurisdictionDocumentUploadFn=createServerFn({method:"PO
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     return finishSchoolJurisdictionDocumentUpload(actor,data);
+  });
+
+/** Actual independently scoped legal proof available only to CAN reviewer,
+ * distinct from the anonymous school parent-information projection. */
+export const getSchoolJurisdictionEvidenceForCAN=createServerFn({method:"GET"})
+  .validator((value:unknown)=>z.object({actionId:z.string().uuid()}).strict().parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    return readSchoolJurisdictionEvidenceForCAN(actor,data.actionId);
+  });
+export const getSchoolJurisdictionEvidenceDownloadForCAN=createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({
+    actionId:z.string().uuid(),documentId:z.string().uuid(),
+  }).strict().parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    return getSchoolJurisdictionEvidenceDownloadForCAN(actor,data);
   });
