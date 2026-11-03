@@ -142,6 +142,9 @@ export const draftSiteContactSchema = z.object({
   email:contact.email.trim().toLowerCase(),website:contact.website.trim(),
 }));
 
+/** Days are a count, not a Monday–Friday assumption; Sundays may be scheduled by academic-time. */
+export const launchOnsiteDaysPerWeekSchema=z.number().int().min(1).max(7);
+
 /** Explicit IANA zone selection; an address, ZIP, state or browser is not a reliable substitute. */
 export const siteTimezoneSchema=z.string().trim().min(3).max(80).refine(zone=>{
   try {new Intl.DateTimeFormat("en-US",{timeZone:zone});return true;}
