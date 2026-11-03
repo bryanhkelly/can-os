@@ -50,6 +50,37 @@ export function publicSchoolDayScheduleSignature(
     :JSON.stringify(normalized);
 }
 
+export type ActiveScheduleWindow = {
+  schoolYearStatus:string;
+  templateActive:boolean;
+  programMatches:boolean;
+  siteMatches:boolean;
+  startsOn:string;
+  endsOn:string;
+  effectiveFrom:string;
+  effectiveThrough:string|null;
+};
+
+/** Returns true for ambiguity from two distinct simultaneously active
+ * Program timetables. The caller supplies only records for one Program+Site;
+ * approval status deliberately does not enter conflict detection. */
+export function competingActiveSchoolDaySchedules(
+  schedules:readonly ActiveScheduleWindow[],
+  target:{schoolYearStartsOn:string;schoolYearEndsOn:string;
+    effectiveFrom:string;effectiveThrough:string|null},
+):boolean {
+  const first=[target.schoolYearStartsOn,target.effectiveFrom].sort().at(-1)!;
+  const last=[target.schoolYearEndsOn,target.effectiveThrough??target.schoolYearEndsOn].sort()[0]!;
+  if(first>last)return true;
+  return schedules.filter(item=>{
+    if(!item.templateActive || item.schoolYearStatus!=="active" ||
+      !item.programMatches||!item.siteMatches)return false;
+    const from=[item.startsOn,item.effectiveFrom].sort().at(-1)!;
+    const to=[item.endsOn,item.effectiveThrough??item.endsOn].sort()[0]!;
+    return from<=last && to>=first && from<=to;
+  }).length>1;
+}
+
 type Schedule = {
   schoolYearStatus: string;
   templateActive: boolean;
@@ -105,12 +136,16 @@ export function projectPublicSchoolDay(
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
   }).formatToParts(now).map(part => [part.type, part.value]));
   const day = `${parts.year}-${parts.month}-${parts.day}`;
-  const eligible = schedules.filter(schedule =>
+  const candidates = schedules.filter(schedule =>
     schedule.schoolYearStatus === "active" && schedule.templateActive &&
     schedule.programMatches && schedule.siteMatches && schedule.timezoneMatches &&
     schedule.startsOn <= day && schedule.endsOn >= day &&
     schedule.effectiveFrom <= day &&
-    (!schedule.effectiveThrough || schedule.effectiveThrough >= day) &&
+    (!schedule.effectiveThrough || schedule.effectiveThrough >= day));
+  // An overlapping unapproved or recently changed active template also makes
+  // the public projection ambiguous. Never ignore it just because it lacks approval.
+  if(candidates.length!==1)return pending();
+  const eligible = candidates.filter(schedule =>
     schedule.approval?.status === "approved" &&
     Boolean(schedule.approval.reviewedByPersonId) &&
     Number.isSafeInteger(schedule.approval.revision) &&
@@ -138,6 +173,23 @@ export function projectPublicSchoolDay(
   if (!instructional.length || instructional.length !==
     schedule.periods.filter(p => p.type === "instruction").length) return pending();
   const days = [...new Set(instructional.map(p => p.dayOfWeek))].sort((a,b) => a-b);
+  const separatedDays = days.filter(dayOfWeek=>{
+    const items=instructional.filter(p=>p.dayOfWeek===dayOfWeek)
+      .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal));
+    for(let i=1;i<items.length;i++){
+      // Invalid overlapping instruction cannot be displayed even as segments.
+      if(items[i]!.startsAtLocal<items[i-1]!.endsAtLocal)return -1;
+    }
+    return items.some((period,i)=>i>0 &&
+      period.startsAtLocal>items[i-1]!.endsAtLocal);
+  });
+  const hasInstructionalOverlap=days.some(dayOfWeek=>{
+    const items=instructional.filter(p=>p.dayOfWeek===dayOfWeek)
+      .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal));
+    return items.some((period,i)=>i>0 &&
+      period.startsAtLocal<items[i-1]!.endsAtLocal);
+  });
+  if(hasInstructionalOverlap)return pending();
   const dailyRanges = days.map(dayOfWeek => {
     const daily = instructional.filter(p => p.dayOfWeek === dayOfWeek);
     return {
@@ -145,12 +197,20 @@ export function projectPublicSchoolDay(
       end:daily.map(p => p.endsAtLocal).sort().at(-1)!.slice(0,5),
     };
   });
-  const weeklyPattern: PublicWeeklyDayPattern[] = days.map((dayOfWeek,index)=>({
-    dayOfWeek,
-    startsAtLocal:dailyRanges[index]!.start,
-    endsAtLocal:dailyRanges[index]!.end,
-    timezone,
-  }));
+  // Where lessons have a real gap, publish separate intervals instead of
+  // claiming that the school instructs continuously between first and last.
+  const weeklyPattern: PublicWeeklyDayPattern[] = separatedDays.length
+    ? instructional.map(p=>({
+        dayOfWeek:p.dayOfWeek,startsAtLocal:p.startsAtLocal.slice(0,5),
+        endsAtLocal:p.endsAtLocal.slice(0,5),timezone,
+      })).sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
+        a.startsAtLocal.localeCompare(b.startsAtLocal))
+    : days.map((dayOfWeek,index)=>({
+        dayOfWeek,
+        startsAtLocal:dailyRanges[index]!.start,
+        endsAtLocal:dailyRanges[index]!.end,
+        timezone,
+      }));
   const source=schedule.reviewScope?{
     scope:schedule.reviewScope,
     approval:{revision:schedule.approval!.revision,reviewedAt:schedule.approval!.reviewedAt},
@@ -163,7 +223,7 @@ export function projectPublicSchoolDay(
   }:null;
   // A varied but independently approved weekly pattern is still safe to show
   // at the Program level. Only legacy uniform time claims remain withheld.
-  if (dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
+  if (separatedDays.length || dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
     range.end !== dailyRanges[0]!.end)) return {
       ...pending(), timezone,
       weeklyPatternState:"approved", weeklyPattern,
