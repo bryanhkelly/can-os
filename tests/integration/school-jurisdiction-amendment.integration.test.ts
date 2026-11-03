@@ -32,7 +32,6 @@ integration("school jurisdiction material-change lifecycle (rollback only)",()=>
       const id=crypto.randomUUID();
       const now=new Date(),past=new Date(now.getTime()-24*3600_000);
       const future=new Date(now.getTime()+365*86400_000);
-      const currentYear=now.getUTCFullYear();
       const [church]=await tx.insert(s.organizations).values({
         name:"Synthetic church",slug:"jurisdiction-church-"+id,type:"church",
       }).returning();
@@ -44,18 +43,19 @@ integration("school jurisdiction material-change lifecycle (rollback only)",()=>
         address:{street1:"100 First Street",city:"Oakland",state:"CA",
           postalCode:"94612",country:"US",county:"Alameda"},
       }).returning();
-      const [jurisdiction]=await tx.insert(s.jurisdictions).values({
-        code:"US-CA-"+id, // intentionally invalid until assigned code is reconciled
-        name:"Synthetic California jurisdiction",
-      }).returning();
-      // The real canonical jurisdiction is a fixed US state code; update the
-      // synthetic row before any C applicability evaluation.
-      await tx.update(s.jurisdictions).set({code:"US-CA"})
-        .where(eq(s.jurisdictions.id,jurisdiction!.id));
+      // Reuse the canonical California jurisdiction when already seeded.
+      // Its unique state code must never be rewritten to create a fixture.
+      const [existingJurisdiction]=await tx.select().from(s.jurisdictions)
+        .where(eq(s.jurisdictions.code,"US-CA")).limit(1);
+      const jurisdiction=existingJurisdiction ??
+        (await tx.insert(s.jurisdictions).values({
+          code:"US-CA",countryCode:"US",name:"California",
+        }).returning())[0]!;
+
       const two=await tx.insert(s.programs).values(["elementary","enrichment"].map((name,i)=>({
-        organizationId:church!.id,siteId:site!.id,jurisdictionId:jurisdiction!.id,
+        organizationId:church!.id,siteId:site!.id,jurisdictionId:jurisdiction.id,
         hostOrganizationId:church!.id,academicProviderOrganizationId:can!.id,
-        name,slug:id+"-"+name,type:i===0?"full_school" as const:"enrichment" as const,
+        name,slug:id+"-"+name,type:i===0?"full_school" as const:"after_school_enrichment" as const,
         status:"active" as const,gradeRange:{min:"K",max:"K"},
         deliveryModel:{onsite:true},
         metadata:{jurisdictionOperatingModel:"church-hosted",
@@ -183,8 +183,7 @@ integration("school jurisdiction material-change lifecycle (rollback only)",()=>
       })).rejects.toThrow();
       const audits=await tx.select().from(s.auditEvents).where(
         eq(s.auditEvents.action,"program.jurisdiction.independently_verified"));
-      expect(audits.some(event=>event.entityId===accepted.actionId ||
-        event.resourceId===accepted.actionId)).toBe(true);
+      expect(audits.some(event=>event.resourceId===accepted.actionId)).toBe(true);
       exercised=true;
       throw rollback;
     });}catch(error){if(error!==rollback)throw error;}
