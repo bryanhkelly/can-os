@@ -31,6 +31,32 @@ export const siteTimezoneSchema = z.string().trim().min(3).max(80).refine(zone=>
 export type PhysicalSiteAddress = z.infer<typeof physicalSiteAddressSchema>;
 export type DraftSiteContact = z.infer<typeof draftSiteContactSchema>;
 
+/**
+ * JSONB objects can reorder keys. Compare the editable fields rather than
+ * stringifying entire records; this also preserves any older unrecognized keys.
+ */
+export function samePhysicalSiteAddress(
+  current:Record<string,unknown>|null|undefined,
+  next:PhysicalSiteAddress,
+):boolean {
+  if(!current)return false;
+  return (["street1","street2","city","state","postalCode","country","county"] as const)
+    .every(key=>{
+      const previous=key==="country"?(current[key]??"US"):(current[key]??"");
+      return previous===(next[key]??"");
+    });
+}
+
+export function sameDraftSiteContact(
+  current:unknown,
+  next:DraftSiteContact,
+):boolean {
+  if(!current || typeof current!=="object" || Array.isArray(current))return false;
+  const value=current as Record<string,unknown>;
+  return (["displayName","email","phone","website"] as const)
+    .every(key=>(value[key]??"")===(next[key]??""));
+}
+
 /** Empty location is permitted for initial setup; partially entered is not. */
 export function hasEnteredSiteAddress(address:Record<string,string>):boolean {
   return Object.entries(address).some(([key,value])=>
