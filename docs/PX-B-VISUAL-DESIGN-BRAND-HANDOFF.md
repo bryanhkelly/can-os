@@ -42,3 +42,15 @@ The school currently offers **CAN Signature** and curated, manual alternatives. 
 5. Resolve operations workspace build blocker and run full typecheck, build, all affected tests and explicit production release gate separately.
 
 **Status:** B visual-theme implementation and source-only safety contract committed; screenshot evidence established; latest-code browser capture, full-repository build and reference-comparison gate are separate release/integration checks.
+
+## Final focused verification and screenshot audit
+
+- [Visual screenshot run `7bd90e51`](https://github.com/bryanhkelly/can-os/actions/runs/41665968060): **successful**; 35 screenshots across all three fictional brands and four viewport widths where applicable; browser-generated `report.json` confirms **0 horizontal overflow**, **0 scripts** and a present skip link in every capture. Artifact: `px-b-visual-screenshots`.
+- Inspected actual 1440px Heritage and enrichment Home captures and 320px microschool Home captures. The initial microschool long-name screenshot visibly broke in the middle of words; the latest `7bd90e51` screenshot demonstrates readable lines, no midword line breaks, and working 320px layout. Hero photography remains dependent on explicit rights-cleared local assets; fixtures intentionally have no child photos.
+- [Focused B workflow `7bd90e51`](https://github.com/bryanhkelly/can-os/actions/runs/41665967868): **50/50 tests passed** across nine files; its subsequent full build remained blocked by concurrently edited `OperationsWorkspace.tsx:161` parsing error. Do not describe full build as passed.
+
+## Workstream B-09 commit inventory on main
+
+`6b69cb71c4ff` theme resolver + proposal interface; `7f725c9e557d` local-content branding IDs; `43db1a9e02b3` authenticated token validation; `b0f23864a51a` editorial public renderer; `1b6ce416dcc8` visual review UI; `a8b6f2d0e3cc` legacy-content regression; `e66e90941d86` screenshot fixture capture; `0014d4dfbedf` visual workflow; `4a2a30bc326b` no-program and hostname status; `4d7f4edf074d` token/provenance tests; `8df52eb523f6` matching Playwright package fix; `023aedd92c82` focused CI coverage; `eb8280a05059` supported Ubuntu runner; `8adaa7f50e68` canonical CTA; `87cc37603f59` mobile long-name visual adjustment; `7bd90e5119dd` consented accessible photo hero; `43abe381a1a6` integration handoff.
+
+No schema migration was introduced in B-09; no isolated Neon rehearsal was required for these application-level changes. Workstream P's source discovery, reusable media licensing, approved comp comparison and final release remain separate acceptance gates.
