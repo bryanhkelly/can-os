@@ -38,7 +38,7 @@ const draftInput = z.object({
   programId: z.string().uuid(),
   offeringName: z.string().trim().min(2).max(160),
   seasonName: z.string().trim().min(2).max(120),
-  activityType: z.enum(["athletics", "club", "arts", "service", "other"]),
+  activityType: z.enum(["athletics", "club", "arts", "service", "stem", "faith", "leadership", "outings", "other"]),
   startsOn: day,
   endsOn: day,
   capacity: z.number().int().min(1).max(10000),
