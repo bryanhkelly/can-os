@@ -64,3 +64,37 @@ Each jurisdiction has a canonical, linkable state profile page, with a stable UR
 4. Changing the site to Florida recalculates applicable requirements without losing unrelated setup progress.
 5. Funding opportunities are described as conditional; approval, eligibility and authorization are independently represented.
 6. Curriculum and delivery remain separate: curriculum approval is scoped by jurisdiction and academic purpose; schedules belong to the program/section.
+
+## November 2026 school launch integration
+
+**Product boundary:** public state landing pages and marketing lead capture live in the separate `can-website` repository. The CAN OS changes described here are for authenticated school setup and legal readiness; CAN OS does not serve public SEO state pages.
+
+In `/operations/launch` the jurisdiction selector now displays a bounded source-linked funding/research preview through `listLaunchJurisdictionResearch`, and saved school preparation includes `SchoolJurisdictionReviewPanel`. Draft or in-review material is visible only where the profile explicitly sets `editorial.launchResearchVisibility = "school_operator"`, includes a source and carries a public disclosure audience for each candidate item. Draft funding is displayed as under review regardless of its internal funding status; internal-only requirements and reviewer commentary are never projected.
+
+The preview is **not a legal evaluator or a readiness checklist**. Source-backed questions remain informational. The existing school-scoped `readSchoolJurisdictionReview` and `ensureSchoolJurisdictionReviewAction` services remain authoritative for requiring a CAN legal review, and do not by themselves authorize opening, admissions or funding participation. A source URL is evidence of research, not verification of CAN provider qualification.
+
+### Eight-state research staging
+
+`scripts/seed-sourced-jurisdiction-research.mjs` prepares sourced in-review entries for TX, FL, AZ, WV, AR, IA, OK and WI. It is dry-run by default, creates only revision `research-2026-11-03`, will not overwrite any previous version, and never marks a version published or verified.
+
+Run against a deliberately selected database using its existing `DATABASE_URL` and inspect the printed dry-run report:
+
+```bash
+DATABASE_URL=... node scripts/seed-sourced-jurisdiction-research.mjs
+```
+
+After validating the target database identity and record conflicts, an authorized operator may explicitly apply:
+
+```bash
+JURISDICTION_SEED_ALLOW_WRITE=1 JURISDICTION_SEED_DATABASE_CONFIRMED=<exact-db-name> DATABASE_URL=... node scripts/seed-sourced-jurisdiction-research.mjs --apply
+```
+
+No database write, migration, source verification attestation or production deployment is implied by the code commit. Legal reviewers still need to scope applicability, assess current effective dates and official regulations, and independently verify/publish appropriate versions before CAN can rely on them operationally.
+
+### Acceptance to complete
+
+1. Seed sourced draft profiles in the intended isolated environment and confirm the source-linked preview appears when a corresponding jurisdiction is selected.
+2. Verify unverified research never creates a binding action, satisfies readiness or appears anonymously.
+3. Create a real school and request a legal-review Action; confirm deduplication and registrar/scope authorization.
+4. Independently verify and publish a jurisdiction profile, then confirm review decisions use the current, effective source snapshot.
+5. Complete typecheck, build and authenticated multi-role browser acceptance before production rollout.
