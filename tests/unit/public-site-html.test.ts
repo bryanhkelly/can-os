@@ -58,7 +58,7 @@ describe("standalone public site HTML", () => {
     expect(about).not.toContain("Proposed school program");
     const schoolDay = renderPublicSiteHtml(page, {path: "/school-day"});
     expect(schoolDay).toContain("2 onsite days per week");
-    expect(schoolDay).not.toContain("Monday–Friday schedule");
+    expect(schoolDay).toContain("does not imply a Monday–Friday schedule");
     const live = renderPublicSiteHtml(page, {
       path: "/academics", makeRequestId: () => "request-a",
     });
