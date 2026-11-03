@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  classifySiteLocalContent, emptySiteLocalContent, normalizeSiteLocalContent,
+  classifySiteLocalContent, createIllustrativeSchoolContent, emptySiteLocalContent, normalizeSiteLocalContent,
 } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 
@@ -14,6 +14,28 @@ const churchCopy = {
 };
 
 describe("PUB-18: distributed church website ownership", () => {
+  it("offers safe, fictional school copy for review without institutional claims", () => {
+    const starter = createIllustrativeSchoolContent("Valor School");
+    const normalized = normalizeSiteLocalContent(starter);
+    expect(normalized.branding.paletteId).toBe("heritage");
+    expect(normalized.schoolVision).toContain("Curious minds");
+    expect(normalized.localDescription).toContain("Valor School");
+    expect(classifySiteLocalContent(normalized)).toEqual({
+      status: "published", flaggedFields: [],
+    });
+    const html = renderPublicSiteHtml({
+      host: "synthetic.can-os.com",
+      site: {name: "Valor School", organizationName: "Synthetic Church"},
+      demonstration: true,
+      localContent: normalized,
+      offerings: [],
+    });
+    expect(html).toContain("A community with a story to tell");
+    expect(html).toContain("Content provided by the local church");
+    expect(html).toContain("fictional demonstration school");
+    expect(html).not.toContain('action="/apply"');
+  });
+
   it("publishes normal local, denominational and theological content without CAN review", () => {
     expect(classifySiteLocalContent(normalizeSiteLocalContent(churchCopy)))
       .toEqual({ status: "published", flaggedFields: [] });
