@@ -6,7 +6,7 @@ import { Eye, Globe2, LockKeyhole, PencilLine } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
-  emptySiteLocalContent, siteLocalContentLimits, siteLocalImageMaxBytes,
+  createIllustrativeSchoolContent, emptySiteLocalContent, siteLocalContentLimits, siteLocalImageMaxBytes,
   siteLocalThemes, type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
@@ -208,15 +208,17 @@ function LocalWebsiteCopyEditor({
 }: { data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>> }) {
   const router = useRouter();
   const [content, setContent] = useState<SiteLocalContent>(
-    data.editingContent ?? emptySiteLocalContent,
+    data.editingContent ?? (data.demonstration
+      ? createIllustrativeSchoolContent(data.siteName) : emptySiteLocalContent),
   );
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const [error, setError] = useState("");
   useEffect(() => {
-    setContent(data.editingContent ?? emptySiteLocalContent);
-  }, [data.currentRevision, data.editingContent]);
+    setContent(data.editingContent ?? (data.demonstration
+      ? createIllustrativeSchoolContent(data.siteName) : emptySiteLocalContent));
+  }, [data.currentRevision, data.editingContent, data.demonstration, data.siteName]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -264,6 +266,16 @@ function LocalWebsiteCopyEditor({
       approval. Official curriculum, admissions, tuition, accreditation and
       school-of-record information comes from CAN OS and cannot be edited here.
     </p>
+    {data.demonstration && !data.editingContent && <div role="note" className="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
+      <p className="font-semibold">Fictional sample prepared for this demo school</p>
+      <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
+        This content has not been saved or published. Review and edit the story, then
+        use the normal publishing action. The school publication and legal gates do not change.</p>
+      <button type="button" className="mt-2 min-h-11 underline font-semibold"
+        onClick={() => setContent(createIllustrativeSchoolContent(data.siteName))}>
+        Restore fictional starter copy
+      </button>
+    </div>}
     {!data.canPublish && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
       You can preview this Site, but your current verified Site assignment has not
       been granted local website publishing. Ask the Site administrator to assign
