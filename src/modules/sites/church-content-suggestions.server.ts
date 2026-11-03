@@ -16,6 +16,7 @@ import { publishPartnerLocalContentWithinTransaction, readLocalContentHistory, r
 import { extractChurchPublicWebsite } from "./church-public-web-fetch.server";
 import { deriveChurchBrandProposal } from "@/domain/church-brand-suggestions";
 import { assertChurchSourceEditorialCopy } from "@/domain/church-source-editorial-safety";
+import { classifyChurchWebFetchFailure, describeChurchWebFetchFailure } from "@/domain/church-web-fetch-diagnostics";
 
 /**
  * User-submitted or boundedly fetched public church excerpts, never verified
@@ -329,27 +330,31 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
   try {
     pages = await extractChurchPublicWebsite(reference.normalizedUrl);
   } catch (error) {
-    const blocked = error instanceof Error && /robots|DNS|Cross-origin/.test(error.message);
-    await db.transaction(async tx => {
+    const diagnosis = classifyChurchWebFetchFailure(error);
+    const stillActive = await db.transaction(async tx => {
       const checked = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
       const [current] = await tx.select().from(churchSourceReferences)
         .where(and(eq(churchSourceReferences.id, reference.id),
           eq(churchSourceReferences.siteId, checked.id))).for("update").limit(1);
-      if (current && !current.revokedAt && current.normalizedUrl === reference.normalizedUrl &&
-          current.lastAttemptAt?.getTime() === attemptAt.getTime()) {
-        await tx.update(churchSourceReferences).set({
-          referenceState: blocked ? "blocked" : "failed", updatedAt: new Date(),
-        }).where(eq(churchSourceReferences.id, reference.id));
-        await writeAudit(tx, actor, {
-          action: "site.website.source_refresh.failed",
-          entityType: "church_source_reference", entityId: reference.id,
-          scope: { organizationId: checked.organizationId, siteId: checked.id },
-          after: { blocked },
-        });
-      }
+      if (!current || current.revokedAt || current.normalizedUrl !== reference.normalizedUrl ||
+          current.lastAttemptAt?.getTime() !== attemptAt.getTime()) return false;
+      await tx.update(churchSourceReferences).set({
+        referenceState: diagnosis.state, updatedAt: new Date(),
+      }).where(eq(churchSourceReferences.id, reference.id));
+      await writeAudit(tx, actor, {
+        action: "site.website.source_refresh.failed",
+        entityType: "church_source_reference", entityId: reference.id,
+        scope: { organizationId: checked.organizationId, siteId: checked.id },
+        // Bounded reason code only; never persist network errors, request bodies
+        // or DNS response addresses to a general operations action.
+        after: { reasonCode: diagnosis.code, state: diagnosis.state },
+      });
+      return true;
     });
-    return { status: blocked ? "blocked" as const : "failed" as const, count: 0,
-      message: "The website could not be read safely. Use the manual church-story editor instead." };
+    if (!stillActive) return { status: "stale" as const, count: 0,
+      message: "The church reference changed during retrieval. No suggestions were saved." };
+    return { status: diagnosis.state, count: 0, reasonCode: diagnosis.code,
+      message: diagnosis.message };
   }
   const brandProposal = deriveChurchBrandProposal(
     reference.normalizedUrl, new Date().toISOString(),
@@ -402,8 +407,20 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       seen.add(key);
       return true;
     });
-    if (!distinct.length) return { status: "failed" as const, count: 0,
-      message: "No appropriate church story text was found." };
+    if (!distinct.length) {
+      const diagnosis = describeChurchWebFetchFailure("unsafe_excerpt");
+      await tx.update(churchSourceReferences).set({
+        referenceState: diagnosis.state, updatedAt: new Date(),
+      }).where(eq(churchSourceReferences.id, reference.id));
+      await writeAudit(tx, actor, {
+        action: "site.website.source_refresh.failed",
+        entityType: "church_source_reference", entityId: reference.id,
+        scope: { organizationId: checked.organizationId, siteId: checked.id },
+        after: { reasonCode: diagnosis.code, state: diagnosis.state },
+      });
+      return { status: diagnosis.state, count: 0, reasonCode: diagnosis.code,
+        message: diagnosis.message };
+    }
     const created = await tx.insert(churchContentSuggestions).values(distinct).returning({
       id: churchContentSuggestions.id,
       field: churchContentSuggestions.field,
