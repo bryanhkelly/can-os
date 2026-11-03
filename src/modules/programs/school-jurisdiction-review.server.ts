@@ -1,13 +1,17 @@
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   jurisdictionProfileVersions, jurisdictionProfileVerificationDecisions,
-  jurisdictions, programs, schoolYears, sites,
+  actions, jurisdictions, organizations, programs, schoolYears, sites,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { isExtendedLearningType } from "@/domain/program-offerings";
+import { evaluateSiteJurisdictionIdentity } from "@/domain/site-jurisdiction-identity";
+import {
+  hasCurrentIndependentJurisdictionReview, isSiteLocationChangePending,
+} from "@/domain/school-jurisdiction-approval";
 import { launchOpeningDate } from "@/domain/launch-opening-date";
 import {
   evaluateSchoolJurisdictionRequirements,
@@ -22,15 +26,6 @@ import {
   unavailableSchoolJurisdictionReadiness,
 } from "@/domain/school-jurisdiction-readiness";
 
-/** Physical Site state is independently confirmed; timezone is never a legal locator. */
-function siteStateCode(address: Record<string, unknown> | null): string | null {
-  if (!address) return null;
-  const raw = address.stateCode ?? address.state ?? address.regionCode;
-  if (typeof raw !== "string") return null;
-  const code = raw.trim().toUpperCase().replace(/^US[-_]/, "");
-  return /^[A-Z]{2}$/.test(code) ? code : null;
-}
-
 /**
  * Authenticated internal review. The result is NOT itself permission to
  * publish legal disclosures. Agent A must apply its separate institutional
@@ -41,9 +36,10 @@ export async function readSchoolJurisdictionReview(
   executor: Pick<typeof db,"select"> = db,
   now = new Date(),
 ) {
-  if (!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
-    throw new AuthorizationError("verified registrar");
-  assertCapability(actor,"program.read");
+  const networkReviewer = actor.role === "can_jurisdiction_reviewer";
+  if (!actor.actorPersonId || (!hasRegistrarAuthority(actor.role) && !networkReviewer))
+    throw new AuthorizationError("verified school registrar or independent CAN legal reviewer");
+  assertCapability(actor,networkReviewer?"jurisdiction.profile.verify":"program.read");
   const [school] = await executor.select({
     programId:programs.id, siteId:programs.siteId,
     organizationId:programs.organizationId,
@@ -52,17 +48,27 @@ export async function readSchoolJurisdictionReview(
     academicProviderOrganizationId:programs.academicProviderOrganizationId,
     deliveryModel:programs.deliveryModel, hostOrganizationId:programs.hostOrganizationId,
     siteOrganizationId:sites.organizationId, address:sites.address,
-    code:jurisdictions.code,
+    siteUpdatedAt:sites.updatedAt,
+    code:jurisdictions.code,countryCode:jurisdictions.countryCode,
   }).from(programs)
     .innerJoin(sites,eq(sites.id,programs.siteId))
     .innerJoin(jurisdictions,eq(jurisdictions.id,programs.jurisdictionId))
     .where(eq(programs.id,programId)).limit(1);
-  if (!school || !school.siteId ||
-    school.siteOrganizationId !== school.organizationId ||
-    !actor.scope.organizationIds?.includes(school.organizationId) ||
-    !actor.scope.siteIds?.includes(school.siteId) ||
-    !actor.scope.programIds?.includes(programId))
+  if (!school || !school.siteId || school.siteOrganizationId !== school.organizationId)
     throw new AuthorizationError("school-specific jurisdiction review");
+  if (networkReviewer) {
+    if (actor.sessionAccountId || actor.grantSiteId !== null ||
+      !actor.scope.organizationIds?.includes(school.academicProviderOrganizationId))
+      throw new AuthorizationError("CAN institutional jurisdiction reviewer scope");
+    const [institution]=await executor.select({id:organizations.id}).from(organizations)
+      .where(and(eq(organizations.id,school.academicProviderOrganizationId),
+        eq(organizations.type,"can_network"))).limit(1);
+    if (!institution) throw new AuthorizationError("verified CAN academic institution");
+  } else if (!actor.scope.organizationIds?.includes(school.organizationId) ||
+    !actor.scope.siteIds?.includes(school.siteId) ||
+    !actor.scope.programIds?.includes(programId)) {
+    throw new AuthorizationError("school-specific jurisdiction review");
+  }
   // School-year changes and Site address edits must reopen stale legal-review Actions.
   // This scope fingerprint is a change detector, not itself an approval.
   const years = await executor.select({
@@ -84,6 +90,19 @@ export async function readSchoolJurisdictionReview(
     targetOpeningDate:school.programMetadata.targetOpeningDate,
     schoolYears:years,
   });
+  const actionRows=await executor.select({
+    type:actions.type,status:actions.status,metadata:actions.metadata,
+  }).from(actions).where(and(
+    inArray(actions.type,["school_jurisdiction_legal_review","site_location_change_review"]),
+    eq(actions.subjectType,"program"),eq(actions.subjectId,programId),
+    eq(actions.organizationId,school.organizationId),eq(actions.siteId,school.siteId),
+    eq(actions.programId,programId),
+  )).orderBy(desc(actions.updatedAt)).limit(30);
+  const legalAction=actionRows.find(row=>row.type==="school_jurisdiction_legal_review")??null;
+  const locationAction=actionRows.find(row=>row.type==="site_location_change_review")??null;
+  const addressChangeRevision=typeof locationAction?.metadata.siteAddressRevision==="string"
+    ? locationAction.metadata.siteAddressRevision : null;
+  const siteAddressRevision=school.siteUpdatedAt.toISOString();
   const [version] = await executor.select({
     id:jurisdictionProfileVersions.id, revision:jurisdictionProfileVersions.revision,
     status:jurisdictionProfileVersions.status,
@@ -106,22 +125,23 @@ export async function readSchoolJurisdictionReview(
   // A jurisdiction assignment alone does not prove the school's physical state.
   // Missing/unrecognized address or disagreement requires an explicit review,
   // not a not-applicable decision or a publishable legal disclosure.
-  const assignedState = school.code.toUpperCase().replace(/^US[-_]/, "");
-  const physicalState = siteStateCode(school.address);
-  const locationReviewReason = !physicalState
-    ? "Site physical state is missing or unconfirmed"
-    : physicalState !== assignedState
-      ? "Site physical state disagrees with Program jurisdiction"
-      : null;
+  const location=evaluateSiteJurisdictionIdentity(school.address,{
+    code:school.code,countryCode:school.countryCode,
+  });
+  const assignedState=school.code.toUpperCase().replace(/^US[-_]/,"");
+  const locationReviewReason=location.reason;
   if (locationReviewReason) return {
     programId,siteId:school.siteId,revision:version?.revision ?? null,
     reviewRequired:true,locationReviewReason,plannedOpeningReviewReason:null,scopeFingerprint,
-    decisions:[],candidateDisclosures:[],
+    siteAddressRevision,addressChangeRevision,policyReady:false,
+    schoolReviewReason:locationReviewReason,decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness(locationReviewReason,
       version?.id ?? null,version?.revision ?? null),
   };
   if (!version) return {programId,siteId:school.siteId,revision:null,
     reviewRequired:true,locationReviewReason:null,plannedOpeningReviewReason:null,scopeFingerprint,
+    siteAddressRevision,addressChangeRevision,policyReady:false,
+    schoolReviewReason:"No verified jurisdiction profile for this Program",
     decisions:[],candidateDisclosures:[],
     readiness:unavailableSchoolJurisdictionReadiness("No published jurisdiction policy is available")};
   const [decision] = await executor.select({
@@ -159,8 +179,7 @@ export async function readSchoolJurisdictionReview(
     // Grade range endpoints cannot safely prove every intervening grade.
     gradeLevels:school.gradeRange.min === school.gradeRange.max
       ? [school.gradeRange.min] : [],
-    locality:typeof school.address?.county === "string"
-      ? school.address.county : null,
+    locality:location.county,
   };
   const rawProfile = {
     ...version.profile,summary:version.summary,evidence:version.evidence,
@@ -183,19 +202,33 @@ export async function readSchoolJurisdictionReview(
         ? [launchOpeningDate(school.programMetadata)!] : []),
     ], now,
   ) ? "Current policy must be re-reviewed before the planned opening or upcoming academic year" : null;
-  const readiness = projectSchoolJurisdictionReadiness({
-    profile:rawProfile,decisions:evaluated.decisions,
-    verifiedCurrent:isCurrentVerifiedJurisdictionProfileVersion(versionGate,now),
+  const policyReady=!evaluated.reviewRequired && !plannedOpeningReviewReason;
+  const stamp={scopeFingerprint,profileVersionId:version.id};
+  const independentlyReviewed=hasCurrentIndependentJurisdictionReview(legalAction,stamp,now);
+  const locationChangePending=isSiteLocationChangePending(locationAction,stamp,now);
+  const schoolReviewReason=!policyReady
+    ? plannedOpeningReviewReason??"At least one school-specific requirement needs CAN legal review"
+    : locationChangePending
+      ? "The revised physical Site location requires independent CAN legal review"
+      : !independentlyReviewed
+        ? "This school's current location and Program scope have not been independently verified"
+        : null;
+  const schoolReviewReady=policyReady && !schoolReviewReason;
+  const readiness=schoolReviewReady?projectSchoolJurisdictionReadiness({
+    profile:rawProfile,decisions:evaluated.decisions,verifiedCurrent:true,
     profileVersionId:version.id,revision:version.revision,
     reviewedAt:version.reviewedAt,nextReviewAt:version.nextReviewAt,
-  });
+  }):unavailableSchoolJurisdictionReadiness(
+    schoolReviewReason??"School legal review is required",version.id,version.revision,
+  );
   return {
     programId,siteId:school.siteId,revision:version.revision,
-    reviewRequired:evaluated.reviewRequired || Boolean(plannedOpeningReviewReason),
+    reviewRequired:!schoolReviewReady,
+    policyReady,schoolReviewReason,siteAddressRevision,addressChangeRevision,
     locationReviewReason:null,plannedOpeningReviewReason,scopeFingerprint,
     decisions:evaluated.decisions,
     readiness,
-    // Candidates only: requires separate institution-approved public DTO gate.
-    candidateDisclosures:evaluated.publicDisclosures,
+    // Internal candidate disclosures are not approved for public publication.
+    candidateDisclosures:schoolReviewReady?evaluated.publicDisclosures:[],
   };
 }
