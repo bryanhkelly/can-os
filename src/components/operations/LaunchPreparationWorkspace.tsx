@@ -3,6 +3,7 @@ import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch
 import { LaunchAcademicYearStep } from "@/components/operations/LaunchAcademicYearStep";
 import { LaunchWebsiteStep } from "@/components/operations/LaunchWebsiteStep";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
+import { SchoolJurisdictionReviewPanel } from "@/components/operations/SchoolJurisdictionReviewPanel";
 import { LaunchFamilyProgress } from "@/components/operations/LaunchFamilyProgress";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import type { listLaunches } from "@/modules/programs/launch.functions";
@@ -67,6 +68,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           <OneHourSchoolLaunch key={currentLaunch.id} launches={launches} selectedProgramId={currentLaunch.id} selectedSiteId={currentLaunch.siteId??undefined}/>
         </details>:<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>)}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
+          <SchoolJurisdictionReviewPanel key={currentLaunch.id} programId={currentLaunch.id}/>
           <ProgramSiteAuthorizationPanel key={currentLaunch.id} programId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
           <a href="#launch-academic-year" className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</a>
