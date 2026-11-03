@@ -56,7 +56,7 @@ describe("canonical church Site configuration input",()=>{
     )).toBe(false);
     expect(sameDraftSiteContact(
       {phone:"",email:"office@example.org",displayName:"School Office"},
-      {displayName:"School Office",email:"office@example.org",phone:"",website:""},
+      {displayName:"School Office",email:"office@example.org",phone:""},
     )).toBe(true);
     expect(sameDraftSiteContact(null,null)).toBe(true);
   });
