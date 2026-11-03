@@ -7,6 +7,7 @@ import {
 } from "@/domain/church-source-references";
 import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalTextField } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { EventTypes } from "@/domain/event-types";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { publishPartnerLocalContent, readLocalContentHistory } from "./site-local-content.server";
@@ -84,7 +85,7 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
       after: { field: input.field, sourceReferenceId: reference.id },
     });
     await emitEvent(tx, {
-      eventType: "ChurchContentSuggestionSubmitted",
+      eventType: EventTypes.ChurchContentSuggestionSubmitted,
       aggregateType: "church_content_suggestion", aggregateId: created.id,
       actorPersonId: actor.actorPersonId, organizationId: site.organizationId,
       siteId: site.id, payload: { field: input.field },
@@ -165,7 +166,7 @@ export async function reviewChurchSourceExcerpt(actor: AccessContext, input: {
         publicationStatus: publication?.status ?? null },
     });
     await emitEvent(tx, {
-      eventType: "ChurchContentSuggestionReviewed",
+      eventType: EventTypes.ChurchContentSuggestionReviewed,
       aggregateType: "church_content_suggestion", aggregateId: pending.id,
       actorPersonId: actor.actorPersonId, organizationId: checked.organizationId,
       siteId: checked.id, payload: { decision: input.decision },
@@ -278,7 +279,7 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       after: { count: values.length },
     });
     await emitEvent(tx, {
-      eventType: "ChurchWebsiteSuggestionsRetrieved",
+      eventType: EventTypes.ChurchWebsiteSuggestionsRetrieved,
       aggregateType: "church_source_reference", aggregateId: reference.id,
       actorPersonId: actor.actorPersonId,
       organizationId: checked.organizationId, siteId: checked.id,
