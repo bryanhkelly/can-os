@@ -182,23 +182,15 @@ export function projectPublicSchoolDay(
   if (!instructional.length || instructional.length !==
     schedule.periods.filter(p => p.type === "instruction").length) return pending();
   const days = [...new Set(instructional.map(p => p.dayOfWeek))].sort((a,b) => a-b);
-  const separatedDays = days.filter(dayOfWeek=>{
-    const items=instructional.filter(p=>p.dayOfWeek===dayOfWeek)
-      .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal));
-    for(let i=1;i<items.length;i++){
-      // Invalid overlapping instruction cannot be displayed even as segments.
-      if(items[i]!.startsAtLocal<items[i-1]!.endsAtLocal)return -1;
-    }
-    return items.some((period,i)=>i>0 &&
-      period.startsAtLocal>items[i-1]!.endsAtLocal);
-  });
-  const hasInstructionalOverlap=days.some(dayOfWeek=>{
-    const items=instructional.filter(p=>p.dayOfWeek===dayOfWeek)
-      .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal));
-    return items.some((period,i)=>i>0 &&
-      period.startsAtLocal<items[i-1]!.endsAtLocal);
-  });
-  if(hasInstructionalOverlap)return pending();
+  const instructionalDayPairs=days.map(dayOfWeek=>instructional
+    .filter(p=>p.dayOfWeek===dayOfWeek)
+    .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal)));
+  const overlapping=instructionalDayPairs.some(items=>items.some((period,i)=>
+    i>0 && period.startsAtLocal<items[i-1]!.endsAtLocal));
+  if(overlapping)return pending();
+  const hasSplitInstructionalDay=instructionalDayPairs.some(items=>
+    items.some((period,i)=>i>0 &&
+      period.startsAtLocal>items[i-1]!.endsAtLocal));
   const dailyRanges = days.map(dayOfWeek => {
     const daily = instructional.filter(p => p.dayOfWeek === dayOfWeek);
     return {
@@ -208,7 +200,7 @@ export function projectPublicSchoolDay(
   });
   // Where lessons have a real gap, publish separate intervals instead of
   // claiming that the school instructs continuously between first and last.
-  const weeklyPattern: PublicWeeklyDayPattern[] = separatedDays.length
+  const weeklyPattern: PublicWeeklyDayPattern[] = hasSplitInstructionalDay
     ? instructional.map(p=>({
         dayOfWeek:p.dayOfWeek,startsAtLocal:p.startsAtLocal.slice(0,5),
         endsAtLocal:p.endsAtLocal.slice(0,5),timezone,
@@ -232,7 +224,7 @@ export function projectPublicSchoolDay(
   }:null;
   // A varied but independently approved weekly pattern is still safe to show
   // at the Program level. Only legacy uniform time claims remain withheld.
-  if (separatedDays.length || dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
+  if (hasSplitInstructionalDay || dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
     range.end !== dailyRanges[0]!.end)) return {
       ...pending(), timezone,
       weeklyPatternState:"approved", weeklyPattern,
