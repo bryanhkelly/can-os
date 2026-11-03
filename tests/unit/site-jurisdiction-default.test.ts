@@ -15,5 +15,6 @@ describe("school Site address jurisdiction",()=>{
     expect(addressStateJurisdiction({timezone:"America/New_York"},jurisdictions)).toBeNull();
     expect(addressStateJurisdiction({state:"Unknown"},jurisdictions)).toBeNull();
     expect(addressStateJurisdiction(null,jurisdictions)).toBeNull();
+    expect(addressStateJurisdiction({country:"CA",state:"Texas"},jurisdictions)).toBeNull();
   });
 });
