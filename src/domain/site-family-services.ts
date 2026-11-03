@@ -50,10 +50,20 @@ export function projectPublicFamilyServices(
   const categories = ["meals","transportation","before_care","after_care","safety_summary"] as const;
   return categories.map(category => {
     const item = snapshot?.entries.find(entry => entry.category === category);
-    if (!item || !["confirmed","available"].includes(item.status) ||
-      (item.expiresOn && item.expiresOn < today)) {
+    if (!item || (item.expiresOn && item.expiresOn < today))
       return {category,description:unconfiguredClaim<string>("institutional_record")};
-    }
-    return {category,description:verifiedPublicClaim(item.description,"institutional_record",snapshot!.revision)};
+    if (item.status === "not_offered") return {
+      category, description:verifiedPublicClaim("Not offered", "institutional_record", snapshot!.revision),
+    };
+    if (item.status === "planned") return {
+      category, description:item.description
+        ? verifiedPublicClaim(item.description + " (Planned; not currently available)",
+            "institutional_record",snapshot!.revision)
+        : unconfiguredClaim<string>("institutional_record"),
+    };
+    const description=item.status === "confirmed"
+      ? item.description + " (Confirmed; contact the school for availability)"
+      : item.description;
+    return {category,description:verifiedPublicClaim(description,"institutional_record",snapshot!.revision)};
   });
 }
