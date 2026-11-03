@@ -41,6 +41,29 @@ export async function readSchoolJurisdictionReview(
   if (!actor.actorPersonId || (!hasRegistrarAuthority(actor.role) && !networkReviewer))
     throw new AuthorizationError("verified school registrar or independent CAN legal reviewer");
   assertCapability(actor,networkReviewer?"jurisdiction.profile.verify":"program.read");
+  return evaluateCanonicalSchoolJurisdiction(executor,programId,now,actor);
+}
+
+/** Canonical, actor-neutral read used ONLY within institutional opening services.
+ * The caller must independently authorize its opening operation.
+ */
+export async function requireCurrentSchoolJurisdictionForOpening(
+  executor: Pick<typeof db,"select">,
+  programId: string,
+  now = new Date(),
+): Promise<{scopeFingerprint:string;profileVersionId:string}> {
+  const review = await evaluateCanonicalSchoolJurisdiction(executor,programId,now);
+  if (review.reviewRequired || review.readiness.status !== "verified_policy" ||
+    !review.policyVersionId || !review.decisions.length ||
+    review.decisions.some(item=>item.status === "legal_review_required"))
+    throw new AuthorizationError("current independent school-specific jurisdiction approval");
+  return {scopeFingerprint:review.scopeFingerprint,profileVersionId:review.policyVersionId};
+}
+
+async function evaluateCanonicalSchoolJurisdiction(
+  executor: Pick<typeof db,"select">,programId:string,now:Date,actor?:AccessContext,
+) {
+  const networkReviewer=actor?.role==="can_jurisdiction_reviewer";
   const [school] = await executor.select({
     programId:programs.id, siteId:programs.siteId,
     organizationId:programs.organizationId,
@@ -57,7 +80,7 @@ export async function readSchoolJurisdictionReview(
     .where(eq(programs.id,programId)).limit(1);
   if (!school || !school.siteId || school.siteOrganizationId !== school.organizationId)
     throw new AuthorizationError("school-specific jurisdiction review");
-  if (networkReviewer) {
+  if (networkReviewer && actor) {
     if (actor.sessionAccountId || actor.grantSiteId !== null ||
       !actor.scope.organizationIds?.includes(school.academicProviderOrganizationId))
       throw new AuthorizationError("CAN institutional jurisdiction reviewer scope");
@@ -65,9 +88,9 @@ export async function readSchoolJurisdictionReview(
       .where(and(eq(organizations.id,school.academicProviderOrganizationId),
         eq(organizations.type,"can_network"))).limit(1);
     if (!institution) throw new AuthorizationError("verified CAN academic institution");
-  } else if (!actor.scope.organizationIds?.includes(school.organizationId) ||
+  } else if (actor && (!actor.scope.organizationIds?.includes(school.organizationId) ||
     !actor.scope.siteIds?.includes(school.siteId) ||
-    !actor.scope.programIds?.includes(programId)) {
+    !actor.scope.programIds?.includes(programId))) {
     throw new AuthorizationError("school-specific jurisdiction review");
   }
   // School-year changes and Site address edits must reopen stale legal-review Actions.
