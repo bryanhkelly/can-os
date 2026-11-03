@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { projectApprovedParentInformation } from "@/domain/parent-information";
 import { db } from "@/db/client";
 import { sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -39,6 +40,12 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     host,
     status: address?.status ?? null,
     approvedAcademicCount: academicPrograms.length,
+    // Same canonical, approved-only parent DTO as the live Site projection.
+    // Draft copy and internal review history remain separate editor-only fields.
+    parentInformation: projectApprovedParentInformation({
+      site: { name: site.name, organizationName: site.organizationName },
+      academicPrograms, offerings, localContent: local?.content ?? null,
+    }),
     approvedEnrichmentCount: offerings.length,
     editingContent,
     currentRevision: history[0]?.revision ?? 0,
