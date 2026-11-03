@@ -75,6 +75,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const hasStory = Boolean(local && [local.localDescription, local.churchHistory, local.communityOutreach,
     local.schoolVision, local.leadershipWelcome, local.localTraditions, local.denomination,
     local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
+  const hasReviewedPeople = Boolean(page.parentInformation?.people.length);
   const academic = Boolean(page.academicPrograms?.length);
   const parent = page.parentInformation;
   const tuition = Boolean(parent?.tuition.description.canDisplay && parent.tuition.description.value);
@@ -82,7 +83,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
   const faq = Boolean(parent?.admissions.description.canDisplay && parent.admissions.description.value);
   const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
     (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
-  return ["/", ...(hasStory ? ["/about"] as const : []),
+  return ["/", ...(hasStory || hasReviewedPeople ? ["/about"] as const : []),
     ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
     ...(page.offerings.length || (page.demonstration && hasStory) ? ["/student-life"] as const : []),
     ...(tuition ? ["/tuition"] as const : []),
@@ -379,6 +380,30 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `<p class="availability">Schedules differ by Program. Review each Program below for its approved weekly pattern.</p>`
       : `<p class="availability">A reviewed public timetable is not available for this school.
       Contact the school for confirmed instructional days and times.</p>`;
+  // Only the separately consented and independently approved public biographies.
+  const people = parent?.people ?? [];
+  const peopleSection = people.length ? `<section class="people-section editorial-section" aria-labelledby="people-title">
+    <p class="tag">Our people</p><h2 id="people-title">Meet our school community</h2>
+    <div class="people-grid">${people.map(person => `<article class="person-card">
+      <h3>${escapePublicHtml(person.displayName)}</h3>
+      <p class="person-title">${escapePublicHtml(person.publicTitle)}</p>
+      <p>${escapePublicHtml(person.biography)}</p></article>`).join("")}</div>
+    <p class="availability">Introductions shared with permission and reviewed for public display.</p>
+  </section>` : "";
+  const approachCards = (page.academicPrograms ?? []).map(program => {
+    const modes = [program.delivery.onsite ? "Onsite learning" : null,
+      program.delivery.liveOnline ? "Live online learning" : null,
+      program.delivery.asynchronous ? "Self-paced online learning" : null].filter(Boolean);
+    return `<article class="approach-card"><h3>${escapePublicHtml(program.title)}</h3>
+      <p>Grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}</p>
+      <ul>${modes.map(mode => `<li>${mode}</li>`).join("")}</ul></article>`;
+  }).join("");
+  const approachSection = approachCards ? `<section class="approach-section editorial-section" aria-labelledby="approach-title">
+    <p class="tag">The learning model</p><h2 id="approach-title">How learning is organized</h2>
+    <p>These delivery modes are drawn from approved Program information; instructional hours and opening authorization are reviewed independently.</p>
+    <div class="approach-grid">${approachCards}</div>
+    ${availablePaths.includes("/school-day") ? '<a class="text-action" href="/school-day">Explore the school day →</a>' : ""}
+  </section>` : "";
   const tuitionText = verifiedText(parent?.tuition.description);
   const aidText = verifiedText(parent?.tuition.financialAid);
   const tuitionSection = tuitionText ? `<section class="church-section" aria-labelledby="tuition-title">
@@ -398,6 +423,25 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <h2 id="disclosure-title">School status and disclosures</h2>
       ${institutionDisclosures}</section>`
     : "";
+  const faqItems = [
+    {question:"Which programs and grades are available?",answer:(page.academicPrograms ?? []).map(program =>
+      `${escapePublicHtml(program.title)}: grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}`).join("; ")},
+    {question:"What is the school-day schedule?",answer:approvedSchedules.length
+      ? "Approved Program-specific schedules are available on the School Day page."
+      : "A reviewed public timetable is not available yet. Please request current details."},
+    {question:"Are applications open?",answer:hasOpenApplications
+      ? "Some approved Programs permit verified application starts. Eligibility and capacity are checked separately."
+      : "Applications are not currently open through this website. Inquiries do not constitute applications."},
+    {question:"What tuition information is available?",answer:verifiedText(parent?.tuition.description)},
+    {question:"Which family services are offered?",answer:serviceCards
+      ? "Reviewed family-service information is available on the Families page." : ""},
+    {question:"Where is the school located?",answer:reviewedAddress},
+    {question:"How do I contact the school?",answer:reviewedContact},
+  ].filter(item=>Boolean(item.answer));
+  const faqSection = faqItems.length ? `<section class="faq-list editorial-section" aria-labelledby="faq-list-title">
+    <p class="tag">Questions families ask</p><h2 id="faq-list-title">Frequently asked questions</h2>
+    ${faqItems.map(item=>`<details class="faq-item"><summary>${item.question}</summary><p>${item.answer}</p></details>`).join("")}
+  </section>` : "";
   const admissionsNextSteps = `<section class="admissions-next-steps editorial-section" aria-labelledby="admissions-next-title">
     <p class="tag">Your next step</p><h2 id="admissions-next-title">Start with the right information</h2>
     ${admissionExplanation ? `<p>${admissionExplanation}</p>` : ""}
@@ -438,9 +482,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") +
       (reviewedContact || reviewedAddress ? contactSection : ""),
     "/about": secondaryHero("Our community", "A school rooted in community",
-      "Learn about the church and local people behind this school.") + localSection,
+      "Learn about the church and local people behind this school.") + localSection + peopleSection,
     "/academics": secondaryHero("Learning", "Academic programs",
-      "Explore institutionally reviewed program information and delivery options.") + academicSection,
+      "Explore institutionally reviewed program information and delivery options.") + academicSection + approachSection,
     "/student-life": secondaryHero("Beyond the classroom", "Student life",
       "See currently published enrichment and activities.") + enrichmentSection,
     "/school-day": secondaryHero("Learning together", "A look at the school day",
@@ -457,9 +501,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
         demo ? `<section class="mission-split editorial-section"><div><p class="tag">Illustrative family experience</p><h2>Known by name. Connected by purpose.</h2></div><p>The Valor reference experience imagines meaningful communication, shared exhibitions and a connected school community. Actual services require separate configuration and approval.</p></section>` : ""),
     "/faq": secondaryHero("Common questions", "Questions about joining",
-      "Verified guidance from the school.") +
-      `<section class="church-section" aria-labelledby="faq-admissions"><h2 id="faq-admissions">How does admissions work?</h2>
-      <p>${admissionExplanation}</p></section>`,
+      "Only reviewed public information appears here.") + faqSection,
     "/contact": secondaryHero("Get in touch", "Connect with our school",
       "Start with an approved program inquiry when available.") + contactSection + academicSection +
       (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : ""),
@@ -539,6 +581,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 @media(prefers-reduced-motion:reduce){.inquiry-form button{transition:none}}
  .demo-banner{padding:9px 22px;background:#162e39;color:#f9f5ed;text-align:center;font-size:.78rem;line-height:1.5;letter-spacing:.01em}.demo-banner strong{font-weight:700}.vision-feature{display:grid;grid-template-columns:minmax(90px, .3fr) minmax(0,1fr);gap:clamp(20px,5vw,80px);background:var(--site-ink);color:#fff;padding:clamp(28px,5vw,72px);border-radius:5px;margin:clamp(24px,5vw,64px) 0}.vision-feature h2{max-width:800px;font-size:clamp(2.1rem,4.5vw,4.3rem);line-height:1.13;letter-spacing:-.045em}.vision-feature p:not(.tag){color:#e3e6e0;max-width:800px;font-size:1.1rem;line-height:1.8}.vision-feature .tag{color:#e8c996}.vision-number{font-family:var(--site-display);font-size:clamp(4rem,11vw,10rem);line-height:1;color:#d5ac69}.hero-art{pointer-events:none;position:absolute;right:-3%;bottom:-24%;width:min(52%,580px);aspect-ratio:1;border:1px solid rgba(255,255,255,.32);border-radius:50%;opacity:.55;z-index:-1}.hero-art .art-ring{position:absolute;inset:15%;border:1px solid rgba(255,255,255,.45);border-radius:50%}.hero-art .art-line{position:absolute;top:6%;left:45%;width:1px;height:90%;background:rgba(255,255,255,.35);transform:rotate(34deg)}.hero-art .art-dot{position:absolute;top:18%;left:12%;height:12px;width:12px;border-radius:50%;background:#f2d19b}.public-hero.has-image .hero-art{display:none}@media(max-width:700px){.vision-feature{grid-template-columns:1fr}.vision-number{font-size:4rem}.hero-art{width:75%;right:-30%;bottom:-18%;opacity:.3}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .home-story{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(30px,6vw,110px);padding:clamp(38px,6vw,84px) 0;border-block:1px solid #cdd2cd}.home-story-heading h2{max-width:660px;font-size:clamp(2.8rem,5.5vw,5.8rem);line-height:1.03}.home-story-copy{max-width:570px;align-self:center}.home-story-copy>p{font-size:clamp(1.12rem,1.65vw,1.4rem);line-height:1.72;color:var(--site-muted);white-space:pre-line}.home-story-copy .text-action{margin-top:22px}.program-overview-heading{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(220px,.8fr);gap:clamp(24px,5vw,88px);align-items:end;margin-bottom:26px}.program-overview-heading>p{font-size:1.06rem;line-height:1.7;color:var(--site-muted)}.program-overview .grid{margin-top:0}.program-overview>.text-action{margin-top:26px}.editorial-section .tag{color:var(--site-secondary)}@media(max-width:760px){.home-story,.program-overview-heading{grid-template-columns:1fr}.home-story{gap:14px;padding:42px 0}.program-overview-heading{gap:12px}}
+.people-grid,.approach-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:clamp(20px,3vw,46px);margin:28px 0}.person-card,.approach-card{border-top:2px solid var(--site-ink);padding:24px 0}.person-card h3,.approach-card h3{font-family:var(--site-display);font-weight:500;font-size:clamp(1.4rem,2.2vw,2rem);margin:0 0 8px}.person-card p:last-child{white-space:pre-line;line-height:1.7;color:var(--site-muted)}.person-title{font-weight:700;font-size:.88rem;color:var(--site-secondary)}.approach-section>p:not(.tag),.approach-card p{color:var(--site-muted)}.approach-card ul{padding-left:22px;line-height:1.8}.faq-list{max-width:920px;margin-inline:auto}.faq-item{border-top:1px solid var(--site-ink);padding:20px 0}.faq-item:last-child{border-bottom:1px solid var(--site-ink)}.faq-item summary{cursor:pointer;font-family:var(--site-display);font-size:clamp(1.2rem,2vw,1.55rem);line-height:1.35;min-height:44px}.faq-item p{max-width:760px;white-space:pre-line;color:var(--site-muted);line-height:1.75}
 .demo-experience-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(18px,3vw,42px);margin:36px 0 20px}.demo-experience-grid article{min-width:0;border-top:2px solid var(--site-ink);padding-top:24px}.demo-experience-grid h3{font-family:var(--site-display);font-size:clamp(1.6rem,2.4vw,2.35rem);line-height:1.18;letter-spacing:-.035em;font-weight:500}.demo-experience-grid p:last-child{color:var(--site-muted);line-height:1.7}@media(max-width:760px){.demo-experience-grid{grid-template-columns:1fr}.demo-experience-grid article{padding-top:18px}}
  .bot-field{display:none}
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
