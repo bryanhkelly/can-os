@@ -115,6 +115,10 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
             </button>}
           </div>
         </div>
+        <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+          <p className="font-semibold">Next family step · {row.nextStep.owner}</p>
+          <p className="mt-1">{row.nextStep.message}</p>
+        </div>
         <ol className="mt-3 space-y-1 border-l pl-4 text-xs text-muted-foreground" aria-label="Family relationship history">
           {row.invitationBatchId && <li>Pre-opening invitation recorded · Provider receipt does not prove delivery or consent.</li>}
           <li>Family inquiry received · {new Date(row.createdAt).toLocaleString()}</li>
