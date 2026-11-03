@@ -103,7 +103,10 @@ export type PublicTuitionSummary = {
 };
 export type PublicProgramAdmissions = {
   programId: string;
-  status: "verified_application" | "information_only";
+  /** Pre-opening inquiry is not an application, waitlist or booked session. */
+  status: "verified_application" | "preopening_inquiry" | "information_only";
+  /** Never true merely because a family may ask for a tour. */
+  informationSessionInterestAvailable?: boolean;
   description: PublicClaim<string>;
 };
 export type PublicAdmissionsState = {
