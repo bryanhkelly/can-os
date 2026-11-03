@@ -272,6 +272,54 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
       status: "new",
     }).onConflictDoNothing().returning({ id: publicAdmissionsInterests.id });
     if (!created) return;
+    // An invited family's consented reply belongs in the same canonical
+    // registrar follow-up queue as a public website inquiry. The invitation
+    // itself is not consent to contact, and neither path creates an Application.
+    const [followup] = await tx.insert(actions).values({
+      type: "public_admissions_interest_followup",
+      subjectType: "public_admissions_interest",
+      subjectId: created.id,
+      title: "Follow up on invited family interest",
+      organizationId: school.organizationId,
+      siteId: school.siteId,
+      programId: batch.programId,
+      status: "open",
+      priority: "normal",
+      metadata: {
+        source: "staff_invitation",
+        invitationBatchId: data.invitationBatchId,
+      },
+    }).returning({ id: actions.id });
+    if (!followup) throw new Error("Unable to create admissions follow-up");
+    await emitEvent(tx, {
+      eventType: EventTypes.ActionCreated,
+      aggregateType: "action",
+      aggregateId: followup.id,
+      organizationId: school.organizationId,
+      siteId: school.siteId,
+      programId: batch.programId,
+      payload: {
+        type: "public_admissions_interest_followup",
+        subjectId: created.id,
+      },
+    });
+    await writeAudit(tx, {
+      action: "admissions.invited_interest.followup_created",
+      resourceType: "action",
+      resourceId: followup.id,
+      actorPersonId: null,
+      scope: {
+        organizationId: school.organizationId,
+        siteId: school.siteId,
+        programId: batch.programId,
+      },
+      after: {
+        subjectType: "public_admissions_interest",
+        subjectId: created.id,
+        status: "open",
+      },
+      context: { anonymous: true },
+    });
     await emitEvent(tx, {
       eventType: EventTypes.PublicAdmissionsInterestReceived,
       aggregateType: "public_admissions_interest", aggregateId: created.id,

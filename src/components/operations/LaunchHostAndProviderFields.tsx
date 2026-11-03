@@ -1,3 +1,7 @@
+import { LaunchSiteContactEditor, type LaunchSiteContactDraft } from "@/components/operations/LaunchSiteContactEditor";
+import { LaunchSiteAddressFields } from "./LaunchSiteAddressFields";
+import { LaunchSiteIdentityEditor } from "./LaunchSiteIdentityEditor";
+import { LaunchSiteAddressEditor } from "@/components/operations/LaunchSiteAddressEditor";
 import type { LaunchJurisdictionResearch as LaunchResearch } from "@/domain/jurisdiction-launch-research";
 import { JurisdictionLaunchResearch } from "@/components/operations/JurisdictionLaunchResearch";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
@@ -9,19 +13,31 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export type SavedLaunchSiteDraft = {siteId:string;host:string;status:"draft"|"published";replayed:boolean};
+
+export type LaunchSiteAddressDraft = {
+  street1: string; street2: string; city: string; state: string;
+  postalCode: string; country: string; county: string;
+};
+
+export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
   jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   jurisdictionResearch: Record<string,LaunchResearch>;
   hostOrganizationId: string; setHostOrganizationId: (value: string) => void;
   siteId: string; setSiteId: (value: string) => void;
-  setCreatedSiteDraft: (value: {siteId:string;host:string} | null) => void;
+  setCreatedSiteDraft: (value: SavedLaunchSiteDraft | null) => void;
   hostSites: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"];
   newSiteName: string; setNewSiteName: (value: string) => void;
   newSiteSlug: string; setNewSiteSlug: (value: string) => void;
   newSiteTimezone: string; setNewSiteTimezone: (value: string) => void;
+  saveSiteAddress: (address:LaunchSiteAddressDraft,revision:string,reason:string)=>Promise<void>;
+  saveSiteContact: (contact:LaunchSiteContactDraft|null,revision:string)=>Promise<void>;
+  saveSiteIdentity: (identity:{name:string;timezone:string},revision:string,reason:string)=>Promise<void>;
+  newSiteAddress: LaunchSiteAddressDraft;
+  setNewSiteAddress: (value: LaunchSiteAddressDraft) => void;
   duplicateNewSite: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"][number] | undefined;
-  createdSiteDraft: {siteId:string;host:string} | null;
+  createdSiteDraft: SavedLaunchSiteDraft | null;
   busy: boolean; addSite: () => Promise<void>;
   jurisdictionId: string; setJurisdictionId: (value: string) => void;
   academicProviderOrganizationId: string; setAcademicProviderOrganizationId: (value: string) => void;
@@ -59,9 +75,46 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       ))}
                     </Select>
                   </Field>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-semibold">Add a school location</p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {selectedSite && <LaunchSiteIdentityEditor key={"identity-"+selectedSite.id+"-"+selectedSite.updatedAt}
+                    initial={{name:selectedSite.name,timezone:selectedSite.timezone,slug:selectedSite.slug}}
+                    revision={selectedSite.updatedAt} busy={busy} save={saveSiteIdentity}/>}
+                  {selectedSite && <LaunchSiteAddressEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
+                    initial={selectedSite.address} revision={selectedSite.updatedAt}
+                    busy={busy} save={saveSiteAddress}/>}
+                  {selectedSite && <LaunchSiteContactEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
+                    initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
+                    busy={busy} save={saveSiteContact}/> }
+                  {selectedSite && <div className="rounded-lg border px-4 py-3 text-sm">
+                    <p className="font-semibold">Saved Site · {selectedSite.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {selectedSite.addressStatus==="missing"?"Physical address not yet configured":
+                        selectedSite.addressStatus==="legacy_needs_review"?"Older physical address needs correction and review":
+                        selectedSite.addressStatus==="invalid_needs_correction"?"Saved physical address needs correction":
+                        "Physical address supplied by the church, not independently approved"}
+                      {" · "}{selectedSite.timezone}
+                    </p>
+                    {selectedSite.websiteDraft && <p className="mt-2 text-xs text-muted-foreground">
+                      {selectedSite.websiteDraft.status==="published"?"Recorded Site website publication":"Saved private website draft"}
+                      {" · "}<span className="font-mono">{selectedSite.websiteDraft.host}</span>
+                    </p>}
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Website and social references require a separate, verified Site website-editor role.
+                      This registrar session does not confer editor access, and no links are imported or published automatically.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      <Link to="/admin" search={{siteId:selectedSite.id,inviteRole:"site_website_editor"}} className="underline">
+                        Invite or assign a church website editor
+                      </Link>
+                      <Link to="/site-website" search={{siteId:selectedSite.id}} className="underline">
+                        Open references as the assigned editor (switch role first)
+                      </Link>
+                    </div>
+                  </div>}
+                  <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
+                    <summary className="cursor-pointer text-sm font-semibold">
+                      {hostSites.length ? "Add another school location" : "Create your school location"}
+                    </summary>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <Field label="School location name">
                        <Input placeholder="Campus name" value={newSiteName} onChange={e=>{const value=e.target.value;setNewSiteName(value);if(!newSiteSlug||newSiteSlug===suggestedLaunchSlug(newSiteName))setNewSiteSlug(suggestedLaunchSlug(value));}}/>
                       </Field>
@@ -70,26 +123,31 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       </Field>
                       <Field label="Location time zone">
                        <Select value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
-                        {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
+                        <option value="">Choose the school time zone…</option>
+                        {[...new Set([newSiteTimezone,"America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].filter(Boolean).map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
                        </Select>
                       </Field>
+                    </div>
+                    <div className="mt-4 space-y-3 border-t pt-4">
+                      <p className="text-xs font-semibold">Physical location · for state guidance, not legal approval</p>
+                      <LaunchSiteAddressFields address={newSiteAddress} onChange={setNewSiteAddress}/>
+                      <p className="text-xs text-muted-foreground">Enter the actual location of onsite learning. You can leave the address blank and complete it later; partial addresses cannot be saved. The legal jurisdiction must be reviewed separately.</p>
                     </div>
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
                       This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
                     </p>}
-                    <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
+                    <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||!newSiteTimezone||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
-                      <p className="font-semibold">Your website draft is prepared</p>
+                      <p className="font-semibold">{createdSiteDraft.status==="published"?"Your saved school website is already published":createdSiteDraft.replayed?"Resumed your existing school Site and private website draft":"Your private school website draft is prepared"}</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Private draft only. The address is reserved, but no public site, admissions,
-                        or registration is open. An explicitly authorized Site publisher must
-                        review and approve marketing before publication.
+                        {createdSiteDraft.status==="published"?"This Site already has a published website. Publication is separate from admissions and authorization.":"Private website draft only. The host is reserved, but no public school site, admissions,"}
+                        Family enrollment and legal opening remain independently gated. Any new public claims require review by an authorized Site publisher.
                       </p>
                       <Link to="/sites/$siteId/publish" params={{siteId:createdSiteDraft.siteId}}
                         className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
                     </div>}
-                  </div>
+                  </details>
                   <Field label="Jurisdiction" required>
                     <Select value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)}>
                       <option value="">Select jurisdiction…</option>
@@ -100,10 +158,10 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                   </Field>
                   {selectedSite&&siteJurisdictionId&&jurisdictionId&&siteJurisdictionId!==jurisdictionId&&
                     <p role="alert" className="rounded-lg border border-amber-600/50 p-3 text-sm">
-                      The selected jurisdiction differs from this school's saved address. Confirm the legal state and correct either the Site address or the jurisdiction before proceeding.
+                      The selected jurisdiction differs from the Site address. Correct the location or jurisdiction before launch, or ask the CAN jurisdiction reviewer to document an authorized exception. A mismatched draft cannot establish legal applicability.
                     </p>}
                   {selectedSite&&!siteJurisdictionId&&
-                    <p className="text-xs text-muted-foreground">This Site has no recognized state in its saved address. Confirm the jurisdiction manually; a timezone is not evidence of a school's legal location.</p>}
+                    <p role="status" className="text-xs text-muted-foreground">No verified US-state jurisdiction can be inferred from this Site address. If the country is missing, confirm it explicitly; international or unsupported territories require independent CAN applicability review. Choosing a Program jurisdiction here is not legal authorization.</p>}
                   {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
                     <JurisdictionLaunchResearch research={jurisdictionResearch[jurisdictionId]}/>

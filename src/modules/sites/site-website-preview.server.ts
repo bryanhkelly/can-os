@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
@@ -13,6 +13,8 @@ import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
+import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 
 /** Public-safe private preview; institution-owned fields are still read-only. */
 export async function getPartnerWebsitePreview(actor: AccessContext) {
@@ -31,23 +33,27 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const host = address ? publicSiteHost(address.slug) : null;
   const local = address ? await readCurrentLocalContent(site.id) : null;
   const history = address ? await readLocalContentHistory(site.id) : [];
+  const approvedPhotos = host ? await readApprovedSchoolSitePhotos(site.id) : [];
+  const media = host ? projectApprovedSchoolSiteMedia(site.id,host,approvedPhotos) : {};
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent) : null;
   const [siteConfiguration] = host ? await db.select({metadata: sites.metadata})
     .from(sites).where(eq(sites.id, site.id)).limit(1) : [];
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
-    academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : {};
+    academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
+  const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
+    parentExtras?.admissions);
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms, offerings, localContent: local?.content ?? null,
-    ...parentExtras,
+    academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
+    ...(parentExtras ?? {}),
   });
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms, offerings, localContent: local?.content ?? null,
-    parentInformation,
+    academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
+    parentInformation, media,
   } : null;
   const previewPages = previewPage
     ? Object.fromEntries(availablePublicSitePaths(previewPage).map(path => [
@@ -69,6 +75,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     // host reachability, admission authorization or opening authority from a
     // reserved/publication row, even for a synthetic reference school.
     publicInformationReadiness: projectPublicInformationReadiness({
+      siteId: site.id,
       profile: parentInformation,
       marketingPublished: address?.status === "published",
       externalHostReachable: false,
@@ -76,6 +83,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
       openingConfirmed: false,
     }),
     approvedEnrichmentCount: offerings.length,
+    approvedPhotoCount: approvedPhotos.length,
+    mediaUploadsEnabled: process.env.CAN_R2_SITE_MEDIA_UPLOADS_ENABLED === "true",
     editingContent,
     currentRevision: history[0]?.revision ?? 0,
     localContentStatus: history[0]?.status ?? null,

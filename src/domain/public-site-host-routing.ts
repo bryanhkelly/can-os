@@ -87,7 +87,10 @@ export function slugForPublicSiteOrigin(
     return null;
   }
   if (allowLocalPreview && request.method === "GET" &&
-      url.pathname === "/published-site" && isLocalhost(url.hostname)) {
+      (url.pathname === "/published-site" ||
+        (url.pathname.startsWith("/published-site/") &&
+          isPublicSiteReadPath(url.pathname.slice("/published-site".length)))) &&
+      isLocalhost(url.hostname)) {
     const siteValues = url.searchParams.getAll("site");
     if (siteValues.length !== 1 || url.searchParams.size !== 1) return null;
     const slug = siteValues[0];

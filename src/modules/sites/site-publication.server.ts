@@ -4,15 +4,17 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { publicSiteDomain, publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
-import { renderPublicSiteHtml } from "@/domain/public-site-html";
+import { availablePublicSitePaths, renderPublicSiteHtml, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType, isCurrentAcademicMarketingSnapshot } from "@/domain/academic-program-publication";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
+import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
@@ -92,16 +94,36 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     readCurrentLocalContent(site.id),
   ]);
   const publicOfferings = publishedOfferings.map(toPublicSiteEnrichment);
+  const approvedPhotos=address[0] ? await readApprovedSchoolSitePhotos(site.id) : [];
+  const media=address[0] ? projectApprovedSchoolSiteMedia(site.id,publicSiteHost(address[0].slug),approvedPhotos) : {};
   const [siteConfiguration] = await db.select({metadata: sites.metadata})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const parentExtras = await readApprovedPublicParentExtras(site.id,
     approvedAcademicListings.map(program => program.programId),
     siteConfiguration?.metadata ?? null);
+  const authorizedPrograms=withVerifiedPublicApplications(approvedAcademicListings,
+    parentExtras.admissions);
   const parentInformation = projectApprovedParentInformation({
     site: {name: site.name, organizationName: site.organizationName},
-    academicPrograms: approvedAcademicListings, offerings: publicOfferings,
+    academicPrograms: authorizedPrograms, offerings: publicOfferings,
     localContent: localCopy?.content ?? null, ...parentExtras,
   });
+  // Render the same approved-source Site projection for every private page.
+  // Synthetic demo starter copy is display-only and never written to Site CMS.
+  const publisherPreview = address[0] ? withIllustrativeLocalPreview({
+    demonstration: siteConfiguration?.metadata?.synthetic === true,
+    host: publicSiteHost(address[0].slug),
+    site: {name: site.name, organizationName: site.organizationName},
+    academicPrograms: authorizedPrograms,
+    localContent: localCopy?.content ?? null,
+    offerings: publicOfferings,
+    parentInformation,
+    media,
+  }) : null;
+  const previewPages = publisherPreview ? Object.fromEntries(
+    availablePublicSitePaths(publisherPreview).map(path => [path,
+      renderPublicSiteHtml(publisherPreview, {path, localPreview:true})]),
+  ) : {};
   return {
     site,
     canRename: actor.role === "site_admin" && actor.capabilities.has("school.setup.manage"),
@@ -142,14 +164,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     // Identical standalone HTML renderer to /published-site. No request ID
     // generator: this authenticated draft is read-only, not an inquiry form.
     // The client displays it inside an origin-isolated sandboxed iframe.
-    previewHtml: address[0] ? renderPublicSiteHtml({
-      host: publicSiteHost(address[0].slug),
-      site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms: approvedAcademicListings,
-      localContent: localCopy?.content ?? null,
-      offerings: publicOfferings,
-      parentInformation,
-    }) : null,
+    previewHtml: previewPages["/"] ?? null,
+    previewPages,
   };
 }
 

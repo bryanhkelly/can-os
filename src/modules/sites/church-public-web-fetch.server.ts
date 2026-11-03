@@ -1,6 +1,11 @@
 import { resolve4 } from "node:dns/promises";
 import https from "node:https";
 import { normalizeChurchReferenceUrl } from "@/domain/church-source-references";
+import { boundedChurchBrandEvidence, type ChurchBrandEvidence } from "@/domain/church-brand-suggestions";
+import {
+  ChurchWebFetchError, classifyChurchWebFetchFailure,
+  summaryChurchWebFetchFailure, type ChurchWebFailureCode,
+} from "@/domain/church-web-fetch-diagnostics";
 
 /**
  * Bounded public-HTML fetch for voluntary church-website evidence.
@@ -33,9 +38,10 @@ export type WebsitePageEvidence = {
   pageText: string;
   sourceField: "welcome_message" | "church_history" | "church_mission" |
     "leadership_intro" | "ministries";
+  brandEvidence?: ChurchBrandEvidence[];
 };
 
-function plainHtmlText(html: string) {
+export function plainHtmlText(html: string) {
   let fragment = html.replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<(?:script|style|noscript|template|svg|form|iframe)\b[^>]*>[\s\S]*?<\/\s*(?:script|style|noscript|template|svg|form|iframe)\s*>/gi, " ");
   const main = /<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(fragment);
@@ -58,43 +64,60 @@ function plainHtmlText(html: string) {
 }
 
 export function robotsAllows(robots: string, pathname: string): boolean {
-  // Apply wildcard and explicit CAN rules conservatively. If a path matches
-  // competing rules, prefer the more specific match (Allow wins a tie).
-  const rules: Array<{ allow: boolean; length: number; pattern: RegExp }> = [];
-  let agents: string[] = [];
+  // A group may have several consecutive User-agent lines. The first
+  // Allow/Disallow starts its rules; the next User-agent starts a new group.
+  // Explicit matching groups take precedence over the generic "*" group.
+  type Rule = { allow: boolean; length: number; pattern: RegExp };
+  type Group = { agents: string[]; rules: Rule[] };
+  const groups: Group[] = [];
+  let group: Group | undefined;
   let hasRules = false;
+
   for (const raw of robots.split(/\r?\n/)) {
     const line = raw.replace(/#.*/, "").trim();
+    if (!line) continue;
     const parsed = /^([\w-]+)\s*:\s*(.*)$/i.exec(line);
     if (!parsed) continue;
     const directive = parsed[1]!.toLowerCase();
     const value = parsed[2]!.trim();
     if (directive === "user-agent") {
-      if (hasRules) { agents = []; hasRules = false; }
-      agents.push(value.toLowerCase());
+      if (!group || hasRules) {
+        group = { agents: [], rules: [] };
+        groups.push(group);
+        hasRules = false;
+      }
+      group.agents.push(value.toLowerCase());
       continue;
     }
-    if (directive !== "allow" && directive !== "disallow") continue;
+    if (!group || (directive !== "allow" && directive !== "disallow")) continue;
     hasRules = true;
-    if (!agents.some(agent => agent === "*" || agent.includes("canos") || agent.includes("can-os"))) continue;
     if (!value) continue;
     const anchored = value.endsWith("$");
     const source = (anchored ? value.slice(0, -1) : value)
-      .split("*").map(part => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+      .split("*").map(part => part.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")).join(".*");
     try {
-      rules.push({
+      group.rules.push({
         allow: directive === "allow",
         length: value.replace(/[*$]/g, "").length,
         pattern: new RegExp("^" + source + (anchored ? "$" : "")),
       });
     } catch {
-      // Fail closed on an unparseable disallow rather than ignore it.
       if (directive === "disallow") return false;
     }
   }
-  const matched = rules.filter(rule => rule.pattern.test(pathname))
-    .sort((a,b) => b.length - a.length || Number(b.allow) - Number(a.allow));
-  return matched[0]?.allow ?? true;
+
+  const ourAgent = "canos-churchreference/1.0";
+  const matchingNames = groups.flatMap(g => g.agents)
+    .filter(agent => agent !== "*" && ourAgent.startsWith(agent));
+  const longestAgent = matchingNames.reduce((max, name) => Math.max(max, name.length), 0);
+  const selected = longestAgent
+    ? groups.filter(g => g.agents.some(a => a !== "*" &&
+      a.length === longestAgent && ourAgent.startsWith(a)))
+    : groups.filter(g => g.agents.includes("*"));
+  const matches = selected.flatMap(g => g.rules)
+    .filter(rule => rule.pattern.test(pathname))
+    .sort((a, b) => b.length - a.length || Number(b.allow) - Number(a.allow));
+  return matches[0]?.allow ?? true;
 }
 
 async function publicAddress(hostname: string): Promise<string> {
@@ -151,7 +174,7 @@ async function requestPublicPage(
         response.resume(); agent.destroy(); reject(new Error("Church website did not return a public page")); return;
       }
       const mime = String(response.headers["content-type"] ?? "").toLowerCase();
-      const allowedMime = limit === MAX_ROBOTS_BYTES ? mime.startsWith("text/plain") : mime.startsWith("text/html");
+      const allowedMime = limit === MAX_ROBOTS_BYTES ? /^text\/plain(?:;|$)/.test(mime) : /^text\/html(?:;|$)/.test(mime);
       if (!allowedMime || response.headers["content-encoding"] ||
           Number(response.headers["content-length"] ?? 0) > limit) {
         response.destroy();
@@ -200,12 +223,16 @@ export async function extractChurchPublicWebsite(
   ];
   const results: WebsitePageEvidence[] = [];
   const dedup = new Set<string>();
+  const skipped: ChurchWebFailureCode[] = [];
   for (const candidate of candidates) {
     if (results.length >= 5) break;
     const url = new URL(candidate.path, origin);
     if (dedup.has(url.pathname)) continue;
     dedup.add(url.pathname);
-    if (robots.status === 200 && !robotsAllows(robots.text, url.pathname)) continue;
+    if (robots.status === 200 && !robotsAllows(robots.text, url.pathname)) {
+      skipped.push("robots_denied");
+      continue;
+    }
     try {
       const response = await requestPublicPage(url.toString(), origin, MAX_HTML_BYTES, 0,
         robots.status === 200 ? robots.text : undefined);
@@ -213,11 +240,15 @@ export async function extractChurchPublicWebsite(
       const pageText = plainHtmlText(response.text);
       if (pageText.length >= 45) results.push({
         pageUrl: response.url, pageText, sourceField: candidate.field,
+        ...(candidate.path === parsed.pathname
+          ? { brandEvidence: boundedChurchBrandEvidence(response.text, response.url) } : {}),
       });
-    } catch {
-      // Per-page failure never manufactures evidence or blocks other pages.
+    } catch (error) {
+      // No raw exception content crosses this boundary. When all pages fail,
+      // report a bounded reason instead of misleading editors with "no text".
+      skipped.push(classifyChurchWebFetchFailure(error).code);
     }
   }
-  if (!results.length) throw new Error("No public, permitted church website text could be retrieved");
+  if (!results.length) throw new ChurchWebFetchError(summaryChurchWebFetchFailure(skipped));
   return results;
 }

@@ -1,21 +1,93 @@
 import type { PublicSchoolDay } from "./parent-information";
 import { unconfiguredClaim, verifiedPublicClaim } from "./parent-information";
 
-type Period = {
+export type PublicSchoolDayPeriod = {
   dayOfWeek: number;
   startsAtLocal: string;
   endsAtLocal: string;
   type: string;
+  sequence?: number;
+  label?: string;
+};
+type Period = PublicSchoolDayPeriod;
+
+/** Signed school-year and publisher context. Values come from canonical DB rows. */
+export type PublicScheduleApprovalScope = {
+  siteId:string;programId:string;schoolYearId:string;scheduleTemplateId:string;
+  siteTimezone:string;schoolYearTimezone:string;
+  schoolYearStartsOn:string;schoolYearEndsOn:string;
+  effectiveFrom:string;effectiveThrough:string|null;
+  schoolYearKey:string;schoolYearName:string;
+  gradeRange:{min:string;max:string};programType:string;
+  siteRevision:string;programRevision:string;yearRevision:string;templateRevision:string;
 };
 /** Canonical content signature; changes to any displayed period withdraw approval. */
-export function publicSchoolDayScheduleSignature(periods: readonly Period[]): string {
-  return JSON.stringify(periods.map(p=>({
-    dayOfWeek:p.dayOfWeek, startsAtLocal:p.startsAtLocal,
-    endsAtLocal:p.endsAtLocal, type:p.type,
+export function publicSchoolDayScheduleSignature(
+  periods:readonly Period[],scope?:PublicScheduleApprovalScope,
+): string {
+  const normalized=periods.map(p=>({
+    dayOfWeek:p.dayOfWeek,startsAtLocal:p.startsAtLocal,
+    endsAtLocal:p.endsAtLocal,type:p.type,
+    ...(scope?{sequence:p.sequence??0,label:p.label??""}:{}),
   })).sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
     a.startsAtLocal.localeCompare(b.startsAtLocal) ||
     a.endsAtLocal.localeCompare(b.endsAtLocal) ||
-    a.type.localeCompare(b.type)));
+    a.type.localeCompare(b.type) ||
+    (("sequence" in a ? a.sequence : 0)??0) -
+      (("sequence" in b ? b.sequence : 0)??0) ||
+    (("label" in a ? a.label : "")??"").localeCompare(
+      ("label" in b ? b.label : "")??""));
+  // Keep the legacy single-argument signature for pure fixtures, but ONLY
+  // the scope-bound v2 form may be produced by the production approval service.
+  const canonical=(value:unknown):unknown=>Array.isArray(value)
+    ? value.map(canonical)
+    : value && typeof value==="object"
+      ? Object.fromEntries(Object.entries(value)
+          .sort(([a],[b])=>a.localeCompare(b))
+          .map(([key,item])=>[key,canonical(item)]))
+      : value;
+  return scope?JSON.stringify(canonical({version:2,scope,periods:normalized}))
+    :JSON.stringify(normalized);
+}
+
+/** Reviewer must be authenticated, different from the last person who
+ * saved academic timetable content, and authorized by the owning publisher. */
+export function isIndependentPublicScheduleReviewer(
+  reviewerPersonId:string|null,lastAuthorPersonId:string|null,
+):boolean {
+  return Boolean(reviewerPersonId && lastAuthorPersonId &&
+    reviewerPersonId!==lastAuthorPersonId);
+}
+
+export type ActiveScheduleWindow = {
+  schoolYearStatus:string;
+  templateActive:boolean;
+  programMatches:boolean;
+  siteMatches:boolean;
+  startsOn:string;
+  endsOn:string;
+  effectiveFrom:string;
+  effectiveThrough:string|null;
+};
+
+/** Returns true for ambiguity from two distinct simultaneously active
+ * Program timetables. The caller supplies only records for one Program+Site;
+ * approval status deliberately does not enter conflict detection. */
+export function competingActiveSchoolDaySchedules(
+  schedules:readonly ActiveScheduleWindow[],
+  target:{schoolYearStartsOn:string;schoolYearEndsOn:string;
+    effectiveFrom:string;effectiveThrough:string|null},
+):boolean {
+  const first=[target.schoolYearStartsOn,target.effectiveFrom].sort().at(-1)!;
+  const last=[target.schoolYearEndsOn,target.effectiveThrough??target.schoolYearEndsOn].sort()[0]!;
+  if(first>last)return true;
+  return schedules.filter(item=>{
+    if(!item.templateActive || item.schoolYearStatus!=="active" ||
+      !item.programMatches||!item.siteMatches)return false;
+    const from=[item.startsOn,item.effectiveFrom].sort().at(-1)!;
+    const to=[item.endsOn,item.effectiveThrough??item.endsOn].sort()[0]!;
+    return from<=last && to>=first && from<=to;
+  }).length>1;
 }
 
 type Schedule = {
@@ -31,8 +103,30 @@ type Schedule = {
   /** Institution's explicit review, not a website editor checkbox. */
   approval: { status: "approved"; revision: number; reviewedByPersonId: string; reviewedAt: string; signature: string } | null;
   periods: Period[];
+  reviewScope?: PublicScheduleApprovalScope;
 };
-export type PublicSchoolDayProjection = PublicSchoolDay & { state: "pending" | "approved"; timezone: string | null };
+export type PublicWeeklyDayPattern = {
+  dayOfWeek: number;
+  startsAtLocal: string;
+  endsAtLocal: string;
+  timezone: string;
+};
+/**
+ * The legacy parent DTO only represents one uniform time range. Approved weekly
+ * patterns preserve real per-day hours without making up a school-wide schedule.
+ */
+export type PublicSchoolDayProjection = PublicSchoolDay & {
+  state: "pending" | "approved";
+  timezone: string | null;
+  weeklyPatternState: "pending" | "approved";
+  weeklyPattern: PublicWeeklyDayPattern[];
+  approvedPatternSource: {
+    scope:PublicScheduleApprovalScope;
+    approval:{revision:number;reviewedAt:string};
+    instructionalIntervals:PublicWeeklyDayPattern[];
+    patternKind:"standard_weekly_template_not_holiday_calendar";
+  } | null;
+};
 
 /** No guessed Monday–Friday template or schedule from an inactive school year. */
 export function projectPublicSchoolDay(
@@ -42,6 +136,8 @@ export function projectPublicSchoolDay(
 ): PublicSchoolDayProjection {
   const pending = (): PublicSchoolDayProjection => ({
     state: "pending", timezone: null,
+    weeklyPatternState: "pending", weeklyPattern: [],
+    approvedPatternSource:null,
     days: unconfiguredClaim("calendar"), startTime: unconfiguredClaim("calendar"),
     endTime: unconfiguredClaim("calendar"), mode: unconfiguredClaim("calendar"),
   });
@@ -49,17 +145,22 @@ export function projectPublicSchoolDay(
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
   }).formatToParts(now).map(part => [part.type, part.value]));
   const day = `${parts.year}-${parts.month}-${parts.day}`;
-  const eligible = schedules.filter(schedule =>
+  const candidates = schedules.filter(schedule =>
     schedule.schoolYearStatus === "active" && schedule.templateActive &&
-    schedule.programMatches && schedule.siteMatches && schedule.timezoneMatches &&
     schedule.startsOn <= day && schedule.endsOn >= day &&
     schedule.effectiveFrom <= day &&
-    (!schedule.effectiveThrough || schedule.effectiveThrough >= day) &&
+    (!schedule.effectiveThrough || schedule.effectiveThrough >= day));
+  // An overlapping unapproved or recently changed active template also makes
+  // the public projection ambiguous. Never ignore it just because it lacks approval.
+  if(candidates.length!==1)return pending();
+  const eligible = candidates.filter(schedule =>
+    schedule.programMatches && schedule.siteMatches && schedule.timezoneMatches &&
     schedule.approval?.status === "approved" &&
     Boolean(schedule.approval.reviewedByPersonId) &&
     Number.isSafeInteger(schedule.approval.revision) &&
     schedule.approval.revision > 0 &&
-    schedule.approval.signature === publicSchoolDayScheduleSignature(schedule.periods) &&
+    schedule.approval.signature === publicSchoolDayScheduleSignature(
+      schedule.periods,schedule.reviewScope) &&
     Number.isFinite(Date.parse(schedule.approval.reviewedAt)) &&
     Date.parse(schedule.approval.reviewedAt) <= now.getTime(),
   );
@@ -73,11 +174,23 @@ export function projectPublicSchoolDay(
     /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(p.endsAtLocal) &&
     p.startsAtLocal < p.endsAtLocal &&
     ["instruction", "chapel", "advisory", "break", "lunch"].includes(p.type));
+  // Do not silently drop malformed/unknown periods from a signed timetable:
+  // it could otherwise publish incomplete hours while the source is ambiguous.
+  if(periods.length!==schedule.periods.length)return pending();
   // Only instruction establishes an instructional day. Sunday is valid.
   const instructional = periods.filter(p => p.type === "instruction");
   if (!instructional.length || instructional.length !==
     schedule.periods.filter(p => p.type === "instruction").length) return pending();
   const days = [...new Set(instructional.map(p => p.dayOfWeek))].sort((a,b) => a-b);
+  const instructionalDayPairs=days.map(dayOfWeek=>instructional
+    .filter(p=>p.dayOfWeek===dayOfWeek)
+    .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal)));
+  const overlapping=instructionalDayPairs.some(items=>items.some((period,i)=>
+    i>0 && period.startsAtLocal<items[i-1]!.endsAtLocal));
+  if(overlapping)return pending();
+  const hasSplitInstructionalDay=instructionalDayPairs.some(items=>
+    items.some((period,i)=>i>0 &&
+      period.startsAtLocal>items[i-1]!.endsAtLocal));
   const dailyRanges = days.map(dayOfWeek => {
     const daily = instructional.filter(p => p.dayOfWeek === dayOfWeek);
     return {
@@ -85,15 +198,46 @@ export function projectPublicSchoolDay(
       end:daily.map(p => p.endsAtLocal).sort().at(-1)!.slice(0,5),
     };
   });
-  // The existing shared parent DTO has one start/end pair. If days vary,
-  // withhold the pair rather than claiming a school-wide uniform timetable.
-  if (dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
-    range.end !== dailyRanges[0]!.end)) return pending();
+  // Where lessons have a real gap, publish separate intervals instead of
+  // claiming that the school instructs continuously between first and last.
+  const weeklyPattern: PublicWeeklyDayPattern[] = hasSplitInstructionalDay
+    ? instructional.map(p=>({
+        dayOfWeek:p.dayOfWeek,startsAtLocal:p.startsAtLocal.slice(0,5),
+        endsAtLocal:p.endsAtLocal.slice(0,5),timezone,
+      })).sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
+        a.startsAtLocal.localeCompare(b.startsAtLocal))
+    : days.map((dayOfWeek,index)=>({
+        dayOfWeek,
+        startsAtLocal:dailyRanges[index]!.start,
+        endsAtLocal:dailyRanges[index]!.end,
+        timezone,
+      }));
+  const source=schedule.reviewScope?{
+    scope:schedule.reviewScope,
+    approval:{revision:schedule.approval!.revision,reviewedAt:schedule.approval!.reviewedAt},
+    instructionalIntervals:instructional.map(period=>({
+      dayOfWeek:period.dayOfWeek,startsAtLocal:period.startsAtLocal.slice(0,5),
+      endsAtLocal:period.endsAtLocal.slice(0,5),timezone,
+    })).sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
+      a.startsAtLocal.localeCompare(b.startsAtLocal)),
+    patternKind:"standard_weekly_template_not_holiday_calendar" as const,
+  }:null;
+  // A varied but independently approved weekly pattern is still safe to show
+  // at the Program level. Only legacy uniform time claims remain withheld.
+  if (hasSplitInstructionalDay || dailyRanges.some(range=>range.start !== dailyRanges[0]!.start ||
+    range.end !== dailyRanges[0]!.end)) return {
+      ...pending(), timezone,
+      weeklyPatternState:"approved", weeklyPattern,
+      approvedPatternSource:source,
+    };
   const start = dailyRanges[0]!.start;
   const end = dailyRanges[0]!.end;
   const revision = schedule.approval!.revision;
   return {
-    state: "approved", timezone, days: verifiedPublicClaim(days, "calendar", revision),
+    state: "approved", timezone,
+    weeklyPatternState:"approved", weeklyPattern,
+    approvedPatternSource:source,
+    days: verifiedPublicClaim(days, "calendar", revision),
     startTime: verifiedPublicClaim(start, "calendar", revision),
     endTime: verifiedPublicClaim(end, "calendar", revision),
     // Delivery mode is an institutional Program attribute, not implied by periods.

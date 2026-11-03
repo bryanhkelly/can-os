@@ -1,8 +1,19 @@
 import {
   jurisdictionProfileSchema,
   isJurisdictionProfileVerificationEvidenceCurrent,
+  isOfficialJurisdictionSource,
   type JurisdictionProfile,
 } from "./jurisdiction-profile";
+
+/** Only the canonical US K–12 grade ordering is expanded. Unknown labels
+ * remain unconfirmed and require legal review rather than guessed grades. */
+export function expandKnownSchoolGradeRange(range:{min:string;max:string}):string[] {
+  const levels=["PK","TK","K",...Array.from({length:12},(_,i)=>String(i+1))];
+  const low=levels.indexOf(range.min.trim().toUpperCase());
+  const high=levels.indexOf(range.max.trim().toUpperCase());
+  if(low<0||high<low)return [];
+  return levels.slice(low,high+1);
+}
 
 /** A Site/Program context assembled from authoritative setup records, not a website form. */
 export type SchoolJurisdictionContext = {
@@ -41,6 +52,54 @@ function isoDay(value: Date | string): string | null {
 }
 
 /**
+ * A policy reviewed through this month does not automatically establish
+ * applicability for a later planned opening or academic year.
+ */
+export function requiresFutureJurisdictionPolicyReview(
+  nextReviewAt: Date | string | null,
+  plannedStartDates: readonly string[],
+  now = new Date(),
+): boolean {
+  const reviewBy = nextReviewAt ? isoDay(nextReviewAt) : null;
+  const today = isoDay(now);
+  if (!reviewBy || !today) return true;
+  return plannedStartDates.some(value => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return true;
+    const parsed = isoDay(value);
+    if (parsed !== value) return true;
+    return value > today && value > reviewBy;
+  });
+}
+
+/** Verified editorial policy is not itself a school or funding approval. */
+export function isCurrentVerifiedJurisdictionProfileVersion(
+  version: JurisdictionVersionGate,
+  now = new Date(),
+): boolean {
+  const today = isoDay(now);
+  if (!today || version.status !== "published" ||
+    version.verificationStatus !== "verified" || !version.verifiedByPersonId ||
+    !version.publishedAt || !version.effectiveAt || !version.nextReviewAt ||
+    !Array.isArray(version.evidence) || version.evidence.length === 0 ||
+    !version.evidence.every(source => source !== null &&
+      typeof source === "object" &&
+      isOfficialJurisdictionSource(source as {
+        url:string;authority:string;checkedAt:string;
+        officialAuthorityVerified?:boolean;
+        officialAuthorityVerificationNote?:string;
+      })))
+    return false;
+  const published = isoDay(version.publishedAt);
+  const effective = isoDay(version.effectiveAt);
+  const review = isoDay(version.nextReviewAt);
+  return published !== null && effective !== null && review !== null &&
+    published <= today && effective <= today && review >= today &&
+    isJurisdictionProfileVerificationEvidenceCurrent(
+      version.verificationEvidence, version.evidence,
+    );
+}
+
+/**
  * No requirement becomes applicable simply because a school is in the same
  * state. Unknown scope is a legal-review task, not a negative legal finding.
  * This function never grants school opening, registration or accreditation.
@@ -57,18 +116,10 @@ export function evaluateSchoolJurisdictionRequirements(
   if (!parsed.success) return { reviewRequired: true, decisions: [], publicDisclosures: [] };
   const profile: JurisdictionProfile = parsed.data;
   const today = isoDay(now);
-  const published = version.status === "published" &&
-    version.verificationStatus === "verified" && Boolean(version.verifiedByPersonId) &&
-    Boolean(version.publishedAt) && Boolean(version.effectiveAt) &&
-    Boolean(version.nextReviewAt) && Boolean(today) &&
-    isoDay(version.publishedAt!) !== null && isoDay(version.publishedAt!)! <= today! &&
-    isoDay(version.effectiveAt!) !== null && isoDay(version.effectiveAt!)! <= today! &&
-    isoDay(version.nextReviewAt!) !== null &&
-    isoDay(version.nextReviewAt!)! >= today! &&
-    isJurisdictionProfileVerificationEvidenceCurrent(
-      version.verificationEvidence, version.evidence,
-    );
-  const knownUrls = new Set(profile.evidence.map(source => source.url));
+  const published = isCurrentVerifiedJurisdictionProfileVersion(version, now);
+  const knownUrls = new Set(profile.evidence
+    .filter(isOfficialJurisdictionSource)
+    .map(source => source.url));
   const decisions: RequirementDecision[] = profile.requirements.map(requirement => {
     const result = (status: RequirementDecision["status"], reason: string): RequirementDecision => ({
       id: requirement.id, status, reason, disclosureAudience: requirement.disclosureAudience,
@@ -84,7 +135,11 @@ export function evaluateSchoolJurisdictionRequirements(
       return result("not_applicable", "Different verified operating model or authority");
     if (scope.localities) {
       if (!school.locality) return result("legal_review_required", "Locality not confirmed");
-      if (!scope.localities.includes(school.locality)) return result("not_applicable", "Different locality");
+      // County is an S-entered draft fact, not a separately geocoded or
+      // government-confirmed locality. A textual mismatch cannot establish
+      // the legal conclusion that the requirement does not apply.
+      if (!scope.localities.includes(school.locality))
+        return result("legal_review_required", "Locality differs from reviewed policy scope; confirm with CAN");
     }
     if (scope.programTypes) {
       if (!school.programType) return result("legal_review_required", "Program type not confirmed");
@@ -122,7 +177,9 @@ export function evaluateSchoolJurisdictionRequirements(
       : [];
   });
   return {
-    reviewRequired: !published || decisions.some(item => item.status === "legal_review_required"),
+    // A sourced profile with no assessed requirements is not a complete school legal review.
+    reviewRequired: !published || profile.requirements.length === 0 ||
+      decisions.some(item => item.status === "legal_review_required"),
     decisions,
     publicDisclosures,
   };

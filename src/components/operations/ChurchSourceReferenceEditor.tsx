@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
-  churchReferenceKinds, type ChurchReferenceKind,
+  churchReferenceKinds, churchSourcesChangedEvent, type ChurchReferenceKind,
 } from "@/domain/church-source-references";
 import {
   getChurchSourceReferenceView, removeChurchSourceReferenceCommand,
@@ -13,8 +13,15 @@ const labels: Record<ChurchReferenceKind, string> = {
   website: "Church website", youtube: "YouTube",
   instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok",
 };
+const referenceStatusLabels: Record<"saved"|"fetchable"|"unsupported"|"blocked"|"failed", string> = {
+  saved: "Saved privately; no website extraction yet",
+  fetchable: "Public church text retrieved for private review",
+  unsupported: "Reference saved; automatic social import unavailable",
+  blocked: "Automated reading blocked by website access or safety safeguards",
+  failed: "Automated reading unsuccessful; manual entry remains available",
+};
 const descriptions: Record<ChurchReferenceKind, string> = {
-  website: "Save your existing public church website. Automated reading is not enabled yet.",
+  website: "Save your existing public church website. Where enabled, you can request private editorial suggestions.",
   youtube: "Save your public YouTube channel for reference; no videos are imported.",
   instagram: "Save your Instagram profile for reference; no posts are imported.",
   facebook: "Save your Facebook page for reference; no posts are imported.",
@@ -55,6 +62,7 @@ export function ChurchSourceReferenceEditor() {
       });
       const items = await getChurchSourceReferenceView({ data: {} });
       setReferences(items);
+      window.dispatchEvent(new Event(churchSourcesChangedEvent));
       setMessage(`${labels[kind]} saved as a private reference. No content was imported or published.`);
       void router.invalidate();
     } catch (e) {
@@ -69,6 +77,7 @@ export function ChurchSourceReferenceEditor() {
       await removeChurchSourceReferenceCommand({ data: { kind } });
       setReferences(old => old.filter(item => item.kind !== kind));
       setUrls(old => ({ ...old, [kind]: "" }));
+      window.dispatchEvent(new Event(churchSourcesChangedEvent));
       setMessage(`${labels[kind]} reference removed.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to remove church reference.");
@@ -107,7 +116,7 @@ export function ChurchSourceReferenceEditor() {
             value={urls[kind]} onChange={event => setUrls(old => ({ ...old, [kind]: event.target.value }))}
             className="mt-3 w-full rounded-lg border bg-background p-2 text-sm" />
           {existing && <p className="mt-2 text-xs text-muted-foreground">
-            Saved · {existing.referenceState === "unsupported" ? "Automated import unavailable" : "Reference only; no import attempted"}
+            {referenceStatusLabels[existing.referenceState] ?? "Reference saved privately"}
           </p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="submit" disabled={!authorized || busy !== null}

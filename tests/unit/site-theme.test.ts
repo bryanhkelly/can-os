@@ -15,6 +15,26 @@ describe("PX-B curated visual identities",()=>{
       expect(contrastRatio("#ffffff",t.ink)).toBeGreaterThanOrEqual(4.5);
     }
   });
+  it("supports Valor, Ridgeview and Harborlight through one renderer",()=>{
+    const variants=[
+      {school:"Valor Academy",palette:"heritage" as const,expectedInk:"#162b45"},
+      {school:"Ridgeview Christian School",palette:"forest" as const,expectedInk:"#173e35"},
+      {school:"Harborlight Academy",palette:"harbor" as const,expectedInk:"#561c31"},
+    ];
+    for (const variant of variants) {
+      const page={host:"reference.can-os.com",site:{name:variant.school,
+        organizationName:"Illustrative Partner"},offerings:[],
+        localContent:{...emptySiteLocalContent,branding:{
+          theme:"classic" as const,paletteId:variant.palette,
+          typographyId:"editorial" as const,heroImage:null}},
+      };
+      const html=renderPublicSiteHtml(page);
+      expect(html).toContain(`--site-ink:${variant.expectedInk}`);
+      expect(html).toContain(variant.school);
+      expect(html).toContain('aria-label="School website navigation"');
+      expect(html).not.toContain("<script");
+    }
+  });
   it("fails safely to CAN Signature when theme IDs are unknown",()=>{
     expect(resolveSiteTheme("inject:url(https://bad)","A")).toEqual(resolveSiteTheme());
     expect(()=>normalizeSiteLocalContent({...emptySiteLocalContent,

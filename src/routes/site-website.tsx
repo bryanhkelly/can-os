@@ -15,6 +15,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
+import {SchoolMediaFolderManager} from "@/components/operations/SchoolMediaFolderManager";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
 const websiteSearchSchema=siteProgramSelectionSchema.extend({returnGrantId:optionalSearchString});
@@ -64,6 +65,9 @@ function PartnerSiteWebsitePage() {
       </p>
     </section>
     <WebsiteInformationChecklist data={data} />
+    <WebsiteDesignChecklist data={data} />
+    <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
+      enabled={data.mediaUploadsEnabled}/>
     <ChurchSourceReferenceEditor />
     <ChurchSourceSuggestionReview currentRevision={data.currentRevision} />
     {data.host && <LocalWebsiteCopyEditor data={data} />}
@@ -117,8 +121,11 @@ function WebsiteInformationChecklist({ data }: {
               {group.gaps.map(gap => <li key={`${gap.category}:${gap.owner}`}
                 className="flex flex-wrap items-start justify-between gap-2 px-3 py-3 text-sm">
                 <span className="max-w-2xl">{gap.message}</span>
-                <span className="text-xs text-muted-foreground">
-                  Owner: {gap.owner.replace(/_/g, " ")}
+                <span className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+                  <span>Owner: {gap.owner.replace(/_/g, " ")}</span>
+                  <a className="font-semibold underline underline-offset-4" href={gap.destination}>
+                    Open owning workspace
+                  </a>
                 </span>
               </li>)}
             </ul>
@@ -127,6 +134,49 @@ function WebsiteInformationChecklist({ data }: {
       All represented information categories have reviewed public values. This does
       not certify school opening or external hosting.
     </p>}
+  </section>;
+}
+
+/** A shared quality guide for every partner school. This is advisory and
+ * never substitutes for publisher, school opening, hosting, or consent checks. */
+function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>}) {
+  const content=data.editingContent;
+  const publishedPages=Object.keys(data.previewPages??{});
+  const items=[
+    {title:"A recognizable school welcome",ready:Boolean(content?.welcomeMessage?.trim()),
+      help:"Add a short, distinctive welcome in the local website editor."},
+    {title:"Your school's purpose and story",ready:Boolean(content?.schoolVision?.trim() &&
+      (content?.localDescription?.trim() || content?.churchHistory?.trim())),
+      help:"Describe why this school exists and the people and community behind it."},
+    {title:"Reviewed school photography",ready:data.approvedPhotoCount>0 || Boolean(content?.branding.heroImage?.rightsConfirmed &&
+      content?.branding.heroImage?.altText?.trim() &&
+      content?.branding.heroImage?.childImageConsent !== "unconfirmed"),
+      help:"Add one rights-cleared photograph with accessible alt text; the layout works without a photo."},
+    {title:"A complete About page",ready:publishedPages.includes("/about"),
+      help:"Publish local identity content to make the About page available."},
+    {title:"Published academic information",ready:data.approvedAcademicCount>0,
+      help:"Academic Programs require separate institution-owned marketing approval."},
+    {title:"Useful family next steps",ready:Boolean(publishedPages.includes("/admissions") ||
+      publishedPages.includes("/contact")),
+      help:"Families should have a published contact channel or an approved Program inquiry route."},
+  ];
+  const completed=items.filter(item=>item.ready).length;
+  return <section aria-labelledby="school-website-design-readiness" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Website quality</p>
+    <h2 id="school-website-design-readiness" className="mt-2 font-serif text-2xl font-semibold">Make this site feel like your school</h2>
+    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+      A strong school website combines your own story and photography with independently
+      approved programs and family information. These checks are shared by every CAN OS school;
+      they are editorial guidance, not a publication or operating authorization.
+    </p>
+    <p className="mt-3 text-sm font-semibold" role="status">{completed} of {items.length} content-quality signals represented</p>
+    <ul className="mt-4 grid gap-3 md:grid-cols-2">
+      {items.map(item=><li key={item.title} className="rounded-lg border p-4">
+        <p className="text-sm font-semibold">{item.ready?"✓ ":"○ "}{item.title}</p>
+        {!item.ready&&<p className="mt-2 text-sm text-muted-foreground">{item.help}</p>}
+      </li>)}
+    </ul>
+    <p className="mt-3 text-xs text-muted-foreground">Draft media and copy require the existing publication and rights checks before appearing publicly. External hosting, applications and school opening are verified separately.</p>
   </section>;
 }
 

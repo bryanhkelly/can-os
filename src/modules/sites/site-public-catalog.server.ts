@@ -1,4 +1,4 @@
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, sitePublications, sites } from "@/db/schema";
@@ -8,6 +8,8 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
+import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 
 /**
  * Public Site projection, independently gated by an approved Site publication
@@ -41,23 +43,31 @@ export async function readPublishedSiteCatalog(slug: string) {
     const offerings = await readEnrichmentCatalog(site.id, tx);
     const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
+    const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
+    const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
     const publicOfferings = offerings.map(toPublicSiteEnrichment);
     const localContent = locallyPublished?.content ?? null;
     // Same publication-locked, independently approved fragments used by
     // the authorized private editor; no draft services or invented weekday defaults.
     const parentExtras = await readApprovedPublicParentExtras(site.id,
       academicPrograms.map(program => program.programId), site.metadata, tx);
+    // The existing academic catalog's service-level applicationOpen is not
+    // sufficient for a public Apply CTA. The actual family-start command also
+    // requires a current, positive-capacity academic-year seat pool. Keep the
+    // renderer's Program-level button and the parent DTO on the SAME decision.
+    const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
     return {
       parentInformation: projectApprovedParentInformation({
         site: { name: site.name, organizationName: site.organizationName },
-        academicPrograms, offerings: publicOfferings, localContent,
+        academicPrograms:authorizedPrograms, offerings: publicOfferings, localContent,
         ...parentExtras,
       }),
       demonstration: site.metadata?.synthetic === true,
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
-      academicPrograms,
+      academicPrograms:authorizedPrograms,
       localContent,
+      media,
       offerings: publicOfferings,
     };
   });

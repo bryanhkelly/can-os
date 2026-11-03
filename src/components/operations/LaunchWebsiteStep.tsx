@@ -37,6 +37,20 @@ export function LaunchWebsitePreview({data}:{data:Website}){
     : "Ask your CAN contact to finish connecting your school website address. You can continue preparing your page and inviting families in the meantime."}</p>}
 
   {data.includesSuggestions&&<p className="mt-3 rounded border p-3 text-sm">This private preview includes suggested local welcome copy or a planned school listing. Suggestions are not saved editorial revisions or approved public claims.</p>}
+  <div className="mt-4 rounded-xl border bg-background p-4">
+    <h3 className="font-serif text-xl">Your school's photos — one folder, no individual selections</h3>
+    <p className="mt-2 text-sm text-muted-foreground">
+      During school website setup, your authorized church editor can point CAN OS to a photo folder.
+      The shared media engine will automatically propose placements across Home, About, Academics,
+      Student Life, Campus and Families. The church reviews rights and child-image permissions once
+      for the imported files; unapproved or missing photos use the CAN original artwork collection.
+    </p>
+    <p className="mt-2 text-xs text-muted-foreground">
+      A saved folder is private until explicit media approval. This step is optional and never
+      substitutes for legal authority to open or the institutional publisher's review.
+    </p>
+    <div className="mt-3"><LaunchWebsiteEditorHandoff siteId={data.siteId} programId={data.programId}/></div>
+  </div>
   {Object.keys(previewPages).length>0&&<nav aria-label="Preview school website pages" className="mt-4 flex flex-wrap gap-2">
     {Object.keys(previewPages).map(path=><button type="button" key={path}
       aria-pressed={selectedPage===path} onClick={()=>setSelectedPage(path)}

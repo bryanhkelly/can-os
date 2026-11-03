@@ -4,10 +4,11 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { approvePublicSchoolDay } from "./public-school-day-approval.server";
 import { db } from "@/db/client";
-import { programs,scheduleTemplatePeriods,scheduleTemplates,schoolYears } from "@/db/schema";
+import { programs,scheduleTemplatePeriods,scheduleTemplates,schoolYears,sites } from "@/db/schema";
 import { and,eq,inArray } from "drizzle-orm";
 import { requireSitePublisher } from "@/modules/sites/site-publication.server";
-import { publicSchoolDayScheduleSignature } from "@/domain/public-school-day";
+import { publicSchoolDayScheduleSignature, competingActiveSchoolDaySchedules } from "@/domain/public-school-day";
+import { publicSchoolDaySiteRevision } from "./public-school-day-site-revision.server";
 
 /** Explicit institutional review of the already-saved academic timetable. */
 export const approveSchoolDayPublicSummary = createServerFn({method:"POST"})
@@ -32,14 +33,29 @@ export const listPublicSchoolDayReviews=createServerFn({method:"GET"})
     const site=await requireSitePublisher(actor,data.siteId);
     if(!actor.scope.programIds?.includes(data.programId))
       throw new Error("Program outside publication scope");
-    const [program]=await db.select({siteId:programs.siteId,organizationId:programs.organizationId})
+    const [program]=await db.select({
+      siteId:programs.siteId,organizationId:programs.organizationId,
+      gradeRange:programs.gradeRange,programType:programs.type,
+      updatedAt:programs.updatedAt,
+    })
       .from(programs).where(eq(programs.id,data.programId)).limit(1);
     if(!program||program.siteId!==site.id||program.organizationId!==site.organizationId)
       throw new Error("Program does not belong to this Site");
+    const [siteRecord]=await db.select({
+      timezone:sites.timezone,address:sites.address,metadata:sites.metadata,
+    }).from(sites).where(eq(sites.id,site.id)).limit(1);
+    if(!siteRecord)throw new Error("Site configuration missing");
     const templates=await db.select({
       id:scheduleTemplates.id,name:scheduleTemplates.name,
       active:scheduleTemplates.active,metadata:scheduleTemplates.metadata,
-      yearStatus:schoolYears.status,
+      updatedAt:scheduleTemplates.updatedAt,
+      schoolYearId:scheduleTemplates.schoolYearId,
+      effectiveFrom:scheduleTemplates.effectiveFrom,
+      effectiveThrough:scheduleTemplates.effectiveThrough,
+      yearStatus:schoolYears.status,yearUpdatedAt:schoolYears.updatedAt,
+      yearKey:schoolYears.key,yearName:schoolYears.name,
+      yearTimezone:schoolYears.timezone,
+      yearStartsOn:schoolYears.startsOn,yearEndsOn:schoolYears.endsOn,
     }).from(scheduleTemplates)
       .innerJoin(schoolYears,eq(schoolYears.id,scheduleTemplates.schoolYearId))
       .where(and(eq(scheduleTemplates.siteId,site.id),
@@ -48,9 +64,12 @@ export const listPublicSchoolDayReviews=createServerFn({method:"GET"})
         eq(schoolYears.organizationId,site.organizationId),
         eq(schoolYears.status,"active"))).limit(30);
     const ids=templates.map(item=>item.id);
+    const truncated=templates.length>=30;
     const periods=ids.length?await db.select({
       scheduleTemplateId:scheduleTemplatePeriods.scheduleTemplateId,
       dayOfWeek:scheduleTemplatePeriods.dayOfWeek,
+      sequence:scheduleTemplatePeriods.sequence,
+      label:scheduleTemplatePeriods.label,
       startsAtLocal:scheduleTemplatePeriods.startsAtLocal,
       endsAtLocal:scheduleTemplatePeriods.endsAtLocal,
       type:scheduleTemplatePeriods.type,
@@ -65,8 +84,28 @@ export const listPublicSchoolDayReviews=createServerFn({method:"GET"})
         active:template.active,
         periods:schedulePeriods,
         revision:typeof approved.revision==="number"?approved.revision:0,
-        currentApproval:approved.status==="approved" &&
-          approved.signature===publicSchoolDayScheduleSignature(schedulePeriods),
+        currentApproval:!truncated && !competingActiveSchoolDaySchedules(templates.map(item=>({
+          ...item,templateActive:item.active,schoolYearStatus:item.yearStatus,
+          programMatches:true,siteMatches:true,
+          startsOn:item.yearStartsOn,endsOn:item.yearEndsOn,
+          effectiveFrom:item.effectiveFrom,effectiveThrough:item.effectiveThrough,
+        })),{
+          schoolYearStartsOn:template.yearStartsOn,schoolYearEndsOn:template.yearEndsOn,
+          effectiveFrom:template.effectiveFrom,effectiveThrough:template.effectiveThrough,
+        }) && approved.status==="approved" &&
+          approved.signature===publicSchoolDayScheduleSignature(schedulePeriods,{
+            siteId:site.id,programId:data.programId,
+            schoolYearId:template.schoolYearId,scheduleTemplateId:template.id,
+            siteTimezone:siteRecord.timezone,schoolYearTimezone:template.yearTimezone,
+            schoolYearStartsOn:template.yearStartsOn,schoolYearEndsOn:template.yearEndsOn,
+            effectiveFrom:template.effectiveFrom,effectiveThrough:template.effectiveThrough,
+            schoolYearKey:template.yearKey,schoolYearName:template.yearName,
+            gradeRange:program.gradeRange,programType:program.programType,
+            siteRevision:publicSchoolDaySiteRevision(siteRecord),
+            programRevision:program.updatedAt.toISOString(),
+            yearRevision:template.yearUpdatedAt.toISOString(),
+            templateRevision:template.updatedAt.toISOString(),
+          }),
       };
     });
   });

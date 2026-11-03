@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { SiteLocalContent } from "./site-local-content";
+import type { PublicSitePerson } from "./public-site-people";
 
 /**
  * PX-002–004: public information is a projection of approved source records,
@@ -57,6 +58,8 @@ export type PublicSchoolIdentity = {
   contact: PublicClaim<string>;
 };
 export type PublicAcademicSummary = {
+  /** Published public Program identity already used by application destinations. */
+  programId: string;
   title: PublicClaim<string>;
   summary: PublicClaim<string>;
   grades: PublicClaim<{ min: string; max: string }>;
@@ -69,6 +72,23 @@ export type PublicSchoolDay = {
   endTime: PublicClaim<string>;
   mode: PublicClaim<"onsite" | "online" | "hybrid">;
 };
+/** Public Program ID is already used by the published application destination.
+ * This never contains staff/student IDs or internal schedule-template IDs. */
+export type PublicProgramWeeklyPeriod = {
+  dayOfWeek: number; // Sunday 0 through Saturday 6
+  startsAtLocal: string;
+  endsAtLocal: string;
+  timezone: string;
+};
+export type PublicProgramSchoolDay = {
+  programId: string;
+  name: PublicClaim<string>;
+  grades: PublicClaim<{ min: string; max: string }>;
+  timezone: PublicClaim<string>;
+  effectiveFrom: PublicClaim<string>;
+  effectiveThrough: PublicClaim<string>;
+  weeklyPattern: PublicClaim<readonly PublicProgramWeeklyPeriod[]>;
+};
 export type PublicActivitySummary = {
   title: PublicClaim<string>;
   season: PublicClaim<string>;
@@ -76,16 +96,28 @@ export type PublicActivitySummary = {
   registrationOpen: boolean; // enrichment gate, not academic admissions
 };
 export type PublicSchoolService = {
-  category: "meals" | "transportation" | "before_care" | "after_care" | "safety_summary";
+  category: "meals" | "transportation" | "before_care" | "after_care" |
+    "communication" | "family_visits" | "safety_summary";
   description: PublicClaim<string>;
 };
 export type PublicTuitionSummary = {
   description: PublicClaim<string>;
   financialAid: PublicClaim<string>;
 };
+export type PublicProgramAdmissions = {
+  programId: string;
+  /** Pre-opening inquiry is not an application, waitlist or booked session. */
+  status: "verified_application" | "preopening_inquiry" | "information_only";
+  /** Never true merely because a family may ask for a tour. */
+  informationSessionInterestAvailable?: boolean;
+  description: PublicClaim<string>;
+};
 export type PublicAdmissionsState = {
+  /** True only if at least one published Program passed the current intake command gate. */
   applicationOpen: boolean;
   description: PublicClaim<string>;
+  /** Site-wide applicationOpen is legacy only; never imply every Program is open. */
+  programs?: PublicProgramAdmissions[];
 };
 export type PublicInstitutionalDisclosure = {
   category: "authorization" | "licensure" | "accreditation" | "jurisdiction";
@@ -98,6 +130,10 @@ export type PublicParentSchoolProfile = {
   spiritualFormation: PublicClaim<string>;
   academics: PublicAcademicSummary[];
   schoolDay: PublicSchoolDay;
+  /** Program-attributed approved seven-day schedules; never flatten multiple Programs. */
+  programSchedules: PublicProgramSchoolDay[];
+  /** Consent/revision-checked biographies only, with no private person keys. */
+  people: PublicSitePerson[];
   activities: PublicActivitySummary[];
   services: PublicSchoolService[];
   tuition: PublicTuitionSummary;
@@ -105,6 +141,21 @@ export type PublicParentSchoolProfile = {
   disclosures: PublicInstitutionalDisclosure[];
   familyPortal: PublicClaim<string>;
 };
+
+/** The only public Apply CTA source is the per-Program result of the
+ * canonical family-start eligibility check. Marketing publication, active
+ * Program status, and service agreements alone are not sufficient. */
+export function withVerifiedPublicApplications(
+  programs: readonly PublicAcademicProgram[],
+  admissions: PublicAdmissionsState | undefined,
+): PublicAcademicProgram[] {
+  return programs.map(program=>({
+    ...program,
+    applicationOpen: admissions?.programs?.some(item=>
+      item.programId===program.programId &&
+      item.status==="verified_application") === true,
+  }));
+}
 
 /** An unimplemented domain adapter is not permission to synthesize a fact. */
 export function unconfiguredClaim<T>(
@@ -141,6 +192,15 @@ export function projectApprovedParentInformation(input: {
   }[];
   /** Optional CAN-reviewed, single-Program schedule. Never infer a Site-wide timetable. */
   schoolDay?: PublicSchoolDay;
+  programSchedules?: PublicProgramSchoolDay[];
+  people?: PublicSitePerson[];
+  /** Institutional approval is separate from draft Site address or contact. */
+  publicAddress?: PublicClaim<string>;
+  publicContact?: PublicClaim<string>;
+  /** Finance/compliance/registrar must already have granted source-specific authority. */
+  tuition?: PublicTuitionSummary;
+  admissions?: PublicAdmissionsState;
+  disclosures?: PublicInstitutionalDisclosure[];
   /** Site-owned services must already be institutionally reviewed and public-safe. */
   services?: PublicSchoolService[];
 }): PublicParentSchoolProfile {
@@ -154,13 +214,14 @@ export function projectApprovedParentInformation(input: {
     site: {
       name: name ? verifiedPublicClaim(name, "organization_site") : unconfiguredClaim("organization_site"),
       organizationName: organizationName ? verifiedPublicClaim(organizationName, "organization_site") : unconfiguredClaim("organization_site"),
-      address: unconfiguredClaim("organization_site"),
-      contact: unconfiguredClaim("organization_site"),
+      address: input.publicAddress ?? unconfiguredClaim("organization_site"),
+      contact: input.publicContact ?? unconfiguredClaim("organization_site"),
     },
     churchStory: story ? verifiedPublicClaim(story, "site_local_content") : unconfiguredClaim("site_local_content"),
     faith: faith ? verifiedPublicClaim(faith, "site_local_content") : unconfiguredClaim("site_local_content"),
     spiritualFormation: formation ? verifiedPublicClaim(formation, "site_local_content") : unconfiguredClaim("site_local_content"),
     academics: input.academicPrograms.map(program => ({
+      programId:program.programId,
       title: verifiedPublicClaim(program.title, "program_publication"),
       summary: verifiedPublicClaim(program.summary, "program_publication"),
       grades: verifiedPublicClaim(program.grades, "program_publication"),
@@ -173,6 +234,16 @@ export function projectApprovedParentInformation(input: {
       endTime: unconfiguredClaim("calendar"),
       mode: unconfiguredClaim("calendar"),
     },
+    programSchedules: (input.programSchedules ?? []).filter(schedule =>
+      schedule.weeklyPattern.canDisplay &&
+      schedule.weeklyPattern.audience === "public" &&
+      schedule.weeklyPattern.status === "verified" &&
+      schedule.weeklyPattern.value !== null &&
+      input.academicPrograms.some(program => program.programId === schedule.programId &&
+        schedule.name.value === program.title &&
+        schedule.grades.value?.min === program.grades.min &&
+        schedule.grades.value?.max === program.grades.max)),
+    people: input.people ?? [],
     activities: input.offerings.map(activity => ({
       title: verifiedPublicClaim(activity.title, "enrichment_catalog"),
       season: verifiedPublicClaim(activity.season, "enrichment_catalog"),
@@ -181,20 +252,18 @@ export function projectApprovedParentInformation(input: {
       }, "enrichment_catalog"),
       registrationOpen: activity.registrationOpen,
     })),
-    services: input.services ?? (["meals", "transportation", "before_care", "after_care", "safety_summary"] as const)
+    services: input.services ?? (["meals", "transportation", "before_care", "after_care", "communication", "family_visits", "safety_summary"] as const)
       .map(category => ({ category, description: unconfiguredClaim<string>("institutional_record") })),
-    tuition: {
+    tuition: input.tuition ?? {
       description: unconfiguredClaim("institutional_record"),
       financialAid: unconfiguredClaim("institutional_record"),
     },
-    admissions: {
-      // Service authority is necessary but not sufficient for school intake,
-      // so no affirmative application CTA until the admissions owner supplies
-      // its complete gate (window, jurisdiction, capacity and enrollment).
+    admissions: input.admissions ?? {
+      // Never synthesize opening authority from a published marketing record.
       applicationOpen: false,
       description: unconfiguredClaim("admissions"),
     },
-    disclosures: (["authorization", "licensure", "accreditation", "jurisdiction"] as const)
+    disclosures: input.disclosures ?? (["authorization", "licensure", "accreditation", "jurisdiction"] as const)
       .map(category => ({ category, statement: unconfiguredClaim<string>("jurisdiction_profile") })),
     familyPortal: unconfiguredClaim("admissions", "authenticated_family"),
   };

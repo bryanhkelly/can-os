@@ -20,6 +20,12 @@ vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event
 vi.mock("@/modules/programs/program-site-authorization.server",()=>({
   requireChurchHostedOperatingServices:state.contract,
 }));
+vi.mock("@/modules/programs/school-jurisdiction-opening-gate.server",()=>({
+  requireCurrentSchoolJurisdictionForOpening:async()=>({
+    scopeFingerprint:"independent-jurisdiction-scope-v1",
+    jurisdictionProfileVersionId:"independent-policy-v1",
+  }),
+}));
 vi.mock("@/modules/identity/command-context.server",()=>({
   getCommandContext:async()=>state.actor,
 }));
@@ -71,7 +77,9 @@ const tx={
   }),
 };
 function configuration(status="draft",overrides:Record<string,unknown>={}){
-  return {id:ids.configuration,version:1,status,...overrides};
+  return {id:ids.configuration,version:1,status,createdAt:new Date("2026-11-01T00:00:00Z"),
+    config:{jurisdictionOpeningApproval:{scopeFingerprint:"independent-jurisdiction-scope-v1",
+      profileVersionId:"independent-policy-v1"}},...overrides};
 }
 function arrange(config=configuration()){
   state.rows=[
@@ -245,7 +253,7 @@ describe("opening prerequisites match command gates",()=>{
     const model=await readChurchSchoolOpening(actor,ids.program);
     expect(model.approvalReady).toBe(true);
     expect(model.prerequisites.map(item=>[item.id,item.satisfied])).toEqual([
-      ["evidence",true],["agreement",true],["director",true],
+      ["jurisdiction",true],["evidence",true],["agreement",true],["director",true],
     ]);
     expectNoDecision();
   });
@@ -267,7 +275,7 @@ describe("opening prerequisites match command gates",()=>{
     const {AuthorizationError}=await import("@/domain/command-context");
     state.contract.mockRejectedValueOnce(new AuthorizationError("current agreement"));
     const model=await readChurchSchoolOpening(actor,ids.program);
-    expect(model.prerequisites.map(item=>item.satisfied)).toEqual([false,false,false]);
+    expect(model.prerequisites.map(item=>item.satisfied)).toEqual([true,false,false,false]);
     expect(model.approvalReady).toBe(false);
     expect(state.contract).toHaveBeenCalledOnce();
     expect(state.rows).toEqual([]);

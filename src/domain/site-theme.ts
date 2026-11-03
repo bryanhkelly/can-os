@@ -2,7 +2,7 @@
  * No external font, CSS, remote image or untrusted church-source style is injected.
  * A suggested brand is private draft data, NOT a published theme.
  */
-export const sitePaletteIds = ["signature","heritage","forest","copper","coastal"] as const;
+export const sitePaletteIds = ["signature","heritage","forest","copper","coastal","harbor"] as const;
 export type SitePaletteId = typeof sitePaletteIds[number];
 export const siteTypographyIds = ["editorial","traditional","contemporary"] as const;
 export type SiteTypographyId = typeof siteTypographyIds[number];
@@ -28,6 +28,8 @@ const palettes = {
   forest: { ink:"#173e35", canvas:"#f8f8f0", accent:"#b08040", secondary:"#42624c", muted:"#53655c" },
   copper: { ink:"#4a3028", canvas:"#fbf6f0", accent:"#a2643d", secondary:"#734f42", muted:"#685a51" },
   coastal: { ink:"#174153", canvas:"#f5f9f8", accent:"#956e3e", secondary:"#427a78", muted:"#54686d" },
+  // Harborlight reference: burgundy, muted rose and ivory, shared across all Sites.
+  harbor: { ink:"#561c31", canvas:"#fbf6f2", accent:"#c98883", secondary:"#793a4c", muted:"#654e58" },
 } as const;
 const fonts = {
   editorial: { display:"Georgia, Cambria, 'Times New Roman', serif", body:"Arial, Helvetica, sans-serif" },

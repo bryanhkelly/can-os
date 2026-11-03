@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
 import { publicSiteDomain } from "@/domain/public-site-address";
-import { renderPublicSiteHtml } from "@/domain/public-site-html";
+import { isIndexablePublicSite, renderPublicSiteHtml, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 
 const headers = {
   "Content-Type": "text/html; charset=utf-8",
@@ -11,7 +11,7 @@ const headers = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
   "X-Robots-Tag": "index, follow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
 };
 
 /**
@@ -40,10 +40,13 @@ export const Route = createFileRoute("/published-site")({
             status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
           });
           const localPreview = new URL(request.url).searchParams.has("site");
-          return new Response(renderPublicSiteHtml(catalog, {
+          const presentation = localPreview ? withIllustrativeLocalPreview(catalog) : catalog;
+          const indexable = !localPreview && isIndexablePublicSite(catalog);
+          return new Response(renderPublicSiteHtml(presentation, {
             makeRequestId: () => crypto.randomUUID(), localPreview,
-          }), { status: 200, headers: localPreview
-            ? { ...headers, "X-Robots-Tag": "noindex, nofollow" } : headers });
+            localPreviewSlug: localPreview ? slug : undefined,
+          }), { status: 200, headers: indexable
+            ? headers : { ...headers, "X-Robots-Tag": "noindex, nofollow" } });
         } catch {
           // Fail closed on a missing migration, database error or unexpected data.
           return new Response("Site temporarily unavailable", {

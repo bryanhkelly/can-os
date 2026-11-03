@@ -133,6 +133,16 @@ describe("CAN OS partner hostname router", () => {
     const localPreview = (url: string, allowLocalPreview = true) =>
       slugForPublicSiteOrigin(new Request(url), false, allowLocalPreview);
 
+    expect(localPreview("http://127.0.0.1:4173/published-site/academics?site=vineyard"))
+      .toBe("vineyard");
+    expect(localPreview("http://localhost:4173/published-site/about?site=vineyard"))
+      .toBe("vineyard");
+    expect(localPreview("http://127.0.0.1:4173/published-site/operations?site=vineyard"))
+      .toBeNull();
+    expect(localPreview("http://127.0.0.1:4173/published-site/admissions?site=vineyard&other=1"))
+      .toBeNull();
+    expect(localPreview("https://attacker.test/published-site/academics?site=vineyard"))
+      .toBeNull();
     expect(localPreview("http://127.0.0.1:4173/published-site?site=vineyard"))
       .toBe("vineyard");
     expect(localPreview("http://localhost:4173/published-site?site=vineyard"))

@@ -9,6 +9,8 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { getSitePublicationDraftView, renameSitePublicIdentity, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
 import { AcademicProgramMarketingEditor } from "@/components/sites/AcademicProgramMarketingEditor";
+import { SitePublicPeopleReviewPanel } from "@/components/operations/SitePublicPeopleReviewPanel";
+import { FamilyServicesSetupPanel } from "@/components/operations/FamilyServicesSetupPanel";
 
 export const Route = createFileRoute("/sites/$siteId/publish")({
   loader: ({ params }) => safeLoader(
@@ -35,6 +37,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [reason, setReason] = useState("");
   const [contentReviewed, setContentReviewed] = useState(false);
   const [reachability, setReachability] = useState<"live" | "unreachable" | "hosting_disabled" | "not_published" | null>(null);
+  const [previewPath, setPreviewPath] = useState("/");
   const [verifying, setVerifying] = useState(false);
   const [schoolName, setSchoolName] = useState(data.site.name);
   const [newSlug, setNewSlug] = useState(data.address?.slug ?? "");
@@ -144,6 +147,19 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           disabled={saving || !candidate} type="submit">{saving ? "Reserving…" : "Reserve address"}</button>
       </form>}
     </section>
+    <section className="mt-6 rounded-xl border bg-card p-5">
+      <h2 className="text-xl font-semibold">Public campus and family contact approval</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Your reserved website URL is different from your physical Site location.
+        A saved legal address or internal contact is never automatically public.
+        An institutional publisher separately reviews the exact family-visible
+        address and school-controlled contact, with expiry, evidence and withdrawal.
+      </p>
+      <Link to="/sites/$siteId/parent-information" params={{siteId:data.site.id}}
+        className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
+        Review public address and contact
+      </Link>
+    </section>
     {data.canRename && data.address && <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">School name and address</h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -194,14 +210,26 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </span>
       </div>
       {data.previewHtml ? <>
+        <div role="group" aria-label="Preview school website pages" className="mt-4 flex flex-wrap gap-2">
+          {Object.keys(data.previewPages).map(path =>
+            <button type="button" key={path} aria-pressed={previewPath === path}
+              onClick={() => setPreviewPath(path)}
+              className="rounded-md border px-3 py-2 text-sm font-semibold aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+              {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
+            </button>)}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Select a page above to preview it. Navigation inside this isolated frame
+          is not a live site link; public site links operate only on its published host.
+        </p>
         <p className="mt-4 text-xs text-muted-foreground">
           Reserved address: <span className="font-mono">{data.address?.host}</span>.
           {data.hostingConfigured && data.address?.status === "published"
             ? "Hosting is enabled in the application; external DNS/TLS reachability must still be verified."
             : "This is a private preview, not an active public website."}
         </p>
-        <iframe title={`${data.site.name} private website draft preview`}
-          srcDoc={data.previewHtml} sandbox="" referrerPolicy="no-referrer"
+        <iframe key={previewPath} title={`${data.site.name} ${previewPath} private website draft preview`}
+          srcDoc={data.previewPages[previewPath] ?? data.previewHtml} sandbox="" referrerPolicy="no-referrer"
           loading="lazy" className="mt-3 h-[680px] w-full rounded-lg border bg-white"
         />
         <p className="mt-2 text-xs text-muted-foreground">
@@ -277,6 +305,10 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </p>}
       </div>
     </section>
+    <div className="mt-6 grid gap-5 xl:grid-cols-2" id="parent-information-review">
+      <SitePublicPeopleReviewPanel siteId={data.site.id}/>
+      <FamilyServicesSetupPanel siteId={data.site.id}/>
+    </div>
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Site publication decision</h2>
       <p className="mt-2 text-sm text-muted-foreground">

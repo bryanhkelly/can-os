@@ -37,6 +37,22 @@ describe("reviewed family service projections",()=>{
     expect(readSiteFamilyServices({familyServices:{...snapshot,
       entries:[snapshot.entries[0],snapshot.entries[0]]}})).toBeNull();
   });
+  it("includes consented/reviewed communication and family visit descriptions",()=>{
+    const result=projectPublicFamilyServices({familyServices:{
+      ...snapshot,entries:[...snapshot.entries,
+        {category:"communication",status:"available",
+          description:"Families can contact the reviewed school office.",
+          evidenceReference:"Reviewed office communication plan",expiresOn:null},
+        {category:"family_visits",status:"planned",
+          description:"Information sessions are under consideration.",
+          evidenceReference:null,expiresOn:null},
+      ],
+    }},new Date("2026-11-03T00:00:00Z"));
+    expect(result.find(item=>item.category==="communication")?.description.value)
+      .toContain("Families can contact");
+    expect(result.find(item=>item.category==="family_visits")?.description.value)
+      .toContain("not currently available");
+  });
   it("requires substantive evidence for a claimed available service",()=>{
     const result=siteFamilyServicesSchema.safeParse({
       ...snapshot,entries:[{...snapshot.entries[0],evidenceReference:null}],
