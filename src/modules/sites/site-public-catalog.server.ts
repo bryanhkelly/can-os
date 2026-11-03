@@ -1,4 +1,4 @@
-import { projectApprovedParentInformation } from "@/domain/parent-information";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, sitePublications, sites } from "@/db/schema";
@@ -51,12 +51,7 @@ export async function readPublishedSiteCatalog(slug: string) {
     // sufficient for a public Apply CTA. The actual family-start command also
     // requires a current, positive-capacity academic-year seat pool. Keep the
     // renderer's Program-level button and the parent DTO on the SAME decision.
-    const authorizedPrograms = academicPrograms.map(program => ({
-      ...program,
-      applicationOpen: parentExtras.admissions.programs?.some(item =>
-        item.programId === program.programId &&
-        item.status === "verified_application") === true,
-    }));
+    const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
     return {
       parentInformation: projectApprovedParentInformation({
         site: { name: site.name, organizationName: site.organizationName },
