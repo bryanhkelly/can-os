@@ -86,6 +86,32 @@ describe("standalone public site HTML", () => {
     expect(html).toContain("<title>Church School | Programs</title>");
   });
 
+  it("distinguishes multiple academic Programs by grade without inventing universal weekdays", () => {
+    const page = {
+      host: "academy.can-os.com", site: {name: "Academy", organizationName: "Church"},
+      offerings: [],
+      academicPrograms: [
+        {programId: "program-elementary", title: "Elementary Academy", typeLabel: "School",
+          summary: "Elementary", grades: {min: "K", max: "5"},
+          delivery: {onsite: true, asynchronous: false, liveOnline: false, onsiteDaysPerWeek: 3},
+          availability: "planned" as const},
+        {programId: "program-high-school", title: "High School Hybrid", typeLabel: "Hybrid",
+          summary: "High school", grades: {min: "9", max: "12"},
+          delivery: {onsite: true, asynchronous: true, liveOnline: true, onsiteDaysPerWeek: 2},
+          availability: "planned" as const},
+      ],
+    };
+    const html = renderPublicSiteHtml(page, {path: "/school-day"});
+    expect(html).toContain("Select a program's school day");
+    expect(html).toContain('href="#school-day-program-elementary"');
+    expect(html).toContain('id="school-day-program-high-school"');
+    expect(html).toContain("Grades K–5");
+    expect(html).toContain("Grades 9–12");
+    expect(html).toContain("3 onsite days per week");
+    expect(html).toContain("2 onsite days per week");
+    expect(html).not.toContain("Monday, Tuesday, Wednesday, Thursday, Friday");
+  });
+
   it("renders an empty published catalog without claiming enrollment is available", () => {
     const html = renderPublicSiteHtml({
       host: "partner.can-os.com",
