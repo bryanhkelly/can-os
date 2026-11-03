@@ -15,7 +15,7 @@ import {resolveLaunchResume} from "@/domain/launch-resume";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -74,6 +74,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState(selection.siteId??"");
+  useEffect(()=>{
+    if(selection.siteId)setSiteId(selection.siteId);
+  },[selection.siteId]);
   const [newSiteName,setNewSiteName]=useState("");
   const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
