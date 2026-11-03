@@ -156,6 +156,24 @@ const stringFrom=(row:Record<string,unknown>,...keys:string[])=>{
   return "";
 };
 
+/** Populate an editable form from canonical or legacy Site addresses without publishing them. */
+export function siteAddressEditorDraft(value:unknown):{
+  street1:string;street2:string;city:string;state:string;
+  postalCode:string;country:string;county:string;
+} {
+  const item=value&&typeof value==="object"&&!Array.isArray(value)
+    ? value as Record<string,unknown> : {};
+  return {
+    street1:stringFrom(item,"street1","line1","addressLine1","address1","streetAddress"),
+    street2:stringFrom(item,"street2","line2","addressLine2","address2"),
+    city:stringFrom(item,"city","locality"),
+    state:stringFrom(item,"state","stateCode","regionCode","region"),
+    postalCode:stringFrom(item,"postalCode","zipCode","zip","postal"),
+    country:stringFrom(item,"country","countryCode")||"US",
+    county:stringFrom(item,"county"),
+  };
+}
+
 /**
  * Read old Site JSONB shapes without silently changing persisted records.
  * Persist only the canonical structure on an explicit authorized edit.
@@ -169,15 +187,7 @@ export function readSitePhysicalAddress(value:unknown):{
   const item=value as Record<string,unknown>;
   const legacyKeys=["line1","address1","streetAddress","addressLine1","zip","zipCode","region","regionCode","stateCode","countryCode"];
   const legacy=legacyKeys.some(key=>item[key]!==undefined);
-  const candidate={
-    street1:stringFrom(item,"street1","line1","addressLine1","address1","streetAddress"),
-    ...(stringFrom(item,"street2","line2","addressLine2","address2")?{street2:stringFrom(item,"street2","line2","addressLine2","address2")}:{}),
-    city:stringFrom(item,"city","locality"),
-    state:stringFrom(item,"state","stateCode","regionCode","region"),
-    postalCode:stringFrom(item,"postalCode","zipCode","zip","postal"),
-    country:stringFrom(item,"country","countryCode")||"US",
-    ...(stringFrom(item,"county")?{county:stringFrom(item,"county")}:{}),
-  };
+  const candidate=siteAddressEditorDraft(item);
   const parsed=physicalSiteAddressSchema.safeParse(candidate);
   if(!parsed.success)return {value:null,status:"invalid_needs_correction"};
   return {value:parsed.data,status:legacy?"legacy_needs_review":"church_supplied"};
