@@ -81,9 +81,26 @@ export async function submitChurchSourceExcerpt(actor: AccessContext, input: {
     const [reference] = await tx.select().from(churchSourceReferences)
       .where(and(eq(churchSourceReferences.id, input.sourceReferenceId),
         eq(churchSourceReferences.siteId, site.id), eq(churchSourceReferences.kind, "website"),
-        isNull(churchSourceReferences.revokedAt))).limit(1);
+        isNull(churchSourceReferences.revokedAt))).for("update").limit(1);
     if (!reference || new URL(normalizedUrl).origin !== new URL(reference.normalizedUrl).origin) {
       throw new Error("Choose a page from your saved church website");
+    }
+    // The source row is locked so concurrent manual submission, refresh and
+    // revocation cannot leave an orphan pending proposal.
+    const pending = await tx.select({
+      id: churchContentSuggestions.id, field: churchContentSuggestions.field,
+      proposedText: churchContentSuggestions.proposedText,
+      sourcePageUrl: churchContentSuggestions.sourcePageUrl,
+    }).from(churchContentSuggestions).where(and(
+      eq(churchContentSuggestions.siteId, site.id),
+      eq(churchContentSuggestions.reviewDecision, "pending"),
+    )).orderBy(desc(churchContentSuggestions.createdAt)).limit(25);
+    const duplicate = pending.find(row =>
+      row.field === input.field && row.proposedText === proposedText &&
+      row.sourcePageUrl === normalizedUrl);
+    if (duplicate) return { id: duplicate.id, changed: false };
+    if (pending.length >= 25) {
+      throw new Error("Review or discard some existing church suggestions before adding more");
     }
     const [created] = await tx.insert(churchContentSuggestions).values({
       siteId: site.id, sourceReferenceId: reference.id,
@@ -327,9 +344,18 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
         createdByPersonId: actor.actorPersonId!,
       }] : [];
     });
-    if (!values.length) return { status: "failed" as const, count: 0,
+    // Different source paths can repeat identical text. Present only one
+    // bounded proposal per source field/text and keep the first source page.
+    const seen = new Set<string>();
+    const distinct = values.filter(value => {
+      const key = JSON.stringify([value.field, value.proposedText]);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (!distinct.length) return { status: "failed" as const, count: 0,
       message: "No appropriate church story text was found." };
-    await tx.insert(churchContentSuggestions).values(values);
+    await tx.insert(churchContentSuggestions).values(distinct);
     await tx.update(churchSourceReferences).set({
       referenceState: "fetchable", updatedAt: new Date(),
     }).where(eq(churchSourceReferences.id, reference.id));
@@ -337,16 +363,16 @@ export async function refreshChurchWebsiteSuggestions(actor: AccessContext) {
       action: "site.website.source_refresh.completed",
       entityType: "church_source_reference", entityId: reference.id,
       scope: { organizationId: checked.organizationId, siteId: checked.id },
-      after: { count: values.length },
+      after: { count: distinct.length },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ChurchWebsiteSuggestionsRetrieved,
       aggregateType: "church_source_reference", aggregateId: reference.id,
       actorPersonId: actor.actorPersonId,
       organizationId: checked.organizationId, siteId: checked.id,
-      payload: { count: values.length },
+      payload: { count: distinct.length },
     });
-    return { status: "ready" as const, count: values.length,
+    return { status: "ready" as const, count: distinct.length,
       message: "Public church website excerpts are ready for individual review. Nothing was published." };
   });
 }
