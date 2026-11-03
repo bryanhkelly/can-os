@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { personShortName } from "@/domain/person-name";
 import { ArrowUpRight, BookOpen, CalendarDays } from "lucide-react";
-import { DailyCanvas, selectDailyCanvasContent, type DailyCanvasContent } from "./DailyCanvas";
+import { DailyCanvas } from "./DailyCanvas";
+import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { EmptyState, WorkspaceShell, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
@@ -33,9 +34,7 @@ export function StudentExperience({ liveData, success, support }: {
  }).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
   subtitle="Your schedule, coursework and next steps, all from your school records.">
-  <DailyCanvas audience="student" content={selectDailyCanvasContent([
-    { id: "student-default", audience: "student", priority: "default", headline: "Make today count.", supportingCopy: "A fresh start, a clear next step, and everything you need to keep learning.", campaignLabel: "Your learning day" },
-  ] satisfies DailyCanvasContent[], "student", new Date())}
+  <DailyCanvas audience="student" content={resolveEditorialCanvas("student", new Date())}
    operationalSummary={<span>{liveData.sections.length} classes · {summaryUnavailable ? "Assignments updating" : `${upcomingCount} assignments to do or due soon`}</span>}
    primaryAction={nextAssignment ? <Link to="/student/assignments" search={{section:nextAssignment.sectionId??undefined,assessment:nextAssignment.assessmentId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{nextAssignment.kind==="revision"?"Continue revision":nextAssignment.kind==="overdue"?"Complete overdue work":"Continue learning"} <ArrowUpRight className="size-4" /></Link> : starter ? <Link to="/student/assignments" search={{section:starter.sectionId,assessment:starter.firstWeek.assessment!.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start first-week work <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">View my classes <ArrowUpRight className="size-4" /></Link>}
    secondaryAction={<Link to="/student/assignments" className="inline-flex min-h-11 items-center rounded-xl border border-white/70 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Assignments</Link>}
