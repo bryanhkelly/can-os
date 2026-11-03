@@ -6,6 +6,8 @@ import {
   draftSiteContactSchema,
   hasEnteredSiteAddress,
   nextSiteConfigurationRevision,
+  samePhysicalSiteAddress,
+  sameDraftSiteContact,
 } from "@/domain/site-setup-configuration";
 
 describe("canonical church Site configuration input",()=>{
@@ -38,6 +40,20 @@ describe("canonical church Site configuration input",()=>{
     expect(launchGradeRangeIsOrdered({min:"TK",max:"12"})).toBe(true);
     expect(launchGradeRangeIsOrdered({min:"12",max:"K"})).toBe(false);
     expect(launchGradeRangeIsOrdered({min:"9",max:"12"})).toBe(true);
+  });
+  it("replays identical configuration updates regardless of JSONB field order",()=>{
+    expect(samePhysicalSiteAddress(
+      {country:"US",postalCode:"94612",state:"CA",city:"Oakland",street1:"100 Main Street"},
+      {street1:"100 Main Street",city:"Oakland",state:"CA",postalCode:"94612",country:"US"},
+    )).toBe(true);
+    expect(samePhysicalSiteAddress(
+      {country:"US",postalCode:"94612",state:"CA",city:"Oakland",street1:"100 Main Street"},
+      {street1:"100 Main Street",city:"Oakland",state:"NV",postalCode:"94612",country:"US"},
+    )).toBe(false);
+    expect(sameDraftSiteContact(
+      {website:"",phone:"",email:"office@example.org",displayName:"School Office"},
+      {displayName:"School Office",email:"office@example.org",phone:"",website:""},
+    )).toBe(true);
   });
   it("advances Site revision even when two mutations share one millisecond",()=>{
     const previous=new Date("2026-11-03T18:00:00.000Z");
