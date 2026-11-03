@@ -152,7 +152,6 @@ export function projectPublicSchoolDay(
     range.end !== dailyRanges[0]!.end)) return {
       ...pending(), timezone,
       weeklyPatternState:"approved", weeklyPattern,
-    approvedPatternSource:source,
       approvedPatternSource:source,
     };
   const start = dailyRanges[0]!.start;
@@ -161,6 +160,7 @@ export function projectPublicSchoolDay(
   return {
     state: "approved", timezone,
     weeklyPatternState:"approved", weeklyPattern,
+    approvedPatternSource:source,
     days: verifiedPublicClaim(days, "calendar", revision),
     startTime: verifiedPublicClaim(start, "calendar", revision),
     endTime: verifiedPublicClaim(end, "calendar", revision),
