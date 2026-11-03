@@ -106,6 +106,17 @@ export function OnsitePickupPanel({ date, onChanged }: {
     {loading && <p role="status" className="text-sm">Loading family release authority…</p>}
     {!loading && roster && <>
       <p className="mb-5 text-xs text-muted-foreground">{roster.note}</p>
+      <section aria-label="Pickup overview" className="mb-6 rounded-xl border bg-muted/20 p-4">
+        <h3 className="font-semibold">Dismissal overview</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Current verified pickup roster only. Counts are student-program entries, not a deduplicated headcount or permission to release anyone.</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+          <p className="rounded-lg border bg-background p-3">Roster entries<strong className="mt-1 block text-2xl">{roster.students.length}</strong></p>
+          <p className="rounded-lg border bg-background p-3">Verified releases<strong className="mt-1 block text-2xl">{roster.students.filter(s=>Boolean(s.release)).length}</strong></p>
+          <p className="rounded-lg border bg-background p-3">Release holds<strong className="mt-1 block text-2xl">{roster.students.filter(s=>s.activeHolds.length>0&&!s.release).length}</strong></p>
+          <p className="rounded-lg border bg-background p-3">Present or tardy, not released<strong className="mt-1 block text-2xl">{roster.students.filter(s=>["present","tardy"].includes(s.status)&&!s.release).length}</strong></p>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">An unreleased record does not establish a child is still physically present. Verify current observed facts and custody authority before any action.</p>
+      </section>
       {!roster.canRecordPickupObservations && <p role="status" className="mb-5 rounded border p-3 text-sm">
         Historical school-day record: no new pickup release, denial or dismissal observation can be recorded for this date.
         Return to Operate today to witness a current handoff. Existing custody holds and urgent safety reporting remain separate.
