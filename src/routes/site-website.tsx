@@ -118,8 +118,11 @@ function WebsiteInformationChecklist({ data }: {
               {group.gaps.map(gap => <li key={`${gap.category}:${gap.owner}`}
                 className="flex flex-wrap items-start justify-between gap-2 px-3 py-3 text-sm">
                 <span className="max-w-2xl">{gap.message}</span>
-                <span className="text-xs text-muted-foreground">
-                  Owner: {gap.owner.replace(/_/g, " ")}
+                <span className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+                  <span>Owner: {gap.owner.replace(/_/g, " ")}</span>
+                  <a className="font-semibold underline underline-offset-4" href={gap.destination}>
+                    Open owning workspace
+                  </a>
                 </span>
               </li>)}
             </ul>
