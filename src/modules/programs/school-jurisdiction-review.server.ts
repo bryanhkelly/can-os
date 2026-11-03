@@ -14,6 +14,15 @@ import {
 } from "@/domain/jurisdiction-applicability";
 import { isJurisdictionProfileVerificationEvidenceCurrent } from "@/domain/jurisdiction-profile";
 
+/** Physical Site state is independently confirmed; timezone is never a legal locator. */
+function siteStateCode(address: Record<string, unknown> | null): string | null {
+  if (!address) return null;
+  const raw = address.stateCode ?? address.state ?? address.regionCode;
+  if (typeof raw !== "string") return null;
+  const code = raw.trim().toUpperCase().replace(/^US[-_]/, "");
+  return /^[A-Z]{2}$/.test(code) ? code : null;
+}
+
 /**
  * Authenticated internal review. The result is NOT itself permission to
  * publish legal disclosures. Agent A must apply its separate institutional
@@ -64,6 +73,21 @@ export async function readSchoolJurisdictionReview(
     eq(jurisdictionProfileVersions.jurisdictionId,school.jurisdictionId),
     eq(jurisdictionProfileVersions.status,"published"),
   )).orderBy(desc(jurisdictionProfileVersions.publishedAt)).limit(1);
+  // A jurisdiction assignment alone does not prove the school's physical state.
+  // Missing/unrecognized address or disagreement requires an explicit review,
+  // not a not-applicable decision or a publishable legal disclosure.
+  const assignedState = school.code.toUpperCase().replace(/^US[-_]/, "");
+  const physicalState = siteStateCode(school.address);
+  const locationReviewReason = !physicalState
+    ? "Site physical state is missing or unconfirmed"
+    : physicalState !== assignedState
+      ? "Site physical state disagrees with Program jurisdiction"
+      : null;
+  if (locationReviewReason) return {
+    programId,siteId:school.siteId,revision:version?.revision ?? null,
+    reviewRequired:true,locationReviewReason,
+    decisions:[],candidateDisclosures:[],
+  };
   if (!version) return {programId,siteId:school.siteId,revision:null,
     reviewRequired:true,decisions:[],candidateDisclosures:[]};
   const [decision] = await executor.select({
@@ -88,7 +112,7 @@ export async function readSchoolJurisdictionReview(
   const entity = metadata.jurisdictionResponsibleEntity;
   const responsibleEntity = entity === "school_of_record" || entity === "host_church"
     ? entity : null;
-  const state = school.code.toUpperCase().replace(/^US[-_]/,"");
+  const state = assignedState;
   const delivery = school.deliveryModel;
   const online = Boolean(delivery.liveOnline || delivery.asynchronous);
   const onsite = Boolean(delivery.onsite);
