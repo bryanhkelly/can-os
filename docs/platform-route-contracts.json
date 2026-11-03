@@ -697,6 +697,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/published-site.media.$assetId.ts",
+      "route": "/published-site/media/$assetId",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Public visitor sees only a currently published, rights-reviewed photo belonging to the verified tenant Site, with no account/session, source folder or evidence data exposed",
+      "readBoundary": "GET-only exact UUID path, host/slugs and public Site status checked, Site/document ownership, image MIME and current subject releases independently revalidated on every request",
+      "writeBoundary": "No writes. R2 private object fetched server-side through short-lived signing; never exposes storage key or signed R2 URL"
+    },
+    {
       "file": "src/routes/published-site.ts",
       "route": "/published-site",
       "owner": "operations",
