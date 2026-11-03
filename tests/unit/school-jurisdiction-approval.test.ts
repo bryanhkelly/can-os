@@ -1,6 +1,7 @@
 import {describe,expect,it} from "vitest";
 import {
   hasCurrentIndependentJurisdictionReview,hasCurrentJurisdictionRequirementEvidence,
+  isJurisdictionRequirementRenewalCurrent,isJurisdictionRenewalDocumentCurrent,
   isSiteLocationChangePending,
   openingApprovalPredatesLocationChange,
 } from "@/domain/school-jurisdiction-approval";
@@ -59,6 +60,27 @@ describe("independent school jurisdiction approval",()=>{
     expect(hasCurrentJurisdictionRequirementEvidence({
       ...requirement,metadata:{...requirement.metadata,reviewState:"resolved_by_user"},
     },scoped,now)).toBe(false);
+  });
+  it("expires documentary legal approval across a verified renewal deadline",()=>{
+    const prior={status:"resolved",metadata:{
+      ...stamp,requirementId:"annual-filing",
+      reviewState:"independently_verified_documentation",
+      submittedByPersonId:"church-editor",reviewedByPersonId:"can-reviewer",
+      evidenceDocumentId:"new-legal-evidence",
+      reviewedAt:"2026-10-01T12:00:00Z",
+      renewalDeadline:"2026-10-31",
+    }};
+    const requirement={...stamp,requirementId:"annual-filing"};
+    expect(hasCurrentJurisdictionRequirementEvidence(prior,requirement,
+      new Date("2026-10-20T12:00:00Z"))).toBe(true);
+    expect(isJurisdictionRequirementRenewalCurrent(prior.metadata,now)).toBe(false);
+    expect(hasCurrentJurisdictionRequirementEvidence(prior,requirement,now)).toBe(false);
+    expect(isJurisdictionRenewalDocumentCurrent(
+      new Date("2026-10-15T00:00:00Z"),prior.metadata,now)).toBe(false);
+    expect(isJurisdictionRenewalDocumentCurrent(
+      new Date("2026-11-02T00:00:00Z"),prior.metadata,now)).toBe(true);
+    const renewed={...prior,metadata:{...prior.metadata,reviewedAt:"2026-11-02T12:00:00Z"}};
+    expect(hasCurrentJurisdictionRequirementEvidence(renewed,requirement,now)).toBe(true);
   });
   it("rejects opening evidence issued before an address change",()=>{
     expect(openingApprovalPredatesLocationChange(
