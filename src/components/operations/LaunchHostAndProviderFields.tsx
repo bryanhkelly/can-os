@@ -1,3 +1,4 @@
+import { LaunchSiteAddressEditor } from "@/components/operations/LaunchSiteAddressEditor";
 import type { LaunchJurisdictionResearch as LaunchResearch } from "@/domain/jurisdiction-launch-research";
 import { JurisdictionLaunchResearch } from "@/components/operations/JurisdictionLaunchResearch";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
@@ -14,7 +15,7 @@ export type LaunchSiteAddressDraft = {
   postalCode: string; country: string; county: string;
 };
 
-export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
   jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   jurisdictionResearch: Record<string,LaunchResearch>;
@@ -25,6 +26,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
   newSiteName: string; setNewSiteName: (value: string) => void;
   newSiteSlug: string; setNewSiteSlug: (value: string) => void;
   newSiteTimezone: string; setNewSiteTimezone: (value: string) => void;
+  saveSiteAddress: (address:LaunchSiteAddressDraft,revision:string,reason:string)=>Promise<void>;
   newSiteAddress: LaunchSiteAddressDraft;
   setNewSiteAddress: (value: LaunchSiteAddressDraft) => void;
   duplicateNewSite: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>["sites"][number] | undefined;
@@ -66,6 +68,9 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       ))}
                     </Select>
                   </Field>
+                  {selectedSite && <LaunchSiteAddressEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
+                    initial={selectedSite.address} revision={selectedSite.updatedAt}
+                    busy={busy} save={saveSiteAddress}/>}
                   <div className="rounded-lg border p-3">
                     <p className="text-xs font-semibold">Add a school location</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
