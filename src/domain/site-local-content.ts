@@ -10,6 +10,12 @@ export type SiteLocalTextContent = {
   denomination: string;
   statementOfFaith: string;
   spiritualFormation: string;
+  /** Additional church-owned story prompts; optional for existing revisions. */
+  churchHistory?: string;
+  communityOutreach?: string;
+  schoolVision?: string;
+  leadershipWelcome?: string;
+  localTraditions?: string;
 };
 
 export type SiteLocalTextField = keyof SiteLocalTextContent;
@@ -46,6 +52,11 @@ export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
   denomination: "",
   statementOfFaith: "",
   spiritualFormation: "",
+  churchHistory: "",
+  communityOutreach: "",
+  schoolVision: "",
+  leadershipWelcome: "",
+  localTraditions: "",
   branding: emptySiteLocalBranding,
 });
 
@@ -55,6 +66,11 @@ export const siteLocalContentLimits: Readonly<Record<SiteLocalTextField, number>
   denomination: 120,
   statementOfFaith: 2600,
   spiritualFormation: 1200,
+  churchHistory: 1600,
+  communityOutreach: 1200,
+  schoolVision: 1200,
+  leadershipWelcome: 800,
+  localTraditions: 800,
 };
 
 export type SiteLocalContentDecision =
@@ -84,7 +100,7 @@ const unsafeText = [
   /\b(?:kill|attack|physically harm)\s+(?:all|any)\s+(?:children|students|people|members)\b/i,
 ];
 
-function normalizeText(value: string, field: SiteLocalTextField): string {
+function normalizeText(value: string | undefined, field: SiteLocalTextField): string {
   if (typeof value !== "string") throw new Error("Invalid church website field");
   const normalized = value.replace(/\r\n?/g, "\n").trim();
   if (normalized.length > siteLocalContentLimits[field] ||
@@ -151,7 +167,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
 }): SiteLocalContent {
   const result = {} as SiteLocalContent;
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
-    result[field] = normalizeText(input[field], field);
+    result[field] = normalizeText(input[field] ?? "", field);
   }
   const branding = input.branding ?? emptySiteLocalBranding;
   if (!siteLocalThemes.includes(branding.theme)) throw new Error("Choose an approved website theme");
@@ -182,10 +198,10 @@ export function classifySiteLocalContent(content: SiteLocalContent): SiteLocalCo
   const flaggedFields: SiteLocalTextField[] = [];
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
     const text = content[field];
-    if (unsafeText.some(rule => rule.test(text))) {
+    if (unsafeText.some(rule => rule.test(text ?? ""))) {
       throw new Error("This text cannot be published. Remove unsafe markup or sensitive information.");
     }
-    if (containsProtectedInstitutionalClaim(text)) flaggedFields.push(field);
+    if (containsProtectedInstitutionalClaim(text ?? "")) flaggedFields.push(field);
   }
   return flaggedFields.length ? { status: "review_required", flaggedFields }
     : { status: "published", flaggedFields: [] };
