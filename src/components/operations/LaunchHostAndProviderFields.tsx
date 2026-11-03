@@ -161,7 +161,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       The selected jurisdiction differs from the Site address. Correct the location or jurisdiction before launch, or ask the CAN jurisdiction reviewer to document an authorized exception. A mismatched draft cannot establish legal applicability.
                     </p>}
                   {selectedSite&&!siteJurisdictionId&&
-                    <p className="text-xs text-muted-foreground">This Site has no recognized state in its saved address. Confirm the jurisdiction manually; a timezone is not evidence of a school's legal location.</p>}
+                    <p role="status" className="text-xs text-muted-foreground">No verified US-state jurisdiction can be inferred from this Site address. If the country is missing, confirm it explicitly; international or unsupported territories require independent CAN applicability review. Choosing a Program jurisdiction here is not legal authorization.</p>}
                   {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
                     <JurisdictionLaunchResearch research={jurisdictionResearch[jurisdictionId]}/>
