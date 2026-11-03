@@ -1,6 +1,7 @@
 import { resolve4 } from "node:dns/promises";
 import https from "node:https";
 import { normalizeChurchReferenceUrl } from "@/domain/church-source-references";
+import { boundedChurchBrandEvidence, type ChurchBrandEvidence } from "@/domain/church-brand-suggestions";
 
 /**
  * Bounded public-HTML fetch for voluntary church-website evidence.
@@ -33,6 +34,7 @@ export type WebsitePageEvidence = {
   pageText: string;
   sourceField: "welcome_message" | "church_history" | "church_mission" |
     "leadership_intro" | "ministries";
+  brandEvidence?: ChurchBrandEvidence[];
 };
 
 export function plainHtmlText(html: string) {
@@ -230,6 +232,8 @@ export async function extractChurchPublicWebsite(
       const pageText = plainHtmlText(response.text);
       if (pageText.length >= 45) results.push({
         pageUrl: response.url, pageText, sourceField: candidate.field,
+        ...(candidate.path === parsed.pathname
+          ? { brandEvidence: boundedChurchBrandEvidence(response.text, response.url) } : {}),
       });
     } catch {
       // Per-page failure never manufactures evidence or blocks other pages.
