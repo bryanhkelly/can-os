@@ -1,6 +1,6 @@
 # CAN OS demonstration curriculum factory
 
-Generates **120 original synthetic course entries**, including **15 deeper product walkthroughs** (20 illustrative lessons each) and **105 preview courses** (one lesson each). The content is a demonstration artifact, not a credited or academically reviewed curriculum. Demo academic approval status is intentionally `approved` for every supported jurisdiction in the demo environment; this is simulated internal approval, never a claim of external government approval or accreditation. No external third-party texts are embedded, so importing it does not assert rights over OER.
+Generates **120 original synthetic course entries**, including **15 deeper product walkthroughs** (20 illustrative lessons each) and **105 preview courses** (one lesson each). The content is a demonstration artifact, not a credited or academically reviewed curriculum. Demo jurisdiction review records use `under_review` for the eight explicitly configured demo states. They are synthetic workflow fixtures, not academic approvals, external government authorization, or accreditation. No external third-party texts are embedded, so importing it does not assert rights over OER.
 
 ## Generate
 
@@ -21,14 +21,14 @@ DATABASE_URL="<branch-specific connection string>" \
   --publisher "<can-demo-publisher-uuid>"
 ```
 
-This is a dry run. To load drafts, set `DEMO_CURRICULUM_ALLOW_WRITE=1` and add `--apply`. Never point the command at a live production database without deliberately reviewing the target and publisher. The importer verifies course content with the existing Zod schema and wraps all records in one transaction. Re-runs with identical input are idempotent by SHA-256 digest and course code. Different input creates new draft versions rather than rewriting published versions.
+This is a dry run. To load drafts, set `DEMO_CURRICULUM_ALLOW_WRITE=1`, `DEMO_CURRICULUM_DATABASE_CONFIRMED=neondb`, `DEMO_CURRICULUM_EXPECTED_HOST=<isolated-branch-hostname>`, and `DEMO_CURRICULUM_EXPECTED_BRANCH_ID=<isolated-Neon-branch-ID>`, then add `--apply`. Never point the command at a live production database without deliberately reviewing the target and publisher. The importer verifies course content with the existing Zod schema and wraps all records in one transaction. Re-runs with identical input are idempotent by SHA-256 digest and course code. Different input refreshes importer-owned draft versions while leaving published versions immutable.
 
 **No implicit publication or school adoption.** The importer does not create student records, entitlements, enrollments, teacher answer guides, or assignment submissions.
 
 ## Identified integration gaps
 
 1. **Marketplace visibility:** the pack is deliberately private/draft. The existing store needs a publisher-authorized demo-preview path before ordinary visitors can browse it.
-2. **Jurisdiction approval:** all 120 demo course versions must receive `approved` internal academic status for every jurisdiction supported by CAN OS, using the standard version-and-jurisdiction approval mechanism. On a new jurisdiction being added, demo approval coverage must be reconciled. This approval must not imply external authorization or credit recognition. The current importer does not yet create these approval records.
+2. **Jurisdiction approval:** all 120 demo course versions must receive `under_review` synthetic records for the eight configured demonstration states, using the standard version-and-jurisdiction approval mechanism. On a new jurisdiction being added, demo approval coverage must be reconciled. This approval must not imply external authorization or credit recognition. The current importer does not yet create these approval records.
 3. **Assignments:** generated student activities are not section-specific gradebook assessments. A separate, idempotent publisher-assessment-template-to-section materialization flow remains necessary.
 4. **Teacher guides:** demos currently do not include answer keys; add teacher-only guides via the restricted existing `teacherGuides` field before claiming a complete classroom workflow.
 5. **Source ingestion:** this generator authors new, synthetic demos. Importing third-party OER requires item-level rights, attributions, editions and compatibility review.
