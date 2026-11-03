@@ -46,12 +46,14 @@ export async function ensureSchoolJurisdictionReviewAction(
     if(existing){
       const revisionChanged=existing.metadata.profileRevision!==review.revision;
       const locationChanged=existing.metadata.locationReviewReason!==review.locationReviewReason;
-      if(revisionChanged || locationChanged || existing.status==="resolved" || existing.status==="cancelled"){
+      const scopeChanged=existing.metadata.scopeFingerprint!==review.scopeFingerprint;
+      if(revisionChanged || locationChanged || scopeChanged || existing.status==="resolved" || existing.status==="cancelled"){
         await tx.update(actions).set({
           status:"open",resolvedAt:null,resolutionNote:null,
           metadata:{...existing.metadata,
             profileRevision:review.revision,reviewState:"legal_review_requested",
             locationReviewReason:review.locationReviewReason ?? null,
+            scopeFingerprint:review.scopeFingerprint,
             pendingRequirementIds:review.decisions.filter(item=>
               item.status==="legal_review_required").map(item=>item.id)},
           updatedAt:new Date(),
