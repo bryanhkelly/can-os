@@ -108,13 +108,16 @@ describe("read-only church partner website", () => {
     expect(result.approvedAcademicCount).toBe(1);
     expect(result.previewHtml).toContain("Approved Academy");
     expect(result.previewHtml).toContain("Partner Church");
+    expect(result.previewPages["/"]).toContain("Approved Academy");
+    expect(result.previewPages["/academics"]).toContain("Approved Academy");
+    expect(result.previewPages["/admissions"]).not.toContain("<form");
     expect(result.previewHtml).not.toContain("<form");
     expect(result.previewHtml).not.toContain("studentProfileId");
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
       "approvedAcademicCount", "approvedEnrichmentCount", "canPublish",
       "currentRevision", "editingContent", "host", "localContentStatus",
-      "localHistory", "organizationName", "previewHtml", "siteId", "siteName", "status",
+      "localHistory", "organizationName", "parentInformation", "previewHtml", "previewPages", "siteId", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
   });
