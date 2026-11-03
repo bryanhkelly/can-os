@@ -78,6 +78,7 @@ function eligible(siteId: string, photo: SiteMediaPhoto): boolean {
 function score(slot: SchoolSiteMediaSlot, photo: SiteMediaPhoto, preferredFamily: string | null): number {
   const tags = new Set(photo.tags.map(tag => tag.trim().toLowerCase()));
   const matches = slotTags[slot].filter(tag => tags.has(tag));
+  if (matches.length === 0) return Number.NEGATIVE_INFINITY;
   const ratio = photo.width / photo.height;
   const geometry = slot === "hero" ? ratio >= 1.5 ? 9 : ratio >= 1.2 ? 4 : -6 :
     ratio >= 1.2 && ratio <= 2.25 ? 5 : ratio >= .85 ? 2 : 0;
