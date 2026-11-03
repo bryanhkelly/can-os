@@ -32,6 +32,18 @@ function safeJsonObject(value:Record<string,unknown>):Record<string,SafeJson>{
 
 const uuid = z.string().uuid();
 
+/** Physical location is submitted by the church. It is not jurisdiction verification. */
+const launchSiteAddress = z.object({
+  street1: z.string().trim().min(2).max(200),
+  street2: z.string().trim().max(200).optional(),
+  city: z.string().trim().min(2).max(120),
+  state: z.string().trim().min(2).max(80),
+  postalCode: z.string().trim().min(3).max(24),
+  country: z.string().trim().min(2).max(80).default("US"),
+  county: z.string().trim().max(120).optional(),
+}).strict();
+
+
 const startLaunchInput = z.object({
   name: z.string().trim().min(2).max(200),
   slug: z
@@ -493,7 +505,8 @@ export const createLaunchSite = createServerFn({method:"POST"})
   organizationId:uuid,name:z.string().trim().min(2).max(160),
   slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   timezone:z.string().trim().min(3).max(80),
- }).parse(v))
+  address:launchSiteAddress.optional(),
+ }).strict().parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
@@ -520,12 +533,12 @@ export const createLaunchSite = createServerFn({method:"POST"})
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
     actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
-    siteId:site.id,payload:{name:data.name,timezone:data.timezone},
+    siteId:site.id,payload:{name:data.name,timezone:data.timezone,addressProvided:Boolean(data.address)},
    });
    await writeAudit(tx,actor,{
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
-    after:{name:data.name,timezone:data.timezone}});
+    after:{name:data.name,timezone:data.timezone,address:data.address??null}});
    // PUB-12: create the draft within the same transaction, AFTER the Site
    // creation evidence. Nothing is public, and no publishing grant is issued.
    const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
