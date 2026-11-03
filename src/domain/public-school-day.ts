@@ -7,6 +7,17 @@ type Period = {
   endsAtLocal: string;
   type: string;
 };
+/** Canonical content signature; changes to any displayed period withdraw approval. */
+export function publicSchoolDayScheduleSignature(periods: readonly Period[]): string {
+  return JSON.stringify(periods.map(p=>({
+    dayOfWeek:p.dayOfWeek, startsAtLocal:p.startsAtLocal,
+    endsAtLocal:p.endsAtLocal, type:p.type,
+  })).sort((a,b)=>a.dayOfWeek-b.dayOfWeek ||
+    a.startsAtLocal.localeCompare(b.startsAtLocal) ||
+    a.endsAtLocal.localeCompare(b.endsAtLocal) ||
+    a.type.localeCompare(b.type)));
+}
+
 type Schedule = {
   schoolYearStatus: string;
   templateActive: boolean;
@@ -18,7 +29,7 @@ type Schedule = {
   effectiveFrom: string;
   effectiveThrough: string | null;
   /** Institution's explicit review, not a website editor checkbox. */
-  approval: { status: "approved"; revision: number; reviewedByPersonId: string; reviewedAt: string } | null;
+  approval: { status: "approved"; revision: number; reviewedByPersonId: string; reviewedAt: string; signature: string } | null;
   periods: Period[];
 };
 export type PublicSchoolDayProjection = PublicSchoolDay & { state: "pending" | "approved"; timezone: string | null };
@@ -47,6 +58,7 @@ export function projectPublicSchoolDay(
     Boolean(schedule.approval.reviewedByPersonId) &&
     Number.isSafeInteger(schedule.approval.revision) &&
     schedule.approval.revision > 0 &&
+    schedule.approval.signature === publicSchoolDayScheduleSignature(schedule.periods) &&
     Number.isFinite(Date.parse(schedule.approval.reviewedAt)) &&
     Date.parse(schedule.approval.reviewedAt) <= now.getTime(),
   );
