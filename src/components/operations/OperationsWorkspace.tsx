@@ -157,7 +157,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
      <select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="mt-2 block min-h-11 w-full rounded-lg border bg-background px-3 py-2">
       <option value="">All authorized programs</option>
       {data.programs.filter(program=>!selected.siteId||program.siteId===selected.siteId)
-       .map(program=><option key={program.id} value={program.id}>{program.name}</option>)
+       .map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
      </select>
     </label>
    </div>
