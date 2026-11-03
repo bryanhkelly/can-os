@@ -4,15 +4,6 @@
   "generatedFromBranch": "main",
   "routes": [
     {
-      "file": "src/routes/schools.new.tsx",
-      "route": "/schools/new",
-      "owner": "identity",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/__root.tsx",
       "route": "<root>",
       "owner": "shell",
@@ -526,15 +517,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/operations.teacher-marketplace.tsx",
-      "route": "/operations/teacher-marketplace",
-      "owner": "staffing",
-      "verification": "pending",
-      "roleJourney": "school registrar chooses an eligible onboarded provider teacher and engages the teacher across compatible adopted-course classes or one selected class",
-      "writeBoundary": "engagement revalidates adoption, teaching eligibility, open capacity demand, offering, seat capacity and cross-school schedule availability, then commits reservations and canonical assignments in one transaction",
-      "readBoundary": "getTeacherMarketplace (authorized school, adopted curriculum, provider offering, published teaching eligibility, instructional capacity and schedule compatibility)"
-    },
-    {
       "file": "src/routes/operations.curriculum-marketplace.tsx",
       "route": "/operations/curriculum-marketplace",
       "owner": "learning",
@@ -643,6 +625,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.teacher-marketplace.tsx",
+      "route": "/operations/teacher-marketplace",
+      "owner": "staffing",
+      "verification": "pending",
+      "roleJourney": "school registrar chooses an eligible onboarded provider teacher and engages the teacher across compatible adopted-course classes or one selected class",
+      "writeBoundary": "engagement revalidates adoption, teaching eligibility, open capacity demand, offering, seat capacity and cross-school schedule availability, then commits reservations and canonical assignments in one transaction",
+      "readBoundary": "getTeacherMarketplace (authorized school, adopted curriculum, provider offering, published teaching eligibility, instructional capacity and schedule compatibility)"
+    },
+    {
       "file": "src/routes/operations.transfer-records.tsx",
       "route": "/operations/transfer-records",
       "owner": "enrollment",
@@ -677,6 +668,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/published-site.$page.ts",
+      "route": "/published-site/$page",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Anonymous family views only allowlisted published tenant pages on verified Site host; draft previews remain authenticated",
+      "readBoundary": "Tenant-host and publication revalidated; existing public-safe catalog only, never workspace session or household data",
+      "writeBoundary": "GET-only server render; inquiry and application POST continue on their separate secured endpoints"
     },
     {
       "file": "src/routes/published-site.family-start.ts",
@@ -718,6 +718,15 @@
       "file": "src/routes/safeguarding.tsx",
       "route": "/safeguarding",
       "owner": "safeguarding",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/schools.new.tsx",
+      "route": "/schools/new",
+      "owner": "identity",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
