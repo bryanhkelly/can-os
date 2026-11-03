@@ -425,7 +425,7 @@ export async function readLocalSchoolOpeningStatus(actor:AccessContext,programId
   }
   if(!configuration)
     return {programId,schoolSiteId:school.siteId,status:"unconfigured" as const,
-      blocked:true,blockers:["opening_evidence","operating_agreement","site_director"],
+      blocked:true,blockers:["jurisdiction","opening_evidence","operating_agreement","site_director"],
       approvedAt:null};
   const now=new Date();
   const blockers:string[]=[];
