@@ -1,3 +1,4 @@
+import { type PublicSitePath } from "./public-site-paths";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import { normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
@@ -22,9 +23,6 @@ function money(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
     .format(cents / 100);
 }
-
-export const publicSitePagePaths = ["/", "/about", "/academics", "/student-life", "/school-day", "/admissions", "/contact"] as const;
-export type PublicSitePath = typeof publicSitePagePaths[number];
 
 /** Navigation is derived from available approved facts; missing sections are never linked. */
 export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[] {
