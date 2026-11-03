@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { EvidenceUploadSection } from "@/components/evidence";
 import {
   getSchoolJurisdictionReview,
   requestSchoolJurisdictionLegalReview,
   getSchoolJurisdictionRequirementActions,
   submitSchoolLegalRequirementEvidence,
+  beginSchoolJurisdictionDocumentUploadFn,
+  finishSchoolJurisdictionDocumentUploadFn,
 } from "@/modules/programs/school-jurisdiction-review.functions";
 
 type Review = Awaited<ReturnType<typeof getSchoolJurisdictionReview>>;
 type Worklist=Awaited<ReturnType<typeof getSchoolJurisdictionRequirementActions>>;
+type LegalEvidenceUpload={
+  actionId:string;expiresAt:string;fileName:string;
+  mimeType:"application/pdf"|"image/jpeg"|"image/png";size:number;
+};
 
 export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
   const [review,setReview] = useState<Review | null>(null);
@@ -122,6 +129,22 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
           </Button>}
         </li>)}</ul>
         {selectedAction&&<div className="mt-3 space-y-2 rounded-lg border p-3">
+          <EvidenceUploadSection<LegalEvidenceUpload>
+            heading="Upload an actual legal filing or requirement document to private Program storage"
+            adapter={{
+              begin:async input=>beginSchoolJurisdictionDocumentUploadFn({data:input}),
+              finish:async input=>finishSchoolJurisdictionDocumentUploadFn({data:input}),
+            }}
+            makeInput={(file,expiresAt)=>({
+              actionId:selectedAction,expiresAt,fileName:file.name,
+              mimeType:file.type as LegalEvidenceUpload["mimeType"],size:file.size,
+            })}
+            onUploaded={async()=>{
+              setWork(await getSchoolJurisdictionRequirementActions({data:{programId}}));
+              setMessage("Document uploaded to private Program storage. Select it below and submit the legal requirement for independent CAN review.");
+            }}
+            submitLabel="Upload legal evidence"
+          />
           <label className="block text-sm font-medium" htmlFor="legal-doc-selection">Select previously uploaded, verified-storage Program evidence</label>
           <select id="legal-doc-selection" value={selectedDocument}
             onChange={event=>setSelectedDocument(event.target.value)}
@@ -131,7 +154,7 @@ export function SchoolJurisdictionReviewPanel({programId}:{programId:string}) {
               {document.fileName}
             </option>)}
           </select>
-          {work.evidenceDocuments.length===0&&<p className="text-xs text-muted-foreground">No eligible documents uploaded by your account were found. Upload the correctly scoped Program evidence through the existing Documents workflow first.</p>}
+          {work.evidenceDocuments.length===0&&<p className="text-xs text-muted-foreground">No eligible documents are available. Upload the correctly scoped file above, then select it for independent CAN review.</p>}
           <label className="block text-sm font-medium" htmlFor="legal-evidence-statement">Evidence statement</label>
           <textarea id="legal-evidence-statement" rows={3} value={evidenceStatement}
             onChange={event=>setEvidenceStatement(event.target.value)}
