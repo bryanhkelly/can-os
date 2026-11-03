@@ -30,8 +30,8 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   options: {
     now?: Date;
     openingApprovedAt?: Date | null;
-    configurationCreatedAt?: Date | null;
-  } = {},
+    configurationCreatedAt: Date | null;
+  },
 ) {
   const now=options.now??new Date();
   const [school]=await executor.select({
@@ -141,9 +141,10 @@ export async function requireCurrentSchoolJurisdictionForOpening(
     ? locationChange.metadata.siteAddressRevision : null;
   // Fresh opening/safety approval must follow the address change; a legal review
   // alone cannot reauthorize an old school configuration or old facilities proof.
-  if(physicalRevision && (openingApprovalPredatesLocationChange(
-    options.openingApprovedAt??null,physicalRevision) ||
-    openingApprovalPredatesLocationChange(options.configurationCreatedAt??null,physicalRevision)))
+  if(physicalRevision && (
+    openingApprovalPredatesLocationChange(options.configurationCreatedAt,physicalRevision) ||
+    (options.openingApprovedAt!==undefined && openingApprovalPredatesLocationChange(
+      options.openingApprovedAt,physicalRevision))))
     throw new AuthorizationError("new opening configuration and evidence after Site relocation");
   return {siteId:school.siteId,programId,
     jurisdictionProfileVersionId:policy.id,scopeFingerprint:fingerprint,
