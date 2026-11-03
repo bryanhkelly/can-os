@@ -61,6 +61,22 @@ integration("school jurisdiction material-change lifecycle (rollback only)",()=>
         metadata:{jurisdictionOperatingModel:"church-hosted",
           jurisdictionResponsibleEntity:"school_of_record"},
       }))).returning();
+      const [gradeScale]=await tx.insert(s.gradeScales).values({
+        owningOrganizationId:church!.id,name:"Synthetic jurisdiction scale",
+        version:1,active:true,
+        configuration:{entries:[{label:"Pass",minPercent:0,maxPercent:100,passing:true}]},
+      }).returning();
+      const schoolYear=now.getUTCMonth()<6
+        ?now.getUTCFullYear()-1:now.getUTCFullYear();
+      const years=await tx.insert(s.schoolYears).values(two.map(program=>({
+        organizationId:church!.id,programId:program.id,siteId:site!.id,
+        key:schoolYear+"-"+(schoolYear+1),
+        name:"Synthetic school year "+schoolYear,
+        startsOn:schoolYear+"-08-01",endsOn:(schoolYear+1)+"-06-30",
+        timezone:"America/Los_Angeles",status:"active" as const,
+        gradeScaleId:gradeScale!.id,
+      }))).returning();
+      expect(years).toHaveLength(2);
       const [registrarPerson,reviewerPerson,editorPerson,documentVerifier]
         =await tx.insert(s.people).values(["registrar","CAN reviewer","editor","document verifier"].map(name=>({
           legalFirstName:"Synthetic",legalLastName:name,
