@@ -350,7 +350,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="robots" content="${isLive ? "index,follow" : "noindex,nofollow"}"/>
+<meta name="robots" content="${isLive && !demo ? "index,follow" : "noindex,nofollow"}"/>
 ${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
 <title>${pageTitle}</title>
 <meta name="description" content="${pageDescription}"/>
