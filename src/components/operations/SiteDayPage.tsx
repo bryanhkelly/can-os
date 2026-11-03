@@ -169,16 +169,16 @@ export function SiteDayPage() {
         onClick={()=>{const target=addCalendarDays(context.date,1);
           setPreparing(true);setDate(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</Button>}
       {!preparing&&<><Button asChild variant="ghost" size="sm" className="underline">
-          <a href="#attendance">Record attendance</a>
+          <a href="#supervision">1. Staff coverage</a>
         </Button>
         <Button asChild variant="ghost" size="sm" className="underline">
-          <a href="#supervision">Staff duties and arrival</a>
+          <a href="#attendance">2. Record attendance</a>
         </Button>
         <Button asChild variant="ghost" size="sm" className="underline">
-          <a href="#pickup">Student pickup</a>
+          <a href="#pickup">3. Verified pickup</a>
         </Button>
         <Button asChild variant="ghost" size="sm" className="underline">
-          <a href="#day-review">Reconcile the day</a>
+          <a href="#day-review">4. Reconcile the day</a>
         </Button></>}
     </nav>}
     {preparing&&<p role="status" className="mt-4 rounded border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
@@ -196,6 +196,33 @@ export function SiteDayPage() {
     {error && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
     {loading && !error && <p role="status" className="mt-5 text-sm">Loading scheduled roster…</p>}
     {preparing&&preparation&&<SchoolDayPreparationPanel preparation={preparation} onChanged={()=>void load(date,true)}/>}
+    {roster && !preparing && <section aria-label="Today's operational steps" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+      <h2 className="font-serif text-2xl font-semibold">Run today's school day</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Work through the current school day in order. These are navigation steps, not proof that opening, supervision, attendance, or custody requirements are satisfied.</p>
+      <ol className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <li><a href="#supervision" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-primary">1 · Coverage</span>
+          <span className="mt-1 block font-semibold">Confirm staff and supervision</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Review scheduled duties and actual presence</span>
+        </a></li>
+        <li><a href="#attendance" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-primary">2 · Arrival</span>
+          <span className="mt-1 block font-semibold">Record observed attendance</span>
+          <span className="mt-1 block text-xs text-muted-foreground">{roster.students.filter(student=>["unmarked","expected"].includes(student.status)).length} student-program roster entries need a mark</span>
+        </a></li>
+        <li><a href="#pickup" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-primary">3 · Dismissal</span>
+          <span className="mt-1 block font-semibold">Verify student pickup</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Use independent custody and release verification</span>
+        </a></li>
+        <li><a href="#day-review" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-primary">4 · Closeout</span>
+          <span className="mt-1 block font-semibold">Review unresolved records</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Reconcile attendance and linked custody evidence</span>
+        </a></li>
+      </ol>
+    </section>}
+    {context && date && !preparing && <OnsiteSupervisionPanel date={date} onChanged={() => setSchoolDayRevision(revision => revision + 1)} />}
     {roster && !preparing && <>
       <p className="mt-3 text-xs text-muted-foreground">
         These are expected student-program attendance entries, not a deduplicated headcount or proof
@@ -258,6 +285,5 @@ export function SiteDayPage() {
     </>}
     {roster && !preparing && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
     {roster && !preparing && <div id="day-review"><OnsiteDayReconciliationPanel date={date} roster={roster} refreshRevision={schoolDayRevision} /></div>}
-    {context && date && !preparing && <OnsiteSupervisionPanel date={date} onChanged={() => setSchoolDayRevision(revision => revision + 1)} />}
   </WorkspaceShell>;
 }
