@@ -43,6 +43,7 @@ describe("canonical church Site configuration input",()=>{
     expect(launchGradeRangeIsOrdered({min:"TK",max:"12"})).toBe(true);
     expect(launchGradeRangeIsOrdered({min:"12",max:"K"})).toBe(false);
     expect(launchGradeRangeIsOrdered({min:"9",max:"12"})).toBe(true);
+    expect(launchGradeRangeIsOrdered({min:"unknown",max:"12"})).toBe(false);
   });
   it("replays identical configuration updates regardless of JSONB field order",()=>{
     expect(samePhysicalSiteAddress(
