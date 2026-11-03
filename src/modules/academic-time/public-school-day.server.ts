@@ -17,12 +17,13 @@ export async function readApprovedPublicSchoolDay(
     timezone: sites.timezone, siteId: sites.id, siteOrganizationId: sites.organizationId,
     programId: programs.id, programSiteId: programs.siteId,
     programOrganizationId: programs.organizationId, programStatus: programs.status,
+    gradeRange: programs.gradeRange, programType: programs.type,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
     .where(and(eq(sites.id, siteId), eq(programs.id, programId))).limit(1);
   if (!scope || scope.programSiteId !== siteId ||
     scope.siteOrganizationId !== scope.programOrganizationId ||
     !["ready", "active"].includes(scope.programStatus)) {
-    return projectPublicSchoolDay([], "UTC", now);
+    return {...projectPublicSchoolDay([], "UTC", now), programScope:null};
   }
   const templates = await executor.select({
     id: scheduleTemplates.id, active: scheduleTemplates.active,
@@ -52,7 +53,7 @@ export async function readApprovedPublicSchoolDay(
     type: scheduleTemplatePeriods.type,
   }).from(scheduleTemplatePeriods)
     .where(inArray(scheduleTemplatePeriods.scheduleTemplateId, ids)).limit(3000) : [];
-  return projectPublicSchoolDay(templates.map(row => {
+  const projection = projectPublicSchoolDay(templates.map(row => {
     const approval = row.metadata.publicScheduleApproval;
     const verified = approval && typeof approval === "object" &&
       "status" in approval && approval.status === "approved" &&
@@ -73,4 +74,12 @@ export async function readApprovedPublicSchoolDay(
       approval: verified, periods: periods.filter(item => item.scheduleTemplateId === row.id),
     };
   }), scope.timezone, now);
+  return {
+    ...projection,
+    // Program attribution and grade span are NOT independently approved
+    // marketing claims. Agent A must still check the institutional Program gate.
+    programScope:projection.weeklyPatternState === "approved"
+      ? {siteId,programId,gradeRange:scope.gradeRange,programType:scope.programType}
+      : null,
+  };
 }
