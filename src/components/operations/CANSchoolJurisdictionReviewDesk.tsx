@@ -1,15 +1,19 @@
 import {useEffect,useState} from "react";
 import {Button} from "@/components/ui/button";
+import {EvidenceDocumentSummary} from "@/components/evidence";
 import {
   listCANSchoolJurisdictionReviewQueue,
   getSchoolJurisdictionReview,
   reviewSchoolJurisdictionLegally,
   reviewSchoolLegalRequirementEvidence,
+  getSchoolJurisdictionEvidenceForCAN,
+  getSchoolJurisdictionEvidenceDownloadForCAN,
 } from "@/modules/programs/school-jurisdiction-review.functions";
 
 type Queue=Awaited<ReturnType<typeof listCANSchoolJurisdictionReviewQueue>>;
 type Item=Queue["items"][number];
 type Review=Awaited<ReturnType<typeof getSchoolJurisdictionReview>>;
+type Evidence=Awaited<ReturnType<typeof getSchoolJurisdictionEvidenceForCAN>>;
 
 /**
  * CAN-only reviewer component for Integration I to embed in the established
@@ -21,6 +25,7 @@ export function CANSchoolJurisdictionReviewDesk(){
   const [truncated,setTruncated]=useState(false);
   const [selected,setSelected]=useState<Item|null>(null);
   const [review,setReview]=useState<Review|null>(null);
+  const [evidence,setEvidence]=useState<Evidence|null>(null);
   const [sourceUrls,setSourceUrls]=useState<string[]>([]);
   const [note,setNote]=useState("");
   const [loading,setLoading]=useState(true);
@@ -42,13 +47,19 @@ export function CANSchoolJurisdictionReviewDesk(){
     return ()=>{active=false;};
   },[]);
   useEffect(()=>{
-    if(!selected||selected.type!=="school_jurisdiction_legal_review"){
-      setReview(null);setSourceUrls([]);return;
-    }
+    if(!selected){setReview(null);setEvidence(null);setSourceUrls([]);return;}
     let active=true;
-    void getSchoolJurisdictionReview({data:{programId:selected.programId}})
-      .then(result=>{if(active){setReview(result);setSourceUrls([]);}})
-      .catch(()=>{if(active)setError("Current school policy could not be read; no decision recorded.");});
+    if(selected.type==="school_jurisdiction_legal_review"){
+      setEvidence(null);
+      void getSchoolJurisdictionReview({data:{programId:selected.programId}})
+        .then(result=>{if(active){setReview(result);setSourceUrls([]);}})
+        .catch(()=>{if(active)setError("Current school policy could not be read; no decision recorded.");});
+    }else{
+      setReview(null);setSourceUrls([]);
+      void getSchoolJurisdictionEvidenceForCAN({data:{actionId:selected.id}})
+        .then(result=>{if(active)setEvidence(result);})
+        .catch(()=>{if(active)setError("Current scoped Program document could not be loaded; no approval recorded.");});
+    }
     return ()=>{active=false;};
   },[selected]);
 
@@ -72,7 +83,7 @@ export function CANSchoolJurisdictionReviewDesk(){
       setMessage(decision==="verify"
         ?"Independent decision recorded. Site opening, family admissions and funding approvals remain separate."
         :"Correction request recorded in the canonical school Action.");
-      setSelected(null);setNote("");setReview(null);setSourceUrls([]);
+      setSelected(null);setNote("");setReview(null);setEvidence(null);setSourceUrls([]);
       await reload();
     }catch(e){
       setError(e instanceof Error?e.message:
@@ -114,10 +125,23 @@ export function CANSchoolJurisdictionReviewDesk(){
           </label>)}
         </div>
       </>}
-      {selected.type==="school_jurisdiction_requirement"&&<p className="text-sm text-muted-foreground">
-        Inspect the Program's existing scoped, independently verified document before deciding.
-        A note alone does not satisfy a legal requirement; the server rechecks the actual Document.
-      </p>}
+      {selected.type==="school_jurisdiction_requirement"&&<>
+        <p className="text-sm text-muted-foreground">
+          Inspect the actual private Program document before deciding. The server independently checks the current evidence version and reviewer identity; a note alone cannot satisfy the obligation.
+        </p>
+        {evidence?.evidence&&<EvidenceDocumentSummary
+          fileName={evidence.evidence.fileName} version={evidence.evidence.version}
+          submittedAt={evidence.evidence.submittedAt}
+          expiresAt={evidence.evidence.expiresAt}
+          onGetDownloadUrl={async()=>{
+            const link=await getSchoolJurisdictionEvidenceDownloadForCAN({data:{
+              actionId:selected.id,documentId:evidence.evidence!.id,
+            }});
+            return link.downloadUrl;
+          }}/>}
+        {evidence&&!evidence.evidence&&<p role="alert" className="text-sm">No submitted, current, private legal evidence is available for this Action. Request corrections or have the responsible party submit documentation.</p>}
+        {evidence&&!evidence.scopeCurrent&&<p role="alert" className="text-sm">This evidence cannot be approved for the current policy and school configuration until its legal scope is renewed.</p>}
+      </>}
       <label className="block text-sm font-medium" htmlFor="can-jurisdiction-note">Independent decision rationale</label>
       <textarea id="can-jurisdiction-note" value={note} rows={4}
         onChange={event=>setNote(event.target.value)}
@@ -126,7 +150,10 @@ export function CANSchoolJurisdictionReviewDesk(){
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={submitting||note.trim().length<25||
           (selected.type==="school_jurisdiction_legal_review"&&
-            (!review?.policyReady||sourceUrls.length===0))}
+            (!review?.policyReady||sourceUrls.length===0)) ||
+          (selected.type==="school_jurisdiction_requirement"&&
+            (!evidence?.scopeCurrent||!evidence.evidence||
+              evidence.evidence.reviewStatus==="rejected"))}
           onClick={()=>void decide("verify")}>Verify documented scope</Button>
         <Button type="button" variant="outline" disabled={submitting||note.trim().length<25}
           onClick={()=>void decide("request_changes")}>Request corrections</Button>

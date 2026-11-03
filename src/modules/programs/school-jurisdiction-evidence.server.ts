@@ -39,8 +39,10 @@ function requireSubmittedDocument(document:typeof documents.$inferSelect | undef
   if(!document || document.category!=="jurisdiction_requirement_evidence" ||
     document.subjectType!=="program"||document.subjectId!==programId ||
     document.metadata.siteId!==siteId||document.metadata.organizationId!==organizationId||
+    document.metadata.isCurrent!==true ||
     document.storageProvider!=="cloudflare_r2" ||
     document.metadata.storageVerified!==true ||
+    document.metadata.reviewStatus==="rejected" ||
     (document.expiresAt && document.expiresAt<=now) ||
     !isJurisdictionRenewalDocumentCurrent(document.createdAt,requirementMetadata,now))
     throw new AuthorizationError("current scoped verified-storage Program evidence document");
@@ -105,8 +107,12 @@ export async function submitSchoolJurisdictionRequirementEvidence(
     requireSubmittedDocument(document,program.id,site.id,program.organizationId,now,
       action.metadata);
     await requireDocumentAfterPhysicalSiteChange(tx,site,document);
-    if(!document || document.uploadedByPersonId!==actor.actorPersonId)
-      throw new AuthorizationError("evidence uploaded by the authorized submitter");
+    if(!document || document.uploadedByPersonId!==actor.actorPersonId ||
+      document.metadata.actionId!==action.id ||
+      document.metadata.requirementId!==action.metadata.requirementId ||
+      document.metadata.scopeFingerprint!==review.scopeFingerprint ||
+      document.metadata.policyVersionId!==review.policyVersionId)
+      throw new AuthorizationError("current action-scoped evidence uploaded by the authorized submitter");
     const prior=[...action.evidence].reverse().find(entry=>
       entry.kind==="school_jurisdiction_requirement_submission");
     if(action.status==="waiting"&&
@@ -169,11 +175,36 @@ export async function decideSchoolJurisdictionRequirementEvidence(
       action.metadata);
     await requireDocumentAfterPhysicalSiteChange(tx,site,document);
     const scope={organizationId:program.organizationId,siteId:site.id,programId:program.id};
+    if(!document || document.metadata.actionId!==action.id ||
+      document.metadata.requirementId!==action.metadata.requirementId ||
+      document.metadata.scopeFingerprint!==review.scopeFingerprint ||
+      document.metadata.policyVersionId!==review.policyVersionId ||
+      document.metadata.isCurrent!==true)
+      throw new AuthorizationError("document attested for this exact legal requirement and Site revision");
     if(input.decision==="verify"){
-      if(!document || !document.verifiedAt||document.verifiedAt>now ||
-        !document.verifiedByPersonId||
-        document.uploadedByPersonId===document.verifiedByPersonId)
-        throw new AuthorizationError("independently verified current evidence document");
+      if(document.uploadedByPersonId===actor.actorPersonId ||
+        (document.verifiedByPersonId &&
+          document.uploadedByPersonId===document.verifiedByPersonId) ||
+        (document.verifiedAt && document.verifiedAt>now))
+        throw new AuthorizationError("independent document reviewer distinct from uploader");
+      if(!document.verifiedAt){
+        if(document.metadata.reviewStatus!=="pending")
+          throw new AuthorizationError("only current pending evidence may be independently verified");
+        await tx.update(documents).set({
+          verifiedAt:now,verifiedByPersonId:actor.actorPersonId,
+          metadata:{...document.metadata,reviewStatus:"approved",
+            reviewNote:input.note,reviewedAt:now.toISOString(),
+            reviewedByPersonId:actor.actorPersonId},
+          updatedAt:now,
+        }).where(eq(documents.id,document.id));
+        await writeAudit(tx,actor,{
+          action:"program.jurisdiction.document.independently_verified",
+          entityType:"document",entityId:document.id,scope,
+          before:{reviewStatus:"pending"},
+          after:{actionId:action.id,reviewStatus:"approved",
+            reviewerPersonId:actor.actorPersonId},
+        });
+      }
       if(action.status==="resolved" &&
         action.metadata.reviewState==="independently_verified_documentation")
         return {actionId:action.id,verified:true,duplicate:true};
@@ -204,6 +235,19 @@ export async function decideSchoolJurisdictionRequirementEvidence(
           documentId:document.id,reviewerPersonId:actor.actorPersonId},
       });
       return {actionId:action.id,verified:true,duplicate:false};
+    }
+    if(document.metadata.reviewStatus==="pending"){
+      await tx.update(documents).set({
+        metadata:{...document.metadata,reviewStatus:"rejected",
+          reviewNote:input.note,reviewedAt:now.toISOString(),
+          reviewedByPersonId:actor.actorPersonId},
+        updatedAt:now,
+      }).where(eq(documents.id,document.id));
+      await writeAudit(tx,actor,{
+        action:"program.jurisdiction.document.corrections_requested",
+        entityType:"document",entityId:document.id,scope,
+        after:{actionId:action.id,reviewStatus:"rejected"},
+      });
     }
     await tx.update(actions).set({
       status:"open",resolvedAt:null,resolutionNote:null,

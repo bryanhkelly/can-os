@@ -162,7 +162,7 @@ export async function requireCurrentSchoolJurisdictionForOpening(
       ? actionRevision:auditRevision)
     : actionRevision??auditRevision;
   const requirementActions=await executor.select({
-    status:actions.status,metadata:actions.metadata,
+    id:actions.id,status:actions.status,metadata:actions.metadata,
   }).from(actions).where(and(
     eq(actions.type,"school_jurisdiction_requirement"),
     eq(actions.subjectType,"program"),eq(actions.subjectId,programId),
@@ -189,6 +189,14 @@ export async function requireCurrentSchoolJurisdictionForOpening(
       evidence.subjectType!=="program" ||
       evidence.subjectId!==programId ||
       evidence.metadata.siteId!==school.siteId ||
+      evidence.metadata.actionId!==action?.id ||
+      evidence.metadata.requirementId!==duty.id ||
+      evidence.metadata.scopeFingerprint!==fingerprint ||
+      evidence.metadata.policyVersionId!==policy.id ||
+      evidence.metadata.isCurrent!==true ||
+      evidence.metadata.reviewStatus!=="approved" ||
+      !/^school-jurisdiction\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i.test(evidence.storageKey) ||
+      !evidence.storageKey.startsWith("school-jurisdiction/"+programId+"/"+action?.id+"/") ||
       evidence.metadata.organizationId!==school.organizationId ||
       evidence.metadata.storageVerified!==true ||
       evidence.storageProvider!=="cloudflare_r2" ||

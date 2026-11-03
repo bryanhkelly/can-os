@@ -8,10 +8,8 @@ import {hasRegistrarAuthority} from "@/domain/school-roles";
 import {matchesEnrollmentDocumentSignature} from "@/domain/enrollment-document-signature";
 import {validateDocumentUpload} from "@/modules/enrollment/r2-documents.server";
 import {createPrivateUpload,verifyPrivateObject} from "@/platform/storage/r2";
-import {emitEvent,writeAudit} from "@/platform/mutation";
-import {EventTypes} from "@/domain/event-types";
+import {writeAudit} from "@/platform/mutation";
 import {readSchoolJurisdictionReview} from "./school-jurisdiction-review.server";
-import {isJurisdictionRenewalDocumentCurrent} from "@/domain/school-jurisdiction-approval";
 
 export const jurisdictionDocumentKeyPattern=
   /^school-jurisdiction\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i;
@@ -47,7 +45,7 @@ async function currentAction(
   if(!actor.actorPersonId || actor.sessionAccountId)
     throw new AuthorizationError("verified legal evidence submitter");
   if(record.action.metadata.responsibleParty==="church"){
-    if(!hasRegistrarAuthority(actor.role)||actor.grantSiteId!==record.siteId||
+    if(!hasRegistrarAuthority(actor.role)||
       !actor.scope.organizationIds?.includes(record.organizationId)||
       !actor.scope.siteIds?.includes(record.siteId)||
       !actor.scope.programIds?.includes(record.programId))
@@ -134,8 +132,6 @@ export async function finishSchoolJurisdictionDocumentUpload(
     const version=forAction.reduce((max,doc)=>Math.max(max,
       typeof doc.metadata.version==="number"?doc.metadata.version:1),0)+1;
     const now=new Date();
-    if(!isJurisdictionRenewalDocumentCurrent(now,current.action.metadata,now))
-      throw new Error("Renewal deadline requires current evidence");
     for(const document of forAction){
       if(document.metadata.isCurrent===false)continue;
       await tx.update(documents).set({
@@ -167,12 +163,6 @@ export async function finishSchoolJurisdictionDocumentUpload(
       entityType:"document",entityId:created.id,scope,
       after:{actionId:input.actionId,requirementId:current.action.metadata.requirementId,
         version,scopeFingerprint:current.review.scopeFingerprint},
-    });
-    await emitEvent(tx,{
-      eventType:EventTypes.ActionCreated,aggregateType:"document",
-      aggregateId:created.id,actorPersonId:actor.actorPersonId,
-      ...scope,payload:{kind:"jurisdiction_requirement_document_uploaded",
-        actionId:input.actionId,version},
     });
     return {documentId:created.id,created:true};
   });
