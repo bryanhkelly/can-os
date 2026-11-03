@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
   ],
 }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: { rooms: state.rooms, classes: [
+  useQuery: () => ({ data: { canManage: true, rooms: state.rooms, classes: [
     { id: "class", title: "Science", code: "SCI", roomId: "retired-room" },
   ] }, isPending: false, error: null, refetch: vi.fn() }),
 }));
@@ -30,7 +30,7 @@ describe("classroom lifecycle setup", () => {
     expect(html).toContain("Historical records are retained");
     expect(html).toContain("Old classroom (retired - replace or clear)");
     expect(html).toMatch(/<option value="retired-room" disabled="" selected=""/);
-    expect(html).toContain('<option value="active-room">Library');
+    expect(html).toContain('<option value="active-room">Library · capacity 18');
     expect(html).not.toContain("Edit or retire Old classroom");
     expect(html).toContain("Select an active room or clear the default");
   });
