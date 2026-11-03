@@ -45,7 +45,7 @@ export async function ensureSchoolJurisdictionReviewAction(
       )).limit(1);
     if(existing){
       const revisionChanged=existing.metadata.profileRevision!==review.revision;
-      if(revisionChanged || existing.status==="done" || existing.status==="cancelled"){
+      if(revisionChanged || existing.status==="resolved" || existing.status==="cancelled"){
         await tx.update(actions).set({
           status:"open",resolvedAt:null,resolutionNote:null,
           metadata:{...existing.metadata,
