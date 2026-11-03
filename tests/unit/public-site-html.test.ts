@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { escapePublicHtml, isIndexablePublicSite, renderPublicSiteHtml, availablePublicSitePaths, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
+import { emptySiteLocalContent } from "@/domain/site-local-content";
 
 describe("standalone public site HTML", () => {
   it("escapes all publisher-controlled text and contains no client script or private links", () => {
@@ -93,7 +94,7 @@ describe("standalone public site HTML", () => {
 
   it("automatically uses original CAN artwork only when a school has no approved photo",()=>{
     const page={host:"example.can-os.com",site:{name:"School",organizationName:"Church"},offerings:[],
-      localContent:{welcomeMessage:"Welcome",localDescription:"Our community",
+      localContent:{...emptySiteLocalContent,welcomeMessage:"Welcome",localDescription:"Our community",
         churchHistory:"Our story",schoolVision:"Our purpose",
         branding:{theme:"classic" as const,paletteId:"forest" as const,
           typographyId:"editorial" as const,heroImage:null}}};
@@ -112,7 +113,7 @@ describe("standalone public site HTML", () => {
         summary:"A reviewed program",grades:{min:"K",max:"5"},
         delivery:{onsite:true,liveOnline:false,asynchronous:true,onsiteDaysPerWeek:2},
         availability:"planned" as const}],
-      localContent:{welcomeMessage:"Welcome",localDescription:"Our story",
+      localContent:{...emptySiteLocalContent,welcomeMessage:"Welcome",localDescription:"Our story",
         churchHistory:"An authentic story",branding:{theme:"classic" as const,heroImage:null}}};
     const profile=projectApprovedParentInformation({site:base.site,
       academicPrograms:base.academicPrograms,offerings:[],localContent:base.localContent,
