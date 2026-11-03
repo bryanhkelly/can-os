@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'src/domain/public-site-html.ts'
+      - 'src/domain/site-theme.ts'
       - 'src/domain/public-site-host-routing.ts'
       - 'src/domain/public-site-paths.ts'
       - 'src/domain/site-local-content.ts'
@@ -17,6 +18,7 @@ on:
       - 'src/modules/sites/site-local-content.server.ts'
       - 'netlify/edge-functions/site-host-gate.ts'
       - 'tests/unit/public-site*'
+      - 'tests/unit/site-theme.test.ts'
       - 'tests/unit/site-local-content*'
       - 'tests/unit/site-website-preview.server.test.ts'
       - '.github/workflows/px-b-school-website.yml'
@@ -36,7 +38,8 @@ jobs:
       - run: npm ci
       - name: Verify scoped tenant and local story contracts
         run: |
-          npx vitest run tests/unit/public-site-host-routing.test.ts \
+          npx vitest run tests/unit/site-theme.test.ts \
+            tests/unit/public-site-host-routing.test.ts \
             tests/unit/public-site-html.test.ts \
             tests/unit/site-local-content.test.ts \
             tests/unit/site-website-preview.server.test.ts \
