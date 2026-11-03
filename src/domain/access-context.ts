@@ -27,7 +27,7 @@ export type AccessContext = CommandContext & {
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
 const baseRoleCapabilities = {
  // Network partners govern affiliation and their own sites; never student or school operations.
- can_network_steward: ["network.agreements.verify", "network.admins.provision"],
+ can_network_steward: ["network.agreements.verify", "network.admins.provision", "jurisdiction.profile.manage"],
  network_admin: ["network.sites.read", "network.sites.manage", "network.affiliations.read", "network.affiliations.review"],
  // Partner website review is deliberately NOT registration, academic approval,
  // institutional publication, Site operations or access to family records.

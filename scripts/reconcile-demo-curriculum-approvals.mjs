@@ -1,0 +1,63 @@
+#!/usr/bin/env node
+/**
+ * Reconcile internal demo approvals for every course version in the latest
+ * demo catalog pack and every configured jurisdiction. Demo database ONLY.
+ * Requires existing approval tables and DEMO_CURRICULUM_ALLOW_WRITE=1.
+ */
+import { Pool } from "@neondatabase/serverless";
+const apply=process.argv.includes("--apply");
+if(!process.env.DATABASE_URL) throw Error("DATABASE_URL required");
+if(apply && (process.env.DEMO_CURRICULUM_ALLOW_WRITE!=="1" || !process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)) throw Error("Explicit write opt-in and confirmed database name required");
+if(apply){
+  const expectedHost=process.env.DEMO_CURRICULUM_EXPECTED_HOST;
+  if(!expectedHost)throw Error("Writes require DEMO_CURRICULUM_EXPECTED_HOST for the isolated Neon branch");
+  if(new URL(process.env.DATABASE_URL).hostname!==expectedHost)throw Error("Database host mismatch; refusing demo approval writes");
+}
+const pool=new Pool({connectionString:process.env.DATABASE_URL});
+const client=await pool.connect();
+try {
+  await client.query("BEGIN");
+  if(apply){const db=await client.query("SELECT current_database() AS name");if(db.rows[0].name!==process.env.DEMO_CURRICULUM_DATABASE_CONFIRMED)throw Error("Database identity mismatch");const expectedBranch=process.env.DEMO_CURRICULUM_EXPECTED_BRANCH_ID;if(!expectedBranch||!/^br-[a-z0-9-]+$/.test(expectedBranch))throw Error("Writes require DEMO_CURRICULUM_EXPECTED_BRANCH_ID");const branch=await client.query("SELECT current_setting('neon.branch_id',true) AS id");if(branch.rows[0]?.id!==expectedBranch)throw Error("Neon branch identity mismatch; refusing demo approval writes");}
+  const publisher=await client.query("SELECT id FROM organizations WHERE slug='can-demo-publisher' AND metadata->>'demoPublisher'='true'");
+  if(publisher.rowCount!==1)throw Error("Dedicated demo publisher not found");
+  const pack=await client.query("SELECT id FROM curriculum_packs WHERE publisher_organization_id=$1 AND slug='can-os-demo-catalog'",[publisher.rows[0].id]);
+  if(pack.rowCount!==1)throw Error("Demo catalog pack not found");
+  const courses=await client.query(`SELECT DISTINCT i.course_template_version_id AS id
+    FROM curriculum_pack_items i
+    JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
+    WHERE pv.pack_id=$1 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$1)`,[pack.rows[0].id]);
+  const jurisdictions=await client.query("SELECT id FROM jurisdictions WHERE code IN ('US-TX','US-FL','US-AZ','US-WV','US-AR','US-IA','US-OK','US-WI')");
+  // Never overwrite a real academic decision or reset an existing review decision.
+  const conflicts=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
+    WHERE a.academic_purpose='general_instruction'
+      AND a.course_template_version_id=ANY($1::uuid[])
+      AND a.jurisdiction_id=ANY($2::uuid[])
+      AND (a.evidence->>'scope' IS DISTINCT FROM 'internal_demo_only'
+        OR a.authority_organization_id IS DISTINCT FROM $3::uuid)`,
+    [courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id),publisher.rows[0].id]);
+  if(conflicts.rows[0].n>0)throw Error("Refusing to overwrite non-demo curriculum jurisdiction approvals");
+  if(courses.rowCount!==120)throw Error("Expected exactly 120 demo course versions before approval");
+  if(jurisdictions.rowCount!==8)throw Error("Expected eight explicitly scoped demo jurisdictions");
+  const expected=courses.rowCount*jurisdictions.rowCount;
+  const existing=await client.query(`SELECT count(*)::int AS n FROM curriculum_jurisdiction_approvals a
+    WHERE a.academic_purpose='general_instruction'
+    AND a.course_template_version_id=ANY($1::uuid[])
+    AND a.jurisdiction_id=ANY($2::uuid[])
+    AND a.status='in_review'`,[courses.rows.map(x=>x.id),jurisdictions.rows.map(x=>x.id)]);
+  if(!apply){await client.query("ROLLBACK");console.log(JSON.stringify({publisherId:publisher.rows[0].id,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,expectedApprovals:expected,currentlyInReview:existing.rows[0].n,apply:false},null,2));}
+  else {
+    await client.query(`INSERT INTO curriculum_jurisdiction_approvals
+      (course_template_version_id,jurisdiction_id,academic_purpose,status,authority_organization_id,evidence,effective_at)
+      SELECT c.id,j.id,'general_instruction','in_review',$1,
+        '{"scope":"internal_demo_only","externalAuthorization":false}'::jsonb,now()
+      FROM (SELECT DISTINCT i.course_template_version_id AS id FROM curriculum_pack_items i
+        JOIN curriculum_pack_versions pv ON pv.id=i.pack_version_id
+        WHERE pv.pack_id=$2 AND pv.version=(SELECT max(version) FROM curriculum_pack_versions WHERE pack_id=$2)) c
+      CROSS JOIN (SELECT id FROM jurisdictions WHERE code IN ('US-TX','US-FL','US-AZ','US-WV','US-AR','US-IA','US-OK','US-WI')) j
+      ON CONFLICT (course_template_version_id,jurisdiction_id,academic_purpose)
+      DO NOTHING`,[publisher.rows[0].id,pack.rows[0].id]);
+    await client.query("COMMIT");
+    console.log(JSON.stringify({inReview:expected,courses:courses.rowCount,jurisdictions:jurisdictions.rowCount,scope:"internal_demo_only"},null,2));
+  }
+}catch(error){await client.query("ROLLBACK");throw error;}
+finally{client.release();await pool.end();}

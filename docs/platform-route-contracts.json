@@ -526,6 +526,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.teacher-marketplace.tsx",
+      "route": "/operations/teacher-marketplace",
+      "owner": "staffing",
+      "verification": "pending",
+      "roleJourney": "school registrar chooses an eligible onboarded provider teacher and engages the teacher across compatible adopted-course classes or one selected class",
+      "writeBoundary": "engagement revalidates adoption, teaching eligibility, open capacity demand, offering, seat capacity and cross-school schedule availability, then commits reservations and canonical assignments in one transaction",
+      "readBoundary": "getTeacherMarketplace (authorized school, adopted curriculum, provider offering, published teaching eligibility, instructional capacity and schedule compatibility)"
+    },
+    {
       "file": "src/routes/operations.curriculum-marketplace.tsx",
       "route": "/operations/curriculum-marketplace",
       "owner": "learning",
@@ -587,6 +596,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.jurisdiction-profiles.tsx",
+      "route": "/operations/jurisdiction-profiles",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "network policy administrator reviews jurisdiction guidance",
+      "readBoundary": "listJurisdictionProfileReviews (jurisdiction.profile.manage)",
+      "writeBoundary": "saveJurisdictionProfileReview and publishJurisdictionProfile (jurisdiction.profile.manage)"
     },
     {
       "file": "src/routes/operations.launch.$programId.tsx",

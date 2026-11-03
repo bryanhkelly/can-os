@@ -36,6 +36,7 @@ const schoolAdministrationLinks = [
   { title: "Sites", path: "/sites", icon: "home", owns: ["/sites/$siteId", "/sites/$siteId/publish"] },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },
   { title: "Curriculum", path: "/operations/curriculum", icon: "book", owns: ["/operations/curriculum-marketplace"] },
+  { title: "Teachers", path: "/operations/teacher-marketplace", icon: "users" },
   { title: "Administration", path: "/admin", icon: "users" },
 ] satisfies readonly WorkspaceNavigationItem[];
 

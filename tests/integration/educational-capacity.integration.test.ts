@@ -86,6 +86,7 @@ integration("educational capacity", () => {
       code: `AAH-1-${suffix}`,
       title: "African American History",
       termId: academicTime.term.id,
+      scheduleTemplateId: academicTime.scheduleTemplate.id,
       startsAt: new Date("2027-08-20T16:00:00.000Z"),
       endsAt: new Date("2028-05-25T17:00:00.000Z"),
     }).returning();
@@ -120,7 +121,7 @@ integration("educational capacity", () => {
       startsAt: new Date("2027-08-01T00:00:00.000Z"),
       endsAt: new Date("2028-06-15T00:00:00.000Z"),
       timezone: "America/Los_Angeles",
-      weeklyPattern: { days: [2, 4], startTime: "09:00", endTime: "12:00" },
+      weeklyPattern: { days: [2, 4], startTime: "00:00", endTime: "23:59" },
     });
 
     const offeringId = await capacity.createCapacityOffering(context, {
@@ -210,5 +211,82 @@ integration("educational capacity", () => {
       seats: 14,
       status: "held",
     })).rejects.toThrow("Only 13 seats remain");
+
+    const [otherOrg] = await db.insert(s.organizations).values({
+      type: "christian_school",
+      name: `Other Capacity School ${suffix}`,
+      slug: `other-capacity-school-${suffix}`,
+    }).returning();
+    const [otherSite] = await db.insert(s.sites).values({
+      organizationId: otherOrg.id,
+      name: "Other Capacity Campus",
+      slug: `other-capacity-campus-${suffix}`,
+      timezone: "America/New_York",
+    }).returning();
+    const [otherProgram] = await db.insert(s.programs).values({
+      organizationId: otherOrg.id,
+      siteId: otherSite.id,
+      jurisdictionId: jurisdiction.id,
+      type: "full_school",
+      status: "active",
+      name: "Other Capacity Program",
+      slug: `other-capacity-program-${suffix}`,
+      gradeRange: { min: "9", max: "12" },
+      deliveryModel: { liveOnline: true },
+      hostOrganizationId: otherOrg.id,
+      academicProviderOrganizationId: org.id,
+      creditIssuingOrganizationId: otherOrg.id,
+    }).returning();
+    const otherAcademicTime = await createAcademicTimeFixture({
+      organizationId: otherOrg.id,
+      programId: otherProgram.id,
+      siteId: otherSite.id,
+      suffix: `other-${suffix}`,
+    });
+    await db.update(s.schoolYears).set({ timezone: "America/New_York" })
+      .where(eq(s.schoolYears.id, otherAcademicTime.schoolYear.id));
+    await db.update(s.scheduleTemplatePeriods).set({
+      startsAtLocal: "11:00:00",
+      endsAtLocal: "12:00:00",
+    }).where(eq(s.scheduleTemplatePeriods.id, otherAcademicTime.schedulePeriods[0]!.id));
+    await db.insert(s.roleAssignments).values({
+      personId: teacher.id,
+      organizationId: otherOrg.id,
+      roleKey: "teacher",
+    });
+    const [otherSection] = await db.insert(s.sections).values({
+      programId: otherProgram.id,
+      siteId: otherSite.id,
+      courseTemplateVersionId: version.id,
+      code: `AAH-OTHER-${suffix}`,
+      title: "African American History",
+      termId: otherAcademicTime.term.id,
+      scheduleTemplateId: otherAcademicTime.scheduleTemplate.id,
+      startsAt: new Date("2027-08-20T16:00:00.000Z"),
+      endsAt: new Date("2028-05-25T17:00:00.000Z"),
+    }).returning();
+    const otherContext = {
+      ...context2,
+      scope: {
+        organizationIds: [org.id, otherOrg.id],
+        siteIds: [site.id, otherSite.id],
+        programIds: [program.id, otherProgram.id],
+        sectionIds: [section.id, section2.id, otherSection.id],
+      },
+    };
+    const otherDemand = await capacity.upsertSectionCapacityDemand(otherContext, {
+      sectionId: otherSection.id,
+      expectedSeats: 5,
+      modality: "live_online",
+      startsAt: new Date("2027-08-20T16:00:00.000Z"),
+      endsAt: new Date("2028-05-25T17:00:00.000Z"),
+    });
+    await expect(capacity.findCapacityCandidates(otherContext, otherDemand)).resolves.toHaveLength(0);
+    await expect(capacity.reserveInstructionalCapacity(otherContext, {
+      demandId: otherDemand,
+      offeringId,
+      seats: 5,
+      status: "held",
+    })).rejects.toThrow("overlapping class schedule");
   });
 });

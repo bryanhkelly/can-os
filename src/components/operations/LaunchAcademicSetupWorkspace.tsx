@@ -76,6 +76,17 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <StatCard label="Published course versions" value={data.catalog.length}/>
    <StatCard label="Sections provisioned" value={data.sections.length}/>
   </div>
+  <section aria-label="Choose CAN teachers" className="mt-5 rounded-xl border bg-card p-5">
+    <h2 className="font-serif text-2xl">Next: choose your teachers</h2>
+    <p className="mt-2 text-sm text-muted-foreground">
+      Your curriculum determines which CAN Academy instructors are suggested. Review teachers by course
+      or request a specific class assignment after you complete school setup. A request does not appoint an instructor.
+    </p>
+    <Link to="/operations/teacher-marketplace" search={{programId:data.program.id}}
+      className="mt-3 inline-flex rounded-lg border px-4 py-2 text-sm font-semibold underline">
+      Browse CAN teachers for this school's curriculum
+    </Link>
+  </section>
   <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
    <p role="status" className="mt-4 rounded-lg border border-warning/40 p-4 text-sm">
@@ -127,7 +138,8 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   {!data.teachingStaff.length&&<section aria-label="Instructor staffing handoff" className="mt-4 rounded-xl border bg-card p-5 text-sm">
    <h3 className="font-semibold">Get your instructor assigned</h3>
    <p className="mt-2">Request an instructor for {data.program.name} from your CAN academic staffing administrator. Include the planned course and term. A local website or registrar invitation does not appoint a CAN teacher.</p>
-   <button type="button" disabled={busy} onClick={()=>void run(async()=>{},"Instructor choices refreshed from current staffing records.")} className="mt-3 rounded border px-3 py-2">Refresh instructor choices</button>
+
+   <button type="button" disabled={busy} onClick={()=>void router.invalidate()} className="mt-3 rounded border px-3 py-2">Refresh instructor choices</button>
   </section>}
   <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="teacher-class-requests">
    <h2 id="teacher-class-requests" className="font-serif text-2xl">Teacher class requests</h2>

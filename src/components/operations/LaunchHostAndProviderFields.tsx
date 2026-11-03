@@ -1,3 +1,4 @@
+import { jurisdictionSetupGuidance } from "@/domain/jurisdiction-setup-guidance";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { Link } from "@tanstack/react-router";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
@@ -5,8 +6,9 @@ import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
 const selectClass = inputClass;
 
-export function LaunchHostAndProviderFields({ options, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
+  jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   hostOrganizationId: string; setHostOrganizationId: (value: string) => void;
   siteId: string; setSiteId: (value: string) => void;
   setCreatedSiteDraft: (value: {siteId:string;host:string} | null) => void;
@@ -92,6 +94,16 @@ export function LaunchHostAndProviderFields({ options, hostOrganizationId, setHo
                       ))}
                     </select>
                   </label>
+                  {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4" role="status">
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
+                    {jurisdictionGuidance[jurisdictionId]?<>
+                     <p className="mt-2 text-sm leading-6">{jurisdictionGuidance[jurisdictionId].summary}</p>
+                     <p className="mt-2 text-xs text-muted-foreground">Published guidance is informational. Your school still needs its own operating approvals.</p>
+                    </>:<>
+                     <p className="mt-2 text-sm">State-specific guidance is being reviewed. You can continue preparing your school.</p>
+                     <p className="mt-2 text-xs text-muted-foreground">Configuration does not authorize enrollment or operation.</p>
+                    </>}
+                  </div>}
                   <label className="block text-xs">
                     Academic provider
                     <select aria-label="Academic provider organization" className={selectClass} value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)} required>

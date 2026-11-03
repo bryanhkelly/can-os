@@ -1,7 +1,8 @@
 import { and, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import {
-  deliveryArrangements, qualificationClaims, sectionTeachers, staffingEligibilityEvaluations,
+  deliveryArrangements, qualificationClaims, sectionCapacityDemands, sectionTeachers,
+  staffingEligibilityEvaluations,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -11,6 +12,9 @@ import {
 } from "./teaching-eligibility.server";
 import { evaluateInstructionalCoverage } from "./instructional-coverage.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import {
+  findCapacityCandidatesInTransaction, reserveInstructionalCapacityInTransaction,
+} from "./educational-capacity-service";
 
 import { EventTypes } from "@/domain/event-types";
 export { teachingRolePredicate as launchTeacherRolePredicate } from "./teaching-eligibility.server";
@@ -55,7 +59,7 @@ export async function lockLaunchTeacherClaims(tx: Transaction, personIds: string
 
 export async function assignLaunchInstructor(
   tx: Transaction, context: CommandContext,
-  input: { programId: string; sectionId: string; teacherPersonId: string },
+  input: { programId: string; sectionId: string; teacherPersonId: string; capacityDemandId?: string },
 ) {
   assertCapability(context, "program.launch.start");
   const initial = await launchStaffingContext(input.sectionId, tx);
@@ -78,7 +82,34 @@ export async function assignLaunchInstructor(
   await lockLaunchTeacherClaims(tx, [input.teacherPersonId]);
   const eligibility = await evaluateLaunchTeacher(input.sectionId, input.teacherPersonId, tx);
   if (!eligibility.eligible) throw new Error("Instructor is not eligible: " + eligibility.reasons.join(" "));
-  const [existing] = await tx.select({ id: deliveryArrangements.id }).from(deliveryArrangements).where(and(
+  let capacityReservationId: string | null = null;
+  if (input.capacityDemandId) {
+    const [demand] = await tx.select({
+      id: sectionCapacityDemands.id,
+      sectionId: sectionCapacityDemands.sectionId,
+      status: sectionCapacityDemands.status,
+    }).from(sectionCapacityDemands).where(eq(sectionCapacityDemands.id, input.capacityDemandId))
+      .for("update").limit(1);
+    if (!demand || demand.sectionId !== section.id || demand.status !== "open")
+      throw new Error("Open instructional capacity demand does not belong to this class");
+    const candidates = await findCapacityCandidatesInTransaction(tx, context, input.capacityDemandId);
+    const capacity = candidates.find(candidate =>
+      candidate.personId === input.teacherPersonId &&
+      candidate.remainingSeats >= candidate.requiredSeats &&
+      candidate.remainingDemandSeats >= candidate.requiredSeats);
+    if (!capacity) throw new Error("Instructor has no available capacity for this class schedule and enrollment demand");
+    const reservation = await reserveInstructionalCapacityInTransaction(tx, context, {
+      demandId: input.capacityDemandId,
+      offeringId: capacity.offeringId,
+      seats: capacity.requiredSeats,
+      status: "committed",
+    });
+    capacityReservationId = reservation.reservationId;
+  }
+  const [existing] = await tx.select({
+    id: deliveryArrangements.id,
+    capacityReservationId: deliveryArrangements.capacityReservationId,
+  }).from(deliveryArrangements).where(and(
     eq(deliveryArrangements.sectionId, section.id),
     eq(deliveryArrangements.instructorPersonId, input.teacherPersonId),
     eq(deliveryArrangements.academicProviderOrganizationId, section.providerId),
@@ -86,7 +117,14 @@ export async function assignLaunchInstructor(
     or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, section.window.from)),
     or(isNull(deliveryArrangements.effectiveThrough), gte(deliveryArrangements.effectiveThrough, section.window.through)),
   )).limit(1);
-  const [assignment] = await tx.insert(sectionTeachers).values({
+  if (existing && capacityReservationId && existing.capacityReservationId &&
+      existing.capacityReservationId !== capacityReservationId)
+    throw new Error("This class already has a different instructional capacity reservation for the selected teacher");
+  if (existing && capacityReservationId && !existing.capacityReservationId) {
+    await tx.update(deliveryArrangements).set({ capacityReservationId })
+      .where(eq(deliveryArrangements.id, existing.id));
+  }
+  const [assignment] = capacityReservationId ? [undefined] : await tx.insert(sectionTeachers).values({
     sectionId: section.id, personId: input.teacherPersonId, role: "teacher", assignmentSource: "launch",
   }).onConflictDoNothing().returning({ id: sectionTeachers.id });
   if (existing && !assignment) return { created: false };
@@ -96,6 +134,7 @@ export async function assignLaunchInstructor(
   const [arrangement] = existing ? [existing] : await tx.insert(deliveryArrangements).values({
     sectionId: section.id, academicProviderOrganizationId: section.providerId,
     instructorPersonId: input.teacherPersonId, modality, status: "active",
+    capacityReservationId,
     effectiveFrom: section.window.from, effectiveThrough: section.window.through,
   }).returning({ id: deliveryArrangements.id });
   if (!arrangement) throw new Error("Failed to create launch delivery arrangement");
@@ -107,7 +146,7 @@ export async function assignLaunchInstructor(
       through: section.window.through.toISOString(), claimIds: eligibility.claimIds, evaluator: "launch-v1" },
     evidenceIds: eligibility.verificationEventIds,
   }))).returning({id:staffingEligibilityEvaluations.id});
-  if (assignment) await notify(tx, {
+  if (assignment || !existing) await notify(tx, {
     recipientPersonId: input.teacherPersonId, type: "teaching_assignment", status: "unread",
     title: "New teaching assignment", body: "You have been assigned to a launch class",
     resourceType: "section", resourceId: section.id,

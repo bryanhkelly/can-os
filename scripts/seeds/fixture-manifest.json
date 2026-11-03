@@ -1164,6 +1164,25 @@
         "audit_events"
       ]
     },
+    "/operations/teacher-marketplace": {
+      "persona": "registrar",
+      "fixtureRequired": false,
+      "rationale": "The standard teacher marketplace reads authorized adopted curriculum, provider memberships, capabilities and offerings. Synthetic sample teachers are labeled through provider metadata and cannot be engaged.",
+      "interactions": [
+        "select the authorized school after curriculum adoption",
+        "find onboarded provider teachers and labeled sample profiles by adopted course",
+        "engage an onboarded teacher across all active classes for a course or for one selected class",
+        "recheck qualification and program authority through the canonical launch assignment command"
+      ],
+      "downstreamRecords": [
+        "section_teachers",
+        "delivery_arrangements",
+        "staffing_eligibility_evaluations",
+        "audit_events",
+        "domain_events",
+        "notifications"
+      ]
+    },
     "/operations/curriculum-marketplace": {
       "persona": "registrar",
       "seeds": [
@@ -1570,6 +1589,20 @@
         "real verified recipient flow must be separately tested in authenticated staging"
       ],
       "downstreamRecords": [
+        "audit_events"
+      ]
+    },
+    "/operations/jurisdiction-profiles": {
+      "persona": "authorized network jurisdiction policy administrator",
+      "fixtureRequired": false,
+      "rationale": "Review profiles require an explicitly authorized network policy administrator and sourced jurisdiction research. The eight draft records are provisioned separately on the isolated jurisdiction-review database; generic school fixtures must not fabricate verified government sources.",
+      "interactions": [
+        "review jurisdiction operating models and funding programs",
+        "edit requirements and attach authoritative sources",
+        "publish a reviewed profile after source checks"
+      ],
+      "downstreamRecords": [
+        "jurisdiction_profile_versions",
         "audit_events"
       ]
     }
