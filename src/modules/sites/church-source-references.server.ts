@@ -89,6 +89,13 @@ export async function removeChurchSourceReference(actor: AccessContext, input: {
     if (existing.revokedAt) return { changed: false };
     await tx.update(churchSourceReferences).set({ revokedAt: new Date(), updatedAt: new Date() })
       .where(eq(churchSourceReferences.id, existing.id));
+    // Re-adding a revoked URL must not resurrect old pending proposals.
+    await tx.update(churchContentSuggestions).set({
+      reviewDecision: "discarded", reviewedAt: new Date(),
+      reviewedByPersonId: actor.actorPersonId!,
+    }).where(and(eq(churchContentSuggestions.siteId, site.id),
+      eq(churchContentSuggestions.sourceReferenceId, existing.id),
+      eq(churchContentSuggestions.reviewDecision, "pending")));
     await writeAudit(tx, actor, {
       action: "site.website.source_reference.removed",
       entityType: "church_source_reference", entityId: existing.id,
