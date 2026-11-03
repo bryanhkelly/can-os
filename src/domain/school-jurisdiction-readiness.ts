@@ -26,6 +26,8 @@ export type SchoolJurisdictionReadiness = {
     category: string;
     responsibleParty: "can" | "church" | "family";
     phase: "before_opening" | "before_enrollment" | "follow_up";
+    filingDeadline: string | null;
+    renewalDeadline: string | null;
     applicability: RequirementDecision["status"];
     reason: string;
     nextAction: string;
@@ -37,6 +39,8 @@ export type SchoolJurisdictionReadiness = {
     summary: string;
     /** This describes the reviewed state-profile research, NOT this school's eligibility. */
     researchEligibilityStatus: JurisdictionProfile["fundingPrograms"][number]["eligibilityStatus"];
+    applicationDeadline: string | null;
+    renewalDeadline: string | null;
     schoolEligibility: "not_determined";
     providerParticipation: "not_verified";
     governmentApproval: "not_verified";
@@ -128,6 +132,8 @@ export function projectSchoolJurisdictionReadiness(input: {
         category: requirement.category ?? "other",
         responsibleParty: requirement.responsibleParty,
         phase: requirement.phase,
+        filingDeadline:requirement.filingDeadline??null,
+        renewalDeadline:requirement.renewalDeadline??null,
         applicability,
         reason: decision.reason,
         nextAction: applicability === "applicable"
@@ -146,6 +152,8 @@ export function projectSchoolJurisdictionReadiness(input: {
         name: program.name,
         summary: program.summary,
         researchEligibilityStatus: program.eligibilityStatus,
+        applicationDeadline:program.applicationDeadline??null,
+        renewalDeadline:program.renewalDeadline??null,
         schoolEligibility: "not_determined" as const,
         providerParticipation: "not_verified" as const,
         governmentApproval: "not_verified" as const,
