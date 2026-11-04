@@ -34,8 +34,8 @@ integration("GF2 new family enrollment", () => {
     const [hostOrg] = await db
       .insert(schema.organizations)
       .values({
-        type: "church",
-        name: `Host Church ${suffix}`,
+        type: "christian_school",
+        name: `Host School ${suffix}`,
         slug: `host-church-${suffix}`,
       })
       .returning();
@@ -55,7 +55,7 @@ integration("GF2 new family enrollment", () => {
         organizationId: hostOrg.id,
         siteId: site.id,
         jurisdictionId: jurisdiction.id,
-        type: "church_hosted_academy",
+        type: "high_school_extension",
         status: "active",
         name: "CAN Academy",
         slug: `academy-${suffix}`,

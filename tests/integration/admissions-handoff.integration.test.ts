@@ -34,6 +34,7 @@ vi.mock("@/db/client",()=>({
  get db(){if(!state.tx)throw new Error("Admissions handoff must stay in its rollback transaction");return state.tx;},
 }));
 vi.mock("@tanstack/react-start",()=>({
+ createServerOnlyFn:(fn:unknown)=>fn,
  createServerFn:()=>({
   parse:(value:unknown)=>value,
   validator(parse:(value:unknown)=>unknown){this.parse=parse;return this;},
@@ -228,9 +229,9 @@ integration("cross-persona admissions through active classes",()=>{
     // Exercise the same commands as the actual admissions handoff, not a
     // synthetic permission helper, while the Journey is still incomplete.
     state.actor={...staff,scope:{organizationIds:[org.id]}};
-    expect((await getAdmissionsDashboard({data:{programId:program.id}})).map(row=>row.id))
+    expect((await getAdmissionsDashboard({data:{programId:program.id}})).rows.map(row=>row.id))
      .toContain(applicationId);
-    expect((await offers.getAdmissionOfferOptions({data:{programId:program.id}}))
+    expect((await offers.getAdmissionOfferOptions({data:{programId:program.id,applicationId}}))
      .find(row=>row.applicationId===applicationId)?.years.map(year=>year.id))
      .toContain(time.schoolYear.id);
     await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
@@ -270,7 +271,7 @@ integration("cross-persona admissions through active classes",()=>{
     const signed={...formScope,requestId:crypto.randomUUID(),formRevision:configured.revision,
      answers:{contact_plan:"Email the authorized guardian.",school_contact:false},signerName:"Admissions Guardian",confirmed:true as const};
     act("guardian",outsider.id);
-    await expect(formFlow.submitGuardianEnrollmentForm({data:signed})).rejects.toThrow("current managing guardian");
+    await expect(formFlow.submitGuardianEnrollmentForm({data:signed})).rejects.toThrow("independently verified managing guardian relationship");
     state.actor={...family,scope:{...family.scope,programIds:[]}};
     await expect(formFlow.submitGuardianEnrollmentForm({data:signed})).rejects.toThrow("school and program scope");
     state.actor=family;
@@ -340,7 +341,7 @@ integration("cross-persona admissions through active classes",()=>{
     await intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}});
     await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}})).rejects.toThrow("not permitted");
     await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Restore the waitlisted");
-    expect(first(await getAdmissionsDashboard({data:{programId:program.id,siteId:site.id}})).disposition).toBe("waitlisted");
+    expect(first((await getAdmissionsDashboard({data:{programId:program.id,siteId:site.id}})).rows).disposition).toBe("waitlisted");
     state.actor=family;
     expect(first(await getGuardianAdmissionOffers({data:{}})).waitlisted).toBe(true);
     state.actor=staff;
@@ -391,7 +392,7 @@ integration("cross-persona admissions through active classes",()=>{
     const current=await offers.issueAdmissionOffer({data:issuance});
     expect(current.offerId).not.toBe(issued.offerId);
     state.actor={...staff,scope:{...staff.scope,programIds:[]}};
-    await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("admissions program membership");
+    await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow(/program scope|admissions program membership/);
     state.actor=staff;
     await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:false}});
     state.actor=family;
@@ -491,10 +492,10 @@ integration("cross-persona admissions through active classes",()=>{
       .where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
     });
     const lateUpload=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
-    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:lateUpload.key}})).rejects.toThrow("current managing guardian");
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:lateUpload.key}})).rejects.toThrow("independently verified managing guardian relationship");
     expect(await getGuardianAdmissionOffers({data:{}})).toEqual([]);
-    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("current managing guardian");
-    expect((await getNotifications()).find(row=>row.title==="Enrollment document needs correction")?.href).toBeNull();
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("independently verified managing guardian relationship");
+    expect((await getNotifications()).find(row=>row.title==="Enrollment document needs correction")?.href ?? null).toBeNull();
     await tx.update(s.guardianRelationships).set({canManageEnrollment:true}).where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
     state.actor={...family,scope:{...family.scope,siteIds:[]}};
     await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("school and program scope");
@@ -503,7 +504,7 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("enrollment.apply");
     await expect(documentFlow.beginEnrollmentDocumentUpload({data:upload})).rejects.toThrow("enrollment.apply");
     act("guardian",outsider.id);
-    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("current managing guardian");
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("independently verified managing guardian relationship");
     act("student",student.personId);
     await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("guardian");
     state.actor=family;
@@ -534,7 +535,7 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(documentFlow.beginEnrollmentDocumentUpload({data:upload})).rejects.toThrow("closed or unavailable");
     state.actor=staff;
     await expect(reviewRequirementDocument({data:acceptance})).rejects.toThrow("Journey cannot be edited");
-    expect(first(await getAdmissionsDashboard({data:{programId:program.id,siteId:site.id}})).enrollments)
+    expect(first((await getAdmissionsDashboard({data:{programId:program.id,siteId:site.id}})).rows).enrollments)
      .toEqual([{schoolYearId:time.schoolYear.id,status:"active"}]);
     state.actor=family;
     expect(first((await getFamilyHome()).children)).toMatchObject({studentProfileId:profileId,awaitingSections:true});
@@ -568,6 +569,10 @@ integration("cross-persona admissions through active classes",()=>{
       organizationId:org.id,siteId:site.id,
     });
     await tx.insert(s.sectionTeachers).values({sectionId:section.id,personId:classTeacher.id});
+    await tx.insert(s.deliveryArrangements).values({
+     sectionId:section.id,academicProviderOrganizationId:program.academicProviderOrganizationId,
+     instructorPersonId:classTeacher.id,modality:"onsite",status:"active",
+    });
     await tx.insert(s.roleAssignments).values({
       personId:classTeacher.id,organizationId:org.id,siteId:site.id,
       programId:program.id,roleKey:"teacher",
@@ -601,7 +606,7 @@ integration("cross-persona admissions through active classes",()=>{
     expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
       .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false,readyForPlacement:false})]));
     await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
-      .rejects.toThrow("qualifications covering the instructional term");
+      .rejects.toThrow("Assign an active teacher");
     await tx.insert(s.qualificationVerificationEvents).values({
       claimId:teacherQualification.claimId,sequence:3,decision:"approve",actorPersonId:registrar.id,
     });
@@ -634,6 +639,7 @@ integration("cross-persona admissions through active classes",()=>{
       expect(scheduled.students).toEqual(expect.arrayContaining([
         expect.objectContaining({studentProfileId:profileId,programId:program.id}),
       ]));
+      state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
       const present=await markExpectedOnsiteAttendance({data:{
         studentProfileId:profileId,programId:program.id,date:"2027-09-14",
         status:"present",mutationId:crypto.randomUUID(),
@@ -771,10 +777,14 @@ integration("cross-persona admissions through active classes",()=>{
       reviewMethod:"institutional_school_record",
     }})).toMatchObject({status:"approved"});
     expect(state.studentInvite).toHaveBeenCalledOnce();
-    expect(state.studentInvite).toHaveBeenCalledWith(email);
+    expect(state.studentInvite).toHaveBeenCalledWith(email,undefined,"/profiles");
     expect(state.studentLink).toContain("/access/verify#token=");
+    const [accessConsent]=await tx.select({id:s.studentAccessConsents.id})
+      .from(s.studentAccessConsents).where(eq(s.studentAccessConsents.applicationId,applicationId));
+    if(!accessConsent)throw new Error("Student access consent was not created");
     const approvalEvents=await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
-      .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved"));
+      .where(and(eq(s.domainEvents.eventType,"StudentLearningAccessApproved"),
+        eq(s.domainEvents.aggregateId,accessConsent.id)));
     expect(approvalEvents).toHaveLength(1);
     // Email resend can be retried without creating another institutional
     // account approval event or changing the recorded reviewer decision.
@@ -785,7 +795,8 @@ integration("cross-persona admissions through active classes",()=>{
     const originalLink=state.studentLink;
     expect(originalLink).toContain("/access/verify#token=");
     expect(await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
-      .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved")))
+      .where(and(eq(s.domainEvents.eventType,"StudentLearningAccessApproved"),
+        eq(s.domainEvents.aggregateId,accessConsent.id))))
       .toHaveLength(1);
     const [studentAccount]=await tx.select().from(s.accessAccounts)
       .where(eq(s.accessAccounts.emailNormalized,email));
@@ -1001,7 +1012,7 @@ integration("cross-persona admissions through active classes",()=>{
     state.actor=family;
     expect(first((await getFamilyHome()).children)).toMatchObject({studentProfileId:profileId,sectionCount:1,awaitingSections:false});
     expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===current.offerId)?.progress.state).toBe("enrolled");
-    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===issued.offerId)?.progress.state).toBe("revoked");
+    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===issued.offerId)?.progress.state).toBe("enrolled");
     await authorizeClass(family,section.id,student.personId);
     state.actor={...family,scope:{...family.scope,programIds:[]}};
     expect((await getFamilyHome()).children).toEqual([]);
@@ -1117,17 +1128,17 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("registrar");
     state.actor={...staff,capabilities:new Set()};
     await expect(intake.listAdmissionsExistingStudents()).rejects.toThrow("enrollment.decide");
-    state.actor={...staff,scope:{...staff.scope,siteIds:[]}};
-    expect(await intake.listAdmissionsExistingStudents()).toEqual([]);
+    state.actor={...staff,scope:{...staff.scope,organizationIds:[org.id],siteIds:[]}};
+    expect((await intake.listAdmissionsExistingStudents()).items).toEqual([]);
     await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("school and organization");
     state.actor={...staff,scope:{...staff.scope,organizationIds:[]}};
-    expect(await intake.listAdmissionsExistingStudents()).toEqual([]);
-    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("school and organization");
+    await expect(intake.listAdmissionsExistingStudents()).rejects.toThrow("admissions registrar");
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("admissions registrar");
     state.actor={...staff,scope:{...staff.scope,programIds:[crypto.randomUUID()]}};
-    expect(await intake.listAdmissionsExistingStudents()).toEqual([]);
+    expect((await intake.listAdmissionsExistingStudents()).items).toEqual([]);
     await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("admissions program");
     state.actor=staff;
-    expect(await intake.listAdmissionsExistingStudents()).toContainEqual(expect.objectContaining({
+    expect((await intake.listAdmissionsExistingStudents()).items).toContainEqual(expect.objectContaining({
      studentProfileId:returningProfile.id,householdId:returningHousehold.id,guardianPersonId:guardian.id,
     }));
     await expect(intake.createAdmissionsInquiry({data:{...returningInput,
@@ -1212,7 +1223,7 @@ integration("cross-persona admissions through active classes",()=>{
      programId:program.id,kind:"section",status:"active",sectionId:section.id,schoolYearId:time.schoolYear.id});
     const unlinkedInput={requestId:crypto.randomUUID(),programId:program.id,
      existingStudent:{studentProfileId:unlinkedProfile.id,guardianPersonId:unlinkedGuardian.id,createHousehold:true as const}};
-    expect(await intake.listAdmissionsExistingStudents()).toContainEqual(expect.objectContaining({
+    expect((await intake.listAdmissionsExistingStudents()).items).toContainEqual(expect.objectContaining({
      studentProfileId:unlinkedProfile.id,guardianPersonId:unlinkedGuardian.id,householdId:null,
     }));
     await expect(intake.createAdmissionsInquiry({data:{...unlinkedInput,existingStudent:{

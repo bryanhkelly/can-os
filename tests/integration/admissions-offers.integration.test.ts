@@ -6,6 +6,7 @@ vi.mock("@/modules/identity/command-context.server",()=>({
 }));
 vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost")}));
 vi.mock("@tanstack/react-start",()=>({
+ createServerOnlyFn:(fn:unknown)=>fn,
  createServerFn:()=>({
   parse:(value:unknown)=>value,
   validator(parse:(value:unknown)=>unknown){this.parse=parse;return this;},
@@ -26,17 +27,17 @@ integration("synthetic admissions offer concurrency",()=>{
   const {createAcademicTimeFixture}=await import("./helpers/academic-time");
   const suffix=crypto.randomUUID().slice(0,8);
   const [jurisdiction]=await db.insert(s.jurisdictions).values({code:`offer-${suffix}`,name:"Synthetic admissions jurisdiction"}).returning();
-  const [school]=await db.insert(s.organizations).values({type:"church",name:`Synthetic Host ${suffix}`,slug:`offer-host-${suffix}`}).returning();
+  const [school]=await db.insert(s.organizations).values({type:"christian_school",name:`Synthetic Host ${suffix}`,slug:`offer-host-${suffix}`}).returning();
   const [network]=await db.insert(s.organizations).values({type:"can_network",name:`Synthetic CAN ${suffix}`,slug:`offer-can-${suffix}`}).returning();
   const [site]=await db.insert(s.sites).values({organizationId:school.id,name:"Synthetic Campus",slug:`offer-campus-${suffix}`}).returning();
-  const [program]=await db.insert(s.programs).values({organizationId:school.id,siteId:site.id,jurisdictionId:jurisdiction.id,type:"church_hosted_academy",status:"active",name:"Synthetic Academy",slug:`offer-academy-${suffix}`,gradeRange:{min:"6",max:"12"},deliveryModel:{onsite:true},hostOrganizationId:school.id,academicProviderOrganizationId:network.id,creditIssuingOrganizationId:network.id,metadata:{synthetic:true}}).returning();
+  const [program]=await db.insert(s.programs).values({organizationId:school.id,siteId:site.id,jurisdictionId:jurisdiction.id,type:"high_school_extension",status:"active",name:"Synthetic Academy",slug:`offer-academy-${suffix}`,gradeRange:{min:"6",max:"12"},deliveryModel:{onsite:true},hostOrganizationId:school.id,academicProviderOrganizationId:network.id,creditIssuingOrganizationId:network.id,metadata:{synthetic:true}}).returning();
   const calendar=await createAcademicTimeFixture({organizationId:school.id,programId:program.id,siteId:site.id,suffix});
   await db.insert(s.admissionSeatPools).values({programId:program.id,schoolYearId:calendar.schoolYear.id,capacity:1});
   const journeyKey=`synthetic-offers-${suffix}`;
   await db.insert(s.journeyDefinitions).values({key:journeyKey,version:"1",owningOrganizationId:network.id,audience:"family",title:"Synthetic Admissions",configuration:{requirements:[]}});
   const [guardian]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Guardian"}).returning();
   const [registrarPerson]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Registrar"}).returning();
-  const registrar={actorPersonId:registrarPerson.id,role:"registrar",capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{programIds:[program.id]}};
+  const registrar={actorPersonId:registrarPerson.id,role:"registrar",capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{organizationIds:[school.id],siteIds:[site.id],programIds:[program.id]}};
   const family={actorPersonId:guardian.id,role:"guardian",capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
   const records=[];
   let sharedHouseholdId: string | undefined;
