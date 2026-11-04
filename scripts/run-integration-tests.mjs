@@ -14,6 +14,9 @@ const { testUrl } = assertIsolatedTestDatabaseTarget({ env: process.env, fail })
 const applicationDatabaseHost = process.env.CAN_APPLICATION_DB_HOST ??
   (process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : undefined);
 const mode = process.argv[2];
+const roomCoverageMode = mode === "room-coverage";
+if (roomCoverageMode && !process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL)
+  fail("room coverage testing requires an application endpoint comparison.");
 if (mode === "demo-registrar") {
   if (!process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL) {
     fail("demo registrar testing requires an application endpoint comparison.");
@@ -23,7 +26,7 @@ if ((mode === "curriculum-journey" || mode === "curriculum-authoring" || mode ==
   fail("acceptance testing requires CAN_APPLICATION_DB_HOST or DATABASE_URL for a production endpoint comparison.");
 }
 if (process.argv.includes("--preflight")) {
-  if (mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "educational-capacity" && mode !== "launch-staffing" && mode !== "network-onboarding" && mode !== "full-flow" && mode !== "journey-c") {
+  if (!roomCoverageMode && mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "educational-capacity" && mode !== "launch-staffing" && mode !== "network-onboarding" && mode !== "full-flow" && mode !== "journey-c") {
     fail("preflight is only supported for acceptance-test modes.");
   }
   console.log(`Disposable ${mode} database endpoint check passed.`);
@@ -97,7 +100,8 @@ const suite = mode === "demo-registrar" ? ["tests/integration/demo-registrar.int
 if (mode === "launch-staffing") suite.push("tests/integration/program-launch.integration.test.ts");
 if (mode === "demo-registrar") suite.push("tests/integration/school-setup.integration.test.ts");
 if (mode === "admissions-offers") suite.push("tests/integration/admissions-handoff.integration.test.ts", "tests/integration/enrollment.integration.test.ts");
-const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
+if (roomCoverageMode) suite.splice(0, suite.length, "tests/integration/room-coverage.integration.test.ts", "tests/integration/school-setup.integration.test.ts");
+const args = targeted || roomCoverageMode ? process.argv.slice(3) : process.argv.slice(2);
 // Integration files share one disposable database; running them in parallel
 // lets one file's outbox worker claim another file's fixtures mid-assertion.
 const result = spawnSync(process.execPath, [

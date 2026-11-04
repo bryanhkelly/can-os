@@ -16,6 +16,7 @@ import {AttentionQueue} from "@/components/operations/AttentionQueue";
 import {buildDailyOperationsAttention} from "@/domain/daily-operations";
 import {ActionDialog} from "@/components/workspace/action-dialog";
 import {mutationErrorMessage} from "@/lib/mutation-feedback";
+import { plural } from "@/lib/format";
 
 type ActionInput =
  | {kind:"resolve";id:string;title:string}
@@ -44,7 +45,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   const query=new URLSearchParams();
   if(siteId)query.set("siteId",siteId);
   if(programId)query.set("programId",programId);
-  void router.navigate({href:"/operations"+(query.size?"?"+query.toString():"")});
+  void router.navigate({href:"/home"+(query.size?"?"+query.toString():"")});
  };
  const router=useRouter();
  const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
@@ -80,7 +81,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    setError("");setNotice("The saved institutional change was refreshed. You may continue working.");
   }
  }
- if(authError||!data)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
+ if(authError||!data)return <WorkspaceShell width="wide" eyebrow="Operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program.">
   <QueryState error={authError||"Operations data is unavailable. No operational changes were made."}/>
  </WorkspaceShell>;
@@ -142,7 +143,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    staffingIssues:commandCenter?.issues??[],
    programs:dashboard?.programs??[],
  });
- return <DashboardHome eyebrow="CAN OS · School operations" title="Needs You"
+ return <DashboardHome eyebrow="School operations"
   subtitle="Review actions and launch readiness for an authorized school and program. Operational actions remain subject to their existing permissions."
   shortcuts={<>
    <DashboardShortcut title="Action queue" description={`${data.items.length} open actions in scope`} icon={<ClipboardList className="size-5" />}><a href="#operations-actions" /></DashboardShortcut>
@@ -297,7 +298,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
        <div><dt className="text-xs text-muted-foreground">Admissions &amp; enrollment</dt>
         <dd>{program.counts.applications} applications · {program.counts.acceptedApplications} accepted · {program.counts.activeProgramStudents} active students · {program.counts.placedStudents} class placements</dd>
         {program.counts.activeProgramStudents>program.counts.placedStudents&&<dd className="mt-2 font-semibold">
-          {program.counts.activeProgramStudents-program.counts.placedStudents} student(s) awaiting a class.{" "}
+          {plural(program.counts.activeProgramStudents-program.counts.placedStudents, "student")} awaiting a class.{" "}
           <Link to="/admissions" search={{siteId:program.siteId??undefined,programId:program.id}}
             className="underline">Place enrolled students →</Link>
         </dd>}</div>
@@ -319,10 +320,10 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   </div>
   <p className="mt-6">{selected.siteId?<Link to="/sites/$siteId" params={{siteId:selected.siteId}} className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">Open this Site Today →</Link>:<Link to="/sites" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">Choose a site →</Link>} <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
   <div id="operations-actions" className="mt-8 scroll-mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
-  {selected.action&&<Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
+  {selected.action&&<Link to="/home" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
   {selected.action&&<Link to="/actions/$actionId" params={{actionId:selected.action}} className="ml-4 text-sm underline">View Action details</Link>}
   {selected.action&&!data.items.some(item=>item.id===selected.action)&&<WorkspaceNotice tone="danger">This action is unavailable in the current operations queue.</WorkspaceNotice>}
-  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
+  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/home" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
   <p className="mt-2 text-xs text-muted-foreground">Status: {i.status?.replaceAll("_"," ") ?? "open"}
    {i.dueAt&&<> · Due {new Date(i.dueAt).toLocaleDateString()}
     {new Date(i.dueAt).getTime()<Date.now()&&<strong className="ml-2 text-foreground">Overdue</strong>}</>}
@@ -366,7 +367,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={commandsBlocked} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>}
  </>}</div></article>)}
   {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
-  </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
+  </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
  {dialog&&<ActionDialog open title={dialog.kind==="resolve"?"Resolve action":dialog.kind==="deadline"?"Change action deadline":"Complete official "+dialog.exitKind}
   description={<><p>{dialog.title}</p><p className="mt-2">{dialog.kind==="exit"
    ?"Active Program and class memberships end immediately. The student login at this school may also be revoked. Record the institutional decision and academic records handoff."

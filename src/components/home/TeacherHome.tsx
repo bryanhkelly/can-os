@@ -1,6 +1,6 @@
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
@@ -17,21 +17,17 @@ import { buildTeacherAttention } from "@/domain/daily-operations";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-export const Route = createFileRoute("/teacher/")({
- loader: safeLoader(() => getTeacherToday(), { authMessage: "Sign in with an authorized teacher account to view your day." }),
- validateSearch:(search:Record<string,unknown>)=>({
-  gradeAction:typeof search.gradeAction==="string"?search.gradeAction:undefined,
- }),
- component: TeacherTodayPage,
+export const loadTeacherHome = safeLoader(() => getTeacherToday(), {
+ authMessage: "Sign in with an authorized teacher account to view your day.",
 });
 
 type Today = Awaited<ReturnType<typeof getTeacherToday>>;
 type Evidence = Awaited<ReturnType<typeof getTeacherLearningEvidence>>;
 
-function TeacherTodayPage() {
- const outcome = Route.useLoaderData();
- const {gradeAction}=Route.useSearch();
- if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Teacher" title="Teacher Today" outcome={outcome} />;
+export function TeacherHome({ outcome, gradeAction }: {
+ outcome: Awaited<ReturnType<typeof loadTeacherHome>>; gradeAction?: string;
+}) {
+ if (!outcome.ok) return <LoaderFailure eyebrow="Teacher" title="Teacher Today" outcome={outcome} />;
  return <TeacherTodayView data={outcome.data} gradeAction={gradeAction} />;
 }
 
@@ -56,8 +52,8 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
  const ready = data.connected;
 
  return <DashboardHome
-  eyebrow="CAN OS · Teacher"
-  title={ready && data.teacher.firstName ? `Your teaching day, ${data.teacher.firstName}.` : "Your teaching day"}
+  eyebrow="Your teaching day"
+  firstName={ready ? data.teacher.firstName : null}
   subtitle="Your sections, grading queue, and missing work across your school today."
   shortcuts={<>
     <DashboardShortcut title="My classes" description="Open your assigned sections" icon={<BookOpen className="size-5" />}>
@@ -74,7 +70,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
     </DashboardShortcut>
    </>}
   rail={ready ? <TeacherDaySchedule sections={data.sections} /> : undefined}
-  actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/support">Student support →</Link></>}
+  actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/support">Student support →</Link><Link to="/profiles">Professional profile →</Link></>}
  >
    {!data.connected && <p className="mt-8 border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
@@ -105,7 +101,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
 
 
     <section className="mt-10">
-     <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">My sections</p>
+     <p className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">My sections</p>
      {data.sections.length === 0 && <EmptyState className="mt-4" title="No currently authorized teaching sections." description="A named delegation, Section assignment, required qualification or school agreement may be missing, revoked or expired. Contact your school administrator. Historical grades and issued transcripts are unchanged." />}
      <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {data.sections.map(section => <TeacherFirstWeekCard key={section.id} id={section.id}

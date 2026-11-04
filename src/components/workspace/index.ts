@@ -1,8 +1,11 @@
 export { WorkspaceShell, type WorkspaceShellProps } from "./workspace-shell";
+export { PageFrame, PageHeader, PageEyebrow, PageTitle, type PageWidth } from "./page-frame";
+export { CreateAction, secondaryActionClassName } from "./create-action";
+export { FormSection, FormActions, useUnsavedChangesGuard } from "./form-page";
 export { StatCard, type StatCardProps } from "./stat-card";
 export { EmptyState, type EmptyStateProps } from "./empty-state";
 export { QueryState, type QueryStateProps } from "./query-state";
-export { WorkspacePanel, DetailNavigation, StatusBadge, PersonMark, type StatusTone } from "./workspace-panel";
+export { WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, PersonMark, type StatusTone } from "./workspace-panel";
 export { ContextTray } from "./context-tray";
 export { WorkspaceNotice } from "./notice";
 export { SiteProgramFields, type SiteProgramFieldsProps } from "./site-program-fields";

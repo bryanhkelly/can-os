@@ -20,7 +20,7 @@ export function MasterDetailWorkspace({ title, description, toolbar, list, detai
   return <section aria-label={title} className={cn("min-w-0 border border-border bg-card", className)}>
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-4">
       <div className="min-w-0">
-        <h2 className="font-serif text-[1.7rem] font-normal leading-tight">{title}</h2>
+        <h2 className="font-serif text-section font-normal leading-tight">{title}</h2>
         {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
       </div>
       {toolbar}

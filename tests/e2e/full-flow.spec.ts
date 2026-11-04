@@ -202,7 +202,10 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     await test.step("stage 1b: school year, term, grading period and calendar via School-year Studio", async () => {
       const page = operator.page;
       await goto(page, `/operations/school-years?siteId=${fixture.siteId}&programId=${fixture.programId}`);
-      await expect(page.getByRole("region", { name: "School-year planning steps" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "School years" })).toBeVisible();
+      await page.getByRole("link", { name: "Create school year" }).click();
+      await expect(page).toHaveURL(/\/operations\/school-years\/new\?/);
+      await expect(page.getByRole("heading", { level: 1, name: "Create school year" })).toBeVisible();
       await page.getByRole("button", { name: /standard A.F scale/i }).click();
       await expect
         .poll(() => rowCount(sql, "select id from grade_scales where owning_organization_id = $1", [fixture.schoolOrgId]))
@@ -227,6 +230,10 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         [fixture.schoolOrgId],
       );
       fixture.schoolYearId = year.id;
+      await expect(page).toHaveURL(new RegExp(`/operations/school-years/${year.id}\\?`));
+      await expect(page.getByRole("heading", { level: 1, name: fixture.schoolYearName })).toBeVisible();
+      const sections = page.getByRole("navigation", { name: "School year sections" });
+      await sections.getByRole("link", { name: "Terms" }).click();
       await page.getByLabel("Term name").fill(`FullFlow Year ${fixture.suffix}`);
       await page.getByLabel("Term key").fill(`ff-term-${fixture.suffix}`);
       await page.getByLabel("Term start").fill("2026-08-16");
@@ -242,6 +249,10 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       );
       fixture.termId = term.id;
       await page.getByRole("button", { name: "Add grading period" }).click();
+      await expect
+        .poll(() => rowCount(sql, "select id from grading_periods where term_id = $1", [fixture.termId!]))
+        .toBe(1);
+      await sections.getByRole("link", { name: "Calendar" }).click();
       await page.getByRole("button", { name: "Create calendar" }).click();
       await page.getByRole("button", { name: "Activate year" }).click();
       await expect
@@ -607,7 +618,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Sign and submit enrollment form" })).toHaveCount(0);
 
-      await goto(guardian.page, "/guardian");
+      await goto(guardian.page, "/home");
       await expect(guardian.page.getByRole("region", { name: "Enrollment next steps" })).toBeVisible();
       await expect(guardian.page.getByRole("link", { name: /Review offer/i })).toBeVisible();
       await goto(guardian.page, offersUrl);
@@ -713,7 +724,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       const sp = studentPage!;
       // Follow the learner's real first-week handoff instead of jumping
       // directly to a known assessment URL from the test fixture.
-      await goto(sp, "/student");
+      await goto(sp, "/home");
       await expect(sp.getByRole("region", { name: "Continue learning" })).toBeVisible();
       await expect(sp.getByText("Your first week")).toBeVisible();
       await sp.getByRole("link", { name: /Study.*Solving for x/ }).click();
@@ -801,7 +812,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       )).toBeGreaterThanOrEqual(1);
 
       await goto(operator.page,
-        `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}&action=${followUp.id}`,
+        `/home?siteId=${fixture.siteId}&programId=${fixture.programId}&action=${followUp.id}`,
       );
       await expect(operator.page.getByText(/Guardian requests grade follow-up/)).toBeVisible();
       operator.page.once("dialog", dialog => {
@@ -903,7 +914,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     // ------------------------------------------------------------------
     await test.step("stage 6: operations record, reload, fresh session, negative checks, revocation", async () => {
       const page = operator.page;
-      await goto(page, `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}`);
+      await goto(page, `/home?siteId=${fixture.siteId}&programId=${fixture.programId}`);
       await expect(page.getByRole("region", { name: "School improvement and planning" })).toBeVisible();
       await expect(page.getByText(fixture.programName).first()).toBeVisible();
       await expect(page.getByText("Active students")).toBeVisible();
@@ -922,7 +933,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       });
       const fresh = await openAuthenticatedPage(browser, freshSecret);
       try {
-        await goto(fresh.page, `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}`);
+        await goto(fresh.page, `/home?siteId=${fixture.siteId}&programId=${fixture.programId}`);
         await expect(fresh.page.getByText("Active students")).toBeVisible();
       } finally {
         await fresh.context.close();
@@ -931,12 +942,12 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // Onsite attendance and custody are separate from online learning.
       // A family account must never be granted the staff-only school-day
       // roster or physical release controls merely by knowing the Site IDs.
-      await goto(guardian.page, "/site/day");
+      await goto(guardian.page, "/home");
       await expect(guardian.page.getByText(
         "Sign in with a room facilitator, site staff or site leader membership for this site.",
       )).toBeVisible();
       await expect(guardian.page.getByRole("button", { name: /record.*present|mark present/i })).toHaveCount(0);
-      await goto(unrelatedGuardian.page, "/site/day");
+      await goto(unrelatedGuardian.page, "/home");
       await expect(unrelatedGuardian.page.getByText(
         "Sign in with a room facilitator, site staff or site leader membership for this site.",
       )).toBeVisible();
@@ -983,7 +994,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
 
       for (const denied of [publisher.page, otherOperator.page]) {
-        await goto(denied, `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}`);
+        await goto(denied, `/home?siteId=${fixture.siteId}&programId=${fixture.programId}`);
         await expect(denied.getByText(/authorized staff account|could not be loaded/i)).toBeVisible();
         await expect(denied.getByText(fixture.programName)).toHaveCount(0);
       }

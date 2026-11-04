@@ -279,13 +279,13 @@ function CalendarPage() {
 
   if (search.event) {
     if (loading) {
-      return <WorkspaceShell eyebrow="CAN OS · Calendar" title="Event details">
+      return <WorkspaceShell eyebrow="Calendar" title="Event details">
         <p role="status" className="mt-6">Loading event details...</p>
       </WorkspaceShell>;
     }
 
     if (!selectedEvent) {
-      return <WorkspaceShell eyebrow="CAN OS · Calendar" title="Event unavailable">
+      return <WorkspaceShell eyebrow="Calendar" title="Event unavailable">
         <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">
           This event is unavailable on the requested date in your current calendar.
         </p>
@@ -301,7 +301,7 @@ function CalendarPage() {
 
     return <WorkspaceShell
       width="wide"
-      eyebrow="CAN OS · Calendar"
+      eyebrow="Calendar"
       title={selectedEvent.title}
       subtitle={`${typeLabel(selectedEvent)} · ${formatEventDate(selectedEvent.startsAt, selectedEvent.timezone)} · ${eventTime}`}
       breadcrumbs={<><Link to="/calendar" search={{ ...search, event: undefined }} className="underline">Calendar</Link><span>/</span><span>{selectedEvent.title}</span></>}
@@ -355,13 +355,7 @@ function CalendarPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-6xl">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">CAN OS · Calendar</p>
-        <h1 className="mt-2 font-serif text-4xl">Calendar</h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Site and section events, assignment due dates, and your personal events in one calendar.
-        </p>
+    <WorkspaceShell width="wide" eyebrow="Calendar" title="Calendar" subtitle="Site and section events, assignment due dates, and your personal events in one calendar.">
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3">
           <nav aria-label="Calendar view" className="flex gap-2 text-sm">
             {(["month","agenda"] as const).map(view=><Link key={view} to="/calendar" search={{...search,view}} aria-current={(search.view??"month")===view?"page":undefined}
@@ -462,7 +456,7 @@ function CalendarPage() {
                       {item.source==="assessment"&&data?.viewerRole==="student"
                         ? <Link to="/student/assignments" search={{assessment:item.id.slice("assessment:".length)}} className="underline">{item.title}</Link>
                         : <Link to="/calendar" search={{...search,date:dateKeyInTimezone(item.startsAt,item.timezone),event:item.id}} className="underline">{item.title}</Link>}
-                      {item.cancelled && <span className="ml-2 rounded border border-red-300 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">Cancelled</span>}
+                      {item.cancelled && <span className="ml-2 rounded border border-red-300 px-1 py-0.5 text-3xs font-semibold uppercase tracking-wide text-red-700">Cancelled</span>}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {typeLabel(item)} · {formatTime(item.startsAt, item.timezone)}
@@ -601,7 +595,6 @@ function CalendarPage() {
             )}
           </aside>
         </div>
-      </div>
-    </main>
+    </WorkspaceShell>
   );
 }

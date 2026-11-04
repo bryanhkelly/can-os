@@ -93,6 +93,18 @@ describe("authorized church-local invitation provisioning", () => {
     expect(state.requestAccess).toHaveBeenCalledWith("director@example.test");
   });
 
+  it("returns an invited teacher to their professional profile after secure sign-in", async () => {
+    state.selects.push(
+      [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "church" }],
+      [], [], [],
+    );
+
+    await state.handlers[3]!({ data: { ...input, role: "teacher" } });
+
+    expect(state.requestAccess).toHaveBeenCalledWith("director@example.test", undefined, "/profiles");
+  });
+
   it("provisions a pending publisher with only the exact-Site website relationship", async () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],

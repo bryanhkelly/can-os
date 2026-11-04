@@ -21,13 +21,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..");
 const routesDir = join(repoRoot, "src", "routes");
 
-/** "student.assignments.tsx" -> "/student/assignments"; "student.index.tsx" -> "/student" */
+/** "student.assignments.tsx" -> "/student/assignments"; "student.index.tsx" -> "/home" */
 function routePathFor(file: string): string | null {
   const base = file.replace(/\.(tsx|ts)$/, "");
   if (base === "__root") return null;
   const segments = base.split(".");
   if (segments[segments.length - 1] === "index") segments.pop();
-  return "/" + segments.join("/");
+  return "/" + segments.map(segment => segment.replace(/_$/, "")).join("/");
 }
 
 const routeFiles = readdirSync(routesDir).filter((f) => /\.(tsx|ts)$/.test(f));

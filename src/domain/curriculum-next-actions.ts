@@ -1,4 +1,5 @@
 import type { JourneyEvidence } from "./curriculum-journey-readiness";
+import { plural, agree } from "@/lib/format";
 
 /** Operational guidance for the school registrar; no E2E or credit claims. */
 export type CurriculumNextAction={
@@ -19,13 +20,13 @@ export function schoolCurriculumNextActions(evidence:JourneyEvidence):Curriculum
   const noStudents=classes.filter(c=>!c.studentCount).length;
   const noAssignments=classes.filter(c=>c.teacherCount>0&&!c.assignedAssessmentCount).length;
   if(noLessons)actions.push({key:"content",title:"Review classes without published lesson content",
-   detail:`${noLessons} class(es) reference a course with no published lessons. Verify the pinned publisher release.`,destination:"launch"});
+   detail:`${plural(noLessons,"class","classes")} ${agree(noLessons,"references","reference")} a course with no published lessons. Verify the pinned publisher release.`,destination:"launch"});
   if(noTeachers)actions.push({key:"teachers",title:"Assign teaching staff",
-   detail:`${noTeachers} class(es) still need an assigned teacher.`,destination:"launch"});
+   detail:`${plural(noTeachers,"class","classes")} still ${agree(noTeachers,"needs","need")} an assigned teacher.`,destination:"launch"});
   if(noStudents)actions.push({key:"students",title:"Review class enrollment",
-   detail:`${noStudents} class(es) have no active enrolled students. Complete the normal school enrollment and scheduling process.`,destination:"none"});
+   detail:`${plural(noStudents,"class","classes")} ${agree(noStudents,"has","have")} no active enrolled students. Complete the normal school enrollment and scheduling process.`,destination:"none"});
   if(noAssignments)actions.push({key:"assignments",title:"Coordinate first classroom assignments",
-   detail:`${noAssignments} staffed class(es) have no published assessments yet. Ask assigned teachers to use their class planning workspace.`,destination:"none"});
+   detail:`${plural(noAssignments,"staffed class","staffed classes")} ${agree(noAssignments,"has","have")} no published assessments yet. Ask assigned teachers to use their class planning workspace.`,destination:"none"});
  }
  return actions;
 }

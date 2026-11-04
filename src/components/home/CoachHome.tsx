@@ -1,5 +1,5 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { Users, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
@@ -9,13 +9,6 @@ import {
   getCoachStudentHistory,
   logCoachOutreach,
 } from "@/modules/support/coach.functions";
-
-export const Route = createFileRoute("/coach")({
-  validateSearch: (search: Record<string,unknown>):{student?:string}=>({student:typeof search.student==="string"?search.student:undefined}),
-  component:()=>{const search=Route.useSearch();const navigate=Route.useNavigate();
-    return <CoachPage key={search.student??"all"} studentProfileId={search.student}
-      selectStudent={student=>void navigate({search:{student}})}/>;},
-});
 
 type CaseloadStudent = Awaited<ReturnType<typeof getCoachCaseload>>["students"][number];
 type TimelineEntry = Awaited<ReturnType<typeof getCoachStudentHistory>>["timeline"][number];
@@ -107,7 +100,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
   }
 
   return (
-    <DashboardHome eyebrow="CAN OS · Student support" title={title}
+    <DashboardHome eyebrow={title}
       subtitle="Students at your sites with open referrals, support plans, insights, or actions — sorted by what needs attention first."
       shortcuts={<>
         <DashboardShortcut title="Caseload" description={loading?"Loading assigned students":error?"Caseload unavailable":`${students.length} students in scope`} icon={<Users className="size-5" />}><a href="#support-caseload" /></DashboardShortcut>

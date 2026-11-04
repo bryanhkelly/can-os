@@ -10,6 +10,7 @@ import {
   programs,
   sectionTeachers,
   studentProfiles,
+  sites,
 } from "@/db/schema";
 import {
   assertCapability,
@@ -594,11 +595,17 @@ export async function recordAttendanceRevision(
       "@/modules/operations/site-local-delegation.server");
     if (siteActor.role === "site_leader") {
       await requireCurrentSiteLocalDelegate(tx, siteActor, input.programId, "site_director");
-    } else if (await requiresIndependentChurchLocalDelegation(tx, input.programId)) {
-      if (!input.sectionId) throw new AuthorizationError("named Section for facilitator attendance");
-      const { requireCurrentSectionFacilitator } = await import(
-        "@/modules/operations/site-section-facilitators.server");
-      await requireCurrentSectionFacilitator(tx, siteActor, input.programId, input.sectionId);
+    } else {
+      const { siteUsesRoomCoverage } = await import("@/modules/operations/room-coverage.server");
+      await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, input.siteId!)).for("share");
+      const roomBound = await siteUsesRoomCoverage(tx, input.siteId!);
+      if (roomBound || await requiresIndependentChurchLocalDelegation(tx, input.programId)) {
+        if (!input.sectionId) throw new AuthorizationError("named Section for facilitator attendance");
+        const { requireCurrentSectionFacilitator } = await import(
+          "@/modules/operations/site-section-facilitators.server");
+        const date = input.requireExpectedOnsiteDate ?? /^(\d{4}-\d{2}-\d{2}):site-day$/.exec(input.occurrenceKey)?.[1];
+        await requireCurrentSectionFacilitator(tx, siteActor, input.programId, input.sectionId, date);
+      }
     }
   }
   const sourceKey="manual-revision:"+input.mutationId;

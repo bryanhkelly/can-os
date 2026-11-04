@@ -14,7 +14,8 @@ const pageFiles = readdirSync("src/routes").filter(
 );
 const pages = pageFiles.map((file) => {
   const name = file.slice(0, -4);
-  return name === "index" ? "/" : "/" + name.replace(/\.index$/, "").replaceAll(".", "/");
+  // "list_.new" is a non-nested TanStack route served at /list/new.
+  return name === "index" ? "/" : "/" + name.replace(/\.index$/, "").replaceAll(".", "/").replace(/_(?=\/|$)/g, "");
 });
 
 const errors = [];

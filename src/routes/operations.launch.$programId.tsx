@@ -15,7 +15,7 @@ export const Route = createFileRoute("/operations/launch/$programId")({
 function LaunchAcademicSetup() {
   const result = Route.useLoaderData();
   if (!result.ok) {
-    return <LoaderFailure eyebrow="CAN OS · School launch" title="Academic provisioning" outcome={result} />;
+    return <LoaderFailure eyebrow="School launch" title="Academic provisioning" outcome={result} />;
   }
   return <LaunchAcademicSetupWorkspace data={result.data} />;
 }

@@ -25,6 +25,7 @@ import {
   scheduleLaunchOrientation,
   type listLaunches,
 } from "@/modules/programs/launch.functions";
+import { plural } from "@/lib/format";
 
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 
@@ -56,7 +57,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     <h2 className="font-serif text-2xl">This launch is unavailable</h2>
     <p className="mt-3 text-sm">The requested Program is no longer in your pre-opening launch scope.
       It may have opened or your access may have changed.</p>
-    <Link to="/operations" search={{ siteId: selectedSiteId, programId: selectedProgramId }}
+    <Link to="/home" search={{ siteId: selectedSiteId, programId: selectedProgramId }}
       className="mt-4 inline-block font-semibold underline">Review the operating workspace →</Link>
     <Link to="/operations/launch" search={{ siteId: selectedSiteId, programId: undefined }}
       className="ml-4 mt-4 inline-block font-semibold underline">Choose an available launch →</Link>
@@ -229,8 +230,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       {Boolean(next.evidenceStatementCount) && <p className="mt-1 text-xs">Statements submitted: {next.evidenceStatementCount} · Recorded for review, not approved.</p>}
       {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries: {next.evidenceCount ?? 0}</p>}
       {next.requiresRegistrarReview && <p className="mt-2 text-sm font-semibold">This requirement needs the registrar evidence-review workflow; it cannot be self-certified.</p>}
-      {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">{next.latestReviewStatus === "rejected" ? "Latest evidence review was rejected; follow up through the registrar workflow." : `${next.rejectedReviewCount} historical rejection(s); latest review: ${next.latestReviewStatus ?? "unknown"}.`}</p>}
-      {Boolean(next.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">{next.reviewNoteCount} registrar review note(s) on record.</p>}
+      {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">{next.latestReviewStatus === "rejected" ? "Latest evidence review was rejected; follow up through the registrar workflow." : `${plural(next.rejectedReviewCount ?? 0, "historical rejection")}; latest review: ${next.latestReviewStatus ?? "unknown"}.`}</p>}
+      {Boolean(next.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">{plural(next.reviewNoteCount ?? 0, "registrar review note")} on record.</p>}
       {next.evidenceReviewCorrectionPending && <p role="status" className="mt-2 text-sm font-semibold">Correction required before this evidence can be reviewed again.</p>}
       {next.pendingEvidenceReview && <p role="status" className="mt-2 text-sm font-semibold">Evidence submitted; awaiting a CAN institutional decision.</p>}
       {next.latestReviewStatus === "rejected" && next.latestReviewReason && <p className="mt-2 rounded-lg border p-3 text-sm">Correction requested: {next.latestReviewReason}</p>}

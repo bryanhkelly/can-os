@@ -6,6 +6,7 @@ import type { listExpectedOnsiteRoster } from "@/modules/attendance/onsite-atten
 import {
   attestOnsiteDayReview, getOnsiteDayReview,
 } from "@/modules/operations/onsite-day-review.functions";
+import { plural, agree } from "@/lib/format";
 
 type Roster = Awaited<ReturnType<typeof listExpectedOnsiteRoster>>;
 type Review = Awaited<ReturnType<typeof getOnsiteDayReview>>;
@@ -67,8 +68,8 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
     </div>
     {(review?.schoolDay?.staffing.interruptedBlocks??0)>0&&
       <p role="alert" className="mt-4 rounded border p-3 text-sm">
-        <strong>Onsite supervision interruption:</strong> {review!.schoolDay.staffing.interruptedBlocks}
-        {" "}scheduled block(s) have a reported early departure, temporary absence or
+        <strong>Onsite supervision interruption:</strong> {plural(review!.schoolDay.staffing.interruptedBlocks, "scheduled block")}
+        {" "}{agree(review!.schoolDay.staffing.interruptedBlocks, "has", "have")} a reported early departure, temporary absence or
         uncovered handoff. The earlier witnessed arrival no longer establishes
         continued coverage. Arrange current supervision and review the incident
         before treating the campus as safely covered.
@@ -81,10 +82,10 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
         <p>Awaiting release<strong className="mt-1 block text-xl">{review.custody.pendingReleaseEntries}</strong></p>
         <p>Open follow-ups<strong className="mt-1 block text-xl">{review.custody.uncollectedFollowUps}</strong></p>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">{review.custody.deniedAttempts} denied pickup attempt(s) are linked to this snapshot. Pending release does not block an attendance-only attestation and never implies departure.</p>
+      <p className="mt-3 text-xs text-muted-foreground">{plural(review.custody.deniedAttempts, "denied pickup attempt")} {agree(review.custody.deniedAttempts, "is", "are")} linked to this snapshot. Pending release does not block an attendance-only attestation and never implies departure.</p>
     </div>}
     <p className="mt-3 text-xs text-muted-foreground">
-      {summary.distinctStudentCount} distinct students across {summary.programs.length} program(s).
+      {plural(summary.distinctStudentCount, "distinct student")} across {plural(summary.programs.length, "program")}.
       Counts are program-attendance entries; they are not a physical headcount.
     </p>
     {summary.issues.length>0&&<>

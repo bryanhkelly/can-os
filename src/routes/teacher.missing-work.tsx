@@ -16,7 +16,7 @@ export const Route = createFileRoute("/teacher/missing-work")({
 
 function TeacherMissingWork() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Teacher" title="Missing work" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Teacher" title="Missing work" outcome={outcome} />;
   return <TeacherMissingWorkView data={outcome.data} />;
 }
 
@@ -30,10 +30,9 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Teacher"
+      eyebrow="Teacher"
       title="Missing work"
       subtitle="Overdue missing submissions and returned revisions for actively enrolled students in your classes."
-      actions={<p className="mt-2 text-xs"><Link to="/notifications" className="underline">Teacher notifications →</Link></p>}
     >
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating follow-up..."/>
       {!connected && <p role="status" className="mt-4 rounded-xl border p-4">Neon is not connected. The queue cannot load.</p>}

@@ -39,7 +39,7 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
       <header className="classroom-header">
         <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap gap-2 text-xs text-muted-foreground"><Link to="/classes" className="underline">My classes</Link><span>/</span>{title}{lessonPosition && <><span>/</span><span>Lesson {lessonPosition.current}</span></>}</nav>
         <div className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0 flex-1">
-        <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-foreground">CAN OS / Your classroom</p>
+        <p className="can-eyebrow">Your classroom</p>
         <h1 className="mt-2 font-serif text-2xl font-normal tracking-tight sm:text-3xl">{title}</h1>
         {lessonTitle && <h2 className="mt-1 font-serif text-lg font-normal tracking-tight sm:text-xl">{lessonTitle}</h2>}
         <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>

@@ -28,11 +28,11 @@ describe("standalone public site HTML", () => {
     expect(html).toContain("4 seats remaining");
     expect(html).not.toContain("<script");
     expect(html).toContain('href="/" aria-current="page"');
-    expect(html).not.toContain('href="/guardian');
+    expect(html).not.toContain('href="/home');
     expect(html).not.toContain("guardian/enrichment");
     expect(html).not.toContain("studentProfileId");
   });
-  it("makes synthetic local previews genuinely navigable without opening public applications", () => {
+  it("makes synthetic local previews navigable with eligible, consent-gated inquiry forms", () => {
     const original={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"Synthetic school"},
       demonstration:true,offerings:[],academicPrograms:[{programId:"school-a",title:"Hybrid High School",
       typeLabel:"High school",summary:"A fictional example",grades:{min:"9",max:"12"},
@@ -44,16 +44,43 @@ describe("standalone public site HTML", () => {
     expect(paths).toContain("/student-life");
     expect(paths).toContain("/families");
     for(const path of paths){
-      const html=renderPublicSiteHtml(preview,{path,localPreview:true,localPreviewSlug:"valorschool"});
+      const html=renderPublicSiteHtml(preview,{path,localPreview:true,localPreviewSlug:"valorschool",
+        localPreviewSubmissionsEnabled:true,makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
       expect(html).toContain('href="/published-site?site=valorschool"');
       expect(html).not.toContain('href="/academics"');
-      expect(html).not.toContain('action="/inquiry"');
       expect(html).not.toContain('action="/apply"');
+      if(["/", "/academics", "/admissions", "/contact"].includes(path)) {
+        expect(html).toContain('action="/published-site/inquiry?site=valorschool"');
+      } else {
+        expect(html).not.toContain("<form");
+      }
       expect(html).toContain('content="noindex,nofollow"');
     }
+    const academics=renderPublicSiteHtml(preview,{path:"/academics",localPreview:true,
+      localPreviewSlug:"valorschool",localPreviewSubmissionsEnabled:true,
+      makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
+    expect(academics).toContain('id="program-inquiry-school-a"');
+    expect(academics).toContain("I agree to be contacted about this program.");
+    expect(academics).not.toContain("Applications available · identity verification required");
     expect(renderPublicSiteHtml(preview,{path:"/student-life",localPreview:true,
       localPreviewSlug:"valorschool"})).toContain("Robotics &amp; Design Lab");
+    const readOnly=renderPublicSiteHtml(preview,{path:"/academics",localPreview:true,
+      localPreviewSlug:"valorschool",makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
+    expect(readOnly).not.toContain("<form");
     expect(availablePublicSitePaths(original)).not.toContain("/about");
+  });
+
+  it("routes locally previewed application forms through the canonical verification endpoint only when authorized",()=>{
+    const page={host:"sample.can-os.com",site:{name:"Sample",organizationName:"Sample Church"},
+      offerings:[],academicPrograms:[{programId:"program-id",title:"School Program",
+        typeLabel:"School",summary:"Reviewed details",grades:{min:"9",max:"12"},
+        delivery:{onsite:true,liveOnline:false,asynchronous:true,onsiteDaysPerWeek:2},
+        availability:"operating" as const,applicationOpen:true}]};
+    const html=renderPublicSiteHtml(page,{localPreview:true,localPreviewSlug:"sample",
+      localPreviewSubmissionsEnabled:true,makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
+    expect(html).toContain('action="/published-site/family-start?site=sample"');
+    expect(html).toContain("Verify email to apply");
+    expect(html).not.toContain('action="/apply"');
   });
 
   it("uses the same editorial page composition for two distinct churches, not only Valor", () => {
@@ -399,14 +426,19 @@ describe("standalone public site HTML", () => {
       academicPrograms: page.academicPrograms.map(program => ({
         ...program, applicationOpen: true,
       })),
-    }, { ...opts, localPreview: true });
+    }, { ...opts, localPreview: true, localPreviewSlug: "academy",
+      localPreviewSubmissionsEnabled: true });
     expect(localPreview).toContain("Hybrid Academy");
-    expect(localPreview).toContain("Local read-only preview");
-    expect(localPreview).toContain("Applications available on the live website only");
-    expect(localPreview).not.toContain("<form");
+    expect(localPreview).toContain("Local preview. Eligible inquiry forms submit to the development database");
+    expect(localPreview).toContain("Applications available · identity verification required");
+    expect(localPreview).toContain('action="/published-site/family-start?site=academy"');
+    expect(localPreview).toContain('action="/published-site/inquiry?site=academy"');
     expect(localPreview).not.toContain('action="/apply"');
     expect(localPreview).not.toContain('action="/inquiry"');
-    expect(localPreview).not.toContain("use the request-information form");
+    const readOnly = renderPublicSiteHtml(page, { ...opts, localPreview: true,
+      localPreviewSlug: "academy" });
+    expect(readOnly).toContain("Local read-only preview");
+    expect(readOnly).not.toContain("<form");
   });
 
 

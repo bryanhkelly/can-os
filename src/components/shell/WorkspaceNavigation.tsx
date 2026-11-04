@@ -1,6 +1,6 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import {useLocation} from "@tanstack/react-router";
-import {useEffect,useState,type ReactNode} from "react";
+import {useEffect,useState,useSyncExternalStore,type ReactNode} from "react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
@@ -11,6 +11,26 @@ import {WorkspaceNavigationPanels} from "./WorkspaceNavigationPanels";
 
 export {SidebarLinks} from "./WorkspaceSidebarLinks";
 export {workspaceHome,workspaceLinks} from "./workspace-navigation.registry";
+
+// Presentation-only desktop sidebar preference. The server snapshot is "expanded" so
+// SSR markup is stable; the stored value applies after hydration.
+const sidebarPreferenceKey="can-os:sidebar";
+const sidebarListeners=new Set<()=>void>();
+let sidebarMemory=false;
+function readSidebarCollapsed(){
+ try{return window.localStorage.getItem(sidebarPreferenceKey)==="collapsed"}catch{return sidebarMemory}
+}
+function writeSidebarCollapsed(collapsed:boolean){
+ sidebarMemory=collapsed;
+ try{window.localStorage.setItem(sidebarPreferenceKey,collapsed?"collapsed":"expanded")}catch{/* storage unavailable */}
+ sidebarListeners.forEach(listener=>listener());
+}
+function subscribeSidebarPreference(listener:()=>void){
+ sidebarListeners.add(listener);
+ const onStorage=(event:StorageEvent)=>{if(event.key===sidebarPreferenceKey)listener()};
+ window.addEventListener("storage",onStorage);
+ return()=>{sidebarListeners.delete(listener);window.removeEventListener("storage",onStorage)};
+}
 
 export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const location=useLocation();
@@ -23,6 +43,8 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const [switcherOpen,setSwitcherOpen]=useState(false);
  const [accountOpen,setAccountOpen]=useState(false);
  const [sidebarExpanded,setSidebarExpanded]=useState(false);
+ const sidebarCollapsed=useSyncExternalStore(subscribeSidebarPreference,readSidebarCollapsed,()=>false);
+ const toggleSidebarCollapsed=()=>writeSidebarCollapsed(!sidebarCollapsed);
  const focusedClassroom=isFocusedClassroomRoute(location.pathname,location.searchStr,
   session?.authenticated?session.role:null);
  useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
@@ -37,7 +59,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   if(!target)throw new Error("This membership is unavailable.");
   const response=await fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:id})});
   if(!response.ok)throw new Error("Unable to change membership");
-  window.location.assign(target.role==="student"?"/":getWorkspaceHome(target.role)??"/");
+  window.location.assign(getWorkspaceHome(target.role)??"/");
  };
  const signOut=async()=>{
   const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
@@ -54,15 +76,16 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   }
  }
  return <div data-density={preferences?.density} data-reduce-motion={preferences?.reduceMotion?"true":undefined}>
- <div className={current ? focusedClassroom ? `classroom-navigation ${sidebarExpanded ? "classroom-navigation-expanded" : ""}` : "min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]" : "min-h-screen"}>
- {current&&<WorkspaceSidebar member={current} sites={authenticated?.sites??[]} links={links} activePath={activePath}
-  focused={focusedClassroom} expanded={sidebarExpanded} onToggle={()=>setSidebarExpanded(value=>!value)}/>}
+ <div data-sidebar={current&&!focusedClassroom&&sidebarCollapsed?"collapsed":undefined} className={current ? focusedClassroom ? `classroom-navigation ${sidebarExpanded ? "classroom-navigation-expanded" : ""}` : "can-shell" : "min-h-screen"}>
+ {current&&<WorkspaceSidebar member={current} links={links} activePath={activePath}
+  focused={focusedClassroom} expanded={focusedClassroom?sidebarExpanded:!sidebarCollapsed}
+  onToggle={focusedClassroom?()=>setSidebarExpanded(value=>!value):toggleSidebarCollapsed}/>}
  <div className="min-w-0"><WorkspaceTopBar member={current} sites={authenticated?.sites??[]} authenticated={Boolean(authenticated)}
   sessionAvailable={Boolean(session)} sessionError={sessionError} error={error}
   demoAccountSwitching={authenticated?.demoAccountSwitching===true} changing={changing}
   demoTenant={authenticated?.demoTenant===true}
   focused={focusedClassroom}
-  menuOpen={menuOpen} switcherOpen={switcherOpen} accountOpen={accountOpen}
+  menuOpen={menuOpen} switcherOpen={switcherOpen} accountOpen={accountOpen} notificationsOpen={tray==="notifications"}
   onToggleMenu={()=>setMenuOpen(value=>!value)}
   onOpenSwitcher={()=>{setSwitcherError("");setSwitcherOpen(true)}}
   onOpenSearch={()=>window.dispatchEvent(new Event(openPaletteEvent))}

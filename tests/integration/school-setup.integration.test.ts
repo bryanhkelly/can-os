@@ -11,6 +11,7 @@ import { startProgramLaunch } from "@/modules/programs/program-launch-service";
 import { assertSitePublicationScope } from "@/domain/site-publication-policy";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { EventTypes } from "@/domain/event-types";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const state = vi.hoisted(() => ({ tx: undefined as Transaction | undefined }));
@@ -132,6 +133,31 @@ integration("public demo school canonical setup", () => {
           eq(schema.domainEvents.eventType, EventTypes.StaffInvitationAccepted),
         ));
         expect(accepted).toHaveLength(1);
+        const verifiedIdentity = async () => {
+          const [identity] = await tx.select({
+            accepted: verifiedStaffIdentityPredicate(), emailVerifiedAt: schema.accessAccounts.emailVerifiedAt,
+          }).from(schema.accountPersonGrants).innerJoin(schema.accessAccounts,
+            eq(schema.accessAccounts.id, schema.accountPersonGrants.accountId))
+            .where(eq(schema.accountPersonGrants.id, staffGrant.id));
+          return identity;
+        };
+        expect(await verifiedIdentity()).toEqual({ accepted: true, emailVerifiedAt: null });
+        await tx.update(schema.demoSchoolTenants).set({ enabled: false })
+          .where(eq(schema.demoSchoolTenants.siteId, first.siteId));
+        expect((await verifiedIdentity())?.accepted).toBe(false);
+        await tx.update(schema.demoSchoolTenants).set({ enabled: true })
+          .where(eq(schema.demoSchoolTenants.siteId, first.siteId));
+        await tx.update(schema.accessAccounts).set({
+          emailNormalized: `changed-${suffix}@example.test`, emailVerifiedAt: new Date(),
+        }).where(eq(schema.accessAccounts.id, staffAccount.id));
+        expect((await verifiedIdentity())?.accepted).toBe(false);
+        await tx.update(schema.accessAccounts).set({ emailNormalized: staffEmail, emailVerifiedAt: null })
+          .where(eq(schema.accessAccounts.id, staffAccount.id));
+        await tx.update(schema.accountPersonGrants).set({ role: "site_admin" })
+          .where(eq(schema.accountPersonGrants.id, staffGrant.id));
+        expect((await verifiedIdentity())?.accepted).toBe(false);
+        await tx.update(schema.accountPersonGrants).set({ role: "teacher" })
+          .where(eq(schema.accountPersonGrants.id, staffGrant.id));
         await tx.update(schema.accountPersonGrants).set({ active: false })
           .where(eq(schema.accountPersonGrants.id, staffGrant.id));
         await expect(redeemDemoAccess(staffEmail, "000000")).rejects.toThrow("Invalid demo credentials");

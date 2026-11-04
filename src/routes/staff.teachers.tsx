@@ -19,7 +19,7 @@ function StaffTeachersPage() {
   );
 
   return (
-    <WorkspaceShell eyebrow="CAN OS · Staff" title="Teacher directory"
+    <WorkspaceShell eyebrow="Staff" title="Teacher directory"
       subtitle="Teachers leading sections at your school sites, with current rosters.">
         <Field label="Search by name" className="mt-8 max-w-sm">
           <Input

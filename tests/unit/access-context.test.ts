@@ -10,6 +10,13 @@ describe("provider-independent authorization context",()=>{
   expect(ctx.scope.siteIds).toEqual(["site-1"]);
   expect(ctx.grantSiteId).toBe("site-1");
  });
+ it("limits the student self-profile capability to student membership",()=>{
+  const context=resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},
+   [{...grant,role:"student"}]);
+  expect(context.capabilities.has("profiles.self_profile.manage")).toBe(true);
+  expect(context.capabilities.has("profiles.credentials.verify")).toBe(false);
+  expect(context.capabilities.has("admin.manage")).toBe(false);
+ });
  it("preserves original organization-wide membership when its effective site list expands",()=>{
   const context=resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},
    [{...grant,role:"registrar",siteId:null}]);

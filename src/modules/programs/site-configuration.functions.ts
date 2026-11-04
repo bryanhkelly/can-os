@@ -288,6 +288,12 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     });
     const [publication]=await db.select({status:sitePublications.status})
       .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
+    // Website pages require a separate institutional publisher grant; registrar authority alone is not enough.
+    const {requireSitePublisher}=await import("@/modules/sites/site-publication.server");
+    const canPublish=await requireSitePublisher(actor,site.id).then(()=>true,(error:unknown)=>{
+      if(error instanceof AuthorizationError)return false;
+      throw error;
+    });
     const {address,metadata,...identity}=site;
     const physical=readSitePhysicalAddress(address);
     const savedIdentityRevision=typeof metadata.siteIdentityRevision==="string"
@@ -297,7 +303,8 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
     const savedContactRevision=typeof metadata.siteContactRevision==="string"
       ? metadata.siteContactRevision:null;
     return {
-      ...identity,revision:site.updatedAt.toISOString(),identityRevision:savedIdentityRevision,
+      ...identity,organization:displayName(site.organizationId),
+      revision:site.updatedAt.toISOString(),identityRevision:savedIdentityRevision,
       updatedAt:site.updatedAt.toISOString(),
       physicalLocation:{value:physical.value,source:"church_site_record" as const,
         configurationStatus:physical.status,
@@ -322,7 +329,7 @@ export const getLaunchSiteConfiguration = createServerFn({method:"GET"})
         jurisdictionApprovalStatus:"not_asserted" as const,
         locationReviewState:savedLocationRevision?"independent_review_required" as const:"unverified_legacy" as const,
       })),
-      publication:{status:publication?.status??"unconfigured",
+      publication:{status:publication?.status??"unconfigured",canPublish,
         publicReachability:"not_asserted" as const},
       contact:{value:serializableJson(draftSiteContactSchema.safeParse(metadata.setupContact).success ? draftSiteContactSchema.parse(metadata.setupContact) : null),
         source:"church_site_draft" as const,revision:savedContactRevision,

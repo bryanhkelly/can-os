@@ -1,3 +1,4 @@
+import { WorkspaceShell } from "@/components/workspace";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute } from "@tanstack/react-router";
@@ -73,12 +74,7 @@ function AccountSessionsPage() {
    refresh: async () => { if (!redirected) await loadSessions(); } });
  }
 
- return <main className="mx-auto max-w-3xl px-5 py-10">
-  <h1 className="font-serif text-3xl">Account sessions</h1>
-  <p className="mt-3 text-sm text-muted-foreground">
-   Manage the active sign-ins belonging to your account, across every school membership.
-   Revoking a session immediately prevents further authenticated requests from it.
-  </p>
+ return <WorkspaceShell width="reading" eyebrow="Account" title="Account sessions" subtitle="Manage the active sign-ins belonging to your account, across every school membership. Revoking a session immediately prevents further authenticated requests from it.">
   <p className="mt-2 text-xs text-muted-foreground">
    Device names and locations are not collected yet. Sessions are identified by when they began
    and when you last interacted with CAN OS.
@@ -114,5 +110,5 @@ function AccountSessionsPage() {
     This revokes every server session for your account, including this session.
    </p>
   </div>
- </main>;
+ </WorkspaceShell>;
 }

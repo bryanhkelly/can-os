@@ -29,7 +29,7 @@ export function GuidedSchoolJourney({program,journey}:{
             <span className="text-xs text-muted-foreground">Step {index+1} · Suggested: {step.suggestedRole}</span>
             <h4 className="mt-1 font-semibold">{step.title}</h4>
           </div>
-          <span className="rounded-full border px-2 py-1 text-[11px] whitespace-nowrap">
+          <span className="rounded-full border px-2 py-1 text-2xs whitespace-nowrap">
             {step.state==="recorded"?"Recorded":step.state==="review"?"Review":"Needs setup"}
           </span>
         </div>

@@ -5,6 +5,11 @@ import type { ProgramType } from "./program-offerings";
 
 export const FAMILY_INVITATION_BATCH_KIND = "family_invitation_batch" as const;
 export const FAMILY_INVITATION_MAX_RECIPIENTS = 50;
+export const FAMILY_INVITATION_LINK_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function isFamilyInvitationExpired(createdAt: Date, now = new Date()): boolean {
+  return now.getTime() >= createdAt.getTime() + FAMILY_INVITATION_LINK_LIFETIME_MS;
+}
 
 export const familyInvitationSendInput = z.object({
   requestId: z.string().uuid(),

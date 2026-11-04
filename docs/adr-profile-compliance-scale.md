@@ -45,12 +45,26 @@ an agent nor a seed script should choose a license-versus-degree policy simply
 to make a demo eligible.
 
 Current code supports basic catalog definitions, private PDF/JPEG/PNG evidence,
-claims, independent review and effective-dated Program policies. It does not
-establish a dedicated structured resume editor or specialized degree/license
-validation merely by accepting a catalog entry. The current launch policy
-editor publishes nonempty sets of required qualifications before opening;
-active-Program policy repair requires a separately reviewed migration.
-Missing policy or evidence remains a readiness blocker, not implicit approval.
+claims, independent review and effective-dated Program policies. Teachers can
+also record education, teaching experience and specialties in a private,
+self-reported professional profile. Those details are not evidence and do not
+verify a degree, license or certificate; submit those through qualification
+claims for independent review. Identity documents such as a driver's license
+are not universal teacher requirements; collect them only when an applicable
+school/program policy requires them, using restricted evidence storage and
+scoped review. This does not establish a structured resume editor or
+specialized degree/license validation merely by accepting a catalog entry.
+The current launch policy editor publishes nonempty sets of required
+qualifications before opening; active-Program policy repair requires a
+separately reviewed migration. Missing policy or evidence remains a readiness
+blocker, not implicit approval.
+
+Students may complete a lightweight, optional self-profile with a preferred
+name, pronouns and interests. Student sign-in access returns them to their own
+profile after the existing guardian-consent and school-approval handoff; it
+does not gate their learning workspace. Legal identity, grade, enrollment and
+student access remain school-managed. The existing private profile-photo flow
+is reused.
 
 Synthetic demonstrations use the same records, policies and authorization.
 Simulated evidence must be explicitly labeled and never represented as real

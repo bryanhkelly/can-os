@@ -3,7 +3,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { Building2, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
 import { listNetworkAffiliations, reviewNetworkAffiliation } from "@/modules/networks/network-affiliations.functions";
@@ -11,19 +11,15 @@ import { EmptyState } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-export const Route = createFileRoute("/network")({
-  loader: safeLoader(async () => {
+export const loadNetworkHome = safeLoader(async () => {
     const [sites, affiliations] = await Promise.all([getNetworkSites(), listNetworkAffiliations()]);
     return { ...sites, affiliations: affiliations.entries };
   }, {
     authMessage: "Sign in with a verified denomination HQ administrator membership.",
-  }),
-  component: NetworkHome,
-});
+  });
 
-function NetworkHome() {
-  const result = Route.useLoaderData();
-  if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Network" title="Denomination HQ" outcome={result}/>;
+export function NetworkHome({ result }: { result: Awaited<ReturnType<typeof loadNetworkHome>> }) {
+  if (!result.ok) return <LoaderFailure eyebrow="Network" title="Denomination HQ" outcome={result}/>;
   return <NetworkSites data={result.data} />;
 }
 
@@ -56,7 +52,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
       } }), { successMessage: "Affiliation decision recorded.", commandErrorMessage: "Unable to review affiliation." });
   }
 
-  return <DashboardHome eyebrow="CAN OS · Network partner" title={data.organization.name}
+  return <DashboardHome eyebrow={data.organization.name}
     subtitle="Denomination HQ can establish and manage its own locations. This does not grant access to school academic records or enroll students."
     shortcuts={<>
       <DashboardShortcut title="Affiliations" description={`${data.affiliations.filter(entry=>entry.status==="pending").length} requests pending review`} icon={<ClipboardList className="size-5" />}><a href="#network-affiliations" /></DashboardShortcut>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { plural } from "@/lib/format";
 
 /** Presentation-only invitation status; delivery and identity remain server authoritative. */
 export interface FamilyInvitationRecipientStatus {
@@ -32,7 +33,7 @@ export function FamilyInvitationBatchList({
         <p className="mt-1 text-xs text-muted-foreground">
           {new Date(batch.createdAt).toLocaleString()} · {batch.status} · {batch.outboxStatus ?? "Queued for dispatch"}
         </p>
-        <p className="mt-2 text-sm">{batch.recipients.length} recipient(s): {responded} verified a link; {providerAccepted} provider accepted; {retrying} require retry.</p>
+        <p className="mt-2 text-sm">{plural(batch.recipients.length, "recipient")}: {responded} verified a link; {providerAccepted} provider accepted; {retrying} require retry.</p>
         {retrying > 0 && <button type="button" disabled={busy} onClick={() => onRetry(batch.id)}
           className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           Retry unaccepted invitations

@@ -31,10 +31,10 @@ function GuardianHealthPage() {
     return () => { current = false; };
   }, [student, refreshKey]);
 
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Family"
+  return <WorkspaceShell width="wide" eyebrow="Family"
     title="Health and return-to-school"
     subtitle="Review the school's recorded health instructions, compliance status and return clearance. Medical decisions and changes require authorized school review."
-    breadcrumbs={<><Link to="/guardian" search={{student}} className="underline">Family home</Link><span>/</span><span>Health</span></>}>
+    breadcrumbs={<><Link to="/home" search={{student}} className="underline">Family home</Link><span>/</span><span>Health</span></>}>
     <div className="mt-6 flex flex-wrap gap-3 text-sm">
       <button type="button" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}
         className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">

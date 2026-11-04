@@ -22,7 +22,7 @@ export const Route = createFileRoute("/teacher/discussions")({
 function TeacherDiscussions() {
   const outcome = Route.useLoaderData();
   const {section,lesson}=Route.useSearch();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Teacher" title="Class discussions" outcome={outcome}/>;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Teacher" title="Class discussions" outcome={outcome}/>;
   return <TeacherDiscussionsView key={section+":"+(lesson??"all")} data={outcome.data}/>;
 }
 export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<typeof getTeacherCourseDiscussions>> }) {
@@ -41,7 +41,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
     await mutation.run(command, { successMessage: "Class discussion updated.",
       commandErrorMessage: "Unable to update class discussion." });
   }
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Teacher" title="Class discussions"
+  return <WorkspaceShell width="wide" eyebrow="Teacher" title="Class discussions"
     subtitle="Discuss classwork with enrolled students. The assigned teaching team can respond, lock discussions and moderate posts."
     breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Updating class discussion..."/>

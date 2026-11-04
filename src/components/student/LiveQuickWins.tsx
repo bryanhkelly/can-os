@@ -37,7 +37,7 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
   }
 
   return <section className="mt-8 rounded-2xl border-2 border-foreground/15 bg-card p-5 sm:p-7">
-    <Link to="/student" className="text-xs font-semibold underline">Back to Student Today</Link>
+    <Link to="/home" className="text-xs font-semibold underline">Back to Student Today</Link>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Your actions</p><h2 className="mt-2 font-serif text-3xl">Your saved actions</h2><p className="mt-2 text-sm text-muted-foreground">Your assigned actions and support requests.</p></div>
       <span className="rounded-full bg-stone-warm px-3 py-2 text-xs font-semibold">{connected ? "Neon connected" : "Neon unavailable"}</span>

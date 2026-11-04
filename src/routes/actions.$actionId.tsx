@@ -13,12 +13,12 @@ export const Route = createFileRoute("/actions/$actionId")({
 
 function ActionDetailPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Action" title="Action detail" outcome={outcome}/>;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Action" title="Action detail" outcome={outcome}/>;
   const action = outcome.data;
   const statusTone = action.status === "resolved" ? "success"
     : action.status === "waiting" ? "attention"
       : action.status === "in_progress" ? "info" : "neutral";
-  return <WorkspaceShell eyebrow="CAN OS · Action" title={action.title}
+  return <WorkspaceShell eyebrow="Action" title={action.title}
     breadcrumbs={<Link to={action.workspaceHome} className="underline">Back to workspace</Link>}
     subtitle="Recorded work and follow-through. Changes remain in the owning workflow.">
     <WorkspacePanel title="Action details" className="mt-6">
@@ -32,7 +32,7 @@ function ActionDetailPage() {
       {action.resolutionNote && <div className="mt-5 border-t pt-5"><h3 className="font-semibold">Resolution</h3><p className="mt-2 whitespace-pre-wrap text-sm">{action.resolutionNote}</p></div>}
       {action.resolvedAt && <p className="mt-3 text-sm text-muted-foreground">Resolved {new Date(action.resolvedAt).toLocaleDateString()}</p>}
       {action.canManageOperations && !["resolved", "cancelled"].includes(action.status) &&
-        <Link to="/operations" search={{ action: action.id, siteId: action.siteId ?? undefined, programId: action.programId ?? undefined }}
+        <Link to="/home" search={{ action: action.id, siteId: action.siteId ?? undefined, programId: action.programId ?? undefined }}
           className="mt-5 inline-block text-sm font-semibold underline">Open owning operations workflow</Link>}
     </WorkspacePanel>
   </WorkspaceShell>;

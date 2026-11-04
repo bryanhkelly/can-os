@@ -16,6 +16,7 @@ import {
   SITE_TITLE,
 } from "@/lib/site-config";
 import appCss from "../styles.css?url";
+import { AccessReturnRecovery } from "@/lib/access-return-recovery";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: ({ context }) => context.queryClient.fetchQuery(workspaceSessionQueryOptions()),
@@ -68,7 +69,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <WorkspaceSessionProvider initial={session}>
-        <WorkspaceNavigation><Outlet /></WorkspaceNavigation>
+        <WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation>
         <CommandPalette />
       </WorkspaceSessionProvider>
     </QueryClientProvider>

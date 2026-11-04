@@ -10,7 +10,7 @@ import { DashboardProgress, DashboardMediaTile } from "@/components/workspace/da
 import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
 import { StatusBadge } from "@/components/workspace";
 import type { DashboardAssignment, StudentDashboardData } from "./student-dashboard-data";
-import { DashboardHero } from "@/components/workspace/dashboard-home";
+import { DashboardHero, homeGreeting } from "@/components/workspace/dashboard-home";
 
 type Today = Awaited<ReturnType<typeof getMyStudentToday>>;
 const assignmentState = (item: DashboardAssignment) => item.status === "returned" ? "Revision requested"
@@ -26,7 +26,6 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const localDate = dateKeyInTimezone(at, timezone);
   const hour = Number(new Intl.DateTimeFormat("en-US", {hour:"numeric",hourCycle:"h23",timeZone:timezone}).format(at));
   const name = personShortName({preferredName:liveData.student.preferredName,legalFirstName:liveData.student.firstName});
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const assignments: DashboardAssignment[] = data?.assignments.ok ? data.assignments.data
     : data ? [] : liveData.coursework.map(item => ({
       assessmentId:item.assessmentId, sectionId:item.sectionId, title:item.assessmentTitle,
@@ -57,7 +56,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   return <DashboardLayout className="student-dashboard"
     wallpaper={<DashboardHero eyebrow="Your learning day" date={new Intl.DateTimeFormat("en-US", {
           weekday:"long",month:"short",day:"numeric",timeZone:timezone,
-        }).format(at)} title={<>{greeting}, {name}.</>}
+        }).format(at)} title={homeGreeting(hour, name)}
       subtitle={<><p>Your classes, your next step, and room to grow.</p>
         <p className="mt-2 text-xs">{timezone === "UTC" ? "UTC · school timezone not available" : timezone}</p>
       </>} />}
@@ -80,7 +79,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
             <div>
               <div className="flex items-start gap-3">
                 <div className="student-course-art" aria-hidden="true"><BookOpen className="size-8" /></div>
-                <div className="min-w-0 flex-1"><h3 className="font-serif text-[1.7rem] leading-tight">{learning.title}</h3>
+                <div className="min-w-0 flex-1"><h3 className="font-serif text-section leading-tight">{learning.title}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">{learning.lesson?.title ?? "Published lessons reviewed"}</p>
                   {learning.total > 0 ? <DashboardProgress label="Self-reported lesson completion" value={learning.completed}
                     max={learning.total} className="mt-4" /> : <p className="mt-3 text-xs text-muted-foreground">No published instructional lessons available.</p>}
@@ -89,10 +88,10 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
               {learning.lesson ? <Link to="/classes" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}}
                 className="student-resume-action">Resume Lesson <span aria-hidden="true">→</span></Link>
                 : <Link to="/classes" search={{section:learning.sectionId,tab:"lessons"}} className="student-resume-action">Review class →</Link>}
-              <p className="mt-2 text-[0.65rem] text-muted-foreground">Self-reported completion is not mastery or earned credit.</p>
+              <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion is not mastery or earned credit.</p>
             </div>
             <div className="student-up-next">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-widest">Next up</p>
+              <p className="text-3xs font-semibold uppercase tracking-widest">Next up</p>
               <div className="mt-3 flex gap-2"><FileText aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                 <p className="text-xs">{learning.lesson?.title ?? "Check your classwork and feedback"}</p></div>
               {learning.lesson?.estimatedMinutes && <div className="mt-3 flex gap-2"><Clock3 aria-hidden="true" className="size-4 shrink-0" />
@@ -130,7 +129,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
               search={{section:item.sectionId ?? undefined,assessment:item.assessmentId}} className="student-assignment-row">
               <FileText aria-hidden="true" className="size-4 text-muted-foreground" />
               <span className="min-w-0"><b className="block text-xs font-semibold">{item.title}</b><small className="text-muted-foreground">{item.course}</small></span>
-              <span className="text-[0.65rem] text-muted-foreground">{item.dueAt ? `Due ${format(item.dueAt,liveData.sections.find(section => section.sectionId === item.sectionId)?.timezone ?? timezone)}` : "No due date"}</span>
+              <span className="text-3xs text-muted-foreground">{item.dueAt ? `Due ${format(item.dueAt,liveData.sections.find(section => section.sectionId === item.sectionId)?.timezone ?? timezone)}` : "No due date"}</span>
               <StatusBadge tone={item.timeliness === "missing" || item.status === "returned" || item.timeliness === "late" ? "attention" : "neutral"}>{assignmentState(item)}</StatusBadge>
               <strong className="text-xs text-primary">{item.canEdit ? "Continue →" : "View →"}</strong>
             </Link>)}
@@ -144,8 +143,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
           {data && !data.grades.ok ? <p role="alert" className="text-xs">Released grades could not be loaded. <Link to="/student/report-card" className="underline">Open report card to retry.</Link></p>
             : grades.length ? <div className="divide-y">{grades.slice(0,4).map(grade => <div key={grade.sectionGradeId} className="student-grade-row">
               <BookOpen aria-hidden="true" className="size-4 text-muted-foreground" /><div className="min-w-0"><p className="text-xs">{grade.sectionTitle}</p>
-                <p className="mt-1 text-[0.65rem] text-muted-foreground">{grade.schoolYearName} · {grade.gradingPeriodName}</p></div>
-              <b className="text-lg">{grade.letterGrade ?? (grade.percentage !== null ? `${grade.percentage}%` : "—")}</b><small className="text-[0.65rem] text-muted-foreground">Released grade</small>
+                <p className="mt-1 text-3xs text-muted-foreground">{grade.schoolYearName} · {grade.gradingPeriodName}</p></div>
+              <b className="text-lg">{grade.letterGrade ?? (grade.percentage !== null ? `${grade.percentage}%` : "—")}</b><small className="text-3xs text-muted-foreground">Released grade</small>
             </div>)}</div> : <p role="status" className="text-xs text-muted-foreground">No finalized grades yet. Released grades appear here after school review.</p>}
         </DashboardPanel>
       </div>
@@ -169,20 +168,20 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
           <div><Link to="/calendar" search={{date:dateKeyInTimezone(new Date(event.startsAt).toISOString(),event.timezone),event:event.id}}
             className="text-xs font-semibold hover:underline">{event.title}</Link>
             {event.cancelled && <StatusBadge tone="attention">Cancelled</StatusBadge>}
-            <p className="mt-1 text-[0.65rem] text-muted-foreground">{format(event.startsAt,event.timezone)} · {event.timezone}</p>
+            <p className="mt-1 text-3xs text-muted-foreground">{format(event.startsAt,event.timezone)} · {event.timezone}</p>
             {event.description && <p className="mt-1 text-xs text-muted-foreground">{event.description}</p>}
           </div>
         </article>)}</div>
         {!events.length && <p className="text-xs text-muted-foreground">No scheduled events today.</p>}
         {events.length > 5 && <p className="mt-2 text-xs text-muted-foreground">Open the calendar for all {events.length} events.</p>}
       </DashboardPanel>
-      <DashboardPanel title="Announcements" action={<Link to="/notifications" className={textLink}>View all →</Link>}>
+      <DashboardPanel title="Announcements">
         {data && !data.community.ok ? <p role="alert" className="text-xs">Announcements could not be loaded.</p>
           : community?.notices.length ? <div className="divide-y">{community.notices.slice(0,3).map(notice =>
             <Link key={notice.id} to="/notifications" search={{notification:notice.id}} className="student-announcement">
               <FileText aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
               <span className="min-w-0"><b className="block text-xs font-semibold">{notice.title}</b>
-                <span className="mt-1 block text-[0.65rem] text-muted-foreground">{notice.acknowledged ? "Read" : "New"} · {notice.body}</span></span>
+                <span className="mt-1 block text-3xs text-muted-foreground">{notice.acknowledged ? "Read" : "New"} · {notice.body}</span></span>
             </Link>)}</div> : <p role="status" className="text-xs text-muted-foreground">No announcements yet.</p>}
       </DashboardPanel>
     </>}

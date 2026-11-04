@@ -69,8 +69,21 @@ test("school administrator reviews, publishes and renames a standalone school we
   await page.getByRole("link", { name: "Open local public preview" }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: programName })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("Local read-only preview");
-  await expect(page.locator("form")).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("Local preview");
+  const inquiryForm = page.locator('form[action^="/published-site/inquiry"]');
+  await expect(inquiryForm).toHaveCount(1);
+  const parentEmail = `parent-${suffix}@example.test`;
+  await inquiryForm.getByLabel("First name").fill("Synthetic");
+  await inquiryForm.getByLabel("Last name").fill("Parent");
+  await inquiryForm.getByLabel("Email", { exact: true }).fill(parentEmail);
+  await inquiryForm.getByRole("checkbox").check();
+  await inquiryForm.getByRole("button", { name: "Request information" }).click();
+  await expect(page.getByRole("heading", { name: "Thank you for your interest." })).toBeVisible();
+  const [interest] = await sql`
+    SELECT source, status FROM public_admissions_interests
+    WHERE contact_email = ${parentEmail} LIMIT 1
+  `;
+  expect(interest).toMatchObject({ source: "published_site", status: "new" });
   await expect(page.getByRole("complementary", { name: "Workspace sidebar" })).toHaveCount(0);
 
   await page.goto(`/sites/${siteId}/publish`);

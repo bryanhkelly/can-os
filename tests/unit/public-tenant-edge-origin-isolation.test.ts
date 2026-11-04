@@ -12,7 +12,7 @@ describe("public tenant edge to origin isolation", () => {
       expect(route(host, "/")).toMatchObject({ kind: "site", rewrite: true });
       expect(route(host, "/inquiry", "POST")).toMatchObject({ kind: "site", rewrite: true });
       expect(route(host, "/apply", "POST")).toMatchObject({ kind: "site", rewrite: true });
-      for (const path of ["/operations", "/admin", "/access/session",
+      for (const path of ["/home", "/admin", "/access/session",
         "/api/identity", "/_serverFn", "/assets/index.js", "/published-site/other",
         "/apply", "/published-site/family-start", "/inquiry"]) {
         expect(route(host, path)).toEqual({ kind: "deny" });

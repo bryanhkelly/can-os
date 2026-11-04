@@ -14,11 +14,16 @@ export function assertOnsiteAttendanceScope(
   actor: AccessContext,
   siteId?: string | null,
 ): void {
+  assertOnsiteStaffSite(actor, siteId);
+  if (!actor.scope.programIds?.length) throw new AuthorizationError("active onsite attendance Program assignment");
+}
+
+export function assertOnsiteStaffSite(actor: AccessContext, siteId?: string | null): void {
   if (!isOnsiteAttendanceRole(actor.role) ||
       !actor.capabilities.has("onsite.attendance.record") ||
       !actor.actorPersonId || !actor.accountId || !actor.sessionId || !actor.grantId ||
       !actor.grantSiteId || !actor.scope.siteIds?.includes(actor.grantSiteId) ||
-      !actor.scope.organizationIds?.length || !actor.scope.programIds?.length ||
+      !actor.scope.organizationIds?.length ||
       (siteId != null && actor.grantSiteId !== siteId)) {
     throw new AuthorizationError("active site-bound onsite attendance assignment");
   }

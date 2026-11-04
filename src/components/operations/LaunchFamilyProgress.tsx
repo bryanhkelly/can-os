@@ -44,6 +44,8 @@ export function LaunchFamilyProgress({ admissionsCounts, enrollmentCounts, famil
         </section>}
         <nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
           <span className="text-sm font-semibold">After inviting families</span>
+          <Link to="/operations/interest-events" search={{siteId:siteId,programId:programId}}
+            className="text-sm font-semibold underline">Create an interest event</Link>
           <Link to="/admissions/intake" search={{siteId:siteId,programId:programId}}
             className="text-sm font-semibold underline">Review inquiries and applications</Link>
           <Link to="/admissions" search={{siteId:siteId,programId:programId,application:undefined}}

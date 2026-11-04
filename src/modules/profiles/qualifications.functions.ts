@@ -19,6 +19,7 @@ import { DomainError } from "@/domain/errors";
 import { assertScopedQualificationReviewer, reviewQualification } from "./qualification-review.server";
 
 import { EventTypes } from "@/domain/event-types";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
 const uuid = z.string().uuid();
 const selection = z.object({ personId: uuid.optional(), programId: uuid.optional() });
 const keyPattern = /^qualifications\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i;
@@ -57,7 +58,7 @@ async function ownSiteStaff(actor:Actor,executor:Reader=db){
       inArray(accountPersonGrants.organizationId,actor.scope.organizationIds??[]),
       eq(accountPersonGrants.active,true),
       eq(accessAccounts.disabled,false),eq(people.active,true),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
+      verifiedStaffIdentityPredicate(),
     )).limit(1);
   if(!grant)throw new AuthorizationError("current verified onsite staff credential identity");
 }

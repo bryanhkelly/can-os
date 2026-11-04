@@ -23,7 +23,7 @@ const usd = (amount: number) => new Intl.NumberFormat("en-US", {
 
 function FamilyEnrichment() {
   const result = Route.useLoaderData();
-  if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Family"
+  if (!result.ok) return <LoaderFailure eyebrow="Family"
     title="Summer and enrichment programs" outcome={result} />;
   return <EnrichmentFamilyView data={result.data} />;
 }
@@ -89,10 +89,10 @@ function EnrichmentFamilyView({ data }: {
       commandErrorMessage: "Unable to register for this offering." });
   }
 
-  return <WorkspaceShell eyebrow="CAN OS · Family"
+  return <WorkspaceShell eyebrow="Family"
     title="Summer and enrichment programs"
     subtitle="Explore available programs and register your children, whether or not they attend CAN Academy."
-    actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
+    actions={<Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family registration..."/>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     <section className="mt-6 rounded-xl border bg-card p-5">

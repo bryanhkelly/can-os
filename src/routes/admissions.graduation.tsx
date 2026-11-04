@@ -49,7 +49,7 @@ function GraduationCloseout(){
   readingRef.current=true;setReading(true);setMessage("");
   try{await action()}catch(error){setMessage(mutationErrorMessage(error, "Request failed"))}finally{readingRef.current=false;setReading(false)}
  }
- return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Institutional graduation closeout" subtitle="Approve institutional requirements, audit issued transcripts, decide graduation, and issue diplomas. Each action requires an authorized issuer registrar.">
+ return <WorkspaceShell eyebrow="Registrar" title="Institutional graduation closeout" subtitle="Approve institutional requirements, audit issued transcripts, decide graduation, and issue diplomas. Each action requires an authorized issuer registrar.">
   <div className="space-y-6 py-6">
    <Link to="/admissions/credential-delivery" className="inline-block rounded-lg border px-3 py-2 text-sm">Download official credentials</Link>
    <p className="rounded-lg border p-3 text-sm">An issued transcript does not automatically certify graduation. Only institution-approved requirements and a passing credit audit permit graduation approval. Diploma issuance is a separate recorded action.</p>

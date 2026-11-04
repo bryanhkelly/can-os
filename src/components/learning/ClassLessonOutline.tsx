@@ -16,7 +16,7 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
     {!content && <p className="text-sm text-muted-foreground">No published course sequence is available.</p>}
     <nav id="published-lesson-outline" aria-label="Published lesson outline" className="classroom-outline scroll-mt-5">
       {content?.modules.filter(module => module.lessons.some(isLearnerFacingInstruction)).map(module => <section key={module.id}>
-        <h3 className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">{module.title}</h3>
+        <h3 className="mb-2 text-3xs font-bold uppercase tracking-wider text-muted-foreground">{module.title}</h3>
         <ol className="space-y-1">{module.lessons.filter(isLearnerFacingInstruction).map(lesson => {
           const current = currentLessonId === lesson.id;
           const done = showCompletion && completed.has(lesson.id);
@@ -27,8 +27,8 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
               {current ? <Play aria-hidden="true" className="size-3"/> : done ? <Check aria-hidden="true" className="size-3"/> : number}
             </span>
             <span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{number}. {lesson.title}</span>
-              <span className="text-[0.65rem] text-muted-foreground">{lesson.estimatedMinutes ? `${lesson.estimatedMinutes} min` : "Published lesson"}</span></span>
-            <span className={`mt-1 text-[0.6rem] ${done ? "text-success" : "text-muted-foreground"}`}>{current ? "Current" : done ? "Complete" : "Upcoming"}</span>
+              <span className="text-3xs text-muted-foreground">{lesson.estimatedMinutes ? `${lesson.estimatedMinutes} min` : "Published lesson"}</span></span>
+            <span className={`mt-1 text-3xs ${done ? "text-success" : "text-muted-foreground"}`}>{current ? "Current" : done ? "Complete" : "Upcoming"}</span>
           </Link></li>;
         })}</ol>
       </section>)}
@@ -38,8 +38,8 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
       <div role="progressbar" aria-label="Self-reported lesson completion" aria-valuemin={0} aria-valuemax={lessons.length}
         aria-valuenow={completedCount} aria-valuetext={`${completedCount} of ${lessons.length} lessons self-reported complete`}
         className="mt-2 h-1.5 bg-muted"><div className="h-full bg-primary" style={{width:`${percent}%`}}/></div>
-      <div className="mt-2 flex justify-between gap-2 text-[0.65rem] text-muted-foreground"><span>{completedCount} of {lessons.length} lessons</span><span>{percent}% complete</span></div>
-      <p className="mt-2 text-[0.6rem] text-muted-foreground">Self-reported completion, not academic mastery or credit.</p>
+      <div className="mt-2 flex justify-between gap-2 text-3xs text-muted-foreground"><span>{completedCount} of {lessons.length} lessons</span><span>{percent}% complete</span></div>
+      <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion, not academic mastery or credit.</p>
     </div>}
   </WorkspacePanel>;
 }

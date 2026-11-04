@@ -99,7 +99,7 @@ try{
  await check(second,"/",200,expectedB);
  for(const name of [unpublished,unknown])await check(name,"/",404);
  for(const name of [first,second]){
-  for(const path of ["/operations","/access","/_serverFn","/api","/admin","/assets/index.js","/apply","/inquiry","/published-site/family-start","/published-site/inquiry"])
+  for(const path of ["/home","/access","/_serverFn","/api","/admin","/assets/index.js","/apply","/inquiry","/published-site/family-start","/published-site/inquiry"])
    await check(name,path,404);
  }
  // Optional external negative fixtures MUST belong to approved isolated test deployment.

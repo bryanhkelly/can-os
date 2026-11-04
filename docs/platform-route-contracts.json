@@ -256,24 +256,6 @@
       "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
     },
     {
-      "file": "src/routes/coach.tsx",
-      "route": "/coach",
-      "owner": "support",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/counselor.tsx",
-      "route": "/counselor",
-      "owner": "support",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/enrichment-review.tsx",
       "route": "/enrichment-review",
       "owner": "activities",
@@ -294,6 +276,15 @@
     {
       "file": "src/routes/family.interest.ts",
       "route": "/family/interest",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/interest-event.ts",
+      "route": "/interest-event",
       "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
@@ -418,15 +409,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/guardian.index.tsx",
-      "route": "/guardian/",
-      "owner": "family",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/guardian.report-cards.tsx",
       "route": "/guardian/report-cards",
       "owner": "family",
@@ -454,6 +436,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/home.tsx",
+      "route": "/home",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/index.tsx",
       "route": "/",
       "owner": "shell",
@@ -466,24 +457,6 @@
       "file": "src/routes/messages.tsx",
       "route": "/messages",
       "owner": "communication",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/network-steward.tsx",
-      "route": "/network-steward",
-      "owner": "networks",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/network.tsx",
-      "route": "/network",
-      "owner": "networks",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -562,9 +535,9 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/operations.index.tsx",
-      "route": "/operations/",
-      "owner": "operations",
+      "file": "src/routes/operations.interest-events.tsx",
+      "route": "/operations/interest-events",
+      "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -618,6 +591,24 @@
     {
       "file": "src/routes/operations.school-years.tsx",
       "route": "/operations/school-years",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.school-years_.$yearId.tsx",
+      "route": "/operations/school-years_/$yearId",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.school-years_.new.tsx",
+      "route": "/operations/school-years_/new",
       "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
@@ -751,15 +742,6 @@
       "writeBoundary": "verified site.website.local.publish capability and same-Site role assignment only; immutable local content versions, protected claims held, audited rollback; CAN institutional fields never writable"
     },
     {
-      "file": "src/routes/site.day.tsx",
-      "route": "/site/day",
-      "owner": "attendance",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "active site-bound onsite role with organization/site/program scope; pickup roster exposes only current present/tardy enrollments, valid Household-linked authorizations, holds, release evidence and follow-up state",
-      "writeBoundary": "attendance and day-review authority remain separate; onsite.pickup.release plus active scope/delegation for custody holds, denied pickup, uncollected follow-up and staff-witnessed verified release; only site leaders resolve holds"
-    },
-    {
       "file": "src/routes/sites.$siteId.index.tsx",
       "route": "/sites/$siteId/",
       "owner": "operations",
@@ -776,6 +758,15 @@
       "roleJourney": "pending",
       "readBoundary": "Only verified registrar/site-admin with current Site publisher capability and active membership can view private current Site address/contact and exact source review state",
       "writeBoundary": "Separate institutional public-display review, expected canonical Site and review revisions, exact source digest, positive location/contact attestations, finite expiry, Site row lock, scoped audit and withdraw; cannot grant opening, admissions or accreditation"
+    },
+    {
+      "file": "src/routes/sites.$siteId.profile.tsx",
+      "route": "/sites/$siteId/profile",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     },
     {
       "file": "src/routes/sites.$siteId.publish.tsx",
@@ -886,15 +877,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/student.index.tsx",
-      "route": "/student/",
-      "owner": "student-experience",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/student.my-school.tsx",
       "route": "/student/my-school",
       "owner": "student-experience",
@@ -940,6 +922,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/student.study-groups_.new.tsx",
+      "route": "/student/study-groups_/new",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/student.support.tsx",
       "route": "/student/support",
       "owner": "student-experience",
@@ -978,15 +969,6 @@
     {
       "file": "src/routes/teacher.gradebook.tsx",
       "route": "/teacher/gradebook",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/teacher.index.tsx",
-      "route": "/teacher/",
       "owner": "learning",
       "verification": "pending",
       "roleJourney": "pending",

@@ -406,14 +406,27 @@ tests or release gates have passed.
   without copying a previous site's families, staff or confidential data.
 - **Depends on:** PUB-12/13/18 and institutional authorization.
 
-**PUB-22 — Optional events, SEO, custom domain and campaigns.** `Not started`
-- **Implement:** Canonical public calendar events, sitemap/search indexing
-  after launch approval, shareable/QR entry, attribution, custom hostname
-  ownership and validated TLS lifecycle. Avoid a general content platform
-  until core inquiries and applications work.
+**PUB-22 — Optional events, SEO, custom domain and campaigns.** `Partial`
+- **Implemented in this slice:** Site-scoped interest-event records project
+  into the canonical CalendarEvent feed. Authorized registrars/Site Admins can
+  create public or invitation-only events, manage adult RSVPs, and generate
+  revocable invitation links. Public RSVP rechecks the live published Site and
+  Program catalog; invitation links are unlisted and token-protected.
+- **Still deferred:** Public profile event listings, sitemap/search indexing,
+  event reminders, calendar attachments, QR check-in, campaigns/attribution,
+  custom hostname ownership and TLS lifecycle. Event attendance and follow-up
+  outcomes are not yet modeled. Route contracts and release/security evidence
+  remain `pending` until their checks are executed.
 - **DoD:** Events and external domains cannot bypass publication/role
   checks, unpublish, cookie isolation or standard enrollment CTAs.
 - **Depends on:** PUB-13, DNS/TLS gates, existing CalendarEvent.
+
+Pre-opening family invitation links now resolve to a school/program-specific
+welcome page, show approved upcoming public interest events when available,
+and expire 30 days after the invitation batch was created. The page remains
+an adult opt-in for school updates; it does not create an Application, guardian
+identity, or enrollment. An authorized active Program's private application
+invitation continues through the existing verified-email access flow.
 
 ## Release, privacy and integration debt — mandatory gates, not another product
 

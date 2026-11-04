@@ -46,9 +46,9 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   });
   if(result.status==="saved"||result.status==="refresh-failed")setDeclineTarget(null);
  }
- return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment offers"
+ return <WorkspaceShell eyebrow="Family" title="Enrollment offers"
   subtitle="Review offers for students whose enrollment you are authorized to manage."
-  breadcrumbs={<Link to="/guardian" className="underline">Family home</Link>}
+  breadcrumbs={<Link to="/home" className="underline">Family home</Link>}
   actions={<Link to="/guardian/apply" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
   <div className="space-y-6">
   {student&&<Link to="/guardian/admission-offers" className="inline-block text-xs font-semibold underline">View offers for all children →</Link>}
@@ -112,7 +112,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
          className="rounded-lg border px-3 py-2">Attendance and excuses →</Link>
         <Link to="/guardian/attendance" search={{student:app.studentPersonId}} hash="pickup"
          className="rounded-lg border px-3 py-2">Set up pickup and safety before the first school day →</Link>
-        <Link to="/guardian" className="rounded-lg border px-3 py-2">Family home →</Link>
+        <Link to="/home" className="rounded-lg border px-3 py-2">Family home →</Link>
        </div>
      </div>}
     </div>)}{app.offers.length===0&&<div className="mt-3">
@@ -132,7 +132,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
       View or start my application →
     </Link>
   </div>}
-  <Link to="/guardian" className="text-sm underline">Back to family home →</Link>
+  <Link to="/home" className="text-sm underline">Back to family home →</Link>
   </div>
  </WorkspaceShell>;
 }

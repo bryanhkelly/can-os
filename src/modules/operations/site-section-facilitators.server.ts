@@ -14,6 +14,8 @@ import { requiresIndependentChurchLocalDelegation } from "./site-local-delegatio
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
+import { activeRoomCoverageSectionIds, siteUsesRoomCoverage } from "./room-coverage.server";
 type Reader = Pick<typeof db, "select">;
 
 async function hostSection(tx: Reader, sectionId: string) {
@@ -127,7 +129,7 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
         eq(accountPersonGrants.siteId, section.siteId),
         eq(accountPersonGrants.active, true),
         eq(people.active, true), eq(accessAccounts.disabled, false),
-        sql`${accessAccounts.emailVerifiedAt} is not null`)).limit(1);
+        verifiedStaffIdentityPredicate())).limit(1);
     if (!candidate) throw new AuthorizationError("verified Site facilitator identity");
     // Re-appointment restores the retained, soft-revoked role row with its
     // original id instead of accumulating duplicate historical rows.
@@ -202,15 +204,17 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
 
 /** An active facilitator can ONLY see the Sections to which they were appointed. */
 export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessContext,
-  programId: string): Promise<string[]> {
+  programId: string, date?: string): Promise<string[]> {
   if (actor.sessionAccountId || actor.role !== "room_facilitator" ||
       !actor.actorPersonId || !actor.grantSiteId || !actor.accountId || !actor.grantId ||
       !actor.scope.programIds?.includes(programId)) return [];
   // Revoking or expiring the church/CAN operating agreement must immediately
   // revoke pupil-roster reads, not only new attendance/duty writes.
-  await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
+  const independent = await requiresIndependentChurchLocalDelegation(tx, programId);
+  if (independent) await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
+  const roomSections = await activeRoomCoverageSectionIds(tx, actor, programId, date);
   const config = await latestConfig(tx, programId);
-  if (!config) return [];
+  if (!config) return roomSections;
   const now = new Date();
   const rows = await tx.select({
     sectionId: sections.id,
@@ -248,16 +252,16 @@ export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessConte
       sql`${roleAssignments.metadata}->>'sectionId' = ${sections.id}::text`,
       eq(accountPersonGrants.active, true),
       eq(people.active, true), eq(accessAccounts.disabled, false),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
+      verifiedStaffIdentityPredicate(),
       lte(programResponsibilityAssignments.effectiveFrom, now),
       gt(programResponsibilityAssignments.effectiveThrough, now),
     ));
-  return [...new Set(rows.map(row => row.sectionId))];
+  return [...new Set([...roomSections, ...rows.map(row => row.sectionId)])];
 }
 
 /** Use on positive writes, before mutating or returning a replayed result. */
 export async function requireCurrentSectionFacilitator(
-  tx: Reader, actor: AccessContext, programId: string, sectionId: string,
+  tx: Reader, actor: AccessContext, programId: string, sectionId: string, date?: string,
 ): Promise<void> {
   const section = await hostSection(tx, sectionId);
   if (section.programId !== programId ||
@@ -266,11 +270,12 @@ export async function requireCurrentSectionFacilitator(
     throw new AuthorizationError("assigned Section and original host Site scope");
   // Preserve pre-existing ordinary school staffing paths: section-scoped
   // delegation is a new requirement only for independently church-hosted CAN.
-  if (!await requiresIndependentChurchLocalDelegation(tx, programId)) return;
-  const ids = await activeFacilitatorSectionIds(tx, actor, programId);
+  const independent = await requiresIndependentChurchLocalDelegation(tx, programId);
+  if (!independent && !await siteUsesRoomCoverage(tx, section.siteId)) return;
+  const ids = await activeFacilitatorSectionIds(tx, actor, programId, date);
   if (!ids.includes(sectionId))
     throw new AuthorizationError("current exact-Section named facilitator assignment");
-  await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
+  if (independent) await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
 }
 
 /** Host-only operator listing; no student enrollment, grades or schoolwide user directory. */
@@ -311,7 +316,7 @@ export async function listSectionFacilitators(actor: AccessContext, programId: s
         eq(accountPersonGrants.active, true),
         eq(people.active, true),
         eq(accessAccounts.disabled, false),
-        sql`${accessAccounts.emailVerifiedAt} is not null`)).limit(100),
+        verifiedStaffIdentityPredicate())).limit(100),
   ]);
   const sectionIds = new Set(sectionRows.map(section => section.id));
   return {

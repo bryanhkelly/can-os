@@ -8,6 +8,7 @@ export const LOCAL_DEMO_ACCOUNTS = [
   { email: "morgan.guardian@valorschool.demo", role: "Guardian", accountId: "fa000000-0000-4000-8000-000000000004", personId: "f3000000-0000-4000-8000-000000000007" },
   { email: "alex.registrar@valorschool.demo", role: "Registrar", accountId: "f7000000-0000-4000-8000-000000000002", personId: "f7000000-0000-4000-8000-000000000001" },
   { email: "admin.demo@valorschool.demo", role: "Demo admin", accountId: "f7100000-0000-4000-8000-000000000002", personId: "f7100000-0000-4000-8000-000000000001" },
+  { email: "sally.facilitator@valorschool.demo", role: "Room_facilitator", accountId: "f7200000-0000-4000-8000-000000000002", personId: "f7200000-0000-4000-8000-000000000001" },
 ] as const;
 
 export const LOCAL_DEMO_ADMIN = {
@@ -19,6 +20,16 @@ export const LOCAL_DEMO_ADMIN = {
   organizationId: "f1000000-0000-4000-8000-000000000002",
   siteId: "f1000000-0000-4000-8000-000000000003",
   email: "admin.demo@valorschool.demo",
+} as const;
+
+export const LOCAL_DEMO_ROOM_FACILITATOR = {
+  personId: "f7200000-0000-4000-8000-000000000001",
+  accountId: "f7200000-0000-4000-8000-000000000002",
+  grantId: "f7200000-0000-4000-8000-000000000003",
+  roleAssignmentId: "f7200000-0000-4000-8000-000000000005",
+  organizationId: LOCAL_DEMO_ADMIN.organizationId,
+  siteId: LOCAL_DEMO_ADMIN.siteId,
+  email: "sally.facilitator@valorschool.demo",
 } as const;
 
 export function isDemoAccountEmail(email: string): boolean {

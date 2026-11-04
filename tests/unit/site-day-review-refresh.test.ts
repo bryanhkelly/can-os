@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("site day review remains connected to physical school-day evidence",()=>{
  it("refreshes persisted review when staff duty, human arrival and room evidence change",()=>{
-  const route=readFileSync("src/routes/site.day.tsx","utf8");
+  const route=readFileSync("src/routes/home.tsx","utf8");
   const site=readFileSync("src/components/operations/SiteDayPage.tsx","utf8");
   const staff=readFileSync("src/components/operations/OnsiteSupervisionPanel.tsx","utf8");
   const review=readFileSync("src/components/operations/OnsiteDayReconciliationPanel.tsx","utf8");

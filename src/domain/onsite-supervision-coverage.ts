@@ -24,6 +24,8 @@ export type SupervisionBlockInput = {
   /** Internal room evidence identity invalidates stale witnessed arrivals. */
   roomEvidenceVersion?: string | null;
   roomLabel?: string | null;
+  roomId?: string | null;
+  roomCoverageKey?: string | null;
   roomPlanVerified?: boolean;
   namedBackupVerified?: boolean;
   roomCapacityAdequate?: boolean;
@@ -42,6 +44,18 @@ export type SupervisionBlockInput = {
   instructionalDayConfirmed?: boolean;
   overlappingFacilitatorAssignments?: boolean;
 };
+
+function sameReviewedRoomCoverage(a: SupervisionBlockInput, b: SupervisionBlockInput): boolean {
+  return !!a.roomCoverageKey && a.roomCoverageKey === b.roomCoverageKey &&
+    !!a.roomId && a.roomId === b.roomId &&
+    a.facilitatorPersonId === b.facilitatorPersonId && !!a.backupPersonId &&
+    a.backupPersonId === b.backupPersonId &&
+    a.roomPlanVerified === true && b.roomPlanVerified === true &&
+    a.roomCapacityAdequate === true && b.roomCapacityAdequate === true &&
+    a.namedBackupVerified === true && b.namedBackupVerified === true &&
+    a.verifiedSafeguardingScreening === true && b.verifiedSafeguardingScreening === true &&
+    a.verifiedSafeguardingTraining === true && b.verifiedSafeguardingTraining === true;
+}
 
 /** Compare an assigned adult's effective UTC interval to a specific
  * site-local scheduled block. Cross-time-zone sections must not be declared
@@ -124,7 +138,7 @@ export function summarizeOnsiteSupervision(
       const b=blocks[j]!;
       if (a.sectionId===b.sectionId || a.facilitatorPersonId!==b.facilitatorPersonId ||
           b.startMinute===null || b.endMinute===null) continue;
-      if (a.startMinute < b.endMinute && b.startMinute < a.endMinute) {
+      if (a.startMinute < b.endMinute && b.startMinute < a.endMinute && !sameReviewedRoomCoverage(a, b)) {
         for (const entry of [a,b]) {
           if (!entry.gaps.includes("facilitator_conflict")) entry.gaps.push("facilitator_conflict");
           entry.assignedPlan=false;
@@ -141,6 +155,7 @@ export function summarizeOnsiteSupervision(
       const b=blocks[j]!;
       if(a.sectionId===b.sectionId || b.startMinute===null || b.endMinute===null ||
          !(a.startMinute<b.endMinute && b.startMinute<a.endMinute))continue;
+      if(sameReviewedRoomCoverage(a,b))continue;
       // Different Sections cannot both claim the same physical room at the
       // same time. A plan signed for each Section individually is not proof
       // that their shared space can hold two simultaneous classes.

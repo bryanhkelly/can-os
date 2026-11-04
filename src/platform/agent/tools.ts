@@ -40,6 +40,7 @@ export { resolveVisibleStudents, assertStudentAccess } from "@/modules/learning/
 import { resolveVisibleStudents } from "@/modules/learning/academic-domain-api";
 import { getStudentAcademicSummary as academicSummary } from "@/modules/learning/academic-domain-api";
 import { assertStudentAccess, assertGuardianAcademicAccess } from "@/modules/learning/academic-domain-api";
+import { agree } from "@/lib/format";
 export type { VisibleStudent } from "@/modules/learning/academic-domain-api";
 
 export const getStudentAcademicSummary: Extract<AgentTool, { readOnly: true }> = {
@@ -66,7 +67,7 @@ export const createWatch: Extract<AgentTool, { readOnly: false }> = {
     if (!eventTypes.length) throw new Error("A watch needs at least one event type");
     const unsupported = eventTypes.filter((eventType) => !getSubscriptionPolicy(eventType));
     if (unsupported.length) {
-      throw new Error(`Unsupported watch event type(s): ${unsupported.join(", ")}`);
+      throw new Error(`Unsupported watch event ${agree(unsupported.length, "type", "types")}: ${unsupported.join(", ")}`);
     }
 
     const student = await assertStudentAccess(context, studentProfileId);

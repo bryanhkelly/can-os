@@ -23,7 +23,7 @@ type Item=Awaited<ReturnType<typeof listGuardianHealthReviews>>[number];
 function HealthReviewPage(){
  const outcome=Route.useLoaderData();
  const {action}=Route.useSearch();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Medical review"
+ if(!outcome.ok)return <LoaderFailure eyebrow="Medical review"
   title="Family emergency information" outcome={outcome}/>;
  return <HealthReviewList items={outcome.data} action={action}/>;
 }
@@ -53,9 +53,9 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
   );
  }
  const visible=items.filter(item=>!action||item.id===action);
- return <WorkspaceShell eyebrow="CAN OS · Restricted school review" title="Family emergency and health updates"
+ return <WorkspaceShell eyebrow="Restricted school review" title="Family emergency and health updates"
   subtitle="Independently review changes proposed by verified guardians. Only approval updates the school medical record; proposed information must never be treated as cleared emergency instructions."
-  actions={<Link to="/operations" search={{siteId:undefined,programId:undefined,action:undefined}}
+  actions={<Link to="/home" search={{siteId:undefined,programId:undefined,action:undefined}}
    className="rounded border px-3 py-2 text-sm">School operations</Link>}>
   {validationError&&<p role="alert" className="mt-5 rounded border p-4 text-sm">{validationError}</p>}
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving confidential review..."/>

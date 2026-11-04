@@ -8,19 +8,43 @@ const publicRoutes = [
 ] as const;
 
 const protectedRoutes = [
-  "/student", "/student/courses", "/student/assignments", "/student/discussions",
+  "/home", "/student/courses", "/student/assignments", "/student/discussions",
   "/student/my-school", "/student/report-card", "/student/support", "/student/settings",
-  "/teacher", "/teacher/gradebook", "/teacher/missing-work", "/teacher/discussions",
-  "/guardian", "/guardian/academics", "/guardian/attendance", "/guardian/admission-offers",
+  "/home", "/teacher/gradebook", "/teacher/missing-work", "/teacher/discussions",
+  "/home", "/guardian/academics", "/guardian/attendance", "/guardian/admission-offers",
   "/classes", "/sites", "/calendar", "/messages", "/notifications",
-  "/operations", "/operations/curriculum", "/operations/launch", "/admissions",
-  "/staff/students", "/network", "/profiles", "/account/sessions",
+  "/home", "/operations/curriculum", "/operations/launch", "/admissions",
+  "/staff/students", "/home", "/profiles", "/account/sessions",
 ] as const;
 
 test.beforeEach(async ({ page }) => {
   // These checks neither authenticate nor submit business commands.
   await page.route("**/access/request", route => route.fulfill({ status: 403, body: "Read-only browser check" }));
   await page.route("**/access/verify", route => route.fulfill({ status: 403, body: "Read-only browser check" }));
+});
+
+test("home redirect settles and subsequent navigation remains interactive", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/access\?returnTo=%2F$/);
+  await expect(page.getByRole("heading", { name: "Access CAN OS", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Email" })).toBeEnabled();
+  const documents: string[] = [];
+  page.on("request", request => {
+    if (request.isNavigationRequest()) documents.push(request.url());
+  });
+  await page.getByRole("link", { name: "Create a new .demo school", exact: true }).click();
+  await expect(page).toHaveURL(/\/schools\/new$/);
+  await expect(page.getByRole("heading", { name: "Create a school", exact: true })).toBeVisible();
+  await page.getByRole("banner").getByRole("link", { name: "CAN OS", exact: true }).click();
+  await expect(page).toHaveURL(/\/access\?returnTo=%2F$/);
+  await expect(page.getByRole("textbox", { name: "Email" })).toBeEnabled();
+  expect(documents).toEqual([]);
+  expect(errors).toEqual([]);
 });
 
 for (const [path, heading] of publicRoutes) {
@@ -63,7 +87,7 @@ for (const path of protectedRoutes) {
 }
 
 test("authentication redirect settles and preserves query and fragment", async ({ page }) => {
-  const destination = "/student?from=route-check#today";
+  const destination = "/home?from=route-check#today";
   const errors: string[] = [];
   page.on("console", message => {
     if (message.type() === "error") errors.push(message.text());
@@ -95,15 +119,20 @@ test("sign-in uses shared accessible controls and native validation", async ({ p
   await expect(page).toHaveURL(/\/access$/);
 });
 
-for (const path of ["", "/about", "/academics", "/school-day", "/student-life", "/admissions"]) {
-  test(`Valor read-only public website ${path || "/"}`, async ({ page }) => {
+for (const path of ["", "/about", "/academics", "/school-day", "/student-life", "/admissions", "/contact"]) {
+  test(`Valor local public website ${path || "/"}`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
     const response = await page.goto(`/published-site${path}?site=valorschool`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("Local read-only preview");
-    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByRole("status")).toContainText("Local preview");
+    const inquiryForms = page.locator('form[action^="/published-site/inquiry"]');
+    if (["", "/academics", "/admissions", "/contact"].includes(path)) {
+      await expect(inquiryForms).toHaveCount(1);
+    } else {
+      await expect(inquiryForms).toHaveCount(0);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
   });

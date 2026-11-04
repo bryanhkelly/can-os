@@ -44,7 +44,7 @@ async function shell(initial: WorkspaceSessionResult) {
   });
   const home = createRoute({ getParentRoute: () => root, path: "/", component: () => <p>Home</p> });
   const student = createRoute({
-    getParentRoute: () => root, path: "/student", component: () =>
+    getParentRoute: () => root, path: "/home", component: () =>
       <Link to="/messages" search={{ thread: "test thread" }} hash="reply">Open conversation</Link>,
   });
   const messages = createRoute({
@@ -54,7 +54,7 @@ async function shell(initial: WorkspaceSessionResult) {
   });
   const router = createRouter({
     routeTree: root.addChildren([home, student, messages]),
-    history: createMemoryHistory({ initialEntries: ["/student"] }),
+    history: createMemoryHistory({ initialEntries: ["/home"] }),
   });
   await router.load();
   return {
@@ -72,8 +72,10 @@ describe("persistent server-initialized workspace shell", () => {
     expect(html).toContain('aria-label="Workspace sidebar"');
     expect(html).toContain("Test Learner");
     expect(html).toContain("Test School");
-    expect(html.match(/<a\b[^>]*href="\/student"[^>]*>/)?.[0]).toContain("focus-visible:ring-2");
+    expect(html).toMatch(/<a\b(?=[^>]*href="\/home")(?=[^>]*aria-current="page")(?=[^>]*focus-visible:ring-2)[^>]*>/);
     expect(html).toContain('aria-label="Account menu"');
+    expect(html).toContain('aria-label="Notifications" aria-haspopup="dialog" aria-expanded="false"');
+    expect(html).not.toContain('href="/notifications"');
     expect(html).toContain("Ask CAN");
     expect(html.match(/Switch workspace:/g)).toHaveLength(1);
     expect(html).not.toContain("Switcher mode");
@@ -106,7 +108,7 @@ describe("persistent server-initialized workspace shell", () => {
     });
     const html = view.markup();
     expect(html).toContain('aria-label="Account menu"');
-    expect(html).toContain("Demo admin session: acting as Test Learner (student)");
+    expect(html).toContain("Demo admin session: acting as Test Learner (Student)");
     expect(html).not.toContain("/admissions");
     expect(html).not.toContain('aria-label="Active membership"');
     view.queryClient.clear();

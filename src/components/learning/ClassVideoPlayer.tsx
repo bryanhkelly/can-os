@@ -95,7 +95,7 @@ export function ClassVideoPlayer({ title, url, loadUrl, resourceId, declaredVide
     </div>
     {presentation === "classroom" && <div className="classroom-player-footer">
       <div className="min-w-0">{presentation === "classroom" ? <h2 className="text-xs font-semibold">{title}</h2> : <h3 className="text-xs font-semibold">{title}</h3>}
-        <p className="mt-1 text-[0.65rem] text-muted-foreground">{video?.kind === "embed" ? "Playback controls are provided by the video provider." : "Pause, replay, and review at your own pace."}</p></div>
+        <p className="mt-1 text-3xs text-muted-foreground">{video?.kind === "embed" ? "Playback controls are provided by the video provider." : "Pause, replay, and review at your own pace."}</p></div>
       {video?.kind === "file" && <div className="flex items-center gap-2" role="group" aria-label="Playback controls">
         <Button size="sm" variant="outline" disabled={!ready || Boolean(error)} onClick={() => seek(-10)} aria-label="-10s, back ten seconds">-10s</Button>
         <Button size="sm" variant="outline" disabled={!ready || Boolean(error)} onClick={() => seek(10)} aria-label="+10s, forward ten seconds">+10s</Button>
@@ -104,7 +104,7 @@ export function ClassVideoPlayer({ title, url, loadUrl, resourceId, declaredVide
     </div>}
     {url && <a href={url} target="_blank" rel="noopener noreferrer" data-learning-resource-id={resourceId}
       aria-label={`Open ${presentation === "classroom" ? "video" : title} at source: ${title}`}
-      className={presentation === "classroom" ? "block border-t px-4 py-2 text-[0.65rem] text-muted-foreground underline" : "block text-xs underline"}>Open {presentation === "classroom" ? "video" : title} at source</a>}
+      className={presentation === "classroom" ? "block border-t px-4 py-2 text-3xs text-muted-foreground underline" : "block text-xs underline"}>Open {presentation === "classroom" ? "video" : title} at source</a>}
     {error && <div role="alert" className="text-sm"><p>{error}</p>
       <button type="button" disabled={pending} onClick={() => { setPlaybackRevision(value => value + 1); setSource(null); void open(); }}
         className="mt-2 underline">Retry playback</button></div>}

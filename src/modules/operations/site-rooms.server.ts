@@ -8,6 +8,7 @@ import { DomainError } from "@/domain/errors";
 import { assertSiteRoomReader, assertSiteRoomManager, assignSectionRoomSchema, createSiteRoomSchema, retireSiteRoomSchema, siteRoomsScopeSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import type { z } from "zod";
+import { assertRoomCoverageManager, createRoomAtSiteSchema } from "@/domain/room-coverage";
 
 type Reader = Pick<typeof db, "select">;
 
@@ -52,6 +53,23 @@ export async function createSchoolRoom(actor: AccessContext, value: z.infer<type
   const input = createSiteRoomSchema.parse(value);
   return db.transaction(async tx => {
     const school = await roomSchool(tx, actor, input.programId);
+    return createRoomRecord(tx, actor, school, input);
+  });
+}
+
+export async function createRoomAtSite(actor: AccessContext, value: z.infer<typeof createRoomAtSiteSchema>) {
+  const input = createRoomAtSiteSchema.parse(value);
+  return db.transaction(async tx => {
+    const [site] = await tx.select().from(sites).where(eq(sites.id, input.siteId)).limit(1);
+    if (!site) throw new AuthorizationError("existing school Site");
+    assertRoomCoverageManager(actor, site);
+    return createRoomRecord(tx, actor, { siteId: site.id, organizationId: site.organizationId }, input);
+  });
+}
+
+async function createRoomRecord(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], actor: AccessContext,
+  school: { siteId: string; organizationId: string; programId?: string },
+  input: { roomId: string; name: string; capacity: number }) {
     await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, school.siteId)).for("update");
     const [existing] = await tx.select().from(siteRooms).where(eq(siteRooms.id, input.roomId)).limit(1);
     if (existing) {
@@ -72,7 +90,6 @@ export async function createSchoolRoom(actor: AccessContext, value: z.infer<type
       entityId: input.roomId, scope: school, after: { name: input.name, capacity: input.capacity },
       contextExtras: { domainEventId: eventId } });
     return { id: input.roomId, created: true };
-  });
 }
 
 export async function assignSchoolSectionRoom(actor: AccessContext, value: z.infer<typeof assignSectionRoomSchema>) {

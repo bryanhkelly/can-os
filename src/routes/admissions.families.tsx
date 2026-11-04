@@ -1,3 +1,4 @@
+import { WorkspaceShell } from "@/components/workspace";
 import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {getEnrollmentDocumentDownload} from "@/modules/enrollment/r2-document-upload.functions";
@@ -31,7 +32,7 @@ export const Route=createFileRoute("/admissions/families")({
 });
 function Families(){
  const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Enrollment" title="Family enrollment readiness" outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Enrollment" title="Family enrollment readiness" outcome={outcome}/>;
  return <FamiliesView page={outcome.data}/>;
 }
 function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness>>}){
@@ -78,10 +79,7 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   },{successMessage:"Document received and ready for review.",
    commandErrorMessage:"Document upload failed. Retry to finish without uploading again."});
  }
- return <main className="mx-auto max-w-5xl px-5 py-10">
-  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Enrollment</p>
-  <h1 className="mt-2 font-serif text-4xl">Family enrollment readiness</h1>
-  <p className="mt-3 text-sm text-muted-foreground">Review each household journey and its supporting private documents. Uploads are available only where the deployment has enabled the relevant R2 workflow.</p>
+ return <WorkspaceShell width="standard" eyebrow="Enrollment" title="Family enrollment readiness" subtitle="Review each household journey and its supporting private documents. Uploads are available only where the deployment has enabled the relevant R2 workflow.">
   {selection.application&&<Link to="/admissions/families" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-4 inline-block text-sm underline">View all household readiness</Link>}
   {selection.application&&!visibleApps.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current family readiness view.</p>}
   {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
@@ -128,5 +126,5 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
    next={!selection.application&&page.hasMore&&<Link to="/admissions/families" search={{...selection,page:page.nextPage??(selection.page??1)+1}} className="underline">Next families</Link>}/>
   {!families.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No family enrollment cases found in your authorized programs.</p>}
   </div>
- </main>;
+ </WorkspaceShell>;
 }

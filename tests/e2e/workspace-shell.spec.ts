@@ -35,7 +35,7 @@ test("slow route data leaves the existing chrome mounted and usable", async ({ p
   try {
     await page.evaluate(() => {
       if (!window.__TSR_ROUTER__) throw new Error("Router has not hydrated");
-      void window.__TSR_ROUTER__.navigate({ to: "/student" });
+      void window.__TSR_ROUTER__.navigate({ to: "/home" });
     });
     await expect(page.getByRole("status", { name: "Loading page" })).toBeVisible();
     await expect(page.getByRole("banner", { name: "Workspace top bar" })).toBeVisible();

@@ -37,7 +37,7 @@ function StudentReportCardPage() {
     return () => { active = false; };
   }, []);
 
-  return <WorkspaceShell eyebrow="CAN OS · Report card" title="My report card"
+  return <WorkspaceShell eyebrow="Report card" title="My report card"
     subtitle="Your finalized grades by grading period and your transcript record.">
       <QueryState loading={loading && "Loading report card…"} error={error}>
         <ReportCardView grades={grades} />

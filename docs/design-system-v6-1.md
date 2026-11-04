@@ -165,6 +165,119 @@ build so layout and accessibility assertions exercise generated utility styles.
 
 Never use brand hues to infer review, authorization, enrollment, learning mastery, compliance or opening permissions. Dark and site-branded themes retain meaningful semantic contrast.
 
+### Layout and type contract (enforced)
+
+Every authenticated page sits on one grid. Alignment is a property of the tokens and
+primitives, not of individual pages, so a page cannot drift out of line.
+
+| Token (`src/styles.css`) | Value | Owner |
+| --- | --- | --- |
+| `--topbar-height` | 4.5rem (4rem compact) | Top bar **and** sidebar brand block; their bottom borders form one line |
+| `--sidebar-width` / `--sidebar-collapsed-width` | 15rem / 4.5rem | `.can-shell` grid column; `data-sidebar="collapsed"` selects the narrow column |
+| `--page-gutter` | 1rem → 1.5rem (≥640px) → 2.5rem (≥1280px) | Top bar inline padding, page frame padding, Home hero padding |
+| `--page-pad-top` / `--page-pad-bottom` | 1.5rem → 2.25rem / 3rem | First line of every page |
+| `--content-reading` / `-standard` / `-wide` / `-dashboard` | 48 / 64 / 80 / 94.375rem | Right-edge limit only; frames are left-aligned (`margin-inline: 0`) |
+| `text-3xs`, `text-2xs`, `text-section` | 0.625 / 0.6875 / 1.625rem | Micro labels, eyebrows, dashboard section titles |
+| `tracking-eyebrow`, `--eyebrow-color` | 0.16em, workspace accent ink | `.can-eyebrow` |
+
+Primitives (`src/components/workspace/page-frame.tsx`): `PageFrame` is the only
+workspace `<main>`; `PageHeader`, `PageEyebrow` (`.can-eyebrow`) and `PageTitle`
+(`.can-page-title`) own the page title block. `WorkspaceShell`, `RecordHeader`,
+`WorkflowWorkspace` and `DashboardHome` compose them. As a result the switcher in
+the top bar, every eyebrow and every H1 start at `sidebar width + gutter`.
+
+**Home contract.** The shell generates the first navigation item, **Home**
+(home icon, `/home`), for every role
+(`workspace-navigation.registry.ts`); no other item may use the home icon. Role
+homes use `DashboardHome` **without** a `title`, so the H1 is the shared greeting
+("Good morning, Avery."). Role context goes in the eyebrow. Pass `title` only for
+non-home dashboards (for example a site record). Eyebrows name the section; the
+"CAN OS" brand appears only in the shell.
+
+`/home` renders the dashboard for the verified active membership, using the same
+authorized domain readers. Role-named dashboard URLs (`/student`, `/operations`,
+`/teacher`, `/guardian`, `/coach`, `/counselor`, `/network`, `/network-steward`,
+and `/site/day`) are not aliases or redirects. Their workflow subpages remain
+available; the student and operations layout roots return not found on an exact
+visit. Home navigation and membership switching always use `/home`. A student's
+explicit non-Today sign-in preference still selects that workflow from `/`.
+
+**School context: switcher, profile and Today.** The workspace switcher answers
+"which school am I working in?"; pages never ask the user to pick that school again.
+For school administration (Site Admin, registrar) the **School profile** nav item
+(`/sites`) opens `/sites/$siteId/profile` directly when the active membership has one
+school, and lists schools only when it genuinely spans several. The profile is the
+school's stable record — identity, address, contact, programs with authoritative
+enrollment, and links to the workflows that own each part (school setup, school years,
+website). It edits nothing in place, shows no placeholder figures, and hides links the
+viewer is not granted (website publishing needs its own publisher grant). **Site Today**
+(`/sites/$siteId`) is the daily operating view: a drill-in from Home, highlighted as Home
+in the sidebar, never a second navigation destination for administration roles.
+
+**Sidebar collapse.** The desktop collapse/expand control is the first element in the
+sidebar brand bar (far left, before the wordmark), labelled "Collapse navigation" /
+"Expand navigation" with `aria-expanded`. Collapsed navigation keeps every destination
+as an icon link with an accessible name and tooltip. The choice is a presentation-only
+`localStorage` preference restored after hydration. On mobile the left-most top-bar
+button opens the navigation drawer. Sidebars and navigation drawers contain navigation
+only; the top-bar workspace switcher is the single shell surface for active role and
+school context.
+
+**Page header actions.** The header lays out title → subtitle → actions. A module's
+principal creation entry point is `CreateAction` (`create-action.tsx`): one large blue
+button with a plus icon, wrapping a `Link` to a dedicated create page. Other header
+links use `secondaryActionClassName` (outline); never style them as primary. One
+`CreateAction` per page.
+
+**Primary-action restraint.** Blue (`bg-primary`) is for at most one or two decisive
+commands per page, normally the `CreateAction` and a form's submit. Repeated per-item
+commands in lists and feeds ("Mark as read", "Book", "Add period") use `outline` or
+`ghost`, never the default variant.
+
+**Dedicated create pages.** Creation happens on its own route (for example
+`/operations/school-years/new`, `/student/study-groups/new`), never as a form embedded
+above or beside the directory. Use a non-nested TanStack route
+(`<list>_.new.tsx`) so the list layout does not wrap the form. Compose the form from
+`FormSection` (titled `<section>` per group of related fields, two-column field grid
+from `sm`) and `FormActions` (submit first, then Cancel as a quiet link back to the list
+with the same scope search). Guard dirty forms with `useUnsavedChangesGuard`; after a
+confirmed save, call its `release()` and navigate to the saved record (list anchor or
+detail route). Pages that cannot create explain why with a notice instead of a disabled
+form. All live in `form-page.tsx`; see `form-page.stories.tsx`.
+
+**Record sections.** A record page (for example My School, a school year) leads with the
+record's identity as the H1, then `DetailNavigation` for its sections, held in a `tab`
+search parameter. Each tab is a `SectionTab` (`workspace-panel.tsx`) with an explicit
+`current` flag and typed `link` options; it forces exact route matching, because the
+router's default partial search match would also mark a tab without search params
+("Overview") as current on every tab. Exactly one tab is current — see
+`section-tabs.stories.tsx`. The Overview tab shows bounded previews (three items per
+section, or summary cards of value + label linking to the owning tab) with "View all N
+…" links; long lists in a tab are grouped (for example by month in `<details>`).
+
+**Counted copy.** Counts agree with their number: "1 term", "3 classes", "1 lesson
+has". Use `plural()` and `agree()` from `@/lib/format`; never write "class(es)" or
+"item(s)".
+
+**Directory to record.** When a list selects a record through the URL, render the record
+first: a scoped "All applications"-style return link (preserving filters, stage and page)
+and the record heading with `tabIndex={-1}`, focused on selection. Do not render the
+directory overview above the selected record. Below `sm`, directories use stacked rows
+(identity, status, context, next action) instead of compressed tables; tables return at
+`sm` and up.
+
+Enforcement (`npm run lint`):
+
+- `can-os-design/no-raw-page-structure` (error) — `<main>`/`<h1>` only in the primitives, public signed-out pages (`index`, `access.verify`, `church.apply`, `family.join`, `schools.new`) and stories.
+- `can-os-design/no-arbitrary-type-values` (error) — no `text-[…]` sizes, `tracking-[…]` or numeric `leading-[…]`; use tokens.
+- `can-os-design/no-brand-prefixed-labels` (error) — no "CAN OS ·" label prefixes.
+- `can-os-design/section-tabs-only` (error) — links inside `DetailNavigation` render through `SectionTab`.
+- `can-os-design/no-repeated-primary` (error) — no default-variant `Button` rendered per item inside `.map()`; an inline edit `<form>` within the item is exempt.
+- `can-os-design/no-parenthetical-plurals` (error, all of `src` except tests) — no "(s)"/"(es)" copy; use `plural()`/`agree()`.
+- `scripts/check-design-system.mjs` — the layout tokens exist and the shell reads `--topbar-height`, `--page-gutter` and `.can-shell`.
+- `tests/unit/workspace-navigation.test.ts` — Home is first for every role, and exactly one link is `aria-current`.
+- `src/components/shell/ShellAlignment.stories.tsx` (`npm run test:storybook`) — measures that the sidebar divider equals the top bar bottom, and that the switcher and H1 left edges are equal on standard, wide, Home and demo-notice pages. `CollapsibleSidebar` asserts the far-left toggle, the 4.5rem collapsed column and the H1 position in both states.
+
 ## 3. Implementation-ready page templates
 
 | Pattern | Use cases | Code / stories |
@@ -176,6 +289,7 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 | User / Business Workflow | Admissions, enrollment, approvals, school setup, opening, staffing | `WorkflowWorkspace`, `WorkflowProgress`; `workflow-workspace.stories.tsx` |
 | Process / User Flow Map | Cross-persona handoffs, decisions, conditional branches, exception paths, business-process documentation | `UserFlowMap`; `user-flow-map.stories.tsx` |
 | Step-based Setup | Application, site config, jurisdiction details, school year | `GuidedSetupShell`, `Field`, `Button` |
+| Dedicated create page | Create school year, create study group, other "New …" commands | `FormSection`, `FormActions`, `useUnsavedChangesGuard`; `form-page.stories.tsx` |
 | Split Review | Registrar intake, evidence review, publication approvals | `SplitReviewShell`, `StatusBadge`, `ActionDialog` |
 | Checklist/Readiness | Program launch, institutional approval, evidence gaps | `PrerequisiteChecklist`, approved-domain requirement DTOs |
 | Async / failure | Loading, no results, forbidden, retry, saved-but-refresh-failed | `QueryState`, `EmptyState`, `WorkspaceNotice`, `MutationFeedback` |
@@ -253,6 +367,7 @@ Launch with `npm run storybook`.
 - **V6.1 templates / Dashboard widgets** — lessons/progress, assignments preview, class timeline, editorial tiles, and missing-data behavior.
 - **V6.1 templates / User and workflow flows** — admissions and school launch workspaces.
 - **V6.1 templates / Process and user-flow maps** — cross-role school launch and student assignment journey.
+- **Foundations / Dedicated form page** — `FormSection` groups and the `FormActions` submit/cancel footer, with play tests.
 - Existing **Foundations**, **Workflows**, **Persona layouts** and **Student/Daily canvas** — retained production components and regression examples.
 
 ## 8. Required validation before merge

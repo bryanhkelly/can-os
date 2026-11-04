@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
 import { Route as Notifications } from "@/routes/notifications";
-import { Route as Operations } from "@/routes/operations.index";
+import { OperationsHome } from "@/components/home/OperationsHome";
 import { Route as Site } from "@/routes/sites.$siteId.index";
 import { Route as Admissions } from "@/routes/admissions.index";
 import { Route as Intake } from "@/routes/admissions.intake";
@@ -22,6 +22,8 @@ import { admissionsNextStep } from "@/components/admissions/AdmissionsApplicantC
 import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGuardianActions";
 
 const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
+const Operations = { options: { component: () => <OperationsHome
+  result={state.data as Parameters<typeof OperationsHome>[0]["result"]} selected={state.search} /> } };
 // Static presentation tests never open a database connection.
 vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@/hooks/useWorkspaceMutation", () => ({ useWorkspaceMutation: () => ({ isSubmitting: false, submit: vi.fn() }) }));
@@ -33,8 +35,8 @@ vi.mock("@tanstack/react-router",()=>({
     const query=new URLSearchParams(Object.entries(search??{}).filter((entry):entry is [string,string]=>entry[1]!==undefined)).toString();
     return <a href={to+(query?"?"+query:"")}>Continue</a>;
   },
-  Link:({to,search,params,children,...props}:{
-    to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode;
+  Link:({to,search,params,children,activeOptions:_activeOptions,activeProps:_activeProps,...props}:{
+    to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode;activeOptions?:unknown;activeProps?:unknown;
   })=>{
     const path=to.replace(/\$([^/]+)/g,(_,key:string)=>params?.[key]??key);
     const query=new URLSearchParams(Object.entries(search??{}).filter((entry):entry is [string,string]=>entry[1]!==undefined)).toString();
@@ -223,8 +225,8 @@ describe("application contextual navigation",()=>{
     state.search={action:"referral",siteId:"school",programId:"program"};
     state.data={
       operations:{items:[
-        {id:"referral",kind:"action",title:"Academic referral",detail:"Support team follow-up",priority:"normal",managedBySupport:true,href:"/operations"},
-        {id:"other",kind:"action",title:"Unrelated action",detail:"Other",priority:"normal",managedBySupport:false,href:"/operations"},
+        {id:"referral",kind:"action",title:"Academic referral",detail:"Support team follow-up",priority:"normal",managedBySupport:true,href:"/home"},
+        {id:"other",kind:"action",title:"Unrelated action",detail:"Other",priority:"normal",managedBySupport:false,href:"/home"},
       ],sites:[],programs:[],assignees:[],summary:{total:2,urgent:0,needsResponse:2}},
       health:{buildId:"test",schemaStatus:"compatible",details:"Ready"},commandCenter:null,authError:"",
     };
@@ -234,7 +236,7 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("Managed by the support team");
     expect(html).not.toContain('href="/student/support');
     expect(html).not.toContain(">Resolve</button>");
-    expect(html).toContain('href="/operations?siteId=school&amp;programId=program&amp;action=referral"');
+    expect(html).toContain('href="/home?siteId=school&amp;programId=program&amp;action=referral"');
   });
 
   it("preserves the site, program, action and event in Site Today links",()=>{
@@ -245,7 +247,7 @@ describe("application contextual navigation",()=>{
       enrollment:{count:1,note:"Active"},attendance:{count:1,present:1,absent:0,tardy:0,note:"Recorded"},
       actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
       attentionItems:[{id:"action:task",category:"staffing",title:"Review staffing",detail:"Review the staffing follow-up.",
-        href:"/operations?siteId=school&action=task",nextStep:"Review action",ownerName:null,dueAt:null,priority:"normal"}],
+        href:"/home?siteId=school&action=task",nextStep:"Review action",ownerName:null,dueAt:null,priority:"normal"}],
       events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
       programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
       operatingDecision:{status:"opening_unverified",title:"Opening authorization not verified",detail:"No independent opening record",owner:"CAN opening officer",nextStep:"Confirm authorization",href:"#school-day-operating-decision",staffingExceptionCount:0},
@@ -260,15 +262,15 @@ describe("application contextual navigation",()=>{
     };
     successful(siteData);
     const html=render(Site);
-    expect(html).toContain('href="/operations?siteId=school&amp;action=task"');
+    expect(html).toContain('href="/home?siteId=school&amp;action=task"');
     expect(html).toContain('href="/operations/launch?siteId=school"');
     expect(html).toContain('href="/admissions?siteId=school"');
     expect(html).toContain('href="/operations/launch/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
-    expect(html).not.toContain('href="/site/day"');
+    expect(html).not.toContain('href="/home"');
 
     successful({...siteData,canOpenOnsiteDay:true});
-    expect(render(Site)).toContain('href="/site/day"');
+    expect(render(Site)).toContain('href="/home"');
   });
 
   it("routes a handoff to its owning workspace without generic resolve or reassignment controls",()=>{
@@ -295,6 +297,32 @@ describe("application contextual navigation",()=>{
     const html=render(Admissions);
     expect(html).toContain('href="/admissions/families?siteId=school&amp;programId=program&amp;application=application"');
     expect(html).not.toContain("Unrelated application");
+  });
+
+  it("shows a selected application first, focusable, with scoped return and no overview above it",()=>{
+    state.search={siteId:"school",programId:"program",stage:"eligibility",page:2,application:"application"};
+    successful({
+      rows:[],summary:{total:5,awaitingDecision:1,missingRequirements:0,byStage:[{stage:"eligibility",count:5}]},
+      detail:{id:"application",studentName:"Selected applicant",programId:"program",program:"Academy",
+        stage:"eligibility",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]},
+    });
+    const html=render(Admissions);
+    expect(html).toMatch(/<h2 id="selected-application" tabindex="-1"[^>]*>Selected applicant<\/h2>/i);
+    expect(html).not.toContain('aria-label="Admissions stages"');
+    expect(html).not.toContain("Awaiting decision");
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=eligibility&amp;page=2"');
+    expect(html.indexOf("All applications")).toBeLessThan(html.indexOf("Selected applicant"));
+  });
+
+  it("offers one blue create action and stacked mobile rows with the same next step as the table",()=>{
+    successful({rows:[{id:"row",studentName:"Row Applicant",programId:"program",program:"Academy",stage:"inquiry",
+      submittedAt:null,outstandingRequirements:2,offers:[],enrollments:[]}],
+      summary:{total:1,awaitingDecision:0,missingRequirements:2,byStage:[]},filteredTotal:1});
+    const html=render(Admissions);
+    expect(html.match(/data-create-action/g)).toHaveLength(1);
+    expect(html.match(/<a[^>]*data-create-action[^>]*>/)?.[0]).toContain('href="/admissions/intake"');
+    expect(html).toContain('<ul aria-label="Applications" class="divide-y sm:hidden">');
+    expect(html.match(/Review 2 blocking requirements/g)).toHaveLength(2);
   });
 
   it("does not show a list empty state alongside a selected application",()=>{
@@ -432,7 +460,7 @@ describe("application contextual navigation",()=>{
     const html=render(Admissions);
     expect(html).toContain("Jordan Sample");
     expect(html).not.toContain("Casey Sample");
-    expect(html).toContain("Review 2 blocking requirement(s)");
+    expect(html).toContain("Review 2 blocking requirements");
     expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry&amp;application=jordan"');
     expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry" aria-current="page"');
   });
@@ -501,7 +529,7 @@ describe("application contextual navigation",()=>{
       academics:"/operations/launch",staffing:"/staff/teachers",
       calendar:"/operations/school-years",enrollment:"/admissions/capacity",
     });
-    expect(Object.values(links).some(href=>href.startsWith("/student"))).toBe(false);
+    expect(Object.values(links).some(href=>href.startsWith("/student/"))).toBe(false);
   });
 
   it("retains delivery scope in course request queues and return links",()=>{
@@ -514,7 +542,7 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("English Literature");
     expect(html).not.toContain("Unrelated course");
     expect(html).toContain('href="/operations/course-policies?siteId=school&amp;programId=program"');
-    expect(html).toContain('href="/operations?siteId=school&amp;programId=program"');
+    expect(html).toContain('href="/home?siteId=school&amp;programId=program"');
   });
 
   it("explains the content blocker before approval and preserves the pinned-version handoff",()=>{
@@ -628,7 +656,7 @@ describe("application contextual navigation",()=>{
     ]}]);
     const html=render(Offers);
     expect(html).toContain("2 assigned classes");
-    expect(html).toContain('href="/guardian"');
+    expect(html).toContain('href="/home"');
     expect(html).not.toContain(">Accept</button>");
   });
 
@@ -680,10 +708,10 @@ describe("major-role shared shell adoption",()=>{
   beforeEach(()=>{state.search={};state.data=null;});
 
   it.each([
-    ["guardian enrollment",Offers,[],"CAN OS · Family","Family home"],
-    ["student support",Support,{viewerRole:"student",actions:[]},"CAN OS · Student support","Student Today"],
-    ["student groups",StudentGroups,{enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,creationEnabled:false,sections:[],groups:[]},"CAN OS · Student","Student Today"],
-    ["teacher groups",TeacherGroups,{enabled:false,writesEnabled:false,membershipEnabled:false,creationEnabled:false,moderationEnabled:false,queue:[],reports:[],groups:[],scopes:[]},"CAN OS · Teacher","Teacher Today"],
+    ["guardian enrollment",Offers,[],"Family","Family home"],
+    ["student support",Support,{viewerRole:"student",actions:[]},"Student support","Student Today"],
+    ["student groups",StudentGroups,{enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,creationEnabled:false,sections:[],groups:[]},"Student","Student Today"],
+    ["teacher groups",TeacherGroups,{enabled:false,writesEnabled:false,membershipEnabled:false,creationEnabled:false,moderationEnabled:false,queue:[],reports:[],groups:[],scopes:[]},"Teacher","Teacher Today"],
   ] as const)("uses one standard shell and header for %s",(_name,route,data,eyebrow,breadcrumb)=>{
     successful(data);
     const html=render(route);
@@ -691,7 +719,8 @@ describe("major-role shared shell adoption",()=>{
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).toContain(eyebrow);
     expect(html).toContain(breadcrumb);
-    expect(html).toContain("min-h-screen bg-background");
+    expect(html).toContain('<main class="can-page">');
+    expect(html).toContain('class="can-page-title');
   });
 
   it("keeps operator scope filters inside the standard shell with shared metrics",()=>{

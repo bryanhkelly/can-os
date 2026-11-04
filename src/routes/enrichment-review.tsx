@@ -15,7 +15,7 @@ function EnrichmentReview() {
   const result = Route.useLoaderData();
   const [selected, setSelected] = useState("");
   if (!result.ok) return <LoaderFailure eyebrow="CAN OS" title="Extended-learning approvals" outcome={result}/>;
-  return <WorkspaceShell eyebrow="CAN OS · Independent review"
+  return <WorkspaceShell eyebrow="Independent review"
     title="Summer and after-school operating evidence"
     subtitle="For verified CAN network reviewers. All approvals are restricted, audited and tied to one Season.">
     <div className="mt-5 space-y-3">

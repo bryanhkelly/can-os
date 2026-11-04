@@ -18,6 +18,15 @@
   --radius-2xl: 0px;
   --radius-3xl: 0px;
 
+  /* Type roles. Arbitrary text-[…]/tracking-[…] values are lint errors; add a role here instead. */
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 0.875rem;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-section: 1.625rem;
+  --text-section--line-height: 1.15;
+  --tracking-eyebrow: 0.16em;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -60,7 +69,19 @@
 :root {
   --radius: 0px;
   --shell-pad: 1.5rem;
-  --topbar-height: 3.5rem;
+  /* Shell geometry: the sidebar brand block and the top bar share one height so
+     their dividers form a single line. Every page frame starts at the same gutter. */
+  --topbar-height: 4.5rem;
+  --sidebar-width: 15rem;
+  --sidebar-collapsed-width: 4.5rem;
+  --page-gutter: 1rem;
+  --page-pad-top: 1.5rem;
+  --page-pad-bottom: 3rem;
+  --content-reading: 48rem;
+  --content-standard: 64rem;
+  --content-wide: 80rem;
+  --content-dashboard: 94.375rem;
+  --eyebrow-color: var(--workspace-accent-ink);
   --workspace-accent: var(--primary);
   --workspace-accent-soft: #eaf1ff;
   --workspace-accent-ink: #104aa9;
@@ -130,13 +151,18 @@
   --sidebar-ring: var(--brand-primary);
 }
 
-[data-density="compact"] {
-  --shell-pad: 1rem;
-  --topbar-height: 3rem;
+@media (min-width: 640px) {
+  :root { --page-gutter: 1.5rem; --page-pad-top: 2.25rem; }
+}
+@media (min-width: 1280px) {
+  :root { --page-gutter: 2.5rem; }
 }
 
-[data-density="compact"] main {
-  padding: var(--shell-pad);
+[data-density="compact"] {
+  --shell-pad: 1rem;
+  --topbar-height: 4rem;
+  --page-gutter: 1rem;
+  --page-pad-top: 1rem;
 }
 
 [data-density="compact"] [aria-label="Workspace top bar"] {
@@ -329,7 +355,26 @@
 .can-editorial-canvas .can-editorial-label { letter-spacing:.17em; }
 /* Keep the actionable workspace first on record pages; editorial belongs on home views. */
 .can-workspace-header { margin-bottom:1.25rem; padding-bottom:1.1rem; }
-.can-workspace-header h1 { font-size:clamp(1.75rem,2.1vw,2.5rem); line-height:1.15; }
+
+/* Page frame: every workspace page is left-aligned to the shell gutter; width only
+   constrains the right edge so H1s share one x position across the product. */
+.can-page { min-height:100vh; min-width:0; background:var(--background); color:var(--foreground);
+  padding:var(--page-pad-top) var(--page-gutter) var(--page-pad-bottom); }
+.can-page-frame { width:100%; max-width:var(--can-page-width, var(--content-standard)); margin-inline:0; }
+.can-page-frame[data-width="reading"] { --can-page-width:var(--content-reading); }
+.can-page-frame[data-width="wide"] { --can-page-width:var(--content-wide); }
+.can-eyebrow { font-size:var(--text-2xs); line-height:1rem; font-weight:600; letter-spacing:var(--tracking-eyebrow);
+  text-transform:uppercase; color:var(--eyebrow-color); }
+.can-page-title { font-family:var(--font-serif); font-weight:400; font-size:clamp(1.75rem,2.1vw,2.5rem);
+  line-height:1.15; letter-spacing:-.01em; color:var(--foreground); text-wrap:balance; }
+
+/* Shell: sidebar brand block and top bar share --topbar-height. */
+.can-shell { min-height:100vh; }
+@media (min-width:1024px) {
+  .can-shell { display:grid; grid-template-columns:var(--sidebar-width) minmax(0,1fr); }
+  .can-shell[data-sidebar="collapsed"] { grid-template-columns:var(--sidebar-collapsed-width) minmax(0,1fr); }
+}
+.can-shell-bar { min-height:var(--topbar-height); }
 @media(prefers-reduced-motion:reduce) { .can-entity-card {transition:none;} }
 
 /* V6.1: editorial action contrast is independent of site-branded or dark UI ink. */
@@ -343,12 +388,13 @@
 .can-dashboard { font-family:var(--font-sans); }
 .can-dashboard :is(h1,h2,h3) { text-wrap:balance; }
 
-/* Shared role homes: one hero, overlapping shortcuts, work panels and context rail. */
-:is(.student-dashboard-page,.can-dashboard-page) { padding:0 22px 48px; }
-:is(.student-dashboard,.role-dashboard) { max-width:1510px; margin-inline:auto; }
+/* Shared role homes: one hero, overlapping shortcuts, work panels and context rail.
+   Home heroes start at the same gutter and top padding as every WorkspaceShell page. */
+:is(.student-dashboard-page,.can-dashboard-page) { padding:0 var(--page-gutter) var(--page-pad-bottom); }
+:is(.student-dashboard,.role-dashboard) { max-width:var(--content-dashboard); margin-inline:0; }
 .can-dashboard-hero {
-  position:relative; isolation:isolate; min-height:228px; margin-inline:-22px;
-  padding:29px 27px 65px; background-size:cover; background-position:center; color:#101d39;
+  position:relative; isolation:isolate; min-height:228px; margin-inline:calc(-1 * var(--page-gutter));
+  padding:var(--page-pad-top) var(--page-gutter) 65px; background-size:cover; background-position:center; color:#101d39;
 }
 .can-dashboard-hero::before {
   content:""; position:absolute; inset:0; z-index:-1;
@@ -358,8 +404,8 @@
   margin:12px 0 9px; font-family:var(--font-serif); font-weight:400;
   font-size:clamp(43px,4.2vw,61px); letter-spacing:-.45px; line-height:1.02;
 }
-.student-dashboard-date { font-size:10px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; }
-.student-dashboard-date span { display:inline-block; margin-left:11px; border:1px solid #9fb3cf; padding:4px 6px; font-size:9px; }
+.student-dashboard-date { font-size:var(--text-2xs); font-weight:600; letter-spacing:var(--tracking-eyebrow); text-transform:uppercase; color:var(--eyebrow-color); }
+.student-dashboard-date span::before { content:"·"; margin-inline:.5em; }
 :is(.student-dashboard,.role-dashboard) > nav { position:relative; z-index:1; margin-top:-31px; margin-bottom:16px; gap:11px; }
 :is(.student-dashboard,.role-dashboard) > nav > a { min-height:67px; padding:11px 12px; box-shadow:none; }
 :is(.student-dashboard,.role-dashboard) > nav > a > span:first-child { width:44px; height:44px; border:0; }
@@ -407,7 +453,7 @@
 .student-schedule article:last-child { border-bottom:0; }
 .student-schedule time { font-size:10px; color:var(--muted-foreground); }
 .student-announcement { display:flex; gap:10px; align-items:start; padding:12px 0; }
-.student-dashboard-followups { max-width:1510px; margin:24px auto 0; }
+.student-dashboard-followups { max-width:var(--content-dashboard); margin:24px 0 0; }
 .student-dashboard :is(a,button):focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
 .student-dashboard :is(section[id]) { scroll-margin-top:100px; }
 @media (max-width:1220px) {
@@ -423,8 +469,7 @@
   :is(.student-dashboard,.role-dashboard) > nav { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width:760px) {
-  :is(.student-dashboard-page,.can-dashboard-page) { padding-inline:11px; }
-  .can-dashboard-hero { margin-inline:-11px; padding:25px 20px 60px; }
+  .can-dashboard-hero { padding-bottom:60px; }
   .can-dashboard-hero h1 { font-size:clamp(37px,8vw,49px); }
   :is(.student-dashboard,.role-dashboard) > div.grid > aside { display:block; }
   :is(.student-dashboard,.role-dashboard) > div.grid > aside > section { margin-top:16px; }

@@ -19,6 +19,7 @@ import { requireCurrentOnsiteAdultSafety, verifiedAdultSafetyEvidence, verifiedA
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import type { z } from "zod";
 import { listSiteRooms, requireSiteRoom } from "./site-rooms.server";
+import { loadRoomCoverageSchedules, roomCoverageForBlock, roomCoverageOccupancy } from "./room-coverage.server";
 
 type Reader = Pick<typeof db, "select">;
 type BlockInput = z.infer<typeof roomPlanBlockSchema>;
@@ -89,6 +90,13 @@ export function currentRoomPlan(tx: Reader, input: BlockInput) {
 
 async function checkPlannedPrimary(tx:Reader,input:BlockInput,block:{startsAtLocal:string;endsAtLocal:string},
   timezone:string,primaryPersonId:string,substitutesForPersonId?:string){
+  const school = await schoolIdentity(tx, input.programId);
+  const coverage = roomCoverageForBlock(await loadRoomCoverageSchedules(tx, school.siteId), { ...input, ...block });
+  if (coverage) {
+    if (primaryPersonId !== coverage.primaryPersonId || substitutesForPersonId)
+      throw new Error("The room's named primary changed; refresh its coverage assignment");
+    return coverage;
+  }
   const rows=await tx.select({personId:deliveryArrangements.facilitatorPersonId,
     from:deliveryArrangements.effectiveFrom,through:deliveryArrangements.effectiveThrough,
   }).from(deliveryArrangements).innerJoin(programs,eq(programs.id,input.programId))
@@ -104,6 +112,8 @@ async function checkPlannedPrimary(tx:Reader,input:BlockInput,block:{startsAtLoc
 export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<typeof submitRoomPlanSchema>) {
   const input = submitRoomPlanSchema.parse(value);
   return db.transaction(async tx => {
+    const initialSchool = await schoolIdentity(tx, input.programId);
+    await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, initialSchool.siteId)).for("update");
     await tx.select({ id: programs.id }).from(programs).where(eq(programs.id, input.programId)).for("update");
     const { school, block } = await scheduledRoomBlock(tx, input);
     await authorizeRoomPlanHost(tx, actor, school);
@@ -120,12 +130,15 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
     if (!coversLocalSupervisionBlock({ date: input.date, timeZone: timezone, ...block,
       effectiveFrom: new Date(), effectiveThrough: expiresAt }))
       throw new Error("Plan validity must cover the entire scheduled block");
-    await checkPlannedPrimary(tx,input,block,timezone,input.primaryPersonId,input.substitutesForPersonId);
+    const coverage = await checkPlannedPrimary(tx,input,block,timezone,input.primaryPersonId,input.substitutesForPersonId);
+    if (coverage && (coverage.roomId !== room.id || coverage.backupPersonId !== input.backupPersonId))
+      throw new Error("Use the room and named backup from the current room coverage assignment");
     const metadata = { siteId: school.siteId, programId: input.programId, sectionId: input.sectionId,
       periodId: input.periodId, date: input.date, primaryPersonId: input.primaryPersonId,
       backupPersonId: input.backupPersonId, substitutesForPersonId:input.substitutesForPersonId??null,
       roomId: room.id, roomLabel: room.name, roomCapacity: room.capacity,
       startsAtLocal: block.startsAtLocal, endsAtLocal: block.endsAtLocal,
+      roomCoverageId: coverage?.id ?? null, roomCoverageRevision: coverage?.revision ?? null,
       rationale: input.rationale, source: "staff_room_plan", reviewStatus: "pending", isCurrent: true };
     const [replay] = await tx.select().from(documents).where(eq(documents.id, input.documentId)).limit(1);
     if (replay) {
@@ -160,10 +173,12 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
 export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<typeof reviewRoomPlanSchema>) {
   const input = reviewRoomPlanSchema.parse(value);
   return db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:"+input.programId}))`);
+    const initialSchool = await schoolIdentity(tx, input.programId);
+    await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, initialSchool.siteId)).for("update");
     await tx.select({ id: programs.id }).from(programs).where(eq(programs.id, input.programId)).for("update");
     const { school, block } = await scheduledRoomBlock(tx, input);
     verifyCANSchoolApprover(actor, school.institutionId);
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:"+input.programId}))`);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-presence:"+school.siteId+":"+input.date+":"+input.sectionId+":"+input.periodId}))`);
     const [document] = await currentRoomPlan(tx, input);
     if (!document || document.id !== input.documentId || document.metadata.isCurrent === false ||
@@ -193,8 +208,19 @@ export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<
       const primary = m.primaryPersonId, backup = m.backupPersonId;
       if (typeof primary !== "string" || typeof backup !== "string" || primary === backup)
         throw new Error("Two distinct named adults are required");
-      await checkPlannedPrimary(tx,input,block,site!.timezone,primary,
+      const coverage = await checkPlannedPrimary(tx,input,block,site!.timezone,primary,
         typeof m.substitutesForPersonId==="string"?m.substitutesForPersonId:undefined);
+      if (coverage) {
+        if (m.roomCoverageId !== coverage.id || m.roomCoverageRevision !== coverage.revision ||
+            m.roomId !== coverage.roomId || backup !== coverage.backupPersonId)
+          throw new Error("Room coverage changed; submit a corrected plan");
+        if (await roomCoverageOccupancy(tx, coverage) > Number(m.roomCapacity))
+          throw new Error("The combined mixed-course room roster exceeds the room occupancy limit");
+        scope.startsAtLocal = coverage.startsAtLocal;
+        scope.endsAtLocal = coverage.endsAtLocal;
+        if (!coversLocalSupervisionBlock({ ...scope, effectiveFrom: new Date(), effectiveThrough: document.expiresAt }))
+          throw new Error("Plan validity must cover the entire room supervision day");
+      } else if (m.roomCoverageId) throw new Error("The room coverage assignment is no longer current");
       await requireChurchHostedOperatingServices(tx, input.programId, ["onsite_supervision"]);
       const appointments = await verifiedScheduledSectionFacilitators(tx,
         { siteId: school.siteId, organizationId: school.organizationId },
@@ -256,11 +282,22 @@ export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<Bl
   ]) : [[],[],[]];
   if(assignments.length>500||plans.length>1000||arrangements.length>500)
     throw new Error("Room planning source records are incomplete; no approval is inferred");
-  const candidates=assignments.flatMap(row=>{
+  const coverageSchedules = await loadRoomCoverageSchedules(db, school.siteId);
+  const roomPeople = [...new Set(coverageSchedules.flatMap(row =>
+    [row.primaryPersonId, ...(row.backupPersonId ? [row.backupPersonId] : [])]))];
+  const roomNames = roomPeople.length ? await db.select({ id: people.id, first: people.legalFirstName, last: people.legalLastName })
+    .from(people).where(inArray(people.id, roomPeople)) : [];
+  const candidates=[...assignments.flatMap(row=>{
     const [kind,sectionId,personId]=row.key.split(":");
     return kind==="room_facilitator"&&sectionId&&sectionIds.includes(sectionId)&&personId===row.personId
       ? [{personId:row.personId,name:row.name,sectionId,programId:input.programId}] : [];
-  });
+  }), ...coverageSchedules.flatMap(coverage => coverage.sections.filter(section =>
+    section.programId === input.programId).flatMap(section =>
+      [coverage.primaryPersonId, ...(coverage.backupPersonId ? [coverage.backupPersonId] : [])].map(personId => {
+        const person = roomNames.find(row => row.id === personId);
+        return { personId, name: person ? `${person.first} ${person.last}` : "Unavailable adult",
+          sectionId: section.sectionId, programId: input.programId };
+      })))];
   const [appointments,safety]=await Promise.all([
     verifiedScheduledSectionFacilitators(db,{siteId:school.siteId,organizationId:school.organizationId},candidates),
     verifiedAdultSafetyEvidence(db,candidates.map(row=>row.personId)),
@@ -268,7 +305,9 @@ export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<Bl
   const rooms = await listSiteRooms(db, school.siteId);
   return { programId:input.programId,siteId:school.siteId,rooms,date:input.date,timezone:site!.timezone,canSubmit:!canReview,canReview,
     blocks:blocks.map(block=>{
-      const scope={date:input.date,timeZone:site!.timezone,...block};
+      const coverage = roomCoverageForBlock(coverageSchedules, { ...block, date: input.date });
+      const scope={date:input.date,timeZone:site!.timezone,...block,
+        ...(coverage ? { startsAtLocal: coverage.startsAtLocal, endsAtLocal: coverage.endsAtLocal } : {})};
       const staff=[...new Map(candidates.filter(row=>row.sectionId===block.sectionId&&
         scheduledBlockHasNamedFacilitator(appointments,{...row,...scope})&&
         Object.values(verifiedAdultCoversBlock(safety.get(row.personId),scope)).every(Boolean)
@@ -278,7 +317,7 @@ export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<Bl
           effectiveFrom:row.effectiveFrom,effectiveThrough:row.effectiveThrough}))
         .map(row=>row.facilitatorPersonId).filter((id):id is string=>!!id))];
       const document=plans.find(row=>row.subjectId===block.sectionId&&row.metadata.periodId===block.periodId&&row.metadata.isCurrent!==false);
-      return {...block,staff,assignedPrimaryPersonId:primaries.length===1?primaries[0]:null,
+      return {...block,staff,assignedPrimaryPersonId:coverage?.primaryPersonId ?? (primaries.length===1?primaries[0]:null),
         current:document?{id:document.id,submittedByPersonId:document.uploadedByPersonId,
           primaryPersonId:String(document.metadata.primaryPersonId??""),backupPersonId:String(document.metadata.backupPersonId??""),
           roomLabel:String(document.metadata.roomLabel??""),roomCapacity:Number(document.metadata.roomCapacity??0),

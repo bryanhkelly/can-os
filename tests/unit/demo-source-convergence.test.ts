@@ -14,13 +14,14 @@ vi.mock("@/modules/identity/session-grants.server", () => ({
     const account = state.tables.access_accounts?.find(row => row.id === grant.accountId);
     const person = state.tables.people?.find(row => row.id === grant.personId);
     return grant.active && account && !account.disabled && person?.active &&
-      ["student", "teacher", "specialist", "guardian", "registrar"].includes(String(grant.role)) &&
+      ["student", "teacher", "specialist", "guardian", "registrar", "room_facilitator"].includes(String(grant.role)) &&
       String(account.emailNormalized).endsWith("@valorschool.demo") && account.id !== "f7100000-0000-4000-8000-000000000002"
       ? [{ ...grant, email: account.emailNormalized }] : [];
   }),
 }));
-import { provisionDemoSchoolAccess, provisionDemoSiteAdmin, demoRegistrar, demoRegistrarInstitutionalCapabilities } from "@/modules/_demo/provision-demo-registrar";
-import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { provisionDemoSchoolAccess, provisionDemoSiteAdmin, provisionDemoRoomFacilitator, demoRegistrar, demoRegistrarInstitutionalCapabilities } from "@/modules/_demo/provision-demo-registrar";
+import { LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
+import { roleCapabilities } from "@/domain/access-context";
 
 const dialect = new PgDialect();
 function matches(row: Row, predicate: SQL) {
@@ -81,7 +82,7 @@ const emails = ["jordan.student", "riley.teacher", "casey.specialist", "morgan.g
 const roles = ["student", "teacher", "specialist", "guardian"];
 beforeEach(() => {
   vi.clearAllMocks();
-  const registrars = [demoRegistrar, LOCAL_DEMO_ADMIN];
+  const registrars = [demoRegistrar, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR];
   state.tables = {
     organizations: [{ id: LOCAL_DEMO_ADMIN.organizationId, metadata: { synthetic: true } }],
     sites: [{ id: LOCAL_DEMO_ADMIN.siteId, organizationId: LOCAL_DEMO_ADMIN.organizationId, metadata: { synthetic: true } }],
@@ -96,7 +97,8 @@ beforeEach(() => {
     ],
     account_person_grants: [
       ...registrars.map(fixture => ({ id: fixture.grantId, accountId: fixture.accountId, personId: fixture.personId,
-        role: "registrar", organizationId: fixture.organizationId, siteId: fixture.siteId, active: true })),
+        role: fixture === LOCAL_DEMO_ROOM_FACILITATOR ? "room_facilitator" : "registrar",
+        organizationId: fixture.organizationId, siteId: fixture.siteId, active: true })),
       ...sourcePeople.map((personId, index) => ({
         id: `fb000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
         accountId: `fa000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
@@ -107,13 +109,42 @@ beforeEach(() => {
     memberships: registrars.map(fixture => ({ personId: fixture.personId, organizationId: fixture.organizationId, metadata: { synthetic: true } })),
     role_assignments: registrars.map(fixture => ({
       id: fixture.roleAssignmentId, personId: fixture.personId, organizationId: fixture.organizationId,
-      siteId: fixture.siteId, programId: null, roleKey: "registrar",
-      capabilities: [...demoRegistrarInstitutionalCapabilities], metadata: { synthetic: true },
+      siteId: fixture.siteId, programId: null,
+      roleKey: fixture === LOCAL_DEMO_ROOM_FACILITATOR ? "room_facilitator" : "registrar",
+      capabilities: fixture === LOCAL_DEMO_ROOM_FACILITATOR
+        ? [...roleCapabilities.room_facilitator!] : [...demoRegistrarInstitutionalCapabilities],
+      metadata: { synthetic: true },
     })),
   };
 });
 const env = { NODE_ENV: "test", CAN_DEMO_FIXED_ACCESS_ENABLED: "true" };
 describe("explicit legacy demo source convergence", () => {
+  it("replays the exact facilitator identity without adding admin or teacher authority", async () => {
+    const before = structuredClone(state.tables);
+    expect((await provisionDemoRoomFacilitator(database, env)).changes).toEqual([]);
+    expect(state.tables).toEqual(before);
+    expect(state.audit).not.toHaveBeenCalled();
+    expect(state.event).not.toHaveBeenCalled();
+  });
+  it.each(["revoked", "foreign-site", "disabled", "extra-capability"])(
+    "fails closed for %s facilitator state", async kind => {
+      if (kind === "revoked") state.tables.account_person_grants!.find(row => row.id === LOCAL_DEMO_ROOM_FACILITATOR.grantId)!.active = false;
+      if (kind === "foreign-site") state.tables.account_person_grants!.find(row => row.id === LOCAL_DEMO_ROOM_FACILITATOR.grantId)!.siteId = "foreign";
+      if (kind === "disabled") state.tables.access_accounts!.find(row => row.id === LOCAL_DEMO_ROOM_FACILITATOR.accountId)!.disabled = true;
+      if (kind === "extra-capability") state.tables.role_assignments!.find(row => row.id === LOCAL_DEMO_ROOM_FACILITATOR.roleAssignmentId)!.capabilities = ["admin.manage"];
+      const before = structuredClone(state.tables);
+      await expect(provisionDemoRoomFacilitator(database, env)).rejects.toThrow();
+      expect(state.tables).toEqual(before);
+      expect(state.event).not.toHaveBeenCalled();
+    },
+  );
+  it("rolls facilitator repair back when transactional audit fails", async () => {
+    const role = state.tables.role_assignments!.find(row => row.id === LOCAL_DEMO_ROOM_FACILITATOR.roleAssignmentId)!;
+    role.capabilities = [];
+    state.audit.mockRejectedValueOnce(new Error("audit unavailable"));
+    await expect(provisionDemoRoomFacilitator(database, env)).rejects.toThrow("audit unavailable");
+    expect(state.tables.role_assignments!.find(row => row.id === LOCAL_DEMO_ROOM_FACILITATOR.roleAssignmentId)!.capabilities).toEqual([]);
+  });
   it("can repair only the administrator without touching registrar or source identities", async () => {
     const accounts = structuredClone(state.tables.access_accounts);
     const registrarGrant = structuredClone(state.tables.account_person_grants![0]);
@@ -121,7 +152,7 @@ describe("explicit legacy demo source convergence", () => {
     expect(result.changes).toEqual(["site_admin_role", "institutional_capabilities"]);
     expect(state.tables.access_accounts).toEqual(accounts);
     expect(state.tables.account_person_grants![0]).toEqual(registrarGrant);
-    expect(state.tables.account_person_grants!.slice(2).map(row => row.role))
+    expect(state.tables.account_person_grants!.slice(3).map(row => row.role))
       .toEqual(roles);
   });
   it.each(["inactive", "wrong-person", "wrong-tenant"])("refuses a conflicting administrator grant: %s", async scenario => {
@@ -137,7 +168,7 @@ describe("explicit legacy demo source convergence", () => {
     const grants = structuredClone(state.tables.account_person_grants);
     const result = await provisionDemoSchoolAccess(database, env);
     expect(result.changedAccounts).toHaveLength(4);
-    expect(state.tables.access_accounts!.slice(2).map(row => row.emailNormalized))
+    expect(state.tables.access_accounts!.slice(3).map(row => row.emailNormalized))
       .toEqual(emails.map(email => `${email}@valorschool.demo`));
     expect(state.tables.account_person_grants).toEqual(grants?.map(grant =>
       grant.id === LOCAL_DEMO_ADMIN.grantId ? expect.objectContaining({
@@ -172,8 +203,8 @@ describe("explicit legacy demo source convergence", () => {
   });
   it.each(["disabled", "revoked", "wrong-person", "wrong-tenant", "address-collision", "wrong-address"])(
     "fails closed and rolls back earlier address updates for %s", async scenario => {
-      const account = state.tables.access_accounts![5]!;
-      const grant = state.tables.account_person_grants![5]!;
+      const account = state.tables.access_accounts![6]!;
+      const grant = state.tables.account_person_grants![6]!;
       if (scenario === "disabled") account.disabled = true;
       if (scenario === "revoked") grant.active = false;
       if (scenario === "wrong-person") grant.personId = sourcePeople[0];
@@ -188,8 +219,8 @@ describe("explicit legacy demo source convergence", () => {
     },
   );
   it("does not bypass revoked memberships on already normalized fixed accounts", async () => {
-    state.tables.access_accounts![5]!.emailNormalized = "morgan.guardian@valorschool.demo";
-    state.tables.account_person_grants![5]!.active = false;
+    state.tables.access_accounts![6]!.emailNormalized = "morgan.guardian@valorschool.demo";
+    state.tables.account_person_grants![6]!.active = false;
     const before = structuredClone(state.tables);
     await expect(provisionDemoSchoolAccess(database, env)).rejects.toThrow("membership");
     expect(state.tables).toEqual(before);

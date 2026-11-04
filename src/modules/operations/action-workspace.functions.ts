@@ -65,7 +65,7 @@ export const getOperationsActions=createServerFn({method:"GET"})
   priority:record.priority==="urgent"?"critical" as const:record.priority==="high"?"high" as const:"normal" as const,
   createdAt:record.createdAt.toISOString(),
   dueAt:record.dueAt?.toISOString()??null, status:record.status,
-  href:"/operations",
+  href:"/home",
   needsResponse:record.status==="open",
  })));
  const scopedItems=prioritizeSchoolActions(items.map(item=>{

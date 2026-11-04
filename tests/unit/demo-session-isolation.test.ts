@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
 import { readSessionGrants } from "@/modules/identity/session-grants.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 
@@ -31,6 +31,28 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("public demo session isolation", () => {
+  const facilitatorGrant = {
+    ...LOCAL_DEMO_ROOM_FACILITATOR, id: LOCAL_DEMO_ROOM_FACILITATOR.grantId,
+    role: "room_facilitator", active: true,
+  };
+  it("gives Sally only her own room-facilitator workspace, not demo-admin switching", async () => {
+    state.rows = [[facilitatorGrant]];
+    expect(await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).toEqual({
+      grants: [facilitatorGrant], demoAccountSwitching: false,
+    });
+  });
+  it.each([{ role: "site_admin" }, { role: "teacher" }, { siteId: "foreign" },
+    { organizationId: "foreign" }, { personId: "foreign" }, { accountId: "foreign" }])(
+    "denies changed Valor facilitator identity %j", async change => {
+      state.rows = [[{ ...facilitatorGrant, ...change }]];
+      expect((await readSessionGrants(facilitatorGrant.accountId, facilitatorGrant.email)).grants).toEqual([]);
+    },
+  );
+  it("includes the canonical facilitator in admin switching, without creating mirrored authority", async () => {
+    state.rows = [[adminGrant], [facilitatorGrant]];
+    expect((await readSessionGrants(adminGrant.accountId, adminGrant.email)).grants)
+      .toEqual([adminGrant, facilitatorGrant]);
+  });
   const school = {
     domain: "newschool.demo", organizationId: "new-organization", siteId: "new-site",
     adminAccountId: "new-account", adminPersonId: "new-person", adminGrantId: "new-grant",

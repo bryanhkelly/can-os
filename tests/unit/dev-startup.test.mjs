@@ -24,6 +24,7 @@ describe("Local development startup", () => {
     writeFileSync(join(directory, ".env.local"), `DATABASE_URL=${database}\nCAN_ACCESS_TOKEN_PEPPER=${key}\n`);
     const env = developmentEnvironment(directory, {});
     expect(env).toMatchObject({ DATABASE_URL: database, CAN_ACCESS_TOKEN_PEPPER: key, NODE_ENV: "development" });
+    expect(env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED).toBe("true");
     expect(env.CAN_DEMO_FIXED_ACCESS_ENABLED).toBeUndefined();
     expect(env.CAN_DEMO_PUBLIC_ACCESS_ENABLED).toBeUndefined();
     expect(developmentEnvironment(directory, {}).CAN_ACCESS_TOKEN_PEPPER).toBe(key);

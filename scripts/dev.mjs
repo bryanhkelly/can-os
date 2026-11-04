@@ -29,6 +29,7 @@ export function developmentEnvironment(directory, inherited = process.env) {
     ...env,
     NODE_ENV: env.APP_ENV === "test" ? "test" : "development",
     CAN_PUBLIC_SITE_LOCAL_PREVIEW_ENABLED: "true",
+    CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED: "true",
   };
 }
 

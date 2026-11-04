@@ -1,11 +1,10 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
 import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
 import {FirstSchoolDayHandoff} from "@/components/enrollment/FirstSchoolDayHandoff";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getActiveEnrollmentCounts, getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
@@ -13,7 +12,7 @@ import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-
 import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment,withdrawIssuedAdmissionOffer } from "@/modules/enrollment/admissions-offer.functions";
 import { pipelineStages, type AdmissionsStage } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
-import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, SectionTab, StatusBadge, CreateAction, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import {z} from "zod";
@@ -21,6 +20,7 @@ import {optionalSearchUuid,siteProgramSelectionSchema} from "@/lib/route-search"
 import { PageNavigation } from "@/components/workspace/page-navigation";
 import { SiteProgramFields } from "@/components/workspace/site-program-fields";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { plural } from "@/lib/format";
 
 const admissionsSearchSchema=siteProgramSelectionSchema.extend({
  application:optionalSearchUuid,
@@ -68,7 +68,7 @@ export const Route = createFileRoute("/admissions/")({
 
 function Admissions() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Admissions" title="Admissions command center" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Admissions" title="Admissions command center" outcome={outcome} />;
   return <AdmissionsView data={outcome.data} />;
 }
 
@@ -88,6 +88,9 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   const [interactive,setInteractive]=useState(false);
   useEffect(()=>setInteractive(true),[]);
   const busy=!interactive||mutation.pending||mutation.refreshFailed;
+  const selectedHeading=useRef<HTMLHeadingElement>(null);
+  useEffect(()=>{ if(selected.application) selectedHeading.current?.focus(); },[selected.application]);
+  const listSearch={siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:selected.page&&selected.page>1?selected.page:undefined};
 
   async function transact(fn: () => Promise<unknown>) {
     await mutation.run(fn, {
@@ -99,13 +102,18 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   return (
     <WorkspaceShell
       width="wide"
-      eyebrow="CAN OS · Admissions"
+      eyebrow="Admissions"
       title="Admissions command center"
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
-      actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><Link to="/admissions/invite-families" className="rounded-lg border px-3 py-2 text-sm">Invite transfer families</Link><Link to="/admissions/transcripts" search={{query:""}} className="rounded-lg border px-3 py-2 text-sm">Official transcripts</Link><Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg border px-3 py-2 text-sm">Program capacity</Link></div>}
+      actions={<div className="flex flex-wrap items-center gap-2">
+        <CreateAction><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}}>New inquiry</Link></CreateAction>
+        <Link to="/admissions/invite-families" className={secondaryActionClassName}>Invite transfer families</Link>
+        <Link to="/admissions/transcripts" search={{query:""}} className={secondaryActionClassName}>Official transcripts</Link>
+        <Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className={secondaryActionClassName}>Program capacity</Link>
+      </div>}
     >
-      <WorkflowIntro eyebrow="Admissions & enrollment" title="A thoughtful path from inquiry to enrollment." description="Track each family's progress, review decisions, and hand accepted offers into authorized enrollment. Guardian verification remains independent." actions={<Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Open intake <ArrowUpRight className="size-4" /></Link>} />
       <MutationFeedback state={mutation} pendingMessage="Saving enrollment records..." className="mt-4"/>
+      {!selected.application&&<>
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
         <SiteProgramFields sites={sites} programs={programs} siteId={selected.siteId??""} programId={selected.programId??""}
           labelPrefix="Admissions" sitePlaceholder="All permitted schools" programPlaceholder="All permitted programs"
@@ -119,28 +127,27 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active students across programs: <strong>{activeEnrollmentCount}</strong></p></div>
       <h2 className="mt-9 font-serif text-2xl">Pipeline</h2>
       <DetailNavigation label="Admissions stages">
-       <Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId}} aria-current={!selected.stage?"page":undefined}>All ({summary.total})</Link>
-       {summary.byStage.map(item=><Link key={item.stage} to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:item.stage}}
-        aria-current={selected.stage===item.stage?"page":undefined} className="capitalize">{item.stage} ({item.count})</Link>)}
+       <SectionTab current={!selected.stage} link={{to:"/admissions",search:{siteId:selected.siteId,programId:selected.programId}}}>All ({summary.total})</SectionTab>
+       {summary.byStage.map(item=><SectionTab key={item.stage} current={selected.stage===item.stage} className="capitalize"
+        link={{to:"/admissions",search:{siteId:selected.siteId,programId:selected.programId,stage:item.stage}}}>{item.stage} ({item.count})</SectionTab>)}
       </DetailNavigation>
       {!selected.application&&<div className="rounded-xl border bg-card">
-       <Table className="text-left">
+       <ul aria-label="Applications" className="divide-y sm:hidden">{rows.map(row=>{
+        const href={siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id};
+        return <li key={row.id} className="space-y-2 p-4">
+         <div className="flex items-start justify-between gap-3">
+          <Link to="/admissions" search={href} className="font-semibold underline">{row.studentName??row.id}</Link>
+          <StatusBadge tone={row.enrollments.length>0?"success":row.outstandingRequirements>0?"attention":"neutral"}>{row.enrollments.length>0?"Enrolled":formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge>
+         </div>
+         <p className="text-sm text-muted-foreground">{row.program}</p>
+         <Link to="/admissions" search={href} className="inline-flex min-h-11 items-center text-sm font-semibold underline">{nextStep(row)}</Link>
+        </li>;
+       })}</ul>
+       <Table className="hidden text-left sm:table">
         <caption className="sr-only">Authorized admissions pipeline and next steps</caption>
         <TableHeader className="bg-muted/50"><TableRow><TableHead scope="col" className="p-4">Applicant</TableHead><TableHead scope="col" className="p-4">Program</TableHead><TableHead scope="col" className="p-4">Stage</TableHead><TableHead scope="col" className="p-4">Next step</TableHead></TableRow></TableHeader>
         <TableBody className="divide-y">{rows.map(row=>{
-         const offer=selectActionableOffer(row.offers);
-         const next=row.enrollments.length && row.activeSectionCount===0?"Assign staffed instructional class":
-          row.enrollments.length && row.studentAccessStatus==="access_unavailable"?"Review revoked student access":
-          row.enrollments.length && row.studentAccessStatus==="pending_review"?"Review student sign-in request":
-          row.enrollments.length && row.studentAccessStatus==="not_requested"?"Await guardian student sign-in consent":
-          row.enrollments.length && row.studentAccessStatus==="approved"?"Prepare scheduled onsite school day":
-          row.enrollments.length?"Review student access":
-          row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
-          row.disposition==="waitlisted"?"Restore waitlisted application to review":
-          row.outstandingRequirements>0?`Review ${row.outstandingRequirements} blocking requirement(s)`:
-          offer?.status==="issued"?"Awaiting family response":
-          offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
-          row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
+         const next=nextStep(row);
          return <TableRow key={row.id} className="align-top hover:bg-muted/40">
           <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
           <TableCell className="p-4 align-top">{row.program}</TableCell><TableCell className="p-4 align-top"><StatusBadge tone={row.enrollments.length>0?"success":row.outstandingRequirements>0?"attention":"neutral"}>{row.enrollments.length>0?"Enrolled":formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></TableCell>
@@ -155,8 +162,8 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
        next={hasMore&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className="rounded border px-3 py-2">Next page</Link>}>
        <span>Page {page} of {pageCount} · {filteredTotal} applications</span>
       </PageNavigation>}
-      <h2 className="mt-9 font-serif text-2xl">Applications</h2>
-      {selected.application&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:selected.page&&selected.page>1?selected.page:undefined}} className="mt-3 inline-block text-sm underline">View all applications</Link>}
+      </>}
+      {selected.application&&<Link to="/admissions" search={listSearch} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline"><ArrowLeft className="size-4" aria-hidden="true" />All applications</Link>}
       {selected.application&&!detail&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}
       <div className="mt-4 space-y-3">{detail&&[detail].map(x => {
         const years = options.find(o => o.applicationId === x.id)?.years ?? [];
@@ -166,8 +173,8 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         const enrolledOffer = x.offers.find(offer =>
           x.enrollments.some(enrollment => enrollment.schoolYearId === offer.schoolYearId));
         const latest = enrolledOffer ?? selectActionableOffer(x.offers);
-        return <article key={x.id} className="rounded-xl border p-4">
-          <h3 className="mb-2 font-serif text-2xl">{x.studentName??x.id}</h3>
+        return <article key={x.id} aria-labelledby="selected-application" className="rounded-xl border p-4">
+          <h2 id="selected-application" ref={selectedHeading} tabIndex={-1} className="mb-2 font-serif text-2xl outline-none">{x.studentName??x.id}</h2>
           <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
           <p className="mt-1 text-sm text-muted-foreground">{formatStatus(x.stage)} · {x.outstandingRequirements} outstanding blocking requirements</p>
           <section aria-label="Next enrollment action" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
@@ -219,7 +226,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
             <ol className="mt-2 space-y-1 text-muted-foreground" aria-label="School start handoff">
               <li>1. School-year enrollment active.</li>
               <li>2. {x.activeSectionCount>0
-                ? `${x.activeSectionCount} active instructional class assignment(s) recorded.`
+                ? `${plural(x.activeSectionCount,"active instructional class assignment")} recorded.`
                 : "Assign a staffed instructional class above before starting student learning access."}</li>
               <li>3. {x.studentAccessStatus==="approved"
                 ? "Separate student learning account approved. The student signs in with their own email."
@@ -243,6 +250,24 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         {!selected.application && !rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
     </WorkspaceShell>
   );
+}
+
+type AdmissionsRow=Awaited<ReturnType<typeof loadAdmissions>>["rows"][number];
+
+function nextStep(row:AdmissionsRow){
+  const offer=selectActionableOffer(row.offers);
+  return row.enrollments.length && row.activeSectionCount===0?"Assign staffed instructional class":
+   row.enrollments.length && row.studentAccessStatus==="access_unavailable"?"Review revoked student access":
+   row.enrollments.length && row.studentAccessStatus==="pending_review"?"Review student sign-in request":
+   row.enrollments.length && row.studentAccessStatus==="not_requested"?"Await guardian student sign-in consent":
+   row.enrollments.length && row.studentAccessStatus==="approved"?"Prepare scheduled onsite school day":
+   row.enrollments.length?"Review student access":
+   row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
+   row.disposition==="waitlisted"?"Restore waitlisted application to review":
+   row.outstandingRequirements>0?`Review ${plural(row.outstandingRequirements,"blocking requirement")}`:
+   offer?.status==="issued"?"Awaiting family response":
+   offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
+   row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
 }
 
 function OfferWithdrawal({offerId}:{offerId:string}){

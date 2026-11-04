@@ -1,6 +1,6 @@
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BookOpen, CalendarDays, ClipboardList, MessageCircle } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
@@ -12,14 +12,7 @@ import { prioritizeFamilyNeeds } from "@/domain/family-needs";
 import { buildGuardianAttention } from "@/domain/daily-operations";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { dateTimeInputInTimezone } from "@/modules/calendar/timezone";
-
-export const Route = createFileRoute("/guardian/")({
- validateSearch:(search:Record<string,unknown>):{action?:string;student?:string}=>({
-  student:typeof search.student==="string"?search.student:undefined,
-  action:typeof search.action==="string"?search.action:undefined,
- }),
- component:FamilyHomePage,
-});
+import { plural, agree } from "@/lib/format";
 
 type Child = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 type NeedItem = Awaited<ReturnType<typeof getGuardianNeedsYou>>["items"][number];
@@ -27,8 +20,7 @@ type GradeFollowUp = Awaited<ReturnType<typeof listGuardianGradeFollowUps>>["ite
 type CourseApproval = Awaited<ReturnType<typeof listGuardianCourseApprovals>>[number];
 type EnrollmentApplication = Awaited<ReturnType<typeof getGuardianAdmissionOffers>>[number];
 
-function FamilyHomePage() {
- const {action,student}=Route.useSearch();
+export function FamilyHomePage({action,student}: {action?:string;student?:string}) {
  const [children, setChildren] = useState<Child[]>([]);
  const [needs, setNeeds] = useState<NeedItem[]>([]);
  const [loading, setLoading] = useState(true);
@@ -136,8 +128,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
  const prioritized=prioritizeFamilyNeeds([...visibleNeeds,...approvalNeeds,...schoolworkItems],Date.now());
  const schoolworkCount=visibleChildren.reduce((total,child)=>total+child.workNeedsAttentionCount,0);
  return <DashboardHome
-  eyebrow="CAN OS · Family"
-  title="Family home"
+  eyebrow="Family"
   subtitle="Your children, enrollment steps, and school follow-ups in one place."
   shortcuts={<>
    <DashboardShortcut title="Children & academics" description="Released grades and schoolwork" icon={<BookOpen className="size-5" />}><Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} /></DashboardShortcut>
@@ -194,7 +185,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      })}
     </div>}
    </section>}
-   {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Show</span><Link to="/guardian" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/guardian" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
+   {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Show</span><Link to="/home" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/home" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={student?"Selected child":"Your children"} value={childCount}/>
@@ -208,7 +199,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      items={buildGuardianAttention(prioritized.filter(item=>!action||item.kind==="action"&&item.id===action))}
      empty={action?"The selected action is not available in your current family workspace.":"You are all caught up. Nothing needs your attention right now."}
     />
-    {action&&<Link to="/guardian" search={{student}} className="mt-4 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">{student?"View all needs for this child":"View all family needs"}</Link>}
+    {action&&<Link to="/home" search={{student}} className="mt-4 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">{student?"View all needs for this child":"View all family needs"}</Link>}
     {action&&!needsWarning&&!visibleNeeds.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
    </div>
 
@@ -238,7 +229,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
 
    <section aria-label="Your children" className="mt-12">
     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your children</h2>
-    {student&&(selectedChild||selectedEnrollment)&&<p className="mt-2 text-sm text-muted-foreground">Showing {selectedChild?.displayName??selectedEnrollment?.studentName}’s family information. <Link to="/guardian" search={{action,student:undefined}} className="inline-flex min-h-11 items-center font-semibold underline focus-visible:outline-2">Show all children</Link></p>}
+    {student&&(selectedChild||selectedEnrollment)&&<p className="mt-2 text-sm text-muted-foreground">Showing {selectedChild?.displayName??selectedEnrollment?.studentName}’s family information. <Link to="/home" search={{action,student:undefined}} className="inline-flex min-h-11 items-center font-semibold underline focus-visible:outline-2">Show all children</Link></p>}
     {children.length === 0 && visibleEnrollmentApplications.length===0 && <div className="mt-4 rounded-xl border bg-card p-5">
      <p className="font-semibold">No active enrollments to show yet</p>
      <p className="mt-2 text-sm text-muted-foreground">Children with an application or enrollment step in progress appear below by name and school stage. Once enrollment is active, their school information appears here.</p>
@@ -294,7 +285,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Tardies</Link></dt><dd className="text-lg font-semibold">{child.unexcusedTardies}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Intl.DateTimeFormat("en-US",{dateStyle:"medium",...(child.nextDueTimezone?{timeZone:child.nextDueTimezone}:{})}).format(new Date(child.nextDueAt)) : "—"}</dd></div>
       </dl>
-      <p className="mt-4 text-sm text-muted-foreground">{child.missingCount>0?`${child.missingCount} overdue assignment(s) need follow-through.`:child.workNeedsAttentionCount>0?`${child.workNeedsAttentionCount} assignment(s) to complete or revise.`:child.unexcusedAbsences>0||child.unexcusedTardies>0?"Unexcused attendance marks remain. Check Attendance for the school's review status.":child.awaitingSections?"Your school is arranging class placement.":"No overdue unfinished work or unexcused attendance cases in this summary."}</p>
+      <p className="mt-4 text-sm text-muted-foreground">{child.missingCount>0?`${plural(child.missingCount,"overdue assignment")} ${agree(child.missingCount,"needs","need")} follow-through.`:child.workNeedsAttentionCount>0?`${plural(child.workNeedsAttentionCount,"assignment")} to complete or revise.`:child.unexcusedAbsences>0||child.unexcusedTardies>0?"Unexcused attendance marks remain. Check Attendance for the school's review status.":child.awaitingSections?"Your school is arranging class placement.":"No overdue unfinished work or unexcused attendance cases in this summary."}</p>
       {child.workToReview.length>0&&<div className="mt-4 rounded-lg border p-3">
        <p className="text-sm font-semibold">Schoolwork to review · {child.workNeedsAttentionCount}</p>
        <ul className="mt-2 space-y-2">{child.workToReview.map(work=><li key={work.assessmentId} className="text-sm">
@@ -325,7 +316,6 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      <Link to="/guardian/admission-offers" search={{student:undefined}} className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Admission offers</Link>
      <Link to="/guardian/course-approvals" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Course approvals</Link>
      <Link to="/messages" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Messages</Link>
-     <Link to="/notifications" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Notifications</Link>
     </div>
    </section>
   </QueryState>

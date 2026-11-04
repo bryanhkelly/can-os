@@ -23,9 +23,14 @@ describe("native session redemption",()=>{
  it("sets the protected cookie on a 303 navigation to a fixed workspace without credentials in the URL",async()=>{
   const response=await state.handler!({request:form({email:"admin@example.test",code:"fixture"})});
   expect(response.status).toBe(303);expect(response.headers.get("Location")).toBe("/admissions");
-  expect(response.headers.get("Set-Cookie")).toBe(cookie);
+  expect(response.headers.getSetCookie()).toContain(cookie);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(state.demo).toHaveBeenCalledWith("admin@example.test","fixture");
+ });
+ it("arms one-shot return recovery only after successful sign-in to a saved page",async()=>{
+  const response=await state.handler!({request:form({email:"admin@example.test",code:"fixture",returnTo:"/safeguarding"})});
+  expect(response.headers.get("Location")).toBe("/safeguarding");
+  expect(response.headers.getSetCookie()).toContain("can_os_access_return=1; Path=/; Max-Age=120; SameSite=Lax; Secure");
  });
  it("preserves the canonical onboarding destination for a one-time link",async()=>{
   const response=await state.handler!({request:form({token:"fixture-token"})});

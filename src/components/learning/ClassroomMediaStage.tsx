@@ -52,7 +52,7 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
         <Button variant="ghost" size="sm" aria-pressed={mode === "recorded"} onClick={() => setMode("recorded")}><Video aria-hidden="true"/>Recorded lesson</Button>
         {role !== "guardian" && <Button variant="ghost" size="sm" aria-pressed={mode === "live"} onClick={() => setMode("live")}><CalendarDays aria-hidden="true"/>Live classroom</Button>}
       </div>
-      <span className="text-[0.65rem] text-muted-foreground">{mode === "recorded" ? "On-demand · Pause, replay, or review the transcript" : `Class calendar · ${timezone}`}</span>
+      <span className="text-3xs text-muted-foreground">{mode === "recorded" ? "On-demand · Pause, replay, or review the transcript" : `Class calendar · ${timezone}`}</span>
     </div>
     <div className="classroom-video-stage">
       {mode === "recorded" ? recorded : <div className="space-y-4 p-5">
@@ -74,7 +74,7 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
             <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{event.title}</h3>
               <p className="mt-1 text-xs text-muted-foreground">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: event.timezone }).format(new Date(event.startsAt))} · {event.timezone}</p>
               <p className="mt-1 text-xs">{event.cancelled ? "Cancelled" : event.meetingUrl ? "Meeting link available" : "The teacher has not attached a meeting link."}</p></div>
-              {event.meetingUrl && !event.cancelled && <Button asChild size="sm"><a href={event.meetingUrl} target="_blank" rel="noopener noreferrer">Open meeting<span className="sr-only"> for {event.title} in a new tab</span></a></Button>}
+              {event.meetingUrl && !event.cancelled && <Button asChild variant="outline" size="sm"><a href={event.meetingUrl} target="_blank" rel="noopener noreferrer">Open meeting<span className="sr-only"> for {event.title} in a new tab</span></a></Button>}
             </div>
             <Link to="/calendar" search={{ section: sectionId, event: event.id, date: dateKeyInTimezone(event.startsAt, event.timezone), view: "agenda" }} className="text-xs underline">View calendar event</Link>
             {event.canManage && <div>

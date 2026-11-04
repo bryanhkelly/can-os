@@ -86,7 +86,7 @@ export function LaunchPortfolio({ launches, sites, siteId, programId }: {
               </p>
             </div>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
-              {launch.status==="active"&&launch.siteId&&<Link to="/operations"
+              {launch.status==="active"&&launch.siteId&&<Link to="/home"
                 search={{siteId:launch.siteId,programId:launch.id}}
                 className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-primary-foreground">
                 Open school operations →

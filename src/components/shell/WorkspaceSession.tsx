@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { useContext, useEffect, useRef, type ReactNode } from "react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
 import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
+import { WorkspaceSessionContext } from "./workspace-session-context";
 
-const WorkspaceSessionContext = createContext<WorkspaceSessionResult | null>(null);
+export { useActiveWorkspaceMember } from "./workspace-session-context";
 
 export function workspaceSessionQueryOptions() {
   return queryOptions({

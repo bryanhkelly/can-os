@@ -17,6 +17,18 @@ export const personProfileDetails = pgTable("person_profile_details", {
   createdAt: createdAt(), updatedAt: updatedAt(),
 }, t => [uniqueIndex("person_profile_details_person_uq").on(t.personId)]);
 
+/** Self-reported professional background, kept separate from public bio and verified qualification evidence. */
+export const teacherProfessionalProfiles = pgTable("teacher_professional_profiles", {
+  id: id(),
+  personId: uuid("person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
+  education: jsonb("education").$type<{
+    institution: string; degree: string; fieldOfStudy: string | null; graduationYear: number | null;
+  }[]>().default([]).notNull(),
+  teachingExperienceYears: integer("teaching_experience_years"),
+  specialties: jsonb("specialties").$type<string[]>().default([]).notNull(),
+  createdAt: createdAt(), updatedAt: updatedAt(),
+}, t => [uniqueIndex("teacher_professional_profiles_person_uq").on(t.personId)]);
+
 /** Requirements belong to a policy/version/scope, not a hard-coded national checklist. */
 /** Configure existing canonical Programs, never spawn a competing school identity. */
 export const schoolConfigurationVersions = pgTable("school_configuration_versions", {

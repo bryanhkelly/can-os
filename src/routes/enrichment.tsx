@@ -13,7 +13,7 @@ function PublicEnrichment() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS" title="Programs and camps" outcome={outcome}/>;
   const items = outcome.data;
-  return <WorkspaceShell eyebrow="CAN OS · Enrichment"
+  return <WorkspaceShell eyebrow="Enrichment"
     title="Summer camps and after-school programs"
     subtitle="Browse open enrollment programs at CAN partner sites. School-year enrollment is not required."
     actions={<Link to="/guardian/enrichment" className="rounded-lg border px-3 py-2 text-sm">Register your child</Link>}>

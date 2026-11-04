@@ -62,7 +62,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    setNotice(message);
   }catch(e){setError(mutationErrorMessage(e, "Unable to save launch setup"));}
  }
- return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
+ return <WorkspaceShell eyebrow="School launch" title={data.program.name+" · academic setup"}
   subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
   actions={<Button asChild variant="outline" size="sm">
    <Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>

@@ -2,7 +2,7 @@ import {createFileRoute} from "@tanstack/react-router";
 import {createServerOnlyFn} from "@tanstack/react-start";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
-import { accessLandingPath, safeAccessReturnTo } from "@/domain/access-navigation";
+import { accessLandingPath, accessReturnCookieHeader, safeAccessReturnTo } from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
 export const Route=createFileRoute("/access/verify")({
  validateSearch:(search:Record<string,unknown>)=>({returnTo:safeAccessReturnTo(search.returnTo)}),
@@ -43,10 +43,15 @@ export const Route=createFileRoute("/access/verify")({
       ?await (await import("@/modules/identity/passwordless-access.server")).redeemOneTimeAccess(payload.token)
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
-    if(nativeForm)return new Response(null,{status:303,headers:{
-     Location:accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo),
-     "Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer",
-    }});
+    if(nativeForm){
+     const headers=new Headers({
+      Location:accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo),
+      "Cache-Control":"no-store","Referrer-Policy":"no-referrer",
+     });
+     headers.append("Set-Cookie",result.setCookie);
+     headers.append("Set-Cookie",accessReturnCookieHeader(returnTo,new URL(request.url).protocol==="https:"));
+     return new Response(null,{status:303,headers});
+    }
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch(error){
     if(!(error instanceof InvalidAccessCredentialError)&&!(error instanceof AuthorizationError)){

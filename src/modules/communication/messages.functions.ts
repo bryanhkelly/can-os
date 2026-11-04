@@ -1,4 +1,5 @@
 import { roleCapabilities } from "@/domain/access-context";
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { personDisplayName, personShortName } from "@/domain/person-name";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -73,7 +74,35 @@ async function listAllowedThreadContacts(
     relationships.set(personId, parts);
   };
 
-  if (role === "guardian") {
+  if (hasRegistrarAuthority(role)) {
+    const students = await db.selectDistinct({ personId: s.studentProfiles.personId })
+      .from(s.enrollments)
+      .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
+      .innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
+      .innerJoin(s.people, and(eq(s.people.id, s.studentProfiles.personId), eq(s.people.active, true)))
+      .where(and(eq(s.enrollments.kind, "program"), eq(s.enrollments.status, "active"),
+        inArray(s.programs.id, programIds), inArray(s.programs.siteId, siteIds)));
+    const studentIds = students.map(student => student.personId);
+    for (const student of students) add(student.personId, "enrolled student");
+    if (studentIds.length) {
+      const guardians = await db.selectDistinct({ personId: s.guardianRelationships.guardianPersonId })
+        .from(s.guardianRelationships)
+        .innerJoin(s.people, and(eq(s.people.id, s.guardianRelationships.guardianPersonId), eq(s.people.active, true)))
+        .where(guardianRelationshipPredicate({ studentPersonIds: studentIds, access: "enrollment" }));
+      for (const guardian of guardians) add(guardian.personId, "guardian of enrolled student");
+    }
+    const staff = await db.selectDistinct({ personId: s.accountPersonGrants.personId, role: s.accountPersonGrants.role })
+      .from(s.accountPersonGrants)
+      .innerJoin(s.programs, eq(s.programs.organizationId, s.accountPersonGrants.organizationId))
+      .innerJoin(s.accessAccounts, and(eq(s.accessAccounts.id, s.accountPersonGrants.accountId),
+        eq(s.accessAccounts.disabled, false), isNotNull(s.accessAccounts.emailVerifiedAt)))
+      .innerJoin(s.people, and(eq(s.people.id, s.accountPersonGrants.personId), eq(s.people.active, true)))
+      .where(and(eq(s.accountPersonGrants.active, true),
+        inArray(s.accountPersonGrants.role, ["site_admin", "registrar", "teacher", "site_leader", "site_staff", "room_facilitator"]),
+        inArray(s.programs.id, programIds), inArray(s.programs.siteId, siteIds),
+        or(isNull(s.accountPersonGrants.siteId), eq(s.accountPersonGrants.siteId, s.programs.siteId))));
+    for (const contact of staff) add(contact.personId, `school staff (${contact.role.replaceAll("_", " ")})`);
+  } else if (role === "guardian") {
     // Application ownership gives the verified parent a school admissions
     // contact even before a student has an active class or guardian record.
     const admissionsContacts = await db.select({

@@ -1,3 +1,8 @@
+export function formatWorkspaceRole(role: string): string {
+  const words = role.replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function getWorkspaceScopeLabel(
   member: { siteId: string | null },
   sites: readonly { id: string; name: string }[],

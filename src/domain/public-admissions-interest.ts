@@ -31,7 +31,7 @@ export function publicInterestMessage(input:PublicAdmissionsInterestInput):strin
 }
 
 
-export type PublicInterestRoute = "public_site_inquiry" | "public_site_family_start" | "invited_family_interest";
+export type PublicInterestRoute = "public_site_inquiry" | "public_site_family_start" | "invited_family_interest" | "interest_event";
 
 /** Stable, fixed-cardinality platform key plus a verified published Site key. */
 export function publicInterestRateLimitKeys(route: PublicInterestRoute, siteId?: string) {

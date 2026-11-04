@@ -1,3 +1,4 @@
+import { WorkspaceShell } from "@/components/workspace";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
@@ -215,14 +216,7 @@ function StaffAttendancePage() {
 
   const marked = students.filter(student => student.status !== "unmarked" && student.status !== "expected").length;
 
-  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Attendance</p>
-      <h1 className="mt-2 font-serif text-4xl">Daily attendance</h1>
-      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-        Mark students expected onsite at your school and review guardian-submitted excuses.
-        Approved excuses correct the attendance record without erasing history.
-      </p>
+  return <WorkspaceShell width="standard" eyebrow="Attendance" title="Daily attendance" subtitle="Mark students expected onsite at your school and review guardian-submitted excuses. Approved excuses correct the attendance record without erasing history.">
       {programId && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
         Showing the expected onsite roster for the selected Program. Pending guardian excuses
         still cover all students in your authorized review queue.
@@ -347,6 +341,5 @@ function StaffAttendancePage() {
           </section>)}
         </div>}
       </>}
-    </div>
-  </main>;
+  </WorkspaceShell>;
 }

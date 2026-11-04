@@ -15,7 +15,7 @@ const meta = {
     onSubmit: success,
     onSubmitted: fn(),
   },
-  decorators: [Story => <WorkspaceShell eyebrow="CAN OS · Family" title="Apply to a school"
+  decorators: [Story => <WorkspaceShell eyebrow="Family" title="Apply to a school"
     subtitle="Story data is synthetic. Production uses the canonical guardian loader and command."><Story /></WorkspaceShell>],
 } satisfies Meta<typeof GuardianApplicationForm>;
 export default meta;

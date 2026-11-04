@@ -16,7 +16,7 @@ export type PublicSiteHostDecision =
   | { kind: "deny" }
   | { kind: "site"; slug: string; rewrite: boolean };
 
-function isLocalhost(hostname: string): boolean {
+export function isLocalPreviewHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   return host === "localhost" || host === "127.0.0.1" || host === "::1";
 }
@@ -79,6 +79,7 @@ export function slugForPublicSiteOrigin(
   enabled: boolean,
   allowLocalPreview = false,
   configuredDomain?: string,
+  allowLocalPreviewWrites = false,
 ): string | null {
   if (!enabled && !allowLocalPreview) return null;
   const url = new URL(request.url);
@@ -86,11 +87,14 @@ export function slugForPublicSiteOrigin(
   if (hostHeader && hostHeader.toLowerCase().replace(/\.$/, "") !== url.host.toLowerCase()) {
     return null;
   }
-  if (allowLocalPreview && request.method === "GET" &&
-      (url.pathname === "/published-site" ||
-        (url.pathname.startsWith("/published-site/") &&
-          isPublicSiteReadPath(url.pathname.slice("/published-site".length)))) &&
-      isLocalhost(url.hostname)) {
+  const localRead = request.method === "GET" &&
+    (url.pathname === "/published-site" ||
+      (url.pathname.startsWith("/published-site/") &&
+        isPublicSiteReadPath(url.pathname.slice("/published-site".length))));
+  const localWrite = allowLocalPreviewWrites && request.method === "POST" &&
+    ["/published-site/inquiry", "/published-site/family-start"].includes(url.pathname);
+  if (allowLocalPreview && url.protocol === "http:" && (localRead || localWrite) &&
+      isLocalPreviewHost(url.hostname)) {
     const siteValues = url.searchParams.getAll("site");
     if (siteValues.length !== 1 || url.searchParams.size !== 1) return null;
     const slug = siteValues[0];

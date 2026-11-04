@@ -4,9 +4,17 @@ import { submitRoomPlanSchema, effectiveRoomPrimary, assertRoomPrimaryChoice } f
 import { submitOnsiteRoomPlan, reviewOnsiteRoomPlan, getOnsiteRoomPlanning } from "@/modules/operations/onsite-room-plan.server";
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], inserts: [] as Record<string, unknown>[],
   updates: [] as Record<string, unknown>[], delegate: vi.fn(), reviewer: vi.fn(), safety: vi.fn(),
-  room: vi.fn(), appointed: true }));
+  room: vi.fn(), appointed: true, occupancy: 0,
+  coverage: undefined as undefined | {
+    id: string; revision: number; roomId: string; primaryPersonId: string; backupPersonId: string;
+    startsAtLocal: string; endsAtLocal: string;
+  } }));
 vi.mock("@/modules/operations/site-rooms.server", () => ({
   requireSiteRoom: state.room, listSiteRooms: async () => [],
+}));
+vi.mock("@/modules/operations/room-coverage.server", () => ({
+  loadRoomCoverageSchedules: async () => [], roomCoverageForBlock: () => state.coverage,
+  roomCoverageOccupancy: async () => state.occupancy,
 }));
 vi.mock("@/modules/operations/school-opening.server", () => ({
   schoolIdentity: async () => ({ programId:"program", siteId:"site", organizationId:"church", institutionId:"can" }),
@@ -41,8 +49,9 @@ const input = () => ({ programId:id(1), sectionId:id(2), periodId:id(3), documen
   rationale:"The local director has reviewed this room and named adult plan." });
 beforeEach(() => {
   vi.clearAllMocks(); state.inserts=[]; state.updates=[]; state.appointed=true;
+  state.coverage=undefined; state.occupancy=0;
   state.room.mockResolvedValue({id:id(7),name:"Classroom A",capacity:20});
-  state.rows=[[{id:"program"}],[{ startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class" }],
+  state.rows=[[{id:"site"}],[{id:"program"}],[{ startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class" }],
     [{timezone:"UTC"}],[{personId:id(5),from:null,through:null}],[],[]];
 });
 describe("room plan submission", () => {
@@ -72,12 +81,12 @@ describe("room plan submission", () => {
     expect(state.inserts).toEqual([]);
   });
   it("does not overwrite a newer plan discovered after the form was loaded", async () => {
-    state.rows[5]=[{id:id(9)}];
+    state.rows[6]=[{id:id(9)}];
     await expect(submitOnsiteRoomPlan(actor(),input())).rejects.toThrow("Room plan changed");
     expect(state.inserts).toEqual([]); expect(state.updates).toEqual([]);
   });
   it("rejects a noninstructional or unavailable scheduled block", async () => {
-    state.rows[1]=[];
+    state.rows[2]=[];
     await expect(submitOnsiteRoomPlan(actor(),input())).rejects.toThrow("current scheduled instructional Section");
     expect(state.inserts).toEqual([]);
   });
@@ -94,10 +103,39 @@ function prepareReview() {
     documentId:value.documentId,decision:"approve" as const,reason:"Independent review of the named classroom coverage plan."};
   const document={id:value.documentId,uploadedByPersonId:"director",expiresAt:new Date(value.expiresAt),metadata:{
     ...value,siteId:"site",programId:value.programId,reviewStatus:"pending",startsAtLocal:"09:00",endsAtLocal:"10:00"}};
-  state.rows=[[{id:"program"}],[{startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class"}],[document],[{timezone:"UTC"}],[{personId:value.primaryPersonId,from:null,through:null}]];
+  state.rows=[[{id:"site"}],[{id:"program"}],[{startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class"}],[document],[{timezone:"UTC"}],[{personId:value.primaryPersonId,from:null,through:null}]];
   return {review,document,can:{...actor(),role:"can_network_steward",actorPersonId:"reviewer"} as AccessContext};
 }
 describe("independent room plan review",()=>{
+  function prepareSharedReview(occupancy: number) {
+    const prepared=prepareReview();
+    const value=input();
+    state.coverage={id:id(8),revision:2,roomId:value.roomId,primaryPersonId:value.primaryPersonId,
+      backupPersonId:value.backupPersonId,startsAtLocal:"08:00",endsAtLocal:"14:00"};
+    state.occupancy=occupancy;
+    Object.assign(prepared.document.metadata,{roomCoverageId:id(8),roomCoverageRevision:2});
+    return prepared;
+  }
+  it("allows exactly 20 distinct mixed-course occupants and checks both adults for the full room day",async()=>{
+    const {review,can}=prepareSharedReview(20);
+    expect(await reviewOnsiteRoomPlan(can,review)).toMatchObject({changed:true});
+    expect(state.safety).toHaveBeenCalledTimes(2);
+    expect(state.safety).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({
+      startsAtLocal:"08:00",endsAtLocal:"14:00",
+    }));
+  });
+  it("rejects 21 combined occupants in a capacity-20 room without an approval",async()=>{
+    const {review,can}=prepareSharedReview(21);
+    await expect(reviewOnsiteRoomPlan(can,review)).rejects.toThrow("combined mixed-course room roster");
+    expect(state.updates).toEqual([]);
+    expect(state.safety).not.toHaveBeenCalled();
+  });
+  it("invalidates daily approval when the shared room assignment revision changes",async()=>{
+    const {review,can}=prepareSharedReview(20);
+    state.coverage!.revision=3;
+    await expect(reviewOnsiteRoomPlan(can,review)).rejects.toThrow("Room coverage changed");
+    expect(state.updates).toEqual([]);
+  });
   it("rechecks the room's canonical Site and occupancy limit before approving",async()=>{
     const {review,can}=prepareReview();
     state.room.mockResolvedValueOnce({id:id(7),name:"Classroom A",capacity:10});

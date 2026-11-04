@@ -41,9 +41,7 @@ export const getActionDetail = createServerFn({ method: "GET" })
         resolutionNote: action.resolutionNote,
         siteId: action.siteId, programId: action.programId,
         canManageOperations: hasRegistrarAuthority(actor.role) && action.siteId !== null,
-        workspaceHome: hasRegistrarAuthority(actor.role) ? "/operations" as const
-          : actor.role === "teacher" ? "/teacher" as const
-          : actor.role === "counselor" ? "/counselor" as const : "/coach" as const,
+        workspaceHome: "/home" as const,
       };
     });
   });

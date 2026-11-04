@@ -1,3 +1,4 @@
+import { WorkspaceShell } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {useState} from "react";
@@ -25,7 +26,7 @@ export const Route=createFileRoute("/admissions/capacity")({
 });
 function Capacity(){
  const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Admissions" title="Program capacity" outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Admissions" title="Program capacity" outcome={outcome}/>;
  return <CapacityView data={outcome.data}/>;
 }
 function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
@@ -65,11 +66,7 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
   await mutation.run(()=>updateAdmissionsCapacity({data:{poolId:id,capacity:value}}),
    {successMessage:"Seat capacity saved.",commandErrorMessage:"Unable to save capacity"});
  }
- return <main className="mx-auto max-w-5xl px-5 py-10">
- <Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Admissions command center</Link>
- <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Admissions</p>
- <h1 className="mt-2 font-serif text-4xl">Program capacity</h1>
- <p className="mt-3 text-sm text-muted-foreground">Live, school-year seat pools from Neon. Reservations include unexpired issued offers and accepted offers that have not yet activated enrollment. Changes cannot reduce capacity below existing commitments.</p>
+ return <WorkspaceShell width="standard" eyebrow="Admissions" title="Program capacity" subtitle="Live, school-year seat pools from Neon. Reservations include unexpired issued offers and accepted offers that have not yet activated enrollment. Changes cannot reduce capacity below existing commitments." breadcrumbs={<Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Admissions command center</Link>}>
  <div className="mt-5 flex flex-wrap gap-4 rounded-xl border p-4">
   <SiteProgramFields sites={schools} programs={programs} siteId={selection.siteId??""}
    programId={selection.programId??""} labelPrefix="Capacity" sitePlaceholder="All permitted schools"
@@ -107,5 +104,5 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
   onChange={value=>setEdits(previous=>({...previous,[r.id]:value}))}
   onSave={()=>void save(r.id,r.capacity)}/>)}
  {!rows.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No school-year seat pools are configured for the programs in your current authorization scope.</p>}
- </div></main>;
+ </div></WorkspaceShell>;
 }

@@ -19,7 +19,7 @@ export const Route=createFileRoute("/sites/$siteId/parent-information")({
 
 function SiteParentInformationReviewPage(){
   const outcome=Route.useLoaderData();
-  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Institutional publishing"
+  if(!outcome.ok)return <LoaderFailure eyebrow="Institutional publishing"
     title="Public parent information review" outcome={outcome}/>;
   return <SiteParentInformationEditor
     key={outcome.data.siteRevision+":"+outcome.data.reviewRevision}
@@ -73,7 +73,7 @@ function SiteParentInformationEditor({data}:{
       commandErrorMessage:"Unable to publish or withdraw the reviewed Site identity. Refresh and review the current source.",
     });
   }
-  return <WorkspaceShell eyebrow="CAN OS · Institutional publishing"
+  return <WorkspaceShell eyebrow="Institutional publishing"
     title="Public address and contact review"
     subtitle="Independent approval of exact existing Site facts; never a second Site configuration.">
     <p className="mt-4 text-sm"><Link to="/sites/$siteId/publish"

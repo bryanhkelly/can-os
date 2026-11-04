@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadStudentToday } from "@/routes/student.index";
+import { loadStudentToday } from "@/components/home/StudentHome";
 import { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 import { getQuickWinActions } from "@/modules/actions/student-actions.functions";

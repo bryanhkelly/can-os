@@ -1,3 +1,4 @@
+import { WorkspaceShell } from "@/components/workspace";
 import { getDemoCurriculumPreview } from "@/modules/learning/demo-curriculum-preview.functions";
 import { OneRosterStudentReconciliation } from "@/components/learning/OneRosterStudentReconciliation";
 import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
@@ -82,9 +83,8 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   adoptedCourseVersions:data.journey.totals.courseVersionsAvailable,
   classes:data.journey.classes,
  }):[];
- return <main className="mx-auto max-w-6xl space-y-6 px-5 py-10">
-  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Academic operations</p>
-  <h1 className="font-serif text-4xl">Curriculum Marketplace</h1>
+ return <WorkspaceShell width="wide" eyebrow="Academic operations" title="Curriculum Marketplace">
+  <div className="space-y-6">
   {data.demoPreview && <section className="space-y-3 rounded-xl border p-5" aria-label="Sample curriculum catalog">
     <h2 className="font-serif text-2xl">Explore sample curriculum</h2>
     <p className="text-sm text-muted-foreground">These {data.demoPreview.courses.length} synthetic courses are for demonstration and planning only. They are not academically approved or available for adoption.</p>
@@ -374,6 +374,6 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     </section>}
    {market.canPublish&&<OneRosterStudentReconciliation programId={market.program.id}/>}
   </>}
- </main>;
+ </div></WorkspaceShell>;
 }
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";

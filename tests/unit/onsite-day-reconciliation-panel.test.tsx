@@ -42,7 +42,7 @@ describe("site day attendance reconciliation panel",()=>{
       <OnsiteDayReconciliationPanel date="2026-10-22" roster={{
         ...roster,students:[{...roster.students[0]!,status:"present" as const}],
       }}/>);
-    expect(html).toContain("1 distinct students");
+    expect(html).toContain("1 distinct student across 1 program");
     expect(html).toContain("program-attendance entries");
   });
 });

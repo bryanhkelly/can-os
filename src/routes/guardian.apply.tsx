@@ -24,7 +24,7 @@ export const Route = createFileRoute("/guardian/apply")({
 
 function GuardianApplyPage() {
   const result = Route.useLoaderData();
-  if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Family" title="Apply to school" outcome={result} />;
+  if (!result.ok) return <LoaderFailure eyebrow="Family" title="Apply to school" outcome={result} />;
   return <GuardianApplyWorkspace data={result.data} />;
 }
 
@@ -38,9 +38,9 @@ function GuardianApplyWorkspace({ data }: {
     ? data.applications.filter(app => app.programId === requestedProgramId)
     : [];
 
-  return <WorkspaceShell eyebrow="CAN OS · Family" title="Apply to a school"
+  return <WorkspaceShell eyebrow="Family" title="Apply to a school"
     subtitle="Start a real academic application for an eligible CAN school. An application does not automatically approve enrollment or grant access to a child's records."
-    actions={<Button asChild variant="outline"><Link to="/guardian">Family home →</Link></Button>}>
+    actions={<Button asChild variant="outline"><Link to="/home">Family home →</Link></Button>}>
     <WorkspacePanel title="Your applications"
       description="Return to an existing application instead of creating a duplicate. The school controls identity verification and every later transition.">
       {requestedApplicationId && !data.applications.some(app => app.applicationId === requestedApplicationId) &&

@@ -1,4 +1,5 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { isAcademicMarketingType } from "@/domain/academic-program-publication";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -25,6 +26,7 @@ import {
   dedupeFamilyInvitationContacts,
   assertPreopeningFamilyInterestDestination,
   FAMILY_INVITATION_BATCH_KIND,
+  isFamilyInvitationExpired,
   familyInvitationBatchMetadataSchema,
   familyInvitationRetryMatches,
   parseFamilyInvitationRecipients,
@@ -58,14 +60,61 @@ async function resolvePreopeningInterestDestination(tx: Pick<typeof db, "select"
   const [school] = await tx.select({
     programId: programs.id, programName: programs.name,
     organizationId: programs.organizationId, programOrganizationId: programs.organizationId, programSiteId: programs.siteId,
-    siteId: sites.id, siteOrganizationId: sites.organizationId,
+    siteId: sites.id, siteName: sites.name, siteOrganizationId: sites.organizationId,
     slug: sites.slug, type: programs.type, status: programs.status,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
     .where(eq(programs.id, programId)).limit(1);
   if (!school) throw new Error("School is not eligible for pre-opening family interest outreach");
   assertPreopeningFamilyInterestDestination(school);
   return { programId: school.programId, programName: school.programName,
-    organizationId: school.organizationId, siteId: school.siteId, slug: school.slug };
+    organizationId: school.organizationId, siteId: school.siteId, siteName: school.siteName, slug: school.slug };
+}
+
+export async function readPreopeningFamilyWelcome(batchId: string, recipientKey: string) {
+  const [batch] = await db.select({
+    contextId: communicationThreads.contextId,
+    metadata: communicationThreads.metadata,
+    createdAt: communicationThreads.createdAt,
+  }).from(communicationThreads).where(and(
+    eq(communicationThreads.id, batchId),
+    eq(communicationThreads.contextType, "program"),
+  )).limit(1);
+  if (!batch?.contextId) throw new AuthorizationError("pre-opening family invitation");
+  const metadata = familyInvitationBatchMetadataSchema.parse(batch.metadata);
+  if (metadata.destination !== "preopening_interest" ||
+    !metadata.recipients.some(recipient => recipient.key === recipientKey)) {
+    throw new AuthorizationError("pre-opening family invitation recipient");
+  }
+  if (isFamilyInvitationExpired(batch.createdAt)) {
+    throw new AuthorizationError("unexpired pre-opening family invitation");
+  }
+  const [school] = await db.select({
+    programId: programs.id,
+    programName: programs.name,
+    organizationId: programs.organizationId,
+    programSiteId: programs.siteId,
+    siteId: sites.id,
+    siteName: sites.name,
+    siteOrganizationId: sites.organizationId,
+    slug: sites.slug,
+    type: programs.type,
+    status: programs.status,
+  }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
+    .where(eq(programs.id, batch.contextId)).limit(1);
+  if (!school || school.organizationId !== school.siteOrganizationId ||
+    school.programSiteId !== school.siteId ||
+    !isAcademicMarketingType(school.type) ||
+    !["draft", "launching", "ready", "active"].includes(school.status)) {
+    throw new AuthorizationError("available family invitation Program");
+  }
+  const { listPublicInterestEventsForInvitation } = await import("./interest-events.server");
+  return {
+    siteName: school.siteName,
+    programName: school.programName,
+    programStatus: school.status,
+    introduction: metadata.introduction,
+    events: await listPublicInterestEventsForInvitation(batchId, recipientKey),
+  };
 }
 
 function contactProjection(recipient: {
@@ -547,7 +596,7 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   const accepted = await sendNotificationEmail({
     to: recipient.email,
     subject,
-    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services.\n\nIf you would like updates from the school, you can request them here: ${responseUrl.toString()}\n\nOnly an adult who wants follow-up should submit the form. No child details are requested; receiving this email alone does not opt you in.`,
+    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services.\n\nIf you would like updates from the school, you can request them here: ${responseUrl.toString()}\n\nThis invitation link expires 30 days after the invitation was created. Only an adult who wants follow-up should submit the form. No child details are requested; receiving this email alone does not opt you in.`,
   }, `${batchId}:${recipient.key}`);
   if (!accepted) throw new Error("Pre-opening family email was not accepted by the provider");
   return { requestId: recipient.key, created: true };

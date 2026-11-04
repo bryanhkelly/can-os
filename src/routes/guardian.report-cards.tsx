@@ -77,7 +77,7 @@ function GuardianReportCardsPage() {
     ? "This student is unavailable in your current family workspace. Choose an authorized student above."
     : "";
 
-  return <WorkspaceShell eyebrow="CAN OS · Report card" title="Report card"
+  return <WorkspaceShell eyebrow="Report card" title="Report card"
     subtitle="Finalized grades by grading period, plus the durable transcript record, for students connected to your account.">
       {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
         Student

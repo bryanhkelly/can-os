@@ -43,7 +43,7 @@ const pages = readdirSync("src/routes")
     const name = file.slice(0, -4);
     return name === "index"
       ? "/"
-      : "/" + name.replace(/\.index$/, "").replaceAll(".", "/");
+      : "/" + name.replace(/\.index$/, "").replaceAll(".", "/").replace(/_(?=\/|$)/g, "");
   });
 
 describe("synthetic fixture manifest", () => {

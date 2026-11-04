@@ -18,7 +18,7 @@ type Kind="urgent_school_update"|"schedule_change"|"school_closure";
 
 function SchoolFamilyAlertsPage(){
  const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Communications"
+ if(!outcome.ok)return <LoaderFailure eyebrow="Communications"
   title="School to family alerts" outcome={outcome}/>;
  return <Publisher data={outcome.data}/>;
 }
@@ -62,9 +62,9 @@ function Publisher({data}:{data:Data}){
    },
   );
  }
- return <WorkspaceShell eyebrow="CAN OS · School operations" title="Urgent family communications"
+ return <WorkspaceShell eyebrow="School operations" title="Urgent family communications"
   subtitle="Publish verified family notices through in-app notifications, school email and opt-in SMS. Provider acceptance is not evidence of inbox or phone delivery."
-  actions={<Link to="/operations" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
+  actions={<Link to="/home" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family communication..."/>
   <form onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="text-lg font-semibold">Compose a school notice</h2>

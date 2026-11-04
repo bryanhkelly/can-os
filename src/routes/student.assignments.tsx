@@ -35,7 +35,7 @@ function StudentAssignments(){
  const result=Route.useLoaderData();
  const {filter="all",assessment,section}=Route.useSearch();
  const preferences=useStudentDisplayPreferences();
- if(!result.ok)return <LoaderFailure eyebrow="CAN OS · Student" title="Your assignments" outcome={result}/>;
+ if(!result.ok)return <LoaderFailure eyebrow="Student" title="Your assignments" outcome={result}/>;
  return <StudentAssignmentsView key={JSON.stringify([filter,assessment,section,preferences.showCompletedAssignments])} data={result.data} showCompleted={preferences.showCompletedAssignments}/>;
 }
 function StudentAssignmentsView({data,showCompleted}:{data:AssignmentData;showCompleted:boolean}){
@@ -166,9 +166,9 @@ function StudentAssignmentsView({data,showCompleted}:{data:AssignmentData;showCo
    });
   }finally{saving.current=false;setProgress("");}
  }
- return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
+ return <WorkspaceShell width="wide" eyebrow="Student learning" title="Your assignments"
   subtitle="Read instructions, save your response, submit work and follow through on feedback."
-  breadcrumbs={<><Link to="/student" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{section}} className="underline">{section?"Class":"My classes"}</Link><span>/</span><span>Assignments</span></>}
+  breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{section}} className="underline">{section?"Class":"My classes"}</Link><span>/</span><span>Assignments</span></>}
   actions={<Link to="/calendar-export" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Export deadlines (.ics)</Link>}>
   {!connected&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">School records are currently unavailable.</p>}
   {!chosen&&error&&<WorkspaceNotice ref={feedbackRef} tone="danger" className="mt-5">{error}</WorkspaceNotice>}

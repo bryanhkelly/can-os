@@ -1,4 +1,5 @@
-import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useLocation } from "@tanstack/react-router";
+import { WorkspaceShell } from "@/components/workspace";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
 import { defaultStudentDisplayPreferences, studentHomePath } from "@/domain/student-display-preferences";
@@ -8,11 +9,18 @@ export const Route = createFileRoute("/")({ component: HomePage });
 /** Authenticated application entry, never a synthetic-feature showcase. */
 function HomePage() {
   const { session, error } = useWorkspaceSession();
+  const recovered = useLocation({ select: location => location.state.accessReturnFailed === true });
   if (session && !session.authenticated) return <Navigate to="/access" search={{returnTo:"/"}} replace />;
   const destination = session?.authenticated ? session.role==="student"
     ? studentHomePath(session.studentPreferences??defaultStudentDisplayPreferences)
     : getWorkspaceHome(session.role) : undefined;
-  if (destination) return <Navigate to={destination} replace />;
+  if (destination && !recovered && !error) return <Navigate to={destination} replace />;
+  if (recovered) return (
+    <WorkspaceShell title="Home" eyebrow="CAN OS">
+      <p role="status">The previous page could not be opened with your current account. You are home.</p>
+      {destination && <Link to={destination} className="mt-4 inline-block underline">Open my workspace</Link>}
+    </WorkspaceShell>
+  );
 
   return (
     <main className="mx-auto max-w-xl px-6 py-16">

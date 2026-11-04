@@ -84,6 +84,51 @@ Storybook play tests exercise keyboard tab order, required-field validation, sub
 
 ## Shared composition contracts
 
+### Messages and notifications
+
+- Every recognized workspace role has exactly one Messages navigation entry,
+  including Site Admin, registrar and site personnel. The shared registry feeds
+  desktop, collapsed/mobile navigation and page search. Visibility does not
+  grant messaging capabilities, recipient relationships or thread membership;
+  those remain enforced by the existing server APIs.
+- Messages composes `MessagesWorkspace` with the shared master/detail shell,
+  semantic typography, native controls, and an accessible new-message modal.
+  Its Conversations toolbar contains the large blue `CreateAction` so creation
+  remains discoverable within the empty inbox. `ContactLookup` searches names
+  and relationship labels and requires selecting a recipient before sending.
+  Search filters the authorized inbox subjects/snippets; mobile provides a
+  conversation-list return action. No unread/family/staff filters are invented
+  without supporting server data.
+- Registrar and Site Admin contact discovery includes active Program students,
+  their verified enrollment-authorized guardians, and active verified-account
+  school staff in the same authorized Site/Program scope. It excludes the actor
+  and does not expose a global directory. The send command rederives contacts;
+  lookup results do not preserve revoked access or grant arbitrary recipients.
+- The top-bar bell is the notification entry point, not a sidebar or dashboard
+  shortcut. Its flyout includes the shared `NotificationFeed`, unread filtering,
+  read/unread/dismiss controls, mark-all-read, and a link to the full center and
+  delivery history. Existing record-specific deep links and legacy redirects
+  remain supported.
+- Messages and notification mutations use `useMutationFeedback`; a committed
+  command with a failed refresh must not be offered as a fresh send. A
+  `ContextTray` with `keepMounted` retains child recovery state while closed.
+- The Communication stories cover feed filtering/status changes, conversation
+  search/replies, and loading/empty/error states. The Context tray story checks
+  close/reopen refresh recovery and restored trigger focus with isolated data.
+
+Local validation for this slice (2026-11-04): 32 focused unit tests passed
+(navigation, shell, mutation recovery, history loader and notification links).
+Chromium Storybook interaction/axe checks passed 15 stories at both 1440 x 1000
+and 390 x 844, including horizontal-overflow assertions. The production client
+and server build, route-contract checker and diff whitespace check passed.
+Focused ESLint had no errors; existing hook/purity warnings remain. Global
+typecheck is blocked by the unrelated `terms` tab in
+`section-tabs.stories.tsx`; the broader application-navigation run also has two
+unrelated admissions assertions failing. No database mutation, authenticated
+journey or production deployment acceptance is claimed.
+
+### Controls and feedback
+
 - `Checkbox` and `Radio` in `ui/choice.tsx` retain native checked, required, disabled, and form semantics with shared focus and invalid styling.
 - `Field` in `ui/field.tsx` connects one control to its label, description, required state, and error through stable IDs. An explicit control ID is respected; existing description IDs are merged with field help/error IDs, and field errors take precedence over a child's `aria-invalid`. It complements the existing React Hook Form helpers; state-controlled forms do not need a second form framework.
 - `Modal` in `ui/modal.tsx` uses native `dialog.showModal()`, initial focus, Tab/Shift+Tab containment, Escape/backdrop dismissal, and focus restoration. Backdrop dismissal requires a pointer interaction outside the dialog bounds, not internal whitespace; callers may disable backdrop dismissal or all dismissal while saving. Optional `keepMounted` retains state across close/reopen without exposing closed dialog content. The notification tray uses this to preserve refresh-recovery guards and reloads its data when reopened.
@@ -190,8 +235,9 @@ Undeclared routes do not implicitly activate a workspace's home link.
 Ownership affects navigation presentation only, never authorization.
 
 Search opens the page/record command palette; Ask CAN opens the assistant.
-Their labels and tooltips distinguish those existing experiences. The shell
-and switcher identify the active grant's school when site-scoped. An
+Their labels and tooltips distinguish those existing experiences. The
+workspace switcher is the single shell surface for active role and school
+context; sidebars and navigation drawers contain navigation only. An
 organization-scoped grant is labelled with its authorized school scope rather
 than inventing a selected school from a multi-school list.
 

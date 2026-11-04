@@ -1,15 +1,15 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {listStudyGroups,listStudentStudyGroupSections,listStudentStudyGroupClassmates,getStudyGroupDetail,hasStudentStudyGroupGuardian} from "@/modules/study-groups/study-group-queries.functions";
+import {listStudyGroups,listStudentStudyGroupSections,getStudyGroupDetail,hasStudentStudyGroupGuardian} from "@/modules/study-groups/study-group-queries.functions";
 import {getStudyGroupAvailability} from "@/modules/study-groups/canonical-workspace.functions";
 import {createCanonicalGroupPost as postStudyGroupMessage,reportCanonicalGroupPost as reportStudyGroupPost} from "@/modules/study-groups/canonical-moderation.functions";
 import {rsvpCanonicalGroupSession as rsvpStudyGroupSession} from "@/modules/study-groups/canonical-sessions.functions";
-import {createStudentStudyGroup,requestCanonicalGroupMembership,leaveCanonicalGroup} from "@/modules/study-groups/canonical-membership.functions";
+import {requestCanonicalGroupMembership,leaveCanonicalGroup} from "@/modules/study-groups/canonical-membership.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {formatTimestamp} from "@/modules/calendar/timezone";
-import {EmptyState,StatusBadge,WorkspaceNotice,WorkspacePanel,WorkspaceShell} from "@/components/workspace";
+import {CreateAction,EmptyState,StatusBadge,WorkspaceNotice,WorkspacePanel,WorkspaceShell} from "@/components/workspace";
 import {groupSessionSelectionSchema} from "@/lib/route-search";
 import {ActionDialog} from "@/components/workspace/action-dialog";
 const loadStudyGroups=async()=>{
@@ -28,30 +28,14 @@ function StudyGroups(){
  return <StudyGroupsView data={outcome.data}/>;
 }
 function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>>}){
- const {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled,groups,sections,hasEnrollmentGuardian}=data;const router=useRouter();const search=Route.useSearch();
+ const {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled,groups,sections,hasEnrollmentGuardian}=data;const canCreate=sections.length>0&&creationEnabled&&writesEnabled&&hasEnrollmentGuardian!==false;const router=useRouter();const search=Route.useSearch();
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
  const [selected,setSelected]=useState<string|null>(null),[detail,setDetail]=useState<Awaited<ReturnType<typeof getStudyGroupDetail>>|null>(null);
  const [message,setMessage]=useState("");
  const [opening,setOpening]=useState(false),[openError,setOpenError]=useState("");
- const [sectionId,setSectionId]=useState(sections[0]?.id??"");
- const [classmates,setClassmates]=useState<Awaited<ReturnType<typeof listStudentStudyGroupClassmates>>>([]);
- const [inviteeIds,setInviteeIds]=useState<string[]>([]);
- const [groupTitle,setGroupTitle]=useState(""),[groupDescription,setGroupDescription]=useState("");
- const [rosterLoading,setRosterLoading]=useState(false),[rosterError,setRosterError]=useState("");
  const [report,setReport]=useState<{groupId:string;postId:string;body:string}|null>(null);
  const [reportReason,setReportReason]=useState("");
- useEffect(()=>{
-  let active=true;
-  setClassmates([]);setInviteeIds([]);setRosterError("");
-  if(!sectionId)return;
-  setRosterLoading(true);
-  listStudentStudyGroupClassmates({data:{sectionId}})
-   .then(result=>{if(active)setClassmates(result);})
-   .catch(error=>{if(active)setRosterError(mutationErrorMessage(error, "Unable to load classmates."));})
-   .finally(()=>{if(active)setRosterLoading(false);});
-  return()=>{active=false;};
- },[sectionId]);
  useEffect(()=>{
   setSelected(null);setDetail(null);setMessage("");setOpenError("");setOpening(false);
   if(!enabled||!search.group)return;
@@ -70,64 +54,14 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
    refresh:()=>refresh(id),
   });
  }
- return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title="Study Groups"
+ return <WorkspaceShell width="wide" eyebrow="Student" title="Study Groups"
   subtitle="Learn together across classes and interests. Membership is facilitator-approved."
-  breadcrumbs={<Link to="/student" className="underline">Student Today</Link>}>
+  breadcrumbs={<Link to="/home" className="underline">Student Today</Link>}
+  actions={canCreate&&<CreateAction><Link to="/student/study-groups/new">Create study group</Link></CreateAction>}>
  <div className="space-y-6">
  {!writesEnabled&&<WorkspaceNotice>You may join approved groups, participate in their moderated discussions, and report concerning content. Session RSVPs remain unavailable until the session workflow is released.</WorkspaceNotice>}
  {hasEnrollmentGuardian===false&&<WorkspaceNotice tone="danger">A linked guardian is required to request membership or create a study group. Ask your school to verify your guardian relationship before continuing.</WorkspaceNotice>}
  <MutationFeedback state={mutation} pendingMessage="Saving study group change..."/>
- {sections.length===0&&<EmptyState title="No active enrolled classes are currently available for creating a study group."/>}
- {sections.length>0&&(!creationEnabled||!writesEnabled)&&<WorkspaceNotice>Creating study groups is unavailable right now.</WorkspaceNotice>}
- {sections.length>0&&creationEnabled&&writesEnabled&&<WorkspacePanel title="Create a study group"
-  description="Start a group for one of your classes and invite classmates. Your class teacher will facilitate the group, and membership approvals still apply.">
-  <form className="grid gap-4" onSubmit={event=>{
-   event.preventDefault();
-   void mutation.run(async()=>{
-    const result=await createStudentStudyGroup({data:{
-     sectionId,title:groupTitle,description:groupDescription,inviteePersonIds:inviteeIds,
-     maxMembers:Math.max(20,inviteeIds.length+1),
-    }});
-    setGroupTitle("");setGroupDescription("");setInviteeIds([]);
-    return result;
-   },{
-    successMessage:"Group created and invitations sent. Your membership is awaiting guardian permission and facilitator approval.",
-    commandErrorMessage:"Unable to create the study group.",
-   });
-  }}>
-   <fieldset disabled={busy||!hasEnrollmentGuardian} className="grid gap-4">
-   <label className="text-sm">Class
-    <select className="mt-1 block w-full rounded border bg-background p-2" value={sectionId}
-     onChange={event=>setSectionId(event.target.value)} required>
-     {sections.map(section=><option key={section.id} value={section.id}>{section.title}</option>)}
-    </select>
-   </label>
-   <label className="text-sm">Group name
-    <input className="mt-1 block w-full rounded border bg-background p-2" value={groupTitle}
-     onChange={event=>setGroupTitle(event.target.value)} minLength={3} maxLength={100} required/>
-   </label>
-   <label className="text-sm">What will you study together?
-    <textarea className="mt-1 block w-full rounded border bg-background p-2" value={groupDescription}
-     onChange={event=>setGroupDescription(event.target.value)} minLength={10} maxLength={2000} required/>
-   </label>
-   <fieldset className="space-y-2">
-    <legend className="text-sm font-medium">Invite classmates</legend>
-    {rosterLoading&&<p role="status" className="text-sm text-muted-foreground">Loading classmates...</p>}
-    {rosterError&&<p role="alert" className="text-sm text-destructive">{rosterError}</p>}
-    {!rosterLoading&&!rosterError&&classmates.length===0&&<p className="text-sm text-muted-foreground">There are no other currently enrolled classmates in this class.</p>}
-    {classmates.map(classmate=><label className="flex items-center gap-2 text-sm" key={classmate.id}>
-     <input type="checkbox" checked={inviteeIds.includes(classmate.id)} onChange={event=>setInviteeIds(ids=>
-      event.target.checked?[...ids,classmate.id]:ids.filter(id=>id!==classmate.id))}/>
-     {classmate.firstName} {classmate.lastName}
-    </label>)}
-   </fieldset>
-   <button disabled={busy||!hasEnrollmentGuardian||rosterLoading||!sectionId||inviteeIds.length===0}
-    className="w-fit rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-    {mutation.pending?"Creating group...":"Create group and send invitations"}
-   </button>
-   </fieldset>
-  </form>
- </WorkspacePanel>}
  {search.group&&<Link to="/student/study-groups" search={{}} className="inline-block text-sm underline">All study groups</Link>}
  {opening&&<p role="status">Opening study group...</p>}
  {openError&&<WorkspaceNotice tone="danger">{openError}</WorkspaceNotice>}

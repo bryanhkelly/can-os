@@ -83,7 +83,7 @@ export function projectPublicInformationReadiness(input: {
   }
   if (!p.activities.length)
     missing("activities","operations","Add reviewed student activities when offered.",
-      "/operations",false);
+      "/home",false);
   if (!visible(p.tuition.description))
     missing("tuition","finance",
       "An institutionally approved, current tuition/fee statement is missing; do not invent a price.",

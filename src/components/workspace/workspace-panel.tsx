@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link, type RegisteredRouter, type ValidateLinkOptions } from "@tanstack/react-router";
 import { Circle, CircleAlert, CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,24 @@ export function WorkspacePanel({ title, description, actions, children, classNam
 
 export function DetailNavigation({ label, children }: { label: string; children: ReactNode }) {
   return <nav aria-label={label} className="my-6 flex flex-wrap gap-2 rounded-xl border bg-card p-2 text-sm [&_a]:rounded-lg [&_a]:px-4 [&_a]:py-2 [&_a:hover]:bg-muted [&_a[aria-current=page]]:bg-foreground [&_a[aria-current=page]]:text-background">{children}</nav>;
+}
+
+export interface SectionTabProps<TRouter extends RegisteredRouter = RegisteredRouter, TOptions = unknown> {
+  link: ValidateLinkOptions<TRouter, TOptions>;
+  current: boolean;
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * A tab inside DetailNavigation. The caller decides which tab is current; exact
+ * matching stops the router's partial search match from also marking a tab
+ * without search params (for example "Overview") as current on every tab.
+ */
+export function SectionTab<TRouter extends RegisteredRouter, TOptions>(props: SectionTabProps<TRouter, TOptions>): ReactNode;
+export function SectionTab({ link, current, children, className }: SectionTabProps) {
+  return <Link {...link} activeOptions={{ exact: true }} activeProps={{}} aria-current={current ? "page" : undefined}
+    className={className}>{children}</Link>;
 }
 
 export type StatusTone = "neutral" | "info" | "attention" | "success" | "danger";

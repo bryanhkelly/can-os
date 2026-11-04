@@ -42,7 +42,7 @@ if (!connectionString) {
       if (!valid) throw new Error("Demo membership unavailable");
     }
     await client.query("ROLLBACK");
-    console.log("Demo access configuration, schema and all six canonical memberships verified (read-only).");
+    console.log(`Demo access configuration, schema and all ${LOCAL_DEMO_ACCOUNTS.length} canonical memberships verified (read-only).`);
     console.log("Session creation, transactional auditing and browser sign-in still require an end-to-end check.");
   } catch {
     console.error(`Demo access check failed: ${stage}. No credentials or database errors were logged.`);

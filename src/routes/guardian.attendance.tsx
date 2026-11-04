@@ -9,6 +9,7 @@ import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storag
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
+import { plural } from "@/lib/format";
 
 // Shared with the server-side excuse attachment validation (attachment-mimes).
 const excuseAttachmentAccept = attachmentAccept;
@@ -116,9 +117,9 @@ function GuardianAttendancePage() {
   const needsExcuse = absences.filter(absence => !absence.excuse &&
     (absence.status === "absent" || absence.status === "tardy"));
 
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Family" title="Attendance & excuses"
+  return <WorkspaceShell width="wide" eyebrow="Family" title="Attendance & excuses"
     subtitle={`Review recent attendance cases and submit explanations for authorized school review. Submitted excuses do not automatically change attendance.${student?" Showing the selected child.":""}`}
-    breadcrumbs={<><Link to="/guardian" search={{student}} className="underline focus-visible:outline-2">Family home</Link><span>/</span><span>Attendance</span></>}>
+    breadcrumbs={<><Link to="/home" search={{student}} className="underline focus-visible:outline-2">Family home</Link><span>/</span><span>Attendance</span></>}>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving attendance information..."/>
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
@@ -157,7 +158,7 @@ function GuardianAttendancePage() {
             </div>}
             {absence.excuse && <div className="mt-3">
               <p className="rounded-lg bg-muted p-3 text-sm">Your excuse: {absence.excuse.reason}</p>
-              <p className="mt-2 text-xs text-muted-foreground">{docCounts[absence.attendanceEventId] ?? 0} document(s) attached</p>
+              <p className="mt-2 text-xs text-muted-foreground">{plural(docCounts[absence.attendanceEventId] ?? 0, "document")} attached</p>
               {absence.excuse.status === "approved" && <p className="mt-2 text-sm">Approved — this day now counts as excused.</p>}
               {absence.excuse.status === "rejected" && <div className="mt-2 rounded-lg border p-3 text-sm">
                 <p className="font-semibold">The school rejected this excuse.</p>

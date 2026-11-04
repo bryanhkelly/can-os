@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
-import { FamilyHomeView } from "@/routes/guardian.index";
+import { FamilyHomeView } from "@/components/home/GuardianHome";
 import { Route as GuardianAttendance } from "@/routes/guardian.attendance";
 import { Student360View } from "@/routes/staff.students.$personId";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
@@ -16,8 +16,8 @@ vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useSearch: () => state.search, useLoaderData: () => state.data }),
   useRouter: () => ({ invalidate: vi.fn() }),
-  Link: ({ to, search, params, children, ...props }: {
-    to: string; search?: Record<string, string | undefined>; params?: Record<string, string>; children: ReactNode;
+  Link: ({ to, search, params, children, activeOptions: _activeOptions, activeProps: _activeProps, ...props }: {
+    to: string; search?: Record<string, string | undefined>; params?: Record<string, string>; children: ReactNode; activeOptions?: unknown; activeProps?: unknown;
   }) => {
     const path = to.replace(/\$([^/]+)/g, (_, key: string) => params?.[key] ?? key);
     const query = new URLSearchParams(Object.entries(search ?? {}).filter((entry): entry is [string, string] => entry[1] !== undefined)).toString();
@@ -61,7 +61,7 @@ describe("shared workspace presentation", () => {
       rail={<p>Authorized class connections</p>}><p>Classwork</p></WorkspaceShell>);
     expect(html.match(/<main/g)).toHaveLength(1);
     expect(html).toContain("Breadcrumb");
-    expect(html).toContain("max-w-7xl");
+    expect(html).toContain('data-width="wide"');
     expect(html).toContain("<aside");
     expect(html).toContain('href="/student/courses"');
   });
@@ -146,7 +146,7 @@ describe("family and student profiles", () => {
       workToReview:[],workNeedsAttentionCount:0,
     }];
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""/>);
-    expect(html).toContain("3 overdue assignment(s) need follow-through.");
+    expect(html).toContain("3 overdue assignments need follow-through.");
     expect(html).toContain('href="/guardian/academics?student=child-person"');
     expect(html).toContain('href="/guardian/attendance?student=child-person"');
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
@@ -189,7 +189,7 @@ describe("family and student profiles", () => {
     expect(html).toContain("role-dashboard");
     expect(html).toContain("can-dashboard-hero");
     expect(html).toContain('aria-label="Dashboard shortcuts"');
-    expect(html).toContain('href="/guardian?action=consent-1"');
+    expect(html).toContain('href="/home?action=consent-1"');
     expect(html).toContain('href="/guardian/academics?student=child-person"');
     expect(html).not.toContain("Casey Sample");
     expect(html).toContain("focus-visible:outline-2");
@@ -213,7 +213,7 @@ describe("family and student profiles", () => {
   });
   const consentNeed: ComponentProps<typeof FamilyHomeView>["needs"][number] = {
     id: "consent-1", kind: "action", type: "study_group_consent", title: "Study group permission: Reading circle",
-    detail: "Review a student's group request.", href: "/guardian?action=consent-1",
+    detail: "Review a student's group request.", href: "/home?action=consent-1",
     priority: "normal", dueAt: null, createdAt: "2030-01-01T00:00:00.000Z",
   };
   it("clears the selected action without losing the selected child", () => {
@@ -227,7 +227,7 @@ describe("family and student profiles", () => {
       loading={false} error="" action="consent-1" student="child-person"
     />);
     expect(html).toContain("View all needs for this child");
-    expect(html).toContain('href="/guardian?student=child-person"');
+    expect(html).toContain('href="/home?student=child-person"');
   });
   it("links a selected action to its owning workspace instead of dead-ending", () => {
     const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={[consentNeed]} loading={false} error="" action="consent-1"/>);
@@ -236,8 +236,8 @@ describe("family and student profiles", () => {
   });
   it("keeps unknown family actions out of the staff-only action detail route", () => {
     const html = renderToStaticMarkup(<FamilyHomeView children={[]} loading={false} error="" action="other-1"
-      needs={[{ ...consentNeed, id: "other-1", type: "unknown_follow_up", href: "/guardian?action=other-1" }]}/>);
-    expect(html).toContain('href="/guardian?action=other-1"');
+      needs={[{ ...consentNeed, id: "other-1", type: "unknown_follow_up", href: "/home?action=other-1" }]}/>);
+    expect(html).toContain('href="/home?action=other-1"');
     expect(html).not.toContain('href="/actions/other-1"');
   });
   const profile: ComponentProps<typeof Student360View>["profile"] = {

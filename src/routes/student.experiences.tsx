@@ -27,7 +27,7 @@ export const Route = createFileRoute("/student/experiences")({
 function StudentExperiencesPage() {
   const outcome = Route.useLoaderData();
   const { action } = Route.useSearch();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Student" title="Student experiences" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Student" title="Student experiences" outcome={outcome} />;
   const { quickWins, school } = outcome.data;
   const { connected, actions } = quickWins;
   return <><LiveQuickWins key={action??"all"} connected={connected} actions={actions} actionId={action}/>{school&&<LiveSchoolExperiences data={school}/>}</>;

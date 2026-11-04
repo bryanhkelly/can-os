@@ -1,6 +1,7 @@
 import { assertTeacherGuidesMatchCourse, curriculumDraftContent } from "./curriculum-authoring";
 import type { ClassContent } from "./class-content";
 import type { ClassTeacherGuides } from "./class-teacher-guides";
+import { plural, agree } from "@/lib/format";
 
 /**
  * Guidance for the existing publisher authoring screen.
@@ -24,18 +25,18 @@ export function curriculumReleaseReadiness(content: ClassContent, guides: ClassT
  const lessons=content.modules.flatMap(unit=>unit.lessons);
  const missingTargets=lessons.filter(lesson=>!lesson.learningTargets?.length).length;
  const missingStandards=lessons.filter(lesson=>!lesson.standards?.length).length;
- if(missingTargets)warnings.push(`${missingTargets} lesson(s) have no stated learning targets.`);
- if(missingStandards)warnings.push(`${missingStandards} lesson(s) have no standards references.`);
+ if(missingTargets)warnings.push(`${plural(missingTargets,"lesson")} ${agree(missingTargets,"has","have")} no stated learning targets.`);
+ if(missingStandards)warnings.push(`${plural(missingStandards,"lesson")} ${agree(missingStandards,"has","have")} no standards references.`);
  if(!guides)warnings.push("No protected teacher guide is configured for this course.");
  else {
   try{assertTeacherGuidesMatchCourse(content,guides,courseCode);}
   catch{blockers.push("Fix protected teacher guide references or its course code before publishing.");}
   const covered=new Set(guides.units.flatMap(unit=>unit.lessons.map(lesson=>lesson.lessonId)));
   const missing=lessons.filter(lesson=>lesson.activities?.some(activity=>activity.evidence==="teacher_review")&&!covered.has(lesson.id)).length;
-  if(missing)warnings.push(`${missing} lesson(s) request teacher-reviewed evidence without a protected lesson guide.`);
+  if(missing)warnings.push(`${plural(missing,"lesson")} ${agree(missing,"requests","request")} teacher-reviewed evidence without a protected lesson guide.`);
  }
  const planned=content.blueprint?.weeks.filter(week=>week.status==="planned").length??0;
- if(planned)warnings.push(`${planned} planned week(s) have not advanced to authored or reviewed planning status. This is not a weekly publication requirement.`);
+ if(planned)warnings.push(`${plural(planned,"planned week")} ${agree(planned,"has","have")} not advanced to authored or reviewed planning status. This is not a weekly publication requirement.`);
  return {
   blockers,warnings,
   unitCount:content.modules.length,lessonCount:lessons.length,

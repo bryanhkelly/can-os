@@ -14,7 +14,7 @@ export function ContextTray({ title, open, onClose, children, keepMounted = fals
         <h2 className="font-semibold">{title}</h2>
         <Button variant="outline" size="sm" onClick={onClose} aria-label={`Close ${title}`}>Close</Button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">{open && children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">{(open || keepMounted) && children}</div>
     </div>
   </Modal>;
 }

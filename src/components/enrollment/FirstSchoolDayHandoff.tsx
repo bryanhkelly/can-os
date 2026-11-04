@@ -57,7 +57,7 @@ function FirstSchoolDayForApplication({applicationId,programId}:{
       <div className="mt-3 flex flex-wrap gap-3 text-xs">
         <Link to="/staff/attendance" search={{programId}}
           className="font-semibold underline">Open the Program's official attendance roster →</Link>
-        <Link to="/site/day" className="font-semibold underline">
+        <Link to="/home" className="font-semibold underline">
           Site director: Prepare and operate the onsite school day →
         </Link>
       </div>

@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { StudentExperience } from "@/components/student/StudentExperience";
 import { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
@@ -80,15 +79,12 @@ export async function loadStudentToday() {
   return { today, success, support, dashboard };
 }
 
-export const Route = createFileRoute("/student/")({
-  loader: safeLoader(loadStudentToday, {
-    authMessage: "Sign in with an enrolled student account to see your learning day.",
-  }),
-  component: StudentTodayPage,
+export const loadStudentHome = safeLoader(loadStudentToday, {
+  authMessage: "Sign in with an enrolled student account to see your learning day.",
 });
-function StudentTodayPage() {
-  const result = Route.useLoaderData();
-  if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Student" title="Your learning day" outcome={result} />;
+
+export function StudentHome({ result }: { result: Awaited<ReturnType<typeof loadStudentHome>> }) {
+  if (!result.ok) return <LoaderFailure eyebrow="Student" title="Your learning day" outcome={result} />;
   return <StudentExperience liveData={result.data.today} success={result.data.success}
     support={result.data.support} dashboard={result.data.dashboard} />;
 }

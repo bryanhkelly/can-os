@@ -53,7 +53,7 @@ export const Route = createFileRoute("/operations/launch/")({
 function LaunchPage() {
   const result = Route.useLoaderData();
   if (!result.ok) {
-    return <LoaderFailure title="Launch a school" eyebrow="CAN OS · Launch" outcome={result} />;
+    return <LoaderFailure title="Launch a school" eyebrow="Launch" outcome={result} />;
   }
   return <LaunchWizardPage selection={Route.useSearch()} data={result.data} />;
 }

@@ -20,6 +20,7 @@ import { demoSchoolTenants } from "@/db/schema";
 import { DomainError } from "@/domain/errors";
 import { isDemoAccountEmail, isDemoTenantOrganization as isValorOrganization } from "@/domain/local-demo-access";
 import { readDemoStaffBindings } from "./demo-staff-access.server";
+import { verifiedStaffIdentityPredicate } from "./verified-staff-identity.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
 
@@ -129,6 +130,7 @@ export const listAccessAccounts = createServerFn({ method: "GET" }).handler(asyn
   const rows = await db.select({
     accountId: accessAccounts.id,
     email: accessAccounts.emailNormalized,
+    identityVerified: verifiedStaffIdentityPredicate(),
     emailVerifiedAt: accessAccounts.emailVerifiedAt,
     disabled: accessAccounts.disabled,
     personId: people.id,
@@ -172,6 +174,7 @@ export const listAccessAccounts = createServerFn({ method: "GET" }).handler(asyn
       active: row.grantActive,
       invitationPending: issued.has(row.grantId) && !accepted.has(row.grantId),
       emailVerified: row.emailVerifiedAt !== null,
+      demoIdentityAccepted: row.identityVerified && row.emailVerifiedAt === null,
       role: row.role,
       screeningCurrent: current(adultEvidence?.screening),
       trainingCurrent: current(adultEvidence?.training),
@@ -294,7 +297,8 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
       return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized) };
     try {
-      await requestOneTimeAccess(emailNormalized);
+      if (data.role === "teacher") await requestOneTimeAccess(emailNormalized, undefined, "/profiles");
+      else await requestOneTimeAccess(emailNormalized);
       return { ...invitation, emailSent: true };
     } catch {
       // The durable invitation is retry-safe; do not erase it after a provider failure.

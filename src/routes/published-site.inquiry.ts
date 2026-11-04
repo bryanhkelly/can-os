@@ -22,8 +22,9 @@ export const Route = createFileRoute("/published-site/inquiry")({
       const slug = slugForPublicSiteOrigin(
         request,
         process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
-        false,
+        process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_ENABLED === "true",
         publicSiteDomain(),
+        process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED === "true",
       );
       const origin = new URL(request.url).origin;
       if (!slug || request.headers.get("origin") !== origin) {
@@ -72,7 +73,9 @@ export const Route = createFileRoute("/published-site/inquiry")({
           </head><body style="font-family:system-ui,sans-serif;max-width:42rem;margin:4rem auto;padding:1rem">
           <h1>Thank you for your interest.</h1>
           <p>Your request has been received for review. This is not an application or an enrollment confirmation.</p>
-          <p><a href="/">Return to programs</a></p>
+          <p><a href="${new URL(request.url).searchParams.has("site")
+            ? `/published-site?site=${encodeURIComponent(slug)}`
+            : "/"}">Return to programs</a></p>
           </body></html>`, {
           status: 200, headers: { ...commonHeaders,
             "Content-Type": "text/html; charset=utf-8",

@@ -7,7 +7,7 @@ import {
 
 describe("filterDestinations", () => {
   const links = [
-    { to: "/teacher", label: "Today" },
+    { to: "/home", label: "Today" },
     { to: "/teacher/gradebook", label: "Gradebook" },
     { to: "/teacher/missing-work", label: "Missing Work" },
   ];

@@ -14,6 +14,9 @@ export type VerifiedRoomPlan = {
   substitutesForPersonId:string|null;
   roomLabel:string;
   roomCapacity:number;
+  roomId:string|null;
+  roomCoverageId:string|null;
+  roomCoverageRevision:number|null;
   verifiedAt:Date;
   expiresAt:Date;
 };
@@ -65,6 +68,9 @@ export function parseVerifiedRoomPlan(
     periodId:scope.periodId,primaryPersonId:m.primaryPersonId,
     backupPersonId:m.backupPersonId,substitutesForPersonId:typeof m.substitutesForPersonId==="string"?m.substitutesForPersonId:null,roomLabel:m.roomLabel.trim(),
     roomCapacity:m.roomCapacity,verifiedAt:doc.verifiedAt,expiresAt:doc.expiresAt,
+    roomId:typeof m.roomId==="string"?m.roomId:null,
+    roomCoverageId:typeof m.roomCoverageId==="string"?m.roomCoverageId:null,
+    roomCoverageRevision:typeof m.roomCoverageRevision==="number"?m.roomCoverageRevision:null,
   };
 }
 

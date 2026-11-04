@@ -20,7 +20,7 @@ const items: DailyAttentionItem[] = [
     category: "staffing",
     title: "Adult check-in missing",
     detail: "One scheduled coverage block has no current arrival report.",
-    href: "/operations?siteId=synthetic-site&action=coverage",
+    href: "/home?siteId=synthetic-site&action=coverage",
     nextStep: "Review action",
     ownerName: null,
     dueAt: "2030-01-02T12:00:00.000Z",

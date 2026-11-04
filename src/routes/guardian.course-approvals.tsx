@@ -22,7 +22,7 @@ export const Route = createFileRoute("/guardian/course-approvals")({
 function GuardianCourseApprovals() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) {
-    return <LoaderFailure eyebrow="CAN OS · Family" title="Course approvals" outcome={outcome} />;
+    return <LoaderFailure eyebrow="Family" title="Course approvals" outcome={outcome} />;
   }
   return <CourseApprovalList items={outcome.data} />;
 }
@@ -50,13 +50,13 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Family"
+      eyebrow="Family"
       title="Course approvals"
       subtitle="Review student requests to add classes that require your permission. Your decision is recorded with the request for the school registrar."
       actions={<div className="flex flex-wrap gap-2">
         <Link to="/guardian/group-permissions" className="rounded-lg border px-3 py-2 text-sm">Group permissions</Link>
         <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trip permissions</Link>
-        <Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
+        <Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
       </div>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving your course decision..." />

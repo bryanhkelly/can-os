@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { WorkspacePanel } from "@/components/workspace";
+import { plural } from "@/lib/format";
 
 export interface StudentNextSteps {
   nextLessonId?: string | null;
@@ -35,7 +36,7 @@ export function StudentNextStepsPanel({
       )}
       <p className="mt-2 text-sm text-muted-foreground">
         {nextSteps.selfReportedCompleted} of {nextSteps.totalPublishedLessons} published lessons marked complete
-        {" · "}{nextSteps.awaitingFeedback} assessment(s) awaiting feedback
+        {" · "}{plural(nextSteps.awaitingFeedback, "assessment")} awaiting feedback
         {" · "}{nextSteps.revisionRequested} returned for revision
       </p>
       <p className="mt-2 text-xs">

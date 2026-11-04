@@ -36,6 +36,35 @@ export default tseslint.config(
     files: ["src/components/{ui,workspace,workflow}/**/*.tsx", "src/routes/guardian.apply.tsx"],
     rules: { "can-os-design/no-hardcoded-colors": "error" },
   },
+  // Layout and type contract (docs/design-system-v6-1.md): pages align to the shell grid
+  // through the shared primitives, and type sizes/letter-spacing come from tokens.
+  {
+    files: ["src/**/*.tsx"],
+    rules: {
+      "can-os-design/no-raw-page-structure": "error",
+      "can-os-design/no-arbitrary-type-values": "error",
+      "can-os-design/no-brand-prefixed-labels": "error",
+      "can-os-design/section-tabs-only": "error",
+      "can-os-design/no-repeated-primary": "error",
+    },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.{ts,tsx}"],
+    rules: { "can-os-design/no-parenthetical-plurals": "error" },
+  },
+  {
+    // Primitives that own <main>/<h1>, public signed-out pages, and design-system specimens.
+    files: [
+      "src/components/workspace/{page-frame,dashboard-home}.tsx",
+      "src/components/student/StudentExperience.tsx",
+      "src/components/learning/ClassroomWorkspace.tsx",
+      "src/router.tsx",
+      "src/routes/{index,access.verify,church.apply,family.join,schools.new}.tsx",
+      "src/**/*.stories.tsx",
+    ],
+    rules: { "can-os-design/no-raw-page-structure": "off" },
+  },
   {
     files: [
       "src/components/learning/ClassCreationRequestForm.tsx",

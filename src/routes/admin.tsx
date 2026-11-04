@@ -1,4 +1,5 @@
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { personDisplayName } from "@/domain/person-name";
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -153,7 +154,7 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Admin"
+      eyebrow="Admin"
       title="Admin console"
       subtitle="Invite staff, manage access accounts, and browse the people directory for your organizations."
     >
@@ -277,6 +278,7 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
           </div>}
         </section>
 
+        {form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
         <section className="mt-8 rounded-xl border bg-card p-5">
           <h2 className="text-lg font-semibold">People directory</h2>
           <label className="mt-4 block max-w-sm text-sm font-semibold">

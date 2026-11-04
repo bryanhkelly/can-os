@@ -12,6 +12,6 @@ export const Route = createFileRoute("/operations/school-years")({
 function SchoolYearStudio() {
   const result = Route.useLoaderData();
   const selection = Route.useSearch();
-  if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Academic time" title="School-year setup" outcome={result} />;
+  if (!result.ok) return <LoaderFailure eyebrow="Academic time" title="School-year setup" outcome={result} />;
   return <SchoolYearStudioWorkspace key={JSON.stringify(selection)} data={result.data} selection={selection} />;
 }

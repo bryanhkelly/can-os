@@ -491,6 +491,27 @@
       "when": 1793759382965,
       "tag": "0069_classroom_lesson_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1793787625780,
+      "tag": "0070_classy_madripoor",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1793789741040,
+      "tag": "0071_room_coverage",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793814563404,
+      "tag": "0072_interest_events",
+      "breakpoints": true
     }
   ]
 }

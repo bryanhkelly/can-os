@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveAccessContext, type VerifiedAccessGrant } from "@/domain/access-context";
 import {
-  assertOnsiteAttendanceScope, isOnsiteAttendanceRole, onsiteAttendanceRoles,
+  assertOnsiteAttendanceScope, assertOnsiteStaffSite, isOnsiteAttendanceRole, onsiteAttendanceRoles,
 } from "@/domain/onsite-attendance-access";
 
 const base: VerifiedAccessGrant = {
@@ -11,6 +11,12 @@ const base: VerifiedAccessGrant = {
 const session = {accountId:"account",sessionId:"login",activeGrantId:"grant"};
 
 describe("Hybrid Site onsite staff attendance authority",()=>{
+  it("allows exact-site setup context without opening an unconfigured student roster",()=>{
+    const actor=resolveAccessContext(session,[base]);
+    expect(()=>assertOnsiteStaffSite(actor)).not.toThrow();
+    expect(()=>assertOnsiteAttendanceScope(actor)).toThrow();
+    expect(()=>assertOnsiteStaffSite({...actor, grantSiteId:null})).toThrow();
+  });
   it.each(onsiteAttendanceRoles)("%s has site roster/attendance but not registrar/case powers",role=>{
     const actor=resolveAccessContext(session,[{...base,role}]);
     actor.scope.programIds=["program-a"];

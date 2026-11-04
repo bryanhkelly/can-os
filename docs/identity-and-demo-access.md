@@ -22,8 +22,19 @@ When a protected page detects a missing or expired session, sign-in preserves th
 page's local path, query and fragment and returns there after successful
 verification. Return paths are restricted to same-origin application paths and
 cannot target the sign-in flow; server-side authorization is still evaluated on
-the destination request. Without a valid return path, sign-in uses the normal
-role-specific landing page.
+the destination request. Successful native verification sets a short-lived,
+non-authorizing return-attempt cookie. If that one attempt returns a failed
+loader outcome, throws, cannot find its route, or fails to render, the shared
+router boundary replaces it with `/`. Recovery home renders without automatically
+forwarding into a role dashboard; it does not load protected dashboard data.
+The marker is cleared after the attempt, so ordinary subsequent errors are not
+redirected. Without a valid return path, sign-in uses the normal role-specific
+landing page. This does not weaken destination authorization.
+
+Home and access-return recovery subscribe only to the router's recovery and
+failure/loading flags. Subscribing to the complete location or match objects
+can repeatedly restart a mounted redirect during pending navigation, creating
+a React update loop that leaves page content blank and navigation unresponsive.
 
 Shared-code sign-in uses a native form navigation. Keep the email and code
 controls enabled while that submission is pending; disabling their fieldset
@@ -63,6 +74,29 @@ invitations must not be reactivated. A `.demo` suffix alone never authorizes an
 account, and changing a registered identity's email or grant cannot turn it
 into an authentic account. Disabling a tenant removes access without enabling
 external delivery.
+
+Staff onboarding and onsite credential/delegation prerequisites share the
+verified-staff identity predicate. It accepts genuine verified-email accounts,
+the exact fixed Valor bindings, or enabled registered-school bootstrap and
+issued/accepted staff invitation bindings. Shared-code acceptance never sets
+`emailVerifiedAt` or claims email ownership. Callers must still enforce current
+account/person/grant state, capability, exact tenant scope and named workflow
+relationships. Qualification claims and independent safety review remain
+separate; accepted identity does not make an adult qualified.
+
+For ordinary email invitations to teachers, the one-time access link returns
+the recipient to their own `/profiles` page after sign-in. Professional
+background completion is optional and non-blocking; degree and experience
+details are self-reported, while licenses and certificates use the separate
+private qualification-evidence review workflow. Identity documents such as a
+driver's license are collected only when required by an applicable
+school/program policy, not as a universal teacher profile field.
+
+After an independently authorized student learning-access handoff, the
+student's sign-in link returns to `/profiles` for optional, lightweight profile
+setup (preferred name, pronouns and interests). The student may skip setup and
+continue to the learning workspace; student legal identity, grade, enrollment
+and access are not editable through this self-profile.
 
 Registry-aware delivery rules suppress external email/SMS for these schools;
 R2 keeps its separate deployment gates. Public family email-verification and
@@ -126,7 +160,7 @@ strings. Such failures are not recorded as incorrect-credential attempts.
 ### Deployed demo access troubleshooting
 
 Run `npm run demo:check-access` with the server's environment to check the session
-key's presence/length, authentication schema and all six canonical demo grants.
+key's presence/length, authentication schema and every approved canonical demo grant.
 It executes only a read-only transaction, never provisions or repairs records,
 and prints no environment values or raw driver errors. An operator can load a
 local environment file explicitly with
@@ -349,7 +383,11 @@ Valor demo accounts use `@valorschool.demo` and fixed code `000000` locally and 
 
 Use `alex.registrar@valorschool.demo` for the registrar workspace. Jordan, Riley,
 Casey and Morgan retain their separate student, teacher, specialist and guardian
-roles. Registrar access is scoped to the canonical demo Organization
+roles. The explicitly approved `sally.facilitator@valorschool.demo` identity is a
+separate `room_facilitator`, not the retired `demo_facilitator` switching grant.
+It has ordinary site-bound attendance, pickup and concern-submission capabilities,
+not teacher grading, administration or restricted incident browsing.
+Registrar access is scoped to the canonical demo Organization
 `f1000000-0000-4000-8000-000000000002` and Site
 `f1000000-0000-4000-8000-000000000003`, not an unrestricted network administrator.
 
@@ -358,11 +396,33 @@ institutional grants with:
 
 ```powershell
 $env:NODE_ENV = "development"
+$env:CAN_DEMO_FIXED_ACCESS_ENABLED = "true"
 npm run demo:provision-registrar -- --apply
 ```
 
-The command provisions Alex as registrar and the existing Demo Admin as Site
-Admin under explicit environment gates. `--admin-only --apply` reconciles only
+The command provisions Alex as registrar, the existing Demo Admin as Site
+Admin, and Sally as the fixed room facilitator under explicit environment gates.
+`--room-facilitator-only --apply` provisions only Sally's fixed canonical
+identity, membership and role. It does not assign a room, fabricate qualification
+evidence, approve supervision or change an existing conflicting/revoked grant.
+Deployment of the updated fixed registry is required before her shared-code
+login works; operator provisioning is never called by login.
+
+On November 4, 2026, explicitly authorized account-only provisioning created
+Sally's canonical identity, active Valor grant, membership and exact
+`room_facilitator` institutional capabilities, with one transactional audit and
+one `DemoRoomFacilitatorProvisioned` event. Netlify deployment
+`6aeb680d6894eb91effbf379` contains only the account changes over deployed base
+`055ea2664d39bfe3653c0ec3740cd415a06be938`. Playwright verified shared-code login,
+the Sally Demo / Valor School workspace, persistence after reload, attendance
+access and denial of the admin console. The scoped release passed 87 unit tests,
+typecheck, build, focused lint and route inventory checks. Disposable-database
+integration execution remains unverified. No migration or room assignment was
+applied; recurring room planning remains local. The live attendance view reports
+missing instructional calendar setup and no scheduled roster; online
+safeguarding intake is inactive. Account access is not operational readiness.
+
+`--admin-only --apply` reconciles only
 the fixed Demo Admin identity. Its active legacy registrar grant is upgraded in
 place, retaining account, person and grant IDs; its same-Site institutional
 assignment adds publication authority. Revoked or conflicting authority is

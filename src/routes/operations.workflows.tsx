@@ -12,7 +12,7 @@ export const Route = createFileRoute("/operations/workflows")({
 function WorkflowsPage() {
   const result = Route.useLoaderData();
   if (!result.ok) {
-    return <LoaderFailure title="Connected workflows" eyebrow="CAN OS · Operations" outcome={result} />;
+    return <LoaderFailure title="Connected workflows" eyebrow="Operations" outcome={result} />;
   }
   return <ConnectedWorkflowsWorkspace data={result.data} error="" />;
 }

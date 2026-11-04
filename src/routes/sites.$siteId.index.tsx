@@ -6,7 +6,7 @@ import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPan
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { getSiteToday } from "@/modules/operations/site-today.functions";
-import { StatCard } from "@/components/workspace";
+import { StatCard, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
@@ -14,6 +14,7 @@ import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
 import { SiteTodayPriorities } from "@/components/operations/SiteTodayPriorities";
 import type { DailyAttentionItem } from "@/domain/daily-operations";
 import { SiteOwnedActionResolution } from "@/components/operations/SiteOwnedActionResolution";
+import { plural } from "@/lib/format";
 
 export const Route = createFileRoute("/sites/$siteId/")({
   loader: ({ params }) =>
@@ -38,7 +39,7 @@ const ownerResolvableTypes = new Set([
 
 function SiteTodayPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Site Operations"
+  if (!outcome.ok) return <LoaderFailure eyebrow="Today"
     title="Site Today" outcome={outcome} />;
   const data: Awaited<ReturnType<typeof getSiteToday>> = outcome.data;
   const localTime = (date: string) => new Intl.DateTimeFormat("en-US", {
@@ -64,30 +65,26 @@ function SiteTodayPage() {
   const leaderAttention=[...operatingAlerts,...data.attentionItems];
   const ownedFollowUps=data.actions.filter(action=>
     action.ownerPersonId===data.viewerPersonId&&ownerResolvableTypes.has(action.type));
-  return <DashboardHome eyebrow="CAN OS · Site Operations" title={data.site.name}
+  return <DashboardHome eyebrow="Today" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
     shortcuts={<>
-      <DashboardShortcut title="School operations" description="Authorized actions and readiness" icon={<ClipboardList className="size-5" />}><Link to="/operations" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
+      <DashboardShortcut title="School operations" description="Authorized actions and readiness" icon={<ClipboardList className="size-5" />}><Link to="/home" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="Admissions" description="Applications and enrollment" icon={<Users className="size-5" />}><Link to="/admissions" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="School launches" description="Review program configuration" icon={<School className="size-5" />}><Link to="/operations/launch" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="Calendar" description={`Dates in ${data.site.timezone}`} icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:data.localDate}} /></DashboardShortcut>
     </>}
     rail={<DashboardCalendar date={data.localDate} timezone={data.site.timezone} />}
-    actions={<div className="flex flex-wrap gap-2">
-      <Link className="rounded-lg border px-3 py-2 text-sm" to="/sites/$siteId/publish"
-        params={{siteId:data.site.id}}>Public site setup →</Link>
-      <Link className="rounded-lg border px-3 py-2 text-sm" to="/operations"
-        search={{siteId:data.site.id,programId:undefined}}>This school’s operations →</Link>
-    </div>}
+    actions={data.viewerCanOpenSchoolProfile?<Link className={secondaryActionClassName} to="/sites/$siteId/profile"
+      params={{siteId:data.site.id}}>School profile</Link>:undefined}
     priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
-        ["Operations", "/operations"], ["Launch", "/operations/launch"],
+        ["Operations", "/home"], ["Launch", "/operations/launch"],
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
         ["People", "/profiles"], ["Ask CAN", "/ask"],
-      ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
+      ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
-      {data.canOpenOnsiteDay && <Link to="/site/day"
+      {data.canOpenOnsiteDay && <Link to="/home"
         className="border px-3 py-1.5 hover:bg-muted">Onsite day</Link>}
     </nav>
     <section id="school-day-operating-decision" aria-label="School-day operating decision"
@@ -141,7 +138,7 @@ function SiteTodayPage() {
           <h2 className="font-serif text-2xl">Supervised school day</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">One source-derived view of staff coverage, onsite attendance, family explanations, health and incident activity, and dismissal evidence. Learning activity is not physical attendance.</p>
         </div>
-        {data.canOpenOnsiteDay&&<Link to="/site/day" className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
+        {data.canOpenOnsiteDay&&<Link to="/home" className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -167,7 +164,7 @@ function SiteTodayPage() {
               <ul className="mt-2 list-inside list-disc text-xs">
                 {!block.assignedPlan&&<li>Assignment needs review: {block.gaps.map(gap=>gap.replaceAll("_"," ")).join(", ")}</li>}
                 {block.substitution&&<li>Staffing substitution: earlier duty evidence names a different adult.</li>}
-                {block.missingAdultReports>0&&<li>{block.missingAdultReports} required adult arrival report(s) missing.</li>}
+                {block.missingAdultReports>0&&<li>{plural(block.missingAdultReports, "required adult arrival report")} missing.</li>}
                 {block.requiredAdultReports>0&&<li>{block.reportedAdultCount} of {block.requiredAdultReports} arrival reports; independent witness {block.witnessedBothAdults?"recorded":"not recorded"}.</li>}
               </ul>
             </article>)}
@@ -186,13 +183,13 @@ function SiteTodayPage() {
               <p className="mt-1 text-xs text-muted-foreground">{student.programName} · {student.sectionTitle??"Program roster"}</p>
               <ul className="mt-2 list-inside list-disc text-xs">
                 {student.guardianExplanationStatus&&<li>Guardian explanation: {student.guardianExplanationStatus}.</li>}
-                {student.healthVisitCount>0&&<li>{student.healthVisitCount} health-office visit(s) linked to this school day.</li>}
-                {student.incidentCount>0&&<li>{student.incidentCount} incident record(s) linked to this school day.</li>}
+                {student.healthVisitCount>0&&<li>{plural(student.healthVisitCount, "health-office visit")} linked to this school day.</li>}
+                {student.incidentCount>0&&<li>{plural(student.incidentCount, "incident record")} linked to this school day.</li>}
                 {student.activeEmergencyHold&&<li>Emergency pickup hold is active; do not release.</li>}
                 {student.activeCustodyHold&&<li>Custody review hold is active; do not release.</li>}
-                {student.deniedPickupAttempts>0&&<li>{student.deniedPickupAttempts} denied pickup attempt(s) recorded.</li>}
+                {student.deniedPickupAttempts>0&&<li>{plural(student.deniedPickupAttempts, "denied pickup attempt")} recorded.</li>}
                 {["present","tardy"].includes(student.status)&&<li>Dismissal: {student.dismissalStatus.replaceAll("_"," ")}.</li>}
-                {student.uncollectedActionId&&<li><Link to="/operations" search={{siteId:data.site.id,programId:undefined,action:student.uncollectedActionId}} className="underline">Review supervised uncollected-child follow-up →</Link></li>}
+                {student.uncollectedActionId&&<li><Link to="/home" search={{siteId:data.site.id,programId:undefined,action:student.uncollectedActionId}} className="underline">Review supervised uncollected-child follow-up →</Link></li>}
               </ul>
             </article>)}
             {!studentExceptions.length&&<p className="rounded-lg border p-3 text-sm text-muted-foreground">No student attendance, explanation, health, incident or dismissal exceptions are currently linked.</p>}

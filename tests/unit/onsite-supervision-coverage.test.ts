@@ -14,6 +14,31 @@ const period=(patch:Partial<SupervisionBlockInput>={}):SupervisionBlockInput=>({
 });
 
 describe("planned hybrid onsite section supervision",()=>{
+  const shared = {
+    roomId: "room-2", roomCoverageKey: "coverage:3:2026-11-03", roomLabel: "Youth Classroom 2",
+    roomPlanVerified: true, roomCapacityAdequate: true, backupPersonId: "backup",
+    namedBackupVerified: true, verifiedSafeguardingScreening: true, verifiedSafeguardingTraining: true,
+    requiresSectionDelegation: true, verifiedSectionDelegation: true, authorizedSupervisionService: true,
+  };
+  it("permits different simultaneous virtual courses in one explicitly reviewed shared room",()=>{
+    const result = summarizeOnsiteSupervision([
+      period({...shared}), period({...shared, sectionId:"science"}),
+    ]);
+    expect(result.plannedAssignments).toBe(2);
+    expect(result.blocks.every(block=>block.gaps.length===0)).toBe(true);
+    expect(result.hasConfirmedPhysicalCoverage).toBe(false);
+  });
+  it.each([
+    {roomCoverageKey:"coverage:4:2026-11-03"}, {roomCoverageKey:null}, {roomId:"other-room"},
+    {backupPersonId:"other-backup"}, {roomPlanVerified:false}, {roomCapacityAdequate:false},
+    {namedBackupVerified:false}, {verifiedSafeguardingScreening:false}, {verifiedSafeguardingTraining:false},
+  ])("retains conflict protection when shared-room verification differs: %j",patch=>{
+    const result = summarizeOnsiteSupervision([
+      period({...shared}), period({...shared, sectionId:"science", ...patch}),
+    ]);
+    expect(result.plannedAssignments).toBe(0);
+    expect(result.blocks.every(block=>block.gaps.includes("facilitator_conflict"))).toBe(true);
+  });
   it("respects site-local shift effective times, not UTC day estimates",()=>{
     const interval={
       date:"2026-10-22",timeZone:"America/Los_Angeles",

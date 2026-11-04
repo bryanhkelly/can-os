@@ -8,7 +8,7 @@ import { Route as Families } from "@/routes/admissions.families";
 import { Route as Admissions } from "@/routes/admissions.index";
 import { Route as Intake } from "@/routes/admissions.intake";
 import { Route as Operations } from "@/routes/operations";
-import { Route as OperationsIndex } from "@/routes/operations.index";
+import { Route as OperationsIndex } from "@/routes/home";
 import { Route as Insights } from "@/routes/operations.insights";
 import { Route as Website } from "@/routes/site-website";
 import { Route as Groups } from "@/routes/groups";
@@ -128,7 +128,7 @@ describe("composed route search contracts", () => {
     ["admissions", Admissions, ["siteId", "programId", "application", "stage", "page"]],
     ["intake", Intake, ["siteId", "programId", "application", "interest", "page", "studentPage", "search"]],
     ["operations layout", Operations, ["siteId", "programId", "action"]],
-    ["operations index", OperationsIndex, ["siteId", "programId", "action"]],
+    ["home", OperationsIndex, ["siteId", "programId", "action", "student", "gradeAction", "case", "person", "returnGrantId"]],
     ["insights", Insights, ["siteId", "programId", "insight"]],
     ["website", Website, ["siteId", "programId", "returnGrantId"]],
     ["groups", Groups, ["group"]],
@@ -145,6 +145,7 @@ describe("composed route search contracts", () => {
       interest: "interest", studentPage: 3, search: "query", action: "action",
       insight: "insight", returnGrantId: "grant", group: "group", session: "session",
       inviteRole: "registrar", familyStart: "token", unsupported: "discard",
+      student: "student", gradeAction: "grade", case: "case", person: uuid,
     });
     expect(Object.keys(result).sort()).toEqual([...keys].sort());
     expect(Object.values(result)).not.toContain(undefined);

@@ -1,5 +1,6 @@
 import type { summarizeFullFlowOperations } from "./full-flow-operational-snapshot";
 import { activeProgramOperationsHref } from "./launch-operations-handoff";
+import { plural } from "@/lib/format";
 
 export type SchoolProgramRecord = ReturnType<typeof summarizeFullFlowOperations>["programs"][number];
 export type LaunchJourneyRecord = {
@@ -35,7 +36,7 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const site=program.siteId?encodeURIComponent(program.siteId):"";
   const programActive=program.status==="active";
   const operations=programActive?activeProgramOperationsHref({programId:program.id,siteId:program.siteId,status:program.status}):
-    `/operations?programId=${encoded}${site?`&siteId=${site}`:""}`;
+    `/home?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const academic=`/operations/launch/${encoded}`;
   const checklist=`/operations/launch?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const blocking=journey?.requirements.filter(r=>r.blocking&&r.status!=="complete")??[];
@@ -54,13 +55,13 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
     {key:"launch",title:"Configure the school and review opening",
       state:programActive?"review":"needs_attention",
       evidence:programActive?"Program active; review current opening authority in the operating workspace.":
-        journey?`Program ${program.status.replaceAll("_"," ")}; ${blocking.length} recorded blocking launch requirement(s)`:
+        journey?`Program ${program.status.replaceAll("_"," ")}; ${plural(blocking.length,"recorded blocking launch requirement")}`:
           `Program ${program.status.replaceAll("_"," ")}; launch Journey unavailable. Readiness cannot be verified.`,
       nextAction:programActive&&program.siteId?"Open Site Today":programActive?"Review launch history":"Review genuine launch requirements and academic authority",
       href:programActive?operations:checklist,suggestedRole:"School registrar"},
     {key:"instruction",title:"Adopt curriculum, staff and provision classes",
       state:staffed?"review":"needs_attention",
-      evidence:`${c.adoptedCurriculumPacks} active pack adoption(s) · ${c.publishedSections}/${c.sections} published sections · ${c.staffedSections}/${c.sections} staffed`,
+      evidence:`${plural(c.adoptedCurriculumPacks,"active pack adoption")} · ${c.publishedSections}/${c.sections} published sections · ${c.staffedSections}/${c.sections} staffed`,
       nextAction:staffed?"Review first-classroom readiness":"Configure course adoption, academic year and qualified teachers",
       href:academic,suggestedRole:"Curriculum publisher / school registrar"},
     {key:"enrollment",title:"Admit, enroll and place families",

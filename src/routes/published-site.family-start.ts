@@ -17,8 +17,9 @@ export const Route=createFileRoute("/published-site/family-start")({
   const slug=slugForPublicSiteOrigin(
     request,
     process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED==="true",
-    false,
+    process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_ENABLED==="true",
     publicSiteDomain(),
+    process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED==="true",
   );
   if(!slug || request.headers.get("origin")!==new URL(request.url).origin)
     return new Response("Not found",{status:404,headers:{"Cache-Control":"no-store"}});
@@ -52,7 +53,9 @@ export const Route=createFileRoute("/published-site/family-start")({
     <p>If eligible, a verification link has been sent. Open it on your device to
       confirm your email and start or resume a school application.</p>
     <p>This is not admission, a child identity verification or an enrollment confirmation.</p>
-    <p><a href="/">Return to school programs</a></p>
+    <p><a href="${new URL(request.url).searchParams.has("site")
+      ? `/published-site?site=${encodeURIComponent(slug)}`
+      : "/"}">Return to school programs</a></p>
     </body></html>`,{status:200,headers});
  }}},
 });

@@ -19,7 +19,7 @@ type DeliveryMethod="approved_secure_exchange"|"verified_secure_portal"|"physica
 
 function TransferRecordsRoute(){
  const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Registrar"
+ if(!outcome.ok)return <LoaderFailure eyebrow="Registrar"
    title="Academic records transfer" outcome={outcome}/>;
  return <TransferRecordsWorkspace items={outcome.data.items}/>;
 }
@@ -59,10 +59,10 @@ function TransferRecordsWorkspace({items}:{items:Items}){
      },
    );
  }
- return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Transfer records coordination"
+ return <WorkspaceShell eyebrow="Registrar" title="Transfer records coordination"
    subtitle="Issue official records through the credit issuer. Release securely within CAN to an authorized receiving school, or attest an externally completed secure transfer with delivery evidence."
    actions={<div className="flex flex-wrap gap-2">
-     <Link to="/operations" className="rounded border px-3 py-2 text-sm">Operations</Link>
+     <Link to="/home" className="rounded border px-3 py-2 text-sm">Operations</Link>
      <Link to="/admissions/transcripts" search={{query:""}} className="rounded border px-3 py-2 text-sm">Official transcripts</Link>
    </div>}>
    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving records handoff..."/>

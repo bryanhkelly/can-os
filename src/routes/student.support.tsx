@@ -8,6 +8,7 @@ import { isStudentSupportAction } from "@/modules/actions/student-action-policy"
 import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
+import { plural } from "@/lib/format";
 
 const loadSupportReferrals=async()=>{
  const viewer=await getSupportViewerRole();
@@ -38,9 +39,9 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
   });
   if(result.status==="saved"||result.status==="refresh-failed")setMessage("");
  }
- return <WorkspaceShell eyebrow="CAN OS · Student support" title="Get help and follow through."
+ return <WorkspaceShell eyebrow="Student support" title="Get help and follow through."
   subtitle="Your open support requests and recovery actions appear here. Teachers and support staff manage the private referral and service records in their own workspaces."
-  breadcrumbs={<Link to="/student" className="underline">Student Today</Link>}>
+  breadcrumbs={<Link to="/home" className="underline">Student Today</Link>}>
   <MutationFeedback state={mutation} className="mb-5" pendingMessage="Sending support request..."/>
   <WorkspacePanel title="Ask your school for help">
    <label className="block text-sm">What do you need help with?
@@ -100,7 +101,7 @@ export function supportNextStep(referral:{stage:string;assignedTo:string;service
 function SupportPage(){
  const outcome=Route.useLoaderData();
  const search=Route.useSearch();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Student support" title="Student support that follows through." outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Student support" title="Student support that follows through." outcome={outcome}/>;
  if(outcome.data.viewerRole==="student")return <StudentSupportView actions={outcome.data.actions}/>;
  return <SupportView key={JSON.stringify(search)} referrals={outcome.data.referrals} role={outcome.data.viewerRole} search={search}/>;
 }
@@ -138,10 +139,10 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
   if(result.status==="saved"||result.status==="refresh-failed")setNote("");
  }
  const next=chosen?stages[stages.indexOf(chosen.stage as typeof stages[number])+1]:undefined;
- return <WorkspaceShell width="wide" eyebrow="CAN OS · Student support" title="Student support that follows through."
+ return <WorkspaceShell width="wide" eyebrow="Student support" title="Student support that follows through."
   subtitle={<>A teacher raises a concern, a support professional accepts responsibility, and everyone can see the appropriate status and next step.<span className="mt-2 block text-xs">School-support records are shared with authorized staff. Do not enter clinical or private counseling notes here.</span></>}
-  breadcrumbs={<Link to={role==="teacher"?"/teacher":role==="counselor"?"/counselor":"/coach"} className="underline">Workspace home</Link>}
-  actions={<StatusBadge tone="info">{referrals.length} referral(s)</StatusBadge>}>
+  breadcrumbs={<Link to="/home" className="underline">Workspace home</Link>}
+  actions={<StatusBadge tone="info">{plural(referrals.length, "referral")}</StatusBadge>}>
   <p className="mb-5 text-sm">Verified staff role: <strong>{role??"Unavailable"}</strong></p>
   {error&&<WorkspaceNotice tone="danger" className="mb-5">{error}</WorkspaceNotice>}
   <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving support changes..."/>

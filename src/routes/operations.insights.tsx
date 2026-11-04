@@ -6,7 +6,7 @@ import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-searc
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {ActionDialog} from "@/components/workspace/action-dialog";
-import {QueryState} from "@/components/workspace";
+import {QueryState, WorkspaceShell } from "@/components/workspace";
 const insightsSearchSchema=siteProgramSelectionSchema.extend({insight:optionalSearchString});
 
 export const Route = createFileRoute("/operations/insights")({
@@ -95,12 +95,9 @@ function InsightsPage() {
   if(outcome.status==="saved"||outcome.status==="refresh-failed")setDismissTarget(null);
  };
 
- return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-  <div className="mx-auto max-w-5xl">
-   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Insights</p>
-   <h1 className="mt-2 font-serif text-4xl">Insights</h1>
+ return <WorkspaceShell width="standard" eyebrow="Insights" title="Insights">
    <nav aria-label="School review navigation" className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
-    <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Back to operations</Link>
+    <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Back to operations</Link>
     <Link to="/operations/school-years" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">School-year planning</Link>
    </nav>
    <section aria-label="Review process" className="mt-5 rounded-xl border bg-card p-4">
@@ -181,6 +178,5 @@ function InsightsPage() {
      </label>
      <MutationFeedback state={mutation} pendingMessage="Saving insight decision..."/>
    </ActionDialog>}
-  </div>
- </main>;
+ </WorkspaceShell>;
 }

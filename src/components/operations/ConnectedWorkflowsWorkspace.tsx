@@ -1,9 +1,11 @@
+import { WorkspaceShell } from "@/components/workspace";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { activateLaunch } from "@/modules/programs/launch.functions";
 import { reconcileExpiredAdmissionOffers } from "@/modules/enrollment/admission-offer-reconciliation.functions";
 import { getWorkflowIntegration } from "@/modules/operations/workflow-integration.functions";
+import { plural, agree } from "@/lib/format";
 
 
 function Metric({label,value}:{label:string;value:number|string}) {
@@ -31,22 +33,13 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
     await mutation.run(
       () => reconcileExpiredAdmissionOffers({ data: { programId } }),
       {
-        successMessage: result => result.expired + " elapsed offer(s) reconciled.",
+        successMessage: result => `${plural(result.expired, "elapsed offer")} reconciled.`,
         commandErrorMessage: "Could not reconcile elapsed offers.",
         refreshErrorMessage: "Elapsed offers were reconciled, but current workflow records could not be loaded. Retry the refresh before taking another action.",
       },
     );
   }
-  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-    <div className="mx-auto max-w-6xl">
-      <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Operations</p>
-      <h1 className="mt-2 font-serif text-4xl">Connected school workflows</h1>
-      <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
-        One authorized view of the host launch, admissions-to-enrollment,
-        learning intervention, and attendance-excuse lifecycles. Every metric
-        comes from the canonical domain records; use the linked workspaces to act.
-      </p>
+  return <WorkspaceShell width="wide" eyebrow="Operations" title="Connected school workflows" subtitle="One authorized view of the host launch, admissions-to-enrollment, learning intervention, and attendance-excuse lifecycles. Every metric comes from the canonical domain records; use the linked workspaces to act." breadcrumbs={<Link to="/home" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>}>
       {error && <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">{error}</p>}
       <MutationFeedback state={mutation} pendingMessage="Updating connected workflows…" className="mt-6"/>
       {data && data.programs.length === 0 && <p className="mt-6 rounded-lg border p-4 text-sm">
@@ -107,7 +100,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                 Activation remains governed by the enrollment/seat-pool transaction.
               </p>
               {program.enrollment.expiredOffersAwaitingReconciliation > 0 && <div className="mt-3 flex flex-wrap items-center gap-3">
-                <span className="text-xs text-muted-foreground">{program.enrollment.expiredOffersAwaitingReconciliation} elapsed offer(s) awaiting reconciliation.</span>
+                <span className="text-xs text-muted-foreground">{plural(program.enrollment.expiredOffersAwaitingReconciliation, "elapsed offer")} awaiting reconciliation.</span>
                 <button type="button" className="rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
                   disabled={busy} onClick={() => void reconcile(program.id)}>
                   {mutation.pending ? "Updating…" : "Expire elapsed offers"}
@@ -117,7 +110,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF1 · Learning and intervention</h3>
-                <Link to="/operations" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">Actions queue</Link>
+                <Link to="/home" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">Actions queue</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Latest missing attempts" value={program.learning.missingLatestAttempts} />
@@ -149,8 +142,8 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
               {program.attendance.outsideConfiguredExpectations > 0 &&
                 <div role="alert" className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
                   <p className="font-semibold">
-                    {program.attendance.outsideConfiguredExpectations} recorded onsite mark(s)
-                    {" "}no longer match configured expected student-days.
+                    {plural(program.attendance.outsideConfiguredExpectations, "recorded onsite mark")}
+                    {" "}{agree(program.attendance.outsideConfiguredExpectations, "no longer matches", "no longer match")} configured expected student-days.
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     These historical records are preserved. Review the school calendar,
@@ -185,13 +178,12 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                 including {program.attendance.absent} absent,
                 {" "}{program.attendance.excused} excused and
                 {" "}{program.attendance.tardy} tardy.
-                {program.attendance.pendingExcuses} excuse(s) await review.
+                {plural(program.attendance.pendingExcuses, "excuse")} {agree(program.attendance.pendingExcuses, "awaits", "await")} review.
                 This event-log window is separate from the completed-day expected denominator.
               </p>
             </section>
           </div>
         </article>)}
       </div>}
-    </div>
-  </main>;
+  </WorkspaceShell>;
 }

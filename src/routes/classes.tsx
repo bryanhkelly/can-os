@@ -31,7 +31,7 @@ import { getTeacherClassRequestOptions } from "@/modules/programs/section-creati
 import { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge } from "@/components/workspace";
 import { safeLoader, type LoadOutcome } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -64,10 +64,10 @@ export const Route = createFileRoute("/classes")({
 function ClassesPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Classes" title="Classes" outcome={outcome}/>;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Classes" title="Classes" outcome={outcome}/>;
   const { directory, workspace, classRequestOptions, meetings } = outcome.data;
   if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson} meetings={meetings}/>;
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
+  return <WorkspaceShell width="wide" eyebrow="Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
     subtitle="Published learning, class updates and the teaching team, backed by your current relationships and enrollment.">
     <ClassDirectoryCards classes={directory.classes} role={directory.role} />
     {classRequestOptions && <ClassCreationRequestForm options={classRequestOptions}/>}
@@ -259,7 +259,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       </WorkspacePanel>
     </>}>
     <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
-      <Link key={value} to="/classes" search={{ ...search, tab: value }} aria-current={tab === value ? "page" : undefined} className="capitalize">{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</Link>)}</DetailNavigation>
+      <SectionTab key={value} current={tab === value} className="capitalize" link={{ to: "/classes", search: { ...search, tab: value } }}>{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</SectionTab>)}</DetailNavigation>
     <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving class change..."/>
     {tab === "overview" && <div className="grid grid-cols-1 gap-5">
       <ClassroomMediaStage sectionId={data.section.id} timezone={data.section.timezone} role={data.role} meetings={meetings} studentPersonId={search.student} commands={meetingCommands}

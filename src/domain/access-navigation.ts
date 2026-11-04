@@ -2,6 +2,13 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 
 const INTERNAL_ORIGIN = "https://can-os.invalid";
 
+export const accessReturnCookie = "can_os_access_return";
+
+export function accessReturnCookieHeader(returnTo: string | undefined, secure: boolean) {
+ const pending=returnTo&&returnTo!=="/";
+ return `${accessReturnCookie}=${pending?"1":""}; Path=/; Max-Age=${pending?120:0}; SameSite=Lax${secure?"; Secure":""}`;
+}
+
 /** Accept only local application paths; never turn a sign-in return into an open redirect. */
 export function safeAccessReturnTo(value: unknown): string | undefined {
  if(typeof value!=="string"||!value.startsWith("/")||value.startsWith("//")||
@@ -27,7 +34,7 @@ export function accessLandingPath(role: string, launchSiteId?: string, returnTo?
  const safeReturnTo=safeAccessReturnTo(returnTo);
  if(safeReturnTo)return safeReturnTo;
  if(hasRegistrarAuthority(role)&&launchSiteId)return "/operations/launch?siteId="+encodeURIComponent(launchSiteId);
- const home:Record<string,string>={student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
+ const home:Record<string,string>={student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/home",counselor:"/home"};
  return Object.hasOwn(home,role)?home[role]! : "/access";
 }
 export const accessFormErrors={

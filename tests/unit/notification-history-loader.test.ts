@@ -21,6 +21,7 @@ vi.mock("@/modules/communication/notification-center.functions", () => ({
   readAllNotifications: state.read, setNotificationStatus: state.read,
 }));
 vi.mock("@/modules/communication/delivery-history.functions", () => ({ getDeliveryHistory: state.history }));
+vi.mock("@/modules/identity/workspace-session.functions", () => ({ getWorkspaceSession: vi.fn() }));
 
 beforeEach(() => {
   vi.clearAllMocks();

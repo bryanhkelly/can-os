@@ -52,7 +52,7 @@ export function SchoolYearScheduleEditor({schedule,busy,run}:{
     dayOfWeek:1,sequence:rows.filter(p=>p.dayOfWeek===1).length+1,
     label:"Instruction",startsAtLocal:"08:30",endsAtLocal:"09:30",type:"instruction",
    }])}>Add period</Button>
-   <Button type="button" disabled={busy||periods.length===0} onClick={()=>run(()=>
+   <Button type="button" variant="outline" disabled={busy||periods.length===0} onClick={()=>run(()=>
     replaceStudioSchedulePeriods({data:{scheduleTemplateId:schedule.id,periods}}))}>Save schedule</Button>
   </div>
  </div>;

@@ -46,8 +46,7 @@ const meta = {
   },
   decorators:[Story=>{
     const root=createRootRoute({component:()=> <div className="min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <WorkspaceSidebar member={{role:"student",firstName:"Jordan",lastName:"Learner",siteId:"school"}}
-        sites={[{id:"school",name:"Synthetic acceptance school"}]} links={workspaceLinks.student} activePath="/student" />
+      <WorkspaceSidebar member={{role:"student"}} links={workspaceLinks.student} activePath="/home" />
       <div className="min-w-0"><header className="border-b bg-card px-6 py-4 text-xs">Student workspace · Synthetic browser fixture</header><Story /></div>
     </div>});
     return <RouterProvider router={createRouter({routeTree:root,history:createMemoryHistory({initialEntries:["/"]})})} />;

@@ -98,6 +98,37 @@ and transactional domain events. This shared school-support policy does not
 authorize clinical/private counseling notes; those remain excluded pending
 explicit confidentiality, consent, retention and exceptional-access policy.
 
+### In-room facilitator
+The `room_facilitator` is the onsite adult supervising a physical room for the
+school day while students receive virtual instruction. Students sharing that
+room may be enrolled in different courses and simultaneous remote classes.
+Physical supervision therefore follows the assigned room and its students,
+not a requirement that every student attend the same instructional Section.
+Attendance and incident/safety reporting are facilitator duties; teaching,
+grading and restricted case review are separate authorities.
+
+This is the required operating model, not an implementation acceptance claim.
+Room-coverage source support now links a canonical Site room, named primary
+and optional backup, a bounded school-local recurring shift and instructional
+Sections. Administrators can plan it before a Program exists. Facilitators see
+their own assignments; adopting schools require named Section relationships for
+facilitator attendance. Students remain in their original courses: no teacher
+authority is implied. Occupancy conservatively counts distinct active students
+across the linked Section cohorts, not one count per course. Individual seating
+of only part of a Section is not modeled by this relationship.
+Standalone-school use is planning only: the current reviewed daily supervision
+and witnessed-presence workflow remains restricted to independent church/CAN
+Programs. This change does not broaden that opening or reviewer authority.
+
+Supervision evidence and presence remain Section/block-based. Only matching,
+current, independently reviewed shared-room plans with qualified primary and
+backup adults and adequate combined occupancy can avoid the generic overlap
+conflict. A room assignment is not continuous physical-presence evidence.
+Supporting a shared mixed-course room must preserve actual room occupancy
+limits, named qualified coverage, breaks/handoffs, server-scoped student access,
+independent safety review and canonical attendance/audit records. Do not remove
+overlap protections or assign teacher powers to simulate room-level coverage.
+
 ## Organizations and delivery
 
 ### Organization

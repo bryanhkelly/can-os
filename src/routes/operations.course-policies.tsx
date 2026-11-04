@@ -11,7 +11,7 @@ export const Route=createFileRoute("/operations/course-policies")({
 });
 function CoursePoliciesPage(){
  const result=Route.useLoaderData();
- if(!result.ok)return <LoaderFailure eyebrow="CAN OS · Registration" title="Course registration rules" outcome={result}/>;
+ if(!result.ok)return <LoaderFailure eyebrow="Registration" title="Course registration rules" outcome={result}/>;
  return <CoursePolicies rows={result.data}/>;
 }
 type CoursePolicyRow=Awaited<ReturnType<typeof listCoursePolicies>>[number];
@@ -30,11 +30,11 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
    },
   );
  }
- return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Course registration policies"
+ return <WorkspaceShell eyebrow="Academic operations" title="Course registration policies"
   subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
   actions={<div className="flex flex-wrap gap-2">
    <Link to="/operations/course-requests" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
-   <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+   <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
   </div>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving course policy..."/>
   <div className="mt-8 space-y-4">

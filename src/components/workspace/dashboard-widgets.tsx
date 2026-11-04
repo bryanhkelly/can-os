@@ -72,7 +72,7 @@ export function DashboardPreviewList({ items, emptyMessage = "No items to show."
       <span className="min-w-0 flex-1">
         <span className="block text-xs font-semibold">{item.title}</span>
         {item.description && <span className="mt-1 block text-xs text-muted-foreground">{item.description}</span>}
-        {item.meta && <span className="mt-1 block text-[0.7rem] text-muted-foreground">{item.meta}</span>}
+        {item.meta && <span className="mt-1 block text-2xs text-muted-foreground">{item.meta}</span>}
       </span>
       {item.status}
       <span className="text-primary" aria-hidden="true">→</span>

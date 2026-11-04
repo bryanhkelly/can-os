@@ -16,7 +16,7 @@ function StaffStudentsPage() {
   );
 
   return (
-    <WorkspaceShell eyebrow="CAN OS · Staff" title="Student directory"
+    <WorkspaceShell eyebrow="Staff" title="Student directory"
       subtitle="Students at your school sites. Select a student to open their 360 profile.">
         <label className="mt-8 block max-w-sm text-sm font-semibold">
           Search by name

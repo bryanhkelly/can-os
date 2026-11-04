@@ -11,7 +11,7 @@ type Story = StoryObj<typeof meta>;
 
 export const ColorAndTypography: Story = { render: () => <div className="min-h-screen space-y-8 bg-background p-6 text-foreground">
   <div className="border-b pb-5">
-    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">CAN OS / V6.1 system</p>
+    <p className="text-xs font-semibold uppercase tracking-eyebrow text-muted-foreground">V6.1 system</p>
     <h1 className="mt-2 font-serif text-5xl font-normal">Clarity without clutter.</h1>
     <p className="mt-3 font-sans text-sm text-muted-foreground">DM Sans interface text; Instrument Serif editorial and section headings; square corners.</p>
   </div>

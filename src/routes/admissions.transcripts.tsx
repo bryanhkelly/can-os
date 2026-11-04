@@ -27,7 +27,7 @@ export const Route = createFileRoute("/admissions/transcripts")({
 function TranscriptIssuancePage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) {
-    return <LoaderFailure eyebrow="CAN OS · Registrar" title="Official transcripts" outcome={outcome} />;
+    return <LoaderFailure eyebrow="Registrar" title="Official transcripts" outcome={outcome} />;
   }
   return <TranscriptIssuanceView
     query={Route.useSearch().query}
@@ -78,7 +78,7 @@ function TranscriptIssuanceView({
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Registrar"
+      eyebrow="Registrar"
       title="Official transcripts"
       subtitle="Search finalized academic records in your authorized school scope and issue a point-in-time transcript from the credit issuer of record."
       actions={<div className="flex flex-wrap gap-2">

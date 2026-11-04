@@ -11,7 +11,7 @@ const focusRingClass = "focus-visible:outline-none focus-visible:ring-2 focus-vi
 
 export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, onCloseAccount,
   changing, onSignOut, menuOpen, onCloseMenu, links, activePath, tray, onCloseTray }: {
-  member?: { role: string; firstName: string; lastName: string };
+  member?: { role: string };
   authenticated: boolean;
   accountOpen: boolean;
   onCloseAccount: () => void;
@@ -35,7 +35,6 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
     </ContextTray>}
     {member && <>
       <ContextTray title="Workspace navigation" open={menuOpen} onClose={onCloseMenu}>
-        <p className="mb-3 text-sm font-semibold">{member.firstName} {member.lastName} · {member.role}</p>
         <SidebarLinks links={links} activePath={activePath} />
         <Link to="/profiles" className={`mt-3 block rounded-lg border-t p-3 text-sm underline ${focusRingClass}`}>My profile</Link>
         <Link to="/account/sessions" className={`block rounded-lg p-3 text-sm underline ${focusRingClass}`}>Account sessions</Link>

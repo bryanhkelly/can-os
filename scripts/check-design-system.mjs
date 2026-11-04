@@ -44,3 +44,29 @@ for (const name of ["EvidenceUploader", "EvidenceReviewForm", "EvidenceDocumentL
     process.exitCode = 1;
   }
 }
+
+
+// Layout contract: the shell and page frame read the same tokens, so the sidebar
+// brand divider, top bar and page titles line up for every role and page.
+const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+for (const token of ["--topbar-height", "--sidebar-width", "--page-gutter", "--page-pad-top", "--page-pad-bottom",
+  "--content-reading", "--content-standard", "--content-wide", "--content-dashboard", "--text-3xs", "--text-2xs",
+  "--text-section", "--tracking-eyebrow", "--eyebrow-color"]) {
+  if (!new RegExp(token + "\\s*:").test(styles)) {
+    console.error(`Design token ${token} must be defined in src/styles.css`);
+    process.exitCode = 1;
+  }
+}
+const shellContract = {
+  "shell/WorkspaceSidebar.tsx": ["h-[var(--topbar-height)]"],
+  "shell/WorkspaceTopBar.tsx": ["h-[var(--topbar-height)]", "px-[var(--page-gutter)]"],
+  "shell/WorkspaceNavigation.tsx": ["can-shell"],
+  "workspace/workspace-shell.tsx": ["PageFrame", "PageHeader"],
+};
+for (const [file, required] of Object.entries(shellContract)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const value of required) if (!source.includes(value)) {
+    console.error(`${file} must use ${value} so the shell stays on the shared layout grid`);
+    process.exitCode = 1;
+  }
+}

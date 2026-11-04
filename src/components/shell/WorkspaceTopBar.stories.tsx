@@ -32,13 +32,25 @@ export const ActiveSchool: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("button", { name: /Switch workspace/ }))
-      .toHaveAccessibleName(/Switch workspace: CAN OS teacher East School/i);
+      .toHaveAccessibleName(/Switch workspace: Teacher East School/i);
     await expect(canvas.queryByText("2 schools")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Search workspace" }));
     await expect(args.onOpenSearch).toHaveBeenCalledTimes(1);
     await expect(args.onOpenAsk).not.toHaveBeenCalled();
     await userEvent.click(canvas.getByRole("button", { name: "Ask CAN" }));
     await expect(args.onOpenAsk).toHaveBeenCalledTimes(1);
+    const notifications = canvas.getByRole("button", { name: "Notifications" });
+    await expect(notifications).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(notifications);
+    await expect(args.onOpenNotifications).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const NotificationsOpen: Story = {
+  args: { notificationsOpen: true },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByRole("button", { name: "Notifications" }))
+      .toHaveAttribute("aria-expanded", "true");
   },
 };
 
@@ -46,7 +58,7 @@ export const OrganizationScope: Story = {
   args: { member: { role: "registrar", firstName: "Avery", lastName: "Registrar", siteId: null } },
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole("button", { name: /Switch workspace/ }))
-      .toHaveAccessibleName(/Switch workspace: CAN OS registrar All authorized schools \(2\)/i);
+      .toHaveAccessibleName(/Switch workspace: Registrar All authorized schools \(2\)/i);
   },
 };
 
@@ -88,7 +100,7 @@ export const DemoWorkspaceChange: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Dismiss demo information" }));
     await expect(canvas.queryByText(/Demo admin session:/)).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Change demo workspace" }));
-    await expect(canvas.getByRole("status")).toHaveTextContent("acting as Jordan Student (student)");
+    await expect(canvas.getByRole("status")).toHaveTextContent("acting as Jordan Student (Student)");
     await expect(canvas.getByRole("button", { name: "Dismiss demo information" })).toBeVisible();
   },
 };

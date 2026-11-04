@@ -45,6 +45,8 @@ export const Route = createFileRoute("/published-site")({
           return new Response(renderPublicSiteHtml(presentation, {
             makeRequestId: () => crypto.randomUUID(), localPreview,
             localPreviewSlug: localPreview ? slug : undefined,
+            localPreviewSubmissionsEnabled:
+              process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED === "true",
           }), { status: 200, headers: indexable
             ? headers : { ...headers, "X-Robots-Tag": "noindex, nofollow" } });
         } catch {

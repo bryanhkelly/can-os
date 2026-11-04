@@ -80,7 +80,7 @@ function ChurchApplicationPage() {
     finally { setBusy(false); }
   }
   return <main className="mx-auto max-w-2xl space-y-6 px-5 py-12">
-    <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Church partnership</p>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Church partnership</p>
       <h1 className="mt-2 font-serif text-4xl">Bring a school to your church</h1>
       <p className="mt-3 text-muted-foreground">Tell us about your church and your proposed school location. CAN will independently verify that you are authorized to represent the church before issuing access.</p>
     </div>

@@ -23,7 +23,7 @@ describe("Netlify tenant edge entrypoint", () => {
   });
   it("denies platform RPC, private pages, and cross-tenant Host claims", () => {
     env(true);
-    for (const path of ["/admin","/operations","/_serverFn","/access","/assets/app.js"]) {
+    for (const path of ["/admin","/home","/_serverFn","/access","/assets/app.js"]) {
       const out = siteHostGate(new Request("https://first-school.can-os.com"+path));
       expect(out).toBeInstanceOf(Response);
       expect((out as Response).status).toBe(404);

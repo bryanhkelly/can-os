@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
 import {getGuardianStudents} from "@/modules/learning/guardian-academic-queries.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
@@ -20,7 +20,17 @@ type GuardianStudentLookup=
  | {status:"ready";students:GuardianStudent[]}
  | {status:"error"};
 const formatStatus=(status:string)=>status.replaceAll("_"," ").replace(/^\w/,letter=>letter.toUpperCase());
-export function LiveSchoolExperiences({data}:{data:Data}) {
+export type SchoolExperienceSection="calendar"|"announcements"|"conferences";
+/** `all` is the framed community panel; `overview` bounds each section; a section name shows only that section. */
+export type SchoolExperienceView="all"|"overview"|SchoolExperienceSection;
+const OVERVIEW_LIMIT=3;
+export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view?:SchoolExperienceView;
+ moreLink?:(section:SchoolExperienceSection,total:number)=>ReactNode}) {
+ const framed=view==="all";
+ const Heading=framed?"h3":"h2";
+ const show=(section:SchoolExperienceSection)=>view==="all"||view==="overview"||view===section;
+ const bounded=<T,>(items:T[])=>view==="overview"?items.slice(0,OVERVIEW_LIMIT):items;
+ const more=(section:SchoolExperienceSection,total:number)=>view==="overview"&&total>OVERVIEW_LIMIT&&moreLink?moreLink(section,total):null;
  const router=useRouter();
  const familySearch=useSearch({strict:false}) as {student?:string};
  const mutation=useMutationFeedback(()=>invalidateRouterAndCheck(router));
@@ -58,40 +68,43 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
   });
  }
  const format=(stamp:string,tz="America/Los_Angeles")=>new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZone:tz}).format(new Date(stamp));
- return <section aria-labelledby="school-community-heading" className="mt-6 w-full">
-  <div className="rounded-2xl border bg-card p-5 sm:p-7">
-   <div className="flex flex-wrap justify-between gap-3">
+ const unavailable=!data.connected&&<span role="status" className="h-fit rounded-full border border-border px-3 py-2 text-xs font-semibold">School updates temporarily unavailable</span>;
+ return <section {...(framed?{"aria-labelledby":"school-community-heading"}:{"aria-label":"School experiences"})} className={framed?"mt-6 w-full":"w-full"}>
+  <div className={framed?"rounded-2xl border bg-card p-5 sm:p-7":undefined}>
+   {framed?<div className="flex flex-wrap justify-between gap-3">
     <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Student life</p><h2 id="school-community-heading" className="mt-2 font-serif text-3xl">School &amp; community</h2><p className="mt-2 text-sm text-muted-foreground">School calendar updates, announcements and teacher conferences.</p></div>
-    {!data.connected&&<span role="status" className="h-fit rounded-full border border-border px-3 py-2 text-xs font-semibold">School updates temporarily unavailable</span>}
-   </div>
+    {unavailable}
+   </div>:unavailable}
    {!cancelTarget&&<MutationFeedback state={mutation} pendingMessage="Saving change..." className="mt-4" />}
-   <div className="mt-7 grid gap-7 lg:grid-cols-3">
-    <div className="space-y-3">
-     <h3 className="font-semibold">School calendar</h3>
+   <div className={framed?"mt-7 grid gap-7 lg:grid-cols-3":view==="overview"?"grid gap-7 lg:grid-cols-3":"max-w-3xl"}>
+    {show("calendar")&&<div className="space-y-3">
+     <Heading className="font-semibold">School calendar</Heading>
      <p className="text-xs text-muted-foreground">Upcoming schedule changes and important dates.</p>
-     {data.events.map(event=><div key={event.id} className="rounded-xl border border-border bg-background p-4">
+     {bounded(data.events).map(event=><div key={event.id} className="rounded-xl border border-border bg-background p-4">
       <p className="text-sm font-semibold"><Link to="/calendar" search={{date:dateKeyInTimezone(event.startsAt,event.timezone),event:event.id}} className="hover:underline focus-visible:outline-2">{event.title}</Link></p>
       <p className="mt-1 text-xs text-muted-foreground">{format(event.startsAt,event.timezone)}</p>
       <StatusBadge tone={event.status==="cancelled"?"attention":"neutral"}>{formatStatus(event.status)}</StatusBadge>
       <p className="mt-2 text-xs text-muted-foreground">For changes, contact your school office.</p>
      </div>)}
      {data.events.length===0&&<p className="text-xs text-muted-foreground">No upcoming calendar events.</p>}
-    </div>
-    <div className="space-y-3">
-     <h3 className="font-semibold">Announcements</h3>
+     {more("calendar",data.events.length)}
+    </div>}
+    {show("announcements")&&<div className="space-y-3">
+     <Heading className="font-semibold">Announcements</Heading>
      <p className="text-xs text-muted-foreground">Updates from your school and CAN.</p>
-     {data.notices.map(notice=><div key={notice.id} className="rounded-xl border border-border bg-background p-4">
+     {bounded(data.notices).map(notice=><div key={notice.id} className="rounded-xl border border-border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
        <p className="text-sm font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline focus-visible:outline-2">{notice.title}</Link></p>
        <StatusBadge tone={notice.acknowledged?"success":"info"}>{notice.acknowledged?"Read":"New"}</StatusBadge>
       </div>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{notice.body}</p>
-      <Button type="button" disabled={busy||notice.acknowledged} onClick={()=>void perform(()=>readNotification({data:{id:notice.id}}),"Notice marked as read.")} className="mt-3">{notice.acknowledged?"Marked as read":"Mark as read"}</Button>
+      <Button type="button" variant="outline" disabled={busy||notice.acknowledged} onClick={()=>void perform(()=>readNotification({data:{id:notice.id}}),"Notice marked as read.")} className="mt-3">{notice.acknowledged?"Marked as read":"Mark as read"}</Button>
      </div>)}
      {data.notices.length===0&&<p className="text-xs text-muted-foreground">No announcements yet.</p>}
-    </div>
-    <div className="space-y-3">
-     <h3 className="font-semibold">Teacher conferences</h3>
+     {more("announcements",data.notices.length)}
+    </div>}
+    {show("conferences")&&<div className="space-y-3">
+     <Heading className="font-semibold">Teacher conferences</Heading>
      {data.viewerRole==="guardian"&&<Field label="Student for conference">
       <Select disabled={busy||studentsLoading||!!studentsError} value={selectedChild}
        onChange={e=>setChildSelection({searchStudent:familySearch.student,studentPersonId:e.target.value})}>
@@ -131,15 +144,16 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
       </article>)}
      </div>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>
-     {data.slots.map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
+     {bounded(data.slots).map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
       <div className="flex-1"><p className="text-sm font-semibold">{slot.seriesTitle}</p>
        <p className="mt-1 text-xs">{slot.teacherName}</p>
        <p className="mt-1 text-sm">{format(slot.startsAt,slot.timezone)} – {format(slot.endsAt,slot.timezone)} · {slot.timezone}</p>
        <div className="mt-1"><StatusBadge tone={slot.status==="available"?"success":"neutral"}>{formatStatus(slot.status)}</StatusBadge></div></div>
-      <Button type="button" disabled={busy||!selectedChild||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>void perform(()=>bookOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")}>{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</Button>
+      <Button type="button" variant="outline" disabled={busy||!selectedChild||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>void perform(()=>bookOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")}>{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</Button>
      </div>)}
      {data.slots.length===0&&<p className="text-xs text-muted-foreground">No conference times are available right now. Check back later or message your school.</p>}
-    </div>
+     {more("conferences",data.slots.length)}
+    </div>}
    </div>
   </div>
   <ActionDialog open={cancelTarget!==null}

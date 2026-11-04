@@ -13,6 +13,7 @@ import {
 } from "@/domain/site-local-delegation-policy";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -99,7 +100,7 @@ export async function currentSiteDirectorPersonId(
       gt(programResponsibilityAssignments.effectiveThrough, at),
       eq(accountPersonGrants.active, true), eq(people.active, true),
       eq(accessAccounts.disabled, false),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
+      verifiedStaffIdentityPredicate(),
     )).limit(1);
   return director?.personId ?? null;
 }
@@ -111,7 +112,7 @@ async function verifiedLocalCandidate(tx: Reader, input: {
     id: accountPersonGrants.id, personId: accountPersonGrants.personId,
     role: accountPersonGrants.role, active: accountPersonGrants.active,
     organizationId: accountPersonGrants.organizationId, siteId: accountPersonGrants.siteId,
-    emailVerifiedAt: accessAccounts.emailVerifiedAt,
+    identityVerified: verifiedStaffIdentityPredicate(),
     personActive: people.active,
   }).from(accountPersonGrants)
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
@@ -244,7 +245,7 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
     });
     assertLocalDelegateGrant({
       role: candidate?.role ?? "", active: candidate?.active ?? false,
-      verified: !!candidate?.emailVerifiedAt && !!candidate.personActive,
+      verified: !!candidate?.identityVerified && !!candidate.personActive,
       samePerson: candidate?.personId === input.personId,
       organizationMatches: candidate?.organizationId === host.organizationId,
       siteMatches: candidate?.siteId === host.siteId,
@@ -369,7 +370,7 @@ export async function requireCurrentSiteLocalDelegate(
       eq(accountPersonGrants.accountId, actor.accountId),
       eq(accountPersonGrants.active, true), eq(people.active, true),
       eq(accessAccounts.disabled, false),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
+      verifiedStaffIdentityPredicate(),
     )).limit(1);
   if (!assigned) throw new AuthorizationError("effective, named local Site responsibility");
   await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
@@ -404,7 +405,7 @@ export async function listSiteLocalDelegations(actor: AccessContext, programId: 
       eq(accountPersonGrants.organizationId, host.organizationId),
       eq(accountPersonGrants.siteId, host.siteId), eq(accountPersonGrants.active, true),
       eq(people.active, true), eq(accessAccounts.disabled, false),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
+      verifiedStaffIdentityPredicate(),
     )).limit(100);
   return {
     programId: host.id, programName: host.name, siteId: host.siteId,

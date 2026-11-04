@@ -448,10 +448,10 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
          `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}&submission=${encodeURIComponent(action.submissionId)}`);
    }else if(hasRegistrarAuthority(context.role)){
      for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
-       verifiedGradeActions.set(action.id,`/operations?action=${encodeURIComponent(action.id)}`);
+       verifiedGradeActions.set(action.id,`/home?action=${encodeURIComponent(action.id)}`);
    }else if(context.role==="teacher"){
      for(const action of gradeActions)if(action.sectionId&&teacherGradeSections.includes(action.sectionId))
-       verifiedGradeActions.set(action.id,`/teacher?gradeAction=${encodeURIComponent(action.id)}`);
+       verifiedGradeActions.set(action.id,`/home?gradeAction=${encodeURIComponent(action.id)}`);
    }
  }
  const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
@@ -571,13 +571,13 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="enrollment_activated"&&n.resourceType==="enrollment"&&
    n.resourceId&&activatedEnrollmentById.has(n.resourceId)?
    (context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(activatedEnrollmentById.get(n.resourceId)!)}`:
-     context.role==="student"?"/student":null):
+     context.role==="student"?"/home":null):
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
-   n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/home?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="transfer_academic_records_handoff_requested"&&n.resourceType==="action"&&n.resourceId&&permittedRecordsHandoffs.has(n.resourceId)?"/operations/transfer-records":
    n.type==="guardian_health_review_requested"&&n.resourceType==="action"&&n.resourceId&&healthStaffActionIds.has(n.resourceId)?`/operations/health-review?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="guardian_health_review_completed"&&n.resourceType==="action"&&n.resourceId&&healthGuardianChildByAction.has(n.resourceId)?`/guardian/health?student=${encodeURIComponent(healthGuardianChildByAction.get(n.resourceId)!)}`:
-   n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="course_registration_guardian_decision_for_registrar"&&n.resourceType==="action"&&n.resourceId&&permittedRegistrarCourseActions.has(n.resourceId)?`/home?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
@@ -609,8 +609,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
-   n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/site/day#pickup":
-   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/home#pickup":
+   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/home?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });

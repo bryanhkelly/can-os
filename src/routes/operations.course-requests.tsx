@@ -16,7 +16,7 @@ export const Route = createFileRoute("/operations/course-requests")({
 function RegistrarCourseRequests() {
   const result = Route.useLoaderData();
   if (!result.ok) {
-    return <LoaderFailure eyebrow="CAN OS · Registration" title="Course change requests" outcome={result} />;
+    return <LoaderFailure eyebrow="Registration" title="Course change requests" outcome={result} />;
   }
   return <CourseRequestList requests={result.data} />;
 }
@@ -42,7 +42,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Academic operations"
+      eyebrow="Academic operations"
       title="Course change approvals"
       subtitle="Approve or decline pending student course changes. Enrollment guards and any required guardian permission are verified again when you approve."
       actions={<div className="flex flex-wrap gap-2">
@@ -50,7 +50,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
           Registration policies
         </Link>
         <Link to="/operations/field-trips" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
-        <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+        <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving course decision..."/>

@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {
  isDemoAccountEmail,isLocalDemoProvisioningEnabled,isApprovedDemoGrant,
- LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,
+ LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ACCOUNTS,LOCAL_DEMO_ADMIN,LOCAL_DEMO_ROOM_FACILITATOR,
 } from "@/domain/local-demo-access";
 
 describe("tenant demo provisioning and identities",()=>{
@@ -32,6 +32,15 @@ describe("tenant demo provisioning and identities",()=>{
    "morgan.guardian@valorschool.demo",
    "alex.registrar@valorschool.demo",
    "admin.demo@valorschool.demo",
+   "sally.facilitator@valorschool.demo",
   ]);
+ });
+ it("binds Sally only to the approved Valor room facilitator identity",()=>{
+  const grant={...LOCAL_DEMO_ROOM_FACILITATOR,role:"room_facilitator"};
+  expect(isApprovedDemoGrant(grant,LOCAL_DEMO_ROOM_FACILITATOR.email)).toBe(true);
+  for(const changed of [{role:"teacher"},{role:"site_admin"},{personId:"other"},
+   {accountId:"other"},{siteId:"other"},{organizationId:"other"}])
+   expect(isApprovedDemoGrant({...grant,...changed},LOCAL_DEMO_ROOM_FACILITATOR.email)).toBe(false);
+  expect(isApprovedDemoGrant(grant,"sally@valorschool.demo")).toBe(false);
  });
 });

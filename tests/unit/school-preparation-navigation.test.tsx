@@ -8,7 +8,7 @@ describe("school preparation after launch activation",()=>{
  it("keeps the active school's preparation and real operating handoff visible",()=>{
   const html=renderToStaticMarkup(<SchoolPreparationNavigation schools={[school]} selected={school} onSelect={()=>{}}/>);
   expect(html).toContain("Hope School · operating workspace available");expect(html).toContain("family invitations and school-year planning remain available");
-  expect(html).toContain('href="/operations"');expect(html).toContain("Review saved academic year");
+  expect(html).toContain('href="/home"');expect(html).toContain("Review saved academic year");
   expect(html).toContain("Active Program status alone does not certify");
  });
  it("requires an explicit school choice when no school is selected",()=>{

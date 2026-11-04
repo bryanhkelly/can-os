@@ -21,7 +21,7 @@ vi.mock("@/components/learning/TeacherLearningFollowUpForm", () => ({ TeacherLea
 vi.mock("@/components/learning/TeacherLearningFollowUpsPanel", () => ({ TeacherLearningFollowUpsPanel: () => null }));
 vi.mock("@/components/teacher/TeacherConferencePanel", () => ({ TeacherConferencePanel: () => null }));
 
-import { Route } from "@/routes/teacher.index";
+import { TeacherHome } from "@/components/home/TeacherHome";
 
 const today: Awaited<ReturnType<typeof getTeacherToday>> = {
   connected: true, teacher: { firstName: "Avery" },
@@ -34,10 +34,7 @@ const today: Awaited<ReturnType<typeof getTeacherToday>> = {
 };
 
 function render(data: typeof today) {
-  state.data = { ok: true, data };
-  const Page = Route.options.component;
-  if (typeof Page !== "function") throw new Error("Missing teacher dashboard component");
-  return renderToStaticMarkup(<Page />);
+  return renderToStaticMarkup(<TeacherHome outcome={{ ok: true, data }} />);
 }
 
 describe("teacher dashboard migration", () => {
@@ -45,7 +42,8 @@ describe("teacher dashboard migration", () => {
     const html = render(today);
     expect(html).toContain("role-dashboard");
     expect(html).toContain("can-dashboard-hero");
-    expect(html).toContain("Your teaching day, Avery.");
+    expect(html).toContain("Your teaching day");
+    expect(html).toContain("Welcome, Avery.");
     expect(html).toContain("English Literature");
     expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay"');
     expect(html).toContain('href="/messages"');

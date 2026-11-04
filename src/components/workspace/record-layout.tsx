@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { PageEyebrow, PageTitle } from "./page-frame";
 
 /** Route-stable, entity-first record view. The route owns the data and permissions. */
 export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadcrumbs, className }: {
@@ -13,10 +14,10 @@ export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadc
 }) {
   return <header className={cn("min-w-0 border-b border-border pb-5", className)}>
     {breadcrumbs && <nav aria-label="Breadcrumb" className="mb-4 text-xs text-muted-foreground">{breadcrumbs}</nav>}
-    {eyebrow && <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>}
+    {eyebrow && <PageEyebrow className="mb-2">{eyebrow}</PageEyebrow>}
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="font-serif text-4xl font-normal leading-tight tracking-normal text-foreground">{title}</h1>
+        <PageTitle>{title}</PageTitle>
         {subtitle && <div className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</div>}
       </div>
       <div className="flex flex-wrap items-center gap-2">{status}{actions}</div>

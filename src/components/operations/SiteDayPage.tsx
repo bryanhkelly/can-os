@@ -1,4 +1,5 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
 import { StatCard, StatusBadge } from "@/components/workspace";
@@ -78,7 +79,11 @@ export function SiteDayPage() {
       if (!active) return;
       setContext(site);
       setDate(site.date);
-      void load(site.date);
+      if (site.hasPrograms) void load(site.date);
+      else {
+        setNotice("No academic Program is configured for this school yet. Room assignments can be planned now; attendance requires linked classes and an approved calendar.");
+        setLoading(false);
+      }
     }).catch(() => {
       if (!active) return;
       setError("Sign in with a room facilitator, site staff or site leader membership for this site.");
@@ -121,7 +126,7 @@ export function SiteDayPage() {
     } finally { setBusy(""); }
   }
 
-  return <DashboardHome eyebrow="CAN OS · Onsite school" title={context?.siteName ?? "Site Today"}
+  return <DashboardHome eyebrow={context?.siteName ?? "Site Today"}
     subtitle="Supervise the scheduled school day and record staff-observed attendance. Learning activity is not physical presence."
     shortcuts={<>
       <DashboardShortcut title="Staff coverage" description="Review assigned supervision" icon={<Users className="size-5" />}><a href="#supervision" /></DashboardShortcut>
@@ -132,6 +137,7 @@ export function SiteDayPage() {
     rail={context ? <DashboardCalendar date={date||context.date} timezone={context.timeZone} /> : undefined}
     actions={<><Link to="/safeguarding">Report a safety concern →</Link><Link to="/calendar">Open calendar →</Link></>}
     priority={<>
+    {context?.canViewRoomCoverage && <RoomCoverageWorkspace/>}
     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
       <span>{date ? formatDateOnly(date) : "Loading school date"}</span>
       {context && <span>{context.timeZone}</span>}
@@ -177,7 +183,7 @@ export function SiteDayPage() {
       </section>}
     </>}>
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
-    {context&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap items-center gap-3">
+    {context?.hasPrograms&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap items-center gap-3">
       <Button variant={!preparing ? "secondary" : "outline"} aria-pressed={!preparing}
         onClick={()=>{setPreparing(false);setDate(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</Button>
       {context.canPrepareSchoolDays&&<Button variant={preparing ? "secondary" : "outline"} aria-pressed={preparing}
@@ -197,7 +203,7 @@ export function SiteDayPage() {
         </Button></>}
     </nav>}
     {preparing&&<p role="status" className="mt-4 rounded border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
-    {context && <Label className="mt-6 block max-w-sm">
+    {context?.hasPrograms && <Label className="mt-6 block max-w-sm">
       {preparing?"School-local preparation date":"School-local attendance date"}
       <Input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
         className="mt-2"
@@ -237,7 +243,7 @@ export function SiteDayPage() {
         </a></li>
       </ol>
     </section>}
-    {context && date && !preparing && <OnsiteSupervisionPanel date={date} onChanged={() => setSchoolDayRevision(revision => revision + 1)} />}
+    {context?.hasPrograms && date && !preparing && <OnsiteSupervisionPanel date={date} onChanged={() => setSchoolDayRevision(revision => revision + 1)} />}
     {roster && !preparing && <>
       <p className="mt-3 text-xs text-muted-foreground">
         These are expected student-program attendance entries, not a deduplicated headcount or proof

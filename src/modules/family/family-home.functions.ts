@@ -390,7 +390,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    detail: row.description ?? "",
    href: enrollmentApplication
     ? `/guardian/admission-offers?student=${encodeURIComponent(enrollmentApplication.studentPersonId)}&application=${encodeURIComponent(enrollmentApplication.applicationId)}`
-    : `/guardian?action=${encodeURIComponent(row.id)}`,
+    : `/home?action=${encodeURIComponent(row.id)}`,
    priority:row.priority,
    dueAt:row.dueAt?.toISOString()??null,
    timezone:row.timezone,

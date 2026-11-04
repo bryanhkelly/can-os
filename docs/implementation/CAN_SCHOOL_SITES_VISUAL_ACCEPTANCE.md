@@ -52,7 +52,7 @@ Reference fixtures:
 
 For each available page capture **1440, 768, 375, 320 CSS px** screenshots. Compare hero/image framing, header, serif hierarchy, palette contrast, whitespace, logo quality, content density, section sequencing, cards/tabs, calls to action, responsive behavior and footer. Capture mobile menu open and closed. Manually compare with source pack; a CSS or unit test alone does not verify visual parity.
 
-Click and verify each present header/footer/CTA link in the public site and local-only preview, including back navigation. No link may escape a synthetic local preview into an authenticated CAN OS route. Check 404 for unsupported tenant routes, no cross-tenant leakage, no forms in local read-only preview, no scripts/private admin assets at tenant origins, and correct canonical, robots, sitemap and noindex for synthetic Sites.
+Click and verify each present header/footer/CTA link in the public site and local-only preview, including back navigation. No link may escape a synthetic local preview into an authenticated CAN OS route. Check 404 for unsupported tenant routes, no cross-tenant leakage, consent-gated local inquiry forms and their canonical POST handling on the attested development branch, no scripts/private admin assets at tenant origins, and correct canonical, robots, sitemap and noindex for synthetic Sites. The production-build preview remains read-only.
 
 For live-form-eligible fixtures exercise valid and invalid consent, idempotent repeat submissions, forged Site/Program IDs, publisher revocation and admission closure against a disposable isolated DB. Never fabricate independent licensure, opening, child consent or tuition approval to make the screenshots look green.
 

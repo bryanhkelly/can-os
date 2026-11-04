@@ -102,8 +102,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   makeRequestId?: () => string;
   path?: PublicSitePath;
   localPreview?: boolean;
-  /** Trusted server-resolved Site slug for local-only, read-only multipage preview. */
+  /** Trusted server-resolved Site slug for local-only multipage preview. */
   localPreviewSlug?: string;
+  /** Local forms are enabled only by a database-attested development server. */
+  localPreviewSubmissionsEnabled?: boolean;
 }): string {
   const path = options?.path ?? "/";
   const availablePaths = availablePublicSitePaths(page);
@@ -111,6 +113,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
+  const previewSlug = options?.localPreview && options.localPreviewSlug &&
+    isPublicSiteSlug(options.localPreviewSlug) ? options.localPreviewSlug : null;
+  const submissionsEnabled = !options?.localPreview ||
+    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true);
+  const inquiryAction = previewSlug
+    ? `/published-site/inquiry?site=${encodeURIComponent(previewSlug)}`
+    : "/inquiry";
+  const familyStartAction = previewSlug
+    ? `/published-site/family-start?site=${encodeURIComponent(previewSlug)}`
+    : "/apply";
   const demo = page.demonstration === true;
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
@@ -179,14 +191,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       program.delivery.asynchronous ? "Self-paced online" : null,
     ].filter(Boolean).join(" · ");
     const onsiteDays = program.delivery.onsiteDaysPerWeek;
-    const requestId = options?.localPreview ? undefined : options?.makeRequestId?.();
-    const applyRequestId = !options?.localPreview && program.applicationOpen === true
+    const requestId = submissionsEnabled ? options?.makeRequestId?.() : undefined;
+    const applyRequestId = submissionsEnabled && program.applicationOpen === true
       ? options?.makeRequestId?.() : undefined;
     // Only the separately authorized school-of-record/admissions projection
     // can expose Apply. A live Program is NOT automatically an open school.
     // The receiving command rechecks operating authority at submission.
     const applicationForm = program.applicationOpen === true && applyRequestId ?
-      `<form action="/apply" method="post" class="inquiry-form">
+      `<form action="${familyStartAction}" method="post" class="inquiry-form">
         <h4>Start your school application</h4>
         <p class="availability">Verify your email first. No child information is
           collected on this public page, and guardian authority is reviewed by the school.</p>
@@ -201,7 +213,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         </label>
         <button type="submit">Verify email to apply</button>
       </form>` : "";
-    const inquiryForm = requestId ? `<form action="/inquiry" method="post" class="inquiry-form">
+    const inquiryForm = requestId ? `<form id="program-inquiry-${escapePublicHtml(program.programId)}" action="${inquiryAction}" method="post" class="inquiry-form">
         <input type="hidden" name="requestId" value="${escapePublicHtml(requestId)}"/>
         <input type="hidden" name="programId" value="${escapePublicHtml(program.programId)}"/>
         <label>First name<input name="firstName" autocomplete="given-name" maxlength="80" required/></label>
@@ -227,8 +239,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         ${onsiteDays !== null && program.delivery.onsite ? ` · ${onsiteDays} onsite days per week` : ""}
       </p>
       <p class="availability">${program.applicationOpen === true
-        ? options?.localPreview
-          ? "Applications available on the live website only · identity verification required"
+        ? options?.localPreview && !submissionsEnabled
+          ? "Applications available on the development server only · identity verification required"
           : "Applications available · identity verification required"
         : program.availability === "planned"
           ? "Program planned · admissions not open on this page"
@@ -267,6 +279,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     foundingFamilies ? "Founding families" :
     availablePaths.includes("/academics") ? "Explore programs" :
     availablePaths.includes("/contact") ? "Contact" : "Home";
+  const firstAcademicProgram = page.academicPrograms?.[0];
+  const firstInquiryHref = firstAcademicProgram
+    ? previewSlug
+      ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
+      : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
+    : null;
   const hero = `<div id="welcome" class="public-hero has-image${heroHasPhoto ? "" : " original-artwork"}${page.site.name.length > 28 ? " long-name" : ""}"><img class="hero-background-image" src="${escapePublicHtml(heroPhotoSrc)}" alt="${escapePublicHtml(heroPhotoAlt)}"${heroHasPhoto ? "" : ' aria-hidden="true"'} decoding="async"/><p class="tag">${foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${school}</h1>
     ${local?.welcomeMessage ? `<p class="hero-subtitle">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
     <p class="intro">${academicCards ? "Explore reviewed educational programs and the local community." :
@@ -276,6 +294,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       academicCards ? "Inquire about published programs; applications are not currently open through this website." :
       "Check back for published educational opportunities."}</p>
     <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
+    ${firstInquiryHref && submissionsEnabled ? `<a class="hero-text-link" href="${firstInquiryHref}">Request information</a>` : ""}
     ${availablePaths.includes("/about") ? `<a class="hero-text-link" href="/about">Our story →</a>` : ""}
     ${!availablePaths.includes("/academics") && availablePaths.includes("/contact") ? `<a class="hero-text-link" href="/contact">School information →</a>` : ""}</div><div class="hero-art" aria-hidden="true"><span class="art-ring"></span><span class="art-line"></span><span class="art-dot"></span></div></div>`;
   // The homepage introduces the school; detailed church content belongs on
@@ -322,7 +341,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <p class="availability">A published address is not confirmation that the site is open for visits.</p></div>` : ""}
       </div>` : ""}
     <p>${options?.localPreview
-      ? "Inquiry and application submission is disabled in this local preview."
+      ? submissionsEnabled
+        ? "Use the request-information form on a published program to contact the school. This is not an application or enrollment request."
+        : "This local preview is read-only. Request-information forms are available in the development server."
       : academicCards
         ? "For academic program questions, use the request-information form for a published program below."
         : reviewedContact
@@ -564,8 +585,6 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     `Explore ${escapePublicHtml(pageLabels[path].toLowerCase())} at ${school}.`;
   const isLive = Boolean(options?.makeRequestId) && !options?.localPreview;
   const canonical = `https://${host}${path}`;
-  const previewSlug = options?.localPreview && options.localPreviewSlug &&
-    isPublicSiteSlug(options.localPreviewSlug) ? options.localPreviewSlug : null;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -666,11 +685,11 @@ main{padding-top:clamp(22px,3vw,48px)}
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
-<main id="main-content">\n  ${options?.localPreview ? '<p role="status">Local read-only preview. Inquiry and application forms are available only on the configured live school website.</p>' : ""}\n  ${pageContent[path]}\n</main>
+<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Local read-only preview. Run npm run dev to submit eligible inquiry forms."}</p>` : ""}\n  ${pageContent[path]}\n</main>
 <footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
-    // Local previews have distinct, read-only same-origin page endpoints. A bare
+    // Local previews have distinct same-origin page endpoints. A bare
     // /academics href would escape into the CAN OS authenticated application.
     if (!previewSlug || !availablePaths.includes(destination as PublicSitePath)) return match;
     const endpoint = destination === "/" ? "/published-site" : "/published-site" + destination;

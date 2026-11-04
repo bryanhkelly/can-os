@@ -83,11 +83,11 @@ describe("staff Action detail boundary",()=>{
   it("supports site-less academic work without bypassing the shared academic policy",async()=>{
     state.action!.siteId=null;
     state.actor!.role="registrar";
-    expect(await getActionDetail({data:{actionId}})).toMatchObject({siteId:null,canManageOperations:false,workspaceHome:"/operations"});
+    expect(await getActionDetail({data:{actionId}})).toMatchObject({siteId:null,canManageOperations:false,workspaceHome:"/home"});
     expect(state.authority).toHaveBeenCalledOnce();
   });
   it.each([
-    ["teacher","/teacher"],["specialist","/coach"],["counselor","/counselor"],["registrar","/operations"],
+    ["teacher","/home"],["specialist","/home"],["counselor","/home"],["registrar","/home"],
   ])("returns the verified %s workspace destination",async(role,workspaceHome)=>{
     state.actor!.role=role;
     expect(await getActionDetail({data:{actionId}})).toMatchObject({workspaceHome});

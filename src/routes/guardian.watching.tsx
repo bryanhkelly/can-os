@@ -47,7 +47,7 @@ function WatchingPage() {
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Family"
+      eyebrow="Family"
       title="Things CAN Is Watching"
       subtitle="Every standing instruction you've given CAN — inspect it, pause it, or turn it off."
     >

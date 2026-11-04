@@ -249,7 +249,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
                     onChange={event=>setReviewOutcomes(values=>({...values,[review.id]:event.target.value}))}
                     className="mt-1 w-full rounded border bg-background p-2"/>
                 </label>
-                <Button className="mt-2" disabled={!!busy||(reviewOutcomes[review.id]??"").trim().length<10}
+                <Button variant="outline" className="mt-2" disabled={!!busy||(reviewOutcomes[review.id]??"").trim().length<10}
                   onClick={()=>void completeReview(review.id)}>Complete assigned review</Button>
               </>}
             </li>)}</ul>

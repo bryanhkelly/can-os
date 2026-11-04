@@ -18,7 +18,7 @@ function MyCredentials(){
   const doc=await downloadAuthorizedAcademicCredential({data:{authorizationId:id}});
   downloadBase64(doc.base64,doc.filename,"application/pdf");
  }catch(e){setError(mutationErrorMessage(e, "Download denied"))}finally{inFlight.current=false;setDownloading(false)}}
- return <WorkspaceShell eyebrow="CAN OS · Records" title="My official credentials" subtitle="Secure, time-limited access to records authorized for your verified account.">
+ return <WorkspaceShell eyebrow="Records" title="My official credentials" subtitle="Secure, time-limited access to records authorized for your verified account.">
   <div className="space-y-4 py-6">
    {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
    <button type="button" className="rounded-lg border px-3 py-2" disabled={busy} onClick={()=>void query.refetch()}>Refresh authorizations</button>

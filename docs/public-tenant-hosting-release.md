@@ -30,13 +30,15 @@ published site's public rendering at `/published-site?site=<slug>` on the
 current localhost origin. These local commands explicitly enable this preview
 and the preview command binds to loopback. The selected Site must still have
 an approved publication and is read through the normal public-safe catalog.
-Local rendering is read-only: inquiry and application forms are omitted because
-their POST routes require a verified HTTPS tenant origin. Test those submissions
-on an approved configured host, not by bypassing tenant-origin checks.
-`npm run preview` loads `.env.local`, preserving explicit shell overrides.
-It uses the configured database without changing the existing development/test
-branch guards; obtain authorization before persisting ordinary UI changes.
-This does not enable query-based Site selection in production or on
+The normal `npm run dev` app renders eligible inquiry and application forms
+in this preview and accepts their same-origin POSTs through the canonical
+public intake handlers. Its existing startup check confirms the configured
+development Neon project/branch (or the isolated test branch) before it starts.
+Inquiry still requires adult contact consent and creates only the canonical
+interest record and follow-up Action; Apply still requires independently
+authorized application gates and email verification. Demo-school email delivery
+remains suppressed. `npm run preview` stays read-only.
+Local forms never enable query-based Site selection on production or
 non-loopback hosts. Draft content remains available in the authenticated,
 sandboxed website draft preview.
 

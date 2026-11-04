@@ -39,7 +39,7 @@ type InviteeLoad = {
 
 function GroupsPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Groups" title="Study groups" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="Groups" title="Study groups" outcome={outcome} />;
   return <GroupsView data={outcome.data} />;
 }
 
@@ -95,11 +95,11 @@ function GroupsView({ data }: { data: Workspace }) {
   }
 
   return (
-    <WorkspaceShell eyebrow="CAN OS · Collaboration" title="Study groups"
+    <WorkspaceShell eyebrow="Collaboration" title="Study groups"
       subtitle={data.role === "teacher"
         ? "Create facilitated course groups, review membership and manage the canonical meeting schedule."
         : "Discover your school's groups, request participation and manage upcoming session RSVPs."}
-      actions={<Link to={data.role === "teacher" ? "/teacher" : "/student"}
+      actions={<Link to="/home"
         className="rounded-lg border px-3 py-2 text-sm">Workspace home</Link>}
     >
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving group change..."/>

@@ -104,7 +104,7 @@ describe("read-only staff Action detail",()=>{
       id:"action",title:"Review missing work",description:"Meet the student",type:"academic_intervention",
       status,priority:"high",dueAt:"2030-01-01",resolvedAt:null,resolutionNote:null,
       siteId:"site",programId:"program",canManageOperations,
-      workspaceHome:canManageOperations?"/operations":"/teacher",
+      workspaceHome:canManageOperations?"/home":"/home",
     }};
     return render(Action);
   }
@@ -112,12 +112,12 @@ describe("read-only staff Action detail",()=>{
     const html=action(false);
     expect(html).toContain("Review missing work");
     expect(html).toContain("Meet the student");
-    expect(html).not.toContain('href="/operations');
+    expect(html).not.toContain('href="/home?action=');
     expect(html).not.toContain("Mark complete");
-    expect(html).toContain('href="/teacher" class="underline">Back to workspace</a>');
+    expect(html).toContain('href="/home" class="underline">Back to workspace</a>');
   });
   it("links active registrar work to the exact scoped owning workflow, not closed work",()=>{
-    expect(action(true)).toContain('href="/operations?action=action&amp;siteId=site&amp;programId=program"');
+    expect(action(true)).toContain('href="/home?action=action&amp;siteId=site&amp;programId=program"');
     expect(action(true,"resolved")).not.toContain("Open owning operations workflow");
   });
   it("renders unavailable records explicitly instead of displaying other Actions",()=>{

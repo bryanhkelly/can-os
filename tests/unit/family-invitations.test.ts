@@ -5,6 +5,8 @@ import {
   familyInvitationBatchMetadataSchema,
   dedupeFamilyInvitationContacts,
   FAMILY_INVITATION_BATCH_KIND,
+  FAMILY_INVITATION_LINK_LIFETIME_MS,
+  isFamilyInvitationExpired,
   familyInvitationRetryMatches,
   familyInvitationSendInput,
   parseFamilyInvitationRecipients,
@@ -42,6 +44,12 @@ function metadata(): FamilyInvitationBatchMetadata {
 }
 
 describe("family invitation recipient review", () => {
+  it("expires invitation welcome links at the exact 30-day boundary", () => {
+    const createdAt = new Date("2026-01-01T00:00:00.000Z");
+    expect(isFamilyInvitationExpired(createdAt, new Date(createdAt.getTime() + FAMILY_INVITATION_LINK_LIFETIME_MS - 1))).toBe(false);
+    expect(isFamilyInvitationExpired(createdAt, new Date(createdAt.getTime() + FAMILY_INVITATION_LINK_LIFETIME_MS))).toBe(true);
+  });
+
   it("parses and deduplicates a 50-recipient paste without dropping valid rows", () => {
     const rows = Array.from({ length: 50 }, (_, index) => `Family ${index},family${index}@example.test`);
     const parsed = parseFamilyInvitationRecipients([...rows, "FAMILY0@example.test"].join("\n"));

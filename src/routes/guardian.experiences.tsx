@@ -23,7 +23,7 @@ function GuardianExperiencesPage() {
   const outcome = Route.useLoaderData();
   const {student} = Route.useSearch();
   if (!outcome.ok) {
-    return <LoaderFailure eyebrow="CAN OS · Family" title="School experiences" outcome={outcome} />;
+    return <LoaderFailure eyebrow="Family" title="School experiences" outcome={outcome} />;
   }
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Family" title="School & community" subtitle="School calendar, announcements, and teacher conferences for your family." breadcrumbs={<><Link to="/guardian" search={{student}} className="underline">Family home</Link><span>/</span><span>School</span></>}><LiveSchoolExperiences data={outcome.data} /></WorkspaceShell>;
+  return <WorkspaceShell width="wide" eyebrow="Family" title="School & community" subtitle="School calendar, announcements, and teacher conferences for your family." breadcrumbs={<><Link to="/home" search={{student}} className="underline">Family home</Link><span>/</span><span>School</span></>}><LiveSchoolExperiences data={outcome.data} /></WorkspaceShell>;
 }

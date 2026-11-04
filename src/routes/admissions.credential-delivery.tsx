@@ -34,7 +34,7 @@ function CredentialDeliveryPage(){
   readingRef.current=true;setReading(true);setMessage("");
   try{await fn()}catch(e){setMessage(mutationErrorMessage(e, "Unable to process credential"))}finally{readingRef.current=false;setReading(false)}
  }
- return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Official credential delivery" subtitle="Download issued documents and inspect historical delivery receipts. External release is currently disabled.">
+ return <WorkspaceShell eyebrow="Registrar" title="Official credential delivery" subtitle="Download issued documents and inspect historical delivery receipts. External release is currently disabled.">
   <div className="space-y-5 py-6">
    <p className="text-sm">Documents are generated from issued transcript snapshots or approved, active diploma records. Email acceptance does not prove delivery to the recipient's inbox.</p>
    {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}

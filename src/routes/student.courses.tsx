@@ -4,12 +4,13 @@ import { getCourseRegistration, requestCourseChange, decideCourseChange } from "
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge, EmptyState } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, EmptyState } from "@/components/workspace";
 import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { useHydrated } from "@/lib/use-hydrated";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { agree } from "@/lib/format";
 
 const loadCourseRegistration=async(section?:string)=>{
  const registration=await getCourseRegistration();
@@ -30,7 +31,7 @@ export const Route=createFileRoute("/student/courses")({
 function CourseRegistrationPage(){
  const outcome=Route.useLoaderData();
  const search=Route.useSearch();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Academics" title="Choose your classes." outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Academics" title="Choose your classes." outcome={outcome}/>;
  if(outcome.data.viewerRole==="student"&&search.view!=="catalog")return <StudentClasses data={outcome.data}/>;
  return <CourseRegistrationView data={outcome.data}/>;
 }
@@ -48,15 +49,11 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  const active=sections.filter(s=>s.enrollmentStatus==="active");
  const credits=active.reduce((n,s)=>n+s.credits,0);
  const today=new Date();
- return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
-  <nav className="flex flex-wrap items-center gap-4">
+ return <WorkspaceShell width="standard" eyebrow="Course registration" title="Choose your classes." subtitle="Review your school’s available classes and request a schedule change. A registrar reviews each request before enrollment changes. Drops and withdrawals have different deadlines and academic consequences." breadcrumbs={<>
    {role==="student"&&<Link to="/student/courses" className="text-xs font-semibold underline">My classes</Link>}
-   <Link to={hasRegistrarAuthority(role)?"/operations":"/student"} search={{siteId:undefined,programId:undefined}} className="text-xs text-muted-foreground hover:underline">Back to workspace</Link>
+   <Link to="/home" search={{siteId:undefined,programId:undefined}} className="text-xs text-muted-foreground hover:underline">Back to workspace</Link>
    {role==="student"&&<Link to="/student/study-groups" className="text-xs font-semibold underline underline-offset-4">Study groups</Link>}
-  </nav>
-  <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Course registration</p>
-  <h1 className="mt-2 font-serif text-5xl">Choose your classes.</h1>
-  <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Review your school’s available classes and request a schedule change. A registrar reviews each request before enrollment changes. Drops and withdrawals have different deadlines and academic consequences.</p>
+  </>} className="pb-20">
   <div className="mt-6 flex flex-wrap items-center gap-3">
    <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">Signed in as {hasRegistrarAuthority(role)?"School Registrar":"Student"}</span>
    <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">{connected?"School records connected":"School records unavailable"}</span>
@@ -78,7 +75,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
      <div><p className="text-xs font-semibold text-muted-foreground">{s.code} · {s.subject} · {s.mode}</p>
       <h3 className="mt-2 font-serif text-2xl"><Link to="/student/courses" search={{section:s.id,view:"catalog"}} className="hover:underline">{s.title}</Link></h3><p className="mt-2 text-sm text-muted-foreground">{s.description??"Course delivered through the CAN learning model."}</p>
       {enrolled&&role==="student"&&<Link to="/student/assignments" search={{section:s.id}} className="mt-3 inline-block text-sm font-semibold underline">View class assignments</Link>}
-      <p className="mt-2 text-xs text-muted-foreground">{s.credits} credit(s) · {enrolled?"Enrolled":s.enrollmentStatus==="withdrawn"?"Previously withdrawn":s.enrollmentStatus==="cancelled"?"Previously dropped":s.contentReady?"Available to request":"School content setup pending"}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{s.credits} {agree(Number(s.credits), "credit", "credits")} · {enrolled?"Enrolled":s.enrollmentStatus==="withdrawn"?"Previously withdrawn":s.enrollmentStatus==="cancelled"?"Previously dropped":s.contentReady?"Available to request":"School content setup pending"}</p>
       {!enrolled && !s.contentReady && <p className="mt-2 text-sm">
         The school must publish student-accessible lesson content and assign that release to this class before enrollment can be approved.
         You may still request the class; a request does not reserve a seat or enroll you.
@@ -112,7 +109,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
    </div>}
   </div>)}{!requests.length&&<p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">No course change requests yet.</p>}</div>
   <p className="mt-9 text-xs leading-6 text-muted-foreground">A withdrawal retains a W notation on the enrollment record. Class additions that require guardian permission remain pending until an authorized guardian approves and the registrar finalizes the change. Schedule conflicts, prerequisites, capacity and credits are rechecked by the enrollment service when adding a class.</p>
- </main>;
+ </WorkspaceShell>;
 }
 
 function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistration>>}){
@@ -147,8 +144,8 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     </WorkspacePanel>)}
    </div>:<>
     <DetailNavigation label="Class detail">
-     <Link to="/classes" search={{section:course.id,tab:"lessons"}}>Classroom</Link>
-     {(["classwork","grades"] as const).map(value=><Link key={value} to="/student/courses" search={{section:course.id,tab:value}} aria-current={tab===value?"page":undefined}>{value==="classwork"?"Classwork":"Grades & feedback"}</Link>)}
+     <SectionTab current={false} link={{to:"/classes",search:{section:course.id,tab:"lessons"}}}>Classroom</SectionTab>
+     {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
     <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
@@ -163,11 +160,11 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
    </>}
  </>;
  return course?<ClassroomWorkspace title={course.title}
-  subtitle={`${course.code} · ${course.subject} · ${course.credits} credit(s)`}
+  subtitle={`${course.code} · ${course.subject} · ${course.credits} ${agree(Number(course.credits), "credit", "credits")}`}
   rail={connections}>{content}</ClassroomWorkspace>:
-  <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="My classes"
+  <WorkspaceShell width="wide" eyebrow="Student learning" title="My classes"
    subtitle="Enter an enrolled class to see your work, feedback and next steps."
-   breadcrumbs={<><Link to="/student" className="underline">Today</Link><span>/</span><span>My classes</span></>}
+   breadcrumbs={<><Link to="/home" className="underline">Today</Link><span>/</span><span>My classes</span></>}
    actions={<Link to="/student/courses" search={{view:"catalog"}} className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Course catalog / registration</Link>}>
    {content}
   </WorkspaceShell>;

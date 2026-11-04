@@ -44,7 +44,7 @@ export const Route=createFileRoute("/admissions/intake")({
 function IntakePage(){
  const outcome=Route.useLoaderData();
  const selected=Route.useSearch();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Admissions" title="Inquiry and decision pipeline" outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Admissions" title="Inquiry and decision pipeline" outcome={outcome}/>;
  return <Intake key={`${selected.siteId??""}:${selected.programId??""}:${selected.interest??""}:${selected.studentPage??1}`} data={outcome.data}/>;
 }
 function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
@@ -93,7 +93,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  async function perform(fn:()=>Promise<unknown>,message:string,refresh?:()=>Promise<unknown>){
   await mutation.run(fn,{successMessage:message,commandErrorMessage:"Unable to save",refresh});
  }
- return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
+ return <WorkspaceShell eyebrow="Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
   <WorkflowIntro eyebrow="Verified admissions workflow" title="Every applicant, a clear next step." description="Start with a family inquiry, review identity and eligibility, then record decisions in the canonical admissions workflow. A public inquiry never proves guardianship." actions={<a href="#new-inquiry" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">New inquiry <ArrowUpRight className="size-4" /></a>} />

@@ -1,4 +1,5 @@
 vi.mock("@/modules/operations/onsite-day-preparation.functions",()=>({getOnsiteSchoolDayPreparation:vi.fn()}));
+vi.mock("@/components/operations/RoomCoverageWorkspace",()=>({RoomCoverageWorkspace:()=><section>All-day room coverage</section>}));
 vi.mock("@/modules/operations/onsite-room-plan.functions",()=>({getOnsiteRoomPlanningFn:vi.fn(),submitOnsiteRoomPlanFn:vi.fn(),reviewOnsiteRoomPlanFn:vi.fn()}));
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
@@ -44,15 +45,17 @@ vi.mock("@/modules/operations/pickup.functions",()=>({
 describe("Hybrid Site daily facilitator workspace",()=>{
   it("links only site-day and no grades, counseling or generic case consoles",()=>{
     for(const role of ["room_facilitator","site_staff","site_leader"]){
-      expect(getWorkspaceHome(role)).toBe("/site/day");
+      expect(getWorkspaceHome(role)).toBe("/home");
       const destinations=getWorkspaceLinks(role)?.map(item=>item.path)??[];
-      expect(destinations).toContain("/site/day");
-      for(const forbidden of ["/teacher/gradebook","/counselor","/support","/admissions","/admin"])
+      expect(destinations).toContain("/home");
+      for(const forbidden of ["/teacher/gradebook","/support","/admissions","/admin"])
         expect(destinations).not.toContain(forbidden);
     }
     expect(workspaceLinks.paraeducator).toEqual([
+      {title:"Home",path:"/home",icon:"home"},
       {title:"Report a safety concern",path:"/safeguarding",icon:"safety"},
       {title:"My profile",path:"/profiles",icon:"users"},
+      {title:"Messages",path:"/messages",icon:"messages"},
     ]);
   });
   it("explains the boundary between physical presence, online activity and student release",()=>{

@@ -7,7 +7,8 @@ import {
 } from "@/db/schema";
 import { isAcademicMarketingType, publishableAcademicProgram } from "@/domain/academic-program-publication";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
-import { familyInvitationBatchMetadataSchema } from "@/domain/family-invitations";
+import { AuthorizationError } from "@/domain/command-context";
+import { familyInvitationBatchMetadataSchema, isFamilyInvitationExpired } from "@/domain/family-invitations";
 import { invitedFamilyInterestInput, type InvitedFamilyInterestInput } from "@/domain/family-recruitment-interest";
 import { publicAdmissionsInterestInput, publicInterestMessage, publicInterestRateLimitKeys, type PublicInterestRoute, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
@@ -69,7 +70,8 @@ export async function admitPublicAdmissionsInterest(
         row.allowed ? 0 : Math.max(1,Math.min(60,Math.ceil(row.retryAfterSeconds)))};
     }
     const emergency = await charge(keys.emergency,
-      route === "invited_family_interest" ? INVITATION_BUDGET : GLOBAL_EMERGENCY_BUDGET);
+      route === "invited_family_interest" ? INVITATION_BUDGET :
+        route === "interest_event" ? INVITATION_BUDGET : GLOBAL_EMERGENCY_BUDGET);
     if (!emergency.allowed || !keys.site) return emergency;
     return charge(keys.site,PER_SITE_BUDGET);
   });
@@ -221,6 +223,7 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
     const [batch] = await tx.select({
       programId: communicationThreads.contextId,
       metadata: communicationThreads.metadata,
+      createdAt: communicationThreads.createdAt,
     }).from(communicationThreads).where(and(
       eq(communicationThreads.id, data.invitationBatchId),
       eq(communicationThreads.contextType, "program"),
@@ -228,11 +231,14 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
     const metadata = familyInvitationBatchMetadataSchema.safeParse(batch?.metadata);
     if (!batch?.programId || !metadata.success ||
       metadata.data.destination !== "preopening_interest") {
-      throw new Error("This family information invitation is unavailable");
+      throw new AuthorizationError("pre-opening family invitation");
+    }
+    if (isFamilyInvitationExpired(batch.createdAt)) {
+      throw new AuthorizationError("unexpired pre-opening family invitation");
     }
     const recipient = metadata.data.recipients.find(row => row.key === data.invitationRecipientKey);
     if (!recipient || normalizeAccessEmail(recipient.email) !== normalizeAccessEmail(data.email)) {
-      throw new Error("This family information invitation is unavailable");
+      throw new AuthorizationError("intended pre-opening family recipient");
     }
     const [school] = await tx.select({
       siteId: sites.id, organizationId: sites.organizationId,
@@ -248,7 +254,7 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
       school.organizationId !== school.programOrganizationId ||
       !isAcademicMarketingType(school.type) ||
       !["draft", "launching", "ready", "active"].includes(school.status)) {
-      throw new Error("This family information invitation is unavailable");
+      throw new AuthorizationError("available pre-opening family Program");
     }
     const digest = createHmac("sha256", pepper)
       .update(school.siteId).update(":").update(batch.programId)

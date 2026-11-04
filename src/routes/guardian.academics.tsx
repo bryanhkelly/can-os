@@ -62,9 +62,9 @@ function GuardianAcademicsPage() {
  const visible=classAssignments.filter(item=>!assessment||item.assessmentId===assessment);
  const summary = guardianAssignmentSummary(visible, new Date());
 
- return <WorkspaceShell width="wide" eyebrow="CAN OS · Guardian" title="Academic progress"
+ return <WorkspaceShell width="wide" eyebrow="Guardian" title="Academic progress"
   subtitle="Review your children's class assignments, instructions and released teacher feedback."
-  breadcrumbs={<><Link to="/guardian" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
+  breadcrumbs={<><Link to="/home" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
   actions={<Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>}>
    {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
     Student
@@ -81,7 +81,7 @@ function GuardianAcademicsPage() {
      Your family home lists current admissions and enrollment steps by child and stage. Open your child's item there to continue a form. If your child is already enrolled but missing from academics, contact the school.
     </p>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
-     <Link to="/guardian" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Family home and enrollment steps</Link>
+     <Link to="/home" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Family home and enrollment steps</Link>
      <Link to="/messages" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Message the school</Link>
     </div>
    </div>}

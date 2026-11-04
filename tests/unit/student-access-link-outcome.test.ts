@@ -63,6 +63,7 @@ describe("student approval and sign-in request outcomes",()=>{
   expect(await provisionStudentLearningAccess({data:input})).toEqual({status:"approved",signInRequest:"requested"});
   expect(state.emit).toHaveBeenCalledTimes(1);
   expect(state.update).toHaveBeenCalledTimes(1);
+  expect(state.sender).toHaveBeenCalledWith("child@example.test",undefined,"/profiles");
  });
  it("keeps the saved approval when the link request throws",async()=>{
   state.sender.mockRejectedValue(new Error("provider unavailable"));
@@ -77,7 +78,7 @@ describe("student approval and sign-in request outcomes",()=>{
    .toEqual({status:"approved",signInRequest:"requested"});
   expect(state.emit).not.toHaveBeenCalled();
   expect(state.update).not.toHaveBeenCalled();
-  expect(state.sender).toHaveBeenCalledWith("child@example.test");
+  expect(state.sender).toHaveBeenCalledWith("child@example.test",undefined,"/profiles");
  });
  it("does not convert an identity collision into a delivery warning",async()=>{
   rows("pending_review",[{personId:"another-person",role:"student",isSynthetic:false}]);

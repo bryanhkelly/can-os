@@ -30,8 +30,7 @@ function ClassroomFrame({ children }: { children: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   return <div className={`classroom-navigation ${expanded ? "classroom-navigation-expanded" : ""}`}>
     <WorkspaceSidebar focused expanded={expanded} onToggle={() => setExpanded(value => !value)}
-      member={{ role: "student", firstName: "Jordan", lastName: "Learner", siteId: "fixture-school" }}
-      sites={[{ id: "fixture-school", name: "Synthetic acceptance school" }]} links={workspaceLinks.student} activePath="/classes"/>
+      member={{ role: "student" }} links={workspaceLinks.student} activePath="/classes"/>
     <div className="min-w-0">{children}</div>
   </div>;
 }
@@ -67,6 +66,8 @@ type Story = StoryObj<typeof meta>;
 export const Lesson: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const sidebar = canvas.getByRole("complementary", { name: "Workspace sidebar" });
+    await expect(sidebar).not.toHaveTextContent("Jordan Learner");
     await expect(canvas.getByRole("heading", { level: 1, name: "Algebra II" })).toBeVisible();
     await expect(canvas.getByRole("heading", { level: 2, name: lesson.title })).toBeVisible();
   },

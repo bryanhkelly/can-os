@@ -31,7 +31,7 @@ beforeEach(()=>{
 });
 describe("guardian grade Action notification destinations",()=>{
   it("routes the delegated CAN teacher to the exact guardian Action",async()=>{
-    await expect(getNotifications()).resolves.toMatchObject([{href:"/teacher?gradeAction=action"}]);
+    await expect(getNotifications()).resolves.toMatchObject([{href:"/home?gradeAction=action"}]);
   });
   it("removes the teacher destination after Section authority is lost",async()=>{
     state.classes.mockResolvedValue([]);

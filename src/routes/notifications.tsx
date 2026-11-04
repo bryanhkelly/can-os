@@ -1,8 +1,9 @@
+import { MutationFeedback, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { NotificationFeed } from "@/components/communication/NotificationFeed";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {useRef,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getNotifications,readNotification,readAllNotifications,setNotificationStatus} from "@/modules/communication/notification-center.functions";
-import {groupNotices} from "@/domain/notification-center";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {z} from "zod";
@@ -24,7 +25,7 @@ export const Route=createFileRoute("/notifications")({
 function NotificationsPage(){
  const outcome=Route.useLoaderData();
  const {deliveryCursor}=Route.useSearch();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Notifications" title="Notification center" outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Notifications" title="Notification center" outcome={outcome}/>;
  return <NotificationsView key={deliveryCursor??"latest"} notices={outcome.data.notices} history={outcome.data.history}/>;
 }
 function NotificationsView({notices,history}:Awaited<ReturnType<typeof loadNotifications>>){
@@ -36,7 +37,7 @@ function NotificationsView({notices,history}:Awaited<ReturnType<typeof loadNotif
  const [refreshing,setRefreshing]=useState(false);
  const [refreshedHistory,setRefreshedHistory]=useState<{source:typeof history;outcome:typeof history}|null>(null);
  const currentHistory=refreshedHistory&&refreshedHistory.source===history?refreshedHistory.outcome:history;
- const center=groupNotices(notification?notices.filter(item=>item.id===notification):notices);
+ const visible=notification?notices.filter(item=>item.id===notification):notices;
  async function markRead(id:string){
   await feedback.run(()=>readNotification({data:{id}}),{successMessage:"Notification marked as read.",commandErrorMessage:"Unable to update notification."});
  }
@@ -54,18 +55,18 @@ function NotificationsView({notices,history}:Awaited<ReturnType<typeof loadNotif
    setRefreshedHistory({source:history,outcome});
   }finally{refreshingHistory.current=false;setRefreshing(false);}
  }
- return <main className="mx-auto max-w-4xl px-5 py-10">
- <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Notifications</p>
- <h1 className="mt-2 font-serif text-4xl">Notification center</h1>
- <p className="mt-3 text-sm text-muted-foreground">Updates stay linked to their related records. Changes to notification status persist in your account.</p>
+ return <WorkspaceShell width="wide" eyebrow="Communication / Activity center" title="Notifications" subtitle="Relevant academic, operational, and communication updates, with a clear path to the next action.">
  {notification&&<Link to="/notifications" className="mt-4 inline-block text-sm underline">View all notifications</Link>}
- {notification&&!notices.some(item=>item.id===notification)&&<p role="alert" className="mt-4 rounded-xl border p-4">This notification is unavailable in your current account.</p>}
- {feedback.notice&&<p role="status" className="mt-4 text-sm">{feedback.notice}</p>}
- {feedback.error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3 text-sm">{feedback.error}</p>}
- {feedback.refreshFailed&&<button type="button" disabled={feedback.pending} onClick={()=>void feedback.retryRefresh()} className="mt-3 rounded-lg border px-3 py-2 text-sm">Refresh saved notifications</button>}
- <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border bg-card p-4"><span className="font-semibold">Unread notifications: {center.unreadCount}</span><button type="button" disabled={!center.unreadCount||busy} onClick={markAllRead} className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">{feedback.pending?"Saving…":"Mark all as read"}</button></div>
- {([{label:"Needs attention",items:center.unread},{label:"Earlier updates",items:center.earlier}] as const).map(section=><section key={section.label} className="mt-8"><h2 className="font-serif text-2xl">{section.label}</h2>
- <div className="mt-4 space-y-3">{section.items.map(n=><article key={n.id} className="rounded-xl border bg-card p-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{n.href?<Link to={n.href} href={n.href} className="hover:underline">{n.title}</Link>:n.title}</p><time className="text-xs text-muted-foreground">{new Date(n.date).toLocaleDateString()}</time></div><p className="mt-2 text-sm text-muted-foreground">{n.body}</p><div className="mt-3 flex flex-wrap items-center gap-4">{n.href?<Link to={n.href} href={n.href} className="text-xs font-semibold underline">Open related record →</Link>:<span className="text-xs text-muted-foreground">No supported deep link for this update.</span>}{n.status!=="unread"&&<button type="button" disabled={busy} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>changeStatus(n.id,"unread")}>Mark unread</button>}{n.status!=="dismissed"&&<button type="button" disabled={busy} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>changeStatus(n.id,"dismissed")}>Dismiss</button>}{n.status==="unread"&&<button type="button" disabled={busy} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>markRead(n.id)}>{feedback.pending?"Saving…":"Mark as read"}</button>}</div></article>)}{!section.items.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">Nothing here yet.</p>}</div></section>)}
+ {notification&&!notices.some(item=>item.id===notification)&&<WorkspaceNotice tone="danger" className="mt-4">This notification is unavailable in your current account.</WorkspaceNotice>}
+ <MutationFeedback state={feedback} pendingMessage="Updating notifications..." className="mt-4"/>
+ <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+ <NotificationFeed notices={visible} busy={busy} onReadAll={()=>void markAllRead()}
+ onStatus={(id,status)=>void(status==="read"?markRead(id):changeStatus(id,status))}/>
+ <WorkspacePanel title="Your updates" description="Connected to your signed-in account">
+ <p className="text-sm leading-relaxed text-muted-foreground">Open the bell in the top bar from any workspace to check updates. Notification status is saved to your account, and related records retain their own access checks.</p>
+ <p className="mt-4 text-sm leading-relaxed text-muted-foreground">Dismissed updates remain available in this center. Delivery history below reports delivery attempts separately from read status.</p>
+ </WorkspacePanel>
+ </div>
  <DeliveryHistory history={currentHistory.ok?currentHistory.data:null} cursor={deliveryCursor} notification={notification} refreshing={refreshing} onRefresh={()=>void refreshHistory()}/>
- </main>;
+ </WorkspaceShell>;
 }

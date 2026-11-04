@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
-import { demoRegistrar as fixture, demoRegistrarInstitutionalCapabilities, provisionDemoRegistrar, provisionDemoSchoolAccess } from "@/modules/_demo/provision-demo-registrar";
-import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { demoRegistrar as fixture, demoRegistrarInstitutionalCapabilities, provisionDemoRegistrar, provisionDemoRoomFacilitator, provisionDemoSchoolAccess } from "@/modules/_demo/provision-demo-registrar";
+import { LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
 import * as s from "@/db/schema";
 import * as mutation from "@/platform/mutation";
 
@@ -19,6 +19,76 @@ const env = { NODE_ENV: "test", CAN_DEMO_FIXED_ACCESS_ENABLED: "true" };
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("local demo school registrar", () => {
+  it("provisions a separate Valor room facilitator idempotently with restricted ordinary staff authority", async () => {
+    const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-valor-room-facilitator");
+    const facilitator = LOCAL_DEMO_ROOM_FACILITATOR;
+    let checked = false;
+    try {
+      await database.transaction(async tx => {
+        state.tx = tx;
+        await tx.insert(s.organizations).values({
+          id: fixture.organizationId, type: "christian_school", name: "Synthetic demo school",
+          slug: "synthetic-demo-registrar", metadata: { synthetic: true },
+        }).onConflictDoNothing();
+        await tx.insert(s.sites).values({
+          id: fixture.siteId, organizationId: fixture.organizationId, name: "Synthetic demo site",
+          slug: "synthetic-demo-registrar", metadata: { synthetic: true },
+        }).onConflictDoNothing();
+        await expect(provisionDemoRoomFacilitator(tx, { ...env, NODE_ENV: "production" })).rejects.toThrow("local/test");
+        await expect(provisionDemoRoomFacilitator(tx, { ...env, CAN_DEMO_FIXED_ACCESS_ENABLED: "false" })).rejects.toThrow("local/test");
+        expect((await provisionDemoRoomFacilitator(tx, env)).changes).toContain("access_grant");
+        expect((await provisionDemoRoomFacilitator(tx, env)).changes).toEqual([]);
+        const [person] = await tx.select().from(s.people).where(eq(s.people.id, facilitator.personId));
+        expect(person).toMatchObject({ legalFirstName: "Sally", legalLastName: "Demo" });
+        const [role] = await tx.select().from(s.roleAssignments).where(eq(s.roleAssignments.id, facilitator.roleAssignmentId));
+        expect(role).toMatchObject({ roleKey: "room_facilitator", siteId: fixture.siteId, programId: null });
+        expect(role?.capabilities).toContain("onsite.attendance.record");
+        for (const forbidden of ["admin.manage", "assignments:grade", "incident.read", "enrollment.activate"])
+          expect(role?.capabilities).not.toContain(forbidden);
+        const events = await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId, facilitator.personId),
+          eq(s.domainEvents.eventType, "DemoRoomFacilitatorProvisioned")));
+        expect(events).toHaveLength(1);
+        const audits = await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId, facilitator.personId),
+          eq(s.auditEvents.action, "demo.room_facilitator.provision")));
+        expect(audits).toHaveLength(1);
+        const { redeemDemoAccess } = await import("@/modules/identity/passwordless-access.server");
+        const { getCommandContext } = await import("@/modules/identity/command-context.server");
+        vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "valor-room-facilitator-isolated-session-pepper");
+        const login = await redeemDemoAccess(facilitator.email, "000000");
+        const actor = await getCommandContext(new Request("http://localhost", {
+          headers: { cookie: login.setCookie.split(";")[0]! },
+        }));
+        expect(actor.role).toBe("room_facilitator");
+        expect(actor.grantSiteId).toBe(fixture.siteId);
+        expect(actor.sessionAccountId).toBeUndefined();
+        expect(actor.capabilities.has("admin.manage")).toBe(false);
+        const [account] = await tx.select().from(s.accessAccounts).where(eq(s.accessAccounts.id, facilitator.accountId));
+        expect(account?.emailVerifiedAt).toBeNull();
+        await tx.update(s.accountPersonGrants).set({ active: false }).where(eq(s.accountPersonGrants.id, facilitator.grantId));
+        await expect(provisionDemoRoomFacilitator(tx, env)).rejects.toThrow("access grants conflict");
+        await expect(redeemDemoAccess(facilitator.email, "000000")).rejects.toThrow("Invalid demo credentials");
+        await tx.update(s.accountPersonGrants).set({ active: true }).where(eq(s.accountPersonGrants.id, facilitator.grantId));
+        await tx.update(s.accessAccounts).set({ disabled: true }).where(eq(s.accessAccounts.id, facilitator.accountId));
+        await expect(provisionDemoRoomFacilitator(tx, env)).rejects.toThrow("disabled account");
+        await tx.update(s.accessAccounts).set({ disabled: false }).where(eq(s.accessAccounts.id, facilitator.accountId));
+        await tx.update(s.roleAssignments).set({ capabilities: ["admin.manage"] })
+          .where(eq(s.roleAssignments.id, facilitator.roleAssignmentId));
+        await expect(provisionDemoRoomFacilitator(tx, env)).rejects.toThrow("conflicting authority");
+        checked = true;
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    } finally {
+      state.tx = undefined;
+      vi.unstubAllEnvs();
+    }
+    expect(checked).toBe(true);
+  }, 120_000);
+
   it("provisions scoped authority idempotently, signs in normally and fails closed", async () => {
     const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
     const rollback = new Error("rollback-demo-registrar");
@@ -137,7 +207,8 @@ integration("local demo school registrar", () => {
         }).onConflictDoNothing();
         await provisionDemoRegistrar(tx, env);
         for (const account of LOCAL_DEMO_ACCOUNTS.filter(account =>
-          account.email !== LOCAL_DEMO_ADMIN.email && account.email !== fixture.email)) {
+          account.email !== LOCAL_DEMO_ADMIN.email && account.email !== fixture.email &&
+          account.email !== LOCAL_DEMO_ROOM_FACILITATOR.email)) {
           const [existing] = await tx.select().from(s.accessAccounts).where(eq(s.accessAccounts.emailNormalized, account.email));
           if (existing) continue;
           const [person] = await tx.insert(s.people).values({

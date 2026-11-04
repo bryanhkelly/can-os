@@ -1,6 +1,7 @@
 import * as React from "react";
 import { CircleCheck, CircleDot, Circle, CircleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageEyebrow, PageTitle } from "@/components/workspace/page-frame";
 
 /**
  * A reusable user/workflow flow template for admissions, site setup, approvals,
@@ -68,8 +69,8 @@ export function WorkflowWorkspace({ eyebrow, title, description, status, identit
   return <article aria-labelledby={titleId} className={cn("min-w-0 space-y-5", className)}>
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
       <div className="min-w-0">
-        {eyebrow && <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>}
-        <h1 id={titleId} className="font-serif text-4xl font-normal leading-tight tracking-normal">{title}</h1>
+        {eyebrow && <PageEyebrow className="mb-2">{eyebrow}</PageEyebrow>}
+        <PageTitle id={titleId}>{title}</PageTitle>
         {description && <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</div>}
         {identity && <div className="mt-3 text-xs text-muted-foreground">{identity}</div>}
       </div>

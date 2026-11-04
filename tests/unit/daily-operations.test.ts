@@ -101,7 +101,7 @@ describe("daily operations attention", () => {
       ownerName: "Alex Operator",
       dueAt: "2026-10-29T12:00:00.000Z",
       nextStep: "Review the named handoff",
-      href: "/operations?siteId=site-1&programId=program-1&action=opening",
+      href: "/home?siteId=site-1&programId=program-1&action=opening",
     });
     expect(items.find(item => item.id === "documents:program-1")?.nextStep)
       .toBe("Review enrollment requirements");
@@ -230,7 +230,7 @@ describe("role-scoped attention adapters", () => {
       type: "study_group_consent",
       title: "Study group permission",
       detail: "Review the request.",
-      href: "/guardian?action=consent-1",
+      href: "/home?action=consent-1",
       priority: "urgent",
       dueAt: "2026-10-29T10:00:00.000Z",
     }, {

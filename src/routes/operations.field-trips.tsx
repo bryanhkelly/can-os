@@ -29,7 +29,7 @@ type Trip = Data["trips"][number];
 function FieldTripOperations() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) {
-    return <LoaderFailure eyebrow="CAN OS · Operations" title="Field trips" outcome={outcome} />;
+    return <LoaderFailure eyebrow="Operations" title="Field trips" outcome={outcome} />;
   }
   return <FieldTripOperationsView data={outcome.data} />;
 }
@@ -59,11 +59,11 @@ function FieldTripOperationsView({ data }: { data: Data }) {
   }
 
   return (
-    <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Field trips"
+    <WorkspaceShell eyebrow="Academic operations" title="Field trips"
       subtitle="Plan school trips, publish the school's permission language, invite actively enrolled students, and track signed permissions."
       actions={<div className="flex flex-wrap gap-2">
         <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
-        <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+        <Link to="/home" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}>
       <div className="mt-5"><MutationFeedback state={mutation} pendingMessage="Saving field trip change..."/></div>
       <section className="mt-7 rounded-xl border bg-card p-5">

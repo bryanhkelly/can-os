@@ -22,7 +22,7 @@ type Trip = Awaited<ReturnType<typeof listGuardianFieldTripPermissions>>[number]
 function GuardianTrips() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) {
-    return <LoaderFailure eyebrow="CAN OS · Family" title="Field trip permissions" outcome={outcome} />;
+    return <LoaderFailure eyebrow="Family" title="Field trip permissions" outcome={outcome} />;
   }
   return <TripPermissions items={outcome.data} />;
 }
@@ -63,10 +63,10 @@ function TripPermissions({ items }: { items: Trip[] }) {
   }).format(cents / 100);
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Family"
+      eyebrow="Family"
       title="Field trip permissions"
       subtitle="Review published school permission language and respond to invitations for your children. Permission and fees are separate steps."
-      actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
+      actions={<Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
       <div className="mt-7 space-y-4">

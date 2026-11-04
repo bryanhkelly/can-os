@@ -1,6 +1,6 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
@@ -13,16 +13,12 @@ import {
   listNetworkAgreementDesk, provisionDenominationHQOfficer, verifyNetworkAgreement,
 } from "@/modules/networks/network-steward.functions";
 
-export const Route = createFileRoute("/network-steward")({
-  loader: safeLoader(() => listNetworkAgreementDesk(), {
-    authMessage: "This workspace requires an authorized CAN network steward membership.",
-  }),
-  component: CANPartnerDesk,
+export const loadStewardHome = safeLoader(() => listNetworkAgreementDesk(), {
+  authMessage: "This workspace requires an authorized CAN network steward membership.",
 });
 
-function CANPartnerDesk() {
-  const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · CAN" title="Partner contracts" outcome={outcome} />;
+export function CANPartnerDesk({ outcome }: { outcome: Awaited<ReturnType<typeof loadStewardHome>> }) {
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN" title="Partner contracts" outcome={outcome} />;
   return <StewardPanel data={outcome.data} />;
 }
 
@@ -61,7 +57,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
       commandErrorMessage: "Unable to provision HQ officer." });
   };
   const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
-  return <DashboardHome eyebrow="CAN OS · Network partnerships" title="Church onboarding and partner contracts"
+  return <DashboardHome eyebrow="Church onboarding and partner contracts"
     subtitle="Review new church requests, verify church authority, invite leaders, and manage partner contracts. School opening remains separately authorized."
     shortcuts={<>
       <DashboardShortcut title="Church applications" description="Review partner requests" icon={<Building2 className="size-5" />}><a href="#steward-applications" /></DashboardShortcut>

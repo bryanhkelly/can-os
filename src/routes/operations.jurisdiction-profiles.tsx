@@ -27,8 +27,8 @@ function utcIsoValue(value:string){
 }
 function ReviewPage(){
  const result=Route.useLoaderData();
- if(!result.ok)return <LoaderFailure title="Jurisdiction profiles" eyebrow="CAN OS · Policy review" outcome={result}/>;
- return <WorkspaceShell eyebrow="CAN OS · Policy review" title="Jurisdiction profiles"
+ if(!result.ok)return <LoaderFailure title="Jurisdiction profiles" eyebrow="Policy review" outcome={result}/>;
+ return <WorkspaceShell eyebrow="Policy review" title="Jurisdiction profiles"
   subtitle="Review state operating models, funding, requirements and official sources before publishing guidance. Publication does not authorize a school to open.">
   <div className="space-y-5">
    {result.data.length===0

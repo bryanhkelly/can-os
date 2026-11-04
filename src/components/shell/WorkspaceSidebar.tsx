@@ -3,9 +3,8 @@ import { useSyncExternalStore } from "react";
 import { PanelLeftClose, PanelLeftOpen, Settings, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { getWorkspaceHome, type WorkspaceNavigationItem } from "./workspace-navigation.registry";
+import { type WorkspaceNavigationItem } from "./workspace-navigation.registry";
 import { SidebarLinks } from "./WorkspaceSidebarLinks";
-import { getWorkspaceScopeLabel } from "./workspace-scope";
 
 const mobileQuery = "(max-width: 1023px)";
 function subscribeMobile(onChange: () => void) {
@@ -16,8 +15,7 @@ function subscribeMobile(onChange: () => void) {
 const isMobile = () => window.matchMedia(mobileQuery).matches;
 
 type WorkspaceSidebarProps = {
-  member: { role: string; firstName: string; lastName: string; siteId: string | null };
-  sites: readonly { id: string; name: string }[];
+  member: { role: string };
   links: readonly WorkspaceNavigationItem[];
   activePath?: string;
   focused?: boolean;
@@ -26,15 +24,17 @@ type WorkspaceSidebarProps = {
 };
 
 export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
-  return props.focused ? <FocusedWorkspaceSidebar {...props}/> : <ExpandedWorkspaceSidebar {...props}/>;
+  return props.focused
+    ? <FocusedWorkspaceSidebar {...props}/>
+    : <ExpandedWorkspaceSidebar {...props}/>;
 }
 
-function FocusedWorkspaceSidebar({ member, sites, links, activePath, expanded = false, onToggle }: WorkspaceSidebarProps) {
+function FocusedWorkspaceSidebar({ links, activePath, expanded = false, onToggle }: WorkspaceSidebarProps) {
   const mobile = useSyncExternalStore(subscribeMobile, isMobile, () => false);
   return <>
     <aside aria-label="Workspace sidebar" className={`classroom-sidebar ${expanded ? "classroom-sidebar-expanded" : ""} border-r bg-card`}>
-      <div className="flex flex-col items-center gap-3 border-b px-2 py-4">
-        <Link to={member.role === "student" ? "/" : getWorkspaceHome(member.role) ?? "/"} aria-label="CAN OS home" className="font-serif text-xl font-semibold">
+      <div className="can-shell-bar flex h-[var(--topbar-height)] flex-col items-center justify-center gap-1 border-b px-2">
+        <Link to="/home" activeOptions={{ exact: true }} aria-label="CAN OS home" className="font-serif text-xl font-semibold">
           {expanded && !mobile ? "CAN OS" : "C"}
         </Link>
         <Button variant="ghost" size="icon" onClick={onToggle} aria-label={expanded ? "Collapse workspace sidebar" : "Expand workspace sidebar"}
@@ -43,8 +43,6 @@ function FocusedWorkspaceSidebar({ member, sites, links, activePath, expanded = 
         </Button>
       </div>
       <div id="classroom-primary-links" className="flex min-h-0 flex-1 flex-col">
-        {expanded && <div className="hidden p-4 lg:block"><p className="text-sm font-semibold">{member.firstName} {member.lastName}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{getWorkspaceScopeLabel(member, sites)}</p></div>}
         <SidebarLinks links={links} activePath={activePath} collapsed={!expanded}/>
       </div>
       <Link to="/account/sessions" aria-label="Account sessions" title="Account sessions" className="flex justify-center border-t p-4 text-muted-foreground">
@@ -55,34 +53,42 @@ function FocusedWorkspaceSidebar({ member, sites, links, activePath, expanded = 
       className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-dvh w-[min(18rem,85vw)] rounded-none">
       <div className="flex items-center justify-between border-b p-4"><span className="font-serif text-xl">CAN OS</span>
         <Button variant="ghost" size="icon" onClick={onToggle} aria-label="Collapse workspace sidebar"><PanelLeftClose aria-hidden="true"/></Button></div>
-      <div className="p-4"><p className="font-semibold">{member.firstName} {member.lastName}</p>
-        <p className="text-xs text-muted-foreground">{getWorkspaceScopeLabel(member, sites)}</p></div>
       <div id="classroom-mobile-links"><SidebarLinks links={links} activePath={activePath} onNavigate={onToggle}/></div>
     </Modal>
   </>;
 }
 
-function ExpandedWorkspaceSidebar({ member, sites, links, activePath }: WorkspaceSidebarProps) {
+const footerLinkClass = "flex items-center gap-3 rounded-lg py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function ExpandedWorkspaceSidebar({ member, links, activePath, expanded = true, onToggle }: WorkspaceSidebarProps) {
+  const collapsed = !expanded;
+  const footer = (label: string) => ({
+    className: `${footerLinkClass} ${collapsed ? "justify-center px-1" : "px-3"}`,
+    title: collapsed ? label : undefined,
+  });
   return <aside aria-label="Workspace sidebar" className="hidden border-r bg-card lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-    <div className="border-b p-5">
-      <Link to={member.role==="student"?"/":getWorkspaceHome(member.role) ?? "/"} className="rounded-sm font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>
-      <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">Church Academy Network</p>
+    <div className={`can-shell-bar flex h-[var(--topbar-height)] items-center gap-2 border-b ${collapsed ? "justify-center px-2" : "pl-2 pr-3"}`}>
+      {onToggle && <Button variant="ghost" size="icon" onClick={onToggle} aria-expanded={expanded} aria-controls="workspace-primary-links"
+        aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} title={collapsed ? "Expand navigation" : "Collapse navigation"}>
+        {collapsed ? <PanelLeftOpen aria-hidden="true"/> : <PanelLeftClose aria-hidden="true"/>}
+      </Button>}
+      {!collapsed && <div className="flex min-w-0 flex-col justify-center">
+        <Link to="/" activeOptions={{ exact: true }} className="self-start rounded-sm font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>
+        <p className="mt-0.5 whitespace-nowrap text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Church Academy Network</p>
+      </div>}
     </div>
-    <div className="p-4">
-      <p className="text-xs uppercase tracking-widest text-muted-foreground">{member.role} workspace</p>
-      <p className="mt-2 text-sm font-semibold">{member.firstName} {member.lastName}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{getWorkspaceScopeLabel(member, sites)}</p>
+    <div id="workspace-primary-links" className={collapsed ? "pt-4" : undefined}>
+      <SidebarLinks links={links} activePath={activePath} collapsed={collapsed} />
     </div>
-    <SidebarLinks links={links} activePath={activePath} />
-    <div className="border-t p-4">
-      <Link to="/profiles" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-        <Users className="size-4" aria-hidden="true" />My profile
+    <div className="mt-auto border-t p-4">
+      <Link to="/profiles" {...footer("My profile")}>
+        <Users className="size-4" aria-hidden="true" /><span className={collapsed ? "sr-only" : "font-semibold"}>My profile</span>
       </Link>
-      <Link to="/account/sessions" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-        <Settings className="size-4" aria-hidden="true" />Account sessions
+      <Link to="/account/sessions" {...footer("Account sessions")}>
+        <Settings className="size-4" aria-hidden="true" /><span className={collapsed ? "sr-only" : undefined}>Account sessions</span>
       </Link>
-      {member.role === "student" && <Link to="/student/settings" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-        <Settings className="size-4" aria-hidden="true" />Preferences
+      {member.role === "student" && <Link to="/student/settings" {...footer("Preferences")}>
+        <Settings className="size-4" aria-hidden="true" /><span className={collapsed ? "sr-only" : undefined}>Preferences</span>
       </Link>}
     </div>
   </aside>;

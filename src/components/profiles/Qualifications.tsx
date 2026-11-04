@@ -27,11 +27,12 @@ export function Qualifications({ personId, programId, onChanged }: Selection & {
     return () => { active = false; };
   }, [personId, programId, revision]);
   return <section className="mt-6 rounded-xl border bg-card p-5">
-    <h2 className="font-serif text-2xl">Qualification evidence</h2>
+    <h2 className="font-serif text-2xl">School compliance and qualification evidence</h2>
     <p className="mt-2 text-sm">Private credential records are separate from public profile information.
       Verification confirms evidence review, not program eligibility or legal authorization to teach.</p>
     <p className="mt-2 text-sm">Document resumes, degrees, licenses and other qualifications using the shared catalog.
       Each school chooses its required qualifications through program policy; submitting a resume does not verify a degree or license.</p>
+    <p className="mt-2 text-sm">Only upload identity documents such as a driver&apos;s license when your school requests them for an applicable role or requirement. They are private evidence, not general profile information.</p>
     <QueryState loading={!snapshot&&!error?"Loading qualification records...":undefined}
       error={error?<>{error} Review requires an independent, explicitly granted credential verifier in the teacher's institution.</>:undefined}
       onRetry={()=>setRevision(value=>value+1)}>

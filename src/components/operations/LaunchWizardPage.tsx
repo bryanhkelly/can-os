@@ -268,24 +268,18 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   if (authError || !options || !launches) {
     return (
-      <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            CAN OS · Program launch
-          </p>
-          <h1 className="mt-2 font-serif text-4xl">Host / program launch</h1>
+      <WorkspaceShell width="standard" eyebrow="Program launch" title="Host / program launch">
           <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">
             {authError || "Launch data is unavailable."}
           </p>
-        </div>
-      </main>
+      </WorkspaceShell>
     );
   }
 
   const selectionIssue=launchSiteSelectionIssue(selection,options.sites,[
     ...launches.launches,...(preparationPrograms??[]),
   ]);
-  if(selectionIssue)return <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch"
+  if(selectionIssue)return <WorkspaceShell width="wide" eyebrow="Program launch"
     title="School selection needs attention"
     subtitle="Your requested school context was not changed or replaced with another campus.">
     <p role="alert" className="rounded-lg border p-4 text-sm">
@@ -295,7 +289,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       {" "}Open a permitted school from Operations, or start a new setup without carrying over this link.
     </p>
     <div className="mt-4 flex flex-wrap gap-4 text-sm">
-      <Link to="/operations" className="underline">Return to Operations</Link>
+      <Link to="/home" className="underline">Return to Operations</Link>
       <Link to="/operations/launch" search={{}} className="underline">Start a new school setup</Link>
     </div>
   </WorkspaceShell>;
@@ -354,9 +348,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     : "#launch-requirements";
 
   return (
-    <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
+    <WorkspaceShell width="wide" eyebrow="Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
-      breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
+      breadcrumbs={<><Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Button asChild variant="outline" size="sm"><Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}}>Connected workflows</Link></Button>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
         {error && (
@@ -393,7 +387,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           </p>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {currentSchool?.status==="active"
-              ? <Link to="/operations" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
+              ? <Link to="/home" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
                   className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
               : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.requiresRegistrarReview
                 ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}

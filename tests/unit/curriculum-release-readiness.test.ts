@@ -38,8 +38,8 @@ describe("publisher release readiness mirrors mandatory publication contract",()
   expect(result.readyForPublisherPublication).toBe(true);
   expect(result.blockers).toEqual([]);
   expect(result.warnings).toEqual(expect.arrayContaining([
-   "1 lesson(s) have no standards references.",
-   "1 lesson(s) have no stated learning targets.",
+   "1 lesson has no standards references.",
+   "1 lesson has no stated learning targets.",
    "No protected teacher guide is configured for this course.",
   ]));
   expect(()=>assertPublishableCurriculum(content)).not.toThrow();

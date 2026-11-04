@@ -92,7 +92,7 @@ describe("authorized notification destinations",()=>{
     state.role="registrar";
     notification("action","assigned","operations_action_assigned");
     state.rows.actions=[{id:"assigned",siteId:"school",programId:"program"}];
-    expect((await getNotifications())[0]?.href).toBe("/operations?action=assigned");
+    expect((await getNotifications())[0]?.href).toBe("/home?action=assigned");
   });
   it("opens the exact permission action",async()=>{
     notification("action","consent","study_group_consent_requested");

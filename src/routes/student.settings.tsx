@@ -1,3 +1,4 @@
+import { WorkspaceShell } from "@/components/workspace";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
@@ -12,7 +13,7 @@ const loadStudentPreferences=()=>getSyntheticStudentPreferences();
 export const Route=createFileRoute("/student/settings")({loader:safeLoader(loadStudentPreferences,{authMessage:"Sign in with an authorized student account to view display settings."}),component:StudentSettings});
 function StudentSettings(){
  const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Student" title="Display settings" outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="Student" title="Display settings" outcome={outcome}/>;
  return <StudentSettingsView initial={outcome.data}/>;
 }
 function StudentSettingsView({initial}:{initial:Awaited<ReturnType<typeof loadStudentPreferences>>}){
@@ -32,10 +33,7 @@ function StudentSettingsView({initial}:{initial:Awaited<ReturnType<typeof loadSt
    commandErrorMessage:"Unable to save preferences. Please try again.",
   });
  }
- return <main className="mx-auto max-w-3xl px-5 py-10">
-  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Student</p>
-  <h1 className="mt-2 font-serif text-4xl">Display settings</h1>
-  <p className="mt-3 text-sm text-muted-foreground">Personalize your student workspace. Preferences belong to your student identity and apply after saving. The default section opens when you sign in or choose CAN OS home; Today and direct links still open their named page.</p>
+ return <WorkspaceShell width="reading" eyebrow="Student" title="Display settings" subtitle="Personalize your student workspace. Preferences belong to your student identity and apply after saving. The default section opens when you sign in or choose CAN OS home; Today and direct links still open their named page.">
   <fieldset disabled={busy} className="mt-7 space-y-5 rounded-xl border bg-card p-6">
    <legend className="sr-only">Student display preferences</legend>
    <label className="block text-sm font-medium">Layout density<select className="mt-2 block w-full rounded-lg border bg-background p-2" value={value.density} onChange={e=>patch({density:e.target.value as StudentDisplayPreferences["density"]})}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
@@ -45,5 +43,5 @@ function StudentSettingsView({initial}:{initial:Awaited<ReturnType<typeof loadSt
    <button type="button" disabled={busy} onClick={save} className="rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background">{busy?"Saving…":"Save preferences"}</button>
   </fieldset>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving preferences..."/>
- </main>;
+ </WorkspaceShell>;
 }

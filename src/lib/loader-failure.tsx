@@ -1,10 +1,9 @@
 import { useEffect, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
-import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { accessReturnToFromLocation } from "@/domain/access-navigation";
 import { LoaderErrorState, type LoaderErrorStateProps } from "./loader-error-state";
+import { hasPendingAccessReturn } from "./access-return-recovery";
 
 export interface LoaderFailureProps extends LoaderErrorStateProps {
   title: ReactNode;
@@ -15,20 +14,15 @@ export interface LoaderFailureProps extends LoaderErrorStateProps {
 function LoaderFailure({ title, eyebrow, ...state }: LoaderFailureProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { session } = useWorkspaceSession();
   const needsSignIn = state.outcome.kind === "authentication" ||
     (state.outcome.kind === undefined && Boolean(state.outcome.authError));
   const returnTo = accessReturnToFromLocation(location);
-  const workspaceHome = session?.authenticated ? getWorkspaceHome(session.role) : undefined;
-  const fallback = state.fallback ?? (state.outcome.kind === "authorization" && workspaceHome ? (
-    <>
-      {state.outcome.message}{" "}
-      <Link to={workspaceHome} className="font-semibold underline">Go to my workspace →</Link>
-    </>
+  const fallback = state.fallback ?? (state.outcome.kind === "authorization" ? (
+    <>{state.outcome.message}{" "}<Link to="/" className="font-semibold underline">Go home →</Link></>
   ) : undefined);
   // Stable dependencies prevent repeated redirects while the destination is loading.
   useEffect(() => {
-    if (needsSignIn && returnTo) void navigate({ to: "/access", search: { returnTo }, replace: true });
+    if (needsSignIn && returnTo && !hasPendingAccessReturn()) void navigate({ to: "/access", search: { returnTo }, replace: true });
   }, [navigate, needsSignIn, returnTo]);
   return (
     <WorkspaceShell eyebrow={eyebrow} title={title}>

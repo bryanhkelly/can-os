@@ -34,6 +34,19 @@ describe("visible staff onboarding readiness", () => {
     expect(staffOnboardingState({ ...accepted, active: false, invitationPending: true, emailVerified: false })).toMatchObject({
       status: "invited", accepted: false, nextAction: "accept_invitation",
     });
+
+  });
+
+  it("accepts a bound shared-code identity without claiming email ownership or safety clearance", () => {
+    expect(staffOnboardingState({
+      ...accepted, emailVerified: false, demoIdentityAccepted: true,
+    })).toMatchObject({ status: "needs_action", accepted: true, nextAction: "submit_qualifications" });
+    expect(staffOnboardingState({
+      ...accepted, emailVerified: false, demoIdentityAccepted: false,
+    })).toMatchObject({ status: "invited", accepted: false });
+    expect(staffOnboardingState({
+      ...accepted, emailVerified: false, demoIdentityAccepted: true, invitationPending: true,
+    })).toMatchObject({ status: "invited", accepted: false });
   });
 
   it("distinguishes accepted staff who still need evidence or independent review", () => {

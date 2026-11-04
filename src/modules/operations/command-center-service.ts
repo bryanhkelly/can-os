@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { actions, enrollments, instructionalCapacityReservations, programs, sectionCapacityDemands, sectionTeachers, sections } from "@/db/schema";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
+import { plural } from "@/lib/format";
 
 /** Live operational exceptions, not demo/synthetic fixture rows. */
 export async function getSchoolOperationsCommandCenter(context: CommandContext & { role?: string }) {
@@ -41,7 +42,7 @@ export async function getSchoolOperationsCommandCenter(context: CommandContext &
         description:`${demand.seats-(commitmentsBySection.get(section.id)??0)} instructional seats still need commitment.`});
     const queue=waitsBySection.get(section.id)??0;
     if(queue)issues.push({kind:"waitlist",sectionId:section.id,programId:section.programId,
-      title:section.title+" has a waitlist",description:`${queue} student(s) awaiting review or promotion.`});
+      title:section.title+" has a waitlist",description:`${plural(queue, "student")} awaiting review or promotion.`});
   }
   return {
     summary:{sections:accessible.filter(s=>s.active).length,unstaffed:issues.filter(x=>x.kind==="unstaffed").length,

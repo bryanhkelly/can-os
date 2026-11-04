@@ -12,7 +12,7 @@ const meta = {
   parameters: { layout: "fullscreen" },
   args: {
     title: "Your teaching day, Avery.",
-    eyebrow: "CAN OS · Teacher",
+    eyebrow: "Teacher",
     subtitle: "Your sections, grading queue, and missing work across your school today.",
     shortcuts: <>
       <DashboardShortcut title="My classes" description="Open assigned sections" icon={<BookOpen className="size-5" />}><a href="#classes" /></DashboardShortcut>
@@ -77,13 +77,13 @@ export const Teacher: Story = {
     await expect(canvas.getByRole("heading", { name: "Today's schedule" })).toBeVisible();
   },
 };
-export const Family: Story = { args: { title: "Family home", eyebrow: "CAN OS · Family",
+export const Family: Story = { args: { title: "Family home", eyebrow: "Family",
   subtitle: "Your children, enrollment steps, and school follow-ups in one place.",
   ...roleContent("Needs your attention", "Children & academics") } };
-export const Operations: Story = { args: { title: "Needs You", eyebrow: "CAN OS · School operations",
+export const Operations: Story = { args: { title: "Needs You", eyebrow: "School operations",
   subtitle: "Review actions and school launch readiness within your authorized scope.",
   ...roleContent("Action queue", "School launches") } };
-export const SiteLeader: Story = { args: { title: "Synthetic school", eyebrow: "CAN OS · Site Operations",
+export const SiteLeader: Story = { args: { title: "Synthetic school", eyebrow: "Site Operations",
   subtitle: "Opening decisions, staffing, student exceptions and school records.",
   ...roleContent("School operations", "Admissions"),
   priority: <WorkspaceNotice tone="danger">School opening is not currently authorized. Verify authority before receiving students.</WorkspaceNotice> },
@@ -95,19 +95,19 @@ export const SiteLeader: Story = { args: { title: "Synthetic school", eyebrow: "
     await expect(warning.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   },
 };
-export const OnsiteStaff: Story = { args: { title: "Site Today", eyebrow: "CAN OS · Onsite school",
+export const OnsiteStaff: Story = { args: { title: "Site Today", eyebrow: "Onsite school",
   subtitle: "Physical presence, staff coverage, verified pickup, and reconciliation.",
   ...roleContent("Staff coverage", "Attendance"),
   priority: <WorkspaceNotice tone="danger">Opening verification unavailable. Attendance does not authorize operation or student release.</WorkspaceNotice> } };
-export const Specialist: Story = { args: { title: "Specialist caseload", eyebrow: "CAN OS · Student support",
+export const Specialist: Story = { args: { title: "Specialist caseload", eyebrow: "Student support",
   subtitle: "Authorized referrals, support plans, insights and actions.",
   ...roleContent("Caseload", "Referrals & plans") } };
-export const Counselor: Story = { args: { title: "Counselor caseload", eyebrow: "CAN OS · Student support",
+export const Counselor: Story = { args: { title: "Counselor caseload", eyebrow: "Student support",
   subtitle: "Named-case support and school follow-ups.",
   ...roleContent("Caseload", "Referrals & plans") } };
-export const NetworkPartner: Story = { args: { title: "Synthetic denomination", eyebrow: "CAN OS · Network partner",
+export const NetworkPartner: Story = { args: { title: "Synthetic denomination", eyebrow: "Network partner",
   subtitle: "Affiliation does not grant access to student academic records.",
   ...roleContent("Affiliations", "Locations") } };
-export const NetworkSteward: Story = { args: { title: "Church onboarding and partner contracts", eyebrow: "CAN OS · Network partnerships",
+export const NetworkSteward: Story = { args: { title: "Church onboarding and partner contracts", eyebrow: "Network partnerships",
   subtitle: "Verify partner authority. School opening remains separately authorized.",
   ...roleContent("Church applications", "Contracts") } };

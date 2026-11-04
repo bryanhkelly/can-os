@@ -108,9 +108,9 @@ function GuardianEnrollmentChanges(){
      commandErrorMessage:"Could not request a receiving-school verification link."});
  }
  const visibleRequests=requests.filter(item=>!selected||item.studentPersonId===selected.split(":")[0]);
- return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment and family changes"
+ return <WorkspaceShell eyebrow="Family" title="Enrollment and family changes"
    subtitle="Request a withdrawal, transfer or family record correction from your current school. These requests go to the authorized school office; they never automatically remove a student, alter custody or issue a transcript."
-   actions={<Link to="/guardian" search={{student}} className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
+   actions={<Link to="/home" search={{student}} className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
   {loading&&<p className="mt-6" role="status">Checking verified family enrollment…</p>}
   {error&&<p className="mt-6 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
   <MutationFeedback state={mutation} className="mt-6" pendingMessage="Saving family request..."/>

@@ -22,7 +22,7 @@ export const Route = createFileRoute("/sites/$siteId/publish")({
 
 function SitePublishPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Site publishing"
+  if (!outcome.ok) return <LoaderFailure eyebrow="Site publishing"
     title="Public site setup" outcome={outcome}/>;
   return <DraftPublisher key={outcome.data.site.id} data={outcome.data}/>;
 }
@@ -105,9 +105,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     data.academicPrograms.some(program => program.marketing?.catalogEligible);
   const candidate = isPublicSiteSlug(slug)
     ? publicSiteHost(slug, data.publicSiteDomain) : null;
-  return <WorkspaceShell eyebrow="CAN OS · Site publishing" title={data.site.name + " · public site"}
+  return <WorkspaceShell eyebrow="Site publishing" title={data.site.name + " · public site"}
     subtitle="Reserve and publish your school address. Public hosting depends on separate DNS, TLS and deployment configuration."
-    breadcrumbs={<><Link to="/sites/$siteId" params={{ siteId: data.site.id }} className="underline">Site Today</Link><span>/</span><span>Public site</span></>}>
+    breadcrumbs={<><Link to="/sites/$siteId/profile" params={{ siteId: data.site.id }} className="underline">School profile</Link><span>/</span><span>Public site</span></>}>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving public site change..."/>
     <section className="mt-6 rounded-xl border bg-card p-5">

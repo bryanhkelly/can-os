@@ -16,7 +16,7 @@ export const Route=createFileRoute("/guardian/group-permissions")({
 });
 function GuardianConsents(){
  const data=Route.useLoaderData();
- if(!data.ok)return <LoaderFailure eyebrow="CAN OS · Family" title="Study group consent" outcome={data}/>;
+ if(!data.ok)return <LoaderFailure eyebrow="Family" title="Study group consent" outcome={data}/>;
  return <ConsentList items={data.data}/>;
 }
 function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>}){
@@ -35,12 +35,12 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
    },
   );
  }
- return <WorkspaceShell eyebrow="CAN OS · Family" title="Study group permissions"
+ return <WorkspaceShell eyebrow="Family" title="Study group permissions"
   subtitle="Decide whether your student may participate in a teacher-facilitated group. The facilitator must also approve membership."
   actions={<div className="flex flex-wrap gap-2">
    <Link to="/guardian/course-approvals" className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
    <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
-   <Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
+   <Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
   </div>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
   {action&&<Link to="/guardian/group-permissions" className="mt-4 inline-block text-sm underline">View all group permissions</Link>}

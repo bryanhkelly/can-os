@@ -84,7 +84,7 @@ function actionHref(action: DailyOperationsAction): string {
   if (action.siteId) query.set("siteId", action.siteId);
   if (action.programId) query.set("programId", action.programId);
   query.set("action", action.id);
-  return "/operations?" + query.toString();
+  return "/home?" + query.toString();
 }
 
 function actionAttention(action: DailyOperationsAction, role: "registrar" | "site_admin" | "site_leader"): DailyAttentionItem {
@@ -207,7 +207,7 @@ export function buildDailyOperationsAttention(input: {
       category: "academic",
       title: `${c.submittedWork} submission${c.submittedWork === 1 ? "" : "s"} awaiting grading · ${program.name}`,
       detail: "Assigned teachers can review this academic activity in their authorized gradebook.",
-      href: programHref("/operations", program),
+      href: programHref("/home", program),
       nextStep: "Review academic activity",
       ownerName: null,
       dueAt: null,
@@ -238,7 +238,7 @@ export function buildTeacherAttention(data: {
         category: "family" as const,
         title: "Guardian question: " + item.assessmentTitle,
         detail: item.studentName + " · a family is awaiting the school's response to released feedback",
-        href: "/teacher?gradeAction=" + encodeURIComponent(item.id) + "#grade-follow-ups",
+        href: "/home?gradeAction=" + encodeURIComponent(item.id) + "#grade-follow-ups",
         nextStep: "Respond to guardian",
         ownerName: "Teaching team",
         dueAt: null,

@@ -21,7 +21,7 @@ describe("createWatch event type validation", () => {
   it("rejects event types with no registered subscription policy", async () => {
     await expect(
       createWatch.execute(context, { studentProfileId: "s1", eventTypes: ["GradePosted"] }, tx),
-    ).rejects.toThrow("Unsupported watch event type(s): GradePosted");
+    ).rejects.toThrow("Unsupported watch event type: GradePosted");
     expect(academic.assertStudentAccess).not.toHaveBeenCalled();
   });
 

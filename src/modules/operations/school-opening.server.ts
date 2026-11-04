@@ -15,6 +15,7 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
 import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { matchesCurrentOpeningJurisdiction } from "@/domain/school-opening-jurisdiction-guard";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
 import {
   schoolOpeningEvidenceCategories, schoolOpeningEvidenceLabels, schoolOpeningEvidenceNextAction,
   schoolOpeningEvidenceStatus, type SchoolOpeningEvidenceCategory,
@@ -125,7 +126,7 @@ async function requireSchoolOpeningEvidence(tx:Reader, school:Awaited<ReturnType
       isNull(accountPersonGrants.siteId),
       eq(accountPersonGrants.active,true),
       eq(accessAccounts.disabled,false),eq(people.active,true),
-      sql`${accessAccounts.emailVerifiedAt} is not null`,
+      verifiedStaffIdentityPredicate(),
     ));
   const recognized=new Set(verified.map(person=>person.personId));
   if(!verifiers.every(id=>recognized.has(id)))
@@ -169,7 +170,7 @@ async function requireVerifiedChurchSiteDirector(
           sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
           eq(accountPersonGrants.active,true),
           eq(accessAccounts.disabled,false),eq(people.active,true),
-          sql`${accessAccounts.emailVerifiedAt} is not null`,
+          verifiedStaffIdentityPredicate(),
           sql`${programResponsibilityAssignments.effectiveFrom} <= ${now}`,
           sql`${programResponsibilityAssignments.effectiveThrough} > ${now}`,
         )).limit(1);

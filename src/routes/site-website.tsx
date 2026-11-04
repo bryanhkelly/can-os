@@ -20,28 +20,34 @@ import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteE
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
 const websiteSearchSchema=siteProgramSelectionSchema.extend({returnGrantId:optionalSearchString});
 
+export const loadWebsiteHome = (siteId?: string) => safeLoader(
+  () => getPartnerWebsitePreviewView({data:{siteId}}),
+  { authMessage: "This website preview requires a verified, Site-specific editor assignment." },
+)();
+
 export const Route = createFileRoute("/site-website")({
   validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;returnGrantId?:string}=>websiteSearchSchema.parse(search),
   loaderDeps:({search})=>({siteId:search.siteId}),
-  loader:({deps})=>safeLoader(
-    () => getPartnerWebsitePreviewView({data:{siteId:deps.siteId}}),
-    { authMessage: "This website preview requires a verified, Site-specific editor assignment." },
-  )(),
+  loader:({deps})=>loadWebsiteHome(deps.siteId),
   component: PartnerSiteWebsitePage,
 });
 
 function PartnerSiteWebsitePage() {
-  const outcome = Route.useLoaderData();
-  const selection=Route.useSearch();
+  return <WebsiteHome outcome={Route.useLoaderData()} selection={Route.useSearch()} />;
+}
+export function WebsiteHome({ outcome, selection }: {
+  outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
+  selection: { siteId?: string; programId?: string; returnGrantId?: string };
+}) {
   const [step, setStep] = useState(0);
   const returnToLaunch=selection.siteId&&selection.programId&&selection.returnGrantId
     ?<LaunchWebsiteEditorHandoff siteId={selection.siteId} programId={selection.programId} returnGrantId={selection.returnGrantId} destination="launch"/>:null;
-  if (!outcome.ok) return <>{returnToLaunch}<LoaderFailure eyebrow="CAN OS · Partner website"
+  if (!outcome.ok) return <>{returnToLaunch}<LoaderFailure eyebrow="Partner website"
     title="Your Site website" outcome={outcome} /></>;
 
   const data = outcome.data;
   return <WorkspaceShell
-    eyebrow="CAN OS · Church partner website"
+    eyebrow="Church partner website"
     title={data.siteName + " · church website"}
     subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"} actions={returnToLaunch}>
     <GuidedSetupShell

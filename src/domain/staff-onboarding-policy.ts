@@ -43,6 +43,7 @@ export function staffOnboardingState(input: {
   active: boolean;
   invitationPending: boolean;
   emailVerified: boolean;
+  demoIdentityAccepted?: boolean;
   role: string;
   screeningCurrent: boolean;
   trainingCurrent: boolean;
@@ -51,7 +52,7 @@ export function staffOnboardingState(input: {
   if (!input.active && !input.invitationPending) {
     return { status: "inactive", accepted: false, qualificationStatus: "not_required", nextAction: "restore_access" };
   }
-  if (input.invitationPending || !input.emailVerified) {
+  if (input.invitationPending || (!input.emailVerified && !input.demoIdentityAccepted)) {
     return { status: "invited", accepted: false, qualificationStatus: onsiteCredentialRoles.has(input.role) ? "pending" : "not_required", nextAction: "accept_invitation" };
   }
   if (!onsiteCredentialRoles.has(input.role)) {

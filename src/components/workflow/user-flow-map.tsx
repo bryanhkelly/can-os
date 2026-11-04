@@ -59,7 +59,7 @@ export function UserFlowMap({ title, description, stages, transitions, legend, c
     <ol className="grid min-w-0 gap-4 lg:grid-cols-3">
       {stages.map((stage, stageIndex) => <li key={stage.id} className="min-w-0 border border-border bg-card">
         <header className="border-b border-border bg-muted/30 px-4 py-3">
-          <div className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">Stage {stageIndex + 1}</div>
+          <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground">Stage {stageIndex + 1}</div>
           <h3 className="mt-1 text-sm font-semibold">{stage.title}</h3>
           {stage.description && <p className="mt-1 text-xs text-muted-foreground">{stage.description}</p>}
         </header>
@@ -68,7 +68,7 @@ export function UserFlowMap({ title, description, stages, transitions, legend, c
             node.state === "blocked" ? "border-l-danger" :
             node.state === "active" ? "border-l-primary" :
             node.state === "complete" ? "border-l-success" : "border-l-transparent")}>
-            <div className="flex items-center justify-between gap-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 text-3xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{kinds[node.kind]}</span>
               {node.state && <span>{states[node.state]}</span>}
             </div>

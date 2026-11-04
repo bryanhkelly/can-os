@@ -105,7 +105,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
 
   await withAuthenticatedPage(browser, fixture.specialistSecret, async specialist => {
     await test.step("specialist caseload receives the intervention insight", async () => {
-      await specialist.page.goto("/coach");
+      await specialist.page.goto("/home");
       await expect(
         specialist.page.getByRole("heading", { name: "Caseload" }),
       ).toBeVisible();

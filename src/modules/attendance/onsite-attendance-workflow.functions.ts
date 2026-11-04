@@ -12,9 +12,10 @@ import {
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import { assertOnsiteAttendanceScope, assertOnsiteStaffSite, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
 import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "@/modules/operations/site-local-delegation.server";
 import { activeFacilitatorSectionIds, requireCurrentSectionFacilitator } from "@/modules/operations/site-section-facilitators.server";
+import { siteUsesRoomCoverage } from "@/modules/operations/room-coverage.server";
 import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -59,7 +60,7 @@ async function guardian() {
   return actor;
 }
 
-async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string, preparation=false) {
+async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string, preparation=false, date?: string) {
   // The inner join on sites guarantees a non-null site for every row.
   const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
@@ -99,8 +100,9 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
     try {
       if (actor.role === "site_leader") {
         await requireCurrentSiteLocalDelegate(db, actor, program.id, "site_director");
-      } else if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
-        const sections = await activeFacilitatorSectionIds(db, actor, program.id);
+      } else if (await requiresIndependentChurchLocalDelegation(db, program.id) ||
+          await siteUsesRoomCoverage(db, program.siteId)) {
+        const sections = await activeFacilitatorSectionIds(db, actor, program.id, date);
         if (!sections.length) continue;
       }
       delegated.push(program);
@@ -114,7 +116,7 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
 /** One server-authorized program/student/date entitlement, used for reads and writes. */
 async function resolveExpectedRoster(actor: AccessContext,
   date: string, programId?: string, studentId?: string, siteId?: string, preparation=false) {
-  const programsAtSite = await scopedOnsitePrograms(actor, programId, siteId, preparation);
+  const programsAtSite = await scopedOnsitePrograms(actor, programId, siteId, preparation, date);
   const expectedIds = new Map<string, Set<string>>();
   const coverage = await loadExpectedAttendanceCoverage(programsAtSite, [], new Date(), 1,
     { date, studentIds: expectedIds });
@@ -138,8 +140,9 @@ async function resolveExpectedRoster(actor: AccessContext,
   const sectionFilter = new Set<string>();
   if (actor.role === "room_facilitator") {
     for (const program of activePrograms) {
-      if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
-        for (const id of await activeFacilitatorSectionIds(db, actor, program.id))
+      if (await requiresIndependentChurchLocalDelegation(db, program.id) ||
+          await siteUsesRoomCoverage(db, program.siteId)) {
+        for (const id of await activeFacilitatorSectionIds(db, actor, program.id, date))
           sectionFilter.add(id);
       } else {
         // Existing non-independent sites continue using established staff grants.
@@ -265,7 +268,7 @@ export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
   .handler(async () => {
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
-    assertOnsiteAttendanceScope(actor);
+    assertOnsiteStaffSite(actor);
     const [site] = await db.select({
       id: sites.id, name: sites.name, timezone: sites.timezone,
       organizationId: sites.organizationId,
@@ -274,6 +277,8 @@ export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
       throw new AuthorizationError("site day organization and site match");
     return {
       siteId: site.id, siteName: site.name, timeZone: site.timezone,
+      hasPrograms: !!actor.scope.programIds?.length,
+      canViewRoomCoverage: actor.role === "room_facilitator",
       date: siteDate(new Date(), site.timezone),
       canPrepareSchoolDays:actor.role==="site_leader"&&!actor.sessionAccountId,
       preparationThrough:addCalendarDays(siteDate(new Date(),site.timezone),30),
@@ -438,7 +443,7 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await staff("attendance.write");
-    const [program] = await scopedOnsitePrograms(actor, data.programId);
+    const [program] = await scopedOnsitePrograms(actor, data.programId, undefined, false, data.date);
     if (!program) throw new AuthorizationError("attendance program scope");
     if (data.date > siteDate(new Date(), program.timezone))
       throw new Error("Future attendance dates cannot be marked");
@@ -459,9 +464,10 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
       if (isOnsiteAttendanceRole(actor.role)) {
         assertOnsiteAttendanceScope(actor, program.siteId);
         if (actor.role === "room_facilitator" &&
-            await requiresIndependentChurchLocalDelegation(db, program.id)) {
+            (await requiresIndependentChurchLocalDelegation(db, program.id) ||
+              await siteUsesRoomCoverage(db, program.siteId))) {
           if (!replay.sectionId) throw new AuthorizationError("replay requires a named Section");
-          await requireCurrentSectionFacilitator(db, actor, program.id, replay.sectionId);
+          await requireCurrentSectionFacilitator(db, actor, program.id, replay.sectionId, data.date);
         }
       }
       if (actor.role === "teacher") {

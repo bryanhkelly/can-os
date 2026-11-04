@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { getStudent360 } from "@/modules/profiles/directory.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
+import { plural } from "@/lib/format";
 
 const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
 type ProfileTab = (typeof tabs)[number];
@@ -35,7 +36,7 @@ function Student360Page({ personId }: { personId: string }) {
   }, [personId]);
   const { tab = "overview" } = Route.useSearch();
   if (profile) return <Student360View profile={profile} tab={tab}/>;
-  return <WorkspaceShell eyebrow="CAN OS · Staff" title="Student profile">
+  return <WorkspaceShell eyebrow="Staff" title="Student profile">
     {error ? <p role="alert" className="mt-6 rounded-lg border p-4">{error}</p> :
       <p role="status" className="mt-6">Loading student profile...</p>}
   </WorkspaceShell>;
@@ -43,17 +44,16 @@ function Student360Page({ personId }: { personId: string }) {
 
 export function Student360View({ profile, tab = "overview" }: { profile: Student360; tab?: ProfileTab }) {
   const canOpenReferrals = ["teacher", "specialist", "counselor"].includes(profile.viewerRole);
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Staff" title={profile.identity.name}
-    subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${profile.sections.length} active class(es)`}
+  return <WorkspaceShell width="wide" eyebrow="Staff" title={profile.identity.name}
+    subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${plural(profile.sections.length, "active class", "active classes")}`}
     breadcrumbs={<><Link to="/staff/students" className="underline">Students</Link><span>/</span><span>{profile.identity.name}</span></>}
     actions={<ProfilePhoto personId={profile.identity.personId} name={profile.identity.name}/>}
     rail={<WorkspacePanel title="Record context">
       <p className="text-sm leading-6 text-muted-foreground">This profile contains the records returned by your authorized staff view. Private notes and domain decisions remain in their owning workflows.</p>
       <Link to="/messages" className="mt-4 inline-block text-sm underline">Open staff inbox</Link>
     </WorkspacePanel>}>
-    <DetailNavigation label="Student profile sections">{tabs.map(value => <Link key={value}
-      to="/staff/students/$personId" params={{ personId: profile.identity.personId }} search={{ tab: value }}
-      aria-current={tab === value ? "page" : undefined} className="capitalize">{value}</Link>)}</DetailNavigation>
+    <DetailNavigation label="Student profile sections">{tabs.map(value => <SectionTab key={value} current={tab === value} className="capitalize"
+      link={{ to: "/staff/students/$personId", params: { personId: profile.identity.personId }, search: { tab: value } }}>{value}</SectionTab>)}</DetailNavigation>
     <div className="mb-6 grid gap-3 sm:grid-cols-3">
       <StatCard label="Missing work" value={profile.academics.openMissingWorkCount}/>
       <StatCard label="Absences · last 30 days" value={profile.attendance.absenceCount}/>
@@ -84,7 +84,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         {!profile.timeline.length&&<p className="text-sm text-muted-foreground">No academic activity has been recorded in the authorized view.</p>}
       </WorkspacePanel>}
       {(tab === "overview" || tab === "attendance") && <WorkspacePanel title="Attendance" description="Recent recorded events from the last 30 days.">
-        <p className="text-sm">{profile.attendance.absenceCount} absence(s) · {profile.attendance.tardyCount} tardy event(s)</p>
+        <p className="text-sm">{plural(profile.attendance.absenceCount, "absence", "absences")} · {plural(profile.attendance.tardyCount, "tardy event")}</p>
         <ul className="mt-3 divide-y">{profile.attendance.recentEvents.map((event, index) => <li key={`${event.expectedAt}-${index}`} className="flex flex-wrap justify-between gap-3 py-3 text-sm">
           <StatusBadge tone={event.status === "absent" ? "attention" : "neutral"}>{event.status}</StatusBadge>
           <span>{new Date(event.expectedAt).toLocaleDateString()}{event.sectionTitle ? ` · ${event.sectionTitle}` : ""}</span>

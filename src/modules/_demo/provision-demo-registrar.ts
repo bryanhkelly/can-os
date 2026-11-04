@@ -4,7 +4,8 @@ import {
   accessAccounts, accountPersonGrants, memberships, organizations, people,
   programs, roleAssignments, sites,
 } from "@/db/schema";
-import { isLocalDemoProvisioningEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { isLocalDemoProvisioningEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN, LOCAL_DEMO_ROOM_FACILITATOR } from "@/domain/local-demo-access";
+import { roleCapabilities } from "@/domain/access-context";
 import { listDemoSourceGrants } from "@/modules/identity/session-grants.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -34,14 +35,18 @@ type DemoEnvironment = {
 
 /** Explicit operator bootstrap, never called by login or an application request. */
 export async function provisionDemoRegistrar(database: Pick<Database, "transaction">, env: DemoEnvironment) {
-  return provisionScopedRegistrar(database, env, demoRegistrar);
+  return provisionScopedDemoStaff(database, env, demoRegistrar);
 }
 
 export async function provisionDemoSiteAdmin(database: Pick<Database, "transaction">, env: DemoEnvironment) {
-  return provisionScopedRegistrar(database, env, LOCAL_DEMO_ADMIN);
+  return provisionScopedDemoStaff(database, env, LOCAL_DEMO_ADMIN);
 }
 
-async function provisionScopedRegistrar(
+export async function provisionDemoRoomFacilitator(database: Pick<Database, "transaction">, env: DemoEnvironment) {
+  return provisionScopedDemoStaff(database, env, LOCAL_DEMO_ROOM_FACILITATOR);
+}
+
+async function provisionScopedDemoStaff(
   database: Pick<Database, "transaction">, env: DemoEnvironment,
   fixture: { personId: string; accountId: string; grantId: string; roleAssignmentId: string;
     organizationId: string; siteId: string; email: string },
@@ -50,8 +55,10 @@ async function provisionScopedRegistrar(
     throw new Error("Registrar provisioning requires local/test mode and CAN_DEMO_FIXED_ACCESS_ENABLED=true");
   }
   const isAdmin = fixture.accountId === LOCAL_DEMO_ADMIN.accountId;
-  const expectedRole = isAdmin ? "site_admin" : "registrar";
-  const requiredCapabilities = isAdmin
+  const isRoomFacilitator = fixture.accountId === LOCAL_DEMO_ROOM_FACILITATOR.accountId;
+  const expectedRole = isRoomFacilitator ? "room_facilitator" : isAdmin ? "site_admin" : "registrar";
+  const requiredCapabilities = isRoomFacilitator ? [...roleCapabilities.room_facilitator!]
+    : isAdmin
     ? [...demoRegistrarInstitutionalCapabilities, "site.publication.manage"]
     : [...demoRegistrarInstitutionalCapabilities];
   return database.transaction(async tx => {
@@ -68,8 +75,9 @@ async function provisionScopedRegistrar(
 
     const changes: string[] = [];
     const personRows = await tx.insert(people).values({
-      id: fixture.personId, legalFirstName: isAdmin ? "Demo" : "Alex",
-      legalLastName: isAdmin ? "Admin" : "Example", preferredName: isAdmin ? "Demo" : "Alex",
+      id: fixture.personId, legalFirstName: isRoomFacilitator ? "Sally" : isAdmin ? "Demo" : "Alex",
+      legalLastName: isRoomFacilitator ? "Demo" : isAdmin ? "Admin" : "Example",
+      preferredName: isRoomFacilitator ? "Sally" : isAdmin ? "Demo" : "Alex",
       metadata: { synthetic: true, role: expectedRole },
     }).onConflictDoNothing().returning({ id: people.id });
     if (personRows.length) changes.push("person");
@@ -89,7 +97,7 @@ async function provisionScopedRegistrar(
     if (accountRows.length) changes.push("account");
     const [account] = await tx.select().from(accessAccounts)
       .where(eq(accessAccounts.id, fixture.accountId)).for("update");
-    if (account?.emailNormalized === fixture.email.replace("@valorschool.demo", "@can-os.invalid")) {
+    if (!isRoomFacilitator && account?.emailNormalized === fixture.email.replace("@valorschool.demo", "@can-os.invalid")) {
       await tx.update(accessAccounts).set({ emailNormalized: fixture.email, updatedAt: new Date() })
         .where(eq(accessAccounts.id, fixture.accountId));
       changes.push("account_email");
@@ -124,7 +132,7 @@ async function provisionScopedRegistrar(
 
     const membershipRows = await tx.insert(memberships).values({
       personId: fixture.personId, organizationId: fixture.organizationId,
-      title: isAdmin ? "Demo school Site Admin" : "Demo school registrar",
+      title: isRoomFacilitator ? "Demo school room facilitator" : isAdmin ? "Demo school Site Admin" : "Demo school registrar",
       metadata: { synthetic: true, source: "demo-registrar-bootstrap" },
     }).onConflictDoNothing().returning({ id: memberships.id });
     if (membershipRows.length) changes.push("membership");
@@ -148,6 +156,9 @@ async function provisionScopedRegistrar(
       role.metadata.synthetic !== true || role.metadata.revokedAt != null) {
       throw new Error("Existing institutional grant conflicts with the demo school scope");
     }
+    if (isRoomFacilitator && role.capabilities.some(capability => !requiredCapabilities.includes(capability))) {
+      throw new Error("Existing room facilitator assignment has conflicting authority");
+    }
     const capabilities = [...new Set([...role.capabilities, ...requiredCapabilities])];
     if (role.roleKey !== expectedRole ||
       requiredCapabilities.some(capability => !role.capabilities.includes(capability))) {
@@ -161,13 +172,14 @@ async function provisionScopedRegistrar(
     if (changes.length) {
       const scope = { organizationId: fixture.organizationId, siteId: fixture.siteId };
       await writeAudit(tx, {
-        actorPersonId: null, action: "demo.registrar.provision", resourceType: "person",
+        actorPersonId: null, action: isRoomFacilitator ? "demo.room_facilitator.provision" : "demo.registrar.provision", resourceType: "person",
         resourceId: fixture.personId, scope,
         after: { changes, role: expectedRole, roleAssignmentId: role.id, capabilities },
         context: { method: "operator_bootstrap", synthetic: true },
       });
       await emitEvent(tx, {
-        eventType: EventTypes.DemoRegistrarProvisioned, aggregateType: "person", aggregateId: fixture.personId,
+        eventType: isRoomFacilitator ? EventTypes.DemoRoomFacilitatorProvisioned : EventTypes.DemoRegistrarProvisioned,
+        aggregateType: "person", aggregateId: fixture.personId,
         ...scope, payload: { changes, roleAssignmentId: role.id, synthetic: true },
       });
     }
@@ -179,6 +191,7 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
   return database.transaction(async tx => {
     const registrar = await provisionDemoRegistrar(tx, env);
     const admin = await provisionDemoSiteAdmin(tx, env);
+    const roomFacilitator = await provisionDemoRoomFacilitator(tx, env);
     const changedAccounts: string[] = [];
     const sourceFixtures = [
       { suffix: "1", email: "jordan.student@valorschool.demo", role: "student", personId: "f1000000-0000-4000-8000-000000000005" },
@@ -264,6 +277,6 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
         payload: { retiredLegacyGrantIds: changedGrants, normalizedAccountIds: changedAccounts },
       });
     }
-    return { registrar, admin, changedGrants, changedAccounts };
+    return { registrar, admin, roomFacilitator, changedGrants, changedAccounts };
   });
 }

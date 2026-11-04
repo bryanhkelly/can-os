@@ -56,9 +56,9 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
  async function run(operation:()=>Promise<unknown>,successMessage="Study group change saved."){
   await mutation.run(operation,{successMessage,commandErrorMessage:"Unable to save study group change."});
  }
- return <WorkspaceShell eyebrow="CAN OS · Teacher" title="Facilitate study groups"
+ return <WorkspaceShell eyebrow="Teacher" title="Facilitate study groups"
   subtitle="Review requests and moderate groups you facilitate."
-  breadcrumbs={<Link to="/teacher" search={{gradeAction:undefined}} className="underline">Teacher Today</Link>}>
+  breadcrumbs={<Link to="/home" search={{gradeAction:undefined}} className="underline">Teacher Today</Link>}>
   <div className="space-y-6">
   {!enabled?<WorkspaceNotice>Study groups are currently unavailable.</WorkspaceNotice>:<>
   <MutationFeedback state={mutation} pendingMessage="Saving study group change..."/>

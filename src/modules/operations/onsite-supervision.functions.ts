@@ -23,6 +23,8 @@ import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator
 import { verifiedAdultSafetyEvidence, verifiedAdultCoversBlock } from "./onsite-block-safety.server";
 import { fetchRoomPlanEvidence,parseVerifiedRoomPlan,type VerifiedRoomPlan } from "./onsite-block-room-plan.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
+import { loadRoomCoverageSchedules, roomCoverageForBlock, roomCoverageOccupancy } from "./room-coverage.server";
 
 const inputSchema=z.object({date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict();
 
@@ -69,6 +71,9 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
     if (siteDate(new Date(data.date+"T12:00:00Z"),"UTC")!==data.date)
       throw new Error("Invalid school-local date");
     const today=siteDate(new Date(),site.timezone);
+    const roomSchedules = await loadRoomCoverageSchedules(db, site.id);
+    const roomOccupancies = new Map(await Promise.all(roomSchedules.map(async schedule =>
+      [schedule.id, await roomCoverageOccupancy(db, schedule)] as const)));
     const oldest=siteDate(new Date(Date.now()-30*86400_000),site.timezone);
     if(data.registrarFirstDay){
       if(!data.preparation || !data.programId || !data.sectionId ||
@@ -201,7 +206,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           isNull(accountPersonGrants.siteId),
           eq(accountPersonGrants.active,true),
           eq(accessAccounts.disabled,false),eq(people.active,true),
-          sql`${accessAccounts.emailVerifiedAt} is not null`,
+          verifiedStaffIdentityPredicate(),
         )) : [];
     const reviewers=new Set(approvedReviewers.map(r=>r.organizationId+":"+r.personId));
     if(!roomEvidence.truncated){
@@ -236,6 +241,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       ...candidates.map(row=>row.facilitatorPersonId),
       ...[...matchingPlan.values()].map(plan=>plan.primaryPersonId),
       ...[...matchingPlan.values()].map(plan=>plan.backupPersonId),
+      ...roomSchedules.flatMap(schedule => [schedule.primaryPersonId, schedule.backupPersonId]),
     ].filter((id):id is string=>!!id))];
     const [activePeople,staffGrants,adultSafety]=await Promise.all([
       peopleIds.length?db.select({id:people.id,firstName:people.legalFirstName,
@@ -245,7 +251,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         role:accountPersonGrants.role})
         .from(accountPersonGrants)
         .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
-        .where(and(eq(accessAccounts.disabled,false),sql`${accessAccounts.emailVerifiedAt} is not null`,
+        .where(and(eq(accessAccounts.disabled,false),verifiedStaffIdentityPredicate(),
           inArray(accountPersonGrants.personId,peopleIds),
           eq(accountPersonGrants.siteId,site.id),
           eq(accountPersonGrants.organizationId,site.organizationId),
@@ -270,6 +276,9 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         .flatMap(plan=>[plan.primaryPersonId,plan.backupPersonId].map(personId=>({
           programId:plan.programId,sectionId:plan.sectionId,personId,
         }))),
+      ...roomSchedules.flatMap(schedule => schedule.sections.flatMap(section =>
+        [schedule.primaryPersonId, ...(schedule.backupPersonId ? [schedule.backupPersonId] : [])]
+          .map(personId => ({ ...section, personId })))),
     ];
     const verifiedDelegations=await verifiedScheduledSectionFacilitators(db,
       {siteId:site.id,organizationId:site.organizationId},namedCandidates);
@@ -298,7 +307,9 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           !candidates.some(row => row.sectionId === section.id &&
             row.facilitatorPersonId === actor.actorPersonId) &&
           ![...matchingPlan.values()].some(row=>row.sectionId===section.id &&
-            (row.backupPersonId===actor.actorPersonId||row.primaryPersonId===actor.actorPersonId))) continue;
+            (row.backupPersonId===actor.actorPersonId||row.primaryPersonId===actor.actorPersonId)) &&
+          !roomSchedules.some(row => row.sections.some(link => link.sectionId === section.id) &&
+            (row.primaryPersonId === actor.actorPersonId || row.backupPersonId === actor.actorPersonId))) continue;
       const templates=periodRows.filter(row=>
         row.templateId===section.scheduleTemplateId &&
         row.yearId===section.schoolYearId &&
@@ -311,11 +322,16 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         })):[];
         const uniqueIds=[...new Set(eligible.map(row=>row.facilitatorPersonId).filter(
           (id):id is string=>!!id))];
-        const scheduledPrimary=uniqueIds.length===1?uniqueIds[0]!:null;
+        const roomSchedule = period ? roomCoverageForBlock(roomSchedules, {
+          sectionId: section.id, date: data.date, startsAtLocal: period.starts, endsAtLocal: period.ends,
+        }) : undefined;
+        const staffWindow = roomSchedule ? { startsAtLocal: roomSchedule.startsAtLocal, endsAtLocal: roomSchedule.endsAtLocal }
+          : { startsAtLocal: period?.starts ?? null, endsAtLocal: period?.ends ?? null };
+        const scheduledPrimary=roomSchedule?.primaryPersonId ?? (uniqueIds.length===1?uniqueIds[0]!:null);
         const reviewedRoom=period?matchingPlan.get(section.id+":"+period.periodId):undefined;
-        const personId=effectiveRoomPrimary(scheduledPrimary,reviewedRoom);
+        const personId=roomSchedule?.primaryPersonId ?? effectiveRoomPrimary(scheduledPrimary,reviewedRoom);
         const person=personId?peopleById.get(personId):null;
-        const requiresSectionDelegation=independent.has(section.programId);
+        const requiresSectionDelegation=independent.has(section.programId) || !!roomSchedule;
         const approved=!!person?.active && staffGrants.some(grant=>
           grant.personId===personId &&
           (!requiresSectionDelegation || grant.role==="room_facilitator"));
@@ -325,9 +341,13 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         const safety=personId && requiresSectionDelegation
           ? verifiedAdultCoversBlock(adultSafety.get(personId),{
               date:data.date,timeZone:site.timezone,
-              startsAtLocal:period?.starts??null,endsAtLocal:period?.ends??null,
+              ...staffWindow,
             }) : {screening:true,training:true};
-        const approvedRoom=period?matchingPlan.get(section.id+":"+period.periodId):undefined;
+        const savedRoom=period?matchingPlan.get(section.id+":"+period.periodId):undefined;
+        const groupMatches = roomSchedule ? savedRoom?.roomCoverageId === roomSchedule.id &&
+          savedRoom.roomCoverageRevision === roomSchedule.revision && savedRoom.roomId === roomSchedule.roomId &&
+          savedRoom.backupPersonId === roomSchedule.backupPersonId : !savedRoom?.roomCoverageId;
+        const approvedRoom=groupMatches?savedRoom:undefined;
         const roomMatches=!!approvedRoom && !!personId &&
           approvedRoom.primaryPersonId===personId;
         const backupId=roomMatches?approvedRoom!.backupPersonId:null;
@@ -339,18 +359,18 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           scheduledBlockHasNamedFacilitator(verifiedDelegations,{
             programId:section.programId,sectionId:section.id,personId:backupId!,
             date:data.date,timeZone:site.timezone,
-            startsAtLocal:period.starts,endsAtLocal:period.ends,
+            ...staffWindow,
           });
         const backupSafety=backupId && period
           ? verifiedAdultCoversBlock(adultSafety.get(backupId),{
               date:data.date,timeZone:site.timezone,
-              startsAtLocal:period.starts,endsAtLocal:period.ends,
+              ...staffWindow,
             }) : {screening:false,training:false};
         const namedCurrent=personId && period && requiresSectionDelegation
           ? scheduledBlockHasNamedFacilitator(verifiedDelegations,{
               programId:section.programId,sectionId:section.id,personId,
               date:data.date,timeZone:site.timezone,
-              startsAtLocal:period.starts,endsAtLocal:period.ends,
+              ...staffWindow,
             }) : !requiresSectionDelegation;
         result.push({
           sectionId:section.id,sectionTitle:section.title,
@@ -363,16 +383,18 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           verifiedSafeguardingScreening:safety.screening,
           verifiedSafeguardingTraining:safety.training,
           roomLabel:roomMatches?approvedRoom!.roomLabel:null,
+          roomId:roomMatches?approvedRoom!.roomId:null,
+          roomCoverageKey:roomMatches && roomSchedule ? [roomSchedule.id, roomSchedule.revision, data.date].join(":") : null,
           roomEvidenceVersion:roomMatches ? [approvedRoom!.id,
             approvedRoom!.verifiedAt.toISOString(),approvedRoom!.expiresAt.toISOString()].join(":") : null,
           roomPlanVerified:roomMatches,
           roomCapacityAdequate:roomMatches &&
-            (rosterBySection.get(section.id)??0)<=approvedRoom!.roomCapacity,
+            (roomSchedule ? roomOccupancies.get(roomSchedule.id) ?? Infinity : rosterBySection.get(section.id)??0)<=approvedRoom!.roomCapacity,
           backupPersonId:backupId,
           namedBackupVerified:!!backupNamed && backupSafety.screening && backupSafety.training,
           requiresSectionDelegation,
           verifiedSectionDelegation:!!namedCurrent,
-          authorizedSupervisionService:!requiresSectionDelegation ||
+          authorizedSupervisionService:!independent.has(section.programId) ||
             authorizedContracts.get(section.programId)!=null,
           // Private fingerprint, not a claim of background screening.
           delegationVersion:verifiedTerm ? [verifiedTerm.id,
@@ -380,7 +402,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
             verifiedTerm.effectiveThrough.toISOString()].join(":") : null,
           agreementVersion:authorizedContracts.get(section.programId)??null,
           instructionalDayConfirmed:instructionalByYear.get(section.schoolYearId)===true,
-          overlappingFacilitatorAssignments:uniqueIds.length>1,
+          overlappingFacilitatorAssignments:roomSchedule ? uniqueIds.some(id => id !== roomSchedule.primaryPersonId) : uniqueIds.length>1,
         });
       }
     }
@@ -409,6 +431,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         block.verifiedSafeguardingScreening,block.verifiedSafeguardingTraining,
         block.roomPlanVerified,block.roomLabel,block.roomCapacityAdequate,
         block.namedBackupVerified,_backupPersonId,_roomEvidenceVersion,
+        block.roomCoverageKey,
         delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
       // Presence is a separate witnessed workflow. Both named adults can

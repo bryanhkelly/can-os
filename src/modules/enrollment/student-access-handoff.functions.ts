@@ -336,7 +336,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
   // Email is never sent inside an open DB transaction. On delivery failure
   // the approved grant remains retryable through normal passwordless sign-in.
   try {
-    await requestOneTimeAccess(email);
+    await requestOneTimeAccess(email, undefined, "/profiles");
     // The passwordless API intentionally returns a generic acceptance result;
     // it may enforce cooldowns. Never claim provider or inbox delivery here.
     return {status:"approved" as const,signInRequest:"requested" as const};
