@@ -48,11 +48,12 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 
 | Pattern | Use cases | Code / stories |
 | --- | --- | --- |
-| Role Dashboard | Student, teacher, family, site leader, registrar, CAN HQ | `DashboardLayout`, `DashboardPanel`, `DashboardShortcut`; `dashboard-layout.stories.tsx` |
+| Role Dashboard | Student, teacher, family, site leader, registrar, CAN HQ | `DashboardLayout`, `DashboardPanel`, `DashboardShortcut`, `DashboardProgress`, `DashboardTimeline`, `DashboardPreviewList`, `DashboardMediaTile`; `dashboard-layout.stories.tsx`, `dashboard-widgets.stories.tsx` |
 | Directory | Sites, staff, students, applications, programs, classrooms | `DirectoryTable`, `EntityCard`; `record-layout.stories.tsx` |
+| Master/detail Explorer | Admissions and action triage without deeply buried selected record | `MasterDetailWorkspace`, `MasterDetailListItem`; `master-detail-workspace.stories.tsx` |
 | Entity Record | Selected student, applicant, site, teacher, action, program | `RecordHeader`, `RecordLayout`, `DetailNavigation`; `record-layout.stories.tsx` |
 | User / Business Workflow | Admissions, enrollment, approvals, school setup, opening, staffing | `WorkflowWorkspace`, `WorkflowProgress`; `workflow-workspace.stories.tsx` |
-| Process / User Flow Map | Cross-persona handoffs, decisions, edge conditions, business-process documentation | `UserFlowMap`; `user-flow-map.stories.tsx` |
+| Process / User Flow Map | Cross-persona handoffs, decisions, conditional branches, exception paths, business-process documentation | `UserFlowMap`; `user-flow-map.stories.tsx` |
 | Step-based Setup | Application, site config, jurisdiction details, school year | `GuidedSetupShell`, `Field`, `Button` |
 | Split Review | Registrar intake, evidence review, publication approvals | `SplitReviewShell`, `StatusBadge`, `ActionDialog` |
 | Checklist/Readiness | Program launch, institutional approval, evidence gaps | `PrerequisiteChecklist`, approved-domain requirement DTOs |
@@ -126,6 +127,8 @@ Launch with `npm run storybook`.
 - **V6.1 foundations / Visual grammar** — fonts, palette, no-radius surfaces, actions, statuses and metrics.
 - **V6.1 templates / Role dashboards** — student and site leader compositions, wallpaper, shortcuts, panels and context rail.
 - **V6.1 templates / Directories and records** — site portfolio and dedicated applicant detail.
+- **V6.1 templates / Master detail explorer** — application review queue with first-viewport details and URL-backed selection.
+- **V6.1 templates / Dashboard widgets** — lessons/progress, assignments preview, class timeline, editorial tiles, and missing-data behavior.
 - **V6.1 templates / User and workflow flows** — admissions and school launch workspaces.
 - **V6.1 templates / Process and user-flow maps** — cross-role school launch and student assignment journey.
 - Existing **Foundations**, **Workflows**, **Persona layouts** and **Student/Daily canvas** — retained production components and regression examples.
