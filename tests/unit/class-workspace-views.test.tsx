@@ -40,6 +40,9 @@ vi.mock("@/modules/learning/discussion-teacher.functions", () => ({
 vi.mock("@/modules/learning/classroom-meetings.functions", () => ({
   getClassroomMeetings: vi.fn(), scheduleClassroomMeeting: vi.fn(), setClassroomMeetingLink: vi.fn(),
 }));
+vi.mock("@/modules/learning/classroom-notes.functions", () => ({
+  getPrivateLessonNote: vi.fn(), savePrivateLessonNote: vi.fn(),
+}));
 vi.mock("@/modules/learning/course-discussions.functions", () => ({ getCourseDiscussions: vi.fn() }));
 vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionMessage: vi.fn() }));
 
