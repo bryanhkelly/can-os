@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils";
  * Selection lives in URL/router state owned by the route, not in this shell.
  * At mobile widths, the selected record follows the queue in DOM order.
  */
-export function MasterDetailWorkspace({ title, description, toolbar, list, detail, footer, className }: {
+export function MasterDetailWorkspace({ title, description, toolbar, list, detail, footer, mobileMode = "list", className }: {
   title: string;
   description?: string;
   toolbar?: ReactNode;
   list: ReactNode;
   detail: ReactNode;
+  /** Keep mobile selected records in the initial viewport; the route controls this using URL state. */
+  mobileMode?: "list" | "detail";
   footer?: ReactNode;
   className?: string;
 }) {
@@ -24,8 +26,8 @@ export function MasterDetailWorkspace({ title, description, toolbar, list, detai
       {toolbar}
     </header>
     <div className="grid min-w-0 lg:grid-cols-[minmax(16rem,19rem)_minmax(0,1fr)]">
-      <section aria-label="Records in queue" className="min-w-0 border-b border-border lg:border-b-0 lg:border-r">{list}</section>
-      <section aria-label="Selected record details" className="min-w-0">{detail}</section>
+      <section aria-label="Records in queue" className={cn("min-w-0 border-b border-border lg:block lg:border-b-0 lg:border-r", mobileMode === "detail" && "hidden")}>{list}</section>
+      <section aria-label="Selected record details" className={cn("min-w-0 lg:block", mobileMode === "list" && "hidden")}>{detail}</section>
     </div>
     {footer && <footer className="border-t border-border px-5 py-3 text-xs text-muted-foreground">{footer}</footer>}
   </section>;
