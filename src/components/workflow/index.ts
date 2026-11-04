@@ -4,3 +4,6 @@ export { SplitReviewShell } from "./split-review-shell";
 export { WorkflowPrerequisites } from "./WorkflowPrerequisites";
 export type { WorkflowPrerequisite } from "./WorkflowPrerequisites";
 export { WorkflowHandoff } from "./WorkflowHandoff";
+
+export { WorkflowWorkspace, WorkflowProgress, type WorkflowStepView, type WorkflowStepState } from "./workflow-workspace";
+export { UserFlowMap, type UserFlowStage, type UserFlowNode, type UserFlowState, type UserFlowKind } from "./user-flow-map";
