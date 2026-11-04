@@ -63,7 +63,7 @@ describe("V6.1 reusable design system", () => {
   });
 
   it("supports URL-owned master/detail selection without burying the chosen record", () => {
-    const html = renderToStaticMarkup(<MasterDetailWorkspace title="Admissions queue"
+    const html = renderToStaticMarkup(<MasterDetailWorkspace title="Admissions queue" mobileMode="detail"
       list={<MasterDetailListItem title="Avery Kelly" selected href="?application=avery" />}
       detail={<h2>Guardian verification</h2>} />);
     expect(html).toContain('aria-label="Records in queue"');
