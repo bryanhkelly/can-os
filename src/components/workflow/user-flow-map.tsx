@@ -15,6 +15,13 @@ export interface UserFlowNode {
   owner?: string;
   href?: string;
 }
+export interface UserFlowTransition {
+  from: string;
+  to: string;
+  /** Human-readable branch or event, e.g. "Evidence rejected". */
+  outcome?: string;
+  condition?: string;
+}
 export interface UserFlowStage {
   id: string;
   title: string;
@@ -36,10 +43,11 @@ const states: Record<UserFlowState, string> = {
   blocked: "Blocked",
 };
 
-export function UserFlowMap({ title, description, stages, legend, className }: {
+export function UserFlowMap({ title, description, stages, transitions, legend, className }: {
   title: string;
   description?: string;
   stages: readonly UserFlowStage[];
+  transitions?: readonly UserFlowTransition[];
   legend?: ReactNode;
   className?: string;
 }) {
@@ -72,6 +80,24 @@ export function UserFlowMap({ title, description, stages, legend, className }: {
         </ol>
       </li>)}
     </ol>
+    {transitions && transitions.length > 0 && <section aria-label="Transitions, branches and exception paths" className="border border-border bg-card">
+      <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Transitions and decision branches</h3>
+      <div className="overflow-x-auto" role="region" aria-label="Workflow transitions table" tabIndex={0}>
+        <table className="w-full min-w-[36rem] text-left text-xs">
+          <thead className="bg-muted/30 text-muted-foreground"><tr>
+            <th scope="col" className="p-3 font-semibold">From</th>
+            <th scope="col" className="p-3 font-semibold">Trigger / outcome</th>
+            <th scope="col" className="p-3 font-semibold">Next</th>
+            <th scope="col" className="p-3 font-semibold">Guard or exception</th>
+          </tr></thead>
+          <tbody className="divide-y divide-border">{transitions.map((edge, index) =>
+            <tr key={`${edge.from}-${edge.to}-${index}`}>
+              <td className="p-3">{edge.from}</td><td className="p-3">{edge.outcome ?? "Continue"}</td>
+              <td className="p-3">{edge.to}</td><td className="p-3 text-muted-foreground">{edge.condition ?? "—"}</td>
+            </tr>)}</tbody>
+        </table>
+      </div>
+    </section>}
     {legend && <div className="border border-border bg-card p-4">{legend}</div>}
   </section>;
 }
