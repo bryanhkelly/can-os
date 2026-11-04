@@ -74,6 +74,7 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 - On navigation from a directory, record identity, status and next action must be in the initial viewport.
 - Preserve scope, filters and return position in URL state.
 - Tabs represent *different aspects of one record*, not separate independently created records hidden below dashboards.
+- In master/detail, set `mobileMode="detail"` when the route URL selects a record, so its details appear immediately instead of being buried under the queue. Set `mobileMode="list"` when no record is selected.
 - Attach evidence, activity history, reviewer and audit context only from authorized DTOs.
 - Unrelated creation panels belong on create routes or dedicated dialogs, never above the selected record.
 
