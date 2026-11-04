@@ -3,7 +3,7 @@ import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, ClipboardCheck, GraduationCap } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
