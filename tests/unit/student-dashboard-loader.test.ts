@@ -57,6 +57,25 @@ describe("refined student dashboard composition",()=>{
     const serialized=JSON.stringify(result.dashboard);
     expect(serialized).not.toMatch(/private draft|privateNotes|teacherGuides|conferenceNotes|must not project/);
   });
+  it("continues to another enrolled class when the preferred class has no published content",async()=>{
+    vi.mocked(getMyStudentToday).mockResolvedValue({
+      student:{studentProfileId:"student",personId:"person",firstName:"Jordan",preferredName:null,gradeLevel:"9"},
+      generatedAt:new Date("2030-11-05T15:00:00Z"),
+      sections:[{sectionId:"enrolled",sectionTitle:"English",timezone:"America/New_York"},
+        {sectionId:"biology",sectionTitle:"Biology",timezone:"America/New_York"}],
+      coursework:[],events:[],openActions:[],recoveryCandidates:[],firstWeek:[],
+    });
+    vi.mocked(getClassWorkspace).mockImplementation(async ({data}) => data.sectionId==="enrolled"
+      ? {curriculumAccess:{available:false},content:null}
+      : {section:{title:"Biology"},curriculumAccess:{available:true},
+          content:{modules:[{lessons:[{id:"cells",title:"Cells",body:"Study cells",resources:[]}]}]},
+          progress:[]});
+    const result=await loadStudentToday();
+    expect(getClassWorkspace).toHaveBeenCalledTimes(2);
+    expect(result.dashboard.learning).toMatchObject({
+      ok:true,data:{sectionId:"biology",lesson:{id:"cells",title:"Cells"},completed:0,total:1},
+    });
+  });
   it("does not select an unenrolled section suggested by an assignment projection",async()=>{
     vi.mocked(getAssignments).mockResolvedValue({connected:true,assignments:[{
       assessmentId:"essay",sectionId:"outside",title:"Essay",course:"English",dueAt:null,

@@ -63,7 +63,7 @@ export async function loadStudentToday() {
   const learning = await safeLoader(async () => {
     let completedFallback: {
       sectionId: string; title: string;
-      lesson: { id: string; title: string; estimatedMinutes: number | null } | null;
+      lesson: { id: string; title: string; estimatedMinutes?: number } | null;
       completed: number; total: number;
     } | null = null;
     for (const section of candidates) {
@@ -72,7 +72,7 @@ export async function loadStudentToday() {
       const result = await safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))();
       if (!result.ok || !result.data.curriculumAccess.available || !result.data.content) continue;
       const workspace = result.data;
-      const lessons = workspace.content!.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
+      const lessons = workspace.content.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
       if (!lessons.length) continue;
       const steps = deriveClassNextSteps({
         lessonIds: lessons.map(lesson => lesson.id),
@@ -90,6 +90,7 @@ export async function loadStudentToday() {
       if (nextLesson) return projected;
       completedFallback ??= projected;
     }
+    if (!completedFallback && candidates.length) throw new DataUnavailableError();
     return completedFallback;
   })();
   const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community };

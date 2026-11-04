@@ -69,11 +69,14 @@ describe("Student Today summary navigation", () => {
     }} />);
     expect(html).toContain('aria-label="Dashboard shortcuts"');
     for (const id of ["continue-learning", "student-assignments", "student-schedule", "school-life"]) {
-      expect(html).toContain(`href="#${id}"`);
       expect(html).toContain(`id="${id}"`);
     }
+    expect(html).toContain('href="/student/courses"');
+    expect(html).toContain('href="/calendar?date=');
+    expect(html).toContain('href="/student/my-school"');
+    expect(html).not.toContain('href="#continue-learning"');
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain('href="/student/experiences"');
+    expect(html).toContain('href="/student/my-school"');
     expect(html).toContain("School &amp; community");
     expect(html).toContain('href="/student/assignments"');
     expect(html).toContain('href="/student/report-card"');
@@ -333,7 +336,7 @@ describe("individual student actions",()=>{
 
 describe("student Action detail loader",()=>{
   const load=ExperiencesRoute.options.loader as (input:{deps:{action?:string}})=>Promise<{
-    ok:boolean;data?:{quickWins:unknown;school:unknown};
+    ok:boolean;data?:{quickWins:unknown};
   }>;
   beforeEach(()=>vi.clearAllMocks());
   it("requests the exact Action without loading unrelated school experiences",async()=>{
@@ -342,12 +345,12 @@ describe("student Action detail loader",()=>{
     const result=await load({deps:{action}});
     expect(getQuickWinActions).toHaveBeenCalledWith({data:{actionId:action}});
     expect(getSchoolExperiences).not.toHaveBeenCalled();
-    expect(result).toEqual({ok:true,data:{quickWins:{connected:true,actions:[]},school:null}});
+    expect(result).toEqual({ok:true,data:{quickWins:{connected:true,actions:[]}}});
   });
-  it("retains the combined directory when there is no selection",async()=>{
+  it("loads actions only; school content is owned by My School",async()=>{
     vi.mocked(getQuickWinActions).mockResolvedValue({connected:true,actions:[]});
     await load({deps:{}});
     expect(getQuickWinActions).toHaveBeenCalledWith({data:{actionId:undefined}});
-    expect(getSchoolExperiences).toHaveBeenCalledOnce();
+    expect(getSchoolExperiences).not.toHaveBeenCalled();
   });
 });

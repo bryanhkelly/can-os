@@ -1,10 +1,7 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
-import {
-  finishQuickWinAction, requestQuickWinHelp,
-} from "@/modules/actions/student-actions.functions";
+import { finishQuickWinAction } from "@/modules/actions/student-actions.functions";
 import { canCompleteStudentAction } from "@/modules/actions/student-action-policy";
 
 type Action = {
@@ -17,7 +14,6 @@ type Action = {
 };
 export function LiveQuickWins({ actions, connected, actionId }: { actions: Action[]; connected: boolean; actionId?: string }) {
   const router = useRouter();
-  const [message, setMessage] = useState("");
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
   const outstanding = actions.filter(action => ["open", "in_progress", "waiting"].includes(action.status));
@@ -29,18 +25,11 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
     });
   }
 
-  async function requestHelp() {
-    await mutation.run(async () => {
-      await requestQuickWinHelp({ data: { message } });
-      setMessage("");
-    }, { successMessage: "Help request saved.", commandErrorMessage: "Could not save help request." });
-  }
-
   return <section className="mt-8 rounded-2xl border-2 border-foreground/15 bg-card p-5 sm:p-7">
     <Link to="/home" className="text-xs font-semibold underline">Back to Student Today</Link>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Your actions</p><h2 className="mt-2 font-serif text-3xl">Your saved actions</h2><p className="mt-2 text-sm text-muted-foreground">Your assigned actions and support requests.</p></div>
-      <span className="rounded-full bg-stone-warm px-3 py-2 text-xs font-semibold">{connected ? "Neon connected" : "Neon unavailable"}</span>
+      <span className="rounded-full bg-stone-warm px-3 py-2 text-xs font-semibold">{connected ? "School actions available" : "School actions unavailable"}</span>
     </div>
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving action..."/>
     <div className="mt-5 space-y-3">
@@ -70,10 +59,8 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
     {actionId ? <Link to="/student/experiences" className="mt-4 inline-block text-xs underline">View all saved actions</Link> :
       <p className="mt-4 text-xs text-muted-foreground">{outstanding.length} saved action{outstanding.length===1?"":"s"} need attention</p>}
     <div className="mt-7 border-t border-border pt-5">
-      <h3 className="font-semibold">Ask for help · saved request</h3>
-      <p className="mt-2 text-xs text-muted-foreground">Create a support request linked to your account.</p>
-      <textarea rows={3} maxLength={1000} value={message} onChange={event=>setMessage(event.target.value)} placeholder="I need help with…" className="mt-3 w-full rounded-xl border border-border bg-background p-3 text-sm"/>
-      <button disabled={busy || !connected || message.trim().length<3} onClick={requestHelp} className="mt-2 rounded-lg bg-foreground px-5 py-3 text-xs font-semibold text-background disabled:opacity-40">Save help request</button>
+      <h3 className="font-semibold">Ask for help</h3>
+      <Link to="/student/support" className="mt-2 inline-block text-sm underline">Open student support →</Link>
     </div>
   </section>;
 }
