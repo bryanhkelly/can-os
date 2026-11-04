@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ProfileIdentity, ProfileMetricBand, ProfileRecordLayout, profileTabClass } from "@/components/profiles/ProfileRecordLayout";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { ProfileMeetingsPanel, ProfileLinksPanel } from "@/components/profiles/ProfileContextPanels";
 
 describe("V6.1 identity-first profile composition", () => {
   it("puts the selected student's identity ahead of metrics and record sections", () => {
@@ -25,6 +26,19 @@ describe("V6.1 identity-first profile composition", () => {
     const html=renderToStaticMarkup(<ProfileMetricBand metrics={[]}/>);
     expect(html).not.toContain("GPA");
     expect(html).not.toContain("attendance rate");
+  });
+
+  it("renders only authorized appointment facts and safe empty states", () => {
+    const empty=renderToStaticMarkup(<ProfileMeetingsPanel meetings={[]}/>);
+    expect(empty).toContain("No meetings are available in this view");
+    expect(empty).not.toContain("<time");
+    const populated=renderToStaticMarkup(<ProfileMeetingsPanel meetings={[
+      {id:"m1",title:"Academic check-in",startsAt:"2026-11-06T16:00:00Z",displayTime:"Nov 6, 8:00 AM PST"},
+    ]}/>);
+    expect(populated).toContain("Academic check-in");
+    expect(populated).toContain('dateTime="2026-11-06T16:00:00Z"');
+    const links=renderToStaticMarkup(<ProfileLinksPanel links={[{id:"history",title:"Transcript",href:"/records"}]}/>);
+    expect(links).toContain('href="/records"');
   });
 
   it("suppresses the generic workspace h1 when the profile supplies its own", () => {
