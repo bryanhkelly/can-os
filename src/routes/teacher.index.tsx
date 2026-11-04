@@ -66,8 +66,8 @@ function TeacherTodayPage() {
  >
   <QueryState loading={loading ? "Loading your day…" : ""} error={error}>
    <DailyCanvas audience="teacher" content={resolveEditorialCanvas("teacher", new Date())}
-     primaryAction={<Link to="/classes" className="inline-flex min-h-11 items-center gap-2 border border-white bg-white px-4 py-2 text-sm font-semibold !text-slate-900">My classes <ArrowUpRight className="size-4" /></Link>}
-     secondaryAction={<Link to="/teacher/gradebook" className="inline-flex min-h-11 items-center gap-2 border border-white/70 px-4 py-2 text-sm font-semibold text-white">Gradebook</Link>}
+     primaryAction={<Link to="/classes" className="can-editorial-primary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm font-semibold">My classes <ArrowUpRight className="size-4" /></Link>}
+     secondaryAction={<Link to="/teacher/gradebook" className="can-editorial-secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm font-semibold">Gradebook</Link>}
     />
    {data && !data.connected && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
