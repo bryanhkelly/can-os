@@ -35,8 +35,8 @@ function StaffStudentsPage() {
               <p className="mt-1 text-xs text-muted-foreground">Open authorized student profile →</p>
             </div>},
             {id:"grade",title:"Grade",render:student=>student.gradeLevel??"—"},
-            {id:"classes",title:"Classes",render:student=><span className="tabular-nums">{student.activeSectionCount}</span>},
-            {id:"missing",title:"Missing work",render:student=><span className="tabular-nums">{student.openMissingWorkCount}</span>},
+            {id:"classes",title:"Classes",render:student=>student.activeSectionCount},
+            {id:"missing",title:"Missing work",render:student=>student.openMissingWorkCount},
           ]}
         />
     </WorkspaceShell>
