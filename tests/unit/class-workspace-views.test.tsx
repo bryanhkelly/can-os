@@ -37,6 +37,9 @@ vi.mock("@/modules/learning/discussion-teacher-query.functions", () => ({ getTea
 vi.mock("@/modules/learning/discussion-teacher.functions", () => ({
   createCourseDiscussion: vi.fn(), setCourseDiscussionLock: vi.fn(), moderateDiscussionMessage: vi.fn(),
 }));
+vi.mock("@/modules/learning/classroom-meetings.functions", () => ({
+  getClassroomMeetings: vi.fn(), scheduleClassroomMeeting: vi.fn(), setClassroomMeetingLink: vi.fn(),
+}));
 vi.mock("@/modules/learning/course-discussions.functions", () => ({ getCourseDiscussions: vi.fn() }));
 vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionMessage: vi.fn() }));
 
