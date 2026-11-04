@@ -66,11 +66,13 @@ describe("V6.1 reusable design system", () => {
         { id: "interest", title: "Church interested", kind: "entry", owner: "Church" },
         { id: "review", title: "Review evidence", kind: "decision", state: "blocked", owner: "CAN" },
       ],
-    }]} />);
+    }]} transitions={[{ from: "interest", to: "review", outcome: "Submitted" }, { from: "review", to: "interest", outcome: "Rejected", condition: "Request correction" }]} />);
     expect(html).toContain("Church launch journey");
     expect(html).toContain("Decision");
     expect(html).toContain("Blocked");
     expect(html).toContain("Owner: CAN");
+    expect(html).toContain("Transitions and decision branches");
+    expect(html).toContain("Rejected");
     expect(html).not.toContain("<button");
   });
 });
