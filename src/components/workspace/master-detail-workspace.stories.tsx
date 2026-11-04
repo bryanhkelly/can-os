@@ -8,7 +8,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AdmissionsQueue: Story = { render: () => <div className="bg-background p-4 sm:p-8">
-  <MasterDetailWorkspace title="Admissions review" description="Select a student and work immediately in the same viewport."
+  <MasterDetailWorkspace title="Admissions review" mobileMode="detail" description="Select a student and work immediately in the same viewport."
     toolbar={<Button variant="outline">Filter applications</Button>}
     list={<div>
       <MasterDetailListItem selected title="Avery Kelly" description="Valor Academy · Grade 9" href="?application=avery" status={<StatusBadge tone="attention">Review</StatusBadge>} />
