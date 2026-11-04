@@ -152,8 +152,8 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
  >
   <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
    <DailyCanvas audience="guardian" content={resolveEditorialCanvas("guardian", new Date())}
-    primaryAction={<Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 border border-white bg-white px-4 py-2 text-sm font-semibold !text-slate-900">View academics <ArrowUpRight className="size-4" /></Link>}
-    secondaryAction={<Link to="/messages" className="inline-flex min-h-11 items-center gap-2 border border-white/70 px-4 py-2 text-sm font-semibold text-white">Family inbox</Link>}
+    primaryAction={<Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="can-editorial-primary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm font-semibold">View academics <ArrowUpRight className="size-4" /></Link>}
+    secondaryAction={<Link to="/messages" className="can-editorial-secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm font-semibold">Family inbox</Link>}
    />
    <nav aria-label="Family quick links" className="mt-4 flex flex-wrap gap-2">
      <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">School &amp; conferences</Link>
