@@ -76,7 +76,7 @@ export function WorkflowWorkspace({ eyebrow, title, description, status, identit
       {status && <div className="shrink-0">{status}</div>}
     </header>
     {actions && <section aria-label="Available next actions" className="border border-border bg-card p-4">{actions}</section>}
-    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[15rem_minmax(0,1fr)_16rem]">
+    <div className={cn("grid min-w-0 items-start gap-5", context ? "xl:grid-cols-[15rem_minmax(0,1fr)_16rem]" : "xl:grid-cols-[15rem_minmax(0,1fr)]")}>
       <WorkflowProgress steps={steps} />
       <section aria-label="Current workflow step" className="min-w-0 border border-border bg-card p-5">{details}</section>
       {context && <aside aria-label="Workflow guidance and evidence" className="min-w-0 space-y-4">{context}</aside>}
