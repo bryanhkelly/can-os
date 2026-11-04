@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent } from "storybook/test";
 import { DailyCanvas, type DailyCanvasContent, selectDailyCanvasContent } from "./DailyCanvas";
 
 const defaultContent: DailyCanvasContent = {
@@ -16,3 +17,23 @@ export const Emergency: Story = { args: { audience: "student", content: { ...def
 export const NoCampaign: Story = { args: { audience: "student", content: null, operationalSummary: "2 assignments due today" }, render };
 export const ParentNotice: Story = { args: { audience: "guardian", content: { id: "family", audience: "guardian", priority: "local", headline: "Family conference week", supportingCopy: "Review upcoming events with your school." } }, render };
 export const PrioritySelection: Story = { args: { audience: "student", content: selectDailyCanvasContent([defaultContent, { ...defaultContent, id: "safety", priority: "emergency", headline: "Urgent safety update" }], "student", new Date()) }, render };
+
+export const EditorialActions: Story = {
+  args: {
+    audience: "student", content: defaultContent,
+    primaryAction: <a href="#classes" className="can-editorial-primary inline-flex min-h-11 items-center px-5 py-3 text-sm font-semibold">View my classes</a>,
+    secondaryAction: <a href="#assignments" className="can-editorial-secondary inline-flex min-h-11 items-center px-5 py-3 text-sm font-semibold">Assignments</a>,
+  },
+  render,
+  play: async ({ canvas }) => {
+    const primary = canvas.getByRole("link", { name: "View my classes" });
+    await expect(primary).toHaveStyle({ color: "rgb(16, 29, 57)", backgroundColor: "rgb(255, 255, 255)", borderRadius: "0px" });
+    await primary.focus();
+    await expect(primary).toHaveFocus();
+    await expect(primary).toHaveStyle({ outlineStyle: "solid", outlineWidth: "2px" });
+    await userEvent.tab();
+    await expect(canvas.getByRole("link", { name: "Assignments" })).toHaveFocus();
+  },
+};
+export const DarkEditorialActions: Story = { ...EditorialActions, globals: { theme: "dark" } };
+export const SiteEditorialActions: Story = { ...EditorialActions, globals: { theme: "site" } };

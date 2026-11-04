@@ -2,6 +2,11 @@ import {createFileRoute,Link} from "@tanstack/react-router";
 import {useState} from "react";
 import { accessFormErrors, safeAccessReturnTo } from "@/domain/access-navigation";
 import {isDemoAccountEmail} from "@/domain/local-demo-access";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { useHydrated } from "@/lib/use-hydrated";
 export const Route=createFileRoute("/access/")({
  validateSearch:(search:Record<string,unknown>):{email?:string;error?:keyof typeof accessFormErrors;returnTo?:string}=>({
   email:typeof search.email==="string"?search.email:undefined,
@@ -16,6 +21,7 @@ function AccessPage(){
  const[code,setCode]=useState("");
  const[status,setStatus]=useState("");
  const[busy,setBusy]=useState(false);
+ const hydrated=useHydrated();
  const isDemoEmail=isDemoAccountEmail(email);
  const verifyAction=search.returnTo
  ?`/access/verify?returnTo=${encodeURIComponent(search.returnTo)}`:"/access/verify";
@@ -30,18 +36,23 @@ function AccessPage(){
    setStatus("If this email has a CAN OS account, a one-time access link has been sent.");
   }catch{setStatus("Sign-in is temporarily unavailable. Please try again shortly.");}finally{setBusy(false);}
  }
- return <main className="mx-auto max-w-md space-y-6 px-6 py-16">
-  <h1 className="font-serif text-4xl">Access CAN OS</h1>
-  <p>Enter the email address associated with your invited CAN OS account.</p>
-  <form action={verifyAction} method="post" onSubmit={submit} className="space-y-4">
+ return <WorkspaceShell width="reading" eyebrow="CAN OS" title="Access CAN OS"
+  subtitle="Enter the email address associated with your invited CAN OS account.">
+ <WorkspacePanel title="Sign in" className="mx-auto mt-6 max-w-md">
+  <form action={verifyAction} method="post" onSubmit={submit} aria-busy={!hydrated||busy} className="space-y-4">
    <input type="hidden" name="returnTo" value={search.returnTo??""}/>
-   <label className="block space-y-1"><span>Email</span><input name="email" required type="email" autoComplete="email" value={email} onChange={e=>{setEmail(e.target.value);setCode("");}} className="w-full rounded-lg border bg-background p-3"/></label>
-   {isDemoEmail&&<label className="block space-y-1"><span>Demo access code (000000)</span><input name="code" required type="password" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value)} className="w-full rounded-lg border bg-background p-3"/></label>}
-   <button disabled={busy} type="submit" className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">{isDemoEmail?"Sign in":"Email me an access link"}</button>
+   <fieldset disabled={!hydrated||(!isDemoEmail&&busy)} className="space-y-4">
+    <Field label="Email" required><Input name="email" type="email" autoComplete="email" value={email} onChange={e=>{setEmail(e.target.value);setCode("");}}/></Field>
+    {isDemoEmail&&<Field label="Demo access code (000000)" required><Input name="code" type="password" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value)}/></Field>}
+    <Button disabled={!hydrated||busy} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":busy?isDemoEmail?"Signing in…":"Sending access link…":isDemoEmail?"Sign in":"Email me an access link"}</Button>
+   </fieldset>
   </form>
-  <p role="status">{status||(search.error?accessFormErrors[search.error]:"")}</p>
-  <p className="text-sm"><Link to="/schools/new" className="font-semibold underline">Create a new .demo school</Link></p>
-  <p className="text-sm"><Link to="/church/apply" className="font-semibold underline">Church leader? Request to launch a school →</Link></p>
-  <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
- </main>;
+  <p role="status" className="mt-4 text-sm">{status||(search.error?accessFormErrors[search.error]:"")}</p>
+  <div className="mt-6 space-y-4 border-t pt-4">
+   <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/schools/new">Create a new .demo school</Link></Button></p>
+   <p className="text-sm"><Button asChild variant="ghost" className="h-auto w-full whitespace-normal text-center"><Link to="/church/apply">Church leader? Request to launch a school →</Link></Button></p>
+   <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
+  </div>
+ </WorkspacePanel>
+ </WorkspaceShell>;
 }

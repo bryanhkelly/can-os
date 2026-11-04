@@ -1,10 +1,12 @@
 import { defineConfig } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
+import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     storybookTest({
       configDir: fileURLToPath(new URL("./.storybook", import.meta.url)),
     }),

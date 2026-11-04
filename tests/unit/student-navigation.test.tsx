@@ -61,17 +61,22 @@ vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
 }));
 
 describe("Student Today summary navigation", () => {
-  it("renders all three summary cards as links to implemented destinations", () => {
+  it("renders refined dashboard shortcuts and keeps canonical destinations", () => {
     const html = renderToStaticMarkup(<StudentExperience liveData={{
       student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
       generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
       sections: [], coursework: [], events: [], openActions: [], recoveryCandidates: [],
     }} />);
-    expect(html).toMatch(/<a href="\/student\/courses"[^>]*>[\s\S]*?Classes<\/p>/);
-    expect(html).toMatch(/<a href="\/student\/assignments"[^>]*>[\s\S]*?Upcoming assignments<\/p>/);
-    expect(html).toMatch(/<a href="\/student\/assignments\?filter=missing"[^>]*><p[^>]*>Missing work<\/p>/);
+    expect(html).toContain('aria-label="Dashboard shortcuts"');
+    for (const id of ["continue-learning", "student-assignments", "student-schedule", "school-life"]) {
+      expect(html).toContain(`href="#${id}"`);
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
     expect(html).toContain('href="/student/experiences"');
     expect(html).toContain("School &amp; community");
+    expect(html).toContain('href="/student/assignments"');
+    expect(html).toContain('href="/student/report-card"');
   });
 
   it("surfaces the guardian verification prerequisite on Student Today", () => {
@@ -175,7 +180,8 @@ describe("Student Today summary navigation", () => {
         firstWeek: { lesson: { id: "investigate", title: "Investigate cells" }, assessment: { id: "assessment-1", title: "Cell observations" } } }],
       coursework: [], events: [], openActions: [], recoveryCandidates: [],
     }} />);
-    expect(html).toContain("Start first-week work");
+    expect(html).toContain("Your first week");
+    expect(html).toContain("Ready to start");
     expect(html).toContain('href="/student/assignments?section=section-1&amp;assessment=assessment-1"');
     expect(html).toContain('href="/classes?section=section-1&amp;tab=lessons&amp;lesson=investigate"');
     expect(html).toContain("Investigate cells");

@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 import { useEffect,useState } from "react";
 export const Route=createFileRoute("/family/join")({
- server:{handlers:{POST:async({request})=>{
+ server:{handlers:{POST:createServerOnlyFn(async({request})=>{
    if(new URL(request.url).origin!==request.headers.get("origin"))
      return Response.json({error:"Invalid origin"},{status:403,headers:{"Cache-Control":"no-store"}});
    try{
@@ -26,7 +27,7 @@ export const Route=createFileRoute("/family/join")({
      return Response.json({error:"Link expired or cannot be used. Request a new link from your school."},{
        status:401,headers:{"Cache-Control":"no-store"}});
    }
- }}},
+ })}},
  component:FamilyJoinPage,
 });
 function FamilyJoinPage(){

@@ -1,7 +1,12 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
-import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
+import { StatCard, StatusBadge } from "@/components/workspace";
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
+import { ClipboardList, ShieldCheck, Users, CalendarDays } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { addCalendarDays, formatDateOnly } from "@/modules/calendar/timezone";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -116,8 +121,17 @@ export function SiteDayPage() {
     } finally { setBusy(""); }
   }
 
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Onsite school" title={context?.siteName ?? "Site Today"}
-    subtitle="Supervise the scheduled school day and record staff-observed attendance. Learning activity is not physical presence.">
+  return <DashboardHome eyebrow="CAN OS · Onsite school" title={context?.siteName ?? "Site Today"}
+    subtitle="Supervise the scheduled school day and record staff-observed attendance. Learning activity is not physical presence."
+    shortcuts={<>
+      <DashboardShortcut title="Staff coverage" description="Review assigned supervision" icon={<Users className="size-5" />}><a href="#supervision" /></DashboardShortcut>
+      <DashboardShortcut title="Attendance" description="Record staff-observed presence" icon={<ClipboardList className="size-5" />}><a href="#attendance" /></DashboardShortcut>
+      <DashboardShortcut title="Verified pickup" description="Review student release checks" icon={<ShieldCheck className="size-5" />}><a href="#pickup" /></DashboardShortcut>
+      <DashboardShortcut title="Day review" description="Reconcile the onsite day" icon={<CalendarDays className="size-5" />}><a href="#day-review" /></DashboardShortcut>
+    </>}
+    rail={context ? <DashboardCalendar date={date||context.date} timezone={context.timeZone} /> : undefined}
+    actions={<><Link to="/safeguarding">Report a safety concern →</Link><Link to="/calendar">Open calendar →</Link></>}
+    priority={<>
     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
       <span>{date ? formatDateOnly(date) : "Loading school date"}</span>
       {context && <span>{context.timeZone}</span>}
@@ -161,6 +175,7 @@ export function SiteDayPage() {
           })}
         </ul>
       </section>}
+    </>}>
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
     {context&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap items-center gap-3">
       <Button variant={!preparing ? "secondary" : "outline"} aria-pressed={!preparing}
@@ -285,5 +300,5 @@ export function SiteDayPage() {
     </>}
     {roster && !preparing && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
     {roster && !preparing && <div id="day-review"><OnsiteDayReconciliationPanel date={date} roster={roster} refreshRevision={schoolDayRevision} /></div>}
-  </WorkspaceShell>;
+  </DashboardHome>;
 }

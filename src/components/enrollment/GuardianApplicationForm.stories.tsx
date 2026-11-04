@@ -70,7 +70,10 @@ export const ServerError: Story = {
     await fillRequiredFields(canvas);
     await userEvent.click(canvas.getByRole("button", { name: "Submit application" }));
     const alert = await canvas.findByRole("alert");
-    await expect(alert).toHaveTextContent("The application could not be saved. Try again.");
+    await expect(alert).toHaveTextContent("Unable to submit application");
+    await expect(alert).not.toHaveTextContent("The application could not be saved. Try again.");
+    await expect(canvas.getByLabelText("Student legal first name")).toHaveValue("Jordan");
+    await expect(canvas.getByRole("button", { name: "Submit application" })).toBeEnabled();
     await waitFor(() => expect(alert).toHaveFocus());
   },
 };

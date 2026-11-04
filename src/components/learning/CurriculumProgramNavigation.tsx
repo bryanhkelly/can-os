@@ -33,7 +33,7 @@ export function CurriculumProgramNavigation({
           search={{ programId: selectedProgramId }}
           className="rounded-lg border px-3 py-2 text-sm underline"
         >
-          Curriculum Studio
+          Curriculum
         </Link>
       )}
     </nav>

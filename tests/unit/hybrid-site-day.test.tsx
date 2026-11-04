@@ -1,6 +1,7 @@
 vi.mock("@/modules/operations/onsite-day-preparation.functions",()=>({getOnsiteSchoolDayPreparation:vi.fn()}));
 vi.mock("@/modules/operations/onsite-room-plan.functions",()=>({getOnsiteRoomPlanningFn:vi.fn(),submitOnsiteRoomPlanFn:vi.fn(),reviewOnsiteRoomPlanFn:vi.fn()}));
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { SiteDayPage } from "@/components/operations/SiteDayPage";
 import { getWorkspaceHome, getWorkspaceLinks, workspaceLinks } from "@/components/shell/workspace-navigation.registry";
@@ -8,6 +9,7 @@ import { getWorkspaceHome, getWorkspaceLinks, workspaceLinks } from "@/component
 vi.mock("@tanstack/react-router", async importOriginal => ({
   ...await importOriginal<typeof import("@tanstack/react-router")>(),
   createFileRoute: () => (config: unknown) => config,
+  Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
 }));
 vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
   getOnsiteStaffDayContext: vi.fn(),
@@ -58,6 +60,8 @@ describe("Hybrid Site daily facilitator workspace",()=>{
     expect(html).toContain("Site Today");
     expect(html).toContain("Online learning activity is not proof of physical presence");
     expect(html).toContain("arrival marks do not authorize student release");
+    expect(html).toContain("role-dashboard");
+    expect(html.indexOf("Checking current school-opening authorization")).toBeLessThan(html.indexOf("can-dashboard-hero"));
     for(const disallowed of ["Guardian excuse details","Counseling notes","Approve grade","Sign out student"]){
       expect(html).not.toContain(disallowed);
     }

@@ -242,9 +242,9 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
       <div className="mt-4"><LaunchTaskDestination launch={launch} task={next} /></div>
-      {canReviewSelectedLaunch && next.pendingEvidenceReview && <InstitutionalEvidenceReview key={next.id} task={next} busy={busy} review={reviewEvidence} />}
-      <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
-      <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
+      {canReviewSelectedLaunch && next.pendingEvidenceReview && <InstitutionalEvidenceReview key={`review-${next.id}`} task={next} busy={busy} review={reviewEvidence} />}
+      <LaunchEvidenceStatement key={`evidence-${next.id}`} task={next} busy={busy} submit={submitEvidence} />
+      <SchoolOwnedCompletion key={`completion-${next.id}`} task={next} busy={busy} complete={complete} />
       {next.action === "orientation" && next.state === "needs_you" &&
         <LaunchOrientationTask launch={launch} busy={busy} save={saveOrientation} />}
       {next.action === "opening" && next.state === "needs_you" &&
@@ -311,4 +311,3 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </section>
   </section>;
 }
-

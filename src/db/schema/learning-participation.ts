@@ -17,6 +17,21 @@ export const lessonProgress = pgTable("lesson_progress", {
   index("lesson_progress_section_student_idx").on(table.sectionId, table.studentProfileId),
 ]);
 
+export const privateLessonNotes = pgTable("private_lesson_notes", {
+  id: id(),
+  sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "restrict" }),
+  courseTemplateVersionId: uuid("course_template_version_id").notNull().references(() => courseTemplateVersions.id, { onDelete: "restrict" }),
+  authorPersonId: uuid("author_person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
+  lessonId: text("lesson_id").notNull(),
+  body: text("body").default("").notNull(),
+  revision: integer("revision").default(1).notNull(),
+  createdAt: createdAt(), updatedAt: updatedAt(),
+}, table => [
+  uniqueIndex("private_lesson_notes_owner_context_uq").on(table.authorPersonId, table.sectionId, table.courseTemplateVersionId, table.lessonId),
+  check("private_lesson_notes_body_length", sql`length(${table.body}) <= 30000`),
+  check("private_lesson_notes_revision_positive", sql`${table.revision} > 0`),
+]);
+
 export const submissionAnnotations = pgTable("submission_annotations", {
   id: id(),
   submissionId: uuid("submission_id").notNull().references(() => submissions.id, { onDelete: "restrict" }),

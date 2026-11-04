@@ -28,7 +28,12 @@ test("school administrator reviews, publishes and renames a standalone school we
   await page.getByRole("link", { name: "Sign in and continue setup" }).click();
   await page.getByLabel("Email", { exact: true }).fill(`admin.demo@${domain}`);
   await page.getByLabel("Demo access code (000000)").fill("000000");
+  const verificationRequest = page.waitForRequest(request =>
+    request.method() === "POST" && new URL(request.url()).pathname === "/access/verify");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  const credentials = new URLSearchParams((await verificationRequest).postData() ?? "");
+  expect(credentials.get("email")).toBe(`admin.demo@${domain}`);
+  expect(credentials.get("code")).toBe("000000");
   await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible();
 
   const [tenant] = await sql`SELECT organization_id, site_id FROM demo_school_tenants WHERE domain = ${domain}`;

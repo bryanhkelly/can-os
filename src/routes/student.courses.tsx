@@ -1,10 +1,11 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useRouter } from "@tanstack/react-router";
 import { getCourseRegistration, requestCourseChange, decideCourseChange } from "@/modules/learning/course-registration.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, EmptyState } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge, EmptyState } from "@/components/workspace";
+import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { useHydrated } from "@/lib/use-hydrated";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -119,12 +120,8 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
  const enrolled=data.sections.filter(item=>item.enrollmentStatus==="active");
  const course=enrolled.find(item=>item.id===section);
  const work=(data.classwork??[]).filter(item=>item.sectionId===course?.id);
- return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning"
-  title={course?.title??"My classes"}
-  subtitle={course?`${course.code} · ${course.subject} · ${course.credits} credit(s)`:"Enter an enrolled class to see your work, feedback and next steps."}
-  breadcrumbs={<><Link to="/student" className="underline">Today</Link><span>/</span><Link to="/student/courses" className="underline">My classes</Link>{course&&<><span>/</span><span>{course.title}</span></>}</>}
-  actions={<Link to="/student/courses" search={{view:"catalog"}} className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Course catalog / registration</Link>}
-  rail={course?<WorkspacePanel title="Class connections">
+ if(course&&tab==="overview")return <Navigate to="/classes" search={{section:course.id,tab:"lessons"}} replace/>;
+ const connections=course?<WorkspacePanel title="Class connections">
    <nav aria-label="Class connections" className="grid gap-4 text-sm">
     <Link to="/classes" search={{section:course.id}} className="underline">Class lessons, files and announcements</Link>
     <Link to="/student/assignments" search={{section:course.id}} className="underline">View class assignments</Link>
@@ -134,7 +131,8 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     <Link to="/student/study-groups" className="underline">Study groups</Link>
     <Link to="/student/courses" search={{view:"catalog",section:course.id}} className="underline">Registration and change deadlines</Link>
    </nav>
-  </WorkspacePanel>:undefined}>
+  </WorkspacePanel>:undefined;
+ const content=<>
   {section&&!course?<p role="alert" className="mt-6 rounded-xl border p-5">This course is unavailable in your current workspace. Only actively enrolled classes appear here.</p>:
    !course?<div className="mt-7 grid gap-4 md:grid-cols-2">
     {!enrolled.length&&<EmptyState title="Your classes will appear here after placement." description="Your school assigns classes after enrollment. You can also review available classes in the course catalog."/>}
@@ -143,25 +141,16 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
      <p className="text-sm text-muted-foreground">{item.description??"Your classwork and feedback, in one place."}</p>
      <p className="mt-3 text-sm">Teaching team: {item.teachers?.length?item.teachers.map((teacher,index)=><span key={teacher.personId}>{index>0?", ":""}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></span>):"Not assigned"}</p>
      <div className="mt-5 flex flex-wrap gap-3 text-sm">
-      <Link to="/student/courses" search={{section:item.id}} className="rounded-lg bg-foreground px-4 py-2 font-semibold text-background">Open class</Link>
+      <Link to="/classes" search={{section:item.id,tab:"lessons"}} className="rounded-lg bg-foreground px-4 py-2 font-semibold text-background">Open class</Link>
       <Link to="/student/assignments" search={{section:item.id}} className="rounded-lg border px-4 py-2">Classwork</Link>
-      <Link to="/classes" search={{section:item.id,tab:"lessons"}} className="rounded-lg border px-4 py-2">Lessons & resources</Link>
      </div>
     </WorkspacePanel>)}
    </div>:<>
     <DetailNavigation label="Class detail">
-     {(["overview","classwork","grades"] as const).map(value=><Link key={value} to="/student/courses" search={{section:course.id,tab:value}} aria-current={tab===value?"page":undefined}>{value==="overview"?"Overview":value==="classwork"?"Classwork":"Grades & feedback"}</Link>)}
+     <Link to="/classes" search={{section:course.id,tab:"lessons"}}>Classroom</Link>
+     {(["classwork","grades"] as const).map(value=><Link key={value} to="/student/courses" search={{section:course.id,tab:value}} aria-current={tab===value?"page":undefined}>{value==="classwork"?"Classwork":"Grades & feedback"}</Link>)}
     </DetailNavigation>
-    {tab==="overview"&&<>
-     <div className="mb-6 grid gap-3 sm:grid-cols-3">
-      <StatCard label="Assignments" value={work.length}/>
-      <StatCard label="Missing work" value={work.filter(item=>item.timeliness==="missing").length}/>
-      <StatCard label="Awaiting feedback" value={work.filter(item=>item.status==="submitted").length}/>
-     </div>
-     <WorkspacePanel title="About this class"><p className="text-sm leading-7">{course.description??"Your school has not provided a class description yet."}</p><p className="mt-3 text-sm text-muted-foreground">Delivery: {course.mode} · Enrolled</p>
-      <p className="mt-3 text-sm">Teaching team: {course.teachers?.length?course.teachers.map((teacher,index)=><span key={teacher.personId}>{index>0?", ":""}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></span>):"Not assigned"}</p></WorkspacePanel>
-    </>}
-    <WorkspacePanel className={tab==="overview"?"mt-6":""} title={tab==="grades"?"Grades & feedback":tab==="overview"?"Classwork at a glance":"Classwork"}
+    <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
      <div className="divide-y">{work.filter(item=>tab!=="grades"||item.status==="graded"||item.status==="returned").map(item=><article key={item.assessmentId} className="flex flex-wrap items-start justify-between gap-3 py-4 first:pt-0">
       <div className="min-w-0"><h3 className="font-semibold"><Link to="/student/assignments" search={{section:course.id,assessment:item.assessmentId}} className="underline">{item.title}</Link></h3>
@@ -172,5 +161,14 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
      {!work.some(item=>tab!=="grades"||item.status==="graded"||item.status==="returned")&&<p className="text-sm text-muted-foreground">{tab==="grades"?"No graded work or revision feedback yet.":"No published assignments in this class yet."}</p>}
     </WorkspacePanel>
    </>}
- </WorkspaceShell>;
+ </>;
+ return course?<ClassroomWorkspace title={course.title}
+  subtitle={`${course.code} · ${course.subject} · ${course.credits} credit(s)`}
+  rail={connections}>{content}</ClassroomWorkspace>:
+  <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="My classes"
+   subtitle="Enter an enrolled class to see your work, feedback and next steps."
+   breadcrumbs={<><Link to="/student" className="underline">Today</Link><span>/</span><span>My classes</span></>}
+   actions={<Link to="/student/courses" search={{view:"catalog"}} className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Course catalog / registration</Link>}>
+   {content}
+  </WorkspaceShell>;
 }

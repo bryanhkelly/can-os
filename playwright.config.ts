@@ -36,7 +36,7 @@ execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
 });
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: "admissions.spec.ts",
+  testIgnore: ["admissions.spec.ts", "**/read-only/**"],
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

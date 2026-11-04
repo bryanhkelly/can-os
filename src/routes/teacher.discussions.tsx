@@ -8,11 +8,13 @@ import { postDiscussionMessage } from "@/modules/learning/discussion-post.functi
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { z } from "zod";
 
 export const Route = createFileRoute("/teacher/discussions")({
-  validateSearch: (search: Record<string, unknown>): { section?: string; lesson?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { section?: string; lesson?: string; thread?: string } => ({
     section: typeof search.section === "string" ? search.section : undefined,
     lesson: typeof search.lesson === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(search.lesson) ? search.lesson : undefined,
+    thread: typeof search.thread === "string" ? z.string().uuid().parse(search.thread) : undefined,
   }),
   loader: safeLoader(() => getTeacherCourseDiscussions(), { authMessage: "Sign in with an authorized teacher account to manage class discussions." }),
   component: TeacherDiscussions,
@@ -24,10 +26,10 @@ function TeacherDiscussions() {
   return <TeacherDiscussionsView key={section+":"+(lesson??"all")} data={outcome.data}/>;
 }
 export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<typeof getTeacherCourseDiscussions>> }) {
-  const { section, lesson } = Route.useSearch();
+  const { section, lesson, thread: selectedThread } = Route.useSearch();
   const router = useRouter();
   const sections = data.sections.filter(item => !section || item.id === section);
-  const threads = data.threads.filter(item => !section || item.sectionId === section);
+  const threads = data.threads.filter(item => (!section || item.sectionId === section) && (!selectedThread || item.id === selectedThread));
   const [sectionId, setSectionId] = useState(sections[0]?.id ?? "");
   const [subject, setSubject] = useState("");
   const [prompt, setPrompt] = useState("");

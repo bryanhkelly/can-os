@@ -156,6 +156,13 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
        className="mt-1 block w-full rounded border bg-background p-2"/>
      </label>
 
+     <label className="block text-sm">Recorded lesson transcript
+      <textarea value={lesson.transcript ?? ""} maxLength={100000} rows={5}
+       onChange={event=>lessonChange(index,lesson.id,l=>({...l,transcript:event.target.value}))}
+       className="mt-1 block w-full rounded border bg-background p-2"/>
+      <span className="mt-1 block text-xs text-muted-foreground">Student-accessible transcript, published with this course release. Keep teacher-only answers in the protected guide.</span>
+     </label>
+
      <div className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm">Learning targets (one per line)
        <textarea rows={3} value={(lesson.learningTargets??[]).join("\n")} className="mt-1 block w-full rounded border bg-background p-2"

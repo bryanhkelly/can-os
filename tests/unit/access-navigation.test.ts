@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { accessLandingPath, safeAccessReturnTo } from "@/domain/access-navigation";
+import { accessLandingPath, accessReturnToFromLocation, safeAccessReturnTo } from "@/domain/access-navigation";
 
 describe("access navigation", () => {
+  it.each(["reply", "#reply"])("preserves router fragment %s with exactly one separator", hash => {
+    expect(accessReturnToFromLocation({ pathname: "/messages", searchStr: "?thread=123", hash }))
+      .toBe("/messages?thread=123#reply");
+  });
+
+  it("does not create return paths back into authentication", () => {
+    expect(accessReturnToFromLocation({ pathname: "/access", searchStr: "?returnTo=%2Fstudent", hash: "" }))
+      .toBeUndefined();
+  });
+
   it("preserves safe internal paths with their query and fragment", () => {
     expect(safeAccessReturnTo("/operations/teacher-marketplace?programId=123#matches"))
       .toBe("/operations/teacher-marketplace?programId=123#matches");

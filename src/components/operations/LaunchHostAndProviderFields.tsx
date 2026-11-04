@@ -78,10 +78,10 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                   {selectedSite && <LaunchSiteIdentityEditor key={"identity-"+selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={{name:selectedSite.name,timezone:selectedSite.timezone,slug:selectedSite.slug}}
                     revision={selectedSite.updatedAt} busy={busy} save={saveSiteIdentity}/>}
-                  {selectedSite && <LaunchSiteAddressEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
+                  {selectedSite && <LaunchSiteAddressEditor key={"address-"+selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.address} revision={selectedSite.updatedAt}
                     busy={busy} save={saveSiteAddress}/>}
-                  {selectedSite && <LaunchSiteContactEditor key={selectedSite.id+"-"+selectedSite.updatedAt}
+                  {selectedSite && <LaunchSiteContactEditor key={"contact-"+selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
                     busy={busy} save={saveSiteContact}/> }
                   {selectedSite && <div className="rounded-lg border px-4 py-3 text-sm">

@@ -1,6 +1,8 @@
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
-import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, BookOpen, CalendarDays, ClipboardList, School } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import { type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
@@ -140,8 +142,15 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    staffingIssues:commandCenter?.issues??[],
    programs:dashboard?.programs??[],
  });
- return <WorkspaceShell width="wide" eyebrow="CAN OS · School operations" title="Needs You"
+ return <DashboardHome eyebrow="CAN OS · School operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program. Operational actions remain subject to their existing permissions."
+  shortcuts={<>
+   <DashboardShortcut title="Action queue" description={`${data.items.length} open actions in scope`} icon={<ClipboardList className="size-5" />}><a href="#operations-actions" /></DashboardShortcut>
+   <DashboardShortcut title="School launches" description="Review configuration and readiness" icon={<School className="size-5" />}><Link to="/operations/launch" search={{siteId:selected.siteId,programId:selected.programId}} /></DashboardShortcut>
+   <DashboardShortcut title="Curriculum" description="Your school's learning programs" icon={<BookOpen className="size-5" />}><Link to="/operations/curriculum" search={{siteId:selected.siteId,programId:selected.programId}} /></DashboardShortcut>
+   <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
+  </>}
+  priority={attentionItems.some(item=>item.priority==="critical") ? <AttentionQueue items={attentionItems.filter(item=>item.priority==="critical")} /> : undefined}
   actions={<div className="flex flex-wrap gap-2"><Link to="/operations/launch" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link><Link to="/operations/family-alerts" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Notify families</Link></div>}>
   {notice&&<p role="status" className="mb-4 rounded-xl border p-4 text-sm">{notice}</p>}
   <section aria-label="Operations filters" className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
@@ -172,7 +181,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    onClick={()=>void retryExitRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
    Retry institutional change refresh
   </button>}
-  <AttentionQueue items={attentionItems}/>
+  <AttentionQueue items={attentionItems.filter(item=>item.priority!=="critical")}/>
   <section aria-label="School improvement and planning" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
     <p className="text-xs font-bold uppercase tracking-widest text-primary">Sustain · Review and plan</p>
     <h2 className="mt-2 font-serif text-2xl font-semibold">Keep your school moving forward</h2>
@@ -376,5 +385,5 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   </label>}
   {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
  </ActionDialog>}
- </WorkspaceShell>;
+ </DashboardHome>;
 }

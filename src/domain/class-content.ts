@@ -3,6 +3,7 @@ import { yearlongCourseBlueprintSchema } from "./yearlong-course-blueprint";
 
 const key = z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/);
 const httpsUrl = z.string().url().max(2048).refine(value => {
+  if (!URL.canParse(value)) return false;
   const url = new URL(value);
   return url.protocol === "https:" && !url.username && !url.password;
 }, "Resources require an HTTPS URL without embedded credentials");
@@ -28,6 +29,7 @@ const lesson = z.object({
   standards:z.array(z.string().min(3).max(40)).max(20).optional(),
   estimatedMinutes:z.number().int().min(1).max(180).optional(),
   activities:z.array(activity).max(20).optional(),
+  transcript: z.string().max(100_000).optional(),
 });
 export const classLessonSchema = lesson;
 export const classModuleSchema = z.object({

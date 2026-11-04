@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { schoolSetupSchema, type SchoolSetupResult } from "@/domain/school-setup";
 import { DomainError } from "@/domain/errors";
@@ -7,7 +8,7 @@ import { useHydrated } from "@/lib/use-hydrated";
 
 export const Route = createFileRoute("/schools/new")({
   server: { handlers: {
-    POST: async ({ request }) => {
+    POST: createServerOnlyFn(async ({ request }) => {
       const headers = { "Cache-Control": "no-store" };
       if (new URL(request.url).origin !== request.headers.get("origin"))
         return Response.json({ error: "Invalid request origin" }, { status: 403, headers });
@@ -44,7 +45,7 @@ export const Route = createFileRoute("/schools/new")({
         return Response.json({ error: "School setup is temporarily unavailable. Retry with the same domain." },
           { status: 503, headers: { ...headers, "Retry-After": "30" } });
       }
-    },
+    }),
   } },
   component: SchoolSetupPage,
 });

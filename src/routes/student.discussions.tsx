@@ -6,15 +6,19 @@ import {getCourseDiscussions} from "@/modules/learning/course-discussions.functi
 import {postDiscussionMessage} from "@/modules/learning/discussion-post.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
+import { z } from "zod";
 const loadCourseDiscussions=()=>getCourseDiscussions();
 export const Route=createFileRoute("/student/discussions")({
- validateSearch:(search:Record<string,unknown>):{section?:string}=>({section:typeof search.section==="string"?search.section:undefined}),
+ validateSearch:(search:Record<string,unknown>):{section?:string;thread?:string}=>({
+  section:typeof search.section==="string"?search.section:undefined,
+  thread:typeof search.thread==="string"?z.string().uuid().parse(search.thread):undefined,
+ }),
  loader:safeLoader(loadCourseDiscussions,{authMessage:"Sign in with an authorized student account to view course discussions."}),component:DiscussionsPage});
 function DiscussionsPage(){
  const outcome=Route.useLoaderData();
- const {section}=Route.useSearch();
+ const {section,thread}=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Course discussions" title="Course discussions" outcome={outcome}/>;
- return <DiscussionsView threads={outcome.data.filter(thread=>!section||thread.sectionId===section)}/>;
+ return <DiscussionsView threads={outcome.data.filter(item=>(!section||item.sectionId===section)&&(!thread||item.id===thread))}/>;
 }
 function DiscussionsView({threads}:{threads:Awaited<ReturnType<typeof loadCourseDiscussions>>}){
  const router=useRouter();

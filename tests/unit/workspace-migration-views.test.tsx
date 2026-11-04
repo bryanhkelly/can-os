@@ -74,7 +74,7 @@ describe("enrolled learning workspace", () => {
     expect(html).not.toContain("Available Chemistry");
     expect(html).not.toContain("Request class");
     expect(html).toContain('href="/student/courses?view=catalog"');
-    expect(html).toContain('href="/student/courses?section=english"');
+    expect(html).toContain('href="/classes?section=english&amp;tab=lessons"');
   });
   it("retains real registration controls only in the catalog", () => {
     state.search = { view: "catalog" };
@@ -186,6 +186,9 @@ describe("family and student profiles", () => {
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""
       student="child-person" action="consent-1"/>);
     expect(html).toContain("Showing Jordan’s family information.");
+    expect(html).toContain("role-dashboard");
+    expect(html).toContain("can-dashboard-hero");
+    expect(html).toContain('aria-label="Dashboard shortcuts"');
     expect(html).toContain('href="/guardian?action=consent-1"');
     expect(html).toContain('href="/guardian/academics?student=child-person"');
     expect(html).not.toContain("Casey Sample");

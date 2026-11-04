@@ -38,6 +38,15 @@ describe("native session redemption",()=>{
   expect(response.status).toBe(303);
   expect(response.headers.get("Location")).toBe("/operations/launch?siteId=new-school-site");
  });
+ it("routes the fixed Valor Site Admin to Valor's Launch Studio",async()=>{
+  state.demo.mockResolvedValue({
+   role:"site_admin",setCookie:cookie,launchSiteId:"f1000000-0000-4000-8000-000000000003",
+  });
+  const response=await state.handler!({request:form({email:"admin.demo@valorschool.demo",code:"000000"})});
+  expect(response.status).toBe(303);
+  expect(response.headers.get("Location"))
+   .toBe("/operations/launch?siteId=f1000000-0000-4000-8000-000000000003");
+ });
  it("denies a cross-origin form before quota or credential work",async()=>{
   expect((await state.handler!({request:form({email:"admin@example.test",code:"fixture"},"https://other.example")})).status).toBe(403);
   expect(state.admit).not.toHaveBeenCalled();expect(state.demo).not.toHaveBeenCalled();

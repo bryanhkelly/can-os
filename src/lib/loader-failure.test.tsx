@@ -3,6 +3,8 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children, ...props }: { to: string; children: ReactNode; className?: string }) =>
+    createElement("a", { href: to, ...props }, children),
   Navigate: ({ to, search }: { to: string; search: { returnTo: string } }) =>
     createElement("div", { "data-to": to, "data-return-to": search.returnTo }),
   useLocation: () => ({
@@ -10,6 +12,11 @@ vi.mock("@tanstack/react-router", () => ({
     searchStr: "?programId=demo",
     hash: "#matches",
   }),
+  useNavigate: () => vi.fn(),
+}));
+
+vi.mock("@/components/shell/WorkspaceSession", () => ({
+  useWorkspaceSession: () => ({ session: { authenticated: true, role: "site_admin" } }),
 }));
 
 vi.mock("@/components/workspace", () => ({
@@ -17,13 +24,14 @@ vi.mock("@/components/workspace", () => ({
 }));
 
 vi.mock("./loader-error-state", () => ({
-  LoaderErrorState: () => createElement("p", null, "Permission denied"),
+  LoaderErrorState: ({ fallback }: { fallback?: ReactNode }) =>
+    createElement("div", null, fallback ?? "Permission denied"),
 }));
 
 import { LoaderFailure } from "./loader-failure";
 
 describe("LoaderFailure", () => {
-  it("redirects missing sessions to sign-in with the full current route", () => {
+  it("defers missing-session navigation to the client effect", () => {
     const html = renderToStaticMarkup(createElement(LoaderFailure, {
       title: "Teacher marketplace",
       outcome: {
@@ -33,8 +41,8 @@ describe("LoaderFailure", () => {
       },
     }));
 
-    expect(html).toContain('data-to="/access"');
-    expect(html).toContain('data-return-to="/operations/teacher-marketplace?programId=demo#matches"');
+    expect(html).not.toContain('data-to="/access"');
+    expect(html).toContain("Permission denied");
   });
 
   it("does not redirect permission denials to sign-in", () => {
@@ -47,7 +55,9 @@ describe("LoaderFailure", () => {
       },
     }));
 
-    expect(html).toContain("Permission denied");
+    expect(html).toContain("You do not have permission");
+    expect(html).toContain('href="/operations"');
+    expect(html).toContain("Go to my workspace");
     expect(html).not.toContain('data-to="/access"');
   });
 });

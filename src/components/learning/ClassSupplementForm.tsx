@@ -23,7 +23,7 @@ export function ClassSupplementForm({
   }
   return <form className="mb-5 grid gap-3 rounded-lg border p-4" onSubmit={submit}>
     <h3 className="text-sm font-semibold">Add a teacher supplement</h3>
-    <p className="text-xs text-muted-foreground">Share an HTTPS resource with this class, or connect it to a particular published lesson. Publisher content stays unchanged.</p>
+    <p className="text-xs text-muted-foreground">Share an HTTPS resource with this class, or connect it to a particular published lesson. Videos support YouTube, Vimeo and direct MP4/WebM links. Publisher content stays unchanged.</p>
     <label className="text-sm">Title<input aria-label="Resource title" required minLength={3} maxLength={200}
       value={title} onChange={event=>onTitleChange(event.target.value)} className="mt-1 w-full rounded border p-2"/></label>
     <label className="text-sm">External HTTPS resource URL<input aria-label="Resource URL" required type="url"

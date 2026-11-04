@@ -1,10 +1,13 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { Building2, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
 import { listNetworkAffiliations, reviewNetworkAffiliation } from "@/modules/networks/network-affiliations.functions";
-import { WorkspaceShell, EmptyState } from "@/components/workspace";
+import { EmptyState } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -53,9 +56,16 @@ function NetworkSites({ data }: { data: NetworkData }) {
       } }), { successMessage: "Affiliation decision recorded.", commandErrorMessage: "Unable to review affiliation." });
   }
 
-  return <WorkspaceShell eyebrow="CAN OS · Network partner" title={data.organization.name}
-    subtitle="Denomination HQ can establish and manage its own locations. This does not grant access to school academic records or enroll students.">
-    <section className="mt-8 rounded-xl border bg-card p-5">
+  return <DashboardHome eyebrow="CAN OS · Network partner" title={data.organization.name}
+    subtitle="Denomination HQ can establish and manage its own locations. This does not grant access to school academic records or enroll students."
+    shortcuts={<>
+      <DashboardShortcut title="Affiliations" description={`${data.affiliations.filter(entry=>entry.status==="pending").length} requests pending review`} icon={<ClipboardList className="size-5" />}><a href="#network-affiliations" /></DashboardShortcut>
+      <DashboardShortcut title="Locations" description={`${data.sites.length} directly operated locations`} icon={<Building2 className="size-5" />}><a href="#network-locations" /></DashboardShortcut>
+      <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
+      <DashboardShortcut title="Messages" description="Partner conversations" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
+    </>}
+    actions={<><a href="#network-create">Add an HQ-operated location →</a><Link to="/profiles">My profile →</Link></>}>
+    <section id="network-affiliations" className="border bg-card p-5">
       <h2 className="font-serif text-2xl">School affiliation requests</h2>
       <p className="mt-2 text-sm text-muted-foreground">Schools retain their own organizations and academic permissions. Approving a link does not give HQ access to students, families, courses or admissions.</p>
       <div className="mt-4 space-y-3">
@@ -91,7 +101,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
         {data.affiliations.length === 0 && <p className="text-sm text-muted-foreground">No school affiliation requests yet.</p>}
       </div>
     </section>
-    <section className="mt-8 rounded-xl border bg-card p-5">
+    <section id="network-create" className="mt-8 rounded-xl border bg-card p-5">
       <h2 className="font-serif text-2xl">Add a headquarters-operated location</h2>
       <p className="mt-2 text-sm text-muted-foreground">Use this only for a location owned or operated by the denomination. Independently owned churches and schools require a reviewed affiliation link, not a transfer of site ownership.</p>
       <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={create}>
@@ -115,7 +125,7 @@ function NetworkSites({ data }: { data: NetworkData }) {
       </form>
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording network change..."/>
     </section>
-    <section className="mt-8">
+    <section id="network-locations" className="mt-8 border bg-card p-5">
       <h2 className="font-serif text-2xl">Directly operated locations</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {data.sites.map(site => <article key={site.id} className="rounded-xl border bg-card p-5">
@@ -125,5 +135,5 @@ function NetworkSites({ data }: { data: NetworkData }) {
       </div>
       {!data.sites.length && <EmptyState title="No headquarters-operated sites yet." />}
     </section>
-  </WorkspaceShell>;
+  </DashboardHome>;
 }

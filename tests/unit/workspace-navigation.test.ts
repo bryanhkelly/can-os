@@ -2,7 +2,7 @@ import {describe,expect,it,vi} from "vitest";
 import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 import {SidebarLinks,workspaceLinks} from "@/components/shell/WorkspaceNavigation";
-import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks} from "@/components/shell/workspace-navigation.registry";
+import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks,isFocusedClassroomRoute} from "@/components/shell/workspace-navigation.registry";
 import {createMemoryHistory,createRootRoute,createRouter,RouterProvider} from "@tanstack/react-router";
 import { getWorkspaceScopeLabel } from "@/components/shell/workspace-scope";
 
@@ -51,7 +51,7 @@ describe("canonical workspace navigation",()=>{
   expect(getActiveWorkspacePath(workspaceLinks.registrar,"/sites/school/publish/")).toBe("/sites");
   expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school")).toBe("/site/day");
   expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school/publish")).toBe("/site-website");
-  expect(getActiveWorkspacePath(workspaceLinks.registrar,"/classes")).toBe("/operations");
+  expect(getActiveWorkspacePath(workspaceLinks.registrar,"/classes")).toBeUndefined();
   expect(getActiveWorkspacePath(workspaceLinks.teacher,"/staff/students/person")).toBe("/staff/students");
   expect(getActiveWorkspacePath(workspaceLinks.teacher,"/teacher/unowned")).toBeUndefined();
   expect(getActiveWorkspacePath(workspaceLinks.student,"/classes-archive")).toBeUndefined();
@@ -74,6 +74,15 @@ describe("canonical workspace navigation",()=>{
  it("does not give a role duplicate labels for one destination",()=>{
   const facilitatorLinks=getWorkspaceLinks("room_facilitator")??[];
   expect(new Set(facilitatorLinks.map(item=>item.path)).size).toBe(facilitatorLinks.length);
+ });
+ it("focuses the classroom shell only for roles that can use the class workspace",()=>{
+  expect(isFocusedClassroomRoute("/classes","?section=section-id","student")).toBe(true);
+  expect(isFocusedClassroomRoute("/classes","?section=section-id","guardian")).toBe(true);
+  expect(isFocusedClassroomRoute("/classes","?section=section-id","teacher")).toBe(true);
+  expect(isFocusedClassroomRoute("/classes","?section=section-id","site_admin")).toBe(false);
+  expect(isFocusedClassroomRoute("/student/courses","?section=section-id","student")).toBe(true);
+  expect(isFocusedClassroomRoute("/student/courses","?section=section-id&view=catalog","student")).toBe(false);
+  expect(isFocusedClassroomRoute("/classes","?tab=overview","teacher")).toBe(false);
  });
  it("marks only the selected destination and preserves its concrete route",async()=>{
   const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/my-school"})});

@@ -4,6 +4,7 @@ import { encodeCommonCartridge } from "@/components/learning/common-cartridge-en
 import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
 import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClassMappingFields";
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
+import { StaffClassVideos } from "@/components/learning/StaffClassVideos";
 import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -149,7 +150,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
    <section id="curriculum-packs" className="space-y-3">
     <h2 className="font-serif text-2xl">Available curriculum packs</h2>
     <div className="grid gap-4 md:grid-cols-2">
-     {market.packs.map(pack=><article key={pack.versionId} className="space-y-3 rounded-xl border bg-card p-5">
+     {market.packs.map(pack=><article key={pack.versionId} id={`curriculum-pack-${pack.versionId}`} className="scroll-mt-6 space-y-3 rounded-xl border bg-card p-5">
        <p className="text-xs uppercase tracking-wide text-muted-foreground">Version {pack.version} · {pack.licenseCode} · Published by {pack.publisherName}</p>
        <h3 className="font-serif text-2xl">{pack.name}</h3>
        <p className="text-sm text-muted-foreground">{pack.description}</p>
@@ -199,6 +200,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     </div>
     {!market.packs.length&&<p className="rounded border p-4 text-sm">No published curriculum packs are available to this organization yet.</p>}
    </section>
+   <StaffClassVideos sections={market.sections} videos={market.overlays}/>
    <section className="space-y-4 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Supplement adopted curriculum</h2>
     <p className="text-sm text-muted-foreground">Add videos, PDFs hosted at an HTTPS address, websites or other resources. Publisher course versions remain unchanged; approved additions are tracked separately by program, site or class.</p>

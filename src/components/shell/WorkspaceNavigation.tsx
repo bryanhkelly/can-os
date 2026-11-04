@@ -4,7 +4,7 @@ import {useEffect,useState,type ReactNode} from "react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
-import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks} from "./workspace-navigation.registry";
+import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks,isFocusedClassroomRoute} from "./workspace-navigation.registry";
 import {WorkspaceSidebar} from "./WorkspaceSidebar";
 import {WorkspaceTopBar} from "./WorkspaceTopBar";
 import {WorkspaceNavigationPanels} from "./WorkspaceNavigationPanels";
@@ -22,6 +22,9 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const [menuOpen,setMenuOpen]=useState(false);
  const [switcherOpen,setSwitcherOpen]=useState(false);
  const [accountOpen,setAccountOpen]=useState(false);
+ const [sidebarExpanded,setSidebarExpanded]=useState(false);
+ const focusedClassroom=isFocusedClassroomRoute(location.pathname,location.searchStr,
+  session?.authenticated?session.role:null);
  useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
  const preferences=authenticated?.role==="student"?authenticated.studentPreferences:undefined;
@@ -51,12 +54,14 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   }
  }
  return <div data-density={preferences?.density} data-reduce-motion={preferences?.reduceMotion?"true":undefined}>
- <div className={current?"min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]":"min-h-screen"}>
- {current&&<WorkspaceSidebar member={current} sites={authenticated?.sites??[]} links={links} activePath={activePath}/>}
+ <div className={current ? focusedClassroom ? `classroom-navigation ${sidebarExpanded ? "classroom-navigation-expanded" : ""}` : "min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]" : "min-h-screen"}>
+ {current&&<WorkspaceSidebar member={current} sites={authenticated?.sites??[]} links={links} activePath={activePath}
+  focused={focusedClassroom} expanded={sidebarExpanded} onToggle={()=>setSidebarExpanded(value=>!value)}/>}
  <div className="min-w-0"><WorkspaceTopBar member={current} sites={authenticated?.sites??[]} authenticated={Boolean(authenticated)}
   sessionAvailable={Boolean(session)} sessionError={sessionError} error={error}
   demoAccountSwitching={authenticated?.demoAccountSwitching===true} changing={changing}
   demoTenant={authenticated?.demoTenant===true}
+  focused={focusedClassroom}
   menuOpen={menuOpen} switcherOpen={switcherOpen} accountOpen={accountOpen}
   onToggleMenu={()=>setMenuOpen(value=>!value)}
   onOpenSwitcher={()=>{setSwitcherError("");setSwitcherOpen(true)}}

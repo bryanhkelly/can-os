@@ -25,6 +25,7 @@ export const EventTypes = {
   GradePosted: "GradePosted",
   SubmissionGradingDraftSaved: "SubmissionGradingDraftSaved",
   LessonCompletionChanged: "LessonCompletionChanged",
+  PrivateLessonNoteSaved: "PrivateLessonNoteSaved",
   ClassAnnouncementPublished: "ClassAnnouncementPublished",
   SubmissionAnnotated: "SubmissionAnnotated",
   ProfilePhotoChanged: "ProfilePhotoChanged",

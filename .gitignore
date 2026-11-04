@@ -14,5 +14,6 @@ chromatic.log
 
 # Playwright e2e artifacts
 /test-results/
+/test-results-routes/
 /playwright-report/
 /playwright/.cache/

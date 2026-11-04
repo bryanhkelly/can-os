@@ -33,7 +33,9 @@ export const FailedReviewRetainsRationale: Story = {
     const textarea = canvas.getByRole("textbox", { name: "Review rationale" });
     await userEvent.type(textarea, "Please provide a corrected and signed document.");
     await userEvent.click(canvas.getByRole("button", { name: "Reject and request correction" }));
-    await expect(await canvas.findByRole("alert")).toHaveTextContent("Version changed");
+    const alert = await canvas.findByRole("alert");
+    await expect(alert).toHaveTextContent("Evidence review was not recorded");
+    await expect(alert).not.toHaveTextContent("Version changed");
     await expect(textarea).toHaveValue("Please provide a corrected and signed document.");
   },
 };

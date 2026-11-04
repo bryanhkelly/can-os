@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerOnlyFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { ChurchApplicationConfirmation } from "@/components/church/ChurchApplicationConfirmation";
 import { churchApplicationSchema as applicationSchema, churchApplicationLimits,
@@ -6,7 +7,7 @@ import { churchApplicationSchema as applicationSchema, churchApplicationLimits,
 
 export const Route = createFileRoute("/church/apply")({
   server: { handlers: {
-    POST: async ({ request }) => {
+    POST: createServerOnlyFn(async ({ request }) => {
       if (new URL(request.url).origin !== request.headers.get("origin"))
         return Response.json({ error: "Invalid request origin" }, { status: 403 });
       try {
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/church/apply")({
           status: 503, headers: { "Cache-Control": "no-store" },
         });
       }
-    },
+    }),
   } },
   component: ChurchApplicationPage,
 });

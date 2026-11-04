@@ -12,6 +12,7 @@ import {
 } from "@/modules/calendar/calendar.functions";
 import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/timezone";
 import { calendarSources, filterCalendarItems, type CalendarSource } from "@/domain/calendar-view";
+import { StatusBadge, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:"month"|"agenda"}=>({
@@ -33,6 +34,25 @@ function formatTime(iso: string, timezone: string): string {
     return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(iso));
   } catch {
     return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  }
+}
+
+function formatEventDate(iso: string, timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: timezone,
+    }).format(new Date(iso));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(iso));
   }
 }
 
@@ -255,6 +275,84 @@ function CalendarPage() {
   };
 
   const selectedItems = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
+  const selectedEvent = selectedItems.find(item => item.id === search.event);
+
+  if (search.event) {
+    if (loading) {
+      return <WorkspaceShell eyebrow="CAN OS · Calendar" title="Event details">
+        <p role="status" className="mt-6">Loading event details...</p>
+      </WorkspaceShell>;
+    }
+
+    if (!selectedEvent) {
+      return <WorkspaceShell eyebrow="CAN OS · Calendar" title="Event unavailable">
+        <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">
+          This event is unavailable on the requested date in your current calendar.
+        </p>
+        <Link to="/calendar" search={{ ...search, event: undefined }} className="mt-5 inline-block text-sm font-semibold underline">
+          Back to calendar
+        </Link>
+      </WorkspaceShell>;
+    }
+
+    const eventTime = `${formatTime(selectedEvent.startsAt, selectedEvent.timezone)}${selectedEvent.endsAt
+      ? ` – ${formatTime(selectedEvent.endsAt, selectedEvent.timezone)}`
+      : ""}`;
+
+    return <WorkspaceShell
+      width="wide"
+      eyebrow="CAN OS · Calendar"
+      title={selectedEvent.title}
+      subtitle={`${typeLabel(selectedEvent)} · ${formatEventDate(selectedEvent.startsAt, selectedEvent.timezone)} · ${eventTime}`}
+      breadcrumbs={<><Link to="/calendar" search={{ ...search, event: undefined }} className="underline">Calendar</Link><span>/</span><span>{selectedEvent.title}</span></>}
+      rail={<WorkspacePanel title="Record context">
+        <dl className="space-y-4 text-sm">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar status</dt>
+            <dd className="mt-1"><StatusBadge tone={selectedEvent.cancelled ? "danger" : "neutral"}>
+              {selectedEvent.cancelled ? "Cancelled" : "On calendar"}
+            </StatusBadge></dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event type</dt>
+            <dd className="mt-1">{typeLabel(selectedEvent)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time zone</dt>
+            <dd className="mt-1">{selectedEvent.timezone}</dd>
+          </div>
+        </dl>
+      </WorkspacePanel>}
+    >
+      <div className="mt-6 grid gap-5">
+        <WorkspacePanel title="Event details" description="Schedule and description for this calendar event.">
+          <dl className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</dt>
+              <dd className="mt-1 text-sm">{formatEventDate(selectedEvent.startsAt, selectedEvent.timezone)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</dt>
+              <dd className="mt-1 text-sm">{eventTime} <span className="text-muted-foreground">{selectedEvent.timezone}</span></dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</dt>
+              <dd className="mt-1 text-sm">{typeLabel(selectedEvent)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</dt>
+              <dd className="mt-1 text-sm">{selectedEvent.cancelled ? "Cancelled" : "On calendar"}</dd>
+            </div>
+          </dl>
+        </WorkspacePanel>
+        <WorkspacePanel title="Description">
+          <p className="whitespace-pre-wrap text-sm leading-6">
+            {selectedEvent.description || "No additional description has been provided."}
+          </p>
+        </WorkspacePanel>
+      </div>
+    </WorkspaceShell>;
+  }
 
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">
@@ -306,35 +404,45 @@ function CalendarPage() {
             <div className="mt-1 grid grid-cols-7 gap-1">
               {cells.map((cell, index) =>
                 cell ? (
-                  <button
+                  <div
                     key={cell.key}
-                    type="button"
-                    onClick={() => openDay(cell.key)}
+                    onClick={(event) => {
+                      if (!(event.target instanceof Element) || !event.target.closest("a, button")) openDay(cell.key);
+                    }}
                     onDragOver={(event) => {
                       if (isTeacher) event.preventDefault();
                     }}
                     onDrop={(event) => onDrop(event, cell.key)}
-                    className={`min-h-24 rounded-lg border p-1.5 text-left align-top text-xs ${
+                    className={`min-h-24 cursor-pointer rounded-lg border p-1.5 text-xs ${
                       selectedDay === cell.key ? "border-foreground" : "border-border"
-                    } ${isTeacher ? "cursor-pointer" : ""}`}
+                    }`}
                   >
-                    <span className="font-semibold">{cell.day}</span>
+                    <button
+                      type="button"
+                      onClick={() => openDay(cell.key)}
+                      className="block w-full text-left"
+                      aria-label={`Select ${cell.key}`}
+                    >
+                      <span className="font-semibold">{cell.day}</span>
+                    </button>
                     <span className="mt-1 flex flex-col gap-1">
                       {(byDay.get(cell.key) ?? []).map((item) => (
-                        <span
+                        <Link
                           key={item.id}
+                          to="/calendar"
+                          search={{ ...search, date: cell.key, event: item.id }}
                           draggable={isTeacher && item.source === "assessment"}
                           onDragStart={(event) => onDragStart(event, item)}
                           title={`${typeLabel(item)} · ${item.title}`}
-                          className={`block truncate rounded border px-1 py-0.5 ${chipClass(item)} ${
+                          className={`block truncate rounded border px-1 py-0.5 underline underline-offset-2 ${chipClass(item)} ${
                             isTeacher && item.source === "assessment" ? "cursor-grab" : ""
                           }`}
                         >
                           {typeLabel(item)} · {item.title}
-                        </span>
+                        </Link>
                       ))}
                     </span>
-                  </button>
+                  </div>
                 ) : (
                   <div key={`blank-${index}`} className="min-h-24 rounded-lg border border-transparent" />
                 ),
@@ -351,7 +459,9 @@ function CalendarPage() {
                 {selectedItems.map((item) => (
                   <li key={item.id} className={`rounded-lg border p-3 text-sm ${search.event===item.id?"ring-2 ring-primary ":""}${item.cancelled ? "border-red-200 bg-red-50/40" : "border-border"}`}>
                     <p className="font-semibold">
-                      {item.source==="assessment"&&data?.viewerRole==="student"?<Link to="/student/assignments" search={{assessment:item.id.slice("assessment:".length)}} className="underline">{item.title}</Link>:item.title}
+                      {item.source==="assessment"&&data?.viewerRole==="student"
+                        ? <Link to="/student/assignments" search={{assessment:item.id.slice("assessment:".length)}} className="underline">{item.title}</Link>
+                        : <Link to="/calendar" search={{...search,date:dateKeyInTimezone(item.startsAt,item.timezone),event:item.id}} className="underline">{item.title}</Link>}
                       {item.cancelled && <span className="ml-2 rounded border border-red-300 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">Cancelled</span>}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">

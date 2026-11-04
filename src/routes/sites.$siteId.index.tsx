@@ -1,8 +1,12 @@
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
+import { CalendarDays, ClipboardList, School, Users } from "lucide-react";
+import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, CalendarDays, ClipboardCheck, Globe2 } from "lucide-react";
+
 import { getSiteToday } from "@/modules/operations/site-today.functions";
-import { StatCard, WorkspaceShell } from "@/components/workspace";
+import { StatCard } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
@@ -60,15 +64,22 @@ function SiteTodayPage() {
   const leaderAttention=[...operatingAlerts,...data.attentionItems];
   const ownedFollowUps=data.actions.filter(action=>
     action.ownerPersonId===data.viewerPersonId&&ownerResolvableTypes.has(action.type));
-  return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
+  return <DashboardHome eyebrow="CAN OS · Site Operations" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
+    shortcuts={<>
+      <DashboardShortcut title="School operations" description="Authorized actions and readiness" icon={<ClipboardList className="size-5" />}><Link to="/operations" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
+      <DashboardShortcut title="Admissions" description="Applications and enrollment" icon={<Users className="size-5" />}><Link to="/admissions" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
+      <DashboardShortcut title="School launches" description="Review program configuration" icon={<School className="size-5" />}><Link to="/operations/launch" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
+      <DashboardShortcut title="Calendar" description={`Dates in ${data.site.timezone}`} icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:data.localDate}} /></DashboardShortcut>
+    </>}
+    rail={<DashboardCalendar date={data.localDate} timezone={data.site.timezone} />}
     actions={<div className="flex flex-wrap gap-2">
       <Link className="rounded-lg border px-3 py-2 text-sm" to="/sites/$siteId/publish"
         params={{siteId:data.site.id}}>Public site setup →</Link>
       <Link className="rounded-lg border px-3 py-2 text-sm" to="/operations"
         search={{siteId:data.site.id,programId:undefined}}>This school’s operations →</Link>
-    </div>}>
-    <WorkflowIntro eyebrow="Site operations" title="A clear view of your school day." description="Review readiness, outstanding work and the schedule from your authorized site records." actions={<><Link to="/readiness" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> School readiness <ArrowUpRight className="size-4" /></Link>{data.canOpenOnsiteDay&&<Link to="/site/day" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><CalendarDays className="size-4" /> Onsite day</Link>}<Link to="/sites/$siteId/publish" params={{siteId:data.site.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><Globe2 className="size-4" /> Public website</Link></>} />
+    </div>}
+    priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
@@ -76,6 +87,8 @@ function SiteTodayPage() {
         ["People", "/profiles"], ["Ask CAN", "/ask"],
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
+      {data.canOpenOnsiteDay && <Link to="/site/day"
+        className="border px-3 py-1.5 hover:bg-muted">Onsite day</Link>}
     </nav>
     <section id="school-day-operating-decision" aria-label="School-day operating decision"
       role={decision.status==="opening_blocked"?"alert":"status"}
@@ -115,6 +128,7 @@ function SiteTodayPage() {
       staffingExceptionCount={staffingExceptions.length}
       studentExceptionCount={studentExceptions.length}/>
     <OpeningHandoffs handoffs={data.openingHandoffs}/>
+    </>}>
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="Active enrollment" value={data.enrollment.count} hint={data.enrollment.note}/>
       <StatCard label="Attendance recorded" value={data.attendance.count ? data.attendance.count : "No records"} hint={data.attendance.note}/>
@@ -218,5 +232,9 @@ function SiteTodayPage() {
         <p className="mt-4 text-xs text-muted-foreground">Refreshed at {localTime(data.asOf)}. Metrics are derived from canonical records; no fixture totals are substituted.</p>
       </aside>
     </div>
-  </WorkspaceShell>;
+    <details className="mt-8 border bg-card p-4">
+      <summary className="cursor-pointer text-sm font-semibold">Network affiliations and site settings</summary>
+      <div className="mt-4"><SiteAffiliationPanel siteId={data.site.id}/></div>
+    </details>
+  </DashboardHome>;
 }

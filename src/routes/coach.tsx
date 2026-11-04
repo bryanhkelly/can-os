@@ -1,6 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { Users, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   getCoachCaseload,
@@ -105,11 +107,16 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
   }
 
   return (
-    <WorkspaceShell width="wide" eyebrow="CAN OS · Student support" title={title}
-      actions={<Link to="/support" className="rounded-lg border px-4 py-2 text-sm">Referrals, plans & services</Link>}>
-        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Students at your sites with open referrals, support plans, insights, or actions — sorted by what needs attention first.
-        </p>
+    <DashboardHome eyebrow="CAN OS · Student support" title={title}
+      subtitle="Students at your sites with open referrals, support plans, insights, or actions — sorted by what needs attention first."
+      shortcuts={<>
+        <DashboardShortcut title="Caseload" description={loading?"Loading assigned students":error?"Caseload unavailable":`${students.length} students in scope`} icon={<Users className="size-5" />}><a href="#support-caseload" /></DashboardShortcut>
+        <DashboardShortcut title="Referrals & plans" description="Review authorized support services" icon={<ClipboardList className="size-5" />}><Link to="/support" /></DashboardShortcut>
+        <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
+        <DashboardShortcut title="Messages" description="Coordinate student support" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
+      </>}
+      actions={<><Link to="/support">Referrals, plans & services →</Link><Link to="/profiles">My profile →</Link></>}>
+        <div id="support-caseload">
         {loading && <p className="mt-8 text-sm" role="status">Loading caseload…</p>}
         {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
         {!loading&&!error&&selected&&!chosen&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This student is unavailable in your current caseload.</p>}
@@ -245,6 +252,7 @@ export function CoachPage({studentProfileId,selectStudent,title="Specialist case
             </section>
           </div>
         )}
-    </WorkspaceShell>
+        </div>
+    </DashboardHome>
   );
 }

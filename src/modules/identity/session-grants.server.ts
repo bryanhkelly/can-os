@@ -106,7 +106,11 @@ export async function readSessionGrants(accountId: string, email: string, reader
     );
     if (!adminGrant) throw new AuthorizationError("active demo administrator membership");
     const grants = await listDemoSourceGrants(reader);
-    return { grants: [adminGrant, ...grants], demoAccountSwitching: true };
+    return {
+      grants: [adminGrant, ...grants],
+      demoAccountSwitching: true,
+      launchSiteId: LOCAL_DEMO_ADMIN.siteId,
+    };
   }
 
   const grants = ownGrants.filter(grant =>

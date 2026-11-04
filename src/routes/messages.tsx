@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { normalizeClientError } from "@/lib/client-error";
+import { accessReturnToFromLocation } from "@/domain/access-navigation";
 import {
   getThread,
   listMyThreads,
@@ -36,7 +37,7 @@ function MessagesPage() {
   const { thread } = Route.useSearch();
   const navigate = Route.useNavigate();
   const location=useLocation();
-  const returnTo=`${location.pathname}${location.searchStr}${location.hash}`;
+  const returnTo=accessReturnToFromLocation(location);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const selectedId = thread ?? threads[0]?.id ?? "";
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
@@ -60,7 +61,7 @@ function MessagesPage() {
   const [loadingContacts, setLoadingContacts] = useState(true);
 
   useEffect(() => {
-    if (needsSignIn) {
+    if (needsSignIn && returnTo) {
       void navigate({ to: "/access", search: { returnTo }, replace: true });
     }
   }, [needsSignIn, navigate, returnTo]);
@@ -303,25 +304,25 @@ function MessagesPage() {
           <p className="mt-8 text-sm">No conversations yet.</p>
         )}
         {!loading && (threads.length > 0 || Boolean(thread)) && (
-          <div className="mt-8 grid gap-4 md:grid-cols-[300px_1fr]">
-            <nav aria-label="Conversations" className="grid content-start gap-2">
+          <div className="mt-8 grid min-w-0 gap-4 md:grid-cols-[300px_minmax(0,1fr)]">
+            <nav aria-label="Conversations" className="grid min-w-0 content-start gap-2">
               {threads.map((thread) => (
                 <Link
                   key={thread.id}
                   to="/messages"
                   search={{thread:thread.id}}
                   aria-current={thread.id === selectedId?"page":undefined}
-                  className={`rounded-xl border bg-card p-4 text-left ${
+                  className={`min-w-0 rounded-xl border bg-card p-4 text-left ${
                     thread.id === selectedId ? "ring-2 ring-primary" : ""
                   }`}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-sm font-semibold">{thread.subject}</p>
+                  <div className="flex min-w-0 items-baseline justify-between gap-2">
+                    <p className="min-w-0 truncate text-sm font-semibold">{thread.subject}</p>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {relativeTime(thread.lastMessageAt)}
                     </span>
                   </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                  <p className="mt-1 min-w-0 truncate text-xs text-muted-foreground">
                     {thread.snippet || "No messages yet"}
                   </p>
                 </Link>

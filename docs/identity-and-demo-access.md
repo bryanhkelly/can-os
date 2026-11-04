@@ -25,6 +25,11 @@ cannot target the sign-in flow; server-side authorization is still evaluated on
 the destination request. Without a valid return path, sign-in uses the normal
 role-specific landing page.
 
+Shared-code sign-in uses a native form navigation. Keep the email and code
+controls enabled while that submission is pending; disabling their fieldset
+removes credentials from the browser's form payload. Only the submit button
+is disabled to prevent repeat clicks.
+
 ## Public `.demo` school setup
 
 Anyone may submit `/schools/new` with a school name, an unused single-label
@@ -385,7 +390,7 @@ acceptance still require an authorized guardian context, not registrar authority
 ### Demo Admin user switching
 
 Sign in as `admin.demo@valorschool.demo` with the same demo code. Demo Admin
-starts in a site-scoped Site Admin workspace. The top-bar **Demo user** selector
+lands in Valor's site-scoped Launch Studio as a Site Admin. The top-bar **Demo user** selector
 can switch to Jordan, Riley, Casey, Morgan or Alex and back to Demo Admin without
 signing out. A persistent banner identifies the effective person and role.
 Each switch performs a document navigation to discard the previous user's

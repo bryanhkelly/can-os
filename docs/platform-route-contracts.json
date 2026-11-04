@@ -251,9 +251,9 @@
       "route": "/classes",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "V6.4 focused classroom with compact metadata, persistent media stage, native playback and seek/speed footer, outline/progress, Overview/Transcript/My notes/Discussion and canonical assignment next steps; absent lessons retain explicit transcript/notes limitations; notes migration unapplied; student/teacher/related guardian acceptance pending",
+      "writeBoundary": "preserve assigned-teacher private-video upload authorization, 500 MiB verification and deployment gate; own notes bind actor/section/published version/lesson with revision conflicts and transactional audit/outbox excluding note text; assigned teachers create idempotent canonical calendar occurrences/events or edit links on directly managed events with calendar capabilities; no live migration performed",
+      "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
     },
     {
       "file": "src/routes/coach.tsx",
@@ -521,18 +521,18 @@
       "route": "/operations/curriculum-marketplace",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "curriculum-authorized Site Admin/registrar selects a class, uploads classwide or lesson-linked private video and previews student content; acceptance pending",
+      "writeBoundary": "existing scoped institutional curriculum.publish or curriculum.adopt authority; current active Section and pinned published version; verified immutable private upload; transactional audit/outbox; deployment gate",
+      "readBoundary": "staff video options and preview recheck institutional Organization/Program/Site authority; private preview requires active same-class/version verified attachment; no student upload access"
     },
     {
       "file": "src/routes/operations.curriculum.tsx",
       "route": "/operations/curriculum",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "curriculum-authorized Site Admin/registrar immediately sees selected release and course cards or an explicit empty selection across authorized programs; release cards link to existing marketplace review; publisher tools are secondary; connected acceptance pending",
+      "writeBoundary": "existing explicit institutional curriculum.publish grant, membership and Organization/Site/Program scope; immutable releases, revision checks and transactional audit/outbox remain unchanged; installation and adoption retain marketplace review",
+      "readBoundary": "canonical curriculum adopter program and marketplace reads recheck institutional curriculum.adopt or curriculum.publish authority and scope; publisher drafts require curriculum.publish; failed reads are not empty selections"
     },
     {
       "file": "src/routes/operations.family-alerts.tsx",
@@ -863,16 +863,16 @@
       "route": "/student/courses",
       "owner": "student-experience",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "enrolled student class actions enter the focused classroom lessons; existing selected overview links hand off to /classes; explicit classwork and released feedback retain focused shell; view=catalog preserves registration; behavioral acceptance deferred",
+      "writeBoundary": "existing course-change request and registrar decision commands; classroom commands retain canonical Section authorization, pinned curriculum and transactional mutation boundaries",
+      "readBoundary": "canonical course registration reader limits active student class selection; /classes rechecks current enrollment and curriculum access; classwork remains filtered to the selected enrolled Section"
     },
     {
       "file": "src/routes/student.discussions.tsx",
       "route": "/student/discussions",
       "owner": "student-experience",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "section and optional thread deep links from classroom; existing enrolled-student discussions and responses; acceptance pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
     },
@@ -971,7 +971,7 @@
       "route": "/teacher/discussions",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "section/lesson and optional thread deep links from classroom; existing teacher discussion authoring and moderation; acceptance pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
     },

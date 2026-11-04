@@ -1,5 +1,6 @@
 import * as React from "react";
-import { CircleAlert, CircleCheck, Info } from "lucide-react";
+import { CircleAlert, CircleCheck, Info, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const icons = { info: Info, success: CircleCheck, danger: CircleAlert };
@@ -8,7 +9,9 @@ export const WorkspaceNotice = React.forwardRef<HTMLParagraphElement, {
   children: React.ReactNode;
   tone?: "info" | "success" | "danger";
   className?: string;
-}>(({ children, tone = "info", className }, ref) => {
+  onDismiss?: () => void;
+  dismissLabel?: string;
+}>(({ children, tone = "info", className, onDismiss, dismissLabel = "Dismiss notice" }, ref) => {
   const Icon = icons[tone];
   return <p ref={ref} tabIndex={-1} role={tone === "danger" ? "alert" : "status"}
     aria-live={tone === "danger" ? "assertive" : "polite"}
@@ -18,7 +21,11 @@ export const WorkspaceNotice = React.forwardRef<HTMLParagraphElement, {
       tone === "danger" && "border-danger/50 bg-danger/10",
       className)}>
     <Icon aria-hidden="true" className="mt-1 size-4 shrink-0" />
-    <span>{children}</span>
+    <span className="min-w-0 flex-1">{children}</span>
+    {onDismiss && <Button type="button" variant="ghost" size="icon"
+      aria-label={dismissLabel} onClick={onDismiss} className="-my-1 shrink-0">
+      <X aria-hidden="true" />
+    </Button>}
   </p>;
 });
 WorkspaceNotice.displayName = "WorkspaceNotice";

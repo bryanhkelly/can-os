@@ -484,6 +484,13 @@
       "when": 1793713600000,
       "tag": "0068_church_content_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793759382965,
+      "tag": "0069_classroom_lesson_notes",
+      "breakpoints": true
     }
   ]
 }

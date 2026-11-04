@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { getCalendarRange } from "@/modules/calendar/calendar.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 
 type Schedule = Awaited<ReturnType<typeof getCalendarRange>>;
 type TeachingSection = { id: string; title: string };
@@ -38,11 +39,8 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
   const format = (instant: string) => new Intl.DateTimeFormat("en-US", {
     timeZone: timezone || undefined, month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
   }).format(new Date(instant));
-  return <section className="mt-10" aria-label="Today's schedule">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="font-semibold">Today's schedule</h2>
-      <Link to="/calendar" search={{ view: "agenda" }} className="text-sm underline">Open calendar</Link>
-    </div>
+  return <DashboardPanel title="Today's schedule"
+    action={<Link to="/calendar" search={{ view: "agenda" }} className="text-xs text-primary underline">Open calendar</Link>}>
     {timezone && <p className="mt-2 text-xs text-muted-foreground">Today and times shown in {timezone}.</p>}
     {error || (data && !data.connected)
       ? <p role="status" className="mt-3 text-sm">Schedule unavailable. Try opening the calendar.</p>
@@ -70,5 +68,5 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
         })}
       </div>
     </>}
-  </section>;
+  </DashboardPanel>;
 }

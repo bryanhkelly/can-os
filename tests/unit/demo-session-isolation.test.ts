@@ -75,7 +75,11 @@ describe("public demo session isolation", () => {
       { ...studentGrant, organizationId: "authentic-organization" },
     ]];
     const result = await readSessionGrants(LOCAL_DEMO_ADMIN.accountId, LOCAL_DEMO_ADMIN.email);
-    expect(result).toEqual({ grants: [adminGrant, studentGrant], demoAccountSwitching: true });
+    expect(result).toEqual({
+      grants: [adminGrant, studentGrant],
+      demoAccountSwitching: true,
+      launchSiteId: LOCAL_DEMO_ADMIN.siteId,
+    });
   });
   it("does not grant code access to arbitrary demo-domain identities", async () => {
     state.rows = [[{ ...studentGrant, accountId: "new-account" }]];

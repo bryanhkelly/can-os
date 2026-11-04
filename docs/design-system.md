@@ -1,5 +1,7 @@
 # CAN OS production design system
 
+> **Approved V6.1 implementation profile:** [V6.1 Design System](./design-system-v6-1.md) and [Product-wide migration plan](./design-system-v6-1-migration.md). The existing primitives and domain ownership rules documented below remain authoritative.
+
 The coded components under `src/components/` and their Storybook stories are the implementation source of truth. Lovable, Builder.io, Figma, screenshots, and other visual tools are optional design inputs; they do not create a separate production frontend, workflow state, or authorization path.
 
 ## Dependency and ownership contract
@@ -11,6 +13,7 @@ The existing frontend already used Tailwind v4, class-variance-authority, React 
 | Semantic color, typography, density, and brand mappings | `src/styles.css` |
 | Buttons and native form controls | `src/components/ui/` |
 | Panels, metrics, status, feedback, loading/empty/error | `src/components/workspace/` |
+| Shared role-home wallpaper, shortcuts, primary work and context rail | `DashboardHero`, `DashboardHome` in `src/components/workspace/dashboard-home.tsx` |
 | Role navigation registry, sidebar, top bar, and support panels | `src/components/shell/` |
 | Guided Setup, Checklist Workspace, Split Review | `src/components/workflow/` |
 | Controlled institution/site brand validation | `src/design-system/brand-theme.tsx` |
@@ -18,6 +21,13 @@ The existing frontend already used Tailwind v4, class-variance-authority, React 
 | Styling and duplicate-ownership checks | `eslint.config.mjs`, `scripts/check-design-system.mjs` |
 
 New generic UI belongs in the existing shared folders and must have a Storybook story. Route-specific composition stays beside its owning feature. Do not copy a shared component into a route or persona folder to change its appearance; extend a semantic variant or compose it instead.
+
+Role homes reuse the student's refined composition through `DashboardHero` and
+`DashboardHome`. Teacher/family, school operations, Site Today, onsite staff,
+specialist/counselor and network partner/steward routes supply their existing
+authorized content and four role-specific shortcuts. Urgent site/opening context
+precedes wallpaper. The shared image is editorial presentation, not business data
+or evidence of a publishing workflow. See [migration scope and validation](./design-system-v6-1-migration.md#3-teacher-and-family-dashboard).
 
 ## Local commands
 
@@ -27,7 +37,16 @@ npm run build-storybook    # produce the static catalog used by Chromatic
 npm run test:storybook     # local Chromium interaction + axe accessibility checks
 npm run lint               # ESLint + duplicate shared-export ownership check
 npm run test:visual        # build and upload representative snapshots to Chromatic
+npx playwright test --config playwright.routes.config.ts # read-only localhost routes, desktop/mobile
 ```
+
+The read-only route suite requires an already running, database-verified local
+application (`npm run dev`). `CAN_ROUTE_TEST_BASE_URL` optionally selects another
+localhost port; remote origins are rejected. This suite is separate from the
+guarded fixture-based browser suites and never signs in, seeds data, or submits
+business changes. It checks public entry screens, signed-out workspace handling,
+the configured Valor public preview, responsive overflow, and sign-in feedback
+using intercepted requests. It is not authenticated journey or release evidence.
 
 `test:visual` requires `CHROMATIC_PROJECT_TOKEN` in the local environment or a one-time `npx chromatic --project-token=<token>` login. Tokens are never committed. Chromatic uses `chromatic.config.json`, existing-file change detection, 390 px and 1440 px story viewports, and light/dark/site-brand modes on representative foundation and workflow stories. It does not require GitHub Actions and no CI repair is part of this work.
 
@@ -43,6 +62,14 @@ npm run test:visual        # build and upload representative snapshots to Chroma
 | Error | Errors state that no success should be inferred, preserve user input, offer retry where supported, and never bypass the server command. |
 | Success | Confirmation names the real completed transition and any remaining verification or approval gate. |
 | Status | Icon + text + semantic tokens communicate state; color is never the only signal. |
+
+`WorkspaceNotice` supports an optional `onDismiss` action and accessible
+`dismissLabel`; notices remain non-dismissible by default. The top-bar demo
+information can be closed with its X button, returning focus to the workspace
+switcher. Dismissal is local to the mounted workspace context and is not saved
+across reloads; changing the displayed demo identity or scope shows the notice
+again. Session errors remain visible, and dismissal never changes session,
+authorization, audit or shared-demo behavior.
 
 `useMutationFeedback` separates command failure from saved-but-not-refreshed
 state. Pass its returned object to `MutationFeedback` to expose **Retry refresh**.
@@ -142,6 +169,20 @@ lifecycle controls, admissions inquiry form, and guardian offer responses.
 
 ## Workspace navigation semantics
 
+Authentication redirects preserve the original path, query, and fragment using
+`accessReturnToFromLocation`. Stable effect dependencies prevent repeated
+navigation while the access route loads; authentication destinations are not
+accepted as return paths. The top-bar sign-in link retains an existing validated
+return path on the access screen. Fragment-dependent link attributes wait for
+hydration because URL fragments are not available in server requests.
+
+The access screen composes `WorkspaceShell`, `WorkspacePanel`, `Field`, `Input`,
+and `Button` with shared semantic colors, square geometry, and visible focus.
+Controls remain disabled until hydration and while a request is pending. Normal
+email requests retain visible failure feedback and the email draft; demo access
+retains native POST credential redemption and the validated return destination.
+No account registry, session verification, or server authority is changed.
+
 The typed navigation registry declares each destination's `icon` and optional
 `owns` route patterns. Exact destinations take precedence; only explicitly
 declared aliases, `$parameter` segments, or `/*` subtrees select a parent.
@@ -168,7 +209,25 @@ The workflow stepper describes the real school-managed process; it is not a clie
 
 This increment integrates the GF22 **application-entry vertical slice**. It does not by itself certify the complete GF22 inquiry-to-decision journey, the connected six-stage FullFlow journey, live document upload, or production release. Broad route migration remains paused until the guarded Golden Flow acceptance evidence is rerun and reviewed on the same commit.
 
-## Current validation evidence
+## Read-only route validation — 2026-11-03
+
+For the access/navigation hardening slice only:
+
+- `npx playwright test --config playwright.routes.config.ts`: **90 passed**
+  across 1440 px desktop and 390 px mobile. Final execution used a separate
+  database-verified localhost server on port 5183; earlier runs on the shared
+  server encountered transient HTTP failures, cold-loader timeouts, and an
+  artifact-directory collision. The final full run passed without retries.
+- Typecheck, client/server build, and five focused unit files: **passed**
+  (**34 unit tests**).
+- Targeted ESLint: **zero errors**, with one pre-existing synchronous-effect
+  warning in `messages.tsx`. Shared design inventory: **242 component files**.
+- Route inventory: **113 source routes, 113 recorded, zero issues**.
+- No authenticated session, business mutation, fixture seed, database migration,
+  or deployment was performed. Authenticated dashboards, database journeys,
+  Storybook/axe, and production acceptance remain **unverified**.
+
+## Earlier validation evidence
 
 - Typecheck and production application build for the latest shell, teacher/family conference, assessment-composer, school-year setup/editor, launch schedule, marketplace, and jurisdiction-review changes: **passed**.
 - Unit and browser/Storybook test runs for this increment: **not run, per user request**. Earlier test counts are not validation of these changes.

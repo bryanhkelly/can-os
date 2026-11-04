@@ -1,12 +1,12 @@
+import {useMemo} from "react";
 import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {Select} from "@/components/ui/select";
 import {canadianProvinces,isoCountryCodes,usStatesAndTerritories} from "@/domain/site-setup-configuration";
+import {useHydrated} from "@/lib/use-hydrated";
 import type {LaunchSiteAddressDraft} from "./LaunchHostAndProviderFields";
 
-const countryNames=new Intl.DisplayNames(["en"],{type:"region"});
-const countryOptions=isoCountryCodes.map(code=>({code,label:countryNames.of(code)??code}))
-  .sort((a,b)=>a.label.localeCompare(b.label));
+const countryCodeOptions=isoCountryCodes.map(code=>({code,label:code}));
 
 /** Shared Site physical-address entry. All values remain private, church-supplied drafts. */
 export function LaunchSiteAddressFields({
@@ -15,6 +15,13 @@ export function LaunchSiteAddressFields({
   address:LaunchSiteAddressDraft;
   onChange:(value:LaunchSiteAddressDraft)=>void;
 }){
+  const hydrated=useHydrated();
+  const countryOptions=useMemo(()=>{
+    if(!hydrated)return countryCodeOptions;
+    const countryNames=new Intl.DisplayNames(["en"],{type:"region"});
+    return isoCountryCodes.map(code=>({code,label:countryNames.of(code)??code}))
+      .sort((a,b)=>a.label.localeCompare(b.label));
+  },[hydrated]);
   const regions=address.country==="US"?usStatesAndTerritories:
     address.country==="CA"?canadianProvinces:null;
   return <div className="grid gap-2 sm:grid-cols-2">

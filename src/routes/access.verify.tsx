@@ -1,4 +1,5 @@
 import {createFileRoute} from "@tanstack/react-router";
+import {createServerOnlyFn} from "@tanstack/react-start";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
 import { accessLandingPath, safeAccessReturnTo } from "@/domain/access-navigation";
@@ -6,7 +7,7 @@ import {AuthorizationError} from "@/domain/command-context";
 export const Route=createFileRoute("/access/verify")({
  validateSearch:(search:Record<string,unknown>)=>({returnTo:safeAccessReturnTo(search.returnTo)}),
  server:{handlers:{
-  POST:async({request})=>{
+  POST:createServerOnlyFn(async({request})=>{
    const nativeForm=request.headers.get("content-type")?.split(";")[0]?.trim()==="application/x-www-form-urlencoded";
    const requestReturnTo=safeAccessReturnTo(new URL(request.url).searchParams.get("returnTo"));
    const formFailure=(error:"invalid"|"unavailable"|"rate_limited",returnTo=requestReturnTo)=>{
@@ -36,11 +37,10 @@ export const Route=createFileRoute("/access/verify")({
    const payload=value&&typeof value==="object"?value:null;
    const returnTo=payload&&"returnTo" in payload?safeAccessReturnTo(payload.returnTo)??requestReturnTo:requestReturnTo;
    try{
-    const {redeemLocalDemoAccess,redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
     const result=payload&&"email" in payload&&typeof payload.email==="string"&&"code" in payload&&typeof payload.code==="string"
-     ?await redeemLocalDemoAccess(payload.email,payload.code)
+     ?await (await import("@/modules/identity/passwordless-access.server")).redeemLocalDemoAccess(payload.email,payload.code)
      :payload&&"token" in payload&&typeof payload.token==="string"
-      ?await redeemOneTimeAccess(payload.token)
+      ?await (await import("@/modules/identity/passwordless-access.server")).redeemOneTimeAccess(payload.token)
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
     if(nativeForm)return new Response(null,{status:303,headers:{
@@ -70,7 +70,7 @@ export const Route=createFileRoute("/access/verify")({
     return Response.json({error:"Invalid or expired access link"},
      {status:401,headers:{"Cache-Control":"no-store"}});
    }
-  },
+  }),
  }},
  component:VerifyAccess,
 });

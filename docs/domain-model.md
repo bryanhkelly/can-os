@@ -235,7 +235,7 @@ are unique throughout the release. Each resource contains exactly one HTTPS
 absent content is an unpublished-content empty state, not synthetic lessons.
 Sections never maintain a second browser-side curriculum store.
 
-The registrar Curriculum Studio authors the owning organization's courses only
+The registrar Curriculum authoring tools manage the owning organization's courses only
 with an explicit institutional `curriculum.publish` grant, active membership and
 matching organization/site/program scope. A registrar session alone is not
 publisher authority. A course has at most one authoring draft; new drafts may
@@ -249,6 +249,33 @@ Drafts already referenced by a Section require reconciliation before publication
 This authoring workflow permits HTTPS resource links only; private document
 publication awaits a verified asset workflow. Existing published private
 resources retain their authorized read/download behavior.
+
+Teachers and curriculum-authorized Site Admins/registrars may link videos or attach verified private
+MP4/WebM uploads (16 bytes to 500 MiB) classwide or to a stable published lesson
+ID. They reuse `curriculumResources`, `curriculumOverlays` and `Document`; they
+never modify the publisher release. Upload keys bind the uploader, Section,
+course version and resource. Finalization rechecks current manager authority,
+object size, MIME and container signature before committing the resource,
+overlay, audit and domain event together. Staff uploads require an active
+institutional `curriculum.publish` or `curriculum.adopt` grant for the exact
+Organization/Program/Site and use the ordinary Curriculum Marketplace workspace;
+teacher uploads require current assigned-teacher class authority. Students have
+playback only, never upload controls or upload-command authority. Teachers and
+authorized staff can preview. Identical finalization retries reuse
+the attachment. Private playback reauthorizes the current class relationship
+and active attachment before issuing a URL valid for 15 minutes.
+
+YouTube/Vimeo embeds and direct HTTPS videos play on the class/lesson page after
+the viewer selects Play; third-party requests are not made just by listing a
+resource. Watching never automatically marks a lesson complete or grants a
+grade, mastery or attendance. Uploads require the existing
+`CAN_R2_CURRICULUM_UPLOADS_ENABLED=true` gate and private R2 configuration.
+The deployment CSP permits only canonical YouTube/Vimeo frames, HTTPS media
+and private R2 upload connections. R2 CORS must allow the application origin,
+PUT/GET/HEAD, `Content-Type`, `If-None-Match` and `Range`. Container checks do
+not transcode or certify codecs or scan content; use browser-compatible video
+and school-approved sharing rights. Embedding restrictions at the provider
+still apply. Real-storage upload/playback acceptance remains unverified.
 
 ### ModuleTemplate
 Reusable ordered module structure.

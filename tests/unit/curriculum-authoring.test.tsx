@@ -15,6 +15,9 @@ vi.mock("@/modules/learning/publisher-pack-authoring.server",()=>({
  readPublisherPackStudio:vi.fn(),createPublisherPack:vi.fn(),createPublisherPackDraft:vi.fn(),
  savePublisherPackDraft:vi.fn(),publishPublisherPack:vi.fn(),
 }));
+vi.mock("@/modules/learning/curriculum-marketplace.functions",()=>({
+ getCurriculumAdopterPrograms:vi.fn(),getCurriculumMarketplace:vi.fn(),
+}));
 vi.mock("@/modules/learning/curriculum-authoring.server",()=>({
  saveCurriculumDraft:state.save,saveCurriculumLesson:state.lesson,
  publishCurriculumDraft:state.publish,createCurriculumCourse:state.create,
@@ -201,14 +204,14 @@ describe("curriculum studio presentation",()=>{
   expect(html).toContain("Show the same operation on both sides.");
  });
  it("renders empty publisher authority explicitly without exposing editing controls",()=>{
-  state.data={ok:true,data:{programs:[],studio:null}};
+  state.data={ok:true,data:{programs:[],marketplaces:[],studio:null}};
   const Page=Route.options.component!;
   const html=renderToStaticMarkup(<Page/>);
-  expect(html).toContain("No curriculum publisher grants");
+  expect(html).toContain("No curriculum access grants");
   expect(html).not.toContain("Save draft");
  });
  it("shows immutable published releases without a draft editor",()=>{
-  state.data={ok:true,data:{programs:[{id:ids.programId,name:"Academy"}],studio:{programId:ids.programId,courses:[
+  state.data={ok:true,data:{programs:[{id:ids.programId,name:"Academy"}],marketplaces:[],studio:{programId:ids.programId,courses:[
    {id:"course",code:"SCI",title:"Science",subject:"Science",releases:[
     {id:ids.versionId,version:1,status:"published",revision:ids.expectedRevision,content,publishedAt:null},
    ]},

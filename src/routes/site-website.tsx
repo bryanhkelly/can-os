@@ -1,10 +1,10 @@
 import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId } from "@/domain/site-theme";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { Eye, Globe2, LockKeyhole, PencilLine } from "lucide-react";
+import { GuidedSetupShell } from "@/components/workflow";
+import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import {
   createIllustrativeSchoolContent, emptySiteLocalContent, siteLocalContentLimits, siteLocalImageMaxBytes,
   siteLocalThemes, type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
@@ -33,6 +33,7 @@ export const Route = createFileRoute("/site-website")({
 function PartnerSiteWebsitePage() {
   const outcome = Route.useLoaderData();
   const selection=Route.useSearch();
+  const [step, setStep] = useState(0);
   const returnToLaunch=selection.siteId&&selection.programId&&selection.returnGrantId
     ?<LaunchWebsiteEditorHandoff siteId={selection.siteId} programId={selection.programId} returnGrantId={selection.returnGrantId} destination="launch"/>:null;
   if (!outcome.ok) return <>{returnToLaunch}<LoaderFailure eyebrow="CAN OS · Partner website"
@@ -43,36 +44,39 @@ function PartnerSiteWebsitePage() {
     eyebrow="CAN OS · Church partner website"
     title={data.siteName + " · church website"}
     subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"} actions={returnToLaunch}>
-    <WorkflowIntro eyebrow="Your community, your voice" title="Make your school feel local." description="Shape your church's welcome and community story while CAN maintains authoritative school programs, academic claims, and admissions information." actions={<div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl border border-border/70 bg-background/90 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><PencilLine className="size-4 text-primary" /> Church-owned content</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Edit and publish local descriptions and theological content without routine CAN approval.</p></div><div className="rounded-2xl border border-border/70 bg-background/90 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><LockKeyhole className="size-4 text-primary" /> CAN institutional content</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Academic listings, launch status, and regulated claims remain controlled by CAN.</p></div></div>} />
-    <section className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
-      <h2 className="flex items-center gap-2 font-serif text-2xl font-semibold"><Globe2 className="size-5 text-primary" /> Your proposed Site address</h2>
-      {data.host ? <>
-        <p className="mt-3 font-mono text-sm">{data.host}</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Site state: {data.status === "published" ? "Marketing approved" : "Private draft"}.
-          The public hostname is not activated from this workspace.
+    <GuidedSetupShell
+      title="Make your school website feel local"
+      description="Start with a welcome, add your church's story and visual identity, then review the private preview. Your answers stay in this page as you move between steps; nothing is saved or published until you choose Publish."
+      steps={data.host ? [
+        { id: "welcome", title: "Welcome", description: "Introduce your school", status: step === 0 ? "current" : step > 0 ? "complete" : "upcoming" },
+        { id: "story", title: "Church story", description: "Add local context", status: step === 1 ? "current" : step > 1 ? "complete" : "upcoming" },
+        { id: "identity", title: "Look and feel", description: "Choose a visual identity", status: step === 2 ? "current" : step > 2 ? "complete" : "upcoming" },
+        { id: "review", title: "Review and publish", description: "Check the preview and publish", status: step === 3 ? "current" : "upcoming" },
+      ] : [
+        { id: "address", title: "Site address", description: "Ask your registrar to provision a draft", status: "current" },
+      ]}
+      aside={<div className="space-y-3 py-1 text-sm">
+        <p className="font-semibold">Site address</p>
+        {data.host ? <>
+          <p className="break-all font-mono text-xs">{data.host}</p>
+          <p className="text-muted-foreground">
+            {data.status === "published" ? "Marketing approved" : "Private draft"}.
+            The public hostname is not activated from this workspace.
+          </p>
+        </> : <p role="status" className="text-muted-foreground">
+          No address is reserved. Ask your CAN launch registrar to finish draft provisioning.
+        </p>}
+        <p className="border-t pt-3 text-xs leading-5 text-muted-foreground">
+          You can publish church-owned content. CAN retains control of academic claims,
+          admissions and institutional information.
         </p>
-      </> : <p role="status" className="mt-3 text-sm">
-        No public address is reserved for this Site. Ask your CAN launch registrar
-        to finish website draft provisioning. You cannot reserve or publish
-        addresses from this partner workspace.
-      </p>}
-      <p className="mt-3 text-sm text-muted-foreground">
-        You may publish your church-owned descriptions and theological content without
-        routine CAN approval. CAN remains responsible for the Site's institutional
-        launch status, academic claims and admissions. This account cannot change
-        those records or access student information.
-      </p>
-    </section>
-    <WebsiteInformationChecklist data={data} />
-    <WebsiteDesignChecklist data={data} />
-    <SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
-      enabled={data.mediaUploadsEnabled}/>
-    <ChurchSourceReferenceEditor />
-    <ChurchSourceSuggestionReview currentRevision={data.currentRevision} />
-    {data.host && <LocalWebsiteCopyEditor data={data} />}
-    <WebsitePreviewPanel data={data} />
-
+      </div>}>
+      {data.host
+        ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={setStep} />
+        : <p role="status" className="text-sm text-muted-foreground">
+          Your registrar must reserve a draft Site address before website content can be edited.
+        </p>}
+    </GuidedSetupShell>
   </WorkspaceShell>;
 }
 
@@ -118,7 +122,7 @@ function WebsiteInformationChecklist({ data }: {
           <div key={group.label}>
             <h3 className="text-sm font-semibold">{group.label}</h3>
             <ul className="mt-2 divide-y rounded-lg border">
-              {group.gaps.map(gap => <li key={`${gap.category}:${gap.owner}`}
+              {group.gaps.map(gap => <li key={`${gap.category}:${gap.owner}:${gap.message}`}
                 className="flex flex-wrap items-start justify-between gap-2 px-3 py-3 text-sm">
                 <span className="max-w-2xl">{gap.message}</span>
                 <span className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
@@ -254,8 +258,12 @@ const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help
 ];
 
 function LocalWebsiteCopyEditor({
-  data,
-}: { data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>> }) {
+  data, step, onStepChange,
+}: {
+  data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
+  step: number;
+  onStepChange: (step: number) => void;
+}) {
   const router = useRouter();
   const [content, setContent] = useState<SiteLocalContent>(
     data.editingContent ?? (data.demonstration
@@ -270,10 +278,15 @@ function LocalWebsiteCopyEditor({
       ? createIllustrativeSchoolContent(data.siteName) : emptySiteLocalContent));
   }, [data.currentRevision, data.editingContent, data.demonstration, data.siteName]);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function submit() {
     if (busy) return;
     setError("");
+    const heroImage = content.branding.heroImage;
+    if (heroImage && (!heroImage.altText.trim() || !heroImage.rightsConfirmed ||
+      heroImage.childImageConsent === "unconfirmed")) {
+      setError("Complete the artwork description, usage rights and child-privacy confirmations before publishing.");
+      return;
+    }
     await mutation.run(() => publishChurchWebsiteContent({
         data: { content, expectedRevision: data.currentRevision,siteId:data.siteId },
       }), { successMessage: result => result.status === "review_required"
@@ -308,14 +321,28 @@ function LocalWebsiteCopyEditor({
     } finally { setPreparingArtwork(false); }
   }
 
-  return <section aria-labelledby="local-copy-title" className="mt-6 rounded-xl border bg-card p-5">
-    <h2 id="local-copy-title" className="text-xl font-semibold">Tell your school's story</h2>
-    <p className="mt-2 text-sm text-muted-foreground">
-      Share what you know now; optional questions can be left blank and revisited later. Local community, denominational and theological
-      updates publish directly when basic safety checks pass, without CAN editorial
-      approval. Official curriculum, admissions, tuition, accreditation and
-      school-of-record information comes from CAN OS and cannot be edited here.
-    </p>
+  const primaryFields = churchFields.filter(field =>
+    ["welcomeMessage", "schoolVision", "localDescription"].includes(field.key));
+  const storyFields = churchFields.filter(field =>
+    ["churchHistory", "communityOutreach"].includes(field.key));
+  const additionalStoryFields = churchFields.filter(field =>
+    ["leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
+  const textField = (field: typeof churchFields[number]) => <label key={field.key} className="block text-sm">
+    <span className="font-medium">{field.label}</span>
+    <span className="mt-1 block text-xs text-muted-foreground">{field.help}</span>
+    {field.multi
+      ? <textarea rows={field.key === "statementOfFaith" ? 6 : 3}
+          maxLength={siteLocalContentLimits[field.key]}
+          value={content[field.key] ?? ""} onChange={event => setContent(old =>
+            ({ ...old, [field.key]: event.target.value }))}
+          className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
+      : <input type="text" maxLength={siteLocalContentLimits[field.key]}
+          value={content[field.key] ?? ""} onChange={event => setContent(old =>
+            ({ ...old, [field.key]: event.target.value }))}
+          className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />}
+  </label>;
+
+  return <section aria-label="Website content setup">
     {data.demonstration && !data.editingContent && <div role="note" className="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
       <p className="font-semibold">Fictional sample prepared for this demo school</p>
       <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
@@ -337,8 +364,31 @@ function LocalWebsiteCopyEditor({
     </p>}
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website content..."/>
-    <form onSubmit={event => void submit(event)} className="mt-5 space-y-4">
-      <fieldset disabled={busy || !data.canPublish} className="space-y-4 rounded-xl border p-4">
+    <div className="space-y-5">
+      {step === 0 && <div className="space-y-5">
+        <div>
+          <h3 className="text-lg font-semibold">Give families a warm welcome</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Start with a few short answers. Leave anything blank and return to it before publishing.</p>
+        </div>
+        {primaryFields.map(textField)}
+      </div>}
+      {step === 1 && <div className="space-y-5">
+        <div>
+          <h3 className="text-lg font-semibold">Tell the story behind your school</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Share the people and community behind the school. These details are optional.</p>
+        </div>
+        {storyFields.map(textField)}
+        <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
+          <div className="mt-4 space-y-5">{additionalStoryFields.map(textField)}</div>
+        </details>
+      </div>}
+      {step === 2 && <div className="space-y-5">
+      <div>
+        <h3 className="text-lg font-semibold">Choose a visual identity</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Select a ready-made theme. Artwork is optional and requires rights and privacy confirmation.</p>
+      </div>
+      <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
         <legend className="px-2 text-sm font-semibold">Local branding and approved artwork</legend>
         <label className="block text-sm">
           <span className="font-medium">Theme</span>
@@ -399,13 +449,13 @@ function LocalWebsiteCopyEditor({
             className="max-h-52 w-full rounded-lg object-cover" />
           <label className="block text-sm">
             <span className="font-medium">Artwork description for screen readers</span>
-            <input type="text" required maxLength={180} value={content.branding.heroImage.altText}
+            <input type="text" maxLength={180} value={content.branding.heroImage.altText}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 heroImage: old.branding.heroImage ? { ...old.branding.heroImage, altText: event.target.value } : null,
               } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
           </label>
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" required checked={content.branding.heroImage.rightsConfirmed}
+            <input type="checkbox" checked={content.branding.heroImage.rightsConfirmed}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 heroImage: old.branding.heroImage ? { ...old.branding.heroImage, rightsConfirmed: event.target.checked } : null,
               } }))} className="mt-1" />
@@ -413,7 +463,7 @@ function LocalWebsiteCopyEditor({
           </label>
           <label className="block text-sm">
             <span className="font-medium">Child privacy and consent</span>
-            <select required value={content.branding.heroImage.childImageConsent}
+            <select value={content.branding.heroImage.childImageConsent}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 heroImage: old.branding.heroImage ? { ...old.branding.heroImage,
                   childImageConsent: event.target.value as SiteLocalImageConsent } : null,
@@ -428,44 +478,73 @@ function LocalWebsiteCopyEditor({
           }))} className="rounded-lg border px-3 py-1 text-xs">Remove artwork</button>
         </div>}
       </fieldset>
-      <div className="rounded-xl border bg-muted/30 p-4"><h3 className="font-serif text-lg font-semibold">Your church, in your own words</h3><p className="mt-1 text-sm text-muted-foreground">Answer the prompts below. Save when ready; unanswered sections remain hidden on the public website.</p></div>
-      {churchFields.map(field => <label key={field.key} className="block text-sm">
-        <span className="font-medium">{field.label}</span>
-        <span className="mt-1 block text-xs text-muted-foreground">{field.help}</span>
-        {field.multi
-          ? <textarea rows={field.key === "statementOfFaith" ? 6 : 3}
-              maxLength={siteLocalContentLimits[field.key]}
-              value={content[field.key] ?? ""} onChange={e => setContent(old =>
-                ({ ...old, [field.key]: e.target.value }))}
-              className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
-          : <input type="text" maxLength={siteLocalContentLimits[field.key]}
-              value={content[field.key] ?? ""} onChange={e => setContent(old =>
-                ({ ...old, [field.key]: e.target.value }))}
-              className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />}
-      </label>)}
-      <button type="submit" disabled={busy || !data.canPublish}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-        {busy ? "Saving…" : "Publish church-owned content"}
-      </button>
-      <p className="text-xs text-muted-foreground">
-        Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
-        Artwork requires rights and child-privacy confirmations on every new revision.
-      </p>
-    </form>
-    {data.localHistory.length > 0 && <div className="mt-8 border-t pt-5">
-      <h3 className="font-semibold">Version history and rollback</h3>
-      <ul className="mt-3 space-y-2">
-        {data.localHistory.map(version => <li key={version.revision}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
-          <span>Revision {version.revision} · {version.status === "published" ? "Published" : "Held for review"}
-            {" · "}{new Date(version.createdAt).toLocaleString()}</span>
-          {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
-            <button type="button" disabled={busy} onClick={() => void restore(version.revision)}
-              className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
-              Restore as new revision
-            </button>}
-        </li>)}
-      </ul>
-    </div>}
+      <details className="border p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Import photos from a folder (optional)</summary>
+        <div className="mt-4"><SchoolMediaFolderManager siteId={data.siteId} canPublish={data.canPublish}
+          enabled={data.mediaUploadsEnabled}/></div>
+      </details>
+      </div>}
+      {step === 3 && <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold">Review your website</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
+        </div>
+        <WebsitePreviewPanel data={data} />
+        <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
+          <div className="mt-4"><WebsiteInformationChecklist data={data} /></div>
+        </details>
+        <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Review website content quality</summary>
+          <div className="mt-4"><WebsiteDesignChecklist data={data} /></div>
+        </details>
+        <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Add church website and social references (optional)</summary>
+          <div className="mt-4"><ChurchSourceReferenceEditor /></div>
+        </details>
+        <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Review private suggestions from church sources (optional)</summary>
+          <div className="mt-4"><ChurchSourceSuggestionReview currentRevision={data.currentRevision} /></div>
+        </details>
+        {!data.canPublish && <p role="status" className="border p-3 text-sm">
+          You can preview this Site, but your verified Site assignment does not include local website publishing.
+        </p>}
+        <button type="button" disabled={busy || !data.canPublish} onClick={() => void submit()}
+          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          {busy ? "Publishing…" : "Publish church-owned content"}
+        </button>
+        <p className="text-xs text-muted-foreground">
+          Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
+          Only church-owned content is published here; CAN controls institutional information.
+        </p>
+        {data.localHistory.length > 0 && <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Version history and rollback</summary>
+          <ul className="mt-3 space-y-2">
+            {data.localHistory.map(version => <li key={version.revision}
+              className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
+              <span>Revision {version.revision} · {version.status === "published" ? "Published" : "Held for review"}
+                {" · "}{new Date(version.createdAt).toLocaleString()}</span>
+              {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
+                <button type="button" disabled={busy} onClick={() => void restore(version.revision)}
+                  className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
+                  Restore as new revision
+                </button>}
+            </li>)}
+          </ul>
+        </details>}
+      </div>}
+      <div className="flex justify-between gap-3 border-t pt-4">
+        <button type="button" disabled={step === 0}
+          onClick={() => onStepChange(Math.max(0, step - 1))}
+          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          Back
+        </button>
+        {step < 3 && <button type="button"
+          onClick={() => onStepChange(Math.min(3, step + 1))}
+          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
+          Continue
+        </button>}
+      </div>
+    </div>
   </section>;
 }

@@ -1,9 +1,22 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { StatCard, StatusBadge, WorkspacePanel, type StatusTone } from "@/components/workspace";
+import { StatCard, StatusBadge, WorkspaceNotice, WorkspacePanel, type StatusTone } from "@/components/workspace";
 
 describe("workspace design primitives", () => {
+  it("only exposes a labelled dismissal control when the caller opts in", () => {
+    const notice = renderToStaticMarkup(<WorkspaceNotice>Session information</WorkspaceNotice>);
+    expect(notice).not.toContain("<button");
+    const dismissible = renderToStaticMarkup(<WorkspaceNotice onDismiss={() => {}}
+      dismissLabel="Dismiss demo information">Session information</WorkspaceNotice>);
+    expect(dismissible).toContain('aria-label="Dismiss demo information"');
+    expect(dismissible).toContain('type="button"');
+    expect(dismissible).toContain('role="status"');
+    const error = renderToStaticMarkup(<WorkspaceNotice tone="danger">Session unavailable</WorkspaceNotice>);
+    expect(error).toContain('role="alert"');
+    expect(error).not.toContain("<button");
+  });
+
   it.each([
     ["neutral", "bg-muted"],
     ["info", "border-info/40"],
@@ -43,7 +56,8 @@ describe("workspace design primitives", () => {
     expect(informational).not.toContain("focus-visible:ring-2");
 
     const interactive = renderToStaticMarkup(<StatCard asChild label="Needs review" value="4"><a href="/review" /></StatCard>);
-    expect(interactive).toContain("hover:shadow-md");
+    expect(interactive).toContain("hover:border-primary");
+    expect(interactive).not.toContain("hover:shadow-md");
     expect(interactive).toContain('href="/review"');
     expect(interactive).toMatch(/^<a /);
     expect(interactive).not.toContain("<div");

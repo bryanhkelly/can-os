@@ -29,6 +29,10 @@ vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=> (options:object)=>({
     options,useSearch:()=>state.search,useLoaderData:()=>state.data,
   }),
+  Navigate:({to,search}:{to:string;search?:Record<string,string|undefined>})=>{
+    const query=new URLSearchParams(Object.entries(search??{}).filter((entry):entry is [string,string]=>entry[1]!==undefined)).toString();
+    return <a href={to+(query?"?"+query:"")}>Continue</a>;
+  },
   Link:({to,search,params,children,...props}:{
     to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode;
   })=>{
@@ -175,7 +179,7 @@ describe("application contextual navigation",()=>{
   });
 
   it("opens the requested course and links to only that class's assignments",()=>{
-    state.search={section:"english"};
+    state.search={section:"english",tab:"classwork"};
     const policy={addDropEndsOn:"2030-01-01",withdrawalEndsOn:"2030-02-01",prerequisites:[],guardianApprovalRequired:false};
     successful({connected:true,viewerRole:"student",requests:[],sections:[
       {id:"math",title:"Mathematics",credits:1,enrollmentStatus:"active",policy},
@@ -186,6 +190,15 @@ describe("application contextual navigation",()=>{
     expect(html).not.toContain("Mathematics");
     expect(html).toContain('href="/student/assignments?section=english"');
     expect(html).toContain('href="/student/study-groups"');
+  });
+
+  it("redirects an enrolled course overview to that class's lesson workspace",()=>{
+    state.search={section:"english"};
+    const policy={addDropEndsOn:"2030-01-01",withdrawalEndsOn:"2030-02-01",prerequisites:[],guardianApprovalRequired:false};
+    successful({connected:true,viewerRole:"student",requests:[],sections:[
+      {id:"english",title:"English Literature",credits:1,enrollmentStatus:"active",policy},
+    ]});
+    expect(render(Courses)).toContain('href="/classes?section=english&amp;tab=lessons"');
   });
 
   it("reports an unavailable course without opening another course",()=>{
@@ -225,7 +238,7 @@ describe("application contextual navigation",()=>{
   });
 
   it("preserves the site, program, action and event in Site Today links",()=>{
-    successful({
+    const siteData={
       site:{id:"school",name:"Test school",organizationName:"Test organization",timezone:"America/Los_Angeles"},
       localDate:"2030-01-01",asOf:"2030-01-01T12:00:00Z",
       operatingDecision:{status:"evidence_present",title:"Operating evidence recorded",detail:"School-day decision remains subject to authorization.",href:"/readiness",nextStep:"Review readiness",owner:"Site administrator"},
@@ -244,13 +257,18 @@ describe("application contextual navigation",()=>{
         exceptions:{pendingGuardianExplanations:0,healthVisits:0,sentHome:0,incidents:0,
           emergencyHolds:0,openIncidents:0,uncollectedFollowUps:0},
       },
-    });
+    };
+    successful(siteData);
     const html=render(Site);
     expect(html).toContain('href="/operations?siteId=school&amp;action=task"');
     expect(html).toContain('href="/operations/launch?siteId=school"');
     expect(html).toContain('href="/admissions?siteId=school"');
     expect(html).toContain('href="/operations/launch/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
+    expect(html).not.toContain('href="/site/day"');
+
+    successful({...siteData,canOpenOnsiteDay:true});
+    expect(render(Site)).toContain('href="/site/day"');
   });
 
   it("routes a handoff to its owning workspace without generic resolve or reassignment controls",()=>{

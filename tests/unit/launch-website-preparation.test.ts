@@ -1,6 +1,6 @@
 import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({rows:[] as any[],actor:{} as any,catalog:vi.fn(),local:vi.fn(),requireActor:vi.fn()}));
-vi.mock("@/db/client",()=>({db:{select:()=>{const query:any={from:()=>query,innerJoin:()=>query,where:()=>query,limit:async()=>state.rows.shift()??[]};return query;}}}));
+vi.mock("@/db/client",()=>({db:{select:()=>{const query:any={from:()=>query,innerJoin:()=>query,where:()=>query,for:()=>query,limit:async()=>state.rows.shift()??[]};return query;}}}));
 vi.mock("@/db/schema",()=>Object.fromEntries(["organizations","programs","sitePublications","sites"].map(name=>[name,new Proxy({name},{get:(t,key)=>String(key)})])));
 vi.mock("@tanstack/react-start",()=>({createServerFn:()=>({validator(){return this;},handler:(handler:unknown)=>handler})}));
 vi.mock("@tanstack/react-start/server",()=>({setResponseHeader:vi.fn()}));

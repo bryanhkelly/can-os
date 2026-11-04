@@ -1,69 +1,34 @@
 import { Link } from "@tanstack/react-router";
-import { personShortName } from "@/domain/person-name";
-import { ArrowUpRight, BookOpen, CalendarDays } from "lucide-react";
-import { DailyCanvas, selectDailyCanvasContent, type DailyCanvasContent } from "./DailyCanvas";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
-import { EmptyState, WorkspaceShell, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { EmptyState, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
 import { StudentSuccessSupportPanel } from "./StudentSuccessSupportPanel";
 import type { StudentSuccessSupportSummary } from "@/domain/student-success-support";
+import { StudentDashboard } from "./StudentDashboard";
+import type { StudentDashboardData } from "./student-dashboard-data";
 
 const formatStatus=(status:string)=>status.replaceAll("_"," ").replace(/^\w/,letter=>letter.toUpperCase());
 
 /** Read-only, canonical Student Today projection. All mutations live in the owning workflow. */
-export function StudentExperience({ liveData, success, support }: {
+export function StudentExperience({ liveData, success, support, dashboard }: {
   liveData: Awaited<ReturnType<typeof getMyStudentToday>>;
   success?: StudentSuccessPriorities | null;
   support?: StudentSuccessSupportSummary | null;
+  dashboard?: StudentDashboardData;
 }) {
- const displayName=personShortName({ preferredName: liveData.student.preferredName, legalFirstName: liveData.student.firstName });
- const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
- const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
- const overdueCount=success ? success.overdue : missing.length;
- const upcomingCount=success ? success.dueSoon + success.toDo : upcoming.length;
- const summaryUnavailable=success === null;
  const otherOpenActions=liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id));
- const nextAssignment=success?.steps.find(step=>["revision","overdue","due_soon","to_do"].includes(step.kind));
  const firstWeek=liveData.firstWeek??[];
- const starter=firstWeek.find(item=>item.ready);
  const format=(date:Date|string,timeZone?:string)=>new Intl.DateTimeFormat("en-US",{
   dateStyle:"medium",timeStyle:"short",...(timeZone?{timeZone}:{}),
  }).format(new Date(date));
- return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
-  subtitle="Your schedule, coursework and next steps, all from your school records.">
-  <DailyCanvas audience="student" content={selectDailyCanvasContent([
-    { id: "student-default", audience: "student", priority: "default", headline: "Make today count.", supportingCopy: "A fresh start, a clear next step, and everything you need to keep learning.", campaignLabel: "Your learning day" },
-  ] satisfies DailyCanvasContent[], "student", new Date())}
-   operationalSummary={<span>{liveData.sections.length} classes · {summaryUnavailable ? "Assignments updating" : `${upcomingCount} assignments to do or due soon`}</span>}
-   primaryAction={nextAssignment ? <Link to="/student/assignments" search={{section:nextAssignment.sectionId??undefined,assessment:nextAssignment.assessmentId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{nextAssignment.kind==="revision"?"Continue revision":nextAssignment.kind==="overdue"?"Complete overdue work":"Continue learning"} <ArrowUpRight className="size-4" /></Link> : starter ? <Link to="/student/assignments" search={{section:starter.sectionId,assessment:starter.firstWeek.assessment!.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start first-week work <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">View my classes <ArrowUpRight className="size-4" /></Link>}
-   secondaryAction={<Link to="/student/assignments" className="inline-flex min-h-11 items-center rounded-xl border border-white/70 px-5 py-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Assignments</Link>}
-  />
-  {nextAssignment&&<section aria-label="Continue learning" className="mt-6 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-   <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next learning step</p>
-   <h2 className="mt-2 font-serif text-2xl font-semibold">{nextAssignment.title}</h2>
-   <p className="mt-1 text-sm text-muted-foreground">{nextAssignment.course} · {nextAssignment.label}</p>
-   <Link to="/student/assignments" search={{assessment:nextAssignment.assessmentId,section:nextAssignment.sectionId??undefined}}
-    className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open this assignment <ArrowUpRight className="ml-2 size-4"/></Link>
-  </section>}
+ return <main className="student-dashboard-page min-h-screen min-w-0 bg-background text-foreground">
   {liveData.hasEnrollmentGuardian === false && <WorkspaceNotice tone="danger">
    Your student record does not have a verified guardian with enrollment permission. Study-group requests need guardian permission. Ask your school office to verify the parent or guardian on your record; you cannot add or verify a guardian from this student account.
   </WorkspaceNotice>}
-  <div className="mt-6 grid gap-3 sm:grid-cols-3">
-   <Link to="/student/courses" className="rounded-xl border bg-card p-5 transition-colors hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><BookOpen className="size-4" /> Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
-   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 transition-colors hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarDays className="size-4" /> {success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
-   <Link to="/student/assignments" search={{filter:success?"todo":"missing"}} className="rounded-xl border bg-card p-5 transition-colors hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2"><p className="text-sm text-muted-foreground">{success?"Overdue / missing work":"Missing work"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":overdueCount}</p></Link>
-  </div>
-  <nav aria-label="Student workspace" className="mt-6 flex flex-wrap gap-2 text-sm">
-   <Link to="/student/assignments" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Assignments</Link>
-   <Link to="/student/courses" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Courses</Link>
-   <Link to="/student/support" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Support</Link>
-   <Link to="/student/study-groups" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
-   <Link to="/student/experiences" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; community</Link>
-   <Link to="/student/report-card" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Report card</Link>
-   <Link to="/calendar" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Calendar</Link>
-  </nav>
+  <StudentDashboard liveData={liveData} data={dashboard} />
+  <div className="student-dashboard-followups">
   {success !== undefined && <StudentSuccessPriorityPanel plan={success} />}
   {support !== undefined && <StudentSuccessSupportPanel support={support} />}
   {firstWeek.length>0&&<WorkspacePanel title="Your first week" description="Open actual published lessons and assignment work from your enrolled classes. Setup gaps are shown honestly." className="mt-7">
@@ -80,8 +45,19 @@ export function StudentExperience({ liveData, success, support }: {
     </article>;
    })}</div>
   </WorkspacePanel>}
+  <details className="mt-6 border bg-card p-4">
+  <summary className="cursor-pointer text-sm font-semibold">More learning details and school links</summary>
+  <nav aria-label="Student workspace" className="mt-4 flex flex-wrap gap-2 text-sm">
+   <Link to="/student/assignments" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Assignments</Link>
+   <Link to="/student/courses" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Courses</Link>
+   <Link to="/student/support" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Support</Link>
+   <Link to="/student/study-groups" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
+   <Link to="/student/experiences" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; community</Link>
+   <Link to="/student/report-card" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Report card</Link>
+   <Link to="/calendar" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Calendar</Link>
+  </nav>
   {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
-   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/student/courses" search={{section:section.sectionId}} className="rounded-lg border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
+   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/classes" search={{section:section.sectionId,tab:"lessons"}} className="rounded-lg border p-4 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">
     <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
    </Link>)}</div>
   </WorkspacePanel>}
@@ -112,7 +88,10 @@ export function StudentExperience({ liveData, success, support }: {
     </article>)}
     {!liveData.events.length&&<EmptyState title="No scheduled events today." description="Your school and class events will appear here when scheduled."/>}</div>
    </WorkspacePanel>
-   <WorkspacePanel title="Other open actions" description="Support or follow-ups outside your assignment list.">
+    </div>
+  </div>
+  </details>
+    <WorkspacePanel title="Other open actions" description="Support or follow-ups outside your assignment list.">
     <div className="space-y-3">{otherOpenActions.map(action=><article key={action.id} className="rounded-xl border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <h3 className="min-w-0 font-semibold">{action.subjectType==="assessment"?<Link to="/student/assignments" search={{assessment:action.subjectId}} className="hover:underline focus-visible:outline-2">{action.title}</Link>:<Link to="/student/experiences" search={{action:action.id}} className="hover:underline focus-visible:outline-2">{action.title}</Link>}</h3>
@@ -124,8 +103,7 @@ export function StudentExperience({ liveData, success, support }: {
        <Link to="/student/experiences" search={{action:action.id}} className="mt-2 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">Review action →</Link>}
     </article>)}
     {!otherOpenActions.length&&<EmptyState title="No additional open actions outside your learning support list."/>}</div>
-   </WorkspacePanel>
-   </div>
+    </WorkspacePanel>
   </div>
- </WorkspaceShell>;
+ </main>;
 }

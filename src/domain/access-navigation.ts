@@ -16,6 +16,12 @@ export function safeAccessReturnTo(value: unknown): string | undefined {
  }catch{return undefined;}
 }
 
+/** Router locations expose the fragment without its leading hash separator. */
+export function accessReturnToFromLocation(location: { pathname: string; searchStr: string; hash: string }) {
+ const fragment=location.hash?`#${location.hash.replace(/^#/,"")}`:"";
+ return safeAccessReturnTo(`${location.pathname}${location.searchStr}${fragment}`);
+}
+
 /** Fixed application destinations remain the fallback when no safe return path is supplied. */
 export function accessLandingPath(role: string, launchSiteId?: string, returnTo?: unknown): string {
  const safeReturnTo=safeAccessReturnTo(returnTo);

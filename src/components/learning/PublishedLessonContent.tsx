@@ -7,16 +7,17 @@ export function PublishedLessonContent({ lesson }: { lesson: Lesson }) {
     {lesson.estimatedMinutes && <p className="mb-3 text-xs text-muted-foreground">
       Estimated lesson time: {lesson.estimatedMinutes} minutes
     </p>}
-    {lesson.learningTargets?.length ? <section className="mb-5 rounded-lg border p-4">
-      <h3 className="text-sm font-semibold">Learning targets</h3>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-        {lesson.learningTargets.map(target => <li key={target}>{target}</li>)}
-      </ul>
-    </section> : null}
     {lesson.body.trim() && <section className="mb-5" aria-label="Publisher lesson reading" data-learning-content>
       <h3 className="mb-3 text-sm font-semibold">Lesson reading</h3>
       <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body}</div>
     </section>}
+    {lesson.learningTargets?.length ? <section className="mb-5">
+      <h3 className="text-sm font-semibold">Learning targets</h3>
+      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+        {lesson.learningTargets.map((target,index) => <li key={target} className="border p-4 text-xs leading-6">
+          <span className="mb-1 block font-semibold text-primary">{String(index+1).padStart(2,"0")}.</span>{target}</li>)}
+      </ul>
+    </section> : null}
     {lesson.activities?.length ? <section aria-label="Lesson activities" data-learning-content className="mb-5">
       <h3 className="mb-3 text-sm font-semibold">Learning activities</h3>
       <ol className="space-y-5">

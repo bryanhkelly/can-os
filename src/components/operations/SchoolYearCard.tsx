@@ -101,6 +101,10 @@ export function SchoolYearCard({year:y,busy,run}:{year:Snapshot["years"][number]
     </div>)}
     {y.schedules.map(schedule=><SchoolYearScheduleEditor key={schedule.id} schedule={schedule} run={run} busy={busy}/>)}
     {!y.schedules.length&&<SchoolYearScheduleSetup schoolYearId={y.id} programId={y.programId??undefined} startsOn={y.startsOn} endsOn={y.endsOn} timezone={y.timezone} disabled={busy} changed={()=>router.invalidate()}/>}
+    {y.schedules.length>0&&<details key={y.schedules.length} className="mt-4">
+     <summary className="cursor-pointer text-sm font-semibold">Add another instructional schedule</summary>
+     <SchoolYearScheduleSetup schoolYearId={y.id} programId={y.programId??undefined} startsOn={y.startsOn} endsOn={y.endsOn} timezone={y.timezone} disabled={busy} changed={()=>router.invalidate()}/>
+    </details>}
    </section>
   </div>
  </article>;

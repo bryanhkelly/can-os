@@ -50,8 +50,8 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
             selectedSiteId={currentLaunch?.siteId??selection.siteId}/>
         </div>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
-          <SchoolJurisdictionReviewPanel key={currentLaunch.id} programId={currentLaunch.id}/>
-          <ProgramSiteAuthorizationPanel key={currentLaunch.id} programId={currentLaunch.id}/>
+          <SchoolJurisdictionReviewPanel key={`jurisdiction-review-${currentLaunch.id}`} programId={currentLaunch.id}/>
+          <ProgramSiteAuthorizationPanel key={`site-authorization-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
           <a href="#launch-academic-year" className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</a>
         </div>}

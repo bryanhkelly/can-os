@@ -27,14 +27,15 @@ export function ClassDirectoryCards({
             description={role === "guardian" ? section.studentName ?? section.code : section.code}
           >
             <Link
-              to="/classes"
-              search={{
-                section: section.id,
-                student: role === "guardian" ? section.studentPersonId ?? undefined : undefined,
-              }}
-              className="inline-block rounded-lg bg-foreground px-4 py-2 text-sm text-background"
-            >
-              Open class
+                to="/classes"
+                search={{
+                  section: section.id,
+                  student: role === "guardian" ? section.studentPersonId ?? undefined : undefined,
+                  tab: role === "student" ? "lessons" : undefined,
+                }}
+                className="inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background"
+              >
+                Open class
             </Link>
           </WorkspacePanel>
         ))}

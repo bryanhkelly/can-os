@@ -11,6 +11,7 @@ vi.mock("@tanstack/react-router",()=>({
   }),
   useRouter:()=>({invalidate:vi.fn()}),
   useLocation:()=>({pathname:"/actions/action-1",searchStr:"",hash:""}),
+  useNavigate:()=>vi.fn(),
   Link:({to,search,params,children,...props}:{
     to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode;
   })=>{
@@ -19,7 +20,10 @@ vi.mock("@tanstack/react-router",()=>({
     return <a href={path+(query?"?"+query:"")} {...props}>{children}</a>;
   },
 }));
-vi.mock("@/modules/study-groups/study-group-queries.functions",()=>({
+vi.mock("@/components/shell/WorkspaceSession",()=>({
+  useWorkspaceSession:()=>({session:null}),
+}));
+vi.mock("@/modules/study-groups/study-group-queries.functions",() => ({
   listFacilitatorGroupScopes:vi.fn(),listStudyGroupReviewQueue:vi.fn(),listStudyGroupReports:vi.fn(),
 }));
 vi.mock("@/modules/study-groups/canonical-workspace.functions",()=>({getStudyGroupAvailability:vi.fn()}));

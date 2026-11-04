@@ -103,6 +103,7 @@ for (const eventType of [
   EventTypes.SupportServiceCompleted,
   EventTypes.CourseDiscussionCreated,
   EventTypes.CourseDiscussionMessagePosted,
+  EventTypes.PrivateLessonNoteSaved,
   EventTypes.CourseDiscussionLockChanged,
   EventTypes.CourseDiscussionMessageModerated,
   EventTypes.AdmissionOfferRevoked,

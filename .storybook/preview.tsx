@@ -43,7 +43,7 @@ const preview: Preview = {
     chromatic: { viewports: [390, 1440] },
     options: {
       storySort: {
-        order: ["Foundations", "Workflows", "Personas", "Branding"],
+        order: ["V6.1 foundations", "V6.1 templates", "Foundations", "Workflows", "Personas", "Branding"],
       },
     },
   },

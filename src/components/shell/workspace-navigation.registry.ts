@@ -30,7 +30,7 @@ const schoolAdministrationLinks = [
   { title: "Operations", path: "/operations", icon: "clipboard",
     owns: ["/operations/launch", "/operations/launch/$programId", "/operations/workflows",
       "/operations/insights", "/operations/course-policies", "/operations/course-requests",
-      "/operations/family-alerts", "/operations/field-trips", "/operations/health-review", "/operations/transfer-records", "/readiness", "/classes"] },
+      "/operations/family-alerts", "/operations/field-trips", "/operations/health-review", "/operations/transfer-records", "/readiness"] },
   { title: "Admissions", path: "/admissions", icon: "clipboard", owns: ["/admissions/*"] },
   { title: "Students", path: "/staff/students", icon: "users", owns: ["/staff/students/$personId"] },
   { title: "Sites", path: "/sites", icon: "home", owns: ["/sites/$siteId", "/sites/$siteId/publish"] },
@@ -148,4 +148,11 @@ export function getActiveWorkspacePath(
     return expected.every((part, index) => part.startsWith("$")
       ? Boolean(segments[index]) : part === segments[index]);
   }))?.path;
+}
+
+export function isFocusedClassroomRoute(pathname: string, searchStr: string, role: string | null): boolean {
+  const search = new URLSearchParams(searchStr);
+  if (!search.has("section")) return false;
+  if (pathname === "/classes") return role === "student" || role === "guardian" || role === "teacher";
+  return pathname === "/student/courses" && search.get("view") !== "catalog" && role === "student";
 }

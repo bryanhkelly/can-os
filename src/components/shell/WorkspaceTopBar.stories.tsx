@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
+import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { useState } from "react";
 import { WorkspaceTopBar } from "./WorkspaceTopBar";
 
 const meta = {
@@ -14,6 +16,14 @@ const meta = {
     onOpenNotifications: fn(), onOpenAccount: fn(),
   },
   parameters: { layout: "fullscreen" },
+  decorators: [Story => {
+    const root = createRootRoute({ component: Story });
+    const router = createRouter({
+      routeTree: root,
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    });
+    return <RouterProvider router={router} />;
+  }],
 } satisfies Meta<typeof WorkspaceTopBar>;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -37,5 +47,48 @@ export const OrganizationScope: Story = {
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByRole("button", { name: /Switch workspace/ }))
       .toHaveAccessibleName(/Switch workspace: CAN OS registrar All authorized schools \(2\)/i);
+  },
+};
+
+export const DismissDemoInformation: Story = {
+  args: { demoAccountSwitching: true },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const close = canvas.getByRole("button", { name: "Dismiss demo information" });
+    await close.focus();
+    await userEvent.keyboard("{Enter}");
+    await expect(canvas.queryByText(/Demo admin session:/)).not.toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: /Switch workspace/ })).toHaveFocus();
+    await expect(args.onOpenSwitcher).not.toHaveBeenCalled();
+  },
+};
+
+export const DismissDemoSchoolInformation: Story = {
+  args: { demoTenant: true, sessionError: "Session refresh unavailable" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Dismiss demo information" }));
+    await expect(canvas.queryByText(/Demo school:/)).not.toBeInTheDocument();
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Session refresh unavailable");
+  },
+};
+
+export const DemoWorkspaceChange: Story = {
+  render: args => {
+    const [member, setMember] = useState(args.member);
+    return <>
+      <WorkspaceTopBar {...args} member={member} demoAccountSwitching />
+      <button type="button" onClick={() => setMember({
+        role: "student", firstName: "Jordan", lastName: "Student", siteId: "west",
+      })}>Change demo workspace</button>
+    </>;
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Dismiss demo information" }));
+    await expect(canvas.queryByText(/Demo admin session:/)).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Change demo workspace" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent("acting as Jordan Student (student)");
+    await expect(canvas.getByRole("button", { name: "Dismiss demo information" })).toBeVisible();
   },
 };

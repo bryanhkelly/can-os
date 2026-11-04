@@ -1,9 +1,10 @@
 import {createFileRoute} from "@tanstack/react-router";
+import {createServerOnlyFn} from "@tanstack/react-start";
 import {logAuthenticationUnavailable} from "@/domain/access-errors";
 import {safeAccessReturnTo} from "@/domain/access-navigation";
 export const Route=createFileRoute("/access/request")({
  server:{handlers:{
-  POST:async({request})=>{
+  POST:createServerOnlyFn(async({request})=>{
    if(new URL(request.url).origin!==request.headers.get("origin"))return Response.json({error:"Invalid request origin"},{status:403});
    // Protect the anonymous email-link endpoint regardless of account
    // existence. This is a shared emergency cap, not per-client protection.
@@ -23,8 +24,7 @@ export const Route=createFileRoute("/access/request")({
    const returnTo=payload&&typeof payload==="object"&&"returnTo" in payload
     ?safeAccessReturnTo(payload.returnTo):undefined;
    try{
-    const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
-    await requestOneTimeAccess(email,undefined,returnTo);
+    await (await import("@/modules/identity/passwordless-access.server")).requestOneTimeAccess(email,undefined,returnTo);
     return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     if(error instanceof Error && error.message==="Invalid email address")return Response.json({error:"Invalid email"},{status:400});
@@ -32,6 +32,6 @@ export const Route=createFileRoute("/access/request")({
     // Do not reveal which addresses have a CAN OS account via delivery/config errors.
     return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }
-  },
+  }),
  }},
 });

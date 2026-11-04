@@ -1,8 +1,10 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
+import { Building2, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { CANOperatingAuthorizationDesk } from "@/components/networks/CANOperatingAuthorizationDesk";
 import { ChurchApplicationsDesk } from "@/components/networks/ChurchApplicationsDesk";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -59,12 +61,19 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
       commandErrorMessage: "Unable to provision HQ officer." });
   };
   const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
-  return <WorkspaceShell eyebrow="CAN OS · Network partnerships" title="Church onboarding and partner contracts"
-    subtitle="Review new church requests, verify church authority, invite leaders, and manage partner contracts. School opening remains separately authorized.">
-    <ChurchApplicationsDesk/>
+  return <DashboardHome eyebrow="CAN OS · Network partnerships" title="Church onboarding and partner contracts"
+    subtitle="Review new church requests, verify church authority, invite leaders, and manage partner contracts. School opening remains separately authorized."
+    shortcuts={<>
+      <DashboardShortcut title="Church applications" description="Review partner requests" icon={<Building2 className="size-5" />}><a href="#steward-applications" /></DashboardShortcut>
+      <DashboardShortcut title="Contracts" description={`${data.agreements.length} recorded contracts`} icon={<ClipboardList className="size-5" />}><a href="#steward-contracts" /></DashboardShortcut>
+      <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
+      <DashboardShortcut title="Messages" description="Partner conversations" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
+    </>}
+    actions={<><a href="#steward-agreement">Record a verified agreement →</a><Link to="/operations/jurisdiction-profiles">Jurisdiction profiles →</Link></>}>
+    <div id="steward-applications"><ChurchApplicationsDesk/></div>
     <p className="mt-5 text-sm text-muted-foreground">Denomination agreements and HQ officer appointments below require an already verified Document with the appropriate subject and category. Church applications above do not require anyone to assemble a document UUID manually.</p>
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Recording partner authority..."/>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section id="steward-agreement" className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="font-serif text-2xl">Record independently verified agreement</h2>
       <form onSubmit={saveAgreement} className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-medium">Denomination
@@ -118,7 +127,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
       </form>
     </section>
     <section className="mt-6 rounded-xl border bg-card p-5">
-      <h2 className="font-serif text-2xl">Recorded contracts</h2>
+      <h2 id="steward-contracts" className="font-serif text-2xl">Recorded contracts</h2>
       <ul className="mt-3 space-y-2">
         {data.agreements.map(a=><li key={a.id} className="rounded-lg border p-3 text-sm">
           <strong>{data.networks.find(n=>n.id===a.denominationOrganizationId)?.name ?? "Denomination"}</strong>
@@ -129,5 +138,5 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
       </ul>
     </section>
     <CANOperatingAuthorizationDesk/>
-  </WorkspaceShell>;
+  </DashboardHome>;
 }

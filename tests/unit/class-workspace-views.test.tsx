@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({ search: {} as Record<string, unknown>, data: n
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useSearch: () => state.search, useLoaderData: () => state.data }),
   useRouter: () => ({ invalidate: vi.fn() }),
+  useBlocker: () => ({ status: "unblocked", reset: vi.fn(), proceed: vi.fn() }),
   Link: ({ to, search, params, children, ...props }: {
     to: string; search?: Record<string, string | undefined>; params?: Record<string, string>; children: ReactNode;
   }) => {
@@ -29,6 +30,9 @@ vi.mock("@/modules/programs/section-creation-requests.functions", () => ({
 }));
 vi.mock("@/modules/learning/class-communication.functions", () => ({ publishClassAnnouncement: vi.fn() }));
 vi.mock("@/modules/learning/class-supplements.functions", () => ({ addClassSupplement: vi.fn() }));
+vi.mock("@/modules/learning/class-video-upload.functions", () => ({
+  beginClassVideoUpload: vi.fn(), finishClassVideoUpload: vi.fn(),
+}));
 vi.mock("@/modules/learning/discussion-teacher-query.functions", () => ({ getTeacherCourseDiscussions: vi.fn() }));
 vi.mock("@/modules/learning/discussion-teacher.functions", () => ({
   createCourseDiscussion: vi.fn(), setCourseDiscussionLock: vi.fn(), moderateDiscussionMessage: vi.fn(),
@@ -74,8 +78,27 @@ describe("teacher class directory", () => {
 });
 
 describe("published class workspace", () => {
+  it("shows student playback without uploads and teacher upload controls with lesson scope", () => {
+    const data = { ...workspace, videoUploadsEnabled: true, supplements: [{
+      id: "video", title: "Equation video", kind: "video", url: "https://youtu.be/abcdefghijk",
+      resourceId: "resource", lessonId: "evidence", source: "teacher" as const, canManage: false,
+    }] };
+    const student = renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence"/>);
+    expect(student).toContain("Play video");
+    expect(student).not.toContain('type="file"');
+    expect(student).not.toContain("Upload a video");
+    const files = renderToStaticMarkup(<ClassWorkspace data={data} tab="files"/>);
+    expect(files).toContain("Play video");
+    expect(files).not.toContain("Upload a video");
+    const teacher = renderToStaticMarkup(<ClassWorkspace data={{ ...data, role: "teacher" }} tab="lessons" lessonId="evidence"/>);
+    expect(teacher).toContain("Upload a video");
+    expect(teacher).toContain('accept="video/mp4,video/webm,.mp4,.webm"');
+    expect(teacher).toContain("500 MB");
+    expect(teacher).toContain("Play video");
+    expect(teacher).not.toContain("Entire class");
+  });
   it("opens exact class lessons and keeps progress separate from grades and attendance", () => {
-    const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, roster: [] }}/>);
+    const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, roster: [] }} tab="overview"/>);
     expect(html).toContain('href="/classes?section=english&amp;tab=lessons"');
     expect(html).toContain("0 / 1 published lessons");
     expect(html).toContain("not a grade, mastery score or attendance record");
@@ -131,8 +154,8 @@ describe("published class workspace", () => {
     const data={...workspace,content:{...workspace.content!,modules:[{
       ...workspace.content!.modules[0]!,lessons:[real,outline,next],
     }]},progress:[{lessonId:real.id,completedAt:"2026-10-29"},{lessonId:outline.id,completedAt:"2026-10-29"}]};
-    const overview=renderToStaticMarkup(<ClassWorkspace data={data}/>);
-    expect(overview).toContain("1 / 2 published lessons");
+    const overview=renderToStaticMarkup(<ClassWorkspace data={data} tab="overview"/>);
+    expect(overview).toContain("1 / 2 published lessons marked complete");
     expect(overview).toContain('href="/classes?section=english&amp;tab=lessons&amp;lesson=next-real"');
     const current=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId={real.id}/>);
     expect(current).toContain("Lesson 1 of 2");
@@ -207,7 +230,7 @@ describe("published class workspace", () => {
     const content=classContentSchema.parse({version:1,syllabus:"Unit 1 preview",blueprint,
       modules:[{id:unit.unitId,title:unit.title,lessons:unit.lessons}],resources:[]});
     const data={...workspace,content};
-    const overview=renderToStaticMarkup(<ClassWorkspace data={data}/>);
+    const overview=renderToStaticMarkup(<ClassWorkspace data={data} tab="overview"/>);
     expect(overview).toContain("Yearlong course roadmap");
     expect(overview.replaceAll("<!-- -->","")).toContain("1 of 36 weeks authored");
     expect(overview).toContain("not certified as credit-ready");

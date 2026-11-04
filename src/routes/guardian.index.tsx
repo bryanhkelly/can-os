@@ -1,11 +1,13 @@
+import { DashboardHome } from "@/components/workspace/dashboard-home";
+import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
+import { BookOpen, CalendarDays, ClipboardList, MessageCircle } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { listGuardianGradeFollowUps } from "@/modules/learning/guardian-grade-response.functions";
 import { listGuardianCourseApprovals } from "@/modules/learning/guardian-course-approval.functions";
 import { getGuardianAdmissionOffers } from "@/modules/enrollment/guardian-admission-offers.functions";
-import { WorkspaceShell, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
+import { QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
 import { prioritizeFamilyNeeds } from "@/domain/family-needs";
 import { buildGuardianAttention } from "@/domain/daily-operations";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
@@ -133,11 +135,16 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
  })));
  const prioritized=prioritizeFamilyNeeds([...visibleNeeds,...approvalNeeds,...schoolworkItems],Date.now());
  const schoolworkCount=visibleChildren.reduce((total,child)=>total+child.workNeedsAttentionCount,0);
- return <WorkspaceShell
-  width="wide"
+ return <DashboardHome
   eyebrow="CAN OS · Family"
   title="Family home"
   subtitle="Your children, enrollment steps, and school follow-ups in one place."
+  shortcuts={<>
+   <DashboardShortcut title="Children & academics" description="Released grades and schoolwork" icon={<BookOpen className="size-5" />}><Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} /></DashboardShortcut>
+   <DashboardShortcut title="Applications & offers" description="Review enrollment next steps" icon={<ClipboardList className="size-5" />}><Link to="/guardian/admission-offers" search={{student:student||undefined}} /></DashboardShortcut>
+   <DashboardShortcut title="Calendar" description="Your family's authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
+   <DashboardShortcut title="Family inbox" description="Conversations with your school" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
+  </>}
   actions={<div className="flex flex-wrap gap-2">
    <Link to="/guardian/apply" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
     Start a new school application
@@ -149,23 +156,13 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   </div>}
  >
   <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
-   <section aria-label="Family overview" className="relative overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
-    <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-accent opacity-70 blur-3xl" />
-    <div className="relative max-w-2xl">
-     <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><Sparkles className="size-4" /> Your family, connected</p>
-     <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Every school day, together.</h2>
-     <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">Follow your children’s progress, respond to what needs you, and stay connected with your school.</p>
-     <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
-      <Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2"><BookOpen className="size-4" /> View academics <ArrowUpRight className="size-4" /></Link>
-      <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; conferences <ArrowUpRight className="size-4"/></Link>
-      <Link to="/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2"><Mail className="size-4" /> Family inbox</Link>
-      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2"><CalendarDays className="size-4" /> Attendance</Link>
-      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Pickup &amp; safety</Link>
-      <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Health &amp; clearance</Link>
-      <Link to="/guardian/enrollment-changes" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Transfer &amp; family changes</Link>
-     </div>
-    </div>
-   </section>
+   <nav aria-label="Family quick links" className="mt-4 flex flex-wrap gap-2">
+     <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">School &amp; conferences</Link>
+     <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Attendance</Link>
+     <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="border bg-card px-3 py-2 text-sm">Pickup &amp; safety</Link>
+     <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Health &amp; clearance</Link>
+     <Link to="/guardian/enrollment-changes" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Transfer &amp; family changes</Link>
+   </nav>
    {(visibleEnrollmentApplications.length>0||enrollmentWarning)&&<section aria-label="Enrollment next steps" className="mt-6 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3">
      <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Getting started</p>
@@ -332,5 +329,5 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
     </div>
    </section>
   </QueryState>
- </WorkspaceShell>;
+ </DashboardHome>;
 }

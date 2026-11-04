@@ -1,12 +1,15 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import { Bell, ChevronDown, Menu, MessageCircle, Search, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceNotice } from "@/components/workspace";
 import { getWorkspaceScopeLabel } from "./workspace-scope";
+import { accessReturnToFromLocation, safeAccessReturnTo } from "@/domain/access-navigation";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable, sessionError,
   error, demoAccountSwitching, demoTenant, changing, menuOpen, switcherOpen, accountOpen, onToggleMenu,
-  onOpenSwitcher, onOpenSearch, onOpenAsk, onOpenNotifications, onOpenAccount }: {
+  onOpenSwitcher, onOpenSearch, onOpenAsk, onOpenNotifications, onOpenAccount, focused = false }: {
   member?: { role: string; firstName: string; lastName: string; siteId: string | null };
   sites: readonly { id: string; name: string }[];
   authenticated: boolean;
@@ -25,18 +28,29 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
   onOpenAsk: () => void;
   onOpenNotifications: () => void;
   onOpenAccount: () => void;
+  focused?: boolean;
 }) {
   const location=useLocation();
-  const returnTo=`${location.pathname}${location.searchStr}${location.hash}`;
+  const hydrated=useHydrated();
+  const returnTo=location.pathname === "/access" || location.pathname === "/access/"
+    ? safeAccessReturnTo(new URLSearchParams(location.searchStr).get("returnTo"))
+    : accessReturnToFromLocation({ ...location, hash: hydrated ? location.hash : "" });
+  const switcherRef = useRef<HTMLButtonElement>(null);
+  const [dismissedDemoContext, setDismissedDemoContext] = useState<string | null>(null);
+  const demoContext = JSON.stringify([demoAccountSwitching, demoTenant, member]);
+  const dismissDemoNotice = () => {
+    setDismissedDemoContext(demoContext);
+    switcherRef.current?.focus();
+  };
   return <header aria-label="Workspace top bar" className="sticky top-0 z-30 border-b bg-card px-4 py-3 sm:px-6">
     <div className="flex min-w-0 flex-wrap items-center gap-3">
-      {member && <Button variant="outline" size="icon"
+      {member && !focused && <Button variant="outline" size="icon"
         aria-label={menuOpen ? "Close workspace navigation" : "Open workspace navigation"}
         aria-expanded={menuOpen} onClick={onToggleMenu} className="lg:hidden">
         <Menu aria-hidden="true" />
       </Button>}
       {member
-        ? <Button variant="outline" disabled={changing} aria-haspopup="dialog"
+        ? <Button ref={switcherRef} variant="outline" disabled={changing} aria-haspopup="dialog"
           aria-expanded={switcherOpen} onClick={onOpenSwitcher}
           className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center justify-start gap-2 rounded-xl border-border/70 bg-background px-3 py-2 text-left">
           <span className="sr-only">Switch workspace:</span>{" "}
@@ -70,10 +84,12 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
           onClick={onOpenAccount} className="rounded-full border bg-muted"><UserRound aria-hidden="true" /></Button>
         : sessionAvailable && <Link to="/access" search={{returnTo}} className="rounded-lg px-2 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Sign in</Link>}
       {(error || sessionError) && <WorkspaceNotice tone="danger" className="w-full">{error || sessionError}</WorkspaceNotice>}
-      {demoAccountSwitching && <WorkspaceNotice className="w-full">
+      {demoAccountSwitching && dismissedDemoContext !== demoContext && <WorkspaceNotice className="w-full"
+        onDismiss={dismissDemoNotice} dismissLabel="Dismiss demo information">
         Demo admin session: acting as {member?.firstName} {member?.lastName} ({member?.role}). Changes affect shared demo data. User switches are audited.
       </WorkspaceNotice>}
-      {demoTenant && !demoAccountSwitching && <WorkspaceNotice className="w-full">
+      {demoTenant && !demoAccountSwitching && dismissedDemoContext !== demoContext && <WorkspaceNotice className="w-full"
+        onDismiss={dismissDemoNotice} dismissLabel="Dismiss demo information">
         Demo school: use synthetic data only. These shared accounts and changes are visible to other participants. External email and SMS are suppressed.
       </WorkspaceNotice>}
     </div>

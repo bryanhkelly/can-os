@@ -8,6 +8,7 @@ import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "
 import { z } from "zod";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { classResources, readClassContent } from "@/domain/class-content";
+import { classVideoKey, classVideoKeyPattern } from "@/domain/class-video";
 import { readClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -161,6 +162,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const lessonCompletionCounts=actor.role==="teacher"
       ?[...completionGroups].map(([lessonId,students])=>({lessonId,studentCount:students.size})):[];
     return {
+      videoUploadsEnabled: actor.role === "teacher" && process.env.CAN_R2_CURRICULUM_UPLOADS_ENABLED === "true",
       lessonCompletionCounts,
       role: actor.role, section: { id: section.id, programId: section.programId, title: section.title, code: section.code, description: section.description,
         timezone: section.timezone,
@@ -175,6 +177,10 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       }])).values()],
       announcements: announcements.map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt.toISOString(),
         body: announcementMessages.filter(message => message.threadId === row.id).map(message => message.body).join("\n\n") })),
+      discussions: actor.role === "guardian" ? [] : threads.filter(row => row.metadata.kind === "course_discussion" &&
+        (!row.metadata.publisherCourseVersionId || row.metadata.publisherCourseVersionId === section.versionId))
+        .map(row => ({ id: row.id, title: row.title, locked: row.metadata.locked === true,
+          lessonId: typeof row.metadata.curriculumLessonId === "string" ? row.metadata.curriculumLessonId : null })),
     };
   });
 
@@ -269,6 +275,8 @@ export const getClassSupplementDownload = createServerFn({method:"POST"})
       docSensitivity:s.documents.sensitivityTier,
       docProvider:s.documents.storageProvider,
       docExpires:s.documents.expiresAt,
+      resourceKind:s.curriculumResources.kind,
+      uploader:s.documents.uploadedByPersonId,
     }).from(s.curriculumOverlays)
       .innerJoin(s.curriculumResources,eq(s.curriculumResources.id,s.curriculumOverlays.resourceId))
       .innerJoin(s.documents,eq(s.documents.id,s.curriculumResources.documentId))
@@ -278,7 +286,7 @@ export const getClassSupplementDownload = createServerFn({method:"POST"})
         eq(s.curriculumOverlays.programId,section.programId),
         eq(s.curriculumOverlays.courseTemplateVersionId,section.versionId),
         eq(s.curriculumOverlays.status,"active"),
-        eq(s.curriculumResources.kind,"pdf"),
+        inArray(s.curriculumResources.kind,["pdf","video"]),
         eq(s.curriculumResources.ownerOrganizationId,s.programs.organizationId),
         verifiedPrivateDocumentPredicate({
           subjectType:"curriculum_resource",subjectId:s.curriculumResources.id,
@@ -287,13 +295,20 @@ export const getClassSupplementDownload = createServerFn({method:"POST"})
       )).limit(1);
     if(!entry || (entry.overlay.sectionId && entry.overlay.sectionId!==section.id) ||
       (entry.overlay.siteId && entry.overlay.siteId!==section.siteId) ||
-      !entry.docKey.startsWith(`learning/supplements/${entry.resourceId}/`) ||
-      !/^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i.test(entry.docKey) ||
-      entry.docType!=="application/pdf")
+      (entry.resourceKind==="pdf" ? (
+        !entry.docKey.startsWith(`learning/supplements/${entry.resourceId}/`) ||
+        !/^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i.test(entry.docKey) ||
+        entry.docType!=="application/pdf"
+      ) : (
+        !entry.uploader || entry.overlay.sectionId!==section.id ||
+        entry.docKey!==classVideoKey(entry.uploader,section.id,section.versionId,entry.resourceId) ||
+        !classVideoKeyPattern.test(entry.docKey) ||
+        !entry.docType || !["video/mp4","video/webm"].includes(entry.docType)
+      )))
       throw new AuthorizationError("verified private curriculum supplement");
     return {downloadUrl:signPrivateObjectUrl({
       method:"GET",key:entry.docKey,
-      keyPattern:/^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i,
-      expiresSeconds:60,
+      keyPattern:entry.resourceKind==="video"?classVideoKeyPattern:/^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i,
+      expiresSeconds:entry.resourceKind==="video"?900:60,
     })};
   });

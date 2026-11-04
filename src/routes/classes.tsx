@@ -1,4 +1,12 @@
 import { PublishedLessonContent } from "@/components/learning/PublishedLessonContent";
+import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
+import { ClassLessonOutline } from "@/components/learning/ClassLessonOutline";
+import { ClassroomLessonTabs } from "@/components/learning/ClassroomLessonTabs";
+import { PrivateLessonNotes } from "@/components/learning/PrivateLessonNotes";
+import { ClassroomMediaStage, type ClassroomMeetings } from "@/components/learning/ClassroomMediaStage";
+import { ClassVideoPlayer, ClassVideoPlaceholder } from "@/components/learning/ClassVideoPlayer";
+import { ClassVideoUploadForm } from "@/components/learning/ClassVideoUploadForm";
+import { resolveClassVideo } from "@/domain/class-video";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { CommonCartridgeStaticLesson } from "@/components/learning/CommonCartridgeStaticLesson";
 import { ClassAnnouncementFeed } from "@/components/learning/ClassAnnouncementFeed";
@@ -20,16 +28,18 @@ import { classResources, type ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
 import { getTeacherClassRequestOptions } from "@/modules/programs/section-creation-requests.functions";
+import { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
-import { safeLoader } from "@/lib/safe-loader";
+import { safeLoader, type LoadOutcome } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
 import { deriveClassNextSteps } from "@/domain/student-success";
 
 const tabs = ["overview", "lessons", "planning", "files", "syllabus", "announcements", "people", "teacher-guide"] as const;
+const meetingCommands = { get: getClassroomMeetings, schedule: scheduleClassroomMeeting, saveLink: setClassroomMeetingLink };
 const searchSchema = z.object({
   section: z.string().uuid().optional(), student: z.string().uuid().optional(),
   tab: z.enum(tabs).optional(), lesson: z.string().max(100).optional(),
@@ -40,10 +50,13 @@ export const Route = createFileRoute("/classes")({
   loader: ({ deps }) => safeLoader(async () => {
     const directory = await getClassDirectory();
     const workspace = deps.section ? await getClassWorkspace({ data: { sectionId: deps.section, studentPersonId: deps.student } }) : null;
+    const meetings = workspace ? await safeLoader(() => getClassroomMeetings({ data: {
+      sectionId: workspace.section.id, studentPersonId: deps.student,
+    } }))() : undefined;
     const classRequestOptions = !workspace && directory.role === "teacher"
       ? await getTeacherClassRequestOptions()
       : null;
-    return { directory, workspace, classRequestOptions };
+    return { directory, workspace, classRequestOptions, meetings };
   }, { authMessage: "Sign in with an authorized student, parent or teacher account to open classes." })(),
   component: ClassesPage,
 });
@@ -52,8 +65,8 @@ function ClassesPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Classes" title="Classes" outcome={outcome}/>;
-  const { directory, workspace, classRequestOptions } = outcome.data;
-  if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson}/>;
+  const { directory, workspace, classRequestOptions, meetings } = outcome.data;
+  if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson} meetings={meetings}/>;
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
     subtitle="Published learning, class updates and the teaching team, backed by your current relationships and enrollment.">
     <ClassDirectoryCards classes={directory.classes} role={directory.role} />
@@ -62,7 +75,9 @@ function ClassesPage() {
 }
 
 type Workspace = Awaited<ReturnType<typeof getClassWorkspace>>;
-export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Workspace; tab?: (typeof tabs)[number]; lessonId?: string }) {
+export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons" : "overview", lessonId, meetings }: {
+  data: Workspace; tab?: (typeof tabs)[number]; lessonId?: string; meetings?: LoadOutcome<ClassroomMeetings>;
+}) {
   const router = useRouter();
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
@@ -84,13 +99,21 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const assessmentEvidence = data.assessmentEvidence ?? [];
   const assessmentSummary = data.assessmentEvidenceSummary;
   const lessons = data.content?.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction) ?? [];
+  const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
   // The student home can link directly to a real published lesson without
   // predicting the publisher's IDs. Empty shell lessons are not first-day
   // instruction, even if they precede the first authored lesson.
-  const { lesson, lessonIndex, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
+  const { lesson, lessonIndex, previousLesson, nextLesson } = selectPublishedLesson(lessons,
+    lessonId ?? lessons.find(item => !completed.has(item.id))?.id ?? lessons[0]?.id);
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
+  const lessonDiscussions = lesson ? (data.discussions ?? []).filter(item => item.lessonId === lesson.id || item.lessonId === null) : [];
+  const videoResource = (item: ClassContent["resources"][number]) => Boolean(item.url && resolveClassVideo(item.url));
+  const videoSupplement = (item: typeof supplements[number]) => item.kind === "video" || Boolean(item.url && resolveClassVideo(item.url));
+  const mainVideoResource = lesson?.resources.find(videoResource) ?? data.content?.resources.find(videoResource);
+  const mainVideoSupplement = mainVideoResource ? undefined :
+    (lesson ? supplements.find(item => item.lessonId === lesson.id && videoSupplement(item)) : undefined) ??
+    supplements.find(item => item.lessonId === null && videoSupplement(item));
 
-  const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
   const nextSteps = deriveClassNextSteps({
     lessonIds: lessons.map(item => item.id),
     completedLessonIds: [...completed],
@@ -118,9 +141,27 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   }
   function resources(items: ClassContent["resources"]) {
     return <ul className="space-y-3">{items.map(item => <li key={item.id} className="rounded-lg border p-3 text-sm">
-      {item.url ? <a href={item.url} data-learning-resource-id={item.id} target="_blank" rel="noopener noreferrer" className="underline">{item.title} (external)</a> :
+      {item.url && resolveClassVideo(item.url) ? <ClassVideoPlayer title={item.title} url={item.url} resourceId={item.id} declaredVideo={false}/> :
+        item.url ? <a href={item.url} data-learning-resource-id={item.id} target="_blank" rel="noopener noreferrer" className="underline">{item.title} (external)</a> :
         <button type="button" data-learning-resource-id={item.id} disabled={busy} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</button>}
     </li>)}</ul>;
+  }
+  function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
+    if (item.kind === "video" || (item.url && resolveClassVideo(item.url))) {
+      return <ClassVideoPlayer key={`${item.id}:${item.url ?? item.resourceId}`} title={item.title} presentation={presentation}
+        url={item.url} loadUrl={!item.url ? async () => {
+          const result = await getClassSupplementDownload({ data: {
+            sectionId: data.section.id, studentPersonId: search.student, supplementId: item.id,
+          } });
+          return result.downloadUrl;
+        } : undefined}/>;
+    }
+    if (item.url) return <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>;
+    if (item.kind === "html" && item.resourceId) return <CommonCartridgeStaticLesson
+      programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>;
+    if (item.kind === "pdf") return <button type="button" disabled={busy}
+      onClick={() => void downloadSupplement(item.id)} className="underline disabled:opacity-50">{item.title} (private PDF)</button>;
+    return <span>{item.title} (unavailable document)</span>;
   }
   function supplementActions(item:typeof supplements[number]){
     if(data.role!=="teacher"||!item.canManage)return null;
@@ -157,21 +198,76 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const classwork = data.role === "teacher" ? <Link to="/teacher/gradebook" search={{ section: data.section.id }} className="underline">Gradebook and submission review</Link> :
     data.role === "guardian" ? <Link to="/guardian/academics" search={{ student: search.student, section: data.section.id }} className="underline">Assignments and released feedback</Link> :
       <Link to="/student/assignments" search={{ section: data.section.id }} className="underline">Class assignments and feedback</Link>;
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Classes" title={data.section.title}
-    subtitle={`${data.section.code} · ${data.section.subject}`}
-    breadcrumbs={<><Link to="/classes" className="underline">Classes</Link><span>/</span><span>{data.section.title}</span></>}
-    rail={<WorkspacePanel title="Class connections"><nav className="grid gap-4 text-sm" aria-label="Class connections">
+  const recorded = mainVideoResource?.url ? <ClassVideoPlayer key={mainVideoResource.id} title={mainVideoResource.title}
+    url={mainVideoResource.url} resourceId={mainVideoResource.id} declaredVideo={false} presentation="classroom"/> :
+    mainVideoSupplement ? supplementContent(mainVideoSupplement, "classroom") : <ClassVideoPlaceholder
+      title={lesson ? "No lesson recording yet" : "No class recording yet"}
+      message={lesson ? "Your teacher has not attached a recorded video. Use the published reading and activities below." :
+        "Your school has not attached a recorded video to this class. Check Live classroom for scheduled meetings, or open your class assignments."}/>;
+  const stepWork = lesson ? relatedWork : assessmentEvidence;
+  const nextWork = stepWork.find(work => work.status === "returned") ??
+    stepWork.find(work => work.status === "not_submitted" || work.status === "draft");
+  const nextAction = data.role === "student" && nextWork ?
+    <Link to="/student/assignments" search={{section:data.section.id,assessment:nextWork.id}}
+      className="inline-flex justify-center border bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
+      {nextWork.status === "returned" ? "Review revision request" : "Open assignment"} →
+    </Link> : nextSteps.nextLessonId && data.role !== "teacher" ?
+    <Link to="/classes" search={{...search,tab:"lessons",lesson:nextSteps.nextLessonId}}
+      className="inline-flex justify-center border bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Continue lesson →</Link> : classwork;
+  const stepTitle = data.role === "student" && nextWork ? nextWork.title : "Review your classwork";
+  const stepDetail = data.role === "student" && nextWork ?
+    "Open the assignment for instructions, your response, and released teacher feedback." :
+    lessons.length > 0 ? "Continue published lessons or review your assignments. Video playback does not mark a lesson complete." :
+    "Your teacher's assignments remain available while the published lesson sequence is being prepared.";
+  return <ClassroomWorkspace title={data.section.title}
+    lessonTitle={tab === "lessons" ? lesson?.title : undefined}
+    lessonPosition={tab === "lessons" && lesson ? {current:lessonIndex+1,total:lessons.length} : undefined}
+    subtitle={tab === "lessons" && lesson ? `Lesson ${lessonIndex+1} of ${lessons.length} · ${data.section.code} · ${data.section.subject}` :
+      `${data.section.code} · ${data.section.subject}`}
+    actions={<Link to="/classes" search={{...search,tab:"lessons"}} hash="published-lesson-outline"
+      className="inline-flex items-center border bg-card px-3 py-2 text-xs font-semibold">All lessons</Link>}
+    metadata={<>
+      <span><strong>Teacher</strong> · {data.teachers.length ? data.teachers.map(teacher => teacher.name).join(", ") : "Not assigned"}</span>
+      {tab === "lessons" && lesson?.estimatedMinutes && <span><strong>Estimated</strong> · {lesson.estimatedMinutes} min</span>}
+      {data.role !== "teacher" && lessons.length > 0 && <span><strong>Self-reported progress</strong> · {Math.round(completed.size/lessons.length*100)}%</span>}
+    </>}
+    rail={<>
+      <ClassLessonOutline content={data.content} search={search} currentLessonId={tab === "lessons" ? lesson?.id : undefined}
+        completed={completed} showCompletion={data.role !== "teacher"}/>
+      <WorkspacePanel title="Your next step">
+        <p className="text-xs font-semibold">{stepTitle}</p>
+        <p className="mt-2 text-xs leading-6 text-muted-foreground">{stepDetail}</p>
+        <div className="mt-4 text-xs">{nextAction}</div>
+      </WorkspacePanel>
+      {data.role !== "teacher" && lessons.length > 0 && <details className="border bg-card p-4">
+        <summary className="cursor-pointer text-xs font-semibold">Learning progress details</summary>
+        <StudentNextStepsPanel nextSteps={nextSteps} search={search}/>
+      </details>}
+      <WorkspacePanel title="Class connections"><nav className="grid gap-4 text-sm" aria-label="Class connections">
       {classwork}
+      {data.role === "student" && <Link to="/student/courses" search={{section:data.section.id,tab:"grades"}} className="underline">Grades and released feedback</Link>}
+      {data.role === "student" && <Link to="/student/courses" search={{section:data.section.id,view:"catalog"}} className="underline">Registration and change deadlines</Link>}
       {data.role !== "guardian" && <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"} search={{ section: data.section.id }} className="underline">Class discussions</Link>}
       {data.role !== "guardian" && <Link to="/calendar" search={{ section: data.section.id }} className="underline">Class calendar</Link>}
       {data.role === "guardian" && <Link to="/guardian/report-cards" search={{ student: search.student }} className="underline">Published report cards</Link>}
-    </nav></WorkspacePanel>}>
+    </nav></WorkspacePanel>
+      <WorkspacePanel title="Need support?" description="Review the transcript, save your lesson notes, or ask your class a question.">
+        {data.role !== "guardian" ? <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"}
+          search={{section:data.section.id,lesson:lesson?.id}} className="inline-flex w-full justify-center border px-3 py-2 text-xs font-semibold">Open discussion →</Link> :
+          <Link to="/messages" className="text-sm underline">Open school messages</Link>}
+        {data.role === "student" && <p className="mt-3"><Link to="/student/support" className="text-sm underline">Open student support</Link></p>}
+      </WorkspacePanel>
+    </>}>
     <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
       <Link key={value} to="/classes" search={{ ...search, tab: value }} aria-current={tab === value ? "page" : undefined} className="capitalize">{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</Link>)}</DetailNavigation>
     <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving class change..."/>
-    {tab === "overview" && <div className="grid gap-5">
-      {data.role !== "teacher" && <StudentNextStepsPanel nextSteps={nextSteps} search={search} />}
-      <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
+    {tab === "overview" && <div className="grid grid-cols-1 gap-5">
+      <ClassroomMediaStage sectionId={data.section.id} timezone={data.section.timezone} role={data.role} meetings={meetings} studentPersonId={search.student} commands={meetingCommands}
+        recorded={<section><h2 className="font-serif text-2xl font-semibold">About this class</h2>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p>
+          {lessons.length > 0 && <p className="mt-4"><Link to="/classes" search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId ?? lessons[0]!.id }}
+            className="text-sm font-semibold underline">Open published lesson</Link></p>}
+        </section>}/>
       <ClassLearningProgress search={search} isTeacher={data.role==="teacher"}
        lessonCount={lessons.length} completedCount={completed.size} studentCount={data.roster.length} />
       <ClassAssessmentEvidence items={assessmentEvidence} summary={assessmentSummary}
@@ -182,25 +278,38 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">
       {data.curriculumAccess.reason} Your assignments and academic records remain available in their usual workspaces.
     </p>}
-    {tab === "lessons" && <div className="grid gap-5">
+    {tab === "lessons" && <div className="grid grid-cols-1 gap-5">
+      <ClassroomMediaStage key={`media:${lesson?.id ?? "class"}`} sectionId={data.section.id} timezone={data.section.timezone}
+        role={data.role} meetings={meetings} studentPersonId={search.student} commands={meetingCommands} recorded={recorded}/>
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
-      {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
+      {lesson ? <div>
         {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} />}
-        <PublishedLessonNavigation search={search} lessonIndex={lessonIndex} lessonCount={lessons.length} completedCount={completed.size} isStudent={data.role==="student"} previousLesson={previousLesson} nextLesson={nextLesson} />
 
-        <PublishedLessonContent lesson={lesson} />
-        {lesson.resources.length > 0 && <div className="mt-5" data-learning-content>{resources(lesson.resources)}</div>}
-        {supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
+        <ClassroomLessonTabs key={`tabs:${lesson.id}`} materials={<>
+          <PublishedLessonContent lesson={lesson} />
+          {lesson.resources.length > 0 && <div className="mt-5" data-learning-content>{resources(lesson.resources.filter(item => item.id !== mainVideoResource?.id))}</div>}
+          {supplements.some(item=>item.lessonId===lesson.id && item.id !== mainVideoSupplement?.id) && <div className="mt-5 space-y-2">
           <h3 className="font-semibold">Publisher, school and teacher resources</h3>
-          <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id).map(item=>
-            <li key={item.id} className="rounded border p-3 text-sm">{item.url?
-              <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>
-              :item.kind==="html"&&item.resourceId?<CommonCartridgeStaticLesson programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>
-              :item.kind==="pdf"?<button type="button" disabled={busy}
-                onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
-                {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>} <span className="text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}</li>)}</ul>
-        </div>}
+          <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id && item.id !== mainVideoSupplement?.id).map(item=>
+            <li key={item.id} className="rounded border p-3 text-sm">{supplementContent(item)} <span className="text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}</li>)}</ul>
+          </div>}
+          {mainVideoSupplement && <div className="mt-3 text-xs text-muted-foreground">{mainVideoSupplement.title} · {mainVideoSupplement.source}{supplementActions(mainVideoSupplement)}</div>}
+        </>} transcript={lesson.transcript?.trim() ? <section aria-label="Published lesson transcript" data-learning-content>
+          <h3 className="mb-3 text-sm font-semibold">Recorded lesson transcript</h3>
+          <div className="whitespace-pre-wrap text-sm leading-8">{lesson.transcript}</div>
+        </section> : <p role="status" className="text-sm text-muted-foreground">No transcript has been published for this lesson.</p>}
+          notes={data.role !== "guardian" ? <PrivateLessonNotes key={lesson.id} sectionId={data.section.id} versionId={data.section.versionId} lessonId={lesson.id}/> : undefined}
+          discussion={data.role !== "guardian" ? <section className="space-y-4" aria-label="Lesson discussions">
+            <p className="text-sm text-muted-foreground">Discuss this lesson with your class. Posts use the school’s shared discussion threads and teacher moderation.</p>
+            {!lessonDiscussions.length && <p role="status" className="text-sm">No discussion has been opened for this lesson.</p>}
+            <ul className="divide-y">{lessonDiscussions.map(thread => <li key={thread.id} className="py-3">
+              <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"} search={{ section: data.section.id, thread: thread.id }}
+                className="font-semibold underline">{thread.title}</Link>
+              <p className="mt-1 text-xs text-muted-foreground">{thread.locked ? "Locked · read only" : "Open for class responses"}{thread.lessonId === null ? " · Class-wide discussion" : ""}</p>
+            </li>)}</ul>
+            {data.role === "teacher" && <Link to="/teacher/discussions" search={{ section: data.section.id, lesson: lesson.id }} className="text-sm underline">Start a discussion from this lesson</Link>}
+          </section> : undefined}/>
         {data.role==="teacher"&&<form className="mt-5 grid gap-3 rounded-lg border p-4" aria-label="Add resource to this lesson"
           onSubmit={event=>{event.preventDefault();void run(async()=>{
             await addClassSupplement({data:{sectionId:data.section.id,lessonId:lesson.id,
@@ -219,6 +328,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           <button disabled={busy} className="justify-self-start rounded border px-3 py-2 text-sm">Add lesson resource</button>
           <p className="text-xs text-muted-foreground">Only teacher-owned supplementary resources can be replaced or retired here. Publisher content is immutable.</p>
         </form>}
+        {data.role === "teacher" && <ClassVideoUploadForm key={lesson.id} sectionId={data.section.id}
+          lessons={lessons} lessonId={lesson.id} enabled={data.videoUploadsEnabled}/>}
         {relatedWork.length > 0 && <section className="mt-6 space-y-3 rounded-lg border p-4" aria-label="Assignments for this lesson">
           <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
           <ul className="divide-y">{relatedWork.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -252,13 +363,40 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
         } }), completed.has(lesson.id) ? "Lesson marked incomplete." : "Lesson completion saved.")}
           className="mt-5 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{completed.has(lesson.id) ? "Mark incomplete" : "Mark lesson complete"}</button>}
-      </WorkspacePanel> : data.content?.modules.filter(module=>module.lessons.some(isLearnerFacingInstruction)).map(module => <WorkspacePanel key={module.id} title={module.title}>
+        <div className="mt-5"><PublishedLessonNavigation search={search} lessonIndex={lessonIndex} lessonCount={lessons.length} completedCount={completed.size} isStudent={data.role==="student"} previousLesson={previousLesson} nextLesson={nextLesson}/></div>
+      </div> : data.content?.modules.filter(module=>module.lessons.some(isLearnerFacingInstruction)).map(module => <WorkspacePanel key={module.id} title={module.title}>
         <ul className="divide-y">{module.lessons.filter(isLearnerFacingInstruction).map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-3">
           <Link to="/classes" search={{ ...search, tab: "lessons", lesson: item.id }} className="text-sm underline">{item.title}</Link>
           {data.role !== "teacher" && <StatusBadge tone={completed.has(item.id) ? "success" : "neutral"}>{completed.has(item.id) ? "Complete" : "Not completed"}</StatusBadge>}
         </li>)}</ul>
       </WorkspacePanel>)}
       {data.content && !lessons.length && <p className="text-sm text-muted-foreground">No lessons have been published.</p>}
+      {!lesson && <ClassroomLessonTabs materials={<div className="space-y-4">
+        <h3 className="font-serif text-2xl font-normal">About this class</h3>
+        <p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p>
+        <p className="text-sm text-muted-foreground">No published lesson is selected. Your class assignments and school resources remain separate from the course lesson sequence.</p>
+        <div className="text-sm">{classwork}</div>
+        {data.content?.resources.length ? resources(data.content.resources.filter(item => item.id !== mainVideoResource?.id)) : null}
+        {supplements.some(item => item.lessonId === null && item.id !== mainVideoSupplement?.id) && <ul className="space-y-3">
+          {supplements.filter(item => item.lessonId === null && item.id !== mainVideoSupplement?.id).map(item =>
+            <li key={item.id} className="border p-3 text-sm">{supplementContent(item)}{supplementActions(item)}</li>)}
+        </ul>}
+      </div>} transcript={<p role="status" className="text-sm text-muted-foreground">No lesson transcript is available.</p>}
+        notes={data.role !== "guardian" ? <section className="space-y-4" aria-label="Private lesson notes unavailable">
+          <h3 className="font-serif text-2xl font-normal">Your notes</h3>
+          <p role="status" className="text-sm text-muted-foreground">Private notes require a published lesson. This class has no lesson selected yet; no notes can be saved here.</p>
+          <label className="block text-xs font-semibold">Lesson notes<textarea disabled rows={5}
+            className="mt-2 w-full border bg-muted p-3" placeholder="Select a published lesson to take notes."/></label>
+        </section> : undefined}
+        discussion={data.role !== "guardian" ? <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Open your class discussion workspace for teacher-moderated conversations.</p>
+          <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"}
+            search={{section:data.section.id}} className="text-sm underline">Open class discussions</Link>
+        </div> : undefined}/>}
+      <section className="classroom-next-step" aria-label="Continue your learning">
+        <div><h2 className="text-sm font-semibold">{stepTitle}</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">{stepDetail}</p></div>
+        <div className="shrink-0 text-sm">{nextAction}</div>
+      </section>
     </div>}
     {tab === "planning" && (data.role === "teacher" ? <div className="space-y-5" aria-label="Teacher course implementation plan">
       <WorkspacePanel title="Teacher course implementation plan"
@@ -308,14 +446,12 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           }});
           setResourceTitle("");setResourceUrl("");setResourceLesson("");
         },"Class resource added without changing the publisher's curriculum.")} />}
+      {data.role === "teacher" && <ClassVideoUploadForm sectionId={data.section.id}
+        lessons={lessons} enabled={data.videoUploadsEnabled}/>}
       {data.content && resources(classResources(data.content))}
       {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">Publisher, school and teacher resources</h3>
         <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
-          {item.url?<a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} ({item.kind})</a>
-           :item.kind==="html"&&item.resourceId?<CommonCartridgeStaticLesson programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>
-              :item.kind==="pdf"?<button type="button" disabled={busy}
-              onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
-              {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}
+          {supplementContent(item)}
           <span className="ml-2 text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}
         </li>)}</ul>
       </section>}
@@ -378,6 +514,6 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
         }} />}
       <ClassAnnouncementFeed announcements={data.announcements} timezone={data.section.timezone} />
     </div>}
-  </WorkspaceShell>;
+  </ClassroomWorkspace>;
 }
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";

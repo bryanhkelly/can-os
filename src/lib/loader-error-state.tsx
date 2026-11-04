@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
-import { safeAccessReturnTo } from "@/domain/access-navigation";
+import { accessReturnToFromLocation } from "@/domain/access-navigation";
 import type { LoaderFailureKind } from "./safe-loader";
+import { useHydrated } from "./use-hydrated";
 
 export interface LoaderErrorStateProps {
   outcome: {
@@ -22,7 +23,8 @@ export interface LoaderErrorStateProps {
  */
 export function LoaderErrorState({ outcome, onRetry, retrying, fallback }: LoaderErrorStateProps) {
   const location = useLocation();
-  const returnTo = safeAccessReturnTo(`${location.pathname}${location.searchStr}${location.hash}`);
+  const hydrated = useHydrated();
+  const returnTo = accessReturnToFromLocation({ ...location, hash: hydrated ? location.hash : "" });
   const needsSignIn = outcome.kind === "authentication" ||
     (outcome.kind === undefined && Boolean(outcome.authError));
   const error = needsSignIn ? (
