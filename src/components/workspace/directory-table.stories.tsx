@@ -87,7 +87,7 @@ export const BandedClassList: Story = {
       rowKey={row => row.id} selectedRowKey="algebra"
       columns={[
         { id: "class", title: "Class", render: row => <div>
-          <a href={`/classes/${row.id}`} className="font-semibold underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{row.name}</a>
+          <a href={`/classes?section=${row.id}`} className="font-semibold underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{row.name}</a>
           <p className="mt-1 text-xs text-muted-foreground">{row.period}</p>
         </div> },
         { id: "teacher", title: "Teacher", render: row => row.teacher },
