@@ -1,5 +1,7 @@
 # CAN OS production design system
 
+> **Approved V6.1 implementation profile:** [V6.1 Design System](./design-system-v6-1.md) and [Product-wide migration plan](./design-system-v6-1-migration.md). The existing primitives and domain ownership rules documented below remain authoritative.
+
 The coded components under `src/components/` and their Storybook stories are the implementation source of truth. Lovable, Builder.io, Figma, screenshots, and other visual tools are optional design inputs; they do not create a separate production frontend, workflow state, or authorization path.
 
 ## Dependency and ownership contract
