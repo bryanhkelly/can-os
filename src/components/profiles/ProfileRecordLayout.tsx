@@ -54,8 +54,10 @@ export function ProfileRecordLayout({ identity, metrics, navigation, children, r
   className?: string;
 }) {
   return <div className={cn("min-w-0 space-y-5", className)}>
-    {identity}
-    {metrics && metrics.length > 0 && <ProfileMetricBand metrics={metrics}/>}
+    <div className="border border-border bg-card [&>header]:border-0">
+      {identity}
+      {metrics && metrics.length > 0 && <ProfileMetricBand metrics={metrics} className="px-5 pb-5 sm:px-7 sm:pb-7"/>}
+    </div>
     {navigation && <nav aria-label="Profile sections" className="flex min-w-0 gap-1 overflow-x-auto border border-border bg-card px-2 py-1.5 [scrollbar-width:thin]">{navigation}</nav>}
     <div className={cn("grid min-w-0 items-start gap-5", rail && "xl:grid-cols-[minmax(0,1fr)_21rem]")}>
       <div className="min-w-0 space-y-5">{children}</div>
