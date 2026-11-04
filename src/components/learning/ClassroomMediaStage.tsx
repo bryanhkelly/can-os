@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { CalendarDays, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
   commands: ClassroomMeetingCommands;
 }) {
   const [mode, setMode] = useState<"recorded" | "live">("recorded");
+  const modeChosenByStudent = useRef(false);
   const [reloaded, setReloaded] = useState<LoadOutcome<ClassroomMeetings> | null>(null);
   const [title, setTitle] = useState("");
   const [startsLocal, setStartsLocal] = useState("");
@@ -36,6 +37,13 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
   const mutation = useMutationFeedback(refresh);
   const busy = mutation.pending || mutation.refreshFailed;
   const outcome = reloaded ?? meetings;
+  useEffect(() => {
+    if (role === "guardian" || modeChosenByStudent.current || !outcome?.ok) return;
+    const now = Date.now();
+    if (outcome.data.some(event => !event.cancelled && !!event.meetingUrl &&
+        Date.parse(event.startsAt) <= now && !!event.endsAt && Date.parse(event.endsAt) > now))
+      setMode("live");
+  }, [outcome, role]);
   async function schedule() {
     const specification = JSON.stringify({ title: title.trim(), startsLocal, endsLocal, url: url.trim() });
     if (!request.current || request.current.specification !== specification)
@@ -49,8 +57,8 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
   return <section className="min-w-0 space-y-4" aria-label="Classroom media">
     <div className="classroom-mode-bar">
       <div className="classroom-modes" role="group" aria-label="Class format">
-        <Button variant="ghost" size="sm" aria-pressed={mode === "recorded"} onClick={() => setMode("recorded")}><Video aria-hidden="true"/>Recorded lesson</Button>
-        {role !== "guardian" && <Button variant="ghost" size="sm" aria-pressed={mode === "live"} onClick={() => setMode("live")}><CalendarDays aria-hidden="true"/>Live classroom</Button>}
+        <Button variant="ghost" size="sm" aria-pressed={mode === "recorded"} onClick={() => { modeChosenByStudent.current = true; setMode("recorded"); }}><Video aria-hidden="true"/>Recorded lesson</Button>
+        {role !== "guardian" && <Button variant="ghost" size="sm" aria-pressed={mode === "live"} onClick={() => { modeChosenByStudent.current = true; setMode("live"); }}><CalendarDays aria-hidden="true"/>Live classroom</Button>}
       </div>
       <span className="text-3xs text-muted-foreground">{mode === "recorded" ? "On-demand · Pause, replay, or review the transcript" : `Class calendar · ${timezone}`}</span>
     </div>

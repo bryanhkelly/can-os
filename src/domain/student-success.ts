@@ -37,6 +37,8 @@ export type StudentSuccessAssignment = {
   title: string;
   course: string;
   dueAt: string | null;
+  /** School timezone for consistent student-facing deadline formatting. */
+  timezone?: string;
   status: string | null;
   timeliness: string | null;
   assessmentStatus: string;

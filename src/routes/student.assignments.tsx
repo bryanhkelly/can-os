@@ -15,6 +15,7 @@ import {attachmentAccept,attachmentMimeForFileName as attachmentMime} from "@/mo
 import {mutationErrorMessage,useMutationFeedback} from "@/lib/mutation-feedback";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {useStudentDisplayPreferences} from "@/components/shell/WorkspaceSession";
+import {formatTimestamp} from "@/modules/calendar/timezone";
 
 const loadAssignments=()=>getAssignments();
 export const Route=createFileRoute("/student/assignments")({
@@ -28,7 +29,7 @@ export const Route=createFileRoute("/student/assignments")({
 });
 
 function formatDate(value:string|null,timeZone?:string){
- return value?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",...(timeZone?{timeZone}:{})}).format(new Date(value)):"No due date";
+ return value?formatTimestamp(value,timeZone??"UTC"):"No due date";
 }
 type AssignmentData=Awaited<ReturnType<typeof loadAssignments>>;
 function StudentAssignments(){
@@ -192,7 +193,7 @@ function StudentAssignmentsView({data,showCompleted}:{data:AssignmentData;showCo
      className={"block w-full rounded-xl border bg-card p-5 text-left "+(selected===item.assessmentId?"border-foreground":"")}>
      <p className="text-xs text-muted-foreground">{item.course} · {item.status??"not started"}</p>
      <h2 className="mt-2 font-semibold">{item.title}</h2>
-     <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(item.dueAt,item.timezone)}</p>
+     <p className="mt-2 text-xs text-muted-foreground">{item.dueAt?"Due "+formatDate(item.dueAt,item.timezone):"No due date"}</p>
      {item.score!==null&&item.score!==undefined&&<p className="mt-2 text-sm">Score: {item.score} / {item.pointsPossible??100}</p>}
     </Link>)}
    </section>
@@ -213,7 +214,7 @@ function StudentAssignmentsView({data,showCompleted}:{data:AssignmentData;showCo
        search={{section:chosen.sectionId,tab:"lessons",lesson:chosen.metadata.curriculumLessonId}}
        className="mt-2 inline-block text-sm underline">Review publisher lesson: {chosen.metadata.curriculumLessonTitle??chosen.metadata.curriculumLessonId}</Link>}
      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{chosen.instructions??"Follow your teacher's instructions."}</p>
-     <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt,chosen.timezone)} · {chosen.assessmentStatus}</p>
+     <p className="mt-3 text-xs text-muted-foreground">{chosen.dueAt?"Due "+formatDate(chosen.dueAt,chosen.timezone):"No due date"} · {chosen.assessmentStatus}</p>
      {chosen.metadata.maxAttempts!==null&&<p className="mt-3 text-xs text-muted-foreground">
       Attempt {chosen.attemptNumber??1} of {chosen.metadata.maxAttempts} permitted attempts
      </p>}

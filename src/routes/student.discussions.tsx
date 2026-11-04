@@ -10,16 +10,19 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import { z } from "zod";
 const loadCourseDiscussions=()=>getCourseDiscussions();
 export const Route=createFileRoute("/student/discussions")({
- validateSearch:(search:Record<string,unknown>):{section?:string;thread?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{section?:string;lesson?:string;thread?:string}=>({
   section:typeof search.section==="string"?search.section:undefined,
+  lesson:typeof search.lesson==="string"&&/^[A-Za-z0-9_-]{1,100}$/.test(search.lesson)?search.lesson:undefined,
   thread:typeof search.thread==="string"?z.string().uuid().parse(search.thread):undefined,
  }),
  loader:safeLoader(loadCourseDiscussions,{authMessage:"Sign in with an authorized student account to view course discussions."}),component:DiscussionsPage});
 function DiscussionsPage(){
  const outcome=Route.useLoaderData();
- const {section,thread}=Route.useSearch();
+ const {section,lesson,thread}=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="Course discussions" title="Course discussions" outcome={outcome}/>;
- return <DiscussionsView threads={outcome.data.filter(item=>(!section||item.sectionId===section)&&(!thread||item.id===thread))}/>;
+ return <DiscussionsView threads={outcome.data.filter(item=>
+    (!section||item.sectionId===section)&&(!thread||item.id===thread)&&
+    (!lesson||item.curriculumLessonId===lesson||item.curriculumLessonId===null))}/>;
 }
 function DiscussionsView({threads}:{threads:Awaited<ReturnType<typeof loadCourseDiscussions>>}){
  const router=useRouter();

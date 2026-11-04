@@ -62,13 +62,17 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       </>} />}
     quickActions={<>
       <DashboardShortcut title="Continue Learning" description={learning?.lesson?.title ?? nextWork?.title ?? "Open your enrolled classes"}
-        icon={<BookOpen className="size-5" />}><a href="#continue-learning" /></DashboardShortcut>
+        icon={<BookOpen className="size-5" />}>{learning?.lesson
+          ? <Link to="/classes" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}} />
+          : nextWork ? <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}} />
+          : <Link to="/student/courses" />}</DashboardShortcut>
       <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
-        icon={<FileText className="size-5" />}><a href="#student-assignments" /></DashboardShortcut>
+        icon={<FileText className="size-5" />}><Link to="/student/assignments"
+          search={{section:nextWork?.sectionId ?? undefined,assessment:nextWork?.assessmentId}} /></DashboardShortcut>
       <DashboardShortcut title="Today's Schedule" description={`${classesToday.length} class events scheduled`}
-        icon={<CalendarDays className="size-5" />}><a href="#student-schedule" /></DashboardShortcut>
+        icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:localDate}} /></DashboardShortcut>
       <DashboardShortcut title="School Life" description="School events and community"
-        icon={<Users className="size-5" />}><a href="#school-life" /></DashboardShortcut>
+        icon={<Users className="size-5" />}><Link to="/student/my-school" /></DashboardShortcut>
     </>}
     primary={<>
       <div className="student-feature-grid">

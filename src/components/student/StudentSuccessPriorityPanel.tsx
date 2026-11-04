@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { WorkspacePanel } from "@/components/workspace";
+import { formatTimestamp } from "@/modules/calendar/timezone";
 
 /**
  * Student-owned, assignment-derived next steps only. No counselor cases,
@@ -15,11 +16,11 @@ export function StudentSuccessPriorityPanel({ plan }: {
     <Link to="/student/assignments" className="text-sm font-semibold underline">Open assignments to try again →</Link>
   </WorkspacePanel>;
 
-  const fmtDate = (date: string | null) => {
+  const fmtDate = (date: string | null, timezone?: string) => {
     if (!date) return "No due date";
     const parsed = new Date(date);
     return Number.isFinite(parsed.getTime())
-      ? `Due ${new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(parsed)}`
+      ? `Due ${formatTimestamp(parsed, timezone ?? "UTC")}`
       : "Due date unavailable";
   };
 
@@ -41,7 +42,7 @@ export function StudentSuccessPriorityPanel({ plan }: {
             section: step.sectionId ?? undefined,
           }} className="underline">{step.title}</Link>
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">{fmtDate(step.dueAt)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{fmtDate(step.dueAt, step.timezone)}</p>
         <Link to="/student/assignments" search={{
           assessment: step.assessmentId,
           section: step.sectionId ?? undefined,

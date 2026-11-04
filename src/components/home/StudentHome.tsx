@@ -32,7 +32,7 @@ export async function loadStudentToday() {
         assessmentId: item.assessmentId, sectionId: item.sectionId,
         title: item.title, course: item.course, dueAt: item.dueAt,
         status: item.status, timeliness: item.timeliness,
-        assessmentStatus: item.assessmentStatus, canEdit: item.canEdit,
+        assessmentStatus: item.assessmentStatus, canEdit: item.canEdit, timezone: item.timezone,
         hasDraft: Boolean(item.responseText?.trim()),
       }));
     })(),
@@ -55,25 +55,42 @@ export async function loadStudentToday() {
   let success: StudentSuccessPriorities | null = null;
   if (assignmentResult.ok) success = deriveStudentSuccessPriorities(assignmentResult.data, new Date(today.generatedAt));
   const support: StudentSuccessSupportSummary | null = supportResult.ok ? supportResult.data : null;
-  const nextSection = success?.steps.find(step => step.canEdit && step.sectionId)?.sectionId;
-  const sectionId = today.sections.find(section => section.sectionId === nextSection)?.sectionId
-    ?? today.sections[0]?.sectionId;
+  // Prefer the class with urgent work, but never let an empty or unavailable
+  // classroom prevent the student from resuming a different published lesson.
+  const preferredSectionId = success?.steps.find(step => step.canEdit && step.sectionId)?.sectionId;
+  const candidates = [...today.sections].sort((a, b) =>
+    Number(b.sectionId === preferredSectionId) - Number(a.sectionId === preferredSectionId));
   const learning = await safeLoader(async () => {
-    if (!sectionId) return null;
-    const workspace = await getClassWorkspace({ data: { sectionId } });
-    if (!workspace.curriculumAccess.available || !workspace.content) throw new DataUnavailableError();
-    const lessons = workspace.content.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
-    const steps = deriveClassNextSteps({
-      lessonIds: lessons.map(lesson => lesson.id),
-      completedLessonIds: workspace.progress.filter(item => item.completedAt !== null).map(item => item.lessonId),
-      assessments: [],
-    });
-    const lesson = lessons.find(item => item.id === steps.nextLessonId);
-    return {
-      sectionId, title: workspace.section.title,
-      lesson: lesson ? { id: lesson.id, title: lesson.title, estimatedMinutes: lesson.estimatedMinutes } : null,
-      completed: steps.selfReportedCompleted, total: steps.totalPublishedLessons,
-    };
+    let completedFallback: {
+      sectionId: string; title: string;
+      lesson: { id: string; title: string; estimatedMinutes: number | null } | null;
+      completed: number; total: number;
+    } | null = null;
+    for (const section of candidates) {
+      // A single unpublished or temporarily unavailable class must not block
+      // every other enrolled class. The canonical class reader checks access.
+      const result = await safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))();
+      if (!result.ok || !result.data.curriculumAccess.available || !result.data.content) continue;
+      const workspace = result.data;
+      const lessons = workspace.content!.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
+      if (!lessons.length) continue;
+      const steps = deriveClassNextSteps({
+        lessonIds: lessons.map(lesson => lesson.id),
+        completedLessonIds: workspace.progress.filter(item => item.completedAt !== null).map(item => item.lessonId),
+        assessments: [],
+      });
+      const nextLesson = lessons.find(item => item.id === steps.nextLessonId);
+      const projected = {
+        sectionId: section.sectionId,
+        title: workspace.section.title,
+        lesson: nextLesson ? { id: nextLesson.id, title: nextLesson.title, estimatedMinutes: nextLesson.estimatedMinutes } : null,
+        completed: steps.selfReportedCompleted,
+        total: steps.totalPublishedLessons,
+      };
+      if (nextLesson) return projected;
+      completedFallback ??= projected;
+    }
+    return completedFallback;
   })();
   const dashboard: StudentDashboardData = { assignments: assignmentResult, learning, grades, community };
   return { today, success, support, dashboard };
