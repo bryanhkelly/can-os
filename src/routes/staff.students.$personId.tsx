@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { getStudent360 } from "@/modules/profiles/directory.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace";
+import { ProfileIdentity, ProfileRecordLayout, profileTabClass } from "@/components/profiles/ProfileRecordLayout";
 
 const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
 type ProfileTab = (typeof tabs)[number];
@@ -43,22 +44,42 @@ function Student360Page({ personId }: { personId: string }) {
 
 export function Student360View({ profile, tab = "overview" }: { profile: Student360; tab?: ProfileTab }) {
   const canOpenReferrals = ["teacher", "specialist", "counselor"].includes(profile.viewerRole);
-  return <WorkspaceShell width="wide" eyebrow="CAN OS · Staff" title={profile.identity.name}
-    subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${profile.sections.length} active class(es)`}
-    breadcrumbs={<><Link to="/staff/students" className="underline">Students</Link><span>/</span><span>{profile.identity.name}</span></>}
-    actions={<ProfilePhoto personId={profile.identity.personId} name={profile.identity.name}/>}
-    rail={<WorkspacePanel title="Record context">
-      <p className="text-sm leading-6 text-muted-foreground">This profile contains the records returned by your authorized staff view. Private notes and domain decisions remain in their owning workflows.</p>
-      <Link to="/messages" className="mt-4 inline-block text-sm underline">Open staff inbox</Link>
-    </WorkspacePanel>}>
-    <DetailNavigation label="Student profile sections">{tabs.map(value => <Link key={value}
-      to="/staff/students/$personId" params={{ personId: profile.identity.personId }} search={{ tab: value }}
-      aria-current={tab === value ? "page" : undefined} className="capitalize">{value}</Link>)}</DetailNavigation>
-    <div className="mb-6 grid gap-3 sm:grid-cols-3">
-      <StatCard label="Missing work" value={profile.academics.openMissingWorkCount}/>
-      <StatCard label="Absences · last 30 days" value={profile.attendance.absenceCount}/>
-      <StatCard label="Open actions" value={profile.openActions.length}/>
-    </div>
+  return <WorkspaceShell width="wide" title={profile.identity.name} contentHeader
+    breadcrumbs={<><Link to="/staff/students" className="underline underline-offset-4">Students</Link><span>/</span><span>{profile.identity.name}</span></>}>
+    <ProfileRecordLayout
+      identity={<ProfileIdentity name={profile.identity.name}
+        subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${profile.sections.length} authorized active class(es)`}
+        portrait={<ProfilePhoto personId={profile.identity.personId} name={profile.identity.name}/>}
+        badges={<><StatusBadge>Student</StatusBadge>
+          {profile.openActions.some(action=>action.priority==="urgent"||action.priority==="high") &&
+            <StatusBadge tone="attention">Priority action requires review</StatusBadge>}
+        </>}/>}
+      metrics={[
+        {id:"classes",label:"Active classes",value:profile.sections.length,detail:"Current authorized section scope"},
+        {id:"missing",label:"Missing work",value:profile.academics.openMissingWorkCount,detail:"Open work from current class records"},
+        {id:"absences",label:"Absences · 30 days",value:profile.attendance.absenceCount,detail:`${profile.attendance.tardyCount} tardy events`},
+        {id:"actions",label:"Open actions",value:profile.openActions.length,detail:"Current actions visible in your role"},
+      ]}
+      navigation={tabs.map(value=><Link key={value}
+        to="/staff/students/$personId" params={{personId:profile.identity.personId}} search={{tab:value}}
+        aria-current={tab===value?"page":undefined} className={profileTabClass(tab===value)}>
+        {value==="overview"?"About":value==="academics"?"Academics":value==="activity"?"Activity":value==="attendance"?"Attendance":value==="support"?"Support & priorities":"Family"}
+      </Link>)}
+      rail={<>
+        <WorkspacePanel title="Meetings and communication" description="Use the authorized calendar and messaging workflows.">
+          <p className="text-xs leading-5 text-muted-foreground">No meeting appointments are included in this student-record projection. Consult the schedule before confirming availability; do not infer a booking.</p>
+          <div className="mt-4 grid gap-2">
+            <Link to="/calendar" className="border border-border px-3 py-2 text-center text-xs font-semibold hover:bg-muted">Open calendar</Link>
+            <Link to="/messages" className="border border-border px-3 py-2 text-center text-xs font-semibold hover:bg-muted">Open staff inbox</Link>
+          </div>
+        </WorkspacePanel>
+        <WorkspacePanel title="Related information">
+          <p className="text-xs text-muted-foreground">{profile.sections.length} active class relationship(s) · {profile.guardians.length} guardian relationship(s) returned in your authorized view.</p>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">Private case notes, clinical information, and independently governed decisions remain in their authorized workflows, not on this summary.</p>
+          {profile.openActions.length>0&&<div className="mt-4 border-t border-border pt-3 text-xs font-semibold">{profile.openActions.length} open follow-up(s) visible in Support & priorities.</div>}
+        </WorkspacePanel>
+      </>}
+    >
     <div className="grid gap-5">
       {(tab === "overview" || tab === "academics") && <WorkspacePanel title="Academics" description="Finalized results, not estimated progress or mastery.">
         <ul className="divide-y">{profile.academics.sections.map(section => <li key={section.sectionId} className="py-4 first:pt-0">
@@ -129,5 +150,6 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         {!profile.guardians.length && <p className="text-sm text-muted-foreground">No guardians on record.</p>}
       </WorkspacePanel>}
     </div>
+    </ProfileRecordLayout>
   </WorkspaceShell>;
 }
