@@ -118,7 +118,7 @@ function SiteTodayPage() {
     <OpeningHandoffs handoffs={data.openingHandoffs}/>
     <DailyCanvas audience="site" content={resolveEditorialCanvas("site", new Date())} className="mt-6"
       primaryAction={<Link to="/operations" search={{siteId:data.site.id,programId:undefined}}
-        className="inline-flex min-h-11 items-center border border-white bg-white px-4 py-2 text-sm font-semibold !text-slate-900">Open operations →</Link>}
+        className="can-editorial-primary inline-flex min-h-11 items-center px-4 py-2 text-sm font-semibold">Open operations →</Link>}
     />
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="Active enrollment" value={data.enrollment.count} hint={data.enrollment.note}/>
