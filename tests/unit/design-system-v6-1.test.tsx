@@ -4,6 +4,8 @@ import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components
 import { RecordHeader, RecordLayout, EntityCard } from "@/components/workspace/record-layout";
 import { WorkflowWorkspace, WorkflowProgress } from "@/components/workflow/workflow-workspace";
 import { UserFlowMap } from "@/components/workflow/user-flow-map";
+import { MasterDetailWorkspace, MasterDetailListItem } from "@/components/workspace/master-detail-workspace";
+import { DashboardProgress, DashboardTimeline, DashboardPreviewList } from "@/components/workspace/dashboard-widgets";
 
 describe("V6.1 reusable design system", () => {
   it("keeps a role dashboard's wallpaper independent from action panels and rail", () => {
@@ -58,6 +60,30 @@ describe("V6.1 reusable design system", () => {
     expect(html).toContain('href="/review"');
     expect(html).toContain("Institutional authorization");
     expect((html.match(/<a /g) ?? []).length).toBe(1);
+  });
+
+  it("supports URL-owned master/detail selection without burying the chosen record", () => {
+    const html = renderToStaticMarkup(<MasterDetailWorkspace title="Admissions queue"
+      list={<MasterDetailListItem title="Avery Kelly" selected href="?application=avery" />}
+      detail={<h2>Guardian verification</h2>} />);
+    expect(html).toContain('aria-label="Records in queue"');
+    expect(html).toContain('aria-label="Selected record details"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain('href="?application=avery"');
+    expect(html).toContain("Guardian verification");
+  });
+
+  it("does not invent progress for unknown values and maintains accessible schedule semantics", () => {
+    const invalid = renderToStaticMarkup(<DashboardProgress label="Course progress" value={-1} max={0} />);
+    expect(invalid).toContain("Progress cannot be verified");
+    expect(invalid).not.toContain('role="progressbar"');
+    const valid = renderToStaticMarkup(<DashboardProgress label="Lesson completion" value={3} max={8} />);
+    expect(valid).toContain('aria-valuenow="3"');
+    expect(valid).toContain('aria-valuemax="8"');
+    const timeline = renderToStaticMarkup(<DashboardTimeline entries={[{ id: "a", time: "9:00 AM", title: "English" }]} />);
+    expect(timeline).toContain("<time");
+    const empty = renderToStaticMarkup(<DashboardPreviewList items={[]} />);
+    expect(empty).toContain('role="status"');
   });
 
   it("makes a diagram a read-only explanation of decisions and ownership", () => {
