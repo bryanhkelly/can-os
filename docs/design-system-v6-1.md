@@ -49,7 +49,7 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 | Pattern | Use cases | Code / stories |
 | --- | --- | --- |
 | Role Dashboard | Student, teacher, family, site leader, registrar, CAN HQ | `DashboardLayout`, `DashboardPanel`, `DashboardShortcut`, `DashboardProgress`, `DashboardTimeline`, `DashboardPreviewList`, `DashboardMediaTile`; `dashboard-layout.stories.tsx`, `dashboard-widgets.stories.tsx` |
-| Directory | Sites, staff, students, applications, programs, classrooms | `DirectoryTable`, `EntityCard`; `record-layout.stories.tsx` |
+| Directory | Sites, staff, students, applications, programs, classrooms | `DirectoryTable` (`presentation="standard" \| "banded"`), `EntityCard`; `directory-table.stories.tsx`, `record-layout.stories.tsx` |
 | Master/detail Explorer | Admissions and action triage without deeply buried selected record | `MasterDetailWorkspace`, `MasterDetailListItem`; `master-detail-workspace.stories.tsx` |
 | Entity Record | Selected student, applicant, site, teacher, action, program | `RecordHeader`, `RecordLayout`, `DetailNavigation`; `record-layout.stories.tsx` |
 | User / Business Workflow | Admissions, enrollment, approvals, school setup, opening, staffing | `WorkflowWorkspace`, `WorkflowProgress`; `workflow-workspace.stories.tsx` |
@@ -68,6 +68,12 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 - Bottom: community, programs, resources, long-tail discovery.
 - At mobile widths, stack primary before context rail; keep CTAs reachable.
 - No fixture grades or simulated availability, attendance, opening authorization, or statistical improvement.
+
+### Template: banded directory
+
+Use `DirectoryTable presentation="banded"` for class lists, rosters, staff, programs, or other collections where repeating a full card for each record wastes space. The wide (roughly 64–72px) horizontal bands use neutral alternating surface tones, substantial vertical padding, strong separators, meaningful secondary labels, and actual row-specific links. Optional `selectedRowKey` highlights the current record without changing its permissions. Sorting, pagination, query states, and labeled table scroll remain owned by the existing `DirectoryTable`.
+
+Use `presentation="standard"` for compact tables with many columns; use `EntityCard` for visual content with distinct actions; use `MasterDetailWorkspace` for operational queues where the selected record is part of the same task surface. **Do not tint each row with arbitrary status color.** Put a labeled `StatusBadge` in the appropriate cell only when the source record warrants it.
 
 ### Template: record / applicant detail
 
