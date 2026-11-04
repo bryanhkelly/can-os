@@ -66,3 +66,33 @@ export const ErrorWithRetry: Story = {
   },
 };
 export const DarkDirectory: Story = { globals: { theme: "dark" }, render: () => <Example/> };
+
+/** Spacious, neutral directory bands for classes, rosters and site lists.
+ * The table remains semantic and sortable; each row's link leads to a real detail page.
+ */
+export const BandedClassList: Story = {
+  render: () => <div className="min-w-0 bg-background p-5 sm:p-8">
+    <div className="mb-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS / Classes</p>
+      <h1 className="mt-2 font-serif text-4xl font-normal">My classes</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Spacious horizontal bands when separate cards would be repetitive.</p>
+    </div>
+    <DirectoryTable presentation="banded" label="Class directory" caption="Illustrative sections; linked titles open the class workspace."
+      rows={[
+        { id: "algebra", name: "Algebra II", period: "Period 2 · Mathematics", teacher: "Riley Example", students: 24, schedule: "9:00 AM" },
+        { id: "english", name: "English Literature", period: "Period 3 · Humanities", teacher: "Jordan Smith", students: 21, schedule: "10:15 AM" },
+        { id: "biology", name: "Biology", period: "Period 4 · Science", teacher: "Taylor Brooks", students: 18, schedule: "11:30 AM" },
+        { id: "history", name: "World History", period: "Period 5 · Social Studies", teacher: "Morgan Lee", students: 26, schedule: "1:00 PM" },
+      ]}
+      rowKey={row => row.id} selectedRowKey="algebra"
+      columns={[
+        { id: "class", title: "Class", render: row => <div>
+          <a href={`/classes/${row.id}`} className="font-semibold underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{row.name}</a>
+          <p className="mt-1 text-xs text-muted-foreground">{row.period}</p>
+        </div> },
+        { id: "teacher", title: "Teacher", render: row => row.teacher },
+        { id: "students", title: "Students", render: row => <span className="tabular-nums">{row.students}</span> },
+        { id: "next", title: "Class time", render: row => row.schedule },
+      ]} />
+  </div>,
+};
