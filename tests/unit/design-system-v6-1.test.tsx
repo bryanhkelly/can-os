@@ -4,10 +4,23 @@ import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components
 import { RecordHeader, RecordLayout, EntityCard } from "@/components/workspace/record-layout";
 import { WorkflowWorkspace, WorkflowProgress } from "@/components/workflow/workflow-workspace";
 import { UserFlowMap } from "@/components/workflow/user-flow-map";
+import { DirectoryTable } from "@/components/workspace/directory-table";
 import { MasterDetailWorkspace, MasterDetailListItem } from "@/components/workspace/master-detail-workspace";
 import { DashboardProgress, DashboardTimeline, DashboardPreviewList } from "@/components/workspace/dashboard-widgets";
 
 describe("V6.1 reusable design system", () => {
+  it("renders accessible wide-band class lists without changing table semantics", () => {
+    const html = renderToStaticMarkup(<DirectoryTable presentation="banded" label="Classes"
+      caption="Class list" rows={[{ id:"a", name:"Algebra II" }, { id:"b", name:"English" }]}
+      rowKey={row=>row.id} selectedRowKey="a"
+      columns={[{ id:"class", title:"Class", render:row=><a href={"/classes/"+row.id}>{row.name}</a> }]} />);
+    expect(html).toContain('aria-label="Classes"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('href="/classes/a"');
+    expect(html).toContain("bg-muted/35");
+    expect(html).toContain("<table");
+  });
+
   it("keeps a role dashboard's wallpaper independent from action panels and rail", () => {
     const html = renderToStaticMarkup(<DashboardLayout wallpaper={<div>Campaign artwork</div>}
       quickActions={<DashboardShortcut title="Classes" description="My sections"><a href="/classes" /></DashboardShortcut>}
