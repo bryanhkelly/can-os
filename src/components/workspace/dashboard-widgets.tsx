@@ -92,7 +92,7 @@ export function DashboardMediaTile({ title, subtitle, imageSrc, href, label, cla
     className,
   )}>
     {imageSrc && <img src={imageSrc} alt="" loading="lazy" className="absolute inset-0 -z-20 h-full w-full object-cover" />}
-    <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent" />
+    <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
     <span className="font-serif text-2xl leading-tight">{title}</span>
     {subtitle && <span className="mt-1 text-xs text-white/90">{subtitle}</span>}
     <span className="absolute bottom-4 right-4 font-semibold" aria-hidden="true">→</span>
