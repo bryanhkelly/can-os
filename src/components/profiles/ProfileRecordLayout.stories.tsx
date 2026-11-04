@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ProfileIdentity, ProfileMetricBand, ProfileRecordLayout, profileTabClass } from "./ProfileRecordLayout";
+import { ProfileMeetingsPanel, ProfileLinksPanel } from "./ProfileContextPanels";
 import { WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace";
 
 const meta = { title:"V6.1 templates/Person and student profiles", parameters:{layout:"fullscreen"} } satisfies Meta;
@@ -62,3 +63,16 @@ export const MinimalPersonProfile: Story = {render:()=> <div className="max-w-5x
     metrics={[]}><WorkspacePanel title="School connections"><p className="text-sm text-muted-foreground">No active school relationships in this membership.</p></WorkspacePanel>
   </ProfileRecordLayout>
 </div>};
+
+export const ProfileRightRail: Story = {render:()=> <div className="grid max-w-md gap-4 bg-background p-5">
+  <ProfileMeetingsPanel meetings={[
+    {id:"m1",title:"Academic planning conference",startsAt:"2026-11-04T16:00:00Z",displayTime:"Wednesday, Nov 4 · 8:00 AM PST",description:"Illustrative calendar appointment"},
+    {id:"m2",title:"Family follow-up",startsAt:"2026-11-06T19:00:00Z",displayTime:"Friday, Nov 6 · 11:00 AM PST"},
+  ]} scheduleAction={<a href="#schedule" className="block border border-border px-4 py-2 text-center text-xs font-semibold">Open calendar</a>}/>
+  <ProfileLinksPanel links={[
+    {id:"teachers",title:"Teacher directory",href:"#teachers"},
+    {id:"courses",title:"Course catalog",href:"#courses"},
+    {id:"records",title:"Transcripts and records",href:"#records"},
+  ]}/>
+  <ProfileMeetingsPanel meetings={[]} emptyMessage="No authorized meeting appointments are available."/>
+</div> };
