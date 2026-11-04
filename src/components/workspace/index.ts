@@ -14,3 +14,7 @@ export { DirectoryTable, type DirectoryColumn, type DirectorySort } from "./dire
 
 export { DashboardLayout, DashboardPanel, DashboardShortcut } from "./dashboard-layout";
 export { RecordHeader, RecordLayout, EntityCard } from "./record-layout";
+
+export { MasterDetailWorkspace, MasterDetailListItem } from "./master-detail-workspace";
+export { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMediaTile } from "./dashboard-widgets";
+export type { TimelineEntry, DashboardPreviewItem } from "./dashboard-widgets";
