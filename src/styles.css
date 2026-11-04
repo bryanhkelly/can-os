@@ -11,12 +11,12 @@
   --font-serif: "Instrument Serif", "Tiempos Headline", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -331,3 +331,13 @@
 .can-workspace-header { margin-bottom:1.25rem; padding-bottom:1.1rem; }
 .can-workspace-header h1 { font-size:clamp(1.75rem,2.1vw,2.5rem); line-height:1.15; }
 @media(prefers-reduced-motion:reduce) { .can-entity-card {transition:none;} }
+
+/* V6.1: editorial action contrast is independent of site-branded or dark UI ink. */
+:root, .dark { --editorial-action-background: #ffffff; --editorial-action-foreground: #101d39; }
+.can-editorial-primary { background:var(--editorial-action-background); color:var(--editorial-action-foreground) !important; border:1px solid var(--editorial-action-background); }
+.can-editorial-primary:hover { filter:brightness(.96); }
+.can-editorial-secondary { color:#ffffff; border:1px solid rgba(255,255,255,.65); }
+.can-editorial-secondary:hover { background:rgba(255,255,255,.12); }
+/* All presentation surface radii inherit the zero-radius system. */
+.can-dashboard { font-family:var(--font-sans); }
+.can-dashboard :is(h1,h2,h3) { text-wrap:balance; }
