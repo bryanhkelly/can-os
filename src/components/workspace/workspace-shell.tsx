@@ -11,15 +11,17 @@ export interface WorkspaceShellProps {
   width?: "reading" | "standard" | "wide";
   rail?: React.ReactNode;
   className?: string;
+  /** Use when a specialized identity header supplies the page h1 inside children. */
+  contentHeader?: boolean;
   children: React.ReactNode;
 }
 
-function WorkspaceShell({ title, eyebrow, subtitle, actions, breadcrumbs, width = "standard", rail, className, children }: WorkspaceShellProps) {
+function WorkspaceShell({ title, eyebrow, subtitle, actions, breadcrumbs, width = "standard", rail, className, contentHeader = false, children }: WorkspaceShellProps) {
   return (
-    <main className={cn("min-h-screen bg-background px-4 py-6 text-foreground sm:px-6 sm:py-9 xl:px-10", className)}>
+    <main aria-label={contentHeader && typeof title === "string" ? title : undefined} className={cn("min-h-screen bg-background px-4 py-6 text-foreground sm:px-6 sm:py-9 xl:px-10", className)}>
       <div className={cn("mx-auto", width === "wide" ? "max-w-7xl" : width === "reading" ? "max-w-3xl" : "max-w-5xl")}>
         {breadcrumbs && <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">{breadcrumbs}</nav>}
-        <header className="can-workspace-header border-b border-border/60">
+        {!contentHeader && <header className="can-workspace-header border-b border-border/60">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               {eyebrow && (
@@ -32,7 +34,7 @@ function WorkspaceShell({ title, eyebrow, subtitle, actions, breadcrumbs, width 
             {actions}
           </div>
           {subtitle && <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</p>}
-        </header>
+        </header>}
         {rail ? <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="min-w-0">{children}</div>
           <aside aria-label="Related context" className="space-y-4 pt-8 lg:sticky lg:top-6 lg:self-start">{rail}</aside>
