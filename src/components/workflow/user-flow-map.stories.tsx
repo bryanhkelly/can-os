@@ -25,6 +25,11 @@ export const ChurchToSchoolLaunch: Story = { render: () => <div className="bg-ba
         { id: "day", title: "Operate the supervised day", kind: "task", state: "not_started", owner: "Site team" },
       ] },
     ]}
+    transitions={[
+      { from: "interest", to: "partner", outcome: "Church qualifies for review", condition: "Verified organization" },
+      { from: "approved", to: "evidence", outcome: "Evidence rejected", condition: "Re-review is required; no opening granted" },
+      { from: "approved", to: "open", outcome: "Approved", condition: "Independent CAN opening authority confirms current evidence" },
+    ]}
     legend={<p className="text-xs text-muted-foreground">Example use: discovery workshops, implementation handoff, testing scenarios and role boundary reviews. This visualization does not mutate any record or authorize a school opening.</p>}
   />
 </div> };
