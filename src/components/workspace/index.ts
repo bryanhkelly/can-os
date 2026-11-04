@@ -11,3 +11,6 @@ export { LocalDateTimeField } from "./local-datetime-field";
 export { ActionDialog } from "./action-dialog";
 export { PageNavigation } from "./page-navigation";
 export { DirectoryTable, type DirectoryColumn, type DirectorySort } from "./directory-table";
+
+export { DashboardLayout, DashboardPanel, DashboardShortcut } from "./dashboard-layout";
+export { RecordHeader, RecordLayout, EntityCard } from "./record-layout";
