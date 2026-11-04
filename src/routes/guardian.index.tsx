@@ -2,7 +2,7 @@ import { DailyCanvas } from "@/components/student/DailyCanvas";
 import { resolveEditorialCanvas } from "@/domain/editorial-campaigns";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { listGuardianGradeFollowUps } from "@/modules/learning/guardian-grade-response.functions";
 import { listGuardianCourseApprovals } from "@/modules/learning/guardian-course-approval.functions";
