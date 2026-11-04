@@ -43,7 +43,8 @@ describe("workspace design primitives", () => {
     expect(informational).not.toContain("focus-visible:ring-2");
 
     const interactive = renderToStaticMarkup(<StatCard asChild label="Needs review" value="4"><a href="/review" /></StatCard>);
-    expect(interactive).toContain("hover:shadow-md");
+    expect(interactive).toContain("hover:border-primary");
+    expect(interactive).not.toContain("hover:shadow-md");
     expect(interactive).toContain('href="/review"');
     expect(interactive).toMatch(/^<a /);
     expect(interactive).not.toContain("<div");
