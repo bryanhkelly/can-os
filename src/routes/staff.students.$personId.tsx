@@ -7,7 +7,7 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace";
 import { ProfileIdentity, ProfileRecordLayout, profileTabClass } from "@/components/profiles/ProfileRecordLayout";
 
-const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
+const tabs = ["overview", "academics", "courses", "activity", "attendance", "support", "relationships"] as const;
 type ProfileTab = (typeof tabs)[number];
 export const Route = createFileRoute("/staff/students/$personId")({
   validateSearch: (search: Record<string, unknown>): { tab?: ProfileTab } => ({
@@ -63,7 +63,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
       navigation={tabs.map(value=><Link key={value}
         to="/staff/students/$personId" params={{personId:profile.identity.personId}} search={{tab:value}}
         aria-current={tab===value?"page":undefined} className={profileTabClass(tab===value)}>
-        {value==="overview"?"About":value==="academics"?"Academics":value==="activity"?"Activity":value==="attendance"?"Attendance":value==="support"?"Support & priorities":"Family"}
+        {value==="overview"?"About":value==="academics"?"Academics":value==="courses"?"Courses":value==="activity"?"Activity":value==="attendance"?"Attendance":value==="support"?"Support & priorities":"Family"}
       </Link>)}
       rail={<>
         <WorkspacePanel title="Meetings and communication" description="Use the authorized calendar and messaging workflows.">
@@ -81,7 +81,33 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
       </>}
     >
     <div className="grid gap-5">
-      {(tab === "overview" || tab === "academics") && <WorkspacePanel title="Academics" description="Finalized results, not estimated progress or mastery.">
+      {tab === "overview" && <WorkspacePanel title="Student record summary"
+        description="A verified overview from the current student, section, attendance, support and activity records.">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="border border-border bg-muted/35 p-4">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Finalized course results</p>
+            <p className="mt-2 font-sans text-2xl font-semibold tabular-nums">{profile.academics.sections.filter(section=>section.finalizedAt!==null).length}</p>
+          </div>
+          <div className="border border-border bg-muted/35 p-4">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Attendance events · 30 days</p>
+            <p className="mt-2 font-sans text-2xl font-semibold tabular-nums">{profile.attendance.absenceCount+profile.attendance.tardyCount}</p>
+          </div>
+          <div className="border border-border bg-muted/35 p-4">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">Support referrals</p>
+            <p className="mt-2 font-sans text-2xl font-semibold tabular-nums">{profile.supportReferrals.length}</p>
+          </div>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">The authorized staff view includes class relationships, finalized grades, recorded attendance, recent academic activity, open actions, support follow-up, and guardians. GPA, credits earned, graduation status, and booked meeting times are not provided by this record and are intentionally not estimated.</p>
+      </WorkspacePanel>}
+      {tab === "courses" && <WorkspacePanel title="Current courses"
+        description="Active courses and teaching teams returned within your authorized school scope.">
+        <div className="divide-y divide-border">{profile.sections.map(section=><div key={section.sectionId} className="py-4 first:pt-0">
+          <h3 className="text-sm font-semibold">{section.title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Teaching team: {section.teacherNames.join(", ")||"Not recorded"}</p>
+        </div>)}</div>
+        {!profile.sections.length&&<p className="text-sm text-muted-foreground">No active courses in the authorized view.</p>}
+      </WorkspacePanel>}
+      {tab === "academics" && <WorkspacePanel title="Academics" description="Finalized results, not estimated progress or mastery.">
         <ul className="divide-y">{profile.academics.sections.map(section => <li key={section.sectionId} className="py-4 first:pt-0">
           <h3 className="font-semibold">{section.title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{section.letterGrade !== null || section.percentage !== null ?
@@ -91,7 +117,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         </li>)}</ul>
         {!profile.academics.sections.length && <p className="text-sm text-muted-foreground">No active sections.</p>}
       </WorkspacePanel>}
-      {(tab === "overview" || tab === "activity") && <WorkspacePanel title="Academic activity"
+      {tab === "activity" && <WorkspacePanel title="Academic activity"
        description="Chronological class-grade, recorded-attendance and academic-follow-up events from only your authorized school scope. Private case notes are excluded.">
         <ol className="divide-y">
          {profile.timeline.map(item=><li key={item.id} className="py-3 text-sm">
@@ -104,7 +130,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         </ol>
         {!profile.timeline.length&&<p className="text-sm text-muted-foreground">No academic activity has been recorded in the authorized view.</p>}
       </WorkspacePanel>}
-      {(tab === "overview" || tab === "attendance") && <WorkspacePanel title="Attendance" description="Recent recorded events from the last 30 days.">
+      {tab === "attendance" && <WorkspacePanel title="Attendance" description="Recent recorded events from the last 30 days.">
         <p className="text-sm">{profile.attendance.absenceCount} absence(s) · {profile.attendance.tardyCount} tardy event(s)</p>
         <ul className="mt-3 divide-y">{profile.attendance.recentEvents.map((event, index) => <li key={`${event.expectedAt}-${index}`} className="flex flex-wrap justify-between gap-3 py-3 text-sm">
           <StatusBadge tone={event.status === "absent" ? "attention" : "neutral"}>{event.status}</StatusBadge>
@@ -112,7 +138,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         </li>)}</ul>
         {!profile.attendance.recentEvents.length && <p className="mt-3 text-sm text-muted-foreground">No recent attendance events.</p>}
       </WorkspacePanel>}
-      {(tab === "overview" || tab === "support") && <>
+      {tab === "support" && <>
         <WorkspacePanel title="Open actions">
           <ul className="space-y-3">{profile.openActions.map(action => <li key={action.id} className="rounded-lg border p-4">
             <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{action.type==="support_referral"
