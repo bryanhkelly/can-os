@@ -75,6 +75,19 @@
 - [ ] Show household, required evidence, eligibility, placement, offers and enrollment as distinct concepts.
 - [ ] Prevent optimistic or duplicated institutional transitions after refresh failure.
 
+## 5A. Student, teacher and member profiles — identity-first standard
+- [x] Add shared profile identity header, compact metric band, section navigation, context rail.
+- [x] Migrate staff student 360 and person profile to the shared presentation.
+- [x] Preserve existing Student 360: finalized grades, attendance events, activity, open actions, referrals, insights, and guardians.
+- [x] Add student Courses section and authoritative About summary; remove unneeded dashboard cards above record.
+- [x] Convert staff student search to canonical banded table.
+- [x] Add Storybook student counselor, teacher, and minimal profile templates, plus profile hierarchy unit tests.
+- [ ] Integrate canonical meeting/session read projections when authorized source DTOs exist, with scheduling/communication gates.
+- [ ] Build or reuse canonical GPA, earned credits, graduation pathway, transcript and enrollment read models when vetted by academic owners; do not calculate placeholders from incomplete sections.
+- [ ] Add approved counseling interventions and private education support info with explicit case-access grants; preserve FERPA scoping.
+- [ ] Extend to guardian child profiles, teacher personnel detail and site-leader people views after confirming distinct access scopes.
+- [ ] Validate real route at 390, 768, 1024 and 1440 px with actual student data, tab deep links and accessible keyboard flows.
+
 ## 6. School launch and setup flows
 - [ ] Adopt `GuidedSetupShell` for simple steps and `WorkflowWorkspace` for complicated cross-role approval.
 - [ ] Show the actual next readiness blocker rather than assuming all saved programs should proceed to Website.
