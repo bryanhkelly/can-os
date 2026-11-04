@@ -6,6 +6,7 @@ import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace";
 import { ProfileIdentity, ProfileRecordLayout, profileTabClass } from "@/components/profiles/ProfileRecordLayout";
+import { ProfileMeetingsPanel } from "@/components/profiles/ProfileContextPanels";
 
 const tabs = ["overview", "academics", "courses", "activity", "attendance", "support", "relationships"] as const;
 type ProfileTab = (typeof tabs)[number];
@@ -66,13 +67,13 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         {value==="overview"?"About":value==="academics"?"Academics":value==="courses"?"Courses":value==="activity"?"Activity":value==="attendance"?"Attendance":value==="support"?"Support & priorities":"Family"}
       </Link>)}
       rail={<>
-        <WorkspacePanel title="Meetings and communication" description="Use the authorized calendar and messaging workflows.">
-          <p className="text-xs leading-5 text-muted-foreground">No meeting appointments are included in this student-record projection. Consult the schedule before confirming availability; do not infer a booking.</p>
-          <div className="mt-4 grid gap-2">
+        <ProfileMeetingsPanel meetings={[]}
+          emptyMessage="Meeting appointments are not included in this authorized student record. Open the calendar to review the schedule."
+          scheduleAction={<div className="grid gap-2">
             <Link to="/calendar" className="border border-border px-3 py-2 text-center text-xs font-semibold hover:bg-muted">Open calendar</Link>
             <Link to="/messages" className="border border-border px-3 py-2 text-center text-xs font-semibold hover:bg-muted">Open staff inbox</Link>
-          </div>
-        </WorkspacePanel>
+          </div>}
+        />
         <WorkspacePanel title="Related information">
           <p className="text-xs text-muted-foreground">{profile.sections.length} active class relationship(s) · {profile.guardians.length} guardian relationship(s) returned in your authorized view.</p>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">Private case notes, clinical information, and independently governed decisions remain in their authorized workflows, not on this summary.</p>
