@@ -51,6 +51,7 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 | Role Dashboard | Student, teacher, family, site leader, registrar, CAN HQ | `DashboardLayout`, `DashboardPanel`, `DashboardShortcut`, `DashboardProgress`, `DashboardTimeline`, `DashboardPreviewList`, `DashboardMediaTile`; `dashboard-layout.stories.tsx`, `dashboard-widgets.stories.tsx` |
 | Directory | Sites, staff, students, applications, programs, classrooms | `DirectoryTable` (`presentation="standard" \| "banded"`), `EntityCard`; `directory-table.stories.tsx`, `record-layout.stories.tsx` |
 | Master/detail Explorer | Admissions and action triage without deeply buried selected record | `MasterDetailWorkspace`, `MasterDetailListItem`; `master-detail-workspace.stories.tsx` |
+| Person / Student Profile | Student 360, teacher/member profile, staff counseling record | `ProfileIdentity`, `ProfileMetricBand`, `ProfileRecordLayout`, `profileTabClass`; `ProfileRecordLayout.stories.tsx` |
 | Entity Record | Selected student, applicant, site, teacher, action, program | `RecordHeader`, `RecordLayout`, `DetailNavigation`; `record-layout.stories.tsx` |
 | User / Business Workflow | Admissions, enrollment, approvals, school setup, opening, staffing | `WorkflowWorkspace`, `WorkflowProgress`; `workflow-workspace.stories.tsx` |
 | Process / User Flow Map | Cross-persona handoffs, decisions, conditional branches, exception paths, business-process documentation | `UserFlowMap`; `user-flow-map.stories.tsx` |
@@ -74,6 +75,19 @@ Never use brand hues to infer review, authorization, enrollment, learning master
 Use `DirectoryTable presentation="banded"` for class lists, rosters, staff, programs, or other collections where repeating a full card for each record wastes space. The wide (roughly 64–72px) horizontal bands use neutral alternating surface tones, substantial vertical padding, strong separators, meaningful secondary labels, and actual row-specific links. Optional `selectedRowKey` highlights the current record without changing its permissions. Sorting, pagination, query states, and labeled table scroll remain owned by the existing `DirectoryTable`.
 
 Use `presentation="standard"` for compact tables with many columns; use `EntityCard` for visual content with distinct actions; use `MasterDetailWorkspace` for operational queues where the selected record is part of the same task surface. **Do not tint each row with arbitrary status color.** Put a labeled `StatusBadge` in the appropriate cell only when the source record warrants it.
+
+### Template: student and people profiles
+
+The approved profile screenshot establishes **one identity-first card**, with photo, school/grade or staff context, genuinely reviewable status, and a compact four-column metric band. Below it: a URL-backed section navigation strip and a two-column content layout with meetings, related links, and next actions on the right.
+
+- Canonical React primitives: `src/components/profiles/ProfileRecordLayout.tsx` (`ProfileIdentity`, `ProfileMetricBand`, `ProfileRecordLayout`, `profileTabClass`).
+- First implementations: `/staff/students/$personId` (Student 360) and `/profiles` (person, teacher, school-connected member). Staff student directory uses `DirectoryTable presentation="banded"`.
+- Student 360 sections: About, Academics, Courses, Activity, Attendance, Support & priorities, Family. These are backed by the current authorized `getStudent360` data.
+- Right rail: calendar and staff inbox links, actual record context, and contextual actions when authorized. **Meeting bookings are not present in the current student-360 DTO, so the page does not fabricate meetings or display pretend appointment times.**
+- No GPA, credits, transcript, counselor assignment, graduation-track percentage, pathways, application/enrollment state, private interventions, or feedback scores unless the specific authoritative services provide them with appropriate role and relationship checks. Add these as separately gated tabs/sections in a later read-model expansion.
+- Preserve every existing staff authorization boundary: teacher sees only students/sections they teach; support/counselor site scope; no medical/discipline/private note exposure through the profile route.
+- Keep operational detail and evidence in owning workflows; profiles aggregate **authorized read views**, not new approval or mutation commands.
+- At mobile widths stack content ahead of the contextual rail, make the tab strip scrollable, and avoid a duplicate page title.
 
 ### Template: record / applicant detail
 
@@ -134,6 +148,7 @@ Launch with `npm run storybook`.
 - **V6.1 foundations / Visual grammar** — fonts, palette, no-radius surfaces, actions, statuses and metrics.
 - **V6.1 templates / Role dashboards** — student and site leader compositions, wallpaper, shortcuts, panels and context rail.
 - **V6.1 templates / Directories and records** — site portfolio and dedicated applicant detail.
+- **V6.1 templates / Person and student profiles** — student counselor, teacher and minimal person profile reference designs.
 - **V6.1 templates / Master detail explorer** — application review queue with first-viewport details and URL-backed selection.
 - **V6.1 templates / Dashboard widgets** — lessons/progress, assignments preview, class timeline, editorial tiles, and missing-data behavior.
 - **V6.1 templates / User and workflow flows** — admissions and school launch workspaces.
