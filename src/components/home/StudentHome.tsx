@@ -70,9 +70,11 @@ export async function loadStudentToday() {
       // A single unpublished or temporarily unavailable class must not block
       // every other enrolled class. The canonical class reader checks access.
       const result = await safeLoader(() => getClassWorkspace({ data: { sectionId: section.sectionId } }))();
-      if (!result.ok || !result.data.curriculumAccess.available || !result.data.content) continue;
+      if (!result.ok || !result.data.curriculumAccess.available) continue;
       const workspace = result.data;
-      const lessons = workspace.content.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
+      const content = workspace.content;
+      if (!content) continue;
+      const lessons = content.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction);
       if (!lessons.length) continue;
       const steps = deriveClassNextSteps({
         lessonIds: lessons.map(lesson => lesson.id),
