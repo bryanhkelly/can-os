@@ -13,6 +13,11 @@ describe("church reference URLs", () => {
     )).toBe("https://church.org/about?language=es");
   });
 
+  it("saves an existing school website separately from a church website without importing it", () => {
+    expect(normalizeChurchReferenceUrl("school_website","https://academy.org/about?utm_source=ref")).toBe("https://academy.org/about");
+    expect(() => normalizeChurchReferenceUrl("school_website","http://academy.org")).toThrow();
+  });
+
   it("preserves channel identity and platform query arguments", () => {
     expect(normalizeChurchReferenceUrl(
       "youtube", "https://www.youtube.com/@ExampleChurch?view=0&fbclid=123",
@@ -53,6 +58,7 @@ describe("church reference URLs", () => {
     expect(initialChurchReferenceState("facebook")).toBe("unsupported");
     expect(initialChurchReferenceState("tiktok")).toBe("unsupported");
     expect(initialChurchReferenceState("website")).toBe("saved");
+    expect(initialChurchReferenceState("school_website")).toBe("saved");
   });
 });
 
