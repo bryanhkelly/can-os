@@ -62,6 +62,13 @@ export function EngagementLandingIndex() {
 
 export function EngagementLandingDetail({ journey }: { journey: EngagementJourney }) {
   const search = useLocation({ select: loc => loc.searchStr });
+  const { session } = useWorkspaceSession();
+  const verified = engagementVerifiedRoute(journey, session?.authenticated ? session.role : undefined);
+  const sample = mayTryIsolatedSchoolDemo(journey.id);
+  const primaryTarget = verified ?? (sample ? "/schools/new" :
+    new URL(journey.editorialLinks[0].href, publicMarketingOrigin).toString());
+  const primaryLabel = verified ? journey.launch!.label :
+    sample ? "Try an isolated demo school" : "Explore the CAN model";
   const Icon = accents[journey.category];
   return <main>
     <section className="bg-foreground text-background">
@@ -71,13 +78,13 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
           <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[1.07] sm:text-7xl">{journey.headline}</h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-background/85">{journey.introduction}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a href={engagementLocalHref(`/next/${journey.id}`,search)}
+            <a href={primaryTarget}
               className="inline-flex min-h-12 items-center gap-2 bg-background px-6 py-3 text-sm font-semibold text-foreground hover:opacity-90">
-              Explore your next steps <ArrowRight className="size-4" aria-hidden="true"/>
+              {primaryLabel} <ArrowRight className="size-4" aria-hidden="true"/>
             </a>
-            <a href={engagementContactHref(journey,undefined,search)}
+            <a href={engagementLocalHref(`/next/${journey.id}`,search)}
               className="inline-flex min-h-12 items-center gap-2 border border-background/70 px-6 py-3 text-sm font-semibold text-background hover:bg-background/10">
-              Start a conversation <ArrowRight className="size-4" aria-hidden="true"/>
+              Choose a next step <ArrowRight className="size-4" aria-hidden="true"/>
             </a>
           </div>
           <p className="mt-5 max-w-2xl text-xs leading-6 text-background/75">{journey.promise}</p>
