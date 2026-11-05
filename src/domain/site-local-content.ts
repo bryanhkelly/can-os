@@ -123,6 +123,16 @@ export function createIllustrativeSchoolContent(schoolName: string): SiteLocalCo
   return createSchoolWebsiteStarterContent(schoolName);
 }
 
+/** Reset precisely one suggested editorial answer. Previously authored,
+ * verified and non-starter fields are never erased by this action. */
+export function restoreOriginalWebsiteField(
+  content: SiteLocalContent, field: SiteLocalTextField,
+): SiteLocalContent {
+  const original = content.editorialBaseline?.fields[field as WebsiteStarterField];
+  if (typeof original !== "string" || (content[field] ?? "") === original) return content;
+  return { ...content, [field]: original };
+}
+
 /** Opening a historic site never rewrites its published or draft copy. The
  * missing baseline is attached to the editing snapshot only and becomes durable
  * with the next Site-scoped versioned save. */
