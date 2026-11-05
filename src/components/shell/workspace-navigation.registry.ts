@@ -4,7 +4,7 @@ import { roleCapabilities } from "@/domain/access-context";
 export interface WorkspaceNavigationItem {
   title: string;
   path: string;
-  icon: "home" | "building" | "globe" | "book" | "calendar" | "clipboard" | "support" | "messages" | "safety" | "users";
+  icon: "home" | "building" | "globe" | "book" | "calendar" | "clipboard" | "support" | "messages" | "safety" | "users" | "settings";
   owns?: readonly string[];
 }
 
@@ -128,7 +128,11 @@ function withHome(role: WorkspaceRole, links: readonly WorkspaceNavigationItem[]
   });
   const messages: WorkspaceNavigationItem = { title: "Messages", path: "/messages", icon: "messages" };
   const canSendMessages = roleCapabilities[role]?.includes("communication.send") === true;
-  return [home, ...destinations, ...(canSendMessages && !destinations.some(item => item.path === messages.path) ? [messages] : [])];
+  const settings: WorkspaceNavigationItem = { title: "Settings", path: "/settings", icon: "settings" };
+  return [home, ...destinations,
+    ...(canSendMessages && !destinations.some(item => item.path === messages.path) ? [messages] : []),
+    settings,
+  ];
 }
 
 export const workspaceLinks = Object.fromEntries(
