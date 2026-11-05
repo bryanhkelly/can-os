@@ -561,14 +561,14 @@ describe("standalone public site HTML", () => {
     const site = { name: "Heritage Academy", organizationName: "Heritage Community" };
     const page = {host: "heritage.can-os.com", site, offerings: []};
     const ordinary = renderPublicSiteHtml(page);
-    expect(ordinary).not.toContain("Learning with purpose. Growing together.");
+    expect(ordinary).not.toContain("Helping students discover who they are and what they can become.");
     const story = renderPublicSiteHtml({...page, localContent: {
       welcomeMessage: "Come learn with us.", localDescription: "",
       denomination: "", statementOfFaith: "", spiritualFormation: "",
       schoolVision: "Growth, curiosity & community.",
       branding: {theme: "classic" as const, heroImage: null},
     }});
-    expect(story).toContain("Learning with purpose. Growing together.");
+    expect(story).toContain("Helping students discover who they are and what they can become.");
     expect(story).toContain("Growth, curiosity &amp; community.");
     expect(story).not.toContain("<script");
   });
