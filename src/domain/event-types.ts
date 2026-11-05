@@ -221,6 +221,7 @@ export const EventTypes = {
   SitePublicIdentityChanged: "SitePublicIdentityChanged",
   SitePublished: "SitePublished",
   SiteUnpublished: "SiteUnpublished",
+  SiteLocalWebsiteDraftSaved: "SiteLocalWebsiteDraftSaved",
   SiteLocalWebsiteContentPublished: "SiteLocalWebsiteContentPublished",
   SiteLocalWebsiteContentReviewRequested: "SiteLocalWebsiteContentReviewRequested",
   QualificationDefinitionCreated: "QualificationDefinitionCreated",
