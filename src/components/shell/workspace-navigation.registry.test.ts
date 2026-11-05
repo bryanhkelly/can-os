@@ -4,6 +4,13 @@ import { routeNavigation } from "./route-navigation";
 import { roleCapabilities } from "@/domain/access-context";
 
 describe("generated workspace navigation", () => {
+  it("gives every verified workspace one Settings link, without adding a new settings state engine", () => {
+    for (const links of Object.values(workspaceLinks)) {
+      expect(links.filter(item => item.path === "/settings")).toHaveLength(1);
+      expect(links.find(item => item.path === "/settings")?.title).toBe("Settings");
+    }
+  });
+
   it("shows Messages only for roles with the communication capability", () => {
     for (const [role, links] of Object.entries(workspaceLinks)) {
       expect(links.filter(item => item.path === "/home")).toHaveLength(1);
