@@ -56,9 +56,13 @@ function StaffJourney({ data }: { data: Awaited<ReturnType<typeof loadStaffLaunc
     </section>}
     {step === "qualifications" && (data.workspace.canSubmitQualifications ? <Qualifications /> :
       <p role="status" className="border bg-card p-5 text-sm">This role does not use the staff qualification submission workspace. Your administrator can explain its required preparation.</p>)}
-    {step === "next" && <JourneyWelcome summary="Your school confirms required policies, orientation and role-specific readiness."
+    {step === "next" && <><JourneyWelcome summary="Your school confirms required policies, orientation and role-specific readiness."
       requirements={["Follow up on independently reviewed evidence", "Confirm the school's orientation and required policy process"]}
-      outcome="No policy acknowledgment or compliance approval is recorded by visiting these pages. Work assignments and onsite authority remain separately verified." />}
+      outcome="No policy acknowledgment or compliance approval is recorded by visiting these pages. Work assignments and onsite authority remain separately verified." />
+      <div className="border border-border bg-card p-5">
+        <p className="text-sm text-muted-foreground">For general teaching opportunity questions, separate from verified qualifications and assignments:</p>
+        <Link to="/next/$journeyId" params={{journeyId:"teach-with-can"}} className="mt-3 inline-block min-h-11 text-sm font-semibold text-primary underline">Explore teaching next steps</Link>
+      </div></>}
     <section className="border bg-card p-5">
       <label htmlFor="staff-launch-notes" className="text-sm font-semibold">Private preparation notes</label>
       <p id="staff-notes-help" className="mt-2 text-xs text-muted-foreground">Save draft preserves these notes only. Do not include student records, medical information or credential documents. Submit evidence through Qualifications.</p>
