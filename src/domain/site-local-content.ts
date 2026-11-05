@@ -227,7 +227,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       throw new Error("Confirm that no identifiable children appear or that guardian consent is documented");
     }
     result.branding = {
-      theme: branding.theme, paletteId, typographyId,
+      theme: branding.theme, paletteId, typographyId, templateId,
       heroImage: { dataUrl: image.dataUrl, altText, rightsConfirmed: true,
         childImageConsent: image.childImageConsent },
     };
