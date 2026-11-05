@@ -26,7 +26,7 @@ vi.mock("@/modules/identity/actors.server", () => ({
     await tx.insert(auditEvents).values({ action: entry.action, resourceId: entry.resourceId });
   }),
 }));
-vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestOneTimeAccess: state.requestAccess }));
+vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestOneTimeAccessWithDeliveryStatus: state.requestAccess }));
 vi.mock("@/modules/operations/onsite-block-safety.server", () => ({ verifiedAdultSafetyEvidence: vi.fn() }));
 
 const actor = {
@@ -67,7 +67,7 @@ const input = {
 beforeEach(() => {
   actor.role = "registrar";
   state.selects.length = 0; state.inserts.length = 0;
-  state.requestAccess.mockReset(); state.requestAccess.mockResolvedValue({ accepted: true });
+  state.requestAccess.mockReset(); state.requestAccess.mockResolvedValue("dispatched");
   db.select.mockClear(); db.insert.mockClear(); db.transaction.mockClear();
 });
 
@@ -90,7 +90,7 @@ describe("authorized church-local invitation provisioning", () => {
       eventType: EventTypes.StaffInvitationIssued, aggregateId: "grant-1",
     });
     expect(state.inserts.some(row => row.table === auditEvents && row.value.action === "admin.staff_invitation.issued")).toBe(true);
-    expect(state.requestAccess).toHaveBeenCalledWith("director@example.test");
+    expect(state.requestAccess).toHaveBeenCalledWith("director@example.test", undefined);
   });
 
   it("returns an invited teacher to their professional profile after secure sign-in", async () => {
@@ -102,7 +102,7 @@ describe("authorized church-local invitation provisioning", () => {
 
     await state.handlers[3]!({ data: { ...input, role: "teacher" } });
 
-    expect(state.requestAccess).toHaveBeenCalledWith("director@example.test", undefined, "/profiles");
+    expect(state.requestAccess).toHaveBeenCalledWith("director@example.test", "/profiles");
   });
 
   it("provisions a pending publisher with only the exact-Site website relationship", async () => {
@@ -179,14 +179,30 @@ describe("authorized church-local invitation provisioning", () => {
     } })).rejects.toThrow("grant organization scope");
     expect(state.inserts).toEqual([]);
   });
-  it("refuses authentic email addresses in a publicly accessible demo school", async () => {
+  it("invites a real-email tester into the exact synthetic Site", async () => {
     state.selects.push(
       [{ siteId: actor.grantSiteId }],
       [{ id: input.siteId, organizationType: "christian_school" }],
       [{ domain: "newschool.demo", enabled: true }],
+      [], [], [], 
     );
-    await expect(state.handlers[3]!({ data: input })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    expect(state.inserts).toEqual([]);
-    expect(state.requestAccess).not.toHaveBeenCalled();
+    const result = await state.handlers[3]!({ data: input });
+    expect(result).toMatchObject({ created: true, pending: true, emailSent: true, deliveryStatus: "dispatched" });
+    expect(state.requestAccess).toHaveBeenCalledWith("director@example.test", undefined);
+    expect(state.inserts.find(row => row.table === domainEvents)?.value).toMatchObject({
+      eventType: EventTypes.StaffInvitationIssued, aggregateId: "grant-1",
+      payload: expect.objectContaining({ invitationMode: "verified_email", emailNormalized: "director@example.test" }),
+    });
+  });
+
+  it("does not report an email as sent when the provider skipped dispatch", async () => {
+    state.requestAccess.mockResolvedValue("cooldown");
+    state.selects.push(
+      [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "church" }],
+      [], [], [],
+    );
+    const result = await state.handlers[3]!({ data: input });
+    expect(result).toMatchObject({ created: true, pending: true, emailSent: false, deliveryStatus: "cooldown" });
   });
 });

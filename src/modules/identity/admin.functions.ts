@@ -8,7 +8,7 @@ import { assertSafeguardingStaffInviteSite } from "@/domain/site-safeguarding-ac
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent } from "@/platform/mutation";
 import { verifiedAdultSafetyEvidence } from "@/modules/operations/onsite-block-safety.server";
-import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
+import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
 import {
   assertChurchLocalInvitationOrganization, localStaffInviteInput, localStaffInviteRoles, staffOnboardingState,
 } from "@/domain/staff-onboarding-policy";
@@ -219,13 +219,15 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"staff-invitation:" + emailNormalized}))`);
       const [demoSchool] = await tx.select({ domain: demoSchoolTenants.domain, enabled: demoSchoolTenants.enabled })
         .from(demoSchoolTenants).where(eq(demoSchoolTenants.organizationId, organizationId)).limit(1);
-      if (demoSchool ? !demoSchool.enabled || emailNormalized.split("@")[1] !== demoSchool.domain :
-        isDemoAccountEmail(emailNormalized) || isValorOrganization(organizationId)) {
-        throw new DomainError("FORBIDDEN", "Demo staff must belong to their explicitly provisioned demo school domain");
+      const syntheticSchool = Boolean(demoSchool) || isValorOrganization(organizationId);
+      const localDemoIdentity = isDemoAccountEmail(emailNormalized);
+      if ((demoSchool && !demoSchool.enabled) ||
+        (localDemoIdentity && (!demoSchool || emailNormalized.split("@")[1] !== demoSchool.domain))) {
+        throw new DomainError("FORBIDDEN", "Local demo identities require their original registered school domain");
       }
       let [account] = await tx.select({ id: accessAccounts.id }).from(accessAccounts)
         .where(eq(accessAccounts.emailNormalized, emailNormalized)).limit(1);
-      if (account && demoSchool) {
+      if (account && demoSchool && localDemoIdentity) {
         const bindings = await readDemoStaffBindings(account.id, tx);
         if (!bindings.some(binding => binding.enabled && binding.domain === demoSchool.domain &&
           binding.payload.accountId === account!.id && binding.payload.role === data.role))
@@ -238,7 +240,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
           after: { emailNormalized },
         });
       }
-      if (demoSchool) {
+      if (demoSchool && localDemoIdentity) {
         const foreign = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
           .where(and(eq(accountPersonGrants.accountId, account!.id),
             sql`(${accountPersonGrants.organizationId} IS DISTINCT FROM ${organizationId}::uuid
@@ -246,7 +248,10 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         if (foreign.length) throw new DomainError("FORBIDDEN", "An existing identity belongs to another school");
       }
       const [existingPersonGrant] = await tx.select({ personId: accountPersonGrants.personId })
-        .from(accountPersonGrants).where(eq(accountPersonGrants.accountId, account!.id)).limit(1);
+        .from(accountPersonGrants).where(and(
+          eq(accountPersonGrants.accountId, account!.id),
+          ...(syntheticSchool ? [eq(accountPersonGrants.organizationId, organizationId), eq(accountPersonGrants.siteId, siteId)] : []),
+        )).limit(1);
       let personId = existingPersonGrant?.personId;
       if (!personId) {
         const [person] = await tx.insert(people).values({
@@ -285,7 +290,9 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         aggregateId: grant.id,
         actorPersonId: actor.actorPersonId,
         organizationId, siteId,
-        payload: { accountId: account!.id, personId, role: data.role, publisherRelationship },
+        payload: { accountId: account!.id, personId, role: data.role, publisherRelationship,
+          ...(syntheticSchool && !localDemoIdentity ? { invitationMode: "verified_email", emailNormalized } : {}),
+        },
       });
       await recordAudit(tx, actor, {
         action: "admin.staff_invitation.issued", resourceType: STAFF_INVITATION_AGGREGATE, resourceId: grant.id,
@@ -295,14 +302,15 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };
     });
     if (!invitation.pending || isDemoAccountEmail(emailNormalized))
-      return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized) };
+      return { ...invitation, emailSent: false, demoAccess: isDemoAccountEmail(emailNormalized),
+        deliveryStatus: invitation.pending ? "demo_code" as const : "already_active" as const };
     try {
-      if (data.role === "teacher") await requestOneTimeAccess(emailNormalized, undefined, "/profiles");
-      else await requestOneTimeAccess(emailNormalized);
-      return { ...invitation, emailSent: true };
+      const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(
+        emailNormalized, data.role === "teacher" ? "/profiles" : undefined);
+      return { ...invitation, emailSent: deliveryStatus === "dispatched", deliveryStatus };
     } catch {
-      // The durable invitation is retry-safe; do not erase it after a provider failure.
-      return { ...invitation, emailSent: false };
+      // The durable invitation is retry-safe; do not fabricate email delivery.
+      return { ...invitation, emailSent: false, deliveryStatus: "failed" as const };
     }
   });
 

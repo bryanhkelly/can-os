@@ -17,20 +17,55 @@ export function verifiedStaffIdentityPredicate() {
   return sql<boolean>`(
     (${account.emailVerifiedAt} is not null and ${account.emailNormalized} not like '%.demo'
       and not ${inArray(account.id, LOCAL_DEMO_ACCOUNTS.map(identity => identity.accountId))}
+      and ${grant.organizationId} is distinct from ${LOCAL_DEMO_ADMIN.organizationId}::uuid
       and not exists (select 1 from ${demoSchoolTenants}
         where ${demoSchoolTenants.adminAccountId} = ${account.id}
-          or ${demoSchoolTenants.organizationId} = ${grant.organizationId})
-      and not exists (
-        select 1 from ${domainEvents} inner join ${demoSchoolTenants}
-          on ${domainEvents.payload}->>'organizationId' = ${demoSchoolTenants.organizationId}::text
-        where ${domainEvents.aggregateType} = 'StaffInvitation'
-          and ${domainEvents.eventType} = ${EventTypes.StaffInvitationIssued}
-          and ${domainEvents.payload}->>'accountId' = ${account.id}::text
-      ))
+          or ${demoSchoolTenants.organizationId} = ${grant.organizationId}))
     or (
       ${grant.organizationId} = ${LOCAL_DEMO_ADMIN.organizationId}::uuid
       and ${grant.siteId} = ${LOCAL_DEMO_ADMIN.siteId}::uuid
       and (${valor})
+    )
+    or (
+      ${account.emailVerifiedAt} is not null
+      and ${account.emailNormalized} not like '%.demo'
+      and not ${inArray(account.id, LOCAL_DEMO_ACCOUNTS.map(identity => identity.accountId))}
+      and ${grant.active} = true
+      and ${inArray(grant.role, [...localStaffInviteRoles])}
+      and (
+        (${grant.organizationId} = ${LOCAL_DEMO_ADMIN.organizationId}::uuid
+          and ${grant.siteId} = ${LOCAL_DEMO_ADMIN.siteId}::uuid)
+        or exists (
+          select 1 from ${demoSchoolTenants}
+          inner join ${sites} on ${sites.id} = ${demoSchoolTenants.siteId}
+            and ${sites.organizationId} = ${demoSchoolTenants.organizationId}
+          where ${demoSchoolTenants.enabled} = true
+            and ${demoSchoolTenants.organizationId} = ${grant.organizationId}
+            and ${demoSchoolTenants.siteId} = ${grant.siteId}
+        )
+      )
+      and exists (
+        select 1 from ${domainEvents} issued
+        where issued.aggregate_type = 'StaffInvitation'
+          and issued.event_type = ${EventTypes.StaffInvitationIssued}
+          and issued.aggregate_id = ${grant.id}
+          and issued.payload->>'invitationMode' = 'verified_email'
+          and issued.payload->>'emailNormalized' = ${account.emailNormalized}
+          and issued.payload->>'accountId' = ${account.id}::text
+          and issued.payload->>'personId' = ${grant.personId}::text
+          and issued.payload->>'role' = ${grant.role}
+          and issued.payload->>'organizationId' = ${grant.organizationId}::text
+          and issued.payload->>'siteId' = ${grant.siteId}::text
+          and exists (
+            select 1 from ${domainEvents} accepted
+            where accepted.aggregate_type = 'StaffInvitation'
+              and accepted.event_type = ${EventTypes.StaffInvitationAccepted}
+              and accepted.aggregate_id = ${grant.id}
+              and accepted.payload->>'accountId' = ${account.id}::text
+              and accepted.payload->>'personId' = ${grant.personId}::text
+              and accepted.payload->>'role' = ${grant.role}
+          )
+      )
     )
     or exists (
       select 1 from ${demoSchoolTenants}
