@@ -2,6 +2,14 @@
  * No external font, CSS, remote image or untrusted church-source style is injected.
  * A suggested brand is private draft data, NOT a published theme.
  */
+/** Structural template selection is independent of colors, fonts and approved school data. */
+export const siteTemplateIds = ["heritage", "community", "modern", "bright-futures", "summit"] as const;
+export type SiteTemplateId = typeof siteTemplateIds[number];
+export function resolveSiteTemplateId(value: unknown): SiteTemplateId {
+  return typeof value === "string" && siteTemplateIds.includes(value as SiteTemplateId)
+    ? value as SiteTemplateId : "heritage";
+}
+
 export const sitePaletteIds = ["signature","heritage","forest","copper","coastal","harbor"] as const;
 export type SitePaletteId = typeof sitePaletteIds[number];
 export const siteTypographyIds = ["editorial","traditional","contemporary"] as const;
