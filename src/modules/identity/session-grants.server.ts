@@ -1,7 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents, people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
+import { EventTypes } from "@/domain/event-types";
+import { matchesVerifiedExternalSandboxInvitation } from "@/domain/sandbox-external-invitation";
 import { matchesDemoSchoolAdministrator } from "@/domain/school-setup";
 import { readDemoSchoolForAccount } from "./demo-school-tenants.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
@@ -26,6 +28,7 @@ const grantSelection = {
   firstName: people.legalFirstName,
   lastName: people.legalLastName,
   email: accessAccounts.emailNormalized,
+  emailVerifiedAt: accessAccounts.emailVerifiedAt,
 };
 
 const supportedRoles = Object.keys(roleCapabilities);
@@ -84,7 +87,7 @@ export async function readSessionGrants(accountId: string, email: string, reader
       return { grants, demoAccountSwitching: false, launchSiteId: school.siteId };
     }
     const bindings = await readDemoStaffBindings(accountId, reader);
-    if (bindings.length) {
+    if (bindings.length && demoAccount) {
       return { grants: ownGrants.filter(grant =>
         bindings.some(binding => matchesDemoStaffBinding(binding, grant, normalizedEmail))),
       demoAccountSwitching: false };
@@ -93,7 +96,44 @@ export async function readSessionGrants(accountId: string, email: string, reader
   }
 
   if (!adminAccount && !demoAccount) {
-    return { grants: ownGrants, demoAccountSwitching: false };
+    // Real testers use normal verified-email sign-in. A synthetic grant
+    // additionally needs an issued-and-accepted original Site invitation.
+    const organizationIds = [...new Set(ownGrants.map(grant => grant.organizationId)
+      .filter((id): id is string => Boolean(id)))];
+    const schools = organizationIds.length ? await reader.select({
+      organizationId: demoSchoolTenants.organizationId,
+      siteId: demoSchoolTenants.siteId,
+      enabled: demoSchoolTenants.enabled,
+    }).from(demoSchoolTenants).where(inArray(demoSchoolTenants.organizationId, organizationIds)) : [];
+    const byOrg = new Map(schools.map(school => [school.organizationId, school]));
+    const syntheticGrants = ownGrants.filter(grant =>
+      grant.organizationId === LOCAL_DEMO_ADMIN.organizationId ||
+      byOrg.has(grant.organizationId ?? ""));
+    const evidence = syntheticGrants.length ? await reader.select({
+      grantId: domainEvents.aggregateId,
+      eventType: domainEvents.eventType,
+      payload: domainEvents.payload,
+    }).from(domainEvents).where(and(
+      eq(domainEvents.aggregateType, "StaffInvitation"),
+      inArray(domainEvents.aggregateId, syntheticGrants.map(grant => grant.id)),
+      inArray(domainEvents.eventType, [
+        EventTypes.StaffInvitationIssued, EventTypes.StaffInvitationAccepted,
+      ]),
+    )) : [];
+    const issued = new Map(evidence.filter(row => row.eventType === EventTypes.StaffInvitationIssued)
+      .map(row => [row.grantId, row]));
+    const accepted = new Map(evidence.filter(row => row.eventType === EventTypes.StaffInvitationAccepted)
+      .map(row => [row.grantId, row]));
+    const grants = ownGrants.filter(grant => {
+      const valor = grant.organizationId === LOCAL_DEMO_ADMIN.organizationId;
+      const registered = byOrg.get(grant.organizationId ?? "");
+      if (!valor && !registered) return true;
+      if (valor ? grant.siteId !== LOCAL_DEMO_ADMIN.siteId :
+        !registered?.enabled || registered.siteId !== grant.siteId) return false;
+      return matchesVerifiedExternalSandboxInvitation(
+        grant, issued.get(grant.id), accepted.get(grant.id), normalizedEmail);
+    });
+    return { grants, demoAccountSwitching: false };
   }
 
   if (adminAccount) {

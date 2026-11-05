@@ -44,8 +44,8 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
    eq(people.active,true)));
- const pendingInvitations=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))
-  ?[]:await listPendingStaffInvitations(db,account.id);
+ // Existing memberships must not hide newly invited synthetic-school grants.
+ const pendingInvitations=await listPendingStaffInvitations(db,account.id);
  if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return "ineligible";
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
@@ -86,8 +86,8 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
 }
 /** This privileged status is for already-authorized onboarding staff only.
  * Dispatched means the configured sender accepted the message, not inbox delivery. */
-export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string):Promise<AccessDispatchOutcome> {
- return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend);
+export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string,returnTo?:string):Promise<AccessDispatchOutcome> {
+ return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend,returnTo);
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
 export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
@@ -110,6 +110,11 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     eq(people.active,true)));
   const pending=await listPendingStaffInvitations(tx,account.id);
   const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
+  // The verified mailbox has just redeemed the single-use access link.
+  // Persist verification before resolving synthetic-school grants.
+  await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
+  const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx);
+  const authorizedGrantIds=new Set(authorizedGrants.map(grant=>grant.id));
   // A newly accepted church-onboarding grant takes priority over an older
   // membership so the first sign-in lands in that church's own setup workspace.
   const onboarding = accepted.length ? await tx.select({
@@ -136,8 +141,10 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     : [];
   const returningGrant = grants.find(grant =>
     grant.id === returningOnboarding[0]?.invitationGrantId);
-  const activeGrant=onboardingInvitation??returningGrant??
-    grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
+  // Prioritize a freshly accepted invitation over an unrelated existing grant.
+  const activeGrant=[onboardingInvitation,...accepted,returningGrant,...grants]
+    .find(candidate=>candidate && authorizedGrantIds.has(candidate.id) &&
+      Object.hasOwn(roleCapabilities,candidate.role));
   if(!activeGrant)throw new InvalidAccessCredentialError("No supported CAN OS membership");
   const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
   // After the school becomes active, ordinary sign-in need not keep redirecting
@@ -153,7 +160,6 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    activeGrantId:activeGrant.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
-  await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
   await recordSessionSecurityEvent(tx,{
