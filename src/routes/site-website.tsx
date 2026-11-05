@@ -309,7 +309,7 @@ function LocalWebsiteCopyEditor({
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const [error, setError] = useState("");
-  const [draftPreview, setDraftPreview] = useState<Awaited<ReturnType<typeof previewChurchWebsiteDraft>> | null>(null);
+  const [draftPreview, setDraftPreview] = useState<{source: SiteLocalContent; rendered: Awaited<ReturnType<typeof previewChurchWebsiteDraft>>} | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   const [previewError, setPreviewError] = useState("");
   useEffect(() => {
@@ -330,8 +330,9 @@ function LocalWebsiteCopyEditor({
     if (previewPending) return;
     setPreviewPending(true); setPreviewError("");
     try {
-      const preview = await previewChurchWebsiteDraft({ data: { content, siteId: data.siteId } });
-      setDraftPreview(preview);
+      const source = content;
+      const preview = await previewChurchWebsiteDraft({ data: { content: source, siteId: data.siteId } });
+      setDraftPreview({ source, rendered: preview });
     } catch (cause) {
       setPreviewError(mutationErrorMessage(cause,"The private draft could not be rendered. Check artwork rights and source fields."));
     } finally { setPreviewPending(false); }
@@ -579,7 +580,7 @@ function LocalWebsiteCopyEditor({
           <p className="text-xs text-muted-foreground">Preview is private and read-only, and does not save or publish.</p>
         </div>
         {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
-        <WebsitePreviewPanel data={data} draftPreview={draftPreview} />
+        <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
           <div className="mt-4"><WebsiteInformationChecklist data={data} /></div>
