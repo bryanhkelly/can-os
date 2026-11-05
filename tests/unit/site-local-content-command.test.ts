@@ -79,6 +79,31 @@ describe("transactional church-local publication", () => {
     expect(state.emit).toHaveBeenCalledOnce();
   });
 
+  it("pins the original suggested text across later edits and rejects resetting its stored baseline", async () => {
+    const baseline = {
+      version: 1 as const,
+      fields: {
+        heroHeadline: "A place to belong. A future to build.",
+        welcomeMessage: "Purposeful learning and connection.",
+        localDescription: "School-specific original story",
+        schoolVision: "A community of curiosity.",
+        communityOutreach: "Hope to serve our neighbors.",
+      },
+    };
+    const prior = { ...copy, editorialBaseline: baseline };
+    state.rows.push([{ siteId: "site-a" }], [revision(2, prior)]);
+    const alteredBaseline = { ...baseline, fields: {
+      ...baseline.fields, heroHeadline: "An altered original",
+    } };
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "draft", expectedRevision: 2,
+      content: { ...prior, welcomeMessage: "My newly customized words",
+        editorialBaseline: alteredBaseline },
+    })).rejects.toThrow(/original website copy cannot be replaced/);
+    expect(state.inserts).toHaveLength(0);
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+
   it("saves private design drafts without publishing or issuing a CAN approval Action", async () => {
     const proposal = { ...copy, localDescription: "A private proposal for a fully accredited school.",
       branding: { ...copy.branding, templateId: "summit" as const } };
