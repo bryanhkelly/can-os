@@ -79,6 +79,31 @@ describe("transactional church-local publication", () => {
     expect(state.emit).toHaveBeenCalledOnce();
   });
 
+  it("saves private design drafts without publishing or issuing a CAN approval Action", async () => {
+    const proposal = { ...copy, localDescription: "A private proposal for a fully accredited school.",
+      branding: { ...copy.branding, templateId: "summit" as const } };
+    state.rows.push([{ siteId: "site-a" }], [revision(4)]);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "draft", expectedRevision: 4, content: proposal,
+    })).resolves.toMatchObject({ changed: true, revision: 5, status: "draft", flaggedFields: [] });
+    expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value)
+      .toMatchObject({ status: "draft", revision: 5, content: proposal });
+    expect(state.inserts.some(row => row.table === actions)).toBe(false);
+    expect(state.audit).toHaveBeenCalledWith(expect.anything(), expect.anything(),
+      expect.objectContaining({ action: "site.website.local_content.draft_saved" }));
+    expect(state.emit).toHaveBeenCalledOnce();
+  });
+
+  it("rechecks protected claims on publishing a previously private draft", async () => {
+    const proposal = { ...copy, localDescription: "We are fully accredited.",
+      branding: { ...copy.branding, templateId: "modern" as const } };
+    state.rows.push([{ siteId: "site-a" }], [revision(5, proposal, "draft")]);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "save", expectedRevision: 5, content: proposal,
+    })).resolves.toMatchObject({ revision: 6, status: "review_required" });
+    expect(state.inserts.find(row => row.table === actions)).toBeTruthy();
+  });
+
   it("holds only protected copy and preserves the prior published revision", async () => {
     const held = { ...copy, localDescription: "Our school is fully accredited." };
     state.rows.push([{ siteId: "site-a" }], [revision(4)]);
