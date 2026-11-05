@@ -2,7 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Building2, GraduationCap, Handshake, ShieldCheck, Users } from "lucide-react";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { engagementJourneyList, mayTryIsolatedSchoolDemo, type EngagementJourney } from "@/domain/engagement-journeys";
-import { engagementContactHref, engagementLocalHref, engagementVerifiedRoute, publicMarketingOrigin } from "@/domain/engagement-context";
+import { engagementLocalHref, engagementVerifiedRoute, publicMarketingOrigin } from "@/domain/engagement-context";
 
 const accents = { church: Building2, teacher: BookOpen, family: Users, school: GraduationCap, network: Handshake } as const;
 
