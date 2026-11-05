@@ -9,7 +9,7 @@ import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
-  createIllustrativeSchoolContent, emptySiteLocalContent, siteLocalContentLimits, siteLocalImageMaxBytes,
+  prepareWebsiteEditorContent, websiteStarterFieldIds, siteLocalContentLimits, siteLocalImageMaxBytes,
   type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
@@ -281,13 +281,14 @@ async function prepareWebsiteArtwork(file: File): Promise<string> {
 }
 
 const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help: string; multi: boolean }> = [
-  { key: "welcomeMessage", label: "Welcome", help: "A message from your local church.", multi: true },
+  { key: "heroHeadline", label: "Homepage headline", help: "The first words families see. Your school name still appears in the website header.", multi: true },
+  { key: "welcomeMessage", label: "Welcome to families", help: "Introduce the kind of community you hope to build.", multi: true },
   { key: "churchHistory", label: "Tell us about your church", help: "When did your church begin? Share its history and important milestones.", multi: true },
-  { key: "communityOutreach", label: "Who does your church serve?", help: "Describe the people, neighborhoods and outreach efforts central to your community.", multi: true },
-  { key: "schoolVision", label: "Why did your church start a school?", help: "Share your vision without making promises about unapproved academic services.", multi: true },
+  { key: "communityOutreach", label: "Your community", help: "What relationships, partnerships or hopes connect your school with the people around it? Avoid describing unconfirmed activities.", multi: true },
+  { key: "schoolVision", label: "Your vision", help: "What do you hope students will become? You can personalize the prepared wording.", multi: true },
   { key: "leadershipWelcome", label: "A welcome from your pastor or school leader", help: "Optional words approved by your church leader for families.", multi: true },
   { key: "localTraditions", label: "Local traditions and experiences", help: "Share real local traditions, service projects and community experiences.", multi: true },
-  { key: "localDescription", label: "Local community and school vision", help: "Local vision, history, activities and community information; do not promise official academic services.", multi: true },
+  { key: "localDescription", label: "Your school story", help: "What makes your school's purpose and community special? Avoid promises about unapproved academic services.", multi: true },
   { key: "denomination", label: "Denominational affiliation", help: "Describe your church's identity. Do not claim an endorsement that has not been granted.", multi: false },
   { key: "statementOfFaith", label: "Statement of faith", help: "Your church's own theological statement, not CAN's academic policies.", multi: true },
   { key: "spiritualFormation", label: "Spiritual formation", help: "Prayer, worship, discipleship, chapel or religious observances provided locally.", multi: true },
@@ -301,9 +302,8 @@ function LocalWebsiteCopyEditor({
   onStepChange: (step: number) => void;
 }) {
   const router = useRouter();
-  const [content, setContent] = useState<SiteLocalContent>(
-    data.editingContent ?? (data.demonstration
-      ? createIllustrativeSchoolContent(data.siteName) : emptySiteLocalContent),
+  const [content, setContent] = useState<SiteLocalContent>(() =>
+    prepareWebsiteEditorContent(data.editingContent, data.siteName),
   );
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
@@ -314,9 +314,8 @@ function LocalWebsiteCopyEditor({
   const [previewError, setPreviewError] = useState("");
   useEffect(() => {
     setDraftPreview(null);
-    setContent(data.editingContent ?? (data.demonstration
-      ? createIllustrativeSchoolContent(data.siteName) : emptySiteLocalContent));
-  }, [data.currentRevision, data.editingContent, data.demonstration, data.siteName]);
+    setContent(prepareWebsiteEditorContent(data.editingContent, data.siteName));
+  }, [data.currentRevision, data.editingContent, data.siteName]);
 
   async function saveDraft() {
     if (busy || !data.canPublish) return;
@@ -382,25 +381,48 @@ function LocalWebsiteCopyEditor({
   }
 
   const primaryFields = churchFields.filter(field =>
-    ["welcomeMessage", "schoolVision", "localDescription"].includes(field.key));
-  const storyFields = churchFields.filter(field =>
-    ["churchHistory", "communityOutreach"].includes(field.key));
+    ["heroHeadline", "welcomeMessage", "schoolVision", "localDescription", "communityOutreach"].includes(field.key));
   const additionalStoryFields = churchFields.filter(field =>
-    ["leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
-  const textField = (field: typeof churchFields[number]) => <label key={field.key} className="block text-sm">
-    <span className="font-medium">{field.label}</span>
-    <span className="mt-1 block text-xs text-muted-foreground">{field.help}</span>
-    {field.multi
-      ? <textarea rows={field.key === "statementOfFaith" ? 6 : 3}
-          maxLength={siteLocalContentLimits[field.key]}
-          value={content[field.key] ?? ""} onChange={event => setContent(old =>
-            ({ ...old, [field.key]: event.target.value }))}
-          className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
-      : <input type="text" maxLength={siteLocalContentLimits[field.key]}
-          value={content[field.key] ?? ""} onChange={event => setContent(old =>
-            ({ ...old, [field.key]: event.target.value }))}
-          className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />}
-  </label>;
+    ["churchHistory", "leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
+  const textField = (field: typeof churchFields[number]) => {
+    const starter = content.editorialBaseline?.fields[field.key as typeof websiteStarterFieldIds[number]];
+    const changed = typeof starter === "string" && (content[field.key] ?? "") !== starter;
+    const sequence = websiteStarterFieldIds.indexOf(field.key as typeof websiteStarterFieldIds[number]);
+    return <div key={field.key} className="border-b border-border pb-5 last:border-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <label className="min-w-0 flex-1 text-sm" htmlFor={`website-copy-${field.key}`}>
+          <span className="flex items-center gap-3 font-semibold">
+            {sequence >= 0 && <span aria-hidden="true" className="font-mono text-xs font-normal text-muted-foreground">
+              {String(sequence + 1).padStart(2, "0")}
+            </span>}
+            {field.label}
+          </span>
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">{field.help}</span>
+        </label>
+        {typeof starter === "string" && <button type="button"
+          aria-label={`Reset ${field.label} to original suggested copy`}
+          disabled={!changed || busy || !data.canPublish}
+          onClick={() => setContent(old => ({ ...old, [field.key]: starter }))}
+          className="min-h-11 shrink-0 border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+          Reset to original
+        </button>}
+      </div>
+      {field.multi
+        ? <textarea id={`website-copy-${field.key}`} rows={field.key === "statementOfFaith" ? 6 : field.key === "heroHeadline" ? 2 : 4}
+            maxLength={siteLocalContentLimits[field.key]} disabled={busy || !data.canPublish}
+            value={content[field.key] ?? ""} onChange={event => setContent(old =>
+              ({ ...old, [field.key]: event.target.value }))}
+            className="mt-3 w-full border border-border bg-background p-3 text-sm leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        : <input id={`website-copy-${field.key}`} type="text" maxLength={siteLocalContentLimits[field.key]}
+            disabled={busy || !data.canPublish} value={content[field.key] ?? ""} onChange={event => setContent(old =>
+              ({ ...old, [field.key]: event.target.value }))}
+            className="mt-3 min-h-11 w-full border border-border bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />}
+      {typeof starter === "string" && <p className="mt-2 text-xs text-muted-foreground">
+        {changed ? "Personalized copy. Reset restores the original prepared wording for this field." :
+          "Prepared starting copy. Edit anything, or keep it as written after review."}
+      </p>}
+    </div>;
+  };
 
   return <section aria-label="Website content setup">
     {data.demonstration && !data.editingContent && <div role="note" className="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
@@ -452,11 +474,17 @@ function LocalWebsiteCopyEditor({
 
       {step === 3 && <div className="space-y-5">
         <div>
-          <h3 className="text-lg font-semibold">Tell the story behind your school</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Share the people and community behind the school. These details are optional.</p>
+          <h3 className="font-serif text-2xl">Your school story is ready to make your own.</h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            We've prepared thoughtful starting copy using your school name. You can keep it, personalize it,
+            or reset an individual answer to its original wording. Your changes save only when you choose Save private draft or Publish.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Prepared words are suggestions, not verified promises about programs, services, leaders or opening status.
+            Please review them before publishing. Your actual academic and admissions information comes from CAN OS.
+          </p>
         </div>
         {primaryFields.map(textField)}
-        {storyFields.map(textField)}
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review source-attributed church story suggestions (optional)</summary>
           <div className="mt-4"><ChurchSourceSuggestionReview currentRevision={data.currentRevision}/></div>
