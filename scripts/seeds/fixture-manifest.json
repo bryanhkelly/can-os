@@ -20,17 +20,44 @@
     },
     "/launch/student": {
       "persona": "student",
-      "seeds": ["class-participation.sql"],
-      "recordCounts": { "student_profiles": 1, "account_person_grants": 1 },
-      "interactions": ["restore private optional profile and course-choice draft", "save draft without submitting a registration request", "submit a canonical course request subject to school and guardian review"],
-      "downstreamRecords": ["launch_studio_drafts", "actions", "audit_events", "domain_events"]
+      "seeds": [
+        "class-participation.sql"
+      ],
+      "recordCounts": {
+        "student_profiles": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "restore private optional profile and course-choice draft",
+        "save draft without submitting a registration request",
+        "submit a canonical course request subject to school and guardian review"
+      ],
+      "downstreamRecords": [
+        "launch_studio_drafts",
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/launch/staff": {
       "persona": "teacher or permitted local staff",
-      "seeds": ["synthetic-profiles-compliance.sql"],
-      "recordCounts": { "people": 1, "account_person_grants": 1 },
-      "interactions": ["review verified self identity", "save private preparation notes", "submit applicable qualification evidence through the ordinary profile service"],
-      "downstreamRecords": ["launch_studio_drafts", "audit_events", "domain_events"]
+      "seeds": [
+        "synthetic-profiles-compliance.sql"
+      ],
+      "recordCounts": {
+        "people": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "review verified self identity",
+        "save private preparation notes",
+        "submit applicable qualification evidence through the ordinary profile service"
+      ],
+      "downstreamRecords": [
+        "launch_studio_drafts",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/operations/interest-events": {
       "persona": "site administrator or registrar",
@@ -1632,6 +1659,36 @@
         "account_person_grants",
         "attendance_events"
       ]
+    },
+    "/launch/website": {
+      "persona": "site_website_editor",
+      "seeds": [
+        "site-website-editor-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "site_publications": 1,
+        "role_assignments": 1
+      },
+      "interactions": [
+        "open exact-Site editor under independent verified website-editor grant",
+        "review optional school and church website references",
+        "choose one of five layouts and retain school content",
+        "save private versioned draft without public publication",
+        "preview unsaved design at mobile and desktop widths",
+        "publish only explicitly authorized church-owned copy, hold protected institutional claims"
+      ],
+      "downstreamRecords": [
+        "site_local_content_versions",
+        "church_source_references",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/settings": {
+      "persona": "verified signed-in account",
+      "fixtureRequired": false,
+      "rationale": "Settings is a role-scoped navigation hub over existing canonical owner workflows. Actual edits are exercised at each destination's existing fixture contract."
     }
   }
 }
