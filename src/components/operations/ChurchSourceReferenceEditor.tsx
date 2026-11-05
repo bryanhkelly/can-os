@@ -14,7 +14,7 @@ import {
 
 type Reference = Awaited<ReturnType<typeof getChurchSourceReferenceView>>[number];
 const labels: Record<ChurchReferenceKind, string> = {
-  website: "Church website", youtube: "YouTube",
+  website: "Church website", school_website: "Existing school website", youtube: "YouTube",
   instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok",
 };
 const referenceStatusLabels: Record<"saved"|"fetchable"|"unsupported"|"blocked"|"failed", string> = {
@@ -26,6 +26,7 @@ const referenceStatusLabels: Record<"saved"|"fetchable"|"unsupported"|"blocked"|
 };
 const descriptions: Record<ChurchReferenceKind, string> = {
   website: "Save your existing public church website. Where enabled, you can request private editorial suggestions.",
+  school_website: "Save your existing school website as a private reference. No automatic text, logos or images are copied.",
   youtube: "Save your public YouTube channel for reference; no videos are imported.",
   instagram: "Save your Instagram profile for reference; no posts are imported.",
   facebook: "Save your Facebook page for reference; no posts are imported.",
@@ -36,7 +37,7 @@ export function ChurchSourceReferenceEditor() {
   const router = useRouter();
   const [references, setReferences] = useState<Reference[]>([]);
   const [urls, setUrls] = useState<Record<ChurchReferenceKind, string>>({
-    website: "", youtube: "", instagram: "", facebook: "", tiktok: "",
+    website: "", school_website: "", youtube: "", instagram: "", facebook: "", tiktok: "",
   });
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -98,7 +99,7 @@ export function ChurchSourceReferenceEditor() {
     className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Optional · Church identity</p>
     <h2 id="church-references-title" className="mt-1 font-serif text-2xl font-semibold">
-      Does your church have an existing website or public social profiles?
+      Does your school or church have an existing website or social profiles?
     </h2>
     <p className="mt-2 text-sm leading-6 text-muted-foreground">
       Share public links so your school website editor can refer to your church's story and identity.
@@ -124,7 +125,7 @@ export function ChurchSourceReferenceEditor() {
           <Field label={labels[kind]} className="sr-only" required
             error={attempted[kind]&&!validUrl?"Enter a valid public web URL.":undefined}>
           <Input id={`church-source-${kind}`} type="url" maxLength={2048}
-            placeholder={kind === "website" ? "https://yourchurch.org" : "https://"}
+            placeholder={kind === "website" ? "https://yourchurch.org" : kind === "school_website" ? "https://yourschool.org" : "https://"}
             value={urls[kind]} onChange={event => setUrls(old => ({ ...old, [kind]: event.target.value }))}
             className="mt-3 w-full" />
           </Field>
