@@ -209,12 +209,17 @@ function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartne
   </section>;
 }
 
-function WebsitePreviewPanel({ data }: { data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>> }) {
-  const pages = Object.entries(data.previewPages ?? {});
+function WebsitePreviewPanel({ data, draftPreview }: {
+  data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
+  draftPreview?: Awaited<ReturnType<typeof previewChurchWebsiteDraft>> | null;
+}) {
   const [selected, setSelected] = useState("/");
-  const activeHtml = data.previewPages?.[selected] ?? data.previewHtml;
+  const [device, setDevice] = useState<"desktop"|"mobile">("desktop");
+  const htmlPages = draftPreview?.previewPages ?? data.previewPages ?? {};
+  const pages = Object.entries(htmlPages);
+  const activeHtml = htmlPages[selected] ?? draftPreview?.previewHtml ?? data.previewHtml;
   return <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
-    <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> Private website preview</h2>
+    <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Your unsaved design preview" : "Previously saved website preview"}</h2>
     <p className="mt-2 text-sm text-muted-foreground">Review every page with the same server-rendered template used by the live website. Forms and scripts stay disabled here.</p>
     {pages.length > 0 && <div role="group" aria-label="Preview a website page" className="mt-4 flex flex-wrap gap-2">
       {pages.map(([path]) => <button key={path} type="button" aria-pressed={selected === path}
@@ -222,7 +227,13 @@ function WebsitePreviewPanel({ data }: { data: Awaited<ReturnType<typeof getPart
         {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
       </button>)}
     </div>}
-    {activeHtml ? <iframe key={selected} title={`${data.siteName} ${selected} read-only website preview`}
+    <div role="group" aria-label="Preview width" className="mt-4 flex flex-wrap gap-2">
+      <button type="button" aria-pressed={device==="desktop"} onClick={()=>setDevice("desktop")}
+        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Desktop</button>
+      <button type="button" aria-pressed={device==="mobile"} onClick={()=>setDevice("mobile")}
+        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Mobile</button>
+    </div>
+    {activeHtml ? <iframe key={selected+"-"+device} title={`${data.siteName} ${selected} read-only website preview`}
       srcDoc={activeHtml} sandbox="" referrerPolicy="no-referrer" loading="lazy"
       className="mt-4 h-[700px] w-full rounded-lg border bg-white" />
       : <p className="mt-4 rounded-lg border p-4 text-sm">A private website preview becomes available when a Site draft address is reserved by your registrar.</p>}
@@ -298,10 +309,33 @@ function LocalWebsiteCopyEditor({
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
   const [error, setError] = useState("");
+  const [draftPreview, setDraftPreview] = useState<Awaited<ReturnType<typeof previewChurchWebsiteDraft>> | null>(null);
+  const [previewPending, setPreviewPending] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   useEffect(() => {
+    setDraftPreview(null);
     setContent(data.editingContent ?? (data.demonstration
       ? createIllustrativeSchoolContent(data.siteName) : emptySiteLocalContent));
   }, [data.currentRevision, data.editingContent, data.demonstration, data.siteName]);
+
+  async function saveDraft() {
+    if (busy || !data.canPublish) return;
+    setError("");
+    await mutation.run(() => saveChurchWebsiteDraft({
+      data: { content, siteId: data.siteId, expectedRevision: data.currentRevision },
+    }), { successMessage: "Private website draft saved. The public site and approval statuses have not changed.",
+      commandErrorMessage: "Could not save the private website draft." });
+  }
+  async function previewCurrentDraft() {
+    if (previewPending) return;
+    setPreviewPending(true); setPreviewError("");
+    try {
+      const preview = await previewChurchWebsiteDraft({ data: { content, siteId: data.siteId } });
+      setDraftPreview(preview);
+    } catch (cause) {
+      setPreviewError(mutationErrorMessage(cause,"The private draft could not be rendered. Check artwork rights and source fields."));
+    } finally { setPreviewPending(false); }
+  }
 
   async function submit() {
     if (busy) return;
@@ -388,7 +422,7 @@ function LocalWebsiteCopyEditor({
       the last published church copy remains unchanged.
     </p>}
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
-    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website content..."/>
+    <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website changes..."/>
     <div className="space-y-5">
       {step === 0 && <div className="space-y-5">
         <div className="border bg-card p-5">
@@ -537,7 +571,15 @@ function LocalWebsiteCopyEditor({
           <h3 className="text-lg font-semibold">Review your website</h3>
           <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
         </div>
-        <WebsitePreviewPanel data={data} />
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" disabled={previewPending} onClick={() => void previewCurrentDraft()}
+            className="min-h-11 border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+            {previewPending ? "Generating secure preview..." : "Preview current changes"}
+          </button>
+          <p className="text-xs text-muted-foreground">Preview is private and read-only, and does not save or publish.</p>
+        </div>
+        {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
+        <WebsitePreviewPanel data={data} draftPreview={draftPreview} />
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
           <div className="mt-4"><WebsiteInformationChecklist data={data} /></div>
@@ -563,7 +605,7 @@ function LocalWebsiteCopyEditor({
           <ul className="mt-3 space-y-2">
             {data.localHistory.map(version => <li key={version.revision}
               className="flex flex-wrap items-center justify-between gap-3 border p-3 text-sm">
-              <span>Revision {version.revision} · {version.status === "published" ? "Published" : "Held for review"}
+              <span>Revision {version.revision} · {version.status === "published" ? "Published" : version.status === "draft" ? "Private draft" : "Held for review"}
                 {" · "}{new Date(version.createdAt).toLocaleString()}</span>
               {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
                 <button type="button" disabled={busy} onClick={() => void restore(version.revision)}
@@ -574,11 +616,15 @@ function LocalWebsiteCopyEditor({
           </ul>
         </details>}
       </div>}
-      <div className="flex justify-between gap-3 border-t pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         <button type="button" disabled={step === 0}
           onClick={() => onStepChange(Math.max(0, step - 1))}
           className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Back
+        </button>
+        <button type="button" disabled={busy || !data.canPublish} onClick={()=>void saveDraft()}
+          className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
+          {busy?"Saving...":"Save private draft"}
         </button>
         {step < 4 && <button type="button"
           onClick={() => onStepChange(Math.min(4, step + 1))}
