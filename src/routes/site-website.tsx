@@ -430,10 +430,8 @@ function LocalWebsiteCopyEditor({
       <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
         This content has not been saved or published. Review and edit the story, then
         use the normal publishing action. The school publication and legal gates do not change.</p>
-      <button type="button" className="mt-2 min-h-11 underline font-semibold"
-        onClick={() => setContent(createIllustrativeSchoolContent(data.siteName))}>
-        Restore fictional starter copy
-      </button>
+      <p className="mt-2">To change any suggested wording, go to School story and use the Reset to original action
+        beside that individual field. No other answers are affected.</p>
     </div>}
     {!data.canPublish && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
       You can preview this Site, but your current verified Site assignment has not
