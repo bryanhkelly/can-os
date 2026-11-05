@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import { contrastRatio, resolveSiteTheme, reviewSuggestedChurchPalette,
-  sitePaletteIds,siteTypographyIds } from "@/domain/site-theme";
+  sitePaletteIds,siteTypographyIds,schoolSiteTemplateIds,schoolSiteFontIds } from "@/domain/site-theme";
 import { emptySiteLocalContent, normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 
@@ -54,6 +54,32 @@ describe("PX-B curated visual identities",()=>{
     expect(html).not.toContain("@import");
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<link rel=\"stylesheet\"");
+  });
+  it("renders five independent layout identities without changing approved data",()=>{
+    for (const templateId of schoolSiteTemplateIds) {
+      const page={host:"school.can-os.com",site:{name:"Test Academy",organizationName:"Church"},offerings:[],
+        localContent:{...emptySiteLocalContent,branding:{
+          theme:"classic" as const,templateId,paletteId:"forest" as const,
+          headingFontId:"literary" as const,bodyFontId:"humanist" as const,heroImage:null,
+        }}};
+      const html=renderPublicSiteHtml(page);
+      expect(html).toContain(`template-${templateId}`);
+      expect(html).toContain("Palatino");
+      expect(html).toContain("Trebuchet");
+      expect(html).toContain("Test Academy");
+      expect(html).not.toContain("<script");
+      expect(html).not.toContain("@import");
+    }
+  });
+  it("rejects unsupported layout and font IDs while normalizing old revisions",()=>{
+    expect(normalizeSiteLocalContent(emptySiteLocalContent).branding.templateId).toBe("heritage");
+    expect(()=>normalizeSiteLocalContent({...emptySiteLocalContent,branding:{
+      theme:"classic",templateId:"custom-script" as never,heroImage:null,
+    }})).toThrow();
+    expect(()=>normalizeSiteLocalContent({...emptySiteLocalContent,branding:{
+      theme:"classic",headingFontId:"url(https://evil)" as never,heroImage:null,
+    }})).toThrow();
+    expect(schoolSiteFontIds.length).toBe(8);
   });
   it("labels unverified scraped colors and fonts as proposals, never active CSS",()=>{
     expect(reviewSuggestedChurchPalette(null).state).toBe("unavailable");
