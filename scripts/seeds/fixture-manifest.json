@@ -1689,6 +1689,21 @@
       "persona": "verified signed-in account",
       "fixtureRequired": false,
       "rationale": "Settings is a role-scoped navigation hub over existing canonical owner workflows. Actual edits are exercised at each destination's existing fixture contract."
+    },
+    "/landing": {
+      "persona": "public, optional already-verified CAN member",
+      "fixtureRequired": false,
+      "rationale": "Read-only engagement guidance, finite audience registry and optional contact handoff. No canonical school, family, employment, or enrollment records are created by visiting this page."
+    },
+    "/landing/$journeyId": {
+      "persona": "public, optional already-verified CAN member",
+      "fixtureRequired": false,
+      "rationale": "Read-only engagement guidance, finite audience registry and optional contact handoff. No canonical school, family, employment, or enrollment records are created by visiting this page."
+    },
+    "/next/$journeyId": {
+      "persona": "public, optional already-verified CAN member",
+      "fixtureRequired": false,
+      "rationale": "Read-only engagement guidance, finite audience registry and optional contact handoff. No canonical school, family, employment, or enrollment records are created by visiting this page."
     }
   }
 }
