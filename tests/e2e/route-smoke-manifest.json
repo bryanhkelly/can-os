@@ -15,6 +15,18 @@
     [
       "/family/join",
       "Confirm your school application email"
+    ],
+    [
+      "/landing",
+      "Every meaningful beginning"
+    ],
+    [
+      "/landing/start-a-school",
+      "What could a school"
+    ],
+    [
+      "/next/start-a-school",
+      "Your school could start"
     ]
   ],
   "signedOutRoutes": [
