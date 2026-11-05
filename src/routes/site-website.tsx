@@ -1,4 +1,4 @@
-import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId } from "@/domain/site-theme";
+import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, schoolSiteTemplateIds, schoolSiteTemplateNames, schoolSiteFontIds, schoolSiteFontNames, type SiteTypographyId, type SchoolSiteFontId } from "@/domain/site-theme";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { GuidedSetupShell } from "@/components/workflow";
@@ -407,6 +407,28 @@ function LocalWebsiteCopyEditor({
           </select>
         </label>
         <div className="rounded-xl border p-4">
+          <div className="mb-6">
+            <p className="font-semibold">Choose a website design</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              These five layouts have different navigation, hero composition, content and mobile treatments.
+              Switching designs does not change your school information or publication approvals.
+            </p>
+            <div role="group" aria-label="Website layouts" className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {schoolSiteTemplateIds.map(id => <button key={id} type="button"
+                aria-pressed={(content.branding.templateId ?? "heritage")===id}
+                onClick={()=>setContent(old=>({...old,branding:{...old.branding,templateId:id}}))}
+                className="rounded-lg border p-3 text-left aria-pressed:ring-2 aria-pressed:ring-primary">
+                <span aria-hidden="true" className={`mb-2 block h-14 rounded-sm ${id === "heritage" ? "bg-slate-800" :
+                  id === "community" ? "bg-emerald-800" : id === "modern" ? "bg-blue-700" :
+                  id === "bright" ? "bg-orange-400" : "bg-zinc-900"}`}/>
+                <span className="block text-sm font-semibold">{schoolSiteTemplateNames[id]}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {id==="heritage"?"Formal editorial":id==="community"?"Warm and story-led":
+                    id==="modern"?"Bold modular":id==="bright"?"Playful and inviting":"Cinematic minimalism"}
+                </span>
+              </button>)}
+            </div>
+          </div>
           <p className="font-medium">Choose your school's visual identity</p>
           <p className="mt-1 text-xs text-muted-foreground">CAN Signature gives you a complete editorial design.
             Inspired by your church uses approved palette and typography choices; automatic source discovery
@@ -438,6 +460,17 @@ function LocalWebsiteCopyEditor({
               </option>)}
             </select>
           </label>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {(["headingFontId","bodyFontId"] as const).map(field=><label key={field} className="block text-sm">
+              <span className="font-medium">{field==="headingFontId"?"Heading font":"Body font"}</span>
+              <select value={content.branding[field] ?? (field==="headingFontId"?"editorial":"modern")}
+                onChange={event=>setContent(old=>({...old,branding:{...old.branding,
+                  [field]:event.target.value as SchoolSiteFontId}}))}
+                className="mt-2 min-h-11 w-full rounded-lg border bg-background px-3">
+                {schoolSiteFontIds.map(id=><option value={id} key={id}>{schoolSiteFontNames[id]}</option>)}
+              </select>
+            </label>)}
+          </div>
           <p className="mt-3 text-xs text-muted-foreground">All choices use a maintained, contrast-checked palette
             and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
             no logo, third-party font, photograph or CSS is copied automatically.</p>
