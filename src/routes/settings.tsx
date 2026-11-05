@@ -34,13 +34,17 @@ function SettingsHome() {
   const websiteEditor = role === "site_website_editor";
   const family = role === "guardian";
   const student = role === "student";
-  const staff = !schoolAdmin && !websiteEditor && !family && !student;
+  const staff = ["teacher","room_facilitator","site_staff","site_leader","specialist","counselor","paraeducator"].includes(role);
   return <WorkspaceShell eyebrow="Your workspace" title="Settings" width="wide"
     subtitle="Return to the same authorized records whenever your school's information or your preferences change. No second onboarding record is created.">
     <div className="mt-7 grid gap-4">
       {schoolAdmin && <EditDestination title="School setup" icon={<School className="size-5"/>}
         description="Revise school identity, programs, calendars and launch preparation through your existing school setup journey. Saving a draft does not authorize opening.">
         <Link className={actionClass} to="/launch/school" search={{siteId,step:"school"}}>Edit school setup <ArrowRight className="size-4"/></Link>
+      </EditDestination>}
+      {schoolAdmin && siteId && <EditDestination title="School profile" icon={<School className="size-5"/>}
+        description="Review your current school's Site identity, address, organization and verified academic programs without selecting the school again.">
+        <Link className={actionClass} to="/sites/$siteId/profile" params={{siteId}}>School profile <ArrowRight className="size-4"/></Link>
       </EditDestination>}
       {schoolAdmin && <EditDestination title="School website" icon={<Globe className="size-5"/>}
         description="Review the Site's website and current publication status. An explicitly authorized website editor manages branding, sources, photography and local content.">
