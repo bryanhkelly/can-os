@@ -439,6 +439,13 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
             This requirement is not a school-owned approval. Continue permitted preparation while the responsible reviewer or external party acts.
           </p>}
           <p className="mt-3 text-xs text-muted-foreground">This guidance reflects saved Journey requirements, not a live authorization decision. The server separately checks whether the school may open.</p>
+          {step === "next" && <div className="mt-4 border-t border-border pt-4">
+            <p className="text-sm text-muted-foreground">Need a partnership conversation, financial discussion or general advice? These optional choices do not alter school readiness.</p>
+            <Link to="/next/$journeyId" params={{journeyId:"start-a-school"}}
+              className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+              Explore partnership next steps
+            </Link>
+          </div>}
         </section>}
         <LaunchPreparationWorkspace focus={step} currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
         {step === "next" && <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
