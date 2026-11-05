@@ -35,14 +35,15 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      # Generate TanStack's ignored route graph before scripts read it.
+      - name: Build application and route graph
+        run: npm run build
       - name: Verify route ownership contracts
         run: node scripts/check-platform-route-contracts.mjs --check
       - name: Verify route fixture contracts
         run: node scripts/check-route-fixture-coverage.mjs
       - name: Lint
         run: npm run lint
-      - name: Build application and route graph
-        run: npm run build
       - name: Typecheck acceptance tests and app
         run: npm run typecheck
       - name: Run isolated unit regressions
