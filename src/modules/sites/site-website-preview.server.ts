@@ -52,7 +52,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
+    academicPrograms:authorizedPrograms, offerings, localContent: proposedContent ?? local?.content ?? null,
     parentInformation, media,
   } : null;
   const previewPages = previewPage
