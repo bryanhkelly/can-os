@@ -53,7 +53,8 @@ describe("School website prewritten editorial copy and stable originals", () => 
     expect(editor.localDescription).toBe(legacy.localDescription);
     expect(editor.schoolVision).toBe(legacy.schoolVision);
     expect(editor.churchHistory).toBe(legacy.churchHistory);
-    expect(editor.editorialBaseline?.fields.localDescription).toContain("First School");
+    expect(editor.editorialBaseline?.fields.localDescription).toBe("Approved local story");
+    expect(editor.editorialBaseline?.fields.schoolVision).toBe("Our congregation's own school vision.");
     expect(legacy.editorialBaseline).toBeUndefined();
     const saved = normalizeSiteLocalContent(editor);
     const returned = prepareWebsiteEditorContent(saved, "New Name");
