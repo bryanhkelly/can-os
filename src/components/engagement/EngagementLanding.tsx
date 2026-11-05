@@ -1,3 +1,4 @@
+import { PageFrame, PageTitle } from "@/components/workspace";
 import { Link, useLocation } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Building2, GraduationCap, Handshake, ShieldCheck, Users } from "lucide-react";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
@@ -31,9 +32,9 @@ function VerifiedLaunchAction({ journey }: { journey: EngagementJourney }) {
 
 export function EngagementLandingIndex() {
   const search = useLocation({ select: loc => loc.searchStr });
-  return <main className="mx-auto max-w-screen-2xl px-5 pb-20 pt-14 sm:px-8 lg:pt-20">
+  return <PageFrame width="wide" className="mx-auto max-w-screen-2xl px-5 pb-20 pt-14 sm:px-8 lg:pt-20">
     <p className="text-xs font-semibold uppercase tracking-wider text-primary">A clearer beginning with CAN</p>
-    <h1 className="mt-5 max-w-4xl font-serif text-5xl leading-[1.07] sm:text-7xl">Every meaningful beginning starts with a possibility.</h1>
+    <PageTitle className="mt-5 max-w-4xl font-serif text-5xl leading-tight sm:text-7xl">Every meaningful beginning starts with a possibility.</PageTitle>
     <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
       Explore what CAN could make possible for your church, school, teaching career, or family.
       No commitment is needed to learn about the model.
@@ -57,7 +58,7 @@ export function EngagementLandingIndex() {
         </a>;
       })}
     </div>
-  </main>;
+  </PageFrame>;
 }
 
 export function EngagementLandingDetail({ journey }: { journey: EngagementJourney }) {
@@ -70,12 +71,12 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
   const primaryLabel = verified ? journey.launch!.label :
     sample ? "Try an isolated demo school" : "Explore the CAN model";
   const Icon = accents[journey.category];
-  return <main>
+  return <PageFrame width="wide">
     <section className="bg-foreground text-background">
       <div className="mx-auto grid max-w-screen-2xl gap-8 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(15rem,.65fr)] lg:py-24">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-primary-foreground/80">{journey.eyebrow}</p>
-          <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[1.07] sm:text-7xl">{journey.headline}</h1>
+          <PageTitle className="mt-6 max-w-4xl font-serif text-5xl leading-tight sm:text-7xl">{journey.headline}</PageTitle>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-background/85">{journey.introduction}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <a href={primaryTarget}
@@ -143,5 +144,5 @@ export function EngagementLandingDetail({ journey }: { journey: EngagementJourne
         <p className="mt-5 flex gap-2 text-xs leading-5 text-muted-foreground"><ShieldCheck className="size-4 shrink-0"/> Verified CAN OS records are created only by separately authorized actions.</p>
       </section>
     </div>
-  </main>;
+  </PageFrame>;
 }
