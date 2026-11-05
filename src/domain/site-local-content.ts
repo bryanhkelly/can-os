@@ -6,6 +6,8 @@ import { sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId,
  * metadata-free inline PNGs, never remote URLs or third-party tracking.
  */
 export type SiteLocalTextContent = {
+  /** Editorial homepage headline, independent of the school name and intro. */
+  heroHeadline?: string;
   welcomeMessage: string;
   localDescription: string;
   denomination: string;
@@ -20,6 +22,18 @@ export type SiteLocalTextContent = {
 };
 
 export type SiteLocalTextField = keyof SiteLocalTextContent;
+/** Only these editorial fields receive generic, editable starter suggestions.
+ * Church history, theology, denominations, programs and activities are never fabricated. */
+export const websiteStarterFieldIds = [
+  "heroHeadline", "welcomeMessage", "localDescription", "schoolVision", "communityOutreach",
+] as const satisfies readonly (keyof SiteLocalTextContent)[];
+export type WebsiteStarterField = (typeof websiteStarterFieldIds)[number];
+export type SiteEditorialBaseline = {
+  version: 1;
+  fields: Record<WebsiteStarterField, string>;
+};
+
+
 export const siteLocalThemes = ["classic", "warm", "light"] as const;
 export type SiteLocalTheme = typeof siteLocalThemes[number];
 export const siteLocalImageConsentStates = [
@@ -44,6 +58,9 @@ export type SiteLocalBranding = {
 };
 export type SiteLocalContent = SiteLocalTextContent & {
   branding: SiteLocalBranding;
+  /** A versioned snapshot of this Site's original suggested copy, available
+   * to its authorized editor for per-field reset. It is not public content. */
+  editorialBaseline?: SiteEditorialBaseline;
 };
 
 export const siteLocalImageMaxBytes = 160 * 1024;
@@ -56,6 +73,7 @@ export const emptySiteLocalBranding: SiteLocalBranding = Object.freeze({
   heroImage: null,
 });
 export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
+  heroHeadline: "",
   welcomeMessage: "",
   localDescription: "",
   denomination: "",
@@ -69,35 +87,56 @@ export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
   branding: emptySiteLocalBranding,
 });
 
-/**
- * Reusable fictional starter copy for explicitly synthetic school previews.
- * Never writes to the database. A Site editor must review and publish this
- * through the ordinary revisioned church-content command.
- */
-export function createIllustrativeSchoolContent(schoolName: string): SiteLocalContent {
+/** Polished, factual-claim-free suggested language. A Site editor must
+ * review these aspirations before publication; this isn't evidence of actual
+ * teaching, services, leadership commitments, or opening status. */
+export function createSchoolWebsiteEditorialBaseline(schoolName: string): SiteEditorialBaseline {
   const name = schoolName.trim().slice(0, 80) || "Our School";
   return {
-    welcomeMessage: "A place to belong. A world of possibilities.",
-    localDescription: `${name} is an illustrative community-rooted school where students are known, ideas are welcomed, and meaningful learning is part of everyday life. Explore this sample experience to imagine what a local partner school could become.`,
-    denomination: "",
-    statementOfFaith: "",
-    spiritualFormation: "Our fictional school community makes room for reflection, encouragement, faith, and service. Partner-specific faith practices require local review.",
-    churchHistory: "This is the sample origin story of a school imagined around a simple conviction: each young person deserves to be seen, challenged, and supported. A real church partner would replace this with its own history.",
-    communityOutreach: "Student-led neighborhood projects, community conversations, and service opportunities help connect learning to life. These are illustrative concepts rather than scheduled activities.",
-    schoolVision: "Curious minds. Courageous hearts. A community that sees what each student can become. We imagine an education that makes room for both academic challenge and authentic relationships.",
-    leadershipWelcome: "Welcome. We hope this example helps you picture a thoughtful school community with meaningful relationships, purposeful learning, and a clear path for families.",
-    localTraditions: "Imagine student exhibitions, family showcases, Friday celebrations, and community service days. These are fictional examples, not confirmed events.",
-    branding: {
-      theme: "classic",
-      paletteId: "heritage",
-      typographyId: "editorial",
-      templateId: "heritage",
-      heroImage: null,
+    version: 1,
+    fields: {
+      heroHeadline: "A place to belong. A future to build.",
+      welcomeMessage: "Purposeful learning, meaningful relationships, and room to discover what comes next.",
+      localDescription: `At ${name}, we believe young people have strengths worth discovering and potential worth developing. Our hope is to build a learning community shaped by curiosity, connection, and a shared commitment to helping students grow.`,
+      schoolVision: "We envision a learning community where students are known as individuals, encouraged to think deeply, and inspired to use their gifts to serve others.",
+      communityOutreach: "We hope to build meaningful connections with our neighbors, bringing families and community partners together around learning, service, and shared purpose.",
     },
   };
 }
 
+/** Starts real school sites with useful editable copy, not blank fields.
+ * No save, publication or approval occurs until the editor acts. */
+export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocalContent {
+  const editorialBaseline = createSchoolWebsiteEditorialBaseline(schoolName);
+  return {
+    ...emptySiteLocalContent,
+    ...editorialBaseline.fields,
+    branding: { ...emptySiteLocalBranding, paletteId: "heritage" },
+    editorialBaseline,
+  };
+}
+
+/** Demo sites use the same high-quality starter rather than fictional program
+ * or church-history claims in the text fields. A separate global sample marker
+ * remains visible in private previews. */
+export function createIllustrativeSchoolContent(schoolName: string): SiteLocalContent {
+  return createSchoolWebsiteStarterContent(schoolName);
+}
+
+/** Opening a historic site never rewrites its published or draft copy. The
+ * missing baseline is attached to the editing snapshot only and becomes durable
+ * with the next Site-scoped versioned save. */
+export function prepareWebsiteEditorContent(
+  existing: SiteLocalContent | null,
+  schoolName: string,
+): SiteLocalContent {
+  if (!existing) return createSchoolWebsiteStarterContent(schoolName);
+  if (existing.editorialBaseline) return existing;
+  return { ...existing, editorialBaseline: createSchoolWebsiteEditorialBaseline(schoolName) };
+}
+
 export const siteLocalContentLimits: Readonly<Record<SiteLocalTextField, number>> = {
+  heroHeadline: 120,
   welcomeMessage: 240,
   localDescription: 1400,
   denomination: 120,
@@ -201,6 +240,7 @@ function validateInlinePng(dataUrl: string): void {
 
 export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   branding?: SiteLocalBranding | null;
+  editorialBaseline?: SiteEditorialBaseline;
 }): SiteLocalContent {
   const result = {} as SiteLocalContent;
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
@@ -233,6 +273,23 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
     };
   } else {
     result.branding = { theme: branding.theme, paletteId, typographyId, templateId, heroImage: null };
+  }
+  if (input.editorialBaseline) {
+    const baseline = input.editorialBaseline;
+    if (baseline.version !== 1 || !baseline.fields || typeof baseline.fields !== "object" ||
+        Object.keys(baseline.fields).length !== websiteStarterFieldIds.length ||
+        Object.keys(baseline.fields).some(key => !websiteStarterFieldIds.includes(key as WebsiteStarterField))) {
+      throw new Error("Website starter snapshot is invalid");
+    }
+    const fields = {} as Record<WebsiteStarterField, string>;
+    for (const field of websiteStarterFieldIds) {
+      const value = normalizeText(baseline.fields[field], field);
+      if (unsafeText.some(rule => rule.test(value)) || containsProtectedInstitutionalClaim(value)) {
+        throw new Error("Website starter snapshot must not include unsafe or protected claims");
+      }
+      fields[field] = value;
+    }
+    result.editorialBaseline = { version: 1, fields };
   }
   return result;
 }
