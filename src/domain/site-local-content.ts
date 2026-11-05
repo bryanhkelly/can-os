@@ -142,7 +142,17 @@ export function prepareWebsiteEditorContent(
 ): SiteLocalContent {
   if (!existing) return createSchoolWebsiteStarterContent(schoolName);
   if (existing.editorialBaseline) return existing;
-  return { ...existing, editorialBaseline: createSchoolWebsiteEditorialBaseline(schoolName) };
+  // A pre-Studio school's original is the content already saved by its editor,
+  // not a newly introduced template suggestion. Never silently replace it.
+  // Historic protected claims are not copied into reset metadata.
+  const suggested = createSchoolWebsiteEditorialBaseline(schoolName);
+  const fields = { ...suggested.fields };
+  for (const key of websiteStarterFieldIds) {
+    const authored = existing[key] ?? "";
+    if (!containsProtectedInstitutionalClaim(authored) &&
+        !unsafeText.some(rule => rule.test(authored))) fields[key] = authored;
+  }
+  return { ...existing, editorialBaseline: { version: 1, fields } };
 }
 
 export const siteLocalContentLimits: Readonly<Record<SiteLocalTextField, number>> = {
