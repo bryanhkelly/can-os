@@ -66,10 +66,12 @@ authority, access to sibling Sites, or waiver of resource/relationship,
 independent-review and readiness gates. Ordinary registrar staff management
 cannot appoint, modify or deactivate a Site Admin.
 
-Normal staff invitations in registered demo schools must use that school's
-domain. Explicitly invited accounts accept pending exact-Site grants with
-`000000`, without outbound email. Immutable `StaffInvitationIssued` evidence
-binds each account/person/role/grant to its original tenant. Revoked accepted
+Local shared-code staff invitations in registered demo schools use that school's
+`.demo` domain. They accept pending exact-Site grants with `000000`, without
+outbound email. Separately invited real-email staff and external testers use
+a verified passwordless email link; they cannot use the shared code. Their
+`StaffInvitationIssued` evidence binds the original email, account, person,
+role, grant and exact Site, followed by acceptance evidence. Revoked accepted
 invitations must not be reactivated. A `.demo` suffix alone never authorizes an
 account, and changing a registered identity's email or grant cannot turn it
 into an authentic account. Disabling a tenant removes access without enabling
@@ -98,10 +100,11 @@ setup (preferred name, pronouns and interests). The student may skip setup and
 continue to the learning workspace; student legal identity, grade, enrollment
 and access are not editable through this self-profile.
 
-Registry-aware delivery rules suppress external email/SMS for these schools;
-R2 keeps its separate deployment gates. Public family email-verification and
-outreach flows reject demo source organizations rather than inventing delivered
-mail. This bootstrap does not imply shared-code guardian/student provisioning
+Registry-aware notification rules suppress general external email/SMS for
+these schools; authorized staff invitations may use ordinary Resend passwordless
+email to real recipients. R2 keeps its separate deployment gates. Public family
+email-verification and outreach still reject demo source organizations rather
+than inventing delivered mail. This bootstrap does not imply shared-code guardian/student provisioning
 or acceptance of the entire school lifecycle. All contents must remain
 synthetic, and shared accounts do not identify individual human visitors.
 
