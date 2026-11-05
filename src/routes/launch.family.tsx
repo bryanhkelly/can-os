@@ -87,6 +87,8 @@ function FamilyLaunch() {
         <h2 className="font-serif text-2xl">Your school will guide the next step</h2>
         <p className="mt-3">Application submission, guardian verification, document review, an admission offer, enrollment activation and class placement are separate decisions.</p>
         <Link to="/guardian/admission-offers" search={{ application: application?.applicationId }} className="mt-4 inline-block underline">Review your verified offers and enrollment status</Link>
+        <p className="mt-4 text-xs text-muted-foreground">For general CAN questions, separate from your application status:</p>
+        <Link to="/next/$journeyId" params={{journeyId:"family-admissions"}} className="mt-2 inline-block text-primary underline">Explore family information and conversation options</Link>
       </section>}
     </>}
   </LaunchStudioShell>;
