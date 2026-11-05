@@ -35,6 +35,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # TanStack generates src/routeTree.gen.ts during Vite build. Static route
+      # contracts cannot run on a clean checkout before this build.
+      - name: Build application and generate route graph
+        run: npm run build
+
       - name: Audit route fixture coverage
         run: node scripts/check-route-fixture-coverage.mjs
 
@@ -46,9 +51,6 @@ jobs:
 
       - name: Admissions and authorization regressions
         run: npx vitest run tests/unit/admissions-session-roles.test.ts tests/unit/admissions-offer-events.test.ts tests/unit/admissions-seat-occupancy.test.ts
-
-      - name: Build
-        run: npm run build
 
       - name: Typecheck
         run: npm run typecheck
