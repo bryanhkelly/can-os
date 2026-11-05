@@ -38,6 +38,13 @@ export function LaunchStudioEntry() {
       {[{ icon: Save, title: "Return to saved records" }, { icon: ShieldCheck, title: "Secure school records" }, { icon: BookOpen, title: "Help at every step" }].map(item =>
         <div key={item.title} className="flex items-center gap-3 border bg-card p-5 text-xs font-semibold"><item.icon className="size-5 text-primary" />{item.title}</div>)}
     </div>
+    <section className="mt-6 border border-border bg-card p-5">
+      <h2 className="font-serif text-2xl">Just exploring CAN?</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Begin with an audience-specific introduction. No invitation or school record is needed to explore the opportunity.</p>
+      <Link to="/landing" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary underline">
+        Explore CAN pathways <ArrowRight className="size-4"/>
+      </Link>
+    </section>
     <section id="launch-help" className="mt-6 text-sm leading-6 text-muted-foreground">
       <h2 className="font-semibold text-foreground">Have a school invitation?</h2>
       <p>Use the exact account your school invited. <Link to="/access" className="font-semibold underline">Sign in</Link> to continue.
