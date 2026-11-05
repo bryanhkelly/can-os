@@ -110,6 +110,11 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     eq(people.active,true)));
   const pending=await listPendingStaffInvitations(tx,account.id);
   const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
+  // The verified mailbox has just redeemed the single-use access link.
+  // Persist verification before resolving synthetic-school grants.
+  await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
+  const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx);
+  const authorizedGrantIds=new Set(authorizedGrants.map(grant=>grant.id));
   // A newly accepted church-onboarding grant takes priority over an older
   // membership so the first sign-in lands in that church's own setup workspace.
   const onboarding = accepted.length ? await tx.select({
@@ -137,8 +142,9 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   const returningGrant = grants.find(grant =>
     grant.id === returningOnboarding[0]?.invitationGrantId);
   // Prioritize a freshly accepted invitation over an unrelated existing grant.
-  const activeGrant=onboardingInvitation??accepted[0]??returningGrant??
-    grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
+  const activeGrant=[onboardingInvitation,...accepted,returningGrant,...grants]
+    .find(candidate=>candidate && authorizedGrantIds.has(candidate.id) &&
+      Object.hasOwn(roleCapabilities,candidate.role));
   if(!activeGrant)throw new InvalidAccessCredentialError("No supported CAN OS membership");
   const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
   // After the school becomes active, ordinary sign-in need not keep redirecting
@@ -154,7 +160,6 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    activeGrantId:activeGrant.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
-  await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
   await recordSessionSecurityEvent(tx,{
