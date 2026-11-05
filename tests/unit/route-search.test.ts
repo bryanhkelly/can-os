@@ -15,7 +15,7 @@ import { Route as Groups } from "@/routes/groups";
 import { Route as StudentGroups } from "@/routes/student.study-groups";
 import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
 import { Route as Admin } from "@/routes/admin";
-import { Route as Apply } from "@/routes/guardian.apply";
+import { Route as Apply } from "@/routes/launch.family";
 import { Route as Attendance } from "@/routes/staff.attendance";
 import { Route as Curriculum } from "@/routes/operations.curriculum";
 import { Route as Marketplace } from "@/routes/operations.curriculum-marketplace";

@@ -16,11 +16,18 @@ The existing frontend already used Tailwind v4, class-variance-authority, React 
 | Shared role-home wallpaper, shortcuts, primary work and context rail | `DashboardHero`, `DashboardHome` in `src/components/workspace/dashboard-home.tsx` |
 | Role navigation registry, sidebar, top bar, and support panels | `src/components/shell/` |
 | Guided Setup, Checklist Workspace, Split Review | `src/components/workflow/` |
+| Standalone Launch Studio chrome, journey rails and welcome | `src/components/launch-studio/` |
 | Controlled institution/site brand validation | `src/design-system/brand-theme.tsx` |
 | Executable component and workflow documentation | colocated `*.stories.tsx` |
 | Styling and duplicate-ownership checks | `eslint.config.mjs`, `scripts/check-design-system.mjs` |
 
 New generic UI belongs in the existing shared folders and must have a Storybook story. Route-specific composition stays beside its owning feature. Do not copy a shared component into a route or persona folder to change its appearance; extend a semantic variant or compose it instead.
+
+Launch Studio uses a deliberate root-shell boundary for `/launch` and its children,
+not CSS-hidden workspace controls. All four journeys share the same PageFrame,
+PageHeader, semantic tokens and responsive rails. Draft-save feedback distinguishes
+a private saved form snapshot from submission or approval. See
+[implemented boundaries and verification](./school-launch-studio-site-workspace.md#november-5-2026-implementation-and-verification).
 
 Role homes reuse the student's refined composition through `DashboardHero` and
 `DashboardHome`. Teacher/family, school operations, Site Today, onsite staff,
@@ -188,7 +195,7 @@ academic-setup success and error messages use semantic workspace notices.
 
 ## Semantic styling governance
 
-`can-os-design/no-hardcoded-colors` rejects palette-specific utilities such as `bg-blue-600` in shared design primitives and `/guardian/apply`; legacy application occurrences are warnings while migration proceeds. `scripts/check-design-system.mjs` fails duplicate exported component names across the shared tree. Existing general lint findings remain visible as warnings rather than triggering unrelated production repairs.
+`can-os-design/no-hardcoded-colors` rejects palette-specific utilities such as `bg-blue-600` in shared design primitives and `/launch/family`; legacy application occurrences are warnings while migration proceeds. `scripts/check-design-system.mjs` fails duplicate exported component names across the shared tree. Existing general lint findings remain visible as warnings rather than triggering unrelated production repairs.
 
 Use `primary`, `foreground`, `muted-foreground`, `card`, `border`, `success`, `warning`, `danger`, and `info` according to meaning. Do not introduce persona hues or raw hex values in component class names. Token definitions are centralized in `styles.css`.
 
@@ -249,7 +256,7 @@ Brand values are scoped CSS custom properties, not a second token system. Dark m
 
 ## GF22 integrated application-entry slice
 
-`/guardian/apply` now composes `GuidedSetupShell`, shared form controls, semantic status, empty states, and feedback around the existing `getGuardianFamilyApplicationWorkspace` loader and `startGuardianFamilyApplication` bounded command. The request ID, household/program selection, student fields, router invalidation, independent guardian verification, application stages, and links to the canonical enrollment checklist remain intact.
+`/launch/family` now composes `GuidedSetupShell`, shared form controls, semantic status, empty states, and feedback around the existing `getGuardianFamilyApplicationWorkspace` loader and `startGuardianFamilyApplication` bounded command. The request ID, household/program selection, student fields, router invalidation, independent guardian verification, application stages, and links to the canonical enrollment checklist remain intact.
 
 The workflow stepper describes the real school-managed process; it is not a client workflow engine and does not infer verification, readiness, offer, acceptance, or activation. Storybook uses synthetic DTOs only at the component boundary. Production stories and components contain no seeded business state or alternate endpoints.
 

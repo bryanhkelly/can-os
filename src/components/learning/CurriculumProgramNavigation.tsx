@@ -9,17 +9,19 @@ export function CurriculumProgramNavigation({
   programs,
   selectedProgramId,
   canPublish,
+  destination = "/operations/curriculum-marketplace",
 }: {
   programs: readonly CurriculumProgramOption[];
   selectedProgramId?: string;
   canPublish: boolean;
+  destination?: "/operations/curriculum-marketplace" | "/operations/curriculum-marketplace/resources" | "/operations/curriculum-marketplace/imports" | "/operations/curriculum-marketplace/roster";
 }) {
   return (
     <nav className="flex flex-wrap gap-3" aria-label="Curriculum program scope">
       {programs.map((program) => (
         <Link
           key={program.id}
-          to="/operations/curriculum-marketplace"
+          to={destination}
           search={{ programId: program.id }}
           aria-current={selectedProgramId === program.id ? "page" : undefined}
           className="rounded-lg border px-3 py-2 text-sm"

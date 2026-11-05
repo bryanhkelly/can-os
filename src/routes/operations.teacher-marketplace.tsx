@@ -83,7 +83,7 @@ function TeacherMarketplacePage() {
             {market.courses.length} adopted courses · {market.matchedTeachers} teacher candidates
           </p>
         </div>
-        <Button asChild variant="outline"><Link to="/operations/launch/$programId" params={{ programId: market.program.id }}>
+        <Button asChild variant="outline"><Link to="/launch/school/$programId" params={{ programId: market.program.id }}>
           Open class staffing
         </Link></Button>
       </div>

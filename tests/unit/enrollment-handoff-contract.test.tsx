@@ -44,10 +44,10 @@ describe("continuous family enrollment handoff contracts", () => {
   });
 
   it("shows real family application, document, consent and offer state", () => {
-    const applications = source("src/routes/guardian.apply.tsx");
-    expect(applications).toContain("app.schoolYearName");
-    expect(applications).toContain("app.source");
-    expect(applications).toContain("app.stage.replaceAll");
+    const applications = source("src/routes/launch.family.tsx");
+    expect(applications).toContain("item.schoolYearName");
+    expect(applications).toContain("item.source");
+    expect(applications).toContain("item.stage.replaceAll");
     const offers = source("src/routes/guardian.admission-offers.tsx");
     expect(offers).toContain("Offer status:");
     expect(offers).toContain("o.progress.message");

@@ -279,7 +279,7 @@ CAN academic staff-access work by explicit product direction.
   configuration. The draft does **not** certify academic school configuration,
   trained/screened personnel, safeguarding readiness, attendance, custody,
   or campus opening.
-- `/operations/launch/$programId` now offers a scoped, staff-only local
+- `/launch/school/$programId` now offers a scoped, staff-only local
   responsibility panel with verified candidate selection, expiration and
   revocation. The active named relationship is checked for a separate,
   verified session at runtime, not inferred from a role dropdown.

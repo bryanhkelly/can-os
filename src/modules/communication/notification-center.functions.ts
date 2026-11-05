@@ -593,7 +593,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
    n.resourceType==="application"&&n.resourceId&&enrollmentStudent.has(n.resourceId)?
-   (n.type==="admissions_stage_changed"&&!enrollmentApplicationOfferReady.get(n.resourceId)?"/guardian/apply":
+   (n.type==="admissions_stage_changed"&&!enrollmentApplicationOfferReady.get(n.resourceId)?"/launch/family":
     `/guardian/admission-offers?student=${encodeURIComponent(enrollmentStudent.get(n.resourceId)!)}&application=${encodeURIComponent(n.resourceId)}`):
    n.resourceType==="communication_thread"&&n.resourceId&&threadById.has(n.resourceId)?
    (()=>{const thread=threadById.get(n.resourceId!)!;

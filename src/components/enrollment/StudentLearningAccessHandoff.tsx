@@ -91,7 +91,7 @@ function ApplicationLearningAccessHandoff({
   <h4 className="font-semibold">Student learning account · Next requirement</h4>
   <p role="status" className="mt-2">{blocker.message}</p>
   {hasRegistrarAuthority(role)?(blocker.target==="academic_setup"
-   ?<Link to="/operations/launch/$programId" params={{programId:blocker.programId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>
+   ?<Link to="/launch/school/$programId" params={{programId:blocker.programId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>
    :<Link to="/admissions" search={{siteId:blocker.siteId??undefined,programId:blocker.programId,application:blocker.applicationId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>)
    :<Link to="/messages" className="mt-3 inline-block underline">Ask admissions to complete this requirement</Link>}
   <button type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3 rounded border px-3 py-2">Check again</button>

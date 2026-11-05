@@ -70,7 +70,7 @@ function SiteTodayPage() {
     shortcuts={<>
       <DashboardShortcut title="School operations" description="Authorized actions and readiness" icon={<ClipboardList className="size-5" />}><Link to="/home" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="Admissions" description="Applications and enrollment" icon={<Users className="size-5" />}><Link to="/admissions" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
-      <DashboardShortcut title="School launches" description="Review program configuration" icon={<School className="size-5" />}><Link to="/operations/launch" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
+      <DashboardShortcut title="School launches" description="Review program configuration" icon={<School className="size-5" />}><Link to="/launch/school" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="Calendar" description={`Dates in ${data.site.timezone}`} icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:data.localDate}} /></DashboardShortcut>
     </>}
     rail={<DashboardCalendar date={data.localDate} timezone={data.site.timezone} />}
@@ -79,10 +79,10 @@ function SiteTodayPage() {
     priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
-        ["Operations", "/home"], ["Launch", "/operations/launch"],
+        ["Operations", "/home"], ["Launch", "/launch/school"],
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
         ["People", "/profiles"], ["Ask CAN", "/ask"],
-      ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
+      ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/launch/school","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
         {data.canOpenOnsiteDay && <Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }}
         className="border px-3 py-1.5 hover:bg-muted">Onsite day</Link>}
@@ -215,7 +215,7 @@ function SiteTodayPage() {
         <h2 className="font-serif text-2xl">Programs</h2>
         <div className="mt-4 space-y-3">
           {data.programs.map(program => <article key={program.id} className="rounded-xl border bg-card p-4">
-            <h3 className="font-semibold"><Link to="/operations/launch/$programId" params={{programId:program.id}} search={{siteId:data.site.id,programId:undefined}} className="hover:underline">{program.name}</Link></h3>
+            <h3 className="font-semibold"><Link to="/launch/school/$programId" params={{programId:program.id}} search={{siteId:data.site.id,programId:undefined}} className="hover:underline">{program.name}</Link></h3>
             <p className="mt-2 text-xs text-muted-foreground">Grades {program.gradeRange.min}–{program.gradeRange.max} · {program.status.replaceAll("_", " ")}</p>
             <p className="mt-1 text-xs text-muted-foreground">{program.type.replaceAll("_", " ")}</p>
           </article>)}

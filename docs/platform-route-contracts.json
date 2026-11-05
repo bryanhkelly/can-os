@@ -85,6 +85,24 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/admin_.invite.tsx",
+      "route": "/admin_/invite",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admin_.people.tsx",
+      "route": "/admin_/people",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/admin.tsx",
       "route": "/admin",
       "owner": "identity",
@@ -132,6 +150,15 @@
     {
       "file": "src/routes/admissions.index.tsx",
       "route": "/admissions/",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.intake_.new.tsx",
+      "route": "/admissions/intake_/new",
       "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
@@ -328,15 +355,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/guardian.apply.tsx",
-      "route": "/guardian/apply",
-      "owner": "enrollment",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/guardian.attendance.tsx",
       "route": "/guardian/attendance",
       "owner": "family",
@@ -490,6 +508,33 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.curriculum-marketplace_.resources.tsx",
+      "route": "/operations/curriculum-marketplace_/resources",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum-marketplace_.imports.tsx",
+      "route": "/operations/curriculum-marketplace_/imports",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum-marketplace_.roster.tsx",
+      "route": "/operations/curriculum-marketplace_/roster",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/operations.curriculum-marketplace.tsx",
       "route": "/operations/curriculum-marketplace",
       "owner": "learning",
@@ -497,6 +542,33 @@
       "roleJourney": "curriculum-authorized Site Admin/registrar selects a class, uploads classwide or lesson-linked private video and previews student content; acceptance pending",
       "writeBoundary": "existing scoped institutional curriculum.publish or curriculum.adopt authority; current active Section and pinned published version; verified immutable private upload; transactional audit/outbox; deployment gate",
       "readBoundary": "staff video options and preview recheck institutional Organization/Program/Site authority; private preview requires active same-class/version verified attachment; no student upload access"
+    },
+    {
+      "file": "src/routes/operations.curriculum_.new.tsx",
+      "route": "/operations/curriculum_/new",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum_.$courseId.tsx",
+      "route": "/operations/curriculum_/$courseId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum_.publishing.tsx",
+      "route": "/operations/curriculum_/publishing",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
     },
     {
       "file": "src/routes/operations.curriculum.tsx",
@@ -508,9 +580,36 @@
       "readBoundary": "canonical curriculum adopter program and marketplace reads recheck institutional curriculum.adopt or curriculum.publish authority and scope; publisher drafts require curriculum.publish; failed reads are not empty selections"
     },
     {
+      "file": "src/routes/operations.family-alerts_.compose.tsx",
+      "route": "/operations/family-alerts_/compose",
+      "owner": "communication",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/operations.family-alerts.tsx",
       "route": "/operations/family-alerts",
       "owner": "communication",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.field-trips_.new.tsx",
+      "route": "/operations/field-trips_/new",
+      "owner": "field-trips",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.field-trips_.$tripId.tsx",
+      "route": "/operations/field-trips_/$tripId",
+      "owner": "field-trips",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -529,6 +628,24 @@
       "file": "src/routes/operations.health-review.tsx",
       "route": "/operations/health-review",
       "owner": "health",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.interest-events_.new.tsx",
+      "route": "/operations/interest-events_/new",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.interest-events_.$eventId.tsx",
+      "route": "/operations/interest-events_/$eventId",
+      "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -560,33 +677,6 @@
       "roleJourney": "network policy administrator reviews jurisdiction guidance",
       "readBoundary": "listJurisdictionProfileReviews (jurisdiction.profile.manage)",
       "writeBoundary": "saveJurisdictionProfileReview and publishJurisdictionProfile (jurisdiction.profile.manage)"
-    },
-    {
-      "file": "src/routes/operations.launch.$programId.tsx",
-      "route": "/operations/launch/$programId",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/operations.launch.index.tsx",
-      "route": "/operations/launch/",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "School setup retains ready, empty, unavailable and unauthorized supplementary read states",
-      "writeBoundary": "Canonical launch and configuration commands retain server gates; failed jurisdiction reads block configuration submission",
-      "readBoundary": "Launch options and Journey records required; failed jurisdiction or enrollment reads cannot establish opening readiness guidance"
-    },
-    {
-      "file": "src/routes/operations.launch.tsx",
-      "route": "/operations/launch",
-      "owner": "operations",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
     },
     {
       "file": "src/routes/operations.school-years.tsx",
@@ -997,6 +1087,69 @@
       "file": "src/routes/teacher.study-groups.tsx",
       "route": "/teacher/study-groups",
       "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.tsx",
+      "route": "/launch",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.index.tsx",
+      "route": "/launch/",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.school.tsx",
+      "route": "/launch/school",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.school_.$programId.tsx",
+      "route": "/launch/school_/$programId",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.family.tsx",
+      "route": "/launch/family",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.student.tsx",
+      "route": "/launch/student",
+      "owner": "profiles",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.staff.tsx",
+      "route": "/launch/staff",
+      "owner": "profiles",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",

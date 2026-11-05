@@ -8,7 +8,7 @@ import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { Qualifications } from "@/components/profiles/Qualifications";
 import { TeacherProfessionalProfile } from "@/components/profiles/TeacherProfessionalProfile";
 import { StudentProfileSetup } from "@/components/profiles/StudentProfileSetup";
-import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
+import { PageFrame, RecordHeader, RecordLayout, WorkspacePanel } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -57,8 +57,8 @@ export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPe
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to save profile photo. Retry to finish an uploaded photo without uploading again."));}
     finally{saving.current=false;setBusy(false);}
   }
-  return <WorkspaceShell eyebrow="People" title={profile.name} subtitle={profile.kind} width="standard"
-    actions={<ProfilePhoto personId={profile.personId} name={profile.name} revision={revision}/>}>
+  return <PageFrame><RecordLayout header={<RecordHeader eyebrow="People" title={profile.name} subtitle={profile.kind}
+    actions={<ProfilePhoto personId={profile.personId} name={profile.name} revision={revision}/>}/>} main={<>
     <WorkspacePanel title="Profile" description="Your permanent person identity, with relationships verified by the current membership.">
       <p className="text-sm">Only school-connected profile information is shown. Private contact, clinical and credential evidence are not part of this view.</p>
       {profile.isSelf&&<form noValidate className="mt-5 grid gap-3" onSubmit={event=>{event.preventDefault();void save();}}>
@@ -82,5 +82,5 @@ export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPe
     </WorkspacePanel>
     {profile.isSelf&&profile.viewerRole==="teacher"&&<TeacherProfessionalProfile/>}
     {profile.isSelf&&["teacher","room_facilitator","site_leader","site_staff"].includes(profile.viewerRole)&&<Qualifications/>}
-  </WorkspaceShell>;
+  </>}/></PageFrame>;
 }

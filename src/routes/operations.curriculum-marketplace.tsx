@@ -28,21 +28,22 @@ import { validateOneRosterCsvBundle, applyOneRosterClassMappings } from "@/modul
 import { CurriculumProgramNavigation } from "@/components/learning/CurriculumProgramNavigation";
 import { previewRosterClasses } from "@/components/learning/oneroster-class-preview";
 
+export const loadMarketplace=(programId?:string)=>safeLoader(async()=>{
+  const programs=await getCurriculumAdopterPrograms();
+  const marketplace=programId?await getCurriculumMarketplace({data:{programId}}):null;
+  const demoPreview=programId?await getDemoCurriculumPreview({data:{programId}}):null;
+  return {
+   programs,marketplace,demoPreview,
+  journey:programId?await getCurriculumJourneyReadiness({data:{programId}}):null,
+   pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
+  imports:programId&&marketplace?.canPublish
+   ?await listCommonCartridgeImports({data:{programId}}):[],
+  };
+ },{authMessage:"An authorized school curriculum adopter or publisher is required."})();
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
  validateSearch:(search:Record<string,unknown>)=>uuidProgramSelectionSchema.parse(search),
  loaderDeps:({search})=>({programId:search.programId}),
- loader:({deps})=>safeLoader(async()=>{
-  const programs=await getCurriculumAdopterPrograms();
-  const marketplace=deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null;
-  const demoPreview=deps.programId?await getDemoCurriculumPreview({data:{programId:deps.programId}}):null;
-  return {
-   programs,marketplace,demoPreview,
-   journey:deps.programId?await getCurriculumJourneyReadiness({data:{programId:deps.programId}}):null,
-   pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
-   imports:deps.programId&&marketplace?.canPublish
-    ?await listCommonCartridgeImports({data:{programId:deps.programId}}):[],
-  };
- },{authMessage:"An authorized school curriculum adopter or publisher is required."})(),
+ loader:({deps})=>loadMarketplace(deps.programId),
  component:CurriculumMarketplacePage,
 });
 type Market=Awaited<ReturnType<typeof getCurriculumMarketplace>>;
@@ -51,7 +52,7 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};demoPreview:Awaited<ReturnType<typeof getDemoCurriculumPreview>>|null;imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
+export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imports"|"roster";data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};demoPreview:Awaited<ReturnType<typeof getDemoCurriculumPreview>>|null;imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
@@ -88,9 +89,16 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   adoptedCourseVersions:data.journey.totals.courseVersionsAvailable,
   classes:data.journey.classes,
  }):[];
- return <WorkspaceShell width="wide" eyebrow="Academic operations" title="Curriculum Marketplace">
+ const destination=mode==="resources"?"/operations/curriculum-marketplace/resources":mode==="imports"?"/operations/curriculum-marketplace/imports":mode==="roster"?"/operations/curriculum-marketplace/roster":"/operations/curriculum-marketplace";
+ return <WorkspaceShell width="wide" eyebrow="Academic operations" title={mode==="resources"?"Curriculum resources":mode==="imports"?"Curriculum imports":mode==="roster"?"Roster exchange":"Curriculum Marketplace"}
+  actions={<nav aria-label="Curriculum workflows" className="flex flex-wrap gap-3 text-sm">
+   <Link to="/operations/curriculum-marketplace" search={{programId:market?.program.id}} className="underline">Browse</Link>
+   <Link to="/operations/curriculum-marketplace/resources" search={{programId:market?.program.id}} className="underline">Resources</Link>
+   <Link to="/operations/curriculum-marketplace/imports" search={{programId:market?.program.id}} className="underline">Imports</Link>
+   <Link to="/operations/curriculum-marketplace/roster" search={{programId:market?.program.id}} className="underline">Roster exchange</Link>
+  </nav>}>
   <div className="space-y-6">
-  {data.demoPreview && <section className="space-y-3 rounded-xl border p-5" aria-label="Sample curriculum catalog">
+  {mode==="browse" && data.demoPreview && <section className="space-y-3 rounded-xl border p-5" aria-label="Sample curriculum catalog">
     <h2 className="font-serif text-2xl">Explore sample curriculum</h2>
     <p className="text-sm text-muted-foreground">These {data.demoPreview.courses.length} synthetic courses are for demonstration and planning only. They are not academically approved or available for adoption.</p>
     <div className="grid max-h-96 gap-2 overflow-y-auto md:grid-cols-2">
@@ -102,11 +110,11 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     </div>
   </section>}
   <p className="max-w-3xl text-sm text-muted-foreground">Install published curriculum packs into your organization's library, adopt releases for a school program and supplement classes without changing the publisher's immutable material.</p>
-  <CurriculumProgramNavigation programs={data.programs} selectedProgramId={market?.program.id} canPublish={Boolean(market?.canPublish)} />
+  <CurriculumProgramNavigation destination={destination} programs={data.programs} selectedProgramId={market?.program.id} canPublish={Boolean(market?.canPublish)} />
   <MutationFeedback state={mutation} pendingMessage="Saving curriculum change..."/>
   {!market&&<p className="rounded-lg border p-4">Select a program to browse packs under its verified school membership.</p>}
   {market&&<>
-   {data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="School curriculum next actions">
+  {mode==="browse"&&data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="School curriculum next actions">
     <div>
       <h2 className="font-serif text-2xl">School curriculum next actions</h2>
       <p className="text-sm text-muted-foreground">Suggested next steps from current school records. They do not establish academic approval or end-to-end test completion.</p>
@@ -117,10 +125,10 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
         <p className="mt-1 text-xs text-muted-foreground">{action.detail}</p>
       </div>
       {action.destination==="packs"?<a href="#curriculum-packs" className="text-sm underline">Browse curriculum packs</a>:
-       action.destination==="launch"?<Link to="/operations/launch/$programId" params={{programId:market.program.id}} className="text-sm underline">Open class setup</Link>:null}
+       action.destination==="launch"?<Link to="/launch/school/$programId" params={{programId:market.program.id}} className="text-sm underline">Open class setup</Link>:null}
     </li>)}</ol>:<p className="text-sm">No immediate gaps detected in the tracked curriculum handoffs. Continue monitoring instruction and student evidence; this is not an acceptance-test result.</p>}
    </section>}
-   {data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="Curriculum operational evidence">
+  {mode==="browse"&&data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="Curriculum operational evidence">
     <div>
      <h2 className="font-serif text-2xl">Curriculum journey: operational evidence</h2>
      <p className="text-sm text-muted-foreground">Read-only counts from this program's real adopted curriculum, sections and assessed student work. These are not proof that signed-in end-to-end acceptance tests have passed.</p>
@@ -141,7 +149,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
       <p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{value}</p>
      </div>)}
     </div>
-    <Link to="/operations/launch/$programId" params={{programId:market.program.id}} className="inline-block text-sm underline">Provision and staff classes for this program →</Link>
+    <Link to="/launch/school/$programId" params={{programId:market.program.id}} className="inline-block text-sm underline">Provision and staff classes for this program →</Link>
     <h3 className="text-sm font-semibold">Classes using adopted publisher courses</h3>
     {data.journey.classes.map(klass=><div key={klass.id} className="rounded border p-3 text-sm">
      <p className="font-semibold">{klass.code} · {klass.title}</p>
@@ -152,7 +160,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     {!data.journey.classes.length&&<p className="text-sm">No classes use currently adopted publisher course releases. Provision a class after adopting a pack.</p>}
     <p className="text-xs text-muted-foreground">To certify the workflow, run the isolated database acceptance suite and signed-in browser tests. Nonzero counts establish operational records only.</p>
    </section>}
-   <section id="curriculum-packs" className="space-y-3">
+  {mode==="browse"&&<section id="curriculum-packs" className="space-y-3">
     <h2 className="font-serif text-2xl">Available curriculum packs</h2>
     <div className="grid gap-4 md:grid-cols-2">
      {market.packs.map(pack=><article key={pack.versionId} id={`curriculum-pack-${pack.versionId}`} className="scroll-mt-6 space-y-3 rounded-xl border bg-card p-5">
@@ -204,9 +212,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
       </article>)}
     </div>
     {!market.packs.length&&<p className="rounded border p-4 text-sm">No published curriculum packs are available to this organization yet.</p>}
-   </section>
-   <StaffClassVideos sections={market.sections} videos={market.overlays}/>
-   <section className="space-y-4 rounded-xl border bg-card p-5">
+    </section>}
+  {mode==="resources"&&<><StaffClassVideos sections={market.sections} videos={market.overlays}/>
+  <section className="space-y-4">
     <h2 className="font-serif text-2xl">Supplement adopted curriculum</h2>
     <p className="text-sm text-muted-foreground">Add videos, PDFs hosted at an HTTPS address, websites or other resources. Publisher course versions remain unchanged; approved additions are tracked separately by program, site or class.</p>
     {!choices.length?<p className="text-sm">Install and adopt a pack before adding resources.</p>:
@@ -284,9 +292,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      {item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer" className="ml-1 underline">Open</a>}
     </li>)}</ul>
     {!market.overlays.length&&<p className="text-sm text-muted-foreground">No supplemental materials yet.</p>}
-   </section>
+    </section></>}
 
-   {market.canPublish&&<section className="space-y-3 rounded-xl border p-5">
+  {mode==="imports"&&market.canPublish&&<section className="space-y-3">
      <h2 className="font-serif text-2xl">Import Common Cartridge</h2>
      <p className="text-sm text-muted-foreground">Inspect a publisher-supplied 1EdTech Common Cartridge or Thin Common Cartridge (.imscc) without rebuilding it manually. The first stage validates the ZIP manifest, preserves publisher IDs and reports unsupported assessment or application resources. It does not yet publish a course or import embedded files.</p>
      <label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
@@ -342,7 +350,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      {!data.imports.length&&<p className="text-sm text-muted-foreground">No Common Cartridge imports have been staged for this organization.</p>}
    </section>}
 
-   <section className="space-y-3 rounded-xl border p-5">
+  {mode==="roster"&&<><section className="space-y-3">
      <h2 className="font-serif text-2xl">OneRoster 1.2 school exchange</h2>
      <p className="text-sm text-muted-foreground">
        Export the active program's classes, students and teachers as a ZIP containing OneRoster 1.2 bulk roster CSVs.
@@ -389,7 +397,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
       },"External OneRoster class identities reconciled to canonical CAN Sections.")} />}
      <p className="text-xs text-muted-foreground">This scoped class-reconciliation workflow is not a student roster import or OneRoster certification.</p>
     </section>}
-   {market.canPublish&&<OneRosterStudentReconciliation programId={market.program.id}/>}
+  {market.canPublish&&<OneRosterStudentReconciliation programId={market.program.id}/>}</>}
   </>}
  </div></WorkspaceShell>;
 }

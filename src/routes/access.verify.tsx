@@ -44,12 +44,14 @@ export const Route=createFileRoute("/access/verify")({
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
     if(nativeForm){
+     const landing=accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo);
      const headers=new Headers({
-      Location:accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo),
+      Location:landing,
       "Cache-Control":"no-store","Referrer-Policy":"no-referrer",
      });
      headers.append("Set-Cookie",result.setCookie);
-     headers.append("Set-Cookie",accessReturnCookieHeader(returnTo,new URL(request.url).protocol==="https:"));
+     // Arm one-shot return recovery only when the user is actually sent to the saved page.
+     headers.append("Set-Cookie",accessReturnCookieHeader(landing===returnTo?returnTo:undefined,new URL(request.url).protocol==="https:"));
      return new Response(null,{status:303,headers});
     }
     return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});

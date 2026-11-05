@@ -45,7 +45,7 @@ describe("published Site to verified first-family application boundary",()=>{
    expect(classifyPublicSiteRequest(tenant+"/published-site/family-start","POST",true)).toMatchObject({
      kind:"site",slug:"sample-school",rewrite:false,
    });
-   for(const path of ["/family/join","/guardian/apply","/access/request","/api/jobs","/apply?other=1"])
+   for(const path of ["/family/join","/launch/family","/access/request","/api/jobs","/apply?other=1"])
      expect(classifyPublicSiteRequest(tenant+path,"POST",true).kind).toBe("deny");
    expect(classifyPublicSiteRequest(tenant+"/apply","POST",false).kind).toBe("deny");
    expect(slugForPublicSiteOrigin(new Request(tenant+"/published-site/family-start",{

@@ -90,9 +90,9 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
                 application:row.applicationId,interest:undefined}}
               className="rounded-lg border px-3 py-2 text-xs font-semibold">
               View linked inquiry
-            </Link> : row.status !== "closed" && row.admissionsAuthorized && <Link to="/admissions/intake"
+            </Link> : row.status !== "closed" && row.admissionsAuthorized && <Link to="/admissions/intake/new"
               search={{siteId:row.siteId,programId:row.programId,
-                application:undefined,interest:row.id}}
+                interest:row.id}}
               className="rounded-lg border px-3 py-2 text-xs font-semibold">
               Review and create inquiry
             </Link>}

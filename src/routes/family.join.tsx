@@ -53,7 +53,7 @@ function FamilyJoinPage(){
      }
      setToken(null);
      const result=await response.json() as {programId:string;requestId:string};
-     const dest=new URL("/guardian/apply",window.location.origin);
+     const dest=new URL("/launch/family",window.location.origin);
      dest.searchParams.set("programId",result.programId);
      dest.searchParams.set("familyStart",result.requestId);
      window.location.replace(dest.toString());

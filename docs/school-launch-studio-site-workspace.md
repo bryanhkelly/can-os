@@ -1,14 +1,60 @@
 # CAN OS — School Launch Studio and School/Site Workspace
 Status: Product design specification · 2026-10-16
-Scope: Additive specification. No implementation or completed workflow is implied.
+Scope: Product specification with the source-verified implementation note below. No completed end-to-end journey or release approval is implied.
+
+## November 5, 2026 implementation and verification
+
+- Launch Studio is the canonical standalone experience: `/launch`, `/launch/school`,
+  `/launch/school/$programId`, `/launch/family`, `/launch/student`, and `/launch/staff`.
+  The former operations-launch and guardian-application route modules were removed,
+  not retained as aliases or redirects. Internal links and newly issued family
+  invitations use the canonical routes; previously delivered obsolete links are not
+  redirected.
+- The root keeps query/session providers but does not mount workspace navigation,
+  account panels or the command palette for this route family. School steps retain
+  the existing scoped loader and domain commands; step navigation is not a loader
+  dependency. Explicit mutation invalidation still refreshes authoritative data.
+  New-school sign-in prefers school Launch Studio over generic home return paths.
+  Specific safe return links remain honored. Each journey has a bottom dashboard exit.
+- Save draft stores private form buffers by authenticated account, active grant,
+  audience and exact route context, with strict bounded payloads and optimistic
+  revisions. These buffers do not replace canonical school/application/Journey
+  records or create completion, consent, evidence review or approval.
+  School drafts preserve the proposed Program and unsaved new-Site fields, family
+  drafts preserve incomplete application input and its idempotency request,
+  student drafts preserve optional profile fields and course choices, and staff
+  drafts preserve private preparation notes. Independently saved Site edits,
+  academic setup, uploads and qualification evidence retain their ordinary commands.
+  Transfer confirmations are never restored as consent. An inaccessible saved child
+  cannot silently become a new child; already-submitted application drafts are not
+  restored as new submissions.
+- Family documents use the exact school-requested checklist only after independently
+  verified guardian access. Course choices use actual registration requests, not
+  invented timetable/elective periods. Staff evidence uses applicable qualifications;
+  no unsupported policy acknowledgment or automatic compliance approval is simulated.
+- Executed locally: production build, typecheck, targeted ESLint, 273 tests across
+  25 selected unit/regression files, and six Chromium Storybook interaction/axe
+  checks at both default and 390 px viewports passed. The public entry was checked at 390, 430, 768, 1024, 1440 and
+  1600 px without horizontal overflow, with DM Sans/Instrument Serif styling and no
+  workspace controls. Authenticated four-role browser completion and actual 200%
+  browser zoom remain unverified. The broader application-navigation test file
+  still has two failures in existing admissions intake/offer presentation.
+  Fixture contracts now cover every Launch Studio page; the global fixture
+  checker still reports 14 gaps in other in-progress route splits.
+- With explicit owner approval, only migration `0075_launch_studio_drafts` was
+  applied to verified Neon main after exact-SQL rehearsal and rollback-isolated
+  four-audience storage checks on fresh recovery copy `br-icy-tooth-arpvfys8`.
+  Separate-connection postflight verified the new ledger entry and empty draft
+  table. Prior ledger rows were preserved; no production fixtures or business
+  records were changed. This records schema application, not application deployment.
 
 ## North star
 A church, independent school, or local operator can create, configure, open, operate, improve, and expand a school of 1–1,000 students using one canonical operating foundation. Launch Studio and School/Site Workspace are two states of the same Organization → Site → Program lifecycle, NOT separate record stores or products.
 
 ## Existing foundations and source references
-- Public `.demo` school bootstrap begins at `/schools/new`, creates a separate Organization/Site and Site Admin, and hands off after shared-code sign-in to the existing `/operations/launch?siteId=...` workflow. Site Admin has registrar workflow authority within its own Site, not network authority. See [identity and demo access](./identity-and-demo-access.md) for exact identity bindings and migration requirements; this is not end-to-end acceptance or a claim that the proposed routes below exist.
-- Production: `src/routes/operations.launch.tsx`, `src/modules/programs/launch.functions.ts`, `src/modules/programs/gf3-service.ts`, `src/routes/operations.tsx`; see `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/CURRENT-STATE.md`. The October 16 GF3 completeness assessment is historical; confirm current code and acceptance evidence before claiming completion.
-- Physical classrooms: the existing launch portfolio links to `Physical classrooms` in `/operations/launch/$programId`. Site Admin/registrar setup creates reusable Site-owned rooms with a name and occupancy limit, then assigns default Section locations. New daily onsite room plans select those rooms rather than retyping names/capacities. Room creation and class defaults do not certify inspection, reserve exclusive time or approve supervision; independent reviewed coverage remains separate. Current catalog authoring is create-only, not a full facilities/inspection management suite.
+- Public `.demo` school bootstrap begins at `/schools/new`, creates a separate Organization/Site and Site Admin, and hands off after shared-code sign-in to the existing `/launch/school?siteId=...` workflow. Site Admin has registrar workflow authority within its own Site, not network authority. See [identity and demo access](./identity-and-demo-access.md) for exact identity bindings and migration requirements; this is not end-to-end acceptance or a claim that the proposed routes below exist.
+- Production source: `src/routes/launch.school.tsx`, `src/routes/launch.school_.$programId.tsx`, `src/modules/programs/launch.functions.ts`, and `src/modules/programs/gf3-service.ts`; see `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/CURRENT-STATE.md`. The October 16 GF3 completeness assessment is historical; confirm current code and acceptance evidence before claiming completion.
+- Physical classrooms: the existing launch portfolio links to `Physical classrooms` in `/launch/school/$programId`. Site Admin/registrar setup creates reusable Site-owned rooms with a name and occupancy limit, then assigns default Section locations. New daily onsite room plans select those rooms rather than retyping names/capacities. Room creation and class defaults do not certify inspection, reserve exclusive time or approve supervision; independent reviewed coverage remains separate. Current catalog authoring is create-only, not a full facilities/inspection management suite.
 - UX references, not production code: `academy-union-core/src/routes/_shell/launch-center.tsx` and `academy-union-core/src/routes/_shell/church-sites.$siteId.tsx`. Prototype site tabs: overview, local-director operations, partner operations, capacity, revenue, health, compliance, facilities, lab days, attendance, incidents, students, staff, priorities.
 - Follow `docs/prototype-migration.md`: no localStorage workflow state, scripted AI evidence, fake audit history, church-only model, or persona-based production authorization.
 
@@ -24,12 +70,12 @@ A church, independent school, or local operator can create, configure, open, ope
 
 ## A. School Launch Studio
 ### Routes
-- `/operations/launch`: authorized launch portfolio/list; new launch CTA; status, blockers, owner, target open date, and upcoming milestones. Preserve redirect/compatibility with current route.
-- `/operations/launch/new`: guided draft creation; resumable, accessible wizard; validated steps and autosave.
-- `/operations/launch/$programId`: launch HQ: summary; six sections; Needs You; evidence; scenario snapshots; decision log; activation readiness.
-- `/operations/launch/$programId/scenarios`: compare educational and economic configurations.
-- `/operations/launch/$programId/readiness`: categorized journeys/requirements/approvals.
-These are proposed routes, not implemented routes.
+- `/launch/school`: canonical guided setup with a scoped saved-school selector and recorded Journey progress. No legacy redirect route.
+- `/launch/school/new`: guided draft creation; resumable, accessible wizard; validated steps and autosave.
+- `/launch/school/$programId`: existing authorized academic provisioning, classrooms and staffing under Launch Studio chrome.
+- `/launch/school/$programId/scenarios`: compare educational and economic configurations.
+- `/launch/school/$programId/readiness`: categorized journeys/requirements/approvals.
+The `/new`, `/scenarios` and `/readiness` subroutes remain proposals, not implemented routes.
 
 ### Six steps
 1. **Vision**: independent school vs extension vs church academy vs microschool vs hybrid vs supplemental; grades, cohorts, target enrollment, jurisdiction and target opening year; owner/host/governing entity; facilities; identity/branding. Allow uncertainty and deferred answers.

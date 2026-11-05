@@ -40,7 +40,7 @@ export function OnsiteRoomPlanningPanel({programId, initialDate, onChanged}:{
       <p className="mt-2 text-xs text-muted-foreground">Schedule timezone: {model.timezone}. Adult choices require current Section appointments, screening and training for the entire block.</p>
       {model.canSubmit&&!model.rooms.length&&<p role="status" className="mt-3 text-sm">
         Create physical classrooms during school setup before submitting a room coverage plan.{" "}
-        <Link to="/operations/launch/$programId" params={{programId}} hash="physical-classrooms"
+        <Link to="/launch/school/$programId" params={{programId}} hash="physical-classrooms"
           className="underline">Set up school rooms</Link>.
       </p>}
       {!model.blocks.length&&<p className="mt-3 text-sm">No verified instructional blocks on this date. Check the school calendar and Section schedules.</p>}

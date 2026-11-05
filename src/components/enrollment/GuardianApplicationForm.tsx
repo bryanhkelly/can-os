@@ -1,5 +1,7 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { LaunchDraftButton } from "@/components/launch-studio/LaunchDraftButton";
+import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import { guardianApplicationSelection } from "@/domain/guardian-application-selection";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,7 +60,11 @@ const setupSteps: readonly GuidedSetupStep[] = [
 ];
 
 export function GuardianApplicationForm({ programs, households, students = [], transferRequests = [], requestedProgramId,
-  familyStartRequestId, onSubmit, onSubmitted }: {
+  familyStartRequestId, onSubmit, onSubmitted, embedded = false, draft, draftContext, restoreDraft = true }: {
+  restoreDraft?: boolean;
+  embedded?: boolean;
+  draft?: LaunchDraftRecord | null;
+  draftContext?: string;
   programs: readonly GuardianApplicationProgram[];
   households: readonly GuardianApplicationHousehold[];
   students?: readonly GuardianApplicationStudent[];
@@ -69,11 +75,12 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   onSubmitted?: (applicationId: string) => Promise<void> | void;
 }) {
   const id = useId();
+  const saved = restoreDraft && draft?.value.audience === "family" ? draft.value.fields : undefined;
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const requested = programs.find(item => item.id === requestedProgramId);
   const [programId, setProgramId] = useState(
-    requestedProgramId ? requested?.id ?? "" : programs.length === 1 ? programs[0]!.id : "");
-  const [schoolYearId, setSchoolYearId] = useState("");
+    requestedProgramId ? requested?.id ?? "" : saved?.programId ?? (programs.length === 1 ? programs[0]!.id : ""));
+  const [schoolYearId, setSchoolYearId] = useState(saved?.schoolYearId ?? "");
   const [previousRequestedProgramId, setPreviousRequestedProgramId] = useState(requestedProgramId);
   if (previousRequestedProgramId !== requestedProgramId) {
     setPreviousRequestedProgramId(requestedProgramId);
@@ -98,17 +105,21 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   const linkedStudent = linkedTransfer
     ? students.find(student => student.studentProfileId===linkedTransfer.studentProfileId)
     : undefined;
+  const initialStudent = linkedStudent ?? students.find(student =>
+    `${student.studentProfileId}:${student.householdId}` === saved?.studentOptionId);
+  const [unavailableDraftStudent, setUnavailableDraftStudent] = useState(Boolean(saved?.studentOptionId && !initialStudent));
   const [studentOptionId, setStudentOptionId] = useState(
-    linkedStudent ? linkedStudent.studentProfileId+":"+linkedStudent.householdId : "");
-  const [studentProfileId, setStudentProfileId] = useState(linkedStudent?.studentProfileId??"");
+    initialStudent ? initialStudent.studentProfileId+":"+initialStudent.householdId : "");
+  const [studentProfileId, setStudentProfileId] = useState(initialStudent?.studentProfileId??"");
   const [originTransferActionId,setOriginTransferActionId] = useState(linkedStudent?linkedTransfer?.id??"":"");
   const [confirmedDestination,setConfirmedDestination] = useState(false);
   const [authorizedDestinationRecords,setAuthorizedDestinationRecords] = useState(false);
-  const [householdId, setHouseholdId] = useState(linkedStudent?.householdId??households[0]?.id??"");
-  const [firstName, setFirstName] = useState(linkedStudent?.studentFirstName??"");
-  const [lastName, setLastName] = useState(linkedStudent?.studentLastName??"");
-  const [grade, setGrade] = useState(linkedStudent?.gradeLevel??"");
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const [householdId, setHouseholdId] = useState(initialStudent?.householdId ??
+    (households.some(item => item.id === saved?.householdId) ? saved!.householdId : households[0]?.id) ?? "");
+  const [firstName, setFirstName] = useState(initialStudent?.studentFirstName??saved?.firstName??"");
+  const [lastName, setLastName] = useState(initialStudent?.studentLastName??saved?.lastName??"");
+  const [grade, setGrade] = useState(initialStudent?.gradeLevel??saved?.grade??"");
+  const [requestId, setRequestId] = useState(() => saved?.requestId ?? crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -119,6 +130,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   }, [notice, error]);
 
   function selectStudent(optionId: string) {
+    setUnavailableDraftStudent(false);
     setStudentOptionId(optionId);
     const student = students.find(item =>
       `${item.studentProfileId}:${item.householdId}` === optionId);
@@ -141,6 +153,10 @@ export function GuardianApplicationForm({ programs, households, students = [], t
     event.preventDefault();
     if (busy) return;
     setAttempted(true);
+    if (unavailableDraftStudent) {
+      setError("The student selected in this draft is no longer available to your verified household. Contact admissions before continuing.");
+      return;
+    }
     if(linkedTransfer&&!linkedStudent){
       setError("This transfer requires the student's existing verified household identity. Contact admissions rather than creating a second student.");
       return;
@@ -182,14 +198,15 @@ export function GuardianApplicationForm({ programs, households, students = [], t
     }
   }
 
-  return <GuidedSetupShell title="Student application"
-    description="Start one canonical application. You can return to this workspace for the school's independent verification and next steps."
-    steps={setupSteps} aside={<div className="text-sm leading-6 text-muted-foreground">
-      <h3 className="font-semibold text-foreground">What submission does</h3>
-      <p className="mt-2">It creates an application and enrollment journey. A new guardian relationship remains pending independent verification.</p>
-      <h3 className="mt-5 font-semibold text-foreground">What it does not do</h3>
-      <p className="mt-2">It does not establish legal guardianship, accept an offer, activate enrollment or place a student into classes.</p>
-    </div>}>
+  const content = <>
+    {unavailableDraftStudent && <WorkspaceNotice tone="danger" className="mb-5">
+      The student selected in this draft is no longer available to your verified household.
+      No new student identity will be created from their draft details. Contact admissions to restore access.
+      <Button type="button" variant="outline" className="mt-3" onClick={() => {
+        selectStudent("");
+        setRequestId(crypto.randomUUID());
+      }}>Start a different student's application</Button>
+    </WorkspaceNotice>}
     {notice && <WorkspaceNotice ref={feedbackRef} tone="success" className="mb-5">{notice}</WorkspaceNotice>}
     {error && <WorkspaceNotice ref={feedbackRef} tone="danger" className="mb-5">{error}</WorkspaceNotice>}
     {linkedTransfer&&!linkedStudent&&<WorkspaceNotice tone="danger" className="mb-5">
@@ -295,12 +312,22 @@ export function GuardianApplicationForm({ programs, households, students = [], t
             onChange={event => setGrade(event.target.value)} />
         </Field>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || selection.unavailable || !!linkedTransfer&&!linkedStudent} aria-busy={busy}>
+          {draftContext !== undefined && <LaunchDraftButton initial={draft ?? null}
+            selection={{ audience: "family", context: draftContext }} disabled={busy || unavailableDraftStudent}
+            value={() => ({ audience: "family", fields: { requestId, programId, schoolYearId,
+              studentOptionId, householdId, firstName, lastName, grade } })} />}
+          <Button type="submit" size="lg" disabled={busy || unavailableDraftStudent || selection.unavailable || !!linkedTransfer&&!linkedStudent} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>
         </div>
       </fieldset>
     </form>}
-  </GuidedSetupShell>;
+  </>;
+  return embedded ? <section className="border bg-card p-5">{content}</section> :
+    <GuidedSetupShell title="Student application"
+      description="Start one canonical application. Return here for independent verification and next steps."
+      steps={setupSteps} aside={<p className="text-sm leading-6 text-muted-foreground">
+        Submission does not establish legal guardianship, accept an offer, activate enrollment or place a student into classes.
+      </p>}>{content}</GuidedSetupShell>;
 }

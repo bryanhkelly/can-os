@@ -80,7 +80,7 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       <Button type="submit" variant="outline" disabled={!hydrated||busy}>Transfer pending handoff</Button>
     </form>}
     {handoff.programId && handoff.siteId && <div className="mt-3 flex flex-wrap gap-3 text-sm">
-      <Link to="/operations/launch/$programId" params={{ programId: handoff.programId }} className="underline">Review classes and staffing</Link>
+      <Link to="/launch/school/$programId" params={{ programId: handoff.programId }} className="underline">Review classes and staffing</Link>
       <Link to="/operations/school-years" search={{ siteId: handoff.siteId, programId: handoff.programId }} className="underline">Review school year</Link>
       <Link to="/home" search={{ siteId: handoff.siteId, programId: handoff.programId }} className="underline">Program operations</Link>
     </div>}

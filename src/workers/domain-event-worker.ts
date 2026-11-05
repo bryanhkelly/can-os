@@ -48,6 +48,7 @@ registerDomainEventHandler(EventTypes.InsightCreated, handleAcademicPassThroughE
 // Lifecycle facts already have transactional evidence. Pass through to shared
 // subscriptions and complete the outbox; delivery depends on registered consumers.
 for (const eventType of [
+  EventTypes.LaunchDraftSaved,
   EventTypes.ApplicationStarted,
   EventTypes.ApplicationAccepted,
   EventTypes.AdmissionOfferIssued,

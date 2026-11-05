@@ -474,7 +474,7 @@ export async function listFamilyInvitationWorkspace(
       siteId: program.siteId,
       publishedSiteUrl: "",
       privateApplicationUrl: program.purpose === "application"
-        ? `/guardian/apply?programId=${encodeURIComponent(program.programId)}` : undefined,
+        ? `/launch/family?programId=${encodeURIComponent(program.programId)}` : undefined,
       purpose: program.purpose,
     })),
     batches: parsedBatches.map(batch => {

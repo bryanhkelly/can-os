@@ -49,12 +49,12 @@ function withRouter(content: ReactNode) {
   const root = createRootRoute({ component: () => <div className="bg-background p-4 sm:p-8">{content}</div> });
   const index = createRoute({
     getParentRoute: () => root,
-    path: "/operations/launch",
+    path: "/launch/school",
     component: () => null,
   });
   const academicSetup = createRoute({
     getParentRoute: () => root,
-    path: "/operations/launch/$programId",
+    path: "/launch/school/$programId",
     component: () => null,
   });
   const router = createRouter({

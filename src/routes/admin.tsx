@@ -1,9 +1,7 @@
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { personDisplayName } from "@/domain/person-name";
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { KeyRound, UserRoundPlus } from "lucide-react";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   inviteStaffMember,
@@ -12,19 +10,22 @@ import {
   listScopedSites,
   setGrantActive,
 } from "@/modules/identity/admin.functions";
-import { WorkspaceShell, QueryState } from "@/components/workspace";
+import { CreateAction, WorkspaceShell, QueryState, secondaryActionClassName } from "@/components/workspace";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 import { launchStaffInvitationDefaults } from "@/domain/launch-staff-invitation";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {siteProgramSelectionSchema} from "@/lib/route-search";
-const adminSearchSchema=siteProgramSelectionSchema.pick({siteId:true}).extend({
+export const adminSearchSchema=siteProgramSelectionSchema.pick({siteId:true}).extend({
  inviteRole:z.enum(["registrar","site_website_editor"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/admin")({
   validateSearch: (search: Record<string, unknown>): {siteId?: string; inviteRole?: string} => adminSearchSchema.parse(search),
+  beforeLoad: ({search}) => {
+    if(search.inviteRole) throw redirect({to:"/admin/invite",search:adminSearchSchema.parse(search),replace:true});
+  },
   component: AdminConsolePage,
 });
 
@@ -57,7 +58,7 @@ function AdminConsolePage() {
   return <ScopedAdminConsole key={JSON.stringify(selection)} selection={selection}/>;
 }
 
-function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRole?: string}}) {
+export function ScopedAdminConsole({selection, mode="access"}: {selection: {siteId?: string; inviteRole?: string}; mode?: "access"|"invite"|"people"}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -73,7 +74,7 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
 
   useEffect(() => {
     let active = true;
-    Promise.all([listScopedSites(), listAccessAccounts(), listPeople({ data: {} })])
+    Promise.all([listScopedSites(), mode==="access"?listAccessAccounts():Promise.resolve({accounts:[]}), mode==="people"?listPeople({ data: {} }):Promise.resolve({people:[]})])
       .then(([siteResult, accountResult, peopleResult]) => {
         if (!active) return;
         setSites(siteResult.sites);
@@ -92,18 +93,18 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
   }, []);
 
   useEffect(() => {
-    if (authError) return;
+    if (authError || mode!=="people") return;
     let active = true;
     listPeople({ data: { ...(query.trim() ? { query: query.trim() } : {}) } })
       .then(result => { if (active) setPeople(result.people); })
       .catch(() => { if (active) setError("Unable to search the people directory."); });
     return () => { active = false; };
-  }, [query, authError]);
+  }, [query, authError, mode]);
 
   async function refresh() {
     const [accountResult, peopleResult] = await Promise.all([
-      listAccessAccounts(),
-      listPeople({ data: { ...(query.trim() ? { query: query.trim() } : {}) } }),
+      mode==="access"?listAccessAccounts():Promise.resolve({accounts:[]}),
+      mode==="people"?listPeople({ data: { ...(query.trim() ? { query: query.trim() } : {}) } }):Promise.resolve({people:[]}),
     ]);
     setAccounts(accountResult.accounts);
     setPeople(peopleResult.people);
@@ -155,15 +156,18 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
   return (
     <WorkspaceShell
       eyebrow="Admin"
-      title="Admin console"
-      subtitle="Invite staff, manage access accounts, and browse the people directory for your organizations."
+      title={mode==="invite"?"Invite staff":mode==="people"?"People directory":"Staff access"}
+      breadcrumbs={mode!=="access"?<Link to="/admin" search={{siteId:selection.siteId}} className="underline">Administration</Link>:undefined}
+      actions={<div className="flex flex-wrap gap-2">
+        {mode!=="invite"&&<CreateAction><Link to="/admin/invite" search={adminSearchSchema.parse(selection)}>Invite staff</Link></CreateAction>}
+        {mode!=="people"&&<Link to="/admin/people" search={{siteId:selection.siteId}} className={secondaryActionClassName}>People directory</Link>}
+      </div>}
     >
       <QueryState loading={loading ? "Loading admin console…" : ""} error={authError}>
-        <WorkflowIntro eyebrow="Identity & access" title="The right people. The right access." description="Invite church-local staff to one exact Site. Secure email acceptance activates only the intended local role; CAN institutional appointments remain separate." actions={<><a href="#invite-staff" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><UserRoundPlus className="size-4" /> Invite staff</a><a href="#access-accounts" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><KeyRound className="size-4" /> Review readiness</a></>} />
         {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
         {notice && <p className="mt-8 rounded-lg border bg-muted p-4 text-sm" role="status">{notice}</p>}
 
-        <section id="invite-staff" className="mt-8 rounded-2xl border border-border/70 bg-card p-6 shadow-sm"><h2 className="font-serif text-2xl font-semibold">Invite staff</h2>
+        {mode==="invite"&&<section id="invite-staff" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Invitation details</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create the person and an inactive exact-Site grant, then email the canonical secure access link. Accepting it establishes the intended local identity and role.</p>
            <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound. Restricted intake is implemented but has not completed legal review or operational acceptance; continue to use approved external reporting and emergency procedures.</p>
           <Form {...form}>
@@ -230,9 +234,9 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
               </div>
             </form>
           </Form>
-        </section>
+        </section>}
 
-        <section id="access-accounts" className="mt-8 rounded-2xl border border-border/70 bg-card p-6 shadow-sm"><h2 className="font-serif text-2xl font-semibold">Staff access and readiness</h2>
+        {mode==="access"&&<section id="access-accounts" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Staff access and readiness</h2>
           <p className="mt-1 text-sm text-muted-foreground">Acceptance and qualification are separate facts. Onsite directors, facilitators and staff submit screening and safeguarding-training evidence through their Profile; an independent reviewer must approve both.</p>
           {accounts.length === 0 && <p className="mt-4 text-sm">No access accounts found in your organization scope.</p>}
           {accounts.length > 0 && <div className="mt-4 overflow-x-auto">
@@ -276,10 +280,10 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
               </TableBody>
             </Table>
           </div>}
-        </section>
+        </section>}
 
-        {form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
-        <section className="mt-8 rounded-xl border bg-card p-5">
+        {mode==="access"&&form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
+        {mode==="people"&&<section className="mt-8">
           <h2 className="text-lg font-semibold">People directory</h2>
           <label className="mt-4 block max-w-sm text-sm font-semibold">
             Search
@@ -299,7 +303,7 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
               </ul>}
             </article>)}
           </div>}
-        </section>
+        </section>}
       </QueryState>
     </WorkspaceShell>
   );

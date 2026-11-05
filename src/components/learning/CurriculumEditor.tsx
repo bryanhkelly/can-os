@@ -9,9 +9,11 @@ import { curriculumReleaseReadiness } from "@/domain/curriculum-release-readines
 import type { ClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { PublisherTeacherGuideEditor } from "./PublisherTeacherGuideEditor";
 import { saveAuthoredCurriculum, publishAuthoredCurriculum, saveAuthoredLesson } from "@/modules/learning/curriculum-authoring.functions";
+import { useUnsavedChangesGuard } from "@/components/workspace/form-page";
 
-export function CurriculumEditor({programId,courseCode,release,onSaved}:{
+export function CurriculumEditor({programId,courseCode,release,onSaved,mode="combined"}:{
  programId:string;courseCode:string;
+ mode?:"combined"|"author"|"publish";
  release:{id:string;revision:string;content:ClassContent|null;teacherGuides?:ClassTeacherGuides|null};onSaved:()=>Promise<void>;
 }){
  const [content,setContent]=useState<ClassContent>(release.content??{version:1,syllabus:"",modules:[],resources:[]});
@@ -25,6 +27,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
  const saved=useRef(JSON.stringify(release.content??{version:1,syllabus:"",modules:[],resources:[]}));
  const guidesSaved=useRef(JSON.stringify(release.teacherGuides??null));
  const dirty=JSON.stringify(content)!==saved.current||JSON.stringify(teacherGuides)!==guidesSaved.current;
+ useUnsavedChangesGuard(mode==="author"&&dirty);
  const readiness=curriculumReleaseReadiness(content,teacherGuides,courseCode);
  const foundModuleIndex=content.modules.findIndex(module=>module.id===selectedModuleId);
  const activeModuleIndex=foundModuleIndex>=0?foundModuleIndex:0;
@@ -83,7 +86,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    existing classes and lesson progress keep their pinned version.</p>
   {error&&<p role="alert" className="rounded border p-3">{error}</p>}
   {notice&&<p role="status" className="rounded border p-3">{notice}</p>}
-  <fieldset disabled={busy} className="space-y-4">
+  {mode!=="publish"&&<><fieldset disabled={busy} className="space-y-4">
    <label className="block text-sm">Syllabus
     <textarea value={content.syllabus} maxLength={100000} rows={5} className="mt-1 block w-full rounded border bg-background p-2"
      onChange={event=>setContent({...content,syllabus:event.target.value})}/>
@@ -265,8 +268,8 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
     {dirty&&<span className="ml-3 text-sm">Unsaved changes</span>}</div>
   </fieldset>
   <fieldset disabled={busy}><PublisherTeacherGuideEditor courseCode={courseCode} content={content}
-   guides={teacherGuides} onChange={setTeacherGuides}/></fieldset>
-  <section className="space-y-3 rounded border p-4" aria-label="Publisher release readiness">
+    guides={teacherGuides} onChange={setTeacherGuides}/></fieldset></>}
+    {mode!=="author"&&<><section className="space-y-3 rounded border p-4" aria-label="Publisher release readiness">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 className="font-semibold">Publication readiness</h3>
@@ -307,6 +310,6 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    <Checkbox checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
   </Field>
   <Button type="submit" variant="outline" disabled={busy||dirty||!readiness.readyForPublisherPublication}>Publish curriculum release</Button>
-  </form>
+  </form></>}
  </section>;
 }

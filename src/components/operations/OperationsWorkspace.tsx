@@ -144,12 +144,12 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   subtitle="Review actions and launch readiness for an authorized school and program. Operational actions remain subject to their existing permissions."
   shortcuts={<>
    <DashboardShortcut title="Action queue" description={`${data.items.length} open actions in scope`} icon={<ClipboardList className="size-5" />}><a href="#operations-actions" /></DashboardShortcut>
-   <DashboardShortcut title="School launches" description="Review configuration and readiness" icon={<School className="size-5" />}><Link to="/operations/launch" search={{siteId:selected.siteId,programId:selected.programId}} /></DashboardShortcut>
+   <DashboardShortcut title="School launches" description="Review configuration and readiness" icon={<School className="size-5" />}><Link to="/launch/school" search={{siteId:selected.siteId,programId:selected.programId}} /></DashboardShortcut>
    <DashboardShortcut title="Curriculum" description="Your school's learning programs" icon={<BookOpen className="size-5" />}><Link to="/operations/curriculum" search={{siteId:selected.siteId,programId:selected.programId}} /></DashboardShortcut>
    <DashboardShortcut title="Calendar" description="Your authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
   </>}
   priority={attentionItems.some(item=>item.priority==="critical") ? <AttentionQueue items={attentionItems.filter(item=>item.priority==="critical")} /> : undefined}
-  actions={<div className="flex flex-wrap gap-2"><Link to="/operations/launch" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link><Link to="/operations/family-alerts" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Notify families</Link></div>}>
+  actions={<div className="flex flex-wrap gap-2"><Link to="/launch/school" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link><Link to="/operations/family-alerts" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Notify families</Link></div>}>
   {notice&&<p role="status" className="mb-4 rounded-xl border p-4 text-sm">{notice}</p>}
   <section aria-label="Operations filters" className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
    <h2 className="text-sm font-semibold">Filter operational records</h2>
@@ -233,7 +233,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     {commandCenterData.issues.length>0&&<div className="mt-5 divide-y rounded-2xl border bg-card">
       {commandCenterData.issues.map(issue=><article key={issue.kind+issue.sectionId} className="flex flex-wrap items-start justify-between gap-4 p-5">
         <div><h3 className="font-semibold">{issue.title}</h3><p className="mt-1 text-sm text-muted-foreground">{issue.description}</p></div>
-        <Link to="/operations/launch/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
+        <Link to="/launch/school/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
       </article>)}
     </div>}
   </section>}
@@ -248,7 +248,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     <div className="mt-4 space-y-2">
     {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
        <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
-       <Link className="mt-2 inline-block underline" to="/operations/launch/$programId"
+       <Link className="mt-2 inline-block underline" to="/launch/school/$programId"
         params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
      </div>)}
     {!commandCenterData.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
@@ -267,7 +267,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
       <div className="rounded-xl border-2 border-primary/30 p-5">
         <p className="font-semibold">Your school is not set up yet.</p>
         <p className="mt-1 text-sm text-muted-foreground">There are no academic school programs in this scope. Launch Mode creates the canonical Program and Launch Journey, then guides the remaining setup; it never authorizes opening by itself.</p>
-        <Link to="/operations/launch" search={{siteId:undefined,programId:undefined}}
+        <Link to="/launch/school" search={{siteId:undefined,programId:undefined}}
           className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
           Launch a school →
         </Link>
@@ -292,7 +292,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     {dashboardData.programs.map(program=><article key={program.id} className="rounded-xl border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
        <h3 className="font-semibold">{program.name} <span className="text-xs font-normal text-muted-foreground">· {program.status.replaceAll("_"," ")} · {program.type.replaceAll("_"," ")}</span></h3>
-       <Link className="text-sm underline" to="/operations/launch/$programId" params={{programId:program.id}} search={{siteId:undefined,programId:undefined}}>Review program →</Link>
+       <Link className="text-sm underline" to="/launch/school/$programId" params={{programId:program.id}} search={{siteId:undefined,programId:undefined}}>Review program →</Link>
       </div>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
        <div><dt className="text-xs text-muted-foreground">Curriculum &amp; teaching</dt>
@@ -332,7 +332,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    {!i.ownerPersonId&&" · Unassigned"}
   </p>
   <div className="mt-3 flex flex-wrap gap-3">{i.type==="section_creation_request"?i.programId?
-   <Link to="/operations/launch/$programId" params={{programId:i.programId}} className="text-sm underline">Review teacher class request in academic setup →</Link>:
+   <Link to="/launch/school/$programId" params={{programId:i.programId}} className="text-sm underline">Review teacher class request in academic setup →</Link>:
    <WorkspaceNotice tone="danger">This class request is missing its program. Contact your school administrator.</WorkspaceNotice>:
    i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><label className="flex items-center gap-2 text-xs">Assigned to
  <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={commandsBlocked} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>

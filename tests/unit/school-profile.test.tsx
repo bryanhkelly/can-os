@@ -63,7 +63,7 @@ describe("School profile", () => {
   it("links to the owning workflows instead of editing in place", () => {
     const html = render();
     expect(html).not.toContain("<form");
-    for (const href of ["/operations/launch", "/operations/school-years", "/sites/site-1/publish", "/sites/site-1/parent-information", "/sites/site-1"])
+    for (const href of ["/launch/school", "/operations/school-years", "/sites/site-1/publish", "/sites/site-1/parent-information", "/sites/site-1"])
       expect(html).toContain(`href="${href}"`);
     expect(html.match(/ bg-primary /g)).toBeNull();
   });

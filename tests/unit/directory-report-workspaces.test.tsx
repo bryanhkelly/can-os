@@ -297,6 +297,6 @@ describe("guardian academic access guidance", () => {
     expect(html).toContain("lists current admissions and enrollment steps by child and stage");
     expect(html).toContain("Family home and enrollment steps");
     expect(html).toContain('href="/messages"');
-    expect(html).not.toContain('href="/guardian/apply"');
+    expect(html).not.toContain('href="/launch/family"');
   });
 });

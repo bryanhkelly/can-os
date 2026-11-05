@@ -49,7 +49,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
  return <WorkspaceShell eyebrow="Family" title="Enrollment offers"
   subtitle="Review offers for students whose enrollment you are authorized to manage."
   breadcrumbs={<Link to="/home" className="underline">Family home</Link>}
-  actions={<Link to="/guardian/apply" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
+  actions={<Link to="/launch/family" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
   <div className="space-y-6">
   {student&&<Link to="/guardian/admission-offers" className="inline-block text-xs font-semibold underline">View offers for all children →</Link>}
   {!declineTarget&&<MutationFeedback state={mutation} pendingMessage="Saving offer response..."/>}
@@ -128,7 +128,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   {applications.length===0&&<div>
     <EmptyState title="No verified enrollment applications or offers are available for this family membership."
      description="A new family application may still be pending independent guardian verification. You can review applications submitted with your verified email sign-in."/>
-    <Link to="/guardian/apply" className="mt-3 inline-block rounded border px-3 py-2 text-sm font-semibold">
+    <Link to="/launch/family" className="mt-3 inline-block rounded border px-3 py-2 text-sm font-semibold">
       View or start my application →
     </Link>
   </div>}

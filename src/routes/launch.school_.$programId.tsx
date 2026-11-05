@@ -4,7 +4,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcademicSetupWorkspace";
 
-export const Route = createFileRoute("/operations/launch/$programId")({
+export const Route = createFileRoute("/launch/school_/$programId")({
   loader: ({ params }) => safeLoader(
     () => getLaunchAcademicSetup({ data: { programId: params.programId } }),
     { authMessage: "Sign in with a registrar grant for this program." },

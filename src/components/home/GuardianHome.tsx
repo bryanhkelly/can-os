@@ -137,7 +137,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <DashboardShortcut title="Family inbox" description="Conversations with your school" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
   </>}
   actions={<div className="flex flex-wrap gap-2">
-   <Link to="/guardian/apply" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
+   <Link to="/launch/family" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">
     Start a new school application
    </Link>
    <Link to="/guardian/enrichment" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">

@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { createAccessSession, withAuthenticatedPage } from "./helpers/authenticated-persona";
+import { expectWorkspaceRoute, expectWorkspaceShell } from "./helpers/workspace-assertions";
 import { createGf1Fixture, destroyGf1Fixture, type Gf1Fixture, type Sql } from "./fixture";
 import { DATABASE_URL } from "./env";
 import { insertFixtureId } from "./helpers/canonical-fixture";
@@ -68,6 +69,7 @@ for (const { persona: role, destination } of smokeManifest.authenticatedPersonas
       await expect(destinationLink).toBeVisible();
       await destinationLink.click();
       await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+      await expectWorkspaceShell(page);
       expect(errors).toEqual([]);
     });
   });
@@ -84,7 +86,34 @@ test(`${persona} opens its dynamic route`, async ({ browser }) => {
     const response = await page.goto(path);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+    await expectWorkspaceShell(page);
     expect(errors).toEqual([]);
   });
 });
 }
+
+for (const persona of ["student", "guardian", "teacher"] as const) {
+  test(`${persona} uses shared messages and calendar routes`, async ({ browser }) => {
+    const secret = roleSecrets[persona];
+    if (!secret || !fixture) throw new Error(`Missing ${persona} smoke fixture.`);
+    await withAuthenticatedPage(browser, secret, async ({ page }) => {
+      await expectWorkspaceRoute(page, "/messages", "Messages");
+      await expect(page.getByRole("heading", { name: "Conversations", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "New message" })).toBeVisible();
+
+      await expectWorkspaceRoute(page, "/calendar", "Calendar");
+      await expect(page.getByRole("navigation", { name: "Calendar view" })).toBeVisible();
+      await expect(page.getByLabel("Show")).toBeVisible();
+      const movableAssessments = page.locator('a[draggable="true"]');
+      if (persona === "teacher") {
+        await expect(movableAssessments.first()).toBeVisible();
+      } else {
+        await expect(movableAssessments).toHaveCount(0);
+      }
+      if (persona === "student") {
+        await expect(page.getByRole("link", { name: "Export deadlines (.ics)" })).toBeVisible();
+      }
+    });
+  });
+}
+

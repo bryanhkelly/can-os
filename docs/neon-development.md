@@ -4,6 +4,27 @@ CAN OS uses Neon PostgreSQL as the production system of record.
 
 ## Environments
 
+### November 5, 2026: authorized Launch Studio draft storage
+
+Owner approval explicitly targeted main/production. Management metadata and
+Postgres settings confirmed project `sweet-hall-62441909`, branch
+`br-restless-sea-ar9ooo55` (`main`), endpoint `ep-autumn-glade-ar9r1t5q`.
+Only `0075_launch_studio_drafts` was pending after `0074_omniscient_hulk`.
+Prior known migration hashes matched byte-for-byte or after LF normalization;
+the pre-existing additional historical ledger row was retained unchanged.
+
+A fresh production recovery copy, `br-icy-tooth-arpvfys8`, was retained.
+The exact migration was rehearsed there inside a rolled-back transaction.
+Synthetic-only fixtures verified four-audience draft roundtrips, active-grant
+isolation, unique ownership/context, optimistic revision conflicts, column/FK/index
+shape and complete schema/ledger/fixture rollback. No fixtures were run on main.
+
+The approved production transaction used bounded lock/statement timeouts and
+rechecked the ledger before applying only the new table, constraints, index and
+migration entry. A separate connection verified the applied entry and empty
+draft table. All prior ledger entries were preserved. This was not a deployment
+or authenticated browser acceptance; no other migrations were applied.
+
 The Neon primary production branch is named `main` (project
 `sweet-hall-62441909`, branch ID `br-restless-sea-ar9ooo55`). It remains the
 live production database; matching the Git branch name does not make it a

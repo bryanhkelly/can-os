@@ -13,7 +13,7 @@ import { getActiveWorkspacePath, workspaceLinks } from "./workspace-navigation.r
  */
 const member = { role: "site_admin", firstName: "Avery", lastName: "Admin", siteId: "east" };
 const sites = [{ id: "east", name: "East School" }];
-const path = "/operations/launch";
+const path = "/launch/school";
 
 function Shell({ children, demo = false }: { children: ReactNode; demo?: boolean }) {
   const links = workspaceLinks.site_admin;

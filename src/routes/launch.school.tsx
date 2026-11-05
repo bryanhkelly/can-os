@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { resolveLaunchResume } from "@/domain/launch-resume";
 import { LaunchWizardPage } from "@/components/operations/LaunchWizardPage";
 import { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
@@ -12,8 +12,12 @@ import { listLaunchJurisdictionResearch } from "@/modules/programs/jurisdiction-
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { supplementaryRead } from "@/lib/supplementary-read";
+import { schoolLaunchSearch } from "@/domain/launch-studio";
+import { getLaunchStudioDraft } from "@/modules/programs/launch-drafts.functions";
 
-export const Route = createFileRoute("/operations/launch/")({
+export const Route = createFileRoute("/launch/school")({
+  staleTime: Infinity,
+  validateSearch: (search: Record<string, unknown>) => schoolLaunchSearch.parse(search),
   loaderDeps: ({ search }) => ({ siteId: search.siteId, programId: search.programId }),
   loader: async ({ deps }) => {
     // Launch identity and canonical launch records are required; peripheral
@@ -30,22 +34,20 @@ export const Route = createFileRoute("/operations/launch/")({
       ["draft", "launching", "ready", "active"].includes(program.status));
     const selected = resolveLaunchResume(schools, deps).launch
       ?? resolveLaunchResume(launches.launches, deps).launch;
-    // Resolve the same school as the page before loading scoped dashboards.
-    // Redirect outside safeLoader so navigation is not treated as a failure.
-    if (!deps.programId && selected) {
-      throw redirect({ to: "/operations/launch", replace: true,
-        search: { siteId: selected.siteId ?? undefined, programId: selected.id } });
-    }
+    const scope = { siteId: deps.siteId ?? selected?.siteId ?? undefined,
+      programId: deps.programId ?? selected?.id };
     return safeLoader(async () => {
+      const draftContext = `${deps.siteId ?? ""}:${deps.programId ?? ""}`;
+      const draft = await getLaunchStudioDraft({ data: { audience: "school", context: draftContext } });
       const [familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch] = await Promise.all([
         supplementaryRead(() => listFamilyInvitations(), data => data.batches.length === 0),
-        supplementaryRead(() => getLaunchAdmissionsCounts({ data: deps }), data => data.total === 0),
-        supplementaryRead(() => getActiveEnrollmentCounts({ data: deps }), data => data.length === 0),
+        supplementaryRead(() => getLaunchAdmissionsCounts({ data: scope }), data => data.total === 0),
+        supplementaryRead(() => getActiveEnrollmentCounts({ data: scope }), data => data.length === 0),
         supplementaryRead(() => listExtendedSeasonPlanning(), data => Object.keys(data).length === 0),
         supplementaryRead(() => listPublishedJurisdictionGuidance(), data => Object.keys(data).length === 0),
         supplementaryRead(() => listLaunchJurisdictionResearch(), data => Object.keys(data).length === 0),
       ]);
-      return { options, launches, preparationPrograms,
+      return { options, launches, preparationPrograms, draft, draftContext,
         familyInvitations: familyInvitations.data, admissionsCounts: admissionsCounts.data,
         enrollmentCounts: enrollmentCounts.data, extendedPlanning: extendedPlanning.data,
         jurisdictionGuidance: jurisdictionGuidance.data ?? {}, jurisdictionResearch: jurisdictionResearch.data ?? {},
@@ -64,5 +66,5 @@ function LaunchPage() {
   if (!result.ok) {
     return <LoaderFailure title="Launch a school" eyebrow="Launch" outcome={result} />;
   }
-  return <LaunchWizardPage selection={selection} data={result.data} />;
+  return <LaunchWizardPage key={result.data.draftContext} selection={selection} data={result.data} />;
 }

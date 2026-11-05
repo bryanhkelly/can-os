@@ -36,7 +36,7 @@ const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readon
 };
 
 const schoolAdministrationLinks = [
-  { title: "Launch", path: "/operations/launch", icon: "building" },
+  { title: "Launch", path: "/launch/school", icon: "building" },
   { title: "Admissions", path: "/admissions", icon: "clipboard" },
   { title: "Students", path: "/staff/students", icon: "users" },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },

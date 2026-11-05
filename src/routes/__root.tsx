@@ -8,6 +8,7 @@ import {
   HeadContent,
   Outlet,
   Scripts,
+  useLocation,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -17,6 +18,8 @@ import {
 } from "@/lib/site-config";
 import appCss from "../styles.css?url";
 import { AccessReturnRecovery } from "@/lib/access-return-recovery";
+import { isLaunchStudioPath } from "@/domain/launch-studio";
+import { LaunchStudioChrome } from "@/components/launch-studio/LaunchStudioShell";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: ({ context }) => context.queryClient.fetchQuery(workspaceSessionQueryOptions()),
@@ -65,12 +68,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const session = Route.useLoaderData();
+  const standalone = useLocation({ select: location => isLaunchStudioPath(location.pathname) });
 
   return (
     <QueryClientProvider client={queryClient}>
       <WorkspaceSessionProvider initial={session}>
-        <WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation>
-        <CommandPalette />
+        {standalone
+          ? <LaunchStudioChrome><AccessReturnRecovery><Outlet /></AccessReturnRecovery></LaunchStudioChrome>
+          : <><WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation><CommandPalette /></>}
       </WorkspaceSessionProvider>
     </QueryClientProvider>
   );

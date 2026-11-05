@@ -49,13 +49,13 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
         {data.programs.map(program => <article key={program.id} className="rounded-2xl border bg-card p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="font-serif text-2xl"><Link to="/operations/launch/$programId" params={{programId:program.id}} search={{siteId:program.siteId??undefined,programId:undefined}} className="hover:underline">{program.name}</Link></h2>
+              <h2 className="font-serif text-2xl"><Link to="/launch/school/$programId" params={{programId:program.id}} search={{siteId:program.siteId??undefined,programId:undefined}} className="hover:underline">{program.name}</Link></h2>
               <p className="mt-1 text-xs capitalize text-muted-foreground">
                 {program.type.replaceAll("_"," ")} · {program.status}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link to="/operations/launch/$programId" params={{programId:program.id}}
+              <Link to="/launch/school/$programId" params={{programId:program.id}}
                 search={{siteId:undefined,programId:undefined}}
                 className="rounded-lg border px-3 py-2 text-xs font-semibold underline">
                 Open program setup

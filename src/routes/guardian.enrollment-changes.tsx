@@ -219,7 +219,7 @@ function GuardianEnrollmentChanges(){
           {busy?"Requesting…":"Email a secure receiving-school sign-in link"}
         </button>
       </>}
-      <Link to="/guardian/apply" className="inline-block font-semibold underline">
+      <Link to="/launch/family" className="inline-block font-semibold underline">
         Review existing school applications →
       </Link>
       {!destinations.length&&<p className="text-xs text-muted-foreground">No published CAN schools with an active application year are available. Contact the destination school's admissions office or use its official application website.</p>}

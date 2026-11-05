@@ -25,7 +25,7 @@ vi.mock("@tanstack/react-start",()=>({
  }),
 }));
 vi.mock("@tanstack/react-start/server",()=>({
-  getRequest:()=>new Request("https://app.can-os.com/guardian/apply"),
+  getRequest:()=>new Request("https://app.can-os.com/launch/family"),
   setResponseHeader:vi.fn(),
 }));
 vi.mock("@/modules/identity/command-context.server",()=>({

@@ -300,8 +300,8 @@ describe("launch portfolio", () => {
     const html = renderToStaticMarkup(<LaunchPortfolio launches={[launch]} sites={[]} siteId="school"/>);
     expect(html).toContain("0 of 1 recorded requirements complete");
     expect(html).toContain("Assign teachers");
-    expect(html).toContain('href="/operations/launch/program?siteId=school"');
-    expect(html).toContain('href="/operations/launch?siteId=school&amp;programId=program"');
+    expect(html).toContain('href="/launch/school/program?siteId=school"');
+    expect(html).toContain('href="/launch/school?siteId=school&amp;programId=program"');
     expect(html).toContain("Requirement status does not authorize opening");
     expect(html).not.toContain("0%)");
     expect(html).toContain("Review academic setup");

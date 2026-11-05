@@ -38,4 +38,23 @@ describe("access navigation", () => {
     expect(accessLandingPath("teacher", undefined, "/messages?thread=123"))
       .toBe("/messages?thread=123");
   });
+
+  it("sends a new school's registrar-authority sign-in to its launcher without a return path", () => {
+    expect(accessLandingPath("site_admin", "new-school-site"))
+      .toBe("/launch/school?siteId=new-school-site");
+  });
+
+  it.each(["/", "/home"])("prefers the school launcher over the generic %s destination", path => {
+    expect(accessLandingPath("site_admin", "new-school-site", path))
+      .toBe("/launch/school?siteId=new-school-site");
+  });
+
+  it("still honors a specific saved page over the school launcher", () => {
+    expect(accessLandingPath("site_admin", "new-school-site", "/operations/school-years"))
+      .toBe("/operations/school-years");
+  });
+
+  it("never sends a role without registrar authority to the launcher", () => {
+    expect(accessLandingPath("teacher", "new-school-site", "/home")).toBe("/home");
+  });
 });

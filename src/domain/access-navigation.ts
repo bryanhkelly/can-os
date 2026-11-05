@@ -29,11 +29,17 @@ export function accessReturnToFromLocation(location: { pathname: string; searchS
  return safeAccessReturnTo(`${location.pathname}${location.searchStr}${fragment}`);
 }
 
+/** Generic entry points that only lead to a default dashboard. A specific saved page still wins. */
+const genericReturnPaths=new Set(["/","/home"]);
+
 /** Fixed application destinations remain the fallback when no safe return path is supplied. */
 export function accessLandingPath(role: string, launchSiteId?: string, returnTo?: unknown): string {
  const safeReturnTo=safeAccessReturnTo(returnTo);
+ // A new school's first sign-in lands in its guided launcher, not a dashboard;
+ // the launcher itself offers a skip to the dashboard.
+ if(hasRegistrarAuthority(role)&&launchSiteId&&(!safeReturnTo||genericReturnPaths.has(safeReturnTo)))
+  return "/launch/school?siteId="+encodeURIComponent(launchSiteId);
  if(safeReturnTo)return safeReturnTo;
- if(hasRegistrarAuthority(role)&&launchSiteId)return "/operations/launch?siteId="+encodeURIComponent(launchSiteId);
  const home:Record<string,string>={student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/home",counselor:"/home"};
  return Object.hasOwn(home,role)?home[role]! : "/access";
 }

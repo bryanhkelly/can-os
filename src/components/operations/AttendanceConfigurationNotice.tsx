@@ -35,7 +35,7 @@ export function AttendanceConfigurationNotice({ programs, canConfigure, date }: 
           ? <Link to="/admissions/families" search={{ siteId: program.siteId, programId: program.id }}
               className="mt-2 inline-block font-semibold underline">Review enrollment readiness</Link>
           : configuration === "onsite_pattern_mismatch"
-          ? <Link to="/operations/launch/$programId" params={{ programId: program.id }}
+          ? <Link to="/launch/school/$programId" params={{ programId: program.id }}
               className="mt-2 inline-block font-semibold underline">Review Program delivery setup</Link>
           : <Link to="/operations/school-years" search={{ siteId: program.siteId, programId: program.id }}
               className="mt-2 inline-block font-semibold underline">Configure school calendar and schedule</Link>)}

@@ -13,6 +13,25 @@
     "identity-demo-accounts.sql"
   ],
   "routes": {
+    "/launch": {
+      "persona": "public",
+      "fixtureRequired": false,
+      "rationale": "Public Launch Studio entry contains presentation only and no school, household or person records."
+    },
+    "/launch/student": {
+      "persona": "student",
+      "seeds": ["class-participation.sql"],
+      "recordCounts": { "student_profiles": 1, "account_person_grants": 1 },
+      "interactions": ["restore private optional profile and course-choice draft", "save draft without submitting a registration request", "submit a canonical course request subject to school and guardian review"],
+      "downstreamRecords": ["launch_studio_drafts", "actions", "audit_events", "domain_events"]
+    },
+    "/launch/staff": {
+      "persona": "teacher or permitted local staff",
+      "seeds": ["synthetic-profiles-compliance.sql"],
+      "recordCounts": { "people": 1, "account_person_grants": 1 },
+      "interactions": ["review verified self identity", "save private preparation notes", "submit applicable qualification evidence through the ordinary profile service"],
+      "downstreamRecords": ["launch_studio_drafts", "audit_events", "domain_events"]
+    },
     "/operations/interest-events": {
       "persona": "site administrator or registrar",
       "fixtureRequired": false,
@@ -408,7 +427,7 @@
         "domainEvents:ActionCreated"
       ]
     },
-    "/operations/launch": {
+    "/launch/school": {
       "persona": "staff",
       "seeds": [
         "new-experiences-v1.sql"
@@ -837,7 +856,7 @@
         "study_group_memberships"
       ]
     },
-    "/operations/launch/$programId": {
+    "/launch/school/$programId": {
       "persona": "registrar",
       "seeds": [
         "new-experiences-v1.sql",
@@ -1262,7 +1281,7 @@
         "auditEvents:family.public_start.verify"
       ]
     },
-    "/guardian/apply": {
+    "/launch/family": {
       "persona": "guardian",
       "seeds": [
         "public-family-admissions-v1.sql",

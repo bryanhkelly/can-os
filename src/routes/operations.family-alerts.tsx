@@ -5,7 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspaceShell } from "@/components/workspace";
+import { CreateAction, WorkspaceShell, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -27,7 +27,7 @@ function SchoolFamilyAlertsPage(){
   title="School to family alerts" outcome={outcome}/>;
  return <Publisher data={outcome.data}/>;
 }
-function Publisher({data}:{data:Data}){
+export function Publisher({data,mode="history"}:{data:Data;mode?:"history"|"compose"}){
  const router=useRouter();
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
@@ -70,11 +70,13 @@ function Publisher({data}:{data:Data}){
    },
   );
  }
- return <WorkspaceShell eyebrow="School operations" title="Urgent family communications"
+ return <WorkspaceShell eyebrow="School operations" title={mode==="compose"?"Compose family notice":"Urgent family communications"}
   subtitle="Publish verified family notices through in-app notifications, school email and opt-in SMS. Provider acceptance is not evidence of inbox or phone delivery."
-  actions={<Link to="/home" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
+  breadcrumbs={mode==="compose"?<Link to="/operations/family-alerts" className="underline">Family notices</Link>:undefined}
+  actions={mode==="history"?<CreateAction><Link to="/operations/family-alerts/compose">Compose notice</Link></CreateAction>:
+   <Link to="/operations/family-alerts" className={secondaryActionClassName}>Published notices</Link>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family communication..."/>
-  <form noValidate onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
+  {mode==="compose"&&<form noValidate onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4">
    <h2 className="text-lg font-semibold">Compose a school notice</h2>
    <Field label="School Program" required error={attempted&&!programId?"Choose a Program.":undefined}>
     <Select value={programId} onChange={e=>{setProgramId(e.target.value);clearPending();}}>
@@ -103,8 +105,8 @@ function Publisher({data}:{data:Data}){
   <Button type="submit" disabled={busy}>
     {busy?"Publishing…":"Publish to currently enrolled families"}
   </Button>
-  </form>
-  <section className="mt-8 space-y-3">
+  </form>}
+  {mode==="history"&&<section className="mt-8 space-y-3">
    <h2 className="text-lg font-semibold">Recent published notices</h2>
    {data.items.map(item=><article key={item.id} className="rounded-lg border bg-card p-4">
     <p className="font-semibold">{item.title}</p>
@@ -119,7 +121,7 @@ function Publisher({data}:{data:Data}){
     <p className="mt-2 text-xs text-muted-foreground">Accepted does not mean delivered, read or acknowledged. Urgent safety incidents require direct follow-up.</p>
    </article>)}
    {!data.items.length&&<p className="rounded-lg border p-4 text-sm">No published family notices in your authorized schools.</p>}
-  </section>
+  </section>}
  </WorkspaceShell>;
 }
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";

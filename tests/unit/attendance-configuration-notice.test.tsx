@@ -35,7 +35,7 @@ describe("attendance setup handoff", () => {
   it("directs enrollment and delivery-pattern problems to their actual owners", () => {
     expect(render("no_active_enrollments")).toContain('href="/admissions/families?siteId=school&amp;programId=program"');
     expect(render("no_active_enrollments")).toContain("Creating a calendar does not enroll students");
-    expect(render("onsite_pattern_mismatch")).toContain('href="/operations/launch/program"');
+    expect(render("onsite_pattern_mismatch")).toContain('href="/launch/school/program"');
     expect(render("onsite_pattern_mismatch")).not.toContain("/operations/school-years");
   });
   it("tells teachers who must act without suggesting they have registrar authority", () => {

@@ -18,8 +18,11 @@ import {buildLaunchGuidance, launchResponsibility} from "@/domain/launch-guidanc
 import {launchSiteSelectionIssue} from "@/domain/launch-site-selection";
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { useEffect, useState } from "react";
+import { LaunchStudioShell, JourneyWelcome } from "@/components/launch-studio/LaunchStudioShell";
+import { LaunchDraftButton } from "@/components/launch-studio/LaunchDraftButton";
+import { schoolLaunchSteps, launchRequirementProgress } from "@/domain/launch-studio";
+import type { LaunchDraftRecord } from "@/domain/launch-draft";
+import { useState } from "react";
 import { hasEnteredSiteAddress, physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
 import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
@@ -39,6 +42,8 @@ import {
 } from "@/modules/programs/launch.functions";
 
 export type LaunchWizardData = {
+ draft?: LaunchDraftRecord | null;
+ draftContext?: string;
  reads?: LaunchReadStates;
  options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
  launches: Awaited<ReturnType<typeof listLaunches>> | null;
@@ -52,9 +57,15 @@ export type LaunchWizardData = {
  authError: string;
 };
 
-export function LaunchWizardPage({ selection, data }: { selection: {siteId?: string;programId?: string}; data: LaunchWizardData }) {
+export function LaunchWizardPage({ selection, data }: { selection: {siteId?: string;programId?: string;step?: (typeof schoolLaunchSteps)[number]}; data: LaunchWizardData }) {
 
   const { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch, authError } = data;
+  const draft = data.draft?.value.audience === "school" ? data.draft.value.fields : undefined;
+  const step = selection.step ?? "welcome";
+  const initialProgram = selection.programId
+    ? [...(launches?.launches ?? []), ...(preparationPrograms ?? [])].find(item => item.id === selection.programId)
+    : undefined;
+  const initialSiteId = selection.siteId ?? initialProgram?.siteId ?? draft?.siteId ?? "";
   const router = useRouter();
   const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input), invalidateRouter: () => router.invalidate() });
   const contactMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteContact>[0])=>updateLaunchSiteContact(input),invalidateRouter:()=>router.invalidate()});
@@ -66,46 +77,31 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>(
-    options?.schoolSetupAdministrator && options.organizations[0]?.type !== "church" ? "full_school" : "church_hosted_academy");
-  const [summerCreditBearing, setSummerCreditBearing] = useState(false);
+    draft?.type ?? (options?.schoolSetupAdministrator && options.organizations[0]?.type !== "church" ? "full_school" : "church_hosted_academy"));
+  const [summerCreditBearing, setSummerCreditBearing] = useState(draft?.summerCreditBearing ?? false);
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
-  const [name, setName] = useState("");
-  const [targetOpeningDate, setTargetOpeningDate] = useState(() => suggestedSchoolYear().startsOn);
-  const [slug, setSlug] = useState("");
-  const [slugEdited, setSlugEdited] = useState(false);
-  const [gradeMin, setGradeMin] = useState("K");
-  const [gradeMax, setGradeMax] = useState("12");
-  const [onsite, setOnsite] = useState(true);
-  const [asynchronous, setAsynchronous] = useState(false);
-  const [liveOnline, setLiveOnline] = useState(false);
-  const [onsiteDaysPerWeek, setOnsiteDaysPerWeek] = useState("5");
-  const [hostOrganizationId, setHostOrganizationId] = useState("");
-  const [jurisdictionId, setJurisdictionId] = useState("");
-  const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
-  const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
-  const [siteId, setSiteId] = useState(selection.siteId??"");
-  const [newSiteName,setNewSiteName]=useState("");
+  const [name, setName] = useState(draft?.name ?? "");
+  const [targetOpeningDate, setTargetOpeningDate] = useState(() => draft?.targetOpeningDate ?? suggestedSchoolYear().startsOn);
+  const [slug, setSlug] = useState(draft?.slug ?? "");
+  const [slugEdited, setSlugEdited] = useState(Boolean(draft?.slug));
+  const [gradeMin, setGradeMin] = useState(draft?.gradeMin ?? "K");
+  const [gradeMax, setGradeMax] = useState(draft?.gradeMax ?? "12");
+  const [onsite, setOnsite] = useState(draft?.onsite ?? true);
+  const [asynchronous, setAsynchronous] = useState(draft?.asynchronous ?? false);
+  const [liveOnline, setLiveOnline] = useState(draft?.liveOnline ?? false);
+  const [onsiteDaysPerWeek, setOnsiteDaysPerWeek] = useState(draft?.onsiteDaysPerWeek ?? "5");
+  const [hostOrganizationId, setHostOrganizationId] = useState(
+    options?.sites.find(site => site.id === initialSiteId)?.organizationId ?? draft?.hostOrganizationId ?? "");
+  const [jurisdictionId, setJurisdictionId] = useState(draft?.jurisdictionId ?? "");
+  const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState(draft?.academicProviderOrganizationId ?? "");
+  const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState(draft?.creditIssuingOrganizationId ?? "");
+  const [siteId, setSiteId] = useState(initialSiteId);
+  const [newSiteName,setNewSiteName]=useState(draft?.newSiteName ?? "");
   const [createdSiteDraft,setCreatedSiteDraft]=useState<SavedLaunchSiteDraft|null>(null);
-  const [newSiteSlug,setNewSiteSlug]=useState("");
-  const [newSiteTimezone,setNewSiteTimezone]=useState("");
-  useEffect(()=>{
-    // Resume by exact Program when URL contains only programId; never carry a
-    // different school Site forward from the previous screen.
-    const program=selection.programId
-      ? [...(launches?.launches??[]),...(preparationPrograms??[])]
-          .find(item=>item.id===selection.programId) : undefined;
-    const nextSiteId=selection.siteId??program?.siteId??"";
-    setSiteId(nextSiteId);
-    const selected=options?.sites.find(site=>site.id===nextSiteId);
-    if(selected)setHostOrganizationId(selected.organizationId);
-    setCreated(null);
-    setCreatedSiteDraft(null);
-    setName("");
-    setSlug("");
-    setSlugEdited(false);
-  },[selection.siteId,selection.programId]);
+  const [newSiteSlug,setNewSiteSlug]=useState(draft?.newSiteSlug ?? "");
+  const [newSiteTimezone,setNewSiteTimezone]=useState(draft?.newSiteTimezone ?? "");
   const emptySiteAddress: LaunchSiteAddressDraft = {street1:"",street2:"",city:"",state:"",postalCode:"",country:"US",county:""};
-  const [newSiteAddress,setNewSiteAddress]=useState<LaunchSiteAddressDraft>(emptySiteAddress);
+  const [newSiteAddress,setNewSiteAddress]=useState<LaunchSiteAddressDraft>(draft?.newSiteAddress ?? emptySiteAddress);
   async function retrySiteRefresh(){
     const outcome=await siteMutation.retryRefresh();
     if(outcome.status==="refreshed")setError("");
@@ -256,8 +252,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
       try {
         await router.navigate({
-          to: "/operations/launch",
-          search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId },
+          to: "/launch/school",
+          search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId, step: "academics" },
         });
       } catch {
         // startLaunch already committed. Keep the handoff with canonical IDs.
@@ -295,7 +291,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     </p>
     <div className="mt-4 flex flex-wrap gap-4 text-sm">
       <Link to="/home" className="underline">Return to Operations</Link>
-      <Link to="/operations/launch" search={{}} className="underline">Start a new school setup</Link>
+      <Link to="/launch/school" search={{}} className="underline">Start a new school setup</Link>
     </div>
   </WorkspaceShell>;
   const currentLaunch=resolveLaunchResume(launches.launches,selection).launch;
@@ -350,23 +346,38 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           : awaitingCan ? " A submitted requirement awaits institutional review; the school cannot approve it."
           : " Responsible: "+launchResponsibility(nextTask.state)+".")
       : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
-  const nextHref = needsSchoolChoice ? "#school-preparation-selection"
-    : !currentProgram ? "#new-school-launch"
-    : !currentLaunch ? "#launch-website"
-    : "#launch-requirements";
+  function changeStep(id: string) {
+    const next = schoolLaunchSteps.find(item => item === id);
+    if (next) void router.navigate({ to: "/launch/school", search: { ...selection, step: next } });
+  }
+  const titles = { welcome: "Let's build your school.", school: "Your school, your foundation.",
+    academics: "Prepare your academic year.", website: "Introduce your school.",
+    families: "Welcome your families.", readiness: "Review what remains.", next: "Your next beginning." };
 
   return (
-    <WorkspaceShell width="wide" eyebrow="Program launch" title="Open Your School"
-      subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
-      breadcrumbs={<><Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
-      actions={<Button asChild variant="outline" size="sm"><Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}}>Connected workflows</Link></Button>}>
-        <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
-        {data.reads && <section aria-label="Launch data availability" className="mt-4 border p-4 text-sm">
+    <LaunchStudioShell role="School setup" subject={currentProgram?.name ?? "Your school"}
+      title={titles[step]} description="One school, connected records, independent approvals."
+      steps={schoolLaunchSteps.map(id => ({ id, title: { welcome: "Welcome", school: "School details",
+        academics: "Academics", website: "School website", families: "Families & staff",
+        readiness: "Readiness review", next: "What's next" }[id] }))}
+      currentId={step} onStepChange={changeStep}
+      progress={currentLaunch && readinessAvailable ? launchRequirementProgress(currentLaunch.requirements) : undefined}
+      actions={<>
+        <Button type="button" variant="outline" disabled={step === "welcome"}
+          onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) - 1]!)}>Back</Button>
+        {step !== "next" && <Button type="button" onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) + 1]!)}>
+          {step === "welcome" ? "Let's get started" : "Continue"}</Button>}
+      </>}
+      exit={<Link to="/home" search={schoolSelection} className="underline">Skip to dashboard</Link>}>
+        {step === "welcome" && <JourneyWelcome summary="Bring your school to life, one clear step at a time. Your Site, academic Program, website and family applications stay connected."
+          requirements={["Your school location and time zone", "Your academic model, grade range and intended opening date", "The people who will help prepare your school"]}
+          outcome="Save preparation now and return later. CAN services, publication, admissions and legal opening each retain their own review." />}
+        {data.reads && <details aria-label="Launch data availability" className="mt-4 border p-4 text-sm"><summary>School information availability</summary>
           {Object.entries(data.reads).map(([name, state]) => <p key={name} role={state === "unavailable" || state === "unauthorized" ? "status" : undefined}>
             {name.replace(/([A-Z])/g, " $1")}: {state === "empty" ? "No records" : state === "ready" ? "Available" : state === "unauthorized" ? "Not authorized" : "Unavailable"}
           </p>)}
           {!readinessAvailable && <Button type="button" variant="ghost" className="mt-2 underline" onClick={() => void router.invalidate()}>Retry launch information</Button>}
-        </section>}
+        </details>}
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
@@ -390,8 +401,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
         </Button>}
-        <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId??undefined,programId:school.id}})}/>
-        <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
+        <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/launch/school",search:{siteId:school.siteId??undefined,programId:school.id,step}})}/>
+        {(step === "welcome" || step === "readiness" || step === "next") && <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
           <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p>
@@ -404,44 +415,50 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
               ? <Link to="/home" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
                   className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
               : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.requiresRegistrarReview
-                ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
+                ? <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review evidence requirement</Link>
               : currentLaunch && pendingSchoolAction && !awaitingCan && !openingReview && nextTask?.action==="admissions"
                 ? <Link to="/admissions/intake" search={{siteId:currentLaunch.siteId??undefined,programId:currentLaunch.id}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review authorized family intake</Link>
               : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.action==="orientation"
-                ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
+                ? <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Complete orientation setup</Link>
               : currentLaunch && pendingSchoolAction && !awaitingCan && !openingReview && nextTask?.action==="academics"
-                ? <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}}
+                ? <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
                     className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Continue academic preparation</Link>
-              : <a href={nextHref??"#launch-services"}
-                  className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+              : <Button type="button" onClick={() => changeStep(!currentProgram ? "school" : "readiness")}>
                   {needsSchoolChoice?"Choose a saved school":!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":needsEvidenceCorrection?"Review requested correction":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
-                </a>}
-            {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#launch-website" className="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 text-sm font-semibold">Prepare website in parallel</a>}
-            {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <a href="#invite-families" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Family outreach</a>}
+                </Button>}
+            {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <Button variant="outline" onClick={() => changeStep("website")}>Prepare website in parallel</Button>}
+            {currentLaunch && !isExtendedLearningType(currentLaunch.type) && <Button variant="ghost" onClick={() => changeStep("families")}>Family outreach</Button>}
           </div>
           {(awaitingCan || waitingExternal) && <p className="mt-3 text-xs text-muted-foreground">
             This requirement is not a school-owned approval. Continue permitted preparation while the responsible reviewer or external party acts.
           </p>}
           <p className="mt-3 text-xs text-muted-foreground">This guidance reflects saved Journey requirements, not a live authorization decision. The server separately checks whether the school may open.</p>
-        </section>
-        <LaunchPreparationWorkspace currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
-        <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
+        </section>}
+        <LaunchPreparationWorkspace focus={step} currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
+        {step === "next" && <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
           <p className="mt-3 text-sm text-muted-foreground">Continue a saved launch in the guided view, or open its academic setup. Journey requirements remain the canonical source; this summary does not duplicate or grant opening approval.</p>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
-        </details>
+        </details>}
+        <div hidden={step !== "school"}>
         <div className="mt-8 grid gap-6">
+          <LaunchDraftButton key={data.draftContext} selection={{ audience: "school", context: data.draftContext ?? ":" }}
+            initial={data.draft ?? null} disabled={busy || Boolean(created)}
+            value={() => ({ audience: "school", fields: { type, summerCreditBearing, name, targetOpeningDate,
+              slug, gradeMin, gradeMax, onsite, asynchronous, liveOnline, onsiteDaysPerWeek,
+              hostOrganizationId, jurisdictionId, academicProviderOrganizationId, creditIssuingOrganizationId,
+              siteId, newSiteName, newSiteSlug, newSiteTimezone, newSiteAddress } })} />
           <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
           <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
            {extendedPlanning?<ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId}/>:<p role="status" className="mt-3 text-sm">Additional program planning is temporarily unavailable. You can continue setting up your school.</p>}
           </details>
-        </div>
-    </WorkspaceShell>
+        </div></div>
+    </LaunchStudioShell>
   );
 }

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import { Route } from "@/routes/operations.launch.$programId";
+import { Route } from "@/routes/launch.school_.$programId";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
 
 const state = vi.hoisted(() => ({ data: null as unknown }));

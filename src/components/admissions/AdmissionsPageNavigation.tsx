@@ -12,7 +12,7 @@ export function AdmissionsPageNavigation({selection,hasMore,kind}:{
 }){
  const field=kind==="students"?"studentPage":"page";
  const current=selection[field]??1;
- const destination="/admissions/intake" as const;
+ const destination=kind==="students"?"/admissions/intake/new":"/admissions/intake";
  return <PageNavigation label={kind==="students"?"Existing student directory pages":"Admissions record pages"}
   className="my-3"
   previous={current>1&&<Link to={destination} search={{...selection,[field]:current-1}} className="underline">

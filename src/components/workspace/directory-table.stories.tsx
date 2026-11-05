@@ -2,7 +2,12 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
-import { DirectoryTable, type DirectorySort } from "./directory-table";
+import { LayoutGrid, List } from "lucide-react";
+import { DirectoryPage, DirectoryTable, type DirectorySort } from "./directory-table";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { EmptyState } from "./empty-state";
+import { CreateAction } from "./create-action";
 import { PageNavigation } from "./page-navigation";
 
 const meta = {
@@ -66,3 +71,24 @@ export const ErrorWithRetry: Story = {
   },
 };
 export const DarkDirectory: Story = { globals: { theme: "dark" }, render: () => <Example/> };
+
+function PageExample() {
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState("table");
+  const [filter, setFilter] = useState("all");
+  const rows = fixtures.filter(row => row.name.toLowerCase().includes(query.toLowerCase()) && (filter === "all" || row.students >= 20));
+  const empty = <EmptyState kind="matches" actions={<Button variant="outline" onClick={() => { setQuery(""); setFilter("all"); }}>Clear filters</Button>}/>;
+  return <DirectoryPage title="Teacher directory" query={query} onQueryChange={setQuery}
+    actions={<CreateAction><a href="#invite">Invite teacher</a></CreateAction>}
+    filters={<Field label="Roster size"><Select value={filter} onChange={event => setFilter(event.target.value)}>
+      <option value="all">All rosters</option><option value="large">20 or more students</option>
+    </Select></Field>}
+    view={view} onViewChange={setView} views={[{ value: "table", label: "Table view", icon: <List/> }, { value: "grid", label: "Grid view", icon: <LayoutGrid/> }]}>
+    {view === "table" ? <DirectoryTable label="Teachers" caption="Isolated example records." rows={rows} rowKey={row => row.id} empty={empty}
+      columns={[{ id: "name", title: "Teacher", render: row => row.name }, { id: "students", title: "Students", render: row => row.students }]}/>
+      : rows.length ? <div className="mt-6 grid gap-4 sm:grid-cols-2">{rows.map(row => <article key={row.id} className="min-w-0 border p-4"><h2>{row.name}</h2><p>{row.students} students</p></article>)}</div> : empty}
+  </DirectoryPage>;
+}
+export const DirectoryComposition: Story = { render: () => <PageExample/> };
+export const NoRecords: Story = { render: () => <EmptyState kind="records" actions={<Button variant="outline">Create first record</Button>}/> };
+export const NoMatches: Story = { render: () => <EmptyState kind="matches" actions={<Button variant="outline">Clear filters</Button>}/> };

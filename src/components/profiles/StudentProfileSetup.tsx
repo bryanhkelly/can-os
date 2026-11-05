@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { getStudentSelfProfile, saveStudentSelfProfile } from "@/modules/profiles/student-self-profile.functions";
 
 type Snapshot = Awaited<ReturnType<typeof getStudentSelfProfile>>;
+export type StudentProfileFields = { preferredName: string; pronouns: string; interests: string };
 
 export function StudentProfileSetup() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -40,13 +41,20 @@ export function StudentProfileSetup() {
   </section>;
 }
 
-export function StudentProfileEditor({ snapshot, changed }: {
+export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange }: {
   snapshot: Snapshot;
   changed: () => Promise<void>;
+  fields?: StudentProfileFields;
+  onFieldsChange?: (fields: StudentProfileFields) => void;
 }) {
-  const [preferredName, setPreferredName] = useState(snapshot.preferredName);
-  const [pronouns, setPronouns] = useState(snapshot.preferredPronouns);
-  const [interests, setInterests] = useState(snapshot.interests.join(", "));
+  const [localFields, setLocalFields] = useState({ preferredName: snapshot.preferredName,
+    pronouns: snapshot.preferredPronouns, interests: snapshot.interests.join(", ") });
+  const { preferredName, pronouns, interests } = fields ?? localFields;
+  function update(patch: Partial<StudentProfileFields>) {
+    const next = { ...(fields ?? localFields), ...patch };
+    if (onFieldsChange) onFieldsChange(next);
+    else setLocalFields(next);
+  }
   const mutation = useMutationFeedback(changed);
 
   async function save() {
@@ -68,10 +76,10 @@ export function StudentProfileEditor({ snapshot, changed }: {
     <MutationFeedback state={mutation} pendingMessage="Saving student profile..." />
     <fieldset disabled={mutation.pending || mutation.refreshFailed} className="grid gap-3 sm:grid-cols-2">
       <legend className="sr-only">Student profile setup</legend>
-      <Field label="Preferred name (optional)" className="text-sm"><Input maxLength={80} value={preferredName} onChange={event => setPreferredName(event.target.value)}/></Field>
-      <Field label="Pronouns (optional)" className="text-sm"><Input maxLength={60} value={pronouns} onChange={event => setPronouns(event.target.value)}/></Field>
+      <Field label="Preferred name (optional)" className="text-sm"><Input maxLength={80} value={preferredName} onChange={event => update({ preferredName: event.target.value })}/></Field>
+      <Field label="Pronouns (optional)" className="text-sm"><Input maxLength={60} value={pronouns} onChange={event => update({ pronouns: event.target.value })}/></Field>
       <Field label="Interests or hobbies (optional)" className="text-sm sm:col-span-2">
-        <Input maxLength={700} placeholder="For example: drawing, soccer, robotics" value={interests} onChange={event => setInterests(event.target.value)}/>
+        <Input maxLength={700} placeholder="For example: drawing, soccer, robotics" value={interests} onChange={event => update({ interests: event.target.value })}/>
       </Field>
     </fieldset>
     <p className="text-xs text-muted-foreground">Add or change your profile picture above. Your school manages your legal identity, grade, enrollment, and access.</p>

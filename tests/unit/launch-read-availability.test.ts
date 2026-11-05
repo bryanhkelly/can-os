@@ -11,7 +11,8 @@ vi.mock("@/modules/enrollment/admissions-dashboard.functions", () => ({ getActiv
 vi.mock("@/modules/activities/extended-learning.functions", () => ({ listExtendedSeasonPlanning: state.extended }));
 vi.mock("@/modules/programs/jurisdiction-profile.functions", () => ({ listPublishedJurisdictionGuidance: state.guidance }));
 vi.mock("@/modules/programs/jurisdiction-launch-research.functions", () => ({ listLaunchJurisdictionResearch: state.research }));
-import { Route } from "@/routes/operations.launch.index";
+vi.mock("@/modules/programs/launch-drafts.functions", () => ({ getLaunchStudioDraft: async () => null }));
+import { Route } from "@/routes/launch.school";
 import { launchMilestoneAvailable } from "@/lib/supplementary-read";
 
 const load = () => (Route.options.loader as (input: unknown) => Promise<any>)({ deps: { siteId: "school", programId: "program" } });

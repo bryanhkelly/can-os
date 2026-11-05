@@ -32,7 +32,7 @@ describe("launch-to-operations handoff", () => {
   });
 
   it("does not treat an inactive program as operating", () => {
-    expect(activeProgramOperationsHref({ programId: "p", siteId: "s", status: "draft" })).toBe("/operations/launch/p");
+    expect(activeProgramOperationsHref({ programId: "p", siteId: "s", status: "draft" })).toBe("/launch/school/p");
   });
 
   it("encodes site identifiers in destination URLs", () => {

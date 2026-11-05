@@ -19,9 +19,9 @@ export function LaunchCreatedHandoff({created}:{created:LaunchCreatedResult|null
               <p className="font-semibold">Your school has been saved.</p>
               <p className="mt-1">Continue with your academic year, first classroom, school website and family invitations. Your progress is saved as you go.</p>
               <nav aria-label="Next steps for your new program" className="mt-4 flex flex-wrap gap-3">
-                <Link to="/operations/launch" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                <Link to="/launch/school" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
                   hash="launch-academic-year" className="rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">Continue school setup →</Link>
-                <Link to="/operations/launch" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                <Link to="/launch/school" search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
                   hash="invite-families" className="rounded-lg border px-4 py-3 text-sm font-semibold">Invite families →</Link>
               </nav>
               <p className="mt-3 text-xs text-muted-foreground">These are planning actions, not authorization to open. Institutional agreements, academic readiness and child safety must still be independently approved before active enrollment or onsite attendance.</p>

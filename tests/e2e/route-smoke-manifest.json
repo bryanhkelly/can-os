@@ -11,7 +11,7 @@
     "/teacher/gradebook", "/teacher/missing-work", "/teacher/discussions",
     "/guardian/academics", "/guardian/attendance", "/guardian/admission-offers",
     "/classes", "/sites", "/calendar", "/messages", "/notifications",
-    "/operations/curriculum", "/operations/launch", "/admissions",
+    "/operations/curriculum", "/launch/school", "/admissions",
     "/staff/students", "/profiles", "/account/sessions"
   ],
   "authenticatedPersonas": [

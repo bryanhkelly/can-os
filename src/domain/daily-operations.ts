@@ -158,7 +158,7 @@ export function buildDailyOperationsAttention(input: {
       category: "staffing",
       title: issue.title,
       detail: issue.description,
-      href: "/operations/launch/" + encodeURIComponent(issue.programId),
+      href: "/launch/school/" + encodeURIComponent(issue.programId),
       nextStep: issue.kind === "waitlist" ? "Review the section waitlist" : "Review staffing and capacity",
       ownerName: null,
       dueAt: null,

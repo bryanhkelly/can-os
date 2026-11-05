@@ -7,7 +7,9 @@ import {useState} from "react";
 import { prepareLaunchAcademicYear } from "@/modules/programs/launch-year-preparation.functions";
 import {Link,useRouter} from "@tanstack/react-router";
 import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,setLaunchSectionCredits,declineLaunchClassRequest} from "@/modules/programs/launch-academics.functions";
-import {WorkspaceNotice,WorkspaceShell} from "@/components/workspace";
+import {WorkspaceNotice} from "@/components/workspace";
+import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
+import { schoolLaunchSteps } from "@/domain/launch-studio";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import { LocalSiteDelegationPanel } from "@/components/operations/LocalSiteDelegationPanel";
@@ -64,10 +66,16 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    setNotice(message);
   }catch(e){setError(mutationErrorMessage(e, "Unable to save launch setup"));}
  }
- return <WorkspaceShell eyebrow="School launch" title={data.program.name+" · academic setup"}
-  subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
+ return <LaunchStudioShell role="School setup" subject={data.program.name} title="Prepare your classrooms."
+  description="Turn saved plans into school-year dates, published course content and assigned instructors."
+  steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
+  currentId="academics" onStepChange={id=>{
+    const step=schoolLaunchSteps.find(item=>item===id);
+    if(step)void router.navigate({to:"/launch/school",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
+  }}
+  exit={<Link to="/home" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Skip to dashboard</Link>}
   actions={<Button asChild variant="outline" size="sm">
-   <Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
+   <Link to="/launch/school" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
   </Button>}>
   {error&&<WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<Button type="button" variant="outline" className="mt-3"
@@ -281,7 +289,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
      <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Set enrollment policies</Link>
     </Button>
     <Button asChild variant="outline" size="sm">
-     <Link to="/operations/launch" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Return to launch checklist</Link>
+     <Link to="/launch/school" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Return to launch checklist</Link>
     </Button>
    </div>
   </div>}
@@ -312,5 +320,5 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     programId={data.program.id} onChanged={async()=>{await router.invalidate();}}/>}
   </section>
   <SectionLifecycleWorkspace programId={data.program.id} staff={data.teachingStaff}/>
- </WorkspaceShell>;
+ </LaunchStudioShell>;
 }

@@ -87,7 +87,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
                 The registrar must then use that release for this class. Publishing a newer release alone does not update the class's pinned version.</p>
               <div className="mt-2 flex flex-wrap gap-3">
                 <Link to="/operations/curriculum" search={{ programId: request.programId }} className="font-semibold underline">Review curriculum releases</Link>
-                <Link to="/operations/launch/$programId" params={{ programId: request.programId }} className="font-semibold underline">Review class setup</Link>
+                <Link to="/launch/school/$programId" params={{ programId: request.programId }} className="font-semibold underline">Review class setup</Link>
               </div>
             </div>}
             <p className="mt-3 text-sm text-muted-foreground">

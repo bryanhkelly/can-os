@@ -26,12 +26,12 @@ describe("generated workspace navigation", () => {
   it("assigns explicit nested operations journeys to administrator destinations", () => {
     for (const path of [
       "/operations/interest-events",
-      "/operations/launch/00000000-0000-4000-8000-000000000001",
+      "/launch/school/00000000-0000-4000-8000-000000000001",
       "/operations/school-years/00000000-0000-4000-8000-000000000001",
       "/operations/school-years/new",
     ]) {
-      const owner = path.startsWith("/operations/launch") || path === "/operations/interest-events"
-        ? "/operations/launch"
+      const owner = path.startsWith("/launch/school") || path === "/operations/interest-events"
+        ? "/launch/school"
         : path.startsWith("/operations/school-years") ? "/operations/school-years" : "/home";
       expect(getActiveWorkspacePath(workspaceLinks.site_admin, path)).toBe(owner);
       expect(getActiveWorkspacePath(workspaceLinks.registrar, path)).toBe(owner);

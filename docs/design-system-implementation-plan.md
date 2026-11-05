@@ -25,9 +25,9 @@ The current student route is `/student`, rendering `StudentExperience` from cano
 | Experience | Primary routes and components | Existing behavior to preserve |
 |---|---|---|
 | Student | `/student`, `/student/assignments`, `/student/courses`, `/student/experiences`, `/student/support`; `StudentExperience` | Today read model, assignment selection, class/lesson access, support Action links, calendar context. |
-| Parent / guardian | `/guardian`, `/guardian/apply`, `/guardian/admission-offers`, academics, attendance, course approvals, field trips, enrichment, conferences | Family Needs You prioritization, child context, verified relationships, application-to-enrollment distinction, document and signature review gates. |
+| Parent / guardian | `/guardian`, `/launch/family`, `/guardian/admission-offers`, academics, attendance, course approvals, field trips, enrichment, conferences | Family Needs You prioritization, child context, verified relationships, application-to-enrollment distinction, document and signature review gates. |
 | Teacher | `/teacher`, `/classes`, `/teacher/gradebook`, `/teacher/missing-work`, discussions, conferences | Section scope, grading and missing-work queues, learning evidence, follow-ups, conference commands. |
-| Church / site operator | `/site/day`, `/sites/$siteId`, scoped `/operations`, `/operations/launch`, `/sites/$siteId/publish` | Expected onsite roster, observed attendance, correction reasons, site handoffs, delegated local operations, supervised-day controls. |
+| Church / site operator | `/site/day`, `/sites/$siteId`, scoped `/operations`, `/launch/school`, `/sites/$siteId/publish` | Expected onsite roster, observed attendance, correction reasons, site handoffs, delegated local operations, supervised-day controls. |
 | Institutional administration | Registrar `/operations`, `/admissions`, `/admin`; CAN steward `/network-steward`; network partner `/network` | Scoped administration, independent operating/opening approval, contracts, affiliation decisions, staff grants, audit and tenant boundaries. |
 
 These are role-aware views over one identity and data model, not separate portals or security boundaries.
@@ -37,12 +37,12 @@ These are role-aware views over one identity and data model, not separate portal
 | Workflow | Current route / owning UI | Current service and gate boundary |
 |---|---|---|
 | Access and onboarding | `/access`, `/family/join`, `/account/sessions`; staff invitation in `/admin` | Identity server functions, verified sessions and grants. |
-| Family application | `/guardian/apply` | `guardian-family-applications.functions.ts`; canonical Application and Journey, pending independent guardian verification. |
+| Family application | `/launch/family` | `guardian-family-applications.functions.ts`; canonical Application and Journey, pending independent guardian verification. |
 | Registrar intake and decisions | `/admissions/intake`; `PublicInterestInbox` | `admissions-intake.functions.ts`; capability checks, scope, guardian verification, transactional audit/events, blocking requirements. |
 | Offers and enrollment activation | `/guardian/admission-offers`, `/admissions` | Offer and placement functions; accepted offer is distinct from active enrollment and section placement. |
 | Enrollment checklist | `GuardianEnrollmentChecklist`, `EnrollmentForm` | Server-owned requirements, current document review, configured form version/signature, registrar correction/approval. |
-| Program launch | `/operations/launch`, `LaunchPortfolio`, `GuidedSchoolJourney` | Launch/Journey functions, blocking requirements, institutional and site opening gates. |
-| Academic configuration | `/operations/launch/$programId`, school years, course policies, curriculum routes | Academic-year, curriculum release, qualification, staffing, section lifecycle, and placement services. |
+| Program launch | `/launch/school`, `LaunchPortfolio`, `GuidedSchoolJourney` | Launch/Journey functions, blocking requirements, institutional and site opening gates. |
+| Academic configuration | `/launch/school/$programId`, school years, course policies, curriculum routes | Academic-year, curriculum release, qualification, staffing, section lifecycle, and placement services. |
 | Site opening and safeguarding | `SchoolOpeningReviewPanel`, supervision and reconciliation panels | Independently reviewed evidence, current version, institutional decision, daily supervision separate from opening approval. |
 | Site/content publishing | `/sites/$siteId/publish`, academic marketing editor | Publisher grant, private preview vs approved/public state, revision and content-review gates. |
 | Institutional agreements | `/network-steward`, `CANOperatingAuthorizationDesk`, `/network` | Verified agreement evidence, delegated authority, affiliation decision; no automatic student-record access. |
@@ -94,7 +94,7 @@ Proposed files:
 
 Responsibilities: responsive step indicator, focused form column, optional help, Back/Save/Continue composition, error-summary focus target, review/confirmation slots. It must not persist drafts or decide step completion.
 
-First real application: `/guardian/apply`, using its current server-loaded applications and `startGuardianFamilyApplication` command. Do not fabricate additional application steps until the owning backend supports them.
+First real application: `/launch/family`, using its current server-loaded applications and `startGuardianFamilyApplication` command. Do not fabricate additional application steps until the owning backend supports them.
 
 ### `ChecklistWorkspaceShell`
 
@@ -124,7 +124,7 @@ First real application: registrar application review, then institutional opening
 
 **Foundation slice in this increment:** semantic token reconciliation, an accessible semantic `StatusBadge`, tests, and adoption of shared workspace primitives on the read-only `/actions/$actionId` screen. This exercises the design system on a real authorized route with no business-logic change.
 
-**First workflow slice after foundation:** `/guardian/apply` with `GuidedSetupShell`. It is small, real, server-persisted, revisitable, and does not require inventing backend steps. It also establishes the stepper/action-footer contract before larger enrollment and launch migrations.
+**First workflow slice after foundation:** `/launch/family` with `GuidedSetupShell`. It is small, real, server-persisted, revisitable, and does not require inventing backend steps. It also establishes the stepper/action-footer contract before larger enrollment and launch migrations.
 
 Student Home should follow as its own visually focused slice because the approved mountain hero and School Life imagery require dedicated asset, responsive, and visual-regression work; it should not be bundled into token or workflow-shell changes.
 
@@ -159,6 +159,6 @@ Each slice should include changed files, real routes, reused components, service
 
 ## 10. Design-system infrastructure and GF22 application-entry increment
 
-The follow-up infrastructure increment adds Storybook, local interaction and axe checks, Chromatic configuration, ESLint semantic-color governance, duplicate shared-export checks, controlled institution/site brand tokens, all three workflow shells, and the real `/guardian/apply` Guided Setup adoption. The canonical loader, bounded application command, request payload, independent verification gates, and router invalidation remain unchanged.
+The follow-up infrastructure increment adds Storybook, local interaction and axe checks, Chromatic configuration, ESLint semantic-color governance, duplicate shared-export checks, controlled institution/site brand tokens, all three workflow shells, and the real `/launch/family` Guided Setup adoption. The canonical loader, bounded application command, request payload, independent verification gates, and router invalidation remain unchanged.
 
 The production component and Storybook contracts are documented in `docs/design-system.md`. Current evidence: typecheck, application build, Storybook build, 26 Storybook browser tests, and 35 focused regression tests pass; the full unit suite adds seven passing design tests and retains the same inherited failures. Chromatic upload and guarded Golden Flow browser acceptance remain unexecuted pending a project token and an explicitly approved disposable Neon branch respectively. Broad migration remains paused pending that acceptance evidence.

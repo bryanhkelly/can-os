@@ -42,7 +42,7 @@ describe("guided school launch",()=>{
       "needs_attention","needs_attention","needs_attention","needs_attention","needs_attention","review",
     ]);
     expect(steps[0]?.evidence).toContain("1 recorded blocking");
-    expect(steps[1]?.href).toContain("/operations/launch/");
+    expect(steps[1]?.href).toContain("/launch/school/");
     expect(steps.at(-1)?.evidence).toContain("school-opening authority");
   });
   it("preserves partial progress without falsely claiming notifications or browser acceptance",()=>{

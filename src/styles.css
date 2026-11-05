@@ -4,6 +4,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.launch-studio-page {
+  --content-wide: 94rem;
+  --page-pad-top: 2rem;
+}
+
+.launch-studio .can-workspace-header {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.launch-studio .can-page-title {
+  font-weight: 400;
+}
+
+.launch-studio :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) {
+  min-height: 2.75rem;
+}
+
 /* CAN OS — Precision Operator + Warm Stone + Serif Accents */
 
 @theme inline {

@@ -134,7 +134,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       page.on("console", message => {
         if (message.type() === "error") console.error("[FullFlow browser console]", message.text());
       });
-      await goto(page, "/operations/launch");
+      await goto(page, "/launch/school");
       await page.getByLabel("Host organization").selectOption(fixture.schoolOrgId);
       await expect(page.getByLabel("Site", { exact: true })).toBeEnabled();
       await page.getByLabel("New site name").fill(fixture.siteName);
@@ -349,7 +349,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     // ------------------------------------------------------------------
     await test.step("stage 2: staffing policy, class provisioning, registration policy, instructor", async () => {
       const page = operator.page;
-      await goto(page, `/operations/launch/${fixture.programId}`);
+      await goto(page, `/launch/school/${fixture.programId}`);
       await page.getByRole("checkbox", { name: new RegExp(fixture.qualificationKey) }).check();
       await page
         .getByRole("checkbox", { name: /I confirm these requirements are reviewed/ })
@@ -389,7 +389,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         )
         .toBe(1);
 
-      await goto(page, `/operations/launch/${fixture.programId}`);
+      await goto(page, `/launch/school/${fixture.programId}`);
       await page.getByLabel("Assign instructor").selectOption(fixture.teacher.personId);
       await page.getByRole("button", { name: "Add instructor" }).click();
       await expect
@@ -417,7 +417,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     // ------------------------------------------------------------------
     await test.step("stage 3: school-owned launch requirements, activation, opening handoff", async () => {
       const page = operator.page;
-      await goto(page, `/operations/launch?siteId=${fixture.siteId}&programId=${fixture.programId}`);
+      await goto(page, `/launch/school?siteId=${fixture.siteId}&programId=${fixture.programId}`);
       for (let completed = 1; completed <= 2; completed += 1) {
         await page.getByText("Record this school-owned requirement").first().click();
         const details = page

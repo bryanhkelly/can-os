@@ -24,7 +24,7 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
    if(destination==="editor")query.set("returnGrantId",session.activeGrantId);
     await switchVerifiedMembership({grants:session.grants,activeGrantId:session.activeGrantId,
      grantId:grant.id,queryClient,
-     redirectTo:`${destination==="editor"?"/site-website":"/operations/launch"}?${query.toString()}`});
+     redirectTo:`${destination==="editor"?"/site-website":"/launch/school"}?${query.toString()}`});
   }catch(cause){setError(mutationErrorMessage(cause, "The website workspace could not be opened."));setBusy(false);}
  }
  return <span className="inline-block">

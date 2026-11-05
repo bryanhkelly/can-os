@@ -75,4 +75,3 @@ export function LaunchOrientationTask({ launch, busy, save }: {
     <Button type="submit" className="mt-4" disabled={busy}>Save orientation</Button>
   </form>;
 }
-

@@ -53,7 +53,7 @@ by this anonymous bootstrap; `valorschool.demo` remains reserved.
 The transaction creates the initial Site-bound `site_admin`, membership,
 institutional assignment, exact identity registry, AuditEvent and DomainEvents.
 The administrator signs in as `admin.demo@<school>.demo` with `000000` and resumes
-the normal `/operations/launch?siteId=...` workflow. No Program or enrollment is
+the normal `/launch/school?siteId=...` workflow. No Program or enrollment is
 fabricated by bootstrap. Identical retries reuse the existing setup; mismatched,
 disabled or revoked bindings conflict rather than silently repairing access.
 Same-origin checks, a bounded JSON submission and anonymous admission limiting

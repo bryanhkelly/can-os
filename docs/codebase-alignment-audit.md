@@ -497,7 +497,7 @@ Validation: 2 focused unit files / 9 tests passed, covering secret uniqueness,
 hash-only persistence, isolated personas and cookie protections. Production
 build, 86-route contracts and mutation hygiene passed. Full typecheck retains
 47 baseline diagnostics, with none in the changed files. Route fixture coverage
-still fails for the known unseeded `/family/join`, `/guardian/apply` and
+still fails for the known unseeded `/family/join`, `/launch/family` and
 `/site-website` routes. Live Neon integration and authenticated multi-persona
 browser acceptance were not run, so FullFlow/GoldenFlow remains unaccepted.
 
@@ -521,7 +521,7 @@ Validation: 2 focused unit files / 14 tests passed, including successful teardow
 callback-failure teardown, named groups and partial-setup failure. Production
 build, 86-route contracts and mutation hygiene passed. Full typecheck retains
 47 baseline diagnostics, with none in the changed files. Route fixture coverage
-still fails for `/family/join`, `/guardian/apply` and `/site-website`. Live Neon
+still fails for `/family/join`, `/launch/family` and `/site-website`. Live Neon
 and authenticated browser execution remain unverified, so GoldenFlow acceptance
 is unchanged.
 
@@ -547,7 +547,7 @@ business rules into generic abstractions.
 
 ## Complete route fixture declarations
 
-Real idempotent SQL contracts now cover `/family/join`, `/guardian/apply` and
+Real idempotent SQL contracts now cover `/family/join`, `/launch/family` and
 `/site-website`. The public-family seed contains published Site/Program rows,
 a documented synthetic single-use token hash and a verified guardian persona.
 The website seed contains a synthetic Site-scoped editor, membership, explicit

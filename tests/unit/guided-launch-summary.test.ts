@@ -30,7 +30,7 @@ describe("launch summary distinguishes records from current authorization",()=>{
    sections:1,publishedSections:1,staffedSections:1}},null).find(step=>step.key==="instruction")!;
   expect(step.state).toBe("review");
   expect(step.nextAction).toContain("first-classroom readiness");
-  expect(step.href).toBe("/operations/launch/program");
+  expect(step.href).toBe("/launch/school/program");
  });
  it("keeps missing classroom configuration actionable",()=>{
   const step=guidedSchoolJourney(program,null).find(step=>step.key==="instruction")!;

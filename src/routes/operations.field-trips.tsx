@@ -6,7 +6,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
 import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import { DomainError } from "@/domain/errors";
-import { WorkspaceShell } from "@/components/workspace";
+import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {LocalDateTimeField} from "@/components/workspace/local-datetime-field";
@@ -34,7 +34,7 @@ function FieldTripOperations() {
   return <FieldTripOperationsView data={outcome.data} />;
 }
 
-function FieldTripOperationsView({ data }: { data: Data }) {
+export function FieldTripOperationsView({ data, mode="directory", tripId }: { data: Data; mode?: "directory"|"create"|"detail"; tripId?: string }) {
   const router = useRouter();
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
@@ -50,6 +50,7 @@ function FieldTripOperationsView({ data }: { data: Data }) {
   const [permissionText, setPermissionText] = useState("");
   const [candidate, setCandidate] = useState<Record<string, string>>({});
   const selectedSite = data.sites.find(site => site.id === siteId);
+  const selectedTrip = data.trips.find(trip => trip.id === tripId);
 
   async function run(work: () => Promise<unknown>, message: string) {
     await mutation.run(work, {
@@ -59,14 +60,13 @@ function FieldTripOperationsView({ data }: { data: Data }) {
   }
 
   return (
-    <WorkspaceShell eyebrow="Academic operations" title="Field trips"
-      subtitle="Plan school trips, publish the school's permission language, invite actively enrolled students, and track signed permissions."
-      actions={<div className="flex flex-wrap gap-2">
-        <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
-        <Link to="/home" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
-      </div>}>
+    <PageFrame width="wide"><RecordLayout header={<RecordHeader eyebrow="Academic operations"
+      title={mode==="create"?"Propose a field trip":mode==="detail"?selectedTrip?.title??"Trip unavailable":"Field trips"}
+      breadcrumbs={mode!=="directory"?<Link to="/operations/field-trips" className="underline">Field trips</Link>:undefined}
+      actions={mode==="directory"?<CreateAction><Link to="/operations/field-trips/new">Propose trip</Link></CreateAction>:
+        <Link to="/operations/field-trips" className={secondaryActionClassName}>{mode==="create"?"Cancel":"All trips"}</Link>}/>} main={<>
       <div className="mt-5"><MutationFeedback state={mutation} pendingMessage="Saving field trip change..."/></div>
-      <section className="mt-7 rounded-xl border bg-card p-5">
+      {mode==="create"&&<section className="mt-7">
         <h2 className="text-lg font-semibold">Propose a field trip</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Enter school-approved permission language. Families see the exact published version;
@@ -89,7 +89,7 @@ function FieldTripOperationsView({ data }: { data: Data }) {
             setTitle(""); setDestination(""); setDepartsAt("");
             setReturnsAt(""); setPermissionDueAt(""); setPermissionText("");
             setFee("0");
-          }, "Field trip proposed. Review and approve it below.");
+          }, "Field trip proposed. Open it from the trip directory to review and approve it.");
         }}>
           <SiteProgramFields sites={data.sites} programs={data.programs} siteId={siteId} programId={programId}
             siteRequired programPlaceholder="All enrolled programs at this school" disabled={busy}
@@ -129,18 +129,25 @@ function FieldTripOperationsView({ data }: { data: Data }) {
             Propose trip
           </button>
         </form>
-      </section>
-      <section className="mt-8 space-y-4" aria-label="Existing field trips">
+      </section>}
+      {mode==="directory"&&<DirectoryTable label="Field trips" caption="Trips in your authorized school and program scope."
+        rows={data.trips} rowKey={trip=>trip.id} empty={<EmptyState title="No field trips yet"/>}
+        columns={[
+          {id:"trip",title:"Trip",render:trip=><Link to="/operations/field-trips/$tripId" params={{tripId:trip.id}} className="font-semibold underline">{trip.title}</Link>},
+          {id:"site",title:"School",render:trip=>trip.siteName},
+          {id:"departure",title:"Departs",render:trip=>formatTimestamp(trip.departsAt,trip.timezone)},
+          {id:"status",title:"Status",render:trip=>trip.status},
+          {id:"participants",title:"Participants",render:trip=>trip.roster.length},
+        ]}/>}
+      {mode==="detail"&&<section className="space-y-4" aria-label="Trip permissions">
         <h2 className="text-lg font-semibold">Trips and permissions</h2>
-        {data.trips.map(trip => <TripCard key={trip.id} trip={trip} busy={busy}
+        {(selectedTrip?[selectedTrip]:[]).map(trip => <TripCard key={trip.id} trip={trip} busy={busy}
           candidate={candidate[trip.id] ?? ""}
           onCandidateChange={value => setCandidate(previous => ({ ...previous, [trip.id]: value }))}
           run={run} />)}
-        {!data.trips.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">
-          No trips are configured for your authorized school or program.
-        </p>}
-      </section>
-    </WorkspaceShell>
+        {!selectedTrip && <EmptyState title="Trip unavailable" description="This trip is unavailable in your authorized school or program scope."/>}
+      </section>}
+    </>}/></PageFrame>
   );
 }
 

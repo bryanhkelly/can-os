@@ -13,7 +13,8 @@ import type { getActiveEnrollmentCounts } from "@/modules/enrollment/admissions-
 
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 
-export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, currentSchoolStatus, launches, selection, schoolSelection, hasSchoolPreparation, admissionsCounts, enrollmentCounts, familyInvitations }: {
+export function LaunchPreparationWorkspace({ focus, currentLaunch, currentProgram, currentSchoolStatus, launches, selection, schoolSelection, hasSchoolPreparation, admissionsCounts, enrollmentCounts, familyInvitations }: {
+  focus: "welcome" | "school" | "academics" | "website" | "families" | "readiness" | "next";
   currentLaunch: Launch | null;
   currentProgram: { id: string } | null;
   currentSchoolStatus?: string;
@@ -34,7 +35,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
   const recordedOutreachMinutes=firstInvitationTime!==undefined&&Number.isFinite(launchStart)&&firstInvitationTime>=launchStart
     ? Math.floor((firstInvitationTime-launchStart)/60000):null;
   return <>
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<details aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Setup timing and saved milestones</summary>
+        {focus === "readiness" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<details aria-label="Measured launch setup" className="mt-5 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Setup timing and saved milestones</summary>
           <h2 className="font-serif text-xl">Recorded launch start</h2>
           <p className="mt-2 text-sm">Program creation: <time dateTime={currentLaunch.createdAt}>{new Date(currentLaunch.createdAt).toLocaleString()}</time>.</p>
           {firstInvitationTime!==undefined&&<p className="mt-2 text-sm">First saved invitation batch: <time dateTime={new Date(firstInvitationTime).toISOString()}>{new Date(firstInvitationTime).toLocaleString()}</time>.</p>}
@@ -44,27 +45,27 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           {currentLaunch.journey?.status==="ready"&&<p className="mt-2 text-sm">Independent review of opening is the next institutional handoff; journey readiness is not an opening timestamp.</p>}
           <p className="mt-2 text-xs text-muted-foreground">This timestamp is from the saved Program, not a browser stopwatch. No completion duration is claimed until a separately persisted completion or opening event is available. CAN review, hosting and third-party response time cannot be counted as school-controlled setup time without independently timestamped events.</p>
         </details>}
-        {currentSchoolStatus!=="active"&&<div id="launch-requirements" className="scroll-mt-6">
+        {focus === "readiness" && currentSchoolStatus!=="active"&&<div id="launch-requirements" className="scroll-mt-6">
           <OneHourSchoolLaunch key={currentLaunch?.id??`${selection.siteId??""}:${selection.programId??""}`}
             launches={launches} selectedProgramId={currentLaunch?.id??selection.programId}
             selectedSiteId={currentLaunch?.siteId??selection.siteId}/>
         </div>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
+        {focus === "readiness" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<div id="launch-services" className="scroll-mt-6">
           <SchoolJurisdictionReviewPanel key={`jurisdiction-review-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <ProgramSiteAuthorizationPanel key={`site-authorization-${currentLaunch.id}`} programId={currentLaunch.id}/>
           <p className="mt-3 text-sm text-muted-foreground">You can prepare the academic year, website and family outreach while CAN reviews the requested services. Each service, admissions and school opening retain their own authorization checks.</p>
-          <a href="#launch-academic-year" className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</a>
+          <Link to="/launch/school" search={{ ...schoolSelection, step: "academics" }} className="mt-2 inline-block text-sm font-semibold underline">Continue planning your academic year →</Link>
         </div>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
-        {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section id="launch-first-class" className="mt-5 scroll-mt-6 rounded-xl border bg-card p-5" aria-label="Prepare your first classroom">
+        {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
+        {focus === "academics" && currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<section id="launch-first-class" className="mt-5 scroll-mt-6 rounded-xl border bg-card p-5" aria-label="Prepare your first classroom">
           <h2 className="font-serif text-2xl">Prepare your first classroom</h2>
           <p className="mt-2 text-sm text-muted-foreground">Use the real published curriculum, scheduled term and CAN-authorized instructor. The academic setup will suggest the first eligible course and a matching schedule, then independently verify credentials and service authorization before allowing assignment. Preparing a class never opens the school.</p>
-          <Link to="/operations/launch/$programId" params={{programId:currentLaunch.id}} search={{siteId:currentLaunch.siteId??undefined,programId:undefined}} className="mt-3 inline-block text-sm font-semibold underline">Review guided academic setup →</Link>
+          <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}} search={{siteId:currentLaunch.siteId??undefined,programId:undefined}} className="mt-3 inline-block text-sm font-semibold underline">Review guided academic setup →</Link>
           <p className="mt-2 text-xs text-muted-foreground">If the first classroom is still blocked, review the launch task and its named prerequisite rather than creating a placeholder course or teacher.</p>
         </section>}
-        {currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
+        {focus === "website" && currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
 
-        {currentProgram&&<details className="mt-4 rounded-xl border bg-card p-4">
+        {focus === "families" && currentProgram&&<details className="mt-4 rounded-xl border bg-card p-4" open>
           <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
           <p className="mt-2 text-sm text-muted-foreground">An authorized administrator can invite a school registrar to complete setup, or a website editor to prepare church-owned content. Choose the exact Site in the invitation workspace. Access starts only after secure email acceptance; institutional approval remains separate.</p>
           <nav aria-label="School launch staff invitations" className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
@@ -73,7 +74,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           </nav>
         </details>}
 
-        {hasSchoolPreparation && currentProgram && <section id="invite-families" className="scroll-mt-6" aria-label="Invite families and review admissions progress"><LaunchFamilyProgress
+        {focus === "families" && hasSchoolPreparation && currentProgram && <section id="invite-families" className="scroll-mt-6" aria-label="Invite families and review admissions progress"><LaunchFamilyProgress
           admissionsCounts={admissionsCounts}
           enrollmentCounts={enrollmentCounts}
           familyInvitations={familyInvitations}
@@ -81,5 +82,7 @@ export function LaunchPreparationWorkspace({ currentLaunch, currentProgram, curr
           programId={schoolSelection.programId}
         /></section>}
 
+        {!currentProgram && ["academics", "website", "families", "readiness"].includes(focus) &&
+          <p role="status" className="border bg-card p-5 text-sm">Choose or save your school Program in School details before continuing this step.</p>}
   </>;
 }

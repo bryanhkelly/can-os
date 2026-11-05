@@ -265,9 +265,9 @@ describe("application contextual navigation",()=>{
     successful(siteData);
     const html=render(Site);
     expect(html).toContain('href="/home?siteId=school&amp;action=task"');
-    expect(html).toContain('href="/operations/launch?siteId=school"');
+    expect(html).toContain('href="/launch/school?siteId=school"');
     expect(html).toContain('href="/admissions?siteId=school"');
-    expect(html).toContain('href="/operations/launch/program?siteId=school"');
+    expect(html).toContain('href="/launch/school/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
     expect(html).toContain('href="/staff/attendance?programId=program&amp;date=2030-01-01&amp;student=student-profile" class="underline">Jordan Student</a>');
     expect(html).not.toContain('href="/home"');
@@ -531,7 +531,7 @@ describe("application contextual navigation",()=>{
   it("sends readiness shortcuts to operational owners, not student pages",()=>{
     const links=Object.fromEntries(readinessFromSnapshot({}).map(item=>[item.key,item.href]));
     expect(links).toMatchObject({
-      academics:"/operations/launch",staffing:"/staff/teachers",
+      academics:"/launch/school",staffing:"/staff/teachers",
       calendar:"/operations/school-years",enrollment:"/admissions/capacity",
     });
     expect(Object.values(links).some(href=>href.startsWith("/student/"))).toBe(false);
@@ -559,7 +559,7 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("published release with at least one student-accessible lesson");
     expect(html).toContain("does not update the class&#x27;s pinned version");
     expect(html).toContain('href="/operations/curriculum?programId=program"');
-    expect(html).toContain('href="/operations/launch/program"');
+    expect(html).toContain('href="/launch/school/program"');
     expect(html).toMatch(/disabled=""[^>]*>Approve change/);
     expect(html).not.toMatch(/disabled=""[^>]*>Decline/);
   });

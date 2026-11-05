@@ -102,6 +102,7 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
     const verifiedStudentIds=verifiedRelations.map(row=>row.studentPersonId);
     const existing=await db.select({
       applicationId:applications.id,programId:applications.programId,
+      idempotencyKey:applications.idempotencyKey,
       programName:programs.name,studentPersonId:studentProfiles.personId,
       studentFirstName:people.legalFirstName,
       studentLastName:people.legalLastName,stage:applications.stage,
@@ -178,6 +179,8 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
     const verifiedIds=new Set(verifiedStudentIds);
     return {programs:programsWithYears, applications:existing.map(row=>({
       applicationId:row.applicationId,programId:row.programId,programName:row.programName,
+      submissionRequestId:row.idempotencyKey?.startsWith(`guardian-application:${actor.actorPersonId}:`)
+        ? row.idempotencyKey.slice(`guardian-application:${actor.actorPersonId}:`.length) : null,
       studentPersonId:row.studentPersonId,studentFirstName:row.studentFirstName,
       studentLastName:row.studentLastName,stage:row.stage,siteId:row.siteId,
       source:typeof row.metadata.source==="string"?row.metadata.source:null,

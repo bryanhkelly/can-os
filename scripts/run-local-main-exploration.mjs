@@ -25,7 +25,7 @@ const routes = {
   parent: ["/guardian/academics", "/guardian/attendance", "/guardian/admission-offers", "/guardian/study-group-consent", "/guardian/field-trips", "/messages"],
   teacher: ["/classes", "/teacher/gradebook", "/teacher/discussions", "/teacher/study-groups", "/teacher/missing-work", "/calendar", "/messages"],
   room_admin: ["/staff/attendance", "/safeguarding", "/admin", "/messages"],
-  site_admin: ["/operations/launch?siteId=f1000000-0000-4000-8000-000000000003", "/admissions", "/admissions/intake", "/staff/students", "/operations/field-trips", "/sites/f1000000-0000-4000-8000-000000000003/publish", "/site-website", "/safeguarding"],
+  site_admin: ["/launch/school?siteId=f1000000-0000-4000-8000-000000000003", "/admissions", "/admissions/intake", "/staff/students", "/operations/field-trips", "/sites/f1000000-0000-4000-8000-000000000003/publish", "/site-website", "/safeguarding"],
 };
 const directory = resolve(options.output ?? "test-results/local-main-exploration");
 mkdirSync(directory, { recursive: true });

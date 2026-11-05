@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -35,15 +35,21 @@ type Data = Awaited<ReturnType<typeof listSchoolInterestEvents>>;
 
 function InterestEventsPage() {
   const result = Route.useLoaderData();
+  const selection = Route.useSearch();
   if (!result.ok) {
     return <LoaderFailure eyebrow="School launch" title="Interest Events" outcome={result} />;
   }
-  return <InterestEventsWorkspace data={result.data} />;
+  return <InterestEventsWorkspace data={result.data} selection={selection} />;
 }
 
-export function InterestEventsWorkspace({ data }: { data: Data }) {
+export function InterestEventsWorkspace({ data, selection={}, mode="directory", eventId }: {
+  data: Data; selection?: { siteId?: string; programId?: string }; mode?: "directory"|"create"|"detail"; eventId?: string;
+}) {
   const router = useRouter();
-  const search = Route.useSearch();
+  const search = selection;
+  const events = data.events.filter(event => (!search.siteId || data.programs.some(program => program.id === event.programId && program.siteId === search.siteId)) &&
+    (!search.programId || event.programId === search.programId));
+  const selectedEvent = mode==="detail" ? events.find(event => event.id===eventId) : undefined;
   const [programId, setProgramId] = useState(
     data.programs.find(program => program.id === search.programId)?.id ?? data.programs[0]?.id ?? "",
   );
@@ -57,6 +63,7 @@ export function InterestEventsWorkspace({ data }: { data: Data }) {
   const [startsAt, setStartsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000), timezone) : "");
   const [endsAt, setEndsAt] = useState(() => timezone ? dateTimeInputValue(new Date(Date.now() + 7 * 86400000 + 3600000), timezone) : "");
   const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
+  const [createdEventId, setCreatedEventId] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [timeValidationError, setTimeValidationError] = useState("");
   const mutation = useMutationFeedback(() => router.invalidate());
@@ -92,6 +99,7 @@ export function InterestEventsWorkspace({ data }: { data: Data }) {
         visibility,
       } });
       const rsvpUrl = result.rsvpUrl;
+      setCreatedEventId(result.eventId);
       if (rsvpUrl) setShareLinks(current => ({ ...current, [result.eventId]: rsvpUrl }));
       return result;
     }, {
@@ -123,15 +131,15 @@ export function InterestEventsWorkspace({ data }: { data: Data }) {
     });
   }
 
-  return <WorkspaceShell
-    width="wide"
+  return <PageFrame width="wide"><RecordLayout header={<RecordHeader
     eyebrow="School launch"
-    title="Interest Events"
-    subtitle="Create a parent information session, open house, campus tour, or family experience. RSVPs create or reuse an adult-only interest record; they do not create an application or enroll a student."
-    actions={<Link to="/operations/launch" className="rounded border px-3 py-2 text-sm">Launch dashboard</Link>}
-  >
+    title={mode==="create"?"Create interest event":mode==="detail"?selectedEvent?.title??"Event unavailable":"Interest Events"}
+    breadcrumbs={mode!=="directory"?<Link to="/operations/interest-events" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Interest Events</Link>:undefined}
+    actions={mode==="directory"?<CreateAction><Link to="/operations/interest-events/new" search={selection}>Create event</Link></CreateAction>:
+      <Link to="/operations/interest-events" search={{siteId:selection.siteId,programId:selection.programId}} className={secondaryActionClassName}>{mode==="create"?"Cancel":"All events"}</Link>}
+  />} main={<>
     <MutationFeedback state={mutation} pendingMessage="Saving event..." />
-    <form noValidate onSubmit={event => void submit(event)} className="mt-6 space-y-4 rounded-xl border bg-card p-5">
+    {mode==="create"&&<form noValidate onSubmit={event => void submit(event)} className="mt-6 space-y-4">
       <h2 className="font-semibold">Create an interest event</h2>
       {!data.programs.length && <p role="status" className="text-sm">No school programs are available in your authorized scope.</p>}
       <Field label="School Program" required
@@ -173,7 +181,7 @@ export function InterestEventsWorkspace({ data }: { data: Data }) {
       </div>
       {timeValidationError&&<FieldError>{timeValidationError}</FieldError>}
       {timezone ? <p className="text-xs text-muted-foreground">Times use the selected Site's timezone: {timezone}.</p>
-        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/operations/launch" search={{ siteId: selectedProgram?.siteId, programId }} className="underline">Configure school timezone</Link></p>}
+        : <p role="alert" className="text-sm">The school timezone is unavailable. <Link to="/launch/school" search={{ siteId: selectedProgram?.siteId, programId }} className="underline">Configure school timezone</Link></p>}
       <Field label="Location or meeting details">
         <Input maxLength={300} value={location} onChange={event => setLocation(event.target.value)} />
       </Field>
@@ -186,11 +194,23 @@ export function InterestEventsWorkspace({ data }: { data: Data }) {
       <Button type="submit" disabled={busy || !timezone}>
         Create event
       </Button>
-    </form>
+    </form>}
+    {mode==="create"&&createdEventId&&<div className="space-y-3 border-t pt-4">
+      <Link to="/operations/interest-events/$eventId" params={{eventId:createdEventId}} search={selection} className="underline">Open created event</Link>
+      {shareLinks[createdEventId]&&<p className="break-all text-sm">Invite-only RSVP link: <a className="underline" href={shareLinks[createdEventId]}>{shareLinks[createdEventId]}</a></p>}
+    </div>}
+    {mode==="directory"&&<DirectoryTable label="Interest events" caption="Events in your authorized school scope."
+      rows={events} rowKey={event=>event.id} empty={<EmptyState title="No interest events yet"/>}
+      columns={[
+        {id:"event",title:"Event",render:event=><Link to="/operations/interest-events/$eventId" params={{eventId:event.id}} search={selection} className="font-semibold underline">{event.title}</Link>},
+        {id:"program",title:"Program",render:event=>event.programName},
+        {id:"starts",title:"Starts",render:event=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",timeZone:event.timezone}).format(new Date(event.startsAt))},
+        {id:"rsvps",title:"RSVPs",render:event=>event.registrations.length},
+      ]}/>}
 
-    <section className="mt-8 space-y-4" aria-labelledby="saved-events">
+    {mode==="detail"&&<section className="space-y-4" aria-labelledby="saved-events">
       <h2 id="saved-events" className="text-lg font-semibold">Saved events and RSVPs</h2>
-      {data.events.map(event => <article key={event.id} className="rounded-xl border bg-card p-5">
+      {(selectedEvent?[selectedEvent]:[]).map(event => <article key={event.id} className="min-w-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{event.title}</h3>
@@ -234,7 +254,7 @@ export function InterestEventsWorkspace({ data }: { data: Data }) {
           })}</ul>
           : <p className="mt-2 text-sm text-muted-foreground">No RSVPs yet.</p>}
       </article>)}
-      {!data.events.length && <p className="rounded border p-4 text-sm">No interest events have been created for your authorized programs.</p>}
-    </section>
-  </WorkspaceShell>;
+      {!selectedEvent && <EmptyState title="Event unavailable" description="This event is unavailable in your authorized school scope."/>}
+    </section>}
+  </>}/></PageFrame>;
 }

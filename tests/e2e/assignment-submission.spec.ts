@@ -4,6 +4,7 @@ import { neon } from "@neondatabase/serverless";
 import { DATABASE_URL } from "./env";
 import { createGf1Fixture, type Gf1Fixture, type Sql } from "./fixture";
 import { withAuthenticatedPage } from "./helpers/authenticated-persona";
+import { expectMutationFeedback } from "./helpers/workspace-assertions";
 
 let sql: Sql;
 let fixture: Gf1Fixture | undefined;
@@ -102,7 +103,7 @@ test.describe("Assignment upload feedback with live private R2", () => {
       } finally {
         releaseUpload();
       }
-      const failure = page.getByRole("alert").filter({ hasText: "Upload failed for synthetic-assignment.pdf" });
+      const failure = await expectMutationFeedback(page, "error", "Upload failed for synthetic-assignment.pdf");
       await expect(failure).toBeFocused();
       await expect(failure).toBeInViewport();
       await expect(page.getByText(/Not yet uploaded: synthetic-assignment.pdf/)).toBeVisible();
@@ -111,7 +112,7 @@ test.describe("Assignment upload feedback with live private R2", () => {
 
       await page.unroute(uploadPattern);
       await submit.click();
-      const receipt = page.getByRole("status").filter({ hasText: "Your assignment has been submitted. Receipt:" });
+      const receipt = await expectMutationFeedback(page, "success", /Your assignment has been submitted\. Receipt:/);
       await expect(receipt).toBeFocused();
       await expect(receipt).toBeInViewport();
       await expect(receipt).toContainText(f.submissionId);

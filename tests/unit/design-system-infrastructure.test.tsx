@@ -60,8 +60,9 @@ describe("GF22 guided application integration", () => {
   });
 
   it("retains the canonical route loader and bounded submission command", () => {
-    const route = readFileSync(new URL("../../src/routes/guardian.apply.tsx", import.meta.url), "utf8");
-    expect(route).toContain("loader: safeLoader(getGuardianFamilyApplicationWorkspace");
+    const route = readFileSync(new URL("../../src/routes/launch.family.tsx", import.meta.url), "utf8");
+    expect(route).toContain("const workspace = await getGuardianFamilyApplicationWorkspace()");
+    expect(route).toContain("safeLoader(async () =>");
     expect(route).toContain("startGuardianFamilyApplication({ data: input })");
     expect(route).not.toContain("localStorage");
     expect(route).not.toContain("drizzle");

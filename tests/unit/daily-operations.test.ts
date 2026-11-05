@@ -51,16 +51,16 @@ describe("launch to daily operations", () => {
 
   it("keeps site-less programs on their canonical launch record", () => {
     expect(postLaunchOperationsDestination({ programId: "program 1", siteId: null }))
-      .toBe("/operations/launch?programId=program%201");
+      .toBe("/launch/school?programId=program%201");
   });
 
   it("uses Site Today for an active site program without changing launch history elsewhere", () => {
     expect(activeProgramOperationsHref({ programId: "program-1", siteId: "site-1", status: "active" }))
       .toBe("/sites/site-1");
     expect(activeProgramOperationsHref({ programId: "program-1", siteId: "site-1", status: "launching" }))
-      .toBe("/operations/launch/program-1");
+      .toBe("/launch/school/program-1");
     expect(activeProgramOperationsHref({ programId: "program-1", siteId: null, status: "active" }))
-      .toBe("/operations/launch/program-1");
+      .toBe("/launch/school/program-1");
   });
 });
 
