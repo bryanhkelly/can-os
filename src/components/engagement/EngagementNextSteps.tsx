@@ -1,3 +1,4 @@
+import { PageFrame, PageTitle } from "@/components/workspace";
 import { useState } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, MessageCircle, ShieldCheck } from "lucide-react";
@@ -14,7 +15,7 @@ export function EngagementNextSteps({ journey }: { journey: EngagementJourney })
   const destination = choice?.action === "information"
     ? engagementInformationHref(journey, choice)
     : choice ? engagementContactHref(journey, choice, search) : "";
-  return <main className="mx-auto max-w-screen-xl px-5 py-12 sm:px-8 lg:py-20">
+  return <PageFrame width="wide" className="mx-auto max-w-screen-xl px-5 py-12 sm:px-8 lg:py-20">
     <a href={engagementLocalHref(`/landing/${journey.id}`, search)}
       className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary hover:underline">
       <ArrowLeft className="size-4"/> Back to {journey.audience.toLowerCase()}
@@ -22,7 +23,7 @@ export function EngagementNextSteps({ journey }: { journey: EngagementJourney })
     <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(15rem,.7fr)]">
       <section className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">CAN Academy · Next Steps</p>
-        <h1 className="mt-4 font-serif text-5xl leading-tight sm:text-6xl">{journey.next.title}</h1>
+        <PageTitle className="mt-4 font-serif text-5xl leading-tight sm:text-6xl">{journey.next.title}</PageTitle>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{journey.next.description}</p>
         <p className="mt-5 border-l-2 border-primary pl-4 text-sm leading-7 text-muted-foreground">
           This page helps you decide what to explore. Arriving here does not confirm a submitted application,
@@ -74,5 +75,5 @@ export function EngagementNextSteps({ journey }: { journey: EngagementJourney })
         </Link>
       </aside>
     </div>
-  </main>;
+  </PageFrame>;
 }
