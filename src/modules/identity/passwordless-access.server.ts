@@ -44,8 +44,8 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
    eq(people.active,true)));
- const pendingInvitations=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))
-  ?[]:await listPendingStaffInvitations(db,account.id);
+ // Existing memberships must not hide newly invited synthetic-school grants.
+ const pendingInvitations=await listPendingStaffInvitations(db,account.id);
  if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return "ineligible";
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
@@ -86,8 +86,8 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
 }
 /** This privileged status is for already-authorized onboarding staff only.
  * Dispatched means the configured sender accepted the message, not inbox delivery. */
-export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string):Promise<AccessDispatchOutcome> {
- return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend);
+export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string,returnTo?:string):Promise<AccessDispatchOutcome> {
+ return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend,returnTo);
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
 export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
@@ -136,8 +136,9 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     : [];
   const returningGrant = grants.find(grant =>
     grant.id === returningOnboarding[0]?.invitationGrantId);
-  const activeGrant=onboardingInvitation??returningGrant??
-    grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
+  // Prioritize a freshly accepted invitation over an unrelated existing grant.
+  const activeGrant=onboardingInvitation??accepted[0]??returningGrant??
+    grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
   if(!activeGrant)throw new InvalidAccessCredentialError("No supported CAN OS membership");
   const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
   // After the school becomes active, ordinary sign-in need not keep redirecting
