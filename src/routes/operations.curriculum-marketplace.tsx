@@ -4,6 +4,10 @@ import { OneRosterStudentReconciliation } from "@/components/learning/OneRosterS
 import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
 import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
 import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClassMappingFields";
+import { Field } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
 import { StaffClassVideos } from "@/components/learning/StaffClassVideos";
 import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
@@ -57,6 +61,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [courseVersionId,setCourseVersionId]=useState(""),[scope,setScope]=useState<"program"|"site"|"section">("site");
  const [sectionId,setSectionId]=useState(""),[lessonId,setLessonId]=useState("");
  const [title,setTitle]=useState(""),[kind,setKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link"),[url,setUrl]=useState("");
+ const [supplementAttempted,setSupplementAttempted]=useState(false);
  const [pdfFile,setPdfFile]=useState<File|null>(null),[rightsConfirmed,setRightsConfirmed]=useState(false);
  const [pdfKey,setPdfKey]=useState(0);
  const pendingPdf=useRef<{file:File;identity:string;task:{run:()=>Promise<unknown>}}|null>(null);
@@ -205,31 +210,43 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     <h2 className="font-serif text-2xl">Supplement adopted curriculum</h2>
     <p className="text-sm text-muted-foreground">Add videos, PDFs hosted at an HTTPS address, websites or other resources. Publisher course versions remain unchanged; approved additions are tracked separately by program, site or class.</p>
     {!choices.length?<p className="text-sm">Install and adopt a pack before adding resources.</p>:
-    <form className="grid gap-4 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(async()=>{
+    <form noValidate className="grid gap-4 sm:grid-cols-2" onSubmit={e=>{
+      e.preventDefault();setSupplementAttempted(true);
+      let validHttps=false;try{validHttps=new URL(url).protocol==="https:";}catch{/* invalid URL */}
+      if(!courseVersionId||(scope==="section"&&!sectionId)||title.trim().length<3||!validHttps)return;
+      void perform(async()=>{
       await addMarketplaceSupplement({data:{
        programId:market.program.id,courseVersionId,scope,
        ...(scope==="section"?{sectionId}:{}),...(lessonId.trim()?{lessonId:lessonId.trim()}:{}),
        title,kind,url,
       }});
-      setTitle("");setUrl("");setLessonId("");
+      setTitle("");setUrl("");setLessonId("");setSupplementAttempted(false);
      },"Supplement added to the selected curriculum scope.");}}>
-     <label className="text-sm">Course<select required className="mt-1 block w-full rounded border bg-background p-2" value={courseVersionId}
-       onChange={e=>{setCourseVersionId(e.target.value);setSectionId("");}}>
+     <Field label="Course" className="text-sm" required error={supplementAttempted&&!courseVersionId?"Choose a course.":undefined}>
+      <Select value={courseVersionId} onChange={e=>{setCourseVersionId(e.target.value);setSectionId("");}}>
        <option value="">Select a course</option>{choices.map(c=><option value={c.courseVersionId} key={c.courseVersionId}>{c.code} · {c.title}</option>)}
-      </select></label>
-     <label className="text-sm">Visibility<select className="mt-1 block w-full rounded border bg-background p-2" value={scope} onChange={e=>setScope(e.target.value as typeof scope)}>
+      </Select>
+     </Field>
+     <Field label="Visibility" className="text-sm"><Select value={scope} onChange={e=>setScope(e.target.value as typeof scope)}>
       <option value="program">Entire program</option><option value="site" disabled={!market.program.siteId}>Current school site</option><option value="section">One class section</option>
-     </select></label>
-     {scope==="section"&&<label className="text-sm">Class section<select required className="mt-1 block w-full rounded border bg-background p-2" value={sectionId} onChange={e=>setSectionId(e.target.value)}>
+     </Select></Field>
+     {scope==="section"&&<Field label="Class section" className="text-sm" required error={supplementAttempted&&!sectionId?"Choose a class section.":undefined}><Select value={sectionId} onChange={e=>setSectionId(e.target.value)}>
       <option value="">Select class</option>{chosenSections.map(s=><option value={s.id} key={s.id}>{s.title}</option>)}
-     </select></label>}
-     <label className="text-sm">Lesson ID (optional)<input className="mt-1 block w-full rounded border bg-background p-2" value={lessonId} onChange={e=>setLessonId(e.target.value)} placeholder="Publisher lesson ID"/></label>
-     <label className="text-sm">Resource title<input required minLength={3} maxLength={200} className="mt-1 block w-full rounded border bg-background p-2" value={title} onChange={e=>setTitle(e.target.value)}/></label>
-     <label className="text-sm">Resource format<select className="mt-1 block w-full rounded border bg-background p-2" value={kind} onChange={e=>setKind(e.target.value as typeof kind)}>
+     </Select></Field>}
+     <Field label="Lesson ID (optional)" className="text-sm"><Input value={lessonId} onChange={e=>setLessonId(e.target.value)} placeholder="Publisher lesson ID"/></Field>
+    <Field label="Resource title" className="text-sm" required error={supplementAttempted&&title.trim().length<3?"Enter a resource title with at least 3 characters.":undefined}>
+     <Input minLength={3} maxLength={200} value={title} onChange={e=>setTitle(e.target.value)}/>
+    </Field>
+    <Field label="Resource format" className="text-sm"><Select value={kind} onChange={e=>setKind(e.target.value as typeof kind)}>
       {["link","video","pdf","image","audio","document"].map(k=><option key={k} value={k}>{k}</option>)}
-     </select></label>
-     <label className="text-sm sm:col-span-2">HTTPS resource URL<input required type="url" maxLength={2048} className="mt-1 block w-full rounded border bg-background p-2" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://..."/></label>
-     <button disabled={busy||!courseVersionId||(scope==="section"&&!sectionId)} className="justify-self-start rounded bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Add supplement</button>
+    </Select></Field>
+    <Field label="HTTPS resource URL" className="text-sm sm:col-span-2" required
+     error={supplementAttempted&&(!url||!(()=>{try{return new URL(url).protocol==="https:";}catch{return false;}})())?"Enter a valid HTTPS resource URL.":undefined}>
+     <Input type="url" maxLength={2048} value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://..."/>
+    </Field>
+    {supplementAttempted&&!courseVersionId&&<p role="alert" className="text-sm text-destructive">Choose a course.</p>}
+    {supplementAttempted&&scope==="section"&&!sectionId&&<p role="alert" className="text-sm text-destructive">Choose a class section for this visibility scope.</p>}
+    <Button type="submit" disabled={busy} className="justify-self-start">Add supplement</Button>
      <fieldset className="sm:col-span-2 space-y-3 rounded-lg border p-4">
       <legend className="px-2 text-sm font-semibold">Upload a private PDF</legend>
       <CurriculumPdfPicker enabled={data.pdfUpload.enabled} busy={busy} fileKey={pdfKey}

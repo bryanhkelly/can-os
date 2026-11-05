@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { getCalendarRange } from "@/modules/calendar/calendar.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
+import { calendarItemDestination } from "@/domain/calendar-view";
 
 type Schedule = Awaited<ReturnType<typeof getCalendarRange>>;
 type TeachingSection = { id: string; title: string };
@@ -57,9 +58,10 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
       <div className="mt-4 grid gap-3">
         {data.items.map(item => {
           const section = sections.find(section => section.id === item.sectionId);
+          const destination = calendarItemDestination(item, data.viewerRole);
           return <article key={item.id} className="rounded-xl border p-4">
-            {item.source === "assessment" && section
-              ? <Link to="/teacher/gradebook" search={{ section: section.id, assessment: item.id.replace(/^assessment:/, "") }} className="font-semibold underline">{item.title}</Link>
+            {destination
+              ? <Link {...destination} className="font-semibold underline">{item.title}</Link>
               : <Link to="/calendar" search={{ date: dateKeyInTimezone(item.startsAt, item.timezone), event: item.id }} className="font-semibold underline">{item.title}</Link>}
             <p className="mt-1 text-sm">{format(item.startsAt)}{item.endsAt ? ` – ${format(item.endsAt)}` : ""}
               {item.cancelled ? " · Cancelled" : item.source === "assessment" ? " · Due" : ""}</p>

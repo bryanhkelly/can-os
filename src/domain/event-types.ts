@@ -85,6 +85,7 @@ export const EventTypes = {
   CalendarEventCancelled: "CalendarEventCancelled",
   InterestEventCreated: "InterestEventCreated",
   InterestEventRegistrationCreated: "InterestEventRegistrationCreated",
+  InterestEventAttendanceRecorded: "InterestEventAttendanceRecorded",
   ProgramActivated: "ProgramActivated",
   ChurchSchoolOpeningApproved: "ChurchSchoolOpeningApproved",
   ChurchSchoolOpeningSuspended: "ChurchSchoolOpeningSuspended",

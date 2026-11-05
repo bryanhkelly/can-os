@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowUpRight, MessageSquare, Search, Send, ShieldCheck } fro
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Field } from "@/components/ui/field";
 import { CreateAction, MasterDetailWorkspace, PersonMark, QueryState } from "@/components/workspace";
 import type { getThread, listMyThreads } from "@/modules/communication/messages.functions";
 
@@ -28,9 +29,11 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
 }) {
   const [query, setQuery] = useState("");
   const [mobileListFor, setMobileListFor] = useState<string | null>(null);
+  const [replyValidationError, setReplyValidationError] = useState(false);
   const visible = threads.filter(thread =>
     `${thread.subject} ${thread.snippet}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const currentDetail = detail?.thread.id === selectedId ? detail : null;
+  const isLoadingThread = Boolean(selectedId) && loadingThread;
   return <MasterDetailWorkspace title="Conversations"
     description="Stay connected with your school community."
     toolbar={<CreateAction><button type="button" disabled={busy} onClick={onCompose}>New message</button></CreateAction>}
@@ -73,7 +76,7 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
       <div className="border-b px-5 py-4 lg:hidden">
         <Button variant="ghost" size="sm" onClick={() => setMobileListFor(selectedId)}><ArrowLeft aria-hidden="true" />All conversations</Button>
       </div>
-      <QueryState loading={loadingThread ? "Loading conversation..." : undefined}
+      <QueryState loading={isLoadingThread ? "Loading conversation..." : undefined}
         error={error || undefined} onRetry={onRetry}>
         {currentDetail ? <>
           <header className="flex flex-wrap items-start justify-between gap-3 border-b p-5">
@@ -101,13 +104,22 @@ export function MessagesWorkspace({ threads, selectedId, detail, loading, loadin
               </div>
             </li>)}
           </ol>
-          <form className="mt-auto border-t p-5" aria-busy={busy} onSubmit={event => { event.preventDefault(); onSend(); }}>
-            <label htmlFor="message-reply" className="text-xs font-semibold">Reply to this conversation</label>
-            <Textarea id="message-reply" className="mt-2" rows={3} maxLength={4000} required disabled={busy}
-              value={reply} onChange={event => onReplyChange(event.target.value)} placeholder="Write a thoughtful reply..." />
+          <form noValidate className="mt-auto border-t p-5" aria-busy={busy} onSubmit={event => {
+            event.preventDefault();
+            const empty = !reply.trim();
+            setReplyValidationError(empty);
+            if (!empty) onSend();
+          }}>
+            <Field label="Reply to this conversation" required error={replyValidationError ? "Enter a reply." : undefined}>
+              <Textarea id="message-reply" rows={3} maxLength={4000} disabled={busy}
+                value={reply} onChange={event => {
+                  onReplyChange(event.target.value);
+                  if (event.target.value.trim()) setReplyValidationError(false);
+                }} placeholder="Write a thoughtful reply..." />
+            </Field>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <p className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck aria-hidden="true" className="size-4" />Only conversation participants can view messages.</p>
-              <Button type="submit" disabled={busy || !reply.trim()}><Send aria-hidden="true" />{busy ? "Please wait..." : "Send reply"}</Button>
+              <Button type="submit" disabled={busy}><Send aria-hidden="true" />{busy ? "Please wait..." : "Send reply"}</Button>
             </div>
           </form>
         </> : <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">

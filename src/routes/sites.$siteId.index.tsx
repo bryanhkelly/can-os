@@ -9,7 +9,7 @@ import { getSiteToday } from "@/modules/operations/site-today.functions";
 import { StatCard, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { dateKeyInTimezone, formatTimestamp } from "@/modules/calendar/timezone";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
 import { SiteTodayPriorities } from "@/components/operations/SiteTodayPriorities";
 import type { DailyAttentionItem } from "@/domain/daily-operations";
@@ -84,7 +84,7 @@ function SiteTodayPage() {
         ["People", "/profiles"], ["Ask CAN", "/ask"],
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
-      {data.canOpenOnsiteDay && <Link to="/home"
+        {data.canOpenOnsiteDay && <Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }}
         className="border px-3 py-1.5 hover:bg-muted">Onsite day</Link>}
     </nav>
     <section id="school-day-operating-decision" aria-label="School-day operating decision"
@@ -94,7 +94,7 @@ function SiteTodayPage() {
       <p className="mt-2 font-semibold">{decision.title}</p>
       <p className="mt-2 text-sm">{decision.detail}</p>
       <p className="mt-2 text-sm">Responsible: {decision.owner}. <a className="underline" href={decision.href}>{decision.nextStep}</a></p>
-      <p className="mt-2 text-xs text-muted-foreground">Evaluated {new Date(data.asOf).toLocaleString()} in the site timezone. Program activity and attendance alone never authorize opening.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Evaluated {formatTimestamp(data.asOf, data.site.timezone)} ({data.site.timezone}). Program activity and attendance alone never authorize opening.</p>
     </section>
     {blockedOpenings.length>0&&
       <section id="school-opening-authorization" role="alert" aria-label="School opening authorization"
@@ -138,7 +138,7 @@ function SiteTodayPage() {
           <h2 className="font-serif text-2xl">Supervised school day</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">One source-derived view of staff coverage, onsite attendance, family explanations, health and incident activity, and dismissal evidence. Learning activity is not physical attendance.</p>
         </div>
-        {data.canOpenOnsiteDay&&<Link to="/home" className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
+        {data.canOpenOnsiteDay&&<Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }} className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -177,7 +177,7 @@ function SiteTodayPage() {
           <div className="mt-3 space-y-2">
             {studentExceptions.slice(0,30).map(student=><article key={student.programId+":"+student.studentProfileId} className="rounded-lg border p-3 text-sm">
               <div className="flex flex-wrap justify-between gap-2">
-                <p className="font-medium">{student.studentName}</p>
+                <p className="font-medium"><Link to="/staff/attendance" search={{programId:student.programId,date:data.localDate,student:student.studentProfileId}} className="underline">{student.studentName}</Link></p>
                 <span className="text-xs capitalize text-muted-foreground">{student.status.replaceAll("_"," ")}</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{student.programName} · {student.sectionTitle??"Program roster"}</p>

@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 type Snapshot = Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 
 export function LaunchSectionRow({section,staff,busy,authority,assign,saveCredits}:{
@@ -12,27 +16,32 @@ export function LaunchSectionRow({section,staff,busy,authority,assign,saveCredit
  const [credits,setCredits]=useState(section.creditUnits?.toString()??"");
  const [creditReason,setCreditReason]=useState("");
  const candidate=section.candidates.find(candidate=>candidate.personId===personId);
+ const [attempted,setAttempted]=useState(false);
  const alreadyAssigned=section.teachers.some(teacher=>teacher.personId===personId);
  return <article className="rounded-lg border bg-card p-4">
   <h3 className="font-semibold">{section.title} · {section.code}</h3>
   <p className="mt-2 text-xs text-muted-foreground">
    {section.teachers.length?section.teachers.map(t=>t.first+" "+t.last).join(", "):"Instructor not yet assigned"}
   </p>
-  <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto] sm:items-end" onSubmit={e=>{
-    e.preventDefault();void saveCredits(Number(credits),creditReason);
+  <form noValidate className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto] sm:items-end" onSubmit={e=>{
+    e.preventDefault();setAttempted(true);
+    const creditValue=Number(credits);
+    if(!authority.creditConfiguration||!Number.isFinite(creditValue)||creditValue<0.01||creditValue>10||creditReason.trim().length<5)return;
+    void saveCredits(creditValue,creditReason.trim());
    }}>
-    <label className="text-xs">Recorded credit units
-     <input type="number" min="0.01" max="10" step="0.01" required value={credits} disabled={!authority.creditConfiguration}
-      onChange={e=>setCredits(e.target.value)} className="mt-1 w-full rounded border bg-background p-2 disabled:opacity-50"/>
-    </label>
-    <label className="text-xs">Reason for academic credit decision
-     <input value={creditReason} minLength={5} maxLength={500} required disabled={!authority.creditConfiguration}
+    <Field label="Recorded credit units" className="text-xs" required
+      error={attempted&&(!Number.isFinite(Number(credits))||Number(credits)<0.01||Number(credits)>10)
+       ?"Enter credit units from 0.01 to 10.":undefined}>
+     <Input type="number" min="0.01" max="10" step="0.01" value={credits} disabled={!authority.creditConfiguration}
+      onChange={e=>setCredits(e.target.value)}/>
+    </Field>
+    <Field label="Reason for academic credit decision" className="text-xs" required
+      error={attempted&&creditReason.trim().length<5?"Enter at least 5 characters explaining the credit decision.":undefined}>
+     <Input value={creditReason} maxLength={500} disabled={!authority.creditConfiguration}
       onChange={e=>setCreditReason(e.target.value)}
-      placeholder="Reviewed against this program's course credit requirements"
-      className="mt-1 w-full rounded border bg-background p-2 disabled:opacity-50"/>
-    </label>
-    <button type="submit" disabled={busy||!authority.creditConfiguration||!credits||creditReason.trim().length<5}
-      className="rounded border px-3 py-2 text-xs disabled:opacity-50">Record credits</button>
+      placeholder="Reviewed against this program's course credit requirements"/>
+    </Field>
+    <Button type="submit" disabled={busy||!authority.creditConfiguration}>Record credits</Button>
    </form>
    <p className="mt-2 text-xs text-muted-foreground">The school sets actual credit units. Changes are audited and locked after finalized grades.</p>
    <div className="mt-3 grid gap-2 sm:grid-cols-4">
@@ -54,13 +63,13 @@ export function LaunchSectionRow({section,staff,busy,authority,assign,saveCredit
     <ul className="mt-2 list-inside list-disc space-y-1 text-xs">{section.classroom.blockers.map(item=><li key={item.key}>{item.message}</li>)}</ul>}
   </section>
   <div className="mt-3 flex flex-wrap items-end gap-2">
-   <label className="min-w-48 flex-1 text-xs">Assign instructor<select className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50" value={personId} disabled={!authority.teacherAssignment} onChange={e=>setPersonId(e.target.value)}>
+  <Field label="Assign instructor" className="min-w-48 flex-1 text-xs"><Select value={personId} disabled={!authority.teacherAssignment} onChange={e=>setPersonId(e.target.value)}>
     <option value="">Choose teacher</option>{staff.map(t=><option key={t.personId} value={t.personId}>
      {t.first} {t.last}{section.teachers.some(teacher=>teacher.personId===t.personId)?" (assigned)":""}
     </option>)}
-   </select></label>
-   <button type="button" disabled={busy||!authority.teacherAssignment||!section.active||!personId||!candidate?.eligible} onClick={()=>assign(personId)}
-    className="rounded border px-3 py-2 text-sm disabled:opacity-50">{alreadyAssigned?"Confirm instructor coverage":"Add instructor"}</button>
+  </Select></Field>
+  <Button type="button" variant="outline" disabled={busy||!authority.teacherAssignment||!section.active||!personId||!candidate?.eligible} onClick={()=>assign(personId)}>
+   {alreadyAssigned?"Confirm instructor coverage":"Add instructor"}</Button>
   </div>
   {section.teachers.length>0&&<p className="mt-2 text-xs text-muted-foreground">
    Select an assigned instructor to recheck qualifications and restore missing instructional coverage without duplicating their assignment.

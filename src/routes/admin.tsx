@@ -224,7 +224,7 @@ function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRol
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy||!form.watch("siteId")}>
+                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
                   {busy ? "Inviting…" : "Invite staff member"}
                 </button>
               </div>

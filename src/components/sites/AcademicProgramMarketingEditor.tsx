@@ -2,6 +2,10 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {
   getSitePublicationDraftView, setAcademicProgramMarketingStatus,
 } from "@/modules/sites/site-publication.functions";
@@ -20,6 +24,7 @@ export function AcademicProgramMarketingEditor({
   const [summary, setSummary] = useState(program.marketing?.summary ?? "");
   const [reason, setReason] = useState("");
   const [reviewed, setReviewed] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const pending = mutation.pending || mutation.refreshFailed;
   const published = program.marketing?.status === "published";
@@ -28,6 +33,8 @@ export function AcademicProgramMarketingEditor({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    setAttempted(true);
+    if (reason.trim().length < 10 || (!published && (!eligible || !reviewed || summary.trim().length < 30))) return;
     await mutation.run(async () => {
       const result = await setAcademicProgramMarketingStatus({ data: {
         siteId, programId: program.id, action,
@@ -69,34 +76,29 @@ export function AcademicProgramMarketingEditor({
       or revoked, or the Program may no longer be eligible. Review and restore
       the canonical authorization before publishing school information again.
     </p>}
-    <form className="mt-4 space-y-3" onSubmit={submit}>
-      {!published && <label className="block text-sm">
-        Public description (30–2,000 characters; plain text)
-        <textarea rows={4} minLength={30} maxLength={2000}
+    <form noValidate className="mt-4 space-y-3" onSubmit={submit}>
+      {!published && <Field label="Public description (30–2,000 characters; plain text)" required
+        error={attempted&&summary.trim().length<30?"Enter a public description with at least 30 characters.":undefined}>
+        <Textarea rows={4} minLength={30} maxLength={2000}
           value={summary} onChange={event => setSummary(event.target.value)}
-          className="mt-1 block w-full rounded-lg border bg-background p-2"
           placeholder="Describe the educational experience without promising accreditation, admission, credit, or outcomes."/>
-      </label>}
+      </Field>}
       {published && <p className="text-sm whitespace-pre-line">
         Approved description: {program.marketing?.summary}
       </p>}
-      <label className="block text-sm">
-        Decision reason (10–500 characters; no student information)
-        <textarea rows={2} value={reason} minLength={10} maxLength={500}
+      <Field label="Decision reason (10–500 characters; no student information)" required
+        error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining the decision.":undefined}>
+        <Textarea rows={2} value={reason} minLength={10} maxLength={500}
           onChange={event => setReason(event.target.value)}
-          className="mt-1 block w-full rounded-lg border bg-background p-2"/>
-      </label>
-      {!published && <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" checked={reviewed}
-          onChange={event => setReviewed(event.target.checked)}/>
-        <span>I reviewed the title, grades, delivery model and description.
-          I understand this does not open enrollment or certify academic authority.</span>
-      </label>}
-      <button type="submit" disabled={pending || reason.trim().length < 10 ||
-        (!published && (!eligible || !reviewed || summary.trim().length < 30))}
-        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          />
+      </Field>
+      {!published && <Field label="I reviewed the title, grades, delivery model and description. I understand this does not open enrollment or certify academic authority."
+        required error={attempted&&!reviewed?"Confirm that you reviewed the public listing.":undefined}>
+        <Checkbox checked={reviewed} onChange={event => setReviewed(event.target.checked)}/>
+      </Field>}
+      <Button type="submit" variant="outline" disabled={pending}>
         {pending ? "Saving…" : published ? "Unpublish program listing" : "Approve academic listing"}
-      </button>
+      </Button>
       {!eligible && !published && <p className="text-sm text-muted-foreground">
         Paused or closed Programs cannot be newly published.
       </p>}

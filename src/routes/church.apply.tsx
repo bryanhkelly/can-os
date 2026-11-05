@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { ChurchApplicationConfirmation } from "@/components/church/ChurchApplicationConfirmation";
 import { churchApplicationSchema as applicationSchema, churchApplicationLimits,
   type ChurchApplicationField } from "@/domain/church-application";
+import { DEFAULT_SITE_TIMEZONE } from "@/domain/site-timezone";
+import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
 
 export const Route = createFileRoute("/church/apply")({
   server: { handlers: {
@@ -42,7 +44,7 @@ export const Route = createFileRoute("/church/apply")({
 const field = "mt-1 block w-full rounded-lg border bg-background p-3 text-sm";
 function ChurchApplicationPage() {
   const [form, setForm] = useState({
-    churchName: "", siteName: "", timezone: "America/Los_Angeles",
+    churchName: "", siteName: "", timezone: DEFAULT_SITE_TIMEZONE,
     churchWebsite: "", leaderTitle: "", contactEmail: "", firstName: "", lastName: "",
   });
   const [busy, setBusy] = useState(false);
@@ -96,11 +98,7 @@ function ChurchApplicationPage() {
           className={field} value={form[key]} onChange={event=>change(key,event.target.value)} />
         {fieldErrors[key]&&<span id={`church-${key}-error`} className="mt-1 block text-sm text-destructive">{fieldErrors[key]?.[0]}</span>}
       </label>)}
-      <label className="text-sm font-semibold">School timezone
-        <select id="church-timezone" aria-invalid={Boolean(fieldErrors.timezone)} className={field} value={form.timezone} onChange={event=>change("timezone",event.target.value)}>
-          {["America/Los_Angeles","America/Denver","America/Chicago","America/New_York","America/Phoenix","America/Anchorage","Pacific/Honolulu","UTC"].map(tz=><option value={tz} key={tz}>{tz.replaceAll("_"," ")}</option>)}
-        </select>
-      </label>
+      <SiteTimezoneField value={form.timezone} onChange={value=>change("timezone",value)} />
       <label className="text-sm font-semibold"><span id="church-website-label">Church website (optional)</span>
         <input id="church-churchWebsite" type="url" placeholder="https://…" maxLength={churchApplicationLimits.churchWebsite} className={field}
           aria-invalid={Boolean(fieldErrors.churchWebsite)} aria-describedby={fieldErrors.churchWebsite?"church-website-error":undefined}

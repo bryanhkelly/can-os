@@ -21,9 +21,14 @@ import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
 import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
 import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
 import { ClassCreationRequestForm } from "@/components/learning/ClassCreationRequestForm";
+import { ClassTeacherPlanningPanel } from "@/components/learning/ClassTeacherPlanningPanel";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { classResources, type ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
@@ -85,11 +90,13 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   const [body, setBody] = useState("");
   const [resourceTitle,setResourceTitle]=useState("");
   const [resourceUrl,setResourceUrl]=useState("");
+  const [resourceAttempted,setResourceAttempted]=useState(false);
   const [resourceKind,setResourceKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
   const [resourceLesson,setResourceLesson]=useState("");
   const [editingResource,setEditingResource]=useState<string|null>(null);
   const [resourceEditTitle,setResourceEditTitle]=useState("");
   const [resourceEditUrl,setResourceEditUrl]=useState("");
+  const [resourceEditAttempted,setResourceEditAttempted]=useState(false);
   const [resourceEditKind,setResourceEditKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
   const [retireCandidate,setRetireCandidate]=useState<string|null>(null);
   const announcementId = useRef<string | null>(null);
@@ -166,19 +173,26 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   function supplementActions(item:typeof supplements[number]){
     if(data.role!=="teacher"||!item.canManage)return null;
     return <div className="mt-3 space-y-2 border-t pt-3" aria-label={"Manage "+item.title}>
-      {editingResource===item.id?<form className="grid gap-2" onSubmit={event=>{event.preventDefault();void run(async()=>{
+      {editingResource===item.id?<form noValidate className="grid gap-2" onSubmit={event=>{
+        event.preventDefault();setResourceEditAttempted(true);
+        let validHttps=false;try{validHttps=new URL(resourceEditUrl).protocol==="https:";}catch{/* invalid URL */}
+        if(resourceEditTitle.trim().length<3||!validHttps)return;
+        void run(async()=>{
         await manageClassSupplement({data:{action:"replace",sectionId:data.section.id,supplementId:item.id,
           title:resourceEditTitle,kind:resourceEditKind,url:resourceEditUrl}});
-        setEditingResource(null);
+        setEditingResource(null);setResourceEditAttempted(false);
       },"Teacher resource replaced. Publisher content remains unchanged.");}}>
-        <label className="text-xs">Replacement title<input required minLength={3} maxLength={200} value={resourceEditTitle}
-          onChange={e=>setResourceEditTitle(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
-        <label className="text-xs">Replacement HTTPS link<input required type="url" value={resourceEditUrl}
-          onChange={e=>setResourceEditUrl(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
-        <label className="text-xs">Resource format<select value={resourceEditKind}
-          onChange={e=>setResourceEditKind(e.target.value as typeof resourceEditKind)} className="mt-1 block w-full rounded border p-2">
+        <Field label="Replacement title" className="text-xs" required error={resourceEditAttempted&&resourceEditTitle.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
+          <Input minLength={3} maxLength={200} value={resourceEditTitle} onChange={e=>setResourceEditTitle(e.target.value)}/>
+        </Field>
+        <Field label="Replacement HTTPS link" className="text-xs" required
+          error={resourceEditAttempted&&(()=>{try{return new URL(resourceEditUrl).protocol!=="https:";}catch{return true;}})()?"Enter a valid HTTPS resource URL.":undefined}>
+          <Input type="url" value={resourceEditUrl} onChange={e=>setResourceEditUrl(e.target.value)}/>
+        </Field>
+        <Field label="Resource format" className="text-xs"><Select value={resourceEditKind}
+          onChange={e=>setResourceEditKind(e.target.value as typeof resourceEditKind)}>
           {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
-        </select></label>
+        </Select></Field>
         <div className="flex gap-3"><button type="submit" disabled={busy} className="text-xs underline">Save replacement</button>
           <button type="button" onClick={()=>setEditingResource(null)} className="text-xs underline">Cancel</button></div>
       </form>:<button type="button" disabled={busy} className="text-xs underline"
@@ -227,7 +241,9 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     actions={<Link to="/classes" search={{...search,tab:"lessons"}} hash="published-lesson-outline"
       className="inline-flex items-center border bg-card px-3 py-2 text-xs font-semibold">All lessons</Link>}
     metadata={<>
-      <span><strong>Teacher</strong> · {data.teachers.length ? data.teachers.map(teacher => teacher.name).join(", ") : "Not assigned"}</span>
+      <span><strong>Teacher</strong> · {data.teachers.length ? data.teachers.map((teacher, index) => <span key={teacher.personId}>
+        {index > 0 && ", "}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link>
+      </span>) : "Not assigned"}</span>
       {tab === "lessons" && lesson?.estimatedMinutes && <span><strong>Estimated</strong> · {lesson.estimatedMinutes} min</span>}
       {data.role !== "teacher" && lessons.length > 0 && <span><strong>Self-reported progress</strong> · {Math.round(completed.size/lessons.length*100)}%</span>}
     </>}
@@ -310,22 +326,28 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
             </li>)}</ul>
             {data.role === "teacher" && <Link to="/teacher/discussions" search={{ section: data.section.id, lesson: lesson.id }} className="text-sm underline">Start a discussion from this lesson</Link>}
           </section> : undefined}/>
-        {data.role==="teacher"&&<form className="mt-5 grid gap-3 rounded-lg border p-4" aria-label="Add resource to this lesson"
-          onSubmit={event=>{event.preventDefault();void run(async()=>{
+        {data.role==="teacher"&&<form noValidate className="mt-5 grid gap-3 rounded-lg border p-4" aria-label="Add resource to this lesson"
+          onSubmit={event=>{event.preventDefault();setResourceAttempted(true);
+            let validHttps=false;try{validHttps=new URL(resourceUrl).protocol==="https:";}catch{/* invalid URL */}
+            if(resourceTitle.trim().length<3||!validHttps)return;
+            void run(async()=>{
             await addClassSupplement({data:{sectionId:data.section.id,lessonId:lesson.id,
               title:resourceTitle.trim(),url:resourceUrl.trim(),kind:resourceKind}});
-            setResourceTitle("");setResourceUrl("");
+            setResourceTitle("");setResourceUrl("");setResourceAttempted(false);
           },"Teacher supplement attached to this lesson.");}}>
           <h3 className="font-semibold text-sm">Add resource to this lesson</h3>
-          <label className="text-xs">Resource title<input required minLength={3} maxLength={200} value={resourceTitle}
-           onChange={e=>setResourceTitle(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
-          <label className="text-xs">HTTPS resource link<input required type="url" value={resourceUrl}
-           onChange={e=>setResourceUrl(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
-          <label className="text-xs">Resource format<select value={resourceKind}
-           onChange={e=>setResourceKind(e.target.value as typeof resourceKind)} className="mt-1 block w-full rounded border p-2">
+          <Field label="Resource title" className="text-xs" required error={resourceAttempted&&resourceTitle.trim().length<3?"Enter a resource title with at least 3 characters.":undefined}>
+            <Input minLength={3} maxLength={200} value={resourceTitle} onChange={e=>setResourceTitle(e.target.value)}/>
+          </Field>
+          <Field label="HTTPS resource link" className="text-xs" required
+            error={resourceAttempted&&(()=>{try{return new URL(resourceUrl).protocol!=="https:";}catch{return true;}})()?"Enter a valid HTTPS resource URL.":undefined}>
+            <Input type="url" value={resourceUrl} onChange={e=>setResourceUrl(e.target.value)}/>
+          </Field>
+          <Field label="Resource format" className="text-xs"><Select value={resourceKind}
+           onChange={e=>setResourceKind(e.target.value as typeof resourceKind)}>
            {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
-          </select></label>
-          <button disabled={busy} className="justify-self-start rounded border px-3 py-2 text-sm">Add lesson resource</button>
+          </Select></Field>
+          <Button type="submit" variant="outline" disabled={busy} className="justify-self-start">Add lesson resource</Button>
           <p className="text-xs text-muted-foreground">Only teacher-owned supplementary resources can be replaced or retired here. Publisher content is immutable.</p>
         </form>}
         {data.role === "teacher" && <ClassVideoUploadForm key={lesson.id} sectionId={data.section.id}
@@ -398,42 +420,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         <div className="shrink-0 text-sm">{nextAction}</div>
       </section>
     </div>}
-    {tab === "planning" && (data.role === "teacher" ? <div className="space-y-5" aria-label="Teacher course implementation plan">
-      <WorkspacePanel title="Teacher course implementation plan"
-        description="Plan classroom work from the publisher's pinned course sequence. Class assignments and supplements are separate teacher-owned records; completion is self-reported, not mastery or credit.">
-        <p className="text-sm">{lessons.length} published lessons · {data.roster.length} enrolled learners · {assessmentEvidence.length} released assessments</p>
-        {data.content?.blueprint&&<p className="mt-2 text-xs text-muted-foreground">
-          Publisher's proposed {data.content.blueprint.targetInstructionalWeeks}-week sequence:
-          {data.content.blueprint.weeks.filter(week=>week.status!=="planned").length} weeks with authored planning status.
-          Planned weeks without published lessons are not assigned automatically.
-        </p>}
-      </WorkspacePanel>
-      {data.content?.modules.map(module=><WorkspacePanel key={module.id} title={module.title}>
-        {data.content?.blueprint&&<p className="mb-3 text-xs text-muted-foreground">
-          {data.content.blueprint.weeks.filter(week=>week.unitId===module.id).map(week=>`Week ${week.week}: ${week.title} (${week.status})`).join(" · ")||"No matching weeks in publisher roadmap"}
-        </p>}
-        <ol className="divide-y">{module.lessons.map(item=>{
-          const assigned=assessmentEvidence.filter(work=>work.curriculumLessonId===item.id);
-          const marked=data.lessonCompletionCounts.find(count=>count.lessonId===item.id)?.studentCount??0;
-          return <li key={item.id} className="space-y-2 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><p className="font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{assigned.length} linked released assignments · {marked}/{data.roster.length} learners self-reported complete</p>
-              </div>
-              {isLearnerFacingInstruction(item)?<div className="flex flex-wrap gap-3 text-sm">
-                <Link to="/classes" search={{...search,tab:"lessons",lesson:item.id}} className="underline">View lesson</Link>
-                <Link to="/teacher/gradebook" search={{section:data.section.id,lesson:item.id,kind:"classwork"}} className="underline">Create classwork</Link>
-              </div>:<p className="text-xs text-muted-foreground">Outline only — publisher instruction is not available yet.</p>}
-            </div>
-            {assigned.length>0&&<div className="flex flex-wrap gap-2">{assigned.map(work=>
-              <Link key={work.id} to="/teacher/gradebook" search={{section:data.section.id,assessment:work.id}}
-               className="rounded border px-2 py-1 text-xs underline">{work.title}</Link>)}</div>}
-          </li>;
-        })}</ol>
-        {!module.lessons.length&&<p className="text-sm text-muted-foreground">No published lessons in this unit.</p>}
-      </WorkspacePanel>)}
-      {!data.content&&<p className="rounded border p-4 text-sm">No published curriculum is available to plan this class.</p>}
-    </div> : <p role="alert" className="rounded border p-4 text-sm">Teacher planning is available only to the assigned teaching team.</p>)}
+    {tab === "planning" && <ClassTeacherPlanningPanel data={data} lessons={lessons} search={search}/>}
     {tab === "files" && <WorkspacePanel title="Class files and resources" description="Links and verified private documents from the published course version.">
       {data.role==="teacher" && <ClassSupplementForm title={resourceTitle} url={resourceUrl}
         kind={resourceKind} lessonId={resourceLesson} lessons={lessons} busy={busy}

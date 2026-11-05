@@ -4,14 +4,16 @@ import { getOperationsActions } from "@/modules/operations/action-workspace.func
 import { OperationsWorkspace } from "@/components/operations/OperationsWorkspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { supplementaryRead } from "@/lib/supplementary-read";
 
 export const loadOperationsHome = (deps: { siteId?: string; programId?: string }) => safeLoader(async () => {
   const operations = await getOperationsActions({ data: deps });
   const [health, commandCenter, dashboard, launches] = await Promise.all([
-    getReleaseHealth().catch(() => null),
-    getLiveOperationsCommandCenter({ data: deps }).catch(() => null),
-    getLiveFullFlowOperations({ data: deps }).catch(() => null),
-    import("@/modules/programs/launch.functions").then(module => module.listLaunches()).catch(() => null),
+    supplementaryRead(() => getReleaseHealth(), () => false),
+    supplementaryRead(() => getLiveOperationsCommandCenter({ data: deps }), () => false),
+    supplementaryRead(() => getLiveFullFlowOperations({ data: deps }), () => false),
+    supplementaryRead(() => import("@/modules/programs/launch.functions").then(module => module.listLaunches()),
+      data => data.launches.length === 0),
   ]);
   return { operations, health, commandCenter, dashboard, launches, authError: "" };
 })();

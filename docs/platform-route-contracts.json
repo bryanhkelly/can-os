@@ -170,9 +170,9 @@
       "route": "/admissions/transcripts",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "Registrar searches authorized transcript candidates; optional student person ID selects an exact candidate within query results, including same-name students",
       "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "readBoundary": "listTranscriptIssuanceCandidates retains registrar and credit-issuer authority; unavailable selected candidates never fall back to another student"
     },
     {
       "file": "src/routes/admissions.tsx",
@@ -233,9 +233,9 @@
       "route": "/calendar",
       "owner": "calendar",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "Authorized calendar items open exact event records or role-specific assignment details; guardian deadlines bind to the authorized child, with explicit sibling selection for shared Sections",
       "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "readBoundary": "Canonical scoped calendar visibility; guardian deadline child bindings come only from active academic relationships and active Section enrollments within current Site and Program scope"
     },
     {
       "file": "src/routes/church.apply.tsx",
@@ -440,9 +440,9 @@
       "route": "/home",
       "owner": "shell",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Role-selected dashboard; explicit onsite view preserves requested Site and school date",
+      "writeBoundary": "Delegates to independently authorized domain commands; view selection grants no authority",
+      "readBoundary": "Verified workspace session; onsite view requires onsite persona and matches requested Site to server-returned grant Site"
     },
     {
       "file": "src/routes/index.tsx",
@@ -539,9 +539,9 @@
       "route": "/operations/interest-events",
       "owner": "enrollment",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Site administrator or registrar reaches Interest Events from Launch and family outreach",
+      "writeBoundary": "Canonical interest-event commands; time-sensitive creation disabled without a valid selected school timezone",
+      "readBoundary": "Authorized Program and Site event listing; no browser-zone or Pacific fallback"
     },
     {
       "file": "src/routes/operations.insights.tsx",
@@ -575,9 +575,9 @@
       "route": "/operations/launch/",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "School setup retains ready, empty, unavailable and unauthorized supplementary read states",
+      "writeBoundary": "Canonical launch and configuration commands retain server gates; failed jurisdiction reads block configuration submission",
+      "readBoundary": "Launch options and Journey records required; failed jurisdiction or enrollment reads cannot establish opening readiness guidance"
     },
     {
       "file": "src/routes/operations.launch.tsx",
@@ -629,9 +629,9 @@
       "route": "/operations/transfer-records",
       "owner": "enrollment",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "Institutional records registrar selects an exact handoff Action; transcript issuance links preserve the student's person ID and search context",
       "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "readBoundary": "listTransferRecordsHandoffs retains institutional and delegated records scope; unavailable selected Actions never display a different handoff"
     },
     {
       "file": "src/routes/operations.tsx",
@@ -746,9 +746,9 @@
       "route": "/sites/$siteId/",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Site Today uses school-local operational timestamps and explicit onsite Site/date deep links",
+      "writeBoundary": "Existing independently authorized action and handoff commands",
+      "readBoundary": "Canonical getSiteToday Site-scoped projection; timestamps formatted with returned Site timezone"
     },
     {
       "file": "src/routes/sites.$siteId.parent-information.tsx",
@@ -764,9 +764,9 @@
       "route": "/sites/$siteId/profile",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
+      "roleJourney": "School profile remains usable with an explicit supplementary-directory unavailable warning",
+      "readBoundary": "Authorized Site configuration required; unavailable directory count is null, never an invented one",
+      "writeBoundary": "Read-only profile links to canonical setup commands"
     },
     {
       "file": "src/routes/sites.$siteId.publish.tsx",
@@ -800,9 +800,9 @@
       "route": "/staff/attendance",
       "owner": "staff",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Verified staff selects an authorized onsite Program; optional student profile ID and date open an exact attendance roster record; default date uses the Site timezone",
+      "writeBoundary": "Canonical attendance command compares queued account/grant/scope context before normal Program/student checks; replay revalidates workspace",
+      "readBoundary": "Authenticated attendance workspace before roster or queue restoration; student selection filters only the authorized roster and reports unavailable records; tab storage isolated by principal, Site and Program; legacy unscoped queues never adopted"
     },
     {
       "file": "src/routes/staff.students.$personId.tsx",

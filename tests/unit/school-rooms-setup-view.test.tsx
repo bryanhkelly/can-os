@@ -41,7 +41,7 @@ describe("classroom lifecycle setup", () => {
     expect(html).toContain("Reason for changing Library");
     expect(html).toContain('minLength="5"');
     expect(html).toContain('type="checkbox"');
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Retire Library<\/button>/);
+    expect(html).toMatch(/<button[^>]*>Retire Library<\/button>/);
     expect(html).toContain("Pending plans");
   });
   it("allows clearing defaults even when all rooms are retired", () => {

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { getLaunchSiteConfiguration } from "@/modules/programs/site-configuration.functions";
-import { EmptyState, StatCard, StatusBadge, WorkspaceShell, secondaryActionClassName, type StatusTone } from "@/components/workspace";
+import { EmptyState, PageFrame, RecordHeader, RecordLayout, StatCard, StatusBadge, secondaryActionClassName, type StatusTone } from "@/components/workspace";
 import { plural } from "@/lib/format";
 
 export type SchoolProfileSite = Awaited<ReturnType<typeof getLaunchSiteConfiguration>>;
@@ -9,7 +9,7 @@ export interface SchoolProfileData {
   site: SchoolProfileSite;
   organizationName: string | null;
   /** Sites in the active membership's scope; more than one adds a return link to the directory. */
-  siteCount: number;
+  siteCount: number | null;
   /** Active program enrollments by program, or null when the authoritative count is unavailable. */
   activeStudents: Record<string, number> | null;
 }
@@ -60,10 +60,13 @@ export function SchoolProfile({ data }: { data: SchoolProfileData }) {
   const publication = site.publication.status;
   const linkClass = "text-sm font-semibold underline";
 
-  return <WorkspaceShell eyebrow="School profile" title={site.name}
-    subtitle={[organizationName, site.timezone].filter(Boolean).join(" · ")}
-    breadcrumbs={siteCount > 1 ? <Link to="/sites" className="underline">All schools</Link> : undefined}
-    actions={<Link to="/sites/$siteId" params={{ siteId: site.id }} className={secondaryActionClassName}>Open today</Link>}>
+  return <PageFrame>
+    <RecordLayout header={<RecordHeader eyebrow="School profile" title={site.name}
+      subtitle={[organizationName, site.timezone].filter(Boolean).join(" · ")}
+      breadcrumbs={siteCount === null || siteCount > 1 ? <Link to="/sites" className="underline">All schools</Link> : undefined}
+      actions={<Link to="/sites/$siteId" params={{ siteId: site.id }} className={secondaryActionClassName}>Open today</Link>} />}
+    main={<>
+    {siteCount === null && <p role="status" className="mb-4 border p-3 text-sm">The school directory is unavailable. The number of authorized schools could not be verified.</p>}
     <div className="grid gap-3 sm:grid-cols-3">
       <StatCard label="Programs" value={site.programs.length} />
       {totalStudents !== null && <StatCard label="Active students" value={totalStudents} />}
@@ -129,5 +132,6 @@ export function SchoolProfile({ data }: { data: SchoolProfileData }) {
         </ManageLink>}
       </ul>
     </section>
-  </WorkspaceShell>;
+    </>} />
+  </PageFrame>;
 }

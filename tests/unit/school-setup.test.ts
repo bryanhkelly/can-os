@@ -142,7 +142,10 @@ describe("Site Admin inheritance and scope", () => {
     expect(rolesAllow(["site_admin"], "registrar")).toBe(false);
     expect(rolesAllow(["guardian"], context.role)).toBe(false);
     expect(getWorkspaceHome(context.role)).toBe("/home");
-    expect(getWorkspaceLinks(context.role)).toEqual(getWorkspaceLinks("registrar"));
+    const siteAdminLinks = getWorkspaceLinks(context.role) ?? [];
+    expect(siteAdminLinks.filter(link => link.path !== "/sites").map(link => link.path))
+      .toEqual((getWorkspaceLinks("registrar") ?? []).map(link => link.path));
+    expect(siteAdminLinks).toContainEqual(expect.objectContaining({ title: "School profile", path: "/sites" }));
   });
   it.each([
     { id: "foreign-grant" }, { accountId: "foreign-account" }, { personId: "foreign-person" },

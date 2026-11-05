@@ -38,4 +38,10 @@ describe("Teacher Today schedule", () => {
     expect(html).toContain("/teacher/gradebook?section=english&amp;assessment=essay");
     expect(html).toContain(" · Due");
   });
+  it("uses the authorized feed's Section even when the dashboard class summary omits it", () => {
+    const html = render({ ...feed, items: [{ id: "assessment:essay", title: "Essay", type: "due_date", source: "assessment",
+      startsAt: "2026-10-30T16:00:00Z", endsAt: null, timezone: "America/Los_Angeles",
+      description: null, cancelled: false, manageable: false, sectionId: "another-authorized-section" }] });
+    expect(html).toContain("/teacher/gradebook?section=another-authorized-section&amp;assessment=essay");
+  });
 });

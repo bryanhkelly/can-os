@@ -8,6 +8,9 @@ import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
 import { listNetworkAffiliations, reviewNetworkAffiliation } from "@/modules/networks/network-affiliations.functions";
 import { EmptyState } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -26,6 +29,10 @@ export function NetworkHome({ result }: { result: Awaited<ReturnType<typeof load
 type NetworkData = Awaited<ReturnType<typeof getNetworkSites>> & {
   affiliations: Awaited<ReturnType<typeof listNetworkAffiliations>>["entries"];
 };
+function isValidTimezone(value: string) {
+  try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; }
+  catch { return false; }
+}
 
 function NetworkSites({ data }: { data: NetworkData }) {
   const router = useRouter();
@@ -35,12 +42,16 @@ function NetworkSites({ data }: { data: NetworkData }) {
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [createAttempted,setCreateAttempted]=useState(false);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
+    setCreateAttempted(true);
+    if(name.trim().length<2||!(/^[a-z0-9]+(-[a-z0-9]+)*$/).test(slug)||!isValidTimezone(timezone))return;
     await mutation.run(async () => {
       const outcome = await createNetworkSite({ data: { name, slug, timezone } });
       setName(""); setSlug("");
+      setCreateAttempted(false);
       return outcome;
     }, { successMessage: outcome => outcome.created ? "Location created for your denomination." : "This location already exists.",
       commandErrorMessage: "Unable to create denomination location." });
@@ -100,23 +111,22 @@ function NetworkSites({ data }: { data: NetworkData }) {
     <section id="network-create" className="mt-8 rounded-xl border bg-card p-5">
       <h2 className="font-serif text-2xl">Add a headquarters-operated location</h2>
       <p className="mt-2 text-sm text-muted-foreground">Use this only for a location owned or operated by the denomination. Independently owned churches and schools require a reviewed affiliation link, not a transfer of site ownership.</p>
-      <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={create}>
-        <label className="text-sm font-medium">Location name
-          <input required minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)}
-            className="mt-1 block w-full rounded-lg border bg-background p-3" placeholder="Central Community Campus"/>
-        </label>
-        <label className="text-sm font-medium">Unique location code
-          <input required pattern="[a-z0-9]+(-[a-z0-9]+)*" value={slug} onChange={event => setSlug(event.target.value)}
-            className="mt-1 block w-full rounded-lg border bg-background p-3" placeholder="central-community"/>
-        </label>
-        <label className="text-sm font-medium">IANA timezone
-          <input required value={timezone} onChange={event => setTimezone(event.target.value)}
-            className="mt-1 block w-full rounded-lg border bg-background p-3" placeholder="America/Los_Angeles"/>
-        </label>
+      <form noValidate className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={create}>
+        <Field label="Location name" className="text-sm" required error={createAttempted&&name.trim().length<2?"Enter a location name with at least 2 characters.":undefined}>
+          <Input minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)} placeholder="Central Community Campus"/>
+        </Field>
+        <Field label="Unique location code" className="text-sm" required
+          error={createAttempted&&!(/^[a-z0-9]+(-[a-z0-9]+)*$/).test(slug)?"Use lowercase letters, digits, and single hyphens between words.":undefined}>
+          <Input pattern="[a-z0-9]+(-[a-z0-9]+)*" value={slug} onChange={event => setSlug(event.target.value)} placeholder="central-community"/>
+        </Field>
+        <Field label="IANA timezone" className="text-sm" required
+          error={createAttempted&&!isValidTimezone(timezone)?"Enter a valid IANA timezone, such as America/Los_Angeles.":undefined}>
+          <Input value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="America/Los_Angeles"/>
+        </Field>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={busy} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          <Button type="submit" disabled={busy}>
             {busy ? "Creating location…" : "Create location"}
-          </button>
+          </Button>
         </div>
       </form>
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording network change..."/>

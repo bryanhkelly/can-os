@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state=vi.hoisted(()=>({
- classes:vi.fn(),authority:vi.fn(),writes:vi.fn(),results:[] as unknown[][],
+ classes:vi.fn(),authority:vi.fn(),facilitatorSections:vi.fn(),writes:vi.fn(),results:[] as unknown[][],
+ requiredRoles:[] as readonly string[],selectCount:0,
  actor:{actorPersonId:"teacher",role:"teacher",capabilities:new Set(["calendar.event.manage"]),
   scope:{sectionIds:["delegated-section"]}} as Record<string,unknown>,
 }));
@@ -13,13 +14,16 @@ vi.mock("@tanstack/react-start",()=>({
 }));
 vi.mock("@tanstack/react-start/server",()=>({setResponseHeader:vi.fn()}));
 vi.mock("@/modules/identity/actors.server",()=>({
- requireActor:async()=>state.actor,actorSiteIds:()=>[],recordAudit:vi.fn(),
+ requireActor:async(roles:readonly string[])=>{state.requiredRoles=roles;return state.actor;},
+ actorSiteIds:()=>[],recordAudit:vi.fn(),
 }));
 vi.mock("@/modules/learning/class-access.server",()=>({accessibleClasses:state.classes,authorizeClass:state.authority}));
 vi.mock("@/modules/calendar/group-calendar-visibility.server",()=>({visibleStudyGroupCalendarEventIds:async()=>[]}));
+vi.mock("@/modules/operations/site-section-facilitators.server",()=>({activeFacilitatorSectionIds:state.facilitatorSections}));
 vi.mock("@/platform/mutation",()=>({emitEvent:vi.fn(),notifyMany:vi.fn()}));
 vi.mock("@/db/client",()=>{
  const query=()=>{
+  state.selectCount++;
   const chain:Record<string,unknown>={};
   for(const name of ["from","innerJoin","where","orderBy","limit","for"])chain[name]=()=>chain;
   chain.then=(resolve:(rows:unknown[])=>unknown)=>Promise.resolve(state.results.shift()??[]).then(resolve);
@@ -32,14 +36,57 @@ import {getCalendarMonth,getCalendarRange} from "@/modules/calendar/calendar.fun
 import {reviseCalendarEventForActor} from "@/modules/calendar/calendar-events.server";
 beforeEach(()=>{
  vi.clearAllMocks();vi.stubEnv("DATABASE_URL","postgresql://isolated-mock");
+ state.actor={actorPersonId:"teacher",role:"teacher",capabilities:new Set(["calendar.event.manage"]),
+  scope:{sectionIds:["delegated-section"]}};
+ state.requiredRoles=[];state.selectCount=0;
  state.classes.mockResolvedValue([{id:"delegated-section"}]);state.results=[];
 });
 afterEach(()=>vi.unstubAllEnvs());
 describe("calendar authority for delegated academic teachers",()=>{
+ it("projects only the queried guardian children for each assignment Section",async()=>{
+  state.actor={actorPersonId:"guardian",role:"guardian",capabilities:new Set(),
+   scope:{siteIds:["site"],programIds:["program"]}};
+  state.results=[[
+   {sectionId:"english",studentPersonId:"jordan",legalFirstName:"Jordan",legalLastName:"Student",preferredName:null},
+   {sectionId:"english",studentPersonId:"casey",legalFirstName:"Casey",legalLastName:"Student",preferredName:null},
+   {sectionId:"english",studentPersonId:"jordan",legalFirstName:"Jordan",legalLastName:"Student",preferredName:null},
+   {sectionId:"math",studentPersonId:"jordan",legalFirstName:"Jordan",legalLastName:"Student",preferredName:null},
+  ],[],[
+   {id:"essay",title:"Evidence essay",dueAt:new Date("2026-10-29T12:00:00Z"),sectionTitle:"English",sectionId:"english"},
+   {id:"equations",title:"Equations",dueAt:new Date("2026-10-29T12:00:00Z"),sectionTitle:"Math",sectionId:"math"},
+  ]];
+  const result=await getCalendarMonth({data:{year:2026,month:10}});
+  expect(result.items.find(item=>item.id==="assessment:essay")?.guardianStudents).toEqual([
+   {studentPersonId:"jordan",studentName:"Jordan Student"},
+   {studentPersonId:"casey",studentName:"Casey Student"},
+  ]);
+  expect(result.items.find(item=>item.id==="assessment:equations")?.guardianStudents).toEqual([
+   {studentPersonId:"jordan",studentName:"Jordan Student"},
+  ]);
+ });
+ it("does not project assignment child bindings when no active academic relationship is returned",async()=>{
+  state.actor={actorPersonId:"guardian",role:"guardian",capabilities:new Set(),
+   scope:{siteIds:["site"],programIds:["program"]}};
+  state.results=[[],[]];
+  const result=await getCalendarMonth({data:{year:2026,month:10}});
+  expect(result.items).toEqual([]);
+  expect(state.selectCount).toBe(4);
+ });
  it("uses the current classroom directory without requiring host Site or Program scope",async()=>{
   const invoke=getCalendarMonth as unknown as (arg:unknown)=>Promise<unknown>;
   await expect(invoke({data:{year:2026,month:10}})).resolves.toMatchObject({connected:true,items:[]});
   expect(state.classes).toHaveBeenCalledWith(state.actor);
+ });
+ it("limits room-facilitator calendar reads to assigned room Sections and site events", async () => {
+  state.actor = { actorPersonId: "facilitator", role: "room_facilitator", grantSiteId: "site",
+   capabilities: new Set(), scope: { programIds: ["program"] } };
+  state.facilitatorSections.mockResolvedValue(["assigned-section"]);
+  const invoke = getCalendarRange as unknown as (arg: unknown) => Promise<unknown>;
+  await expect(invoke({data:{startsAt:"2026-10-29T00:00:00Z",endsAt:"2026-10-30T00:00:00Z"}}))
+   .resolves.toMatchObject({connected:true,items:[],truncated:false});
+  expect(state.requiredRoles).toContain("room_facilitator");
+  expect(state.facilitatorSections).toHaveBeenCalledWith(expect.anything(), state.actor, "program");
+  expect(state.selectCount).toBe(3);
  });
  it("does not swallow a current classroom authority read failure",async()=>{
   state.classes.mockRejectedValue(new Error("delegation unavailable"));

@@ -11,6 +11,7 @@ import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
  createAssessment,
  manageAssessment,
@@ -21,13 +22,15 @@ import {
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
-import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
+import { QueryState, WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { liveRubricTotal } from "@/components/learning/live-rubric-total";
 import { prioritizeSubmittedReviews, adjacentReviews } from "@/components/learning/gradebook-review-queue";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
+import { normalizeClientError } from "@/lib/client-error";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 
 export const Route = createFileRoute("/teacher/gradebook")({
  validateSearch:(search:Record<string,unknown>):{section?:string;assessment?:string;student?:string;lesson?:string;kind?:string}=>({
@@ -48,20 +51,50 @@ type Assessment = Gradebook["assessments"][number];
 function TeacherGradebookPage() {
  const search=Route.useSearch();
  const navigate=Route.useNavigate();
- const [sections, setSections] = useState<Section[]>([]);
- const [selected, setSelected] = useState("");
- const [gradebook, setGradebook] = useState<Gradebook | null>(null);
- const [loading, setLoading] = useState(true);
- const [error, setError] = useState("");
- const [notice, setNotice] = useState("");
- const mutation=useMutationFeedback(async()=>{
-  const refreshed=await getGradebook({data:{sectionId:selected}});
-  setGradebook(refreshed);
-  return refreshed;
+ const queryClient=useQueryClient();
+ const {session}=useWorkspaceSession();
+ const grantId=session?.authenticated?session.activeGrantId:"anonymous";
+ const sectionsQuery=useQuery({
+  queryKey:["teacher-gradebook-sections",grantId],
+  queryFn:()=>getGradebookSections(),
+  retry:(count,cause)=>normalizeClientError(cause).retryable&&count<1,
  });
- const busy=mutation.pending||mutation.refreshFailed;
+ const sections=sectionsQuery.data?.sections??[];
+ const selected=search.section??sections[0]?.id??"";
+ const selectedSection=sections.some(section=>section.id===selected);
+ const gradebookQuery=useQuery({
+  queryKey:["teacher-gradebook",grantId,selected],
+  queryFn:()=>getGradebook({data:{sectionId:selected}}),
+  enabled:selectedSection,
+  retry:(count,cause)=>normalizeClientError(cause).retryable&&count<1,
+ });
+ const gradebook=gradebookQuery.data??null;
+ const loading=sectionsQuery.isPending||(selectedSection&&gradebookQuery.isPending);
+ const error=sectionsQuery.error
+  ?normalizeClientError(sectionsQuery.error,"Sign in with an authorized teacher account to view the gradebook.").message
+  :search.section&&sectionsQuery.data&&!selectedSection
+   ?"This section is unavailable in your current teacher workspace."
+   :gradebookQuery.error
+    ?normalizeClientError(gradebookQuery.error,"Unable to load the gradebook for this section.").message
+    :gradebook&&search.assessment&&!gradebook.assessments.some(item=>item.id===search.assessment)
+  ?"This assessment is unavailable in the selected section."
+  :gradebook&&search.student&&!gradebook.students.some(item=>item.studentProfileId===search.student)
+   ?"This student is unavailable in the selected section."
+   :"";
+ const retryQuery=sectionsQuery.isError
+  ?normalizeClientError(sectionsQuery.error).retryable?()=>void sectionsQuery.refetch():undefined
+  :gradebookQuery.isError&&normalizeClientError(gradebookQuery.error).retryable
+   ?()=>void gradebookQuery.refetch():undefined;
  const [gradingKey, setGradingKey] = useState("");
  const [detailKey, setDetailKey] = useState("");
+ const refreshGradebook=(sectionId:string)=>queryClient.fetchQuery({
+  queryKey:["teacher-gradebook",grantId,sectionId],
+  queryFn:()=>getGradebook({data:{sectionId}}),
+  staleTime:0,
+ });
+ const [notice, setNotice] = useState("");
+ const mutation=useMutationFeedback(()=>refreshGradebook(selected));
+ const busy=mutation.pending||mutation.refreshFailed;
  const [score, setScore] = useState("");
  const [comment, setComment] = useState("");
  const [rubricInputs, setRubricInputs] = useState<Record<string, string>>({});
@@ -97,68 +130,19 @@ function TeacherGradebookPage() {
   setRubricInputs(Object.fromEntries((draft?.rubricScores??[]).map(item=>[item.id,String(item.points)])));
  },[reviewCell?.submissionId]);
 
- useEffect(() => {
-  let active = true;
-  getGradebookSections().then(result => {
-   if (!active) return;
-   setSections(result.sections);
-   if(search.section&&!result.sections.some(section=>section.id===search.section)){
-    setError("This section is unavailable in your current teacher workspace.");
-    setLoading(false);
-    return;
-   }
-   setSelected(search.section??result.sections[0]?.id??"");
-   if (!result.sections.length) setLoading(false);
-  }).catch(() => {
-   if (active) { setError("Sign in with an authorized teacher account to view the gradebook."); setLoading(false); }
-  });
-  return () => { active = false; };
- }, []);
-
  const loadGradebook = (sectionId: string) => {
-  setLoading(true);
-  setError("");
   setGradingKey("");
-  return getGradebook({ data: { sectionId } }).then(result => {
-   setGradebook(result);
-   setLoading(false);
-   return result;
-  }).catch(cause => {
-   setGradebook(null);
-   setError("Unable to load the gradebook for this section.");
-   setLoading(false);
-   throw cause;
-  });
+  return refreshGradebook(sectionId);
  };
 
  useEffect(() => {
-  if (!selected) { setGradebook(null); return; }
-  let active = true;
-  setLoading(true);
-  setError("");
-  setGradingKey("");
-  setDetailKey("");
-  getGradebook({ data: { sectionId: selected } }).then(result => {
-   if (active) {
-    setGradebook(result); setLoading(false);
-    if(search.assessment&&!result.assessments.some(item=>item.id===search.assessment)){
-     setError("This assessment is unavailable in the selected section.");return;
-    }
-    if(search.student&&!result.students.some(item=>item.studentProfileId===search.student)){
-     setError("This student is unavailable in the selected section.");return;
-    }
-    const target=result.cells.find(cell=>cell.assessmentId===search.assessment&&cell.studentProfileId===search.student);
-    if(target){
-     const key=`${target.studentProfileId}:${target.assessmentId}`;
-     if(target.status==="submitted")setGradingKey(key);
-     else if(target.status==="graded"||target.status==="returned")setDetailKey(key);
-    }
-   }
-  }).catch(() => {
-   if (active) { setGradebook(null); setError("Unable to load the gradebook for this section."); setLoading(false); }
-  });
-  return () => { active = false; };
- }, [selected, search.assessment, search.student]);
+  if(!gradebook||error)return;
+  const target=gradebook.cells.find(cell=>cell.assessmentId===search.assessment&&cell.studentProfileId===search.student);
+  if(!target)return;
+  const key=`${target.studentProfileId}:${target.assessmentId}`;
+  if(target.status==="submitted")setGradingKey(key);
+  else if(target.status==="graded"||target.status==="returned")setDetailKey(key);
+ },[gradebook,search.assessment,search.student,error]);
 
  const cellFor = (studentProfileId: string, assessmentId: string): Cell | undefined =>
   gradebook?.cells.find(cell => cell.studentProfileId === studentProfileId && cell.assessmentId === assessmentId);
@@ -195,7 +179,7 @@ function TeacherGradebookPage() {
    commandErrorMessage:draftOnly?"Unable to save grading draft.":"Unable to post the grade.",
    refresh:async()=>{
     refreshed=await getGradebook({data:{sectionId:selected}});
-    setGradebook(refreshed);
+    queryClient.setQueryData(["teacher-gradebook",grantId,selected],refreshed);
     return refreshed;
    },
   });
@@ -324,8 +308,8 @@ function TeacherGradebookPage() {
    {sections.length > 0 && <div className="mt-8 max-w-sm">
     <GradebookSectionSelector sections={sections} selectedId={selected} onSelect={section => void navigate({search:{section}})} />
    </div>}
-   {loading && <p className="mt-8 text-sm" role="status">Loading gradebook…</p>}
-   {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
+  <QueryState loading={loading?"Loading gradebook...":undefined} error={error||undefined}
+   onRetry={retryQuery} retrying={sectionsQuery.isFetching||gradebookQuery.isFetching}/>
    {notice && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving gradebook changes..."/>
    {!loading && !error && sections.length === 0 && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
@@ -375,7 +359,7 @@ function TeacherGradebookPage() {
        <tr className="border-b text-left">
         <th className="p-3 font-semibold">Student</th>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment =>
-         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} busy={busy}
+         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} sectionId={selected} busy={busy}
           dueDate={assessmentDueDates[assessment.id]??""}
           onDueDateChange={value=>setAssessmentDueDates(current=>({...current,[assessment.id]:value}))}
           onAction={action=>void changeAssessment(assessment.id,action)}
@@ -385,7 +369,7 @@ function TeacherGradebookPage() {
       </thead>
       <tbody>
        {gradebook.students.filter(item=>!search.student||item.studentProfileId===search.student).map((student, rowIndex) => <tr key={student.studentProfileId} className="border-b last:border-0">
-        <th className="p-3 text-left font-semibold">{student.displayName}</th>
+        <th className="p-3 text-left font-semibold"><Link to="/staff/students/$personId" params={{personId:student.personId}} className="underline">{student.displayName}</Link></th>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map((assessment, colIndex) => {
          const cell = cellFor(student.studentProfileId, assessment.id);
          const label = cellLabel(cell, assessment);

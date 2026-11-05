@@ -15,6 +15,7 @@ export type NotificationEmailMessage = {
   subject: string;
   text: string;
   actionUrl?: string;
+  attachments?: { filename: string; content: string; contentType: string }[];
 };
 
 function resolveActionUrl(actionUrl: string | undefined): string | undefined {
@@ -68,6 +69,13 @@ export async function sendNotificationEmail(
         to: [message.to],
         subject: message.subject,
         text,
+        ...(message.attachments?.length ? {
+          attachments: message.attachments.map(attachment => ({
+            filename: attachment.filename,
+            content: attachment.content,
+            content_type: attachment.contentType,
+          })),
+        } : {}),
       }),
     });
     if (!response.ok) {

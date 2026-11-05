@@ -1,8 +1,10 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   calendarEvents,
+  communicationThreads,
+  interestEventEmailDeliveries,
   interestEventRegistrations,
   interestEvents,
   programPublications,
@@ -12,6 +14,7 @@ import {
   sitePublications,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
+import { normalizeAccessEmail } from "@/domain/access-tokens";
 import {
   assertCapability,
   assertOrganizationScope,
@@ -20,9 +23,16 @@ import {
   AuthorizationError,
 } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { familyInvitationBatchMetadataSchema, isFamilyInvitationExpired } from "@/domain/family-invitations";
+import {
+  interestEventFollowUpTime,
+  interestEventRegistrationEmailSchedule,
+} from "@/domain/interest-event-delivery";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import {
   interestEventCreateInput,
+  interestEventAttendanceInput,
+  interestEventInvitationRsvpLink,
   interestEventRegistrationInput,
   interestEventRegistrationMessage,
   interestEventRsvpLink,
@@ -96,6 +106,35 @@ async function loadEvent(reader: Reader, eventId: string) {
   return event;
 }
 
+async function assertFamilyInvitationEventAccess(
+  reader: Reader,
+  event: { siteId: string; programId: string },
+  invitationBatchId: string,
+  invitationRecipientKey: string,
+  email?: string,
+): Promise<{ firstName: string; lastName: string; email: string }> {
+  const [batch] = await reader.select({
+    programId: communicationThreads.contextId,
+    metadata: communicationThreads.metadata,
+    createdAt: communicationThreads.createdAt,
+  }).from(communicationThreads).where(and(
+    eq(communicationThreads.id, invitationBatchId),
+    eq(communicationThreads.contextType, "program"),
+  )).limit(1);
+  const metadata = familyInvitationBatchMetadataSchema.safeParse(batch?.metadata);
+  const recipient = metadata.success
+    ? metadata.data.recipients.find(item => item.key === invitationRecipientKey)
+    : undefined;
+  if (!batch?.programId || !metadata.success ||
+    metadata.data.destination !== "preopening_interest" ||
+    metadata.data.siteId !== event.siteId || batch.programId !== event.programId ||
+    isFamilyInvitationExpired(batch.createdAt) ||
+    !recipient || (email && normalizeAccessEmail(recipient.email) !== normalizeAccessEmail(email))) {
+    unavailableEvent();
+  }
+  return recipient;
+}
+
 async function assertProgramPublic(siteSlug: string, programId: string): Promise<void> {
   if (process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED !== "true") unavailableEvent();
   const catalog = await readPublishedSiteCatalog(siteSlug);
@@ -141,7 +180,10 @@ export async function listInterestEvents(
     title: string; description: string; kind: string; location: string;
     visibility: string; startsAt: string; endsAt: string; timezone: string;
     rsvpUrl?: string;
-    registrations: { id: string; firstName: string; lastName: string; email: string; status: string }[];
+    registrations: {
+      id: string; firstName: string; lastName: string; email: string; status: string;
+      attendanceStatus: "attended" | "no_show" | null; attendanceMarkedAt: string | null;
+    }[];
   }[];
 }> {
   assertInterestEventManager(context);
@@ -196,6 +238,8 @@ export async function listInterestEvents(
     id: interestEventRegistrations.id,
     eventId: interestEventRegistrations.eventId,
     status: interestEventRegistrations.status,
+    attendanceStatus: interestEventRegistrations.attendanceStatus,
+    attendanceMarkedAt: interestEventRegistrations.attendanceMarkedAt,
     firstName: publicAdmissionsInterests.contactFirstName,
     lastName: publicAdmissionsInterests.contactLastName,
     email: publicAdmissionsInterests.contactEmail,
@@ -218,7 +262,10 @@ export async function listInterestEvents(
       ...(row.visibility === "public" && process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true"
         ? { rsvpUrl: interestEventRsvpLink(configuredPublicOrigin(), row.id) }
         : {}),
-      registrations: registrationsByEvent.get(row.id) ?? [],
+      registrations: (registrationsByEvent.get(row.id) ?? []).map(registration => ({
+        ...registration,
+        attendanceMarkedAt: registration.attendanceMarkedAt?.toISOString() ?? null,
+      })),
     })),
   };
 }
@@ -379,12 +426,21 @@ export async function rotateInterestEventInvitationLink(
   });
 }
 
-export async function readInterestEventForRsvp(eventId: string, accessToken: string) {
+export async function readInterestEventForRsvp(
+  eventId: string,
+  accessToken: string,
+  invitation?: { batchId: string; recipientKey: string },
+) {
   const event = await loadEvent(db, eventId);
   if (!event || event.status !== "published" || event.startsAt <= new Date()) unavailableEvent();
+  let invitedFamily: { firstName: string; lastName: string; email: string } | null = null;
   if (event.visibility === "invitation_only") {
     const expected = event.invitationTokenDigest;
-    if (!expected || !accessToken || accessTokenDigest(event.id, accessToken) !== expected) unavailableEvent();
+    const hasEventToken = Boolean(expected && accessToken && accessTokenDigest(event.id, accessToken) === expected);
+    if (!hasEventToken) {
+      if (!invitation) unavailableEvent();
+      invitedFamily = await assertFamilyInvitationEventAccess(db, event, invitation.batchId, invitation.recipientKey);
+    }
   } else if (event.visibility === "public") {
     await assertProgramPublic(event.siteSlug, event.programId);
   } else unavailableEvent();
@@ -402,6 +458,7 @@ export async function readInterestEventForRsvp(eventId: string, accessToken: str
     startsAt: event.startsAt.toISOString(),
     endsAt: event.endsAt?.toISOString() ?? null,
     timezone: event.timezone,
+    invitedFamily,
   };
 }
 
@@ -426,6 +483,7 @@ export async function registerInterestEvent(
       siteSlug: sites.slug,
       programStatus: programs.status,
       startsAt: calendarEvents.startsAt,
+      endsAt: calendarEvents.endsAt,
     }).from(interestEvents)
       .innerJoin(programs, eq(programs.id, interestEvents.programId))
       .innerJoin(sites, eq(sites.id, interestEvents.siteId))
@@ -436,8 +494,14 @@ export async function registerInterestEvent(
       .where(eq(interestEvents.id, data.eventId)).for("update", { of: interestEvents }).limit(1);
     if (!event || event.status !== "published" || event.startsAt <= new Date()) unavailableEvent();
     if (event.visibility === "invitation_only") {
-      if (!event.invitationTokenDigest || !data.accessToken ||
-        accessTokenDigest(event.id, data.accessToken) !== event.invitationTokenDigest) unavailableEvent();
+      const hasEventToken = Boolean(event.invitationTokenDigest && data.accessToken &&
+        accessTokenDigest(event.id, data.accessToken) === event.invitationTokenDigest);
+      if (!hasEventToken) {
+        if (!data.invitationBatchId || !data.invitationRecipientKey) unavailableEvent();
+        await assertFamilyInvitationEventAccess(
+          tx, event, data.invitationBatchId, data.invitationRecipientKey, data.email,
+        );
+      }
     } else if (event.visibility === "public") {
       await assertPublicPublicationLocked(tx, {
         siteId: event.siteId, programId: event.programId, siteSlug: event.siteSlug,
@@ -504,6 +568,17 @@ export async function registerInterestEvent(
     }).returning({ id: interestEventRegistrations.id });
     if (!registration) throw new Error("Unable to save event RSVP");
 
+    const now = new Date();
+    const emailSchedule = interestEventRegistrationEmailSchedule(event.startsAt, now);
+    await tx.insert(interestEventEmailDeliveries).values(emailSchedule.map(delivery => ({
+      registrationId: registration.id,
+      kind: delivery.kind,
+      deliverAt: delivery.deliverAt,
+    }))).onConflictDoNothing({ target: [
+      interestEventEmailDeliveries.registrationId,
+      interestEventEmailDeliveries.kind,
+    ] });
+
     await emitEvent(tx, {
       eventType: EventTypes.InterestEventRegistrationCreated,
       aggregateType: "interest_event_registration",
@@ -511,7 +586,7 @@ export async function registerInterestEvent(
       organizationId: event.organizationId,
       siteId: event.siteId,
       programId: event.programId,
-      payload: { eventId: event.id, publicInterestId },
+      payload: { eventId: event.id, publicInterestId, emailDeliveriesQueued: emailSchedule.map(item => item.kind) },
     });
     await writeAudit(tx, {
       action: "interest_event.registration.create",
@@ -525,47 +600,135 @@ export async function registerInterestEvent(
   });
 }
 
+export async function recordInterestEventAttendance(
+  context: AccessContext,
+  input: unknown,
+): Promise<{ created: boolean; attendanceStatus: "attended" | "no_show" }> {
+  assertInterestEventManager(context);
+  const data = interestEventAttendanceInput.parse(input);
+  return db.transaction(async tx => {
+    const [record] = await tx.select({
+      registrationId: interestEventRegistrations.id,
+      attendanceStatus: interestEventRegistrations.attendanceStatus,
+      organizationId: interestEvents.organizationId,
+      siteId: interestEvents.siteId,
+      programId: interestEvents.programId,
+      eventId: interestEvents.id,
+      eventStatus: interestEvents.status,
+      startsAt: calendarEvents.startsAt,
+      endsAt: calendarEvents.endsAt,
+    }).from(interestEventRegistrations)
+      .innerJoin(interestEvents, eq(interestEvents.id, interestEventRegistrations.eventId))
+      .innerJoin(calendarEvents, and(
+        eq(calendarEvents.sourceType, "interest_event"),
+        eq(calendarEvents.sourceId, interestEvents.id),
+      ))
+      .where(eq(interestEventRegistrations.id, data.registrationId))
+      .for("update", { of: interestEventRegistrations }).limit(1);
+    if (!record || record.eventStatus !== "published") unavailableEvent();
+    assertOrganizationScope(context, record.organizationId);
+    assertSiteScope(context, record.siteId);
+    assertProgramScope(context, record.programId);
+    if (record.attendanceStatus) {
+      if (record.attendanceStatus === data.attendanceStatus) {
+        return { created: false, attendanceStatus: record.attendanceStatus };
+      }
+      throw new DomainError("CONFLICT", "Attendance was already recorded differently");
+    }
+    const now = new Date();
+    if (data.attendanceStatus === "attended" && now < record.startsAt) {
+      throw new DomainError("VALIDATION_FAILED", "Check-in opens when the event starts");
+    }
+    if (data.attendanceStatus === "no_show" && now < (record.endsAt ?? record.startsAt)) {
+      throw new DomainError("VALIDATION_FAILED", "No-show can be recorded after the event ends");
+    }
+    await tx.update(interestEventRegistrations).set({
+      attendanceStatus: data.attendanceStatus,
+      attendanceMarkedAt: now,
+      attendanceMarkedByPersonId: context.actorPersonId!,
+      updatedAt: now,
+    }).where(and(
+      eq(interestEventRegistrations.id, record.registrationId),
+      isNull(interestEventRegistrations.attendanceStatus),
+    ));
+    const followUpKind = data.attendanceStatus === "attended" ? "follow_up_attended" : "follow_up_no_show";
+    const deliverAt = interestEventFollowUpTime(record.endsAt, now);
+    await tx.insert(interestEventEmailDeliveries).values({
+      registrationId: record.registrationId,
+      kind: followUpKind,
+      deliverAt,
+    }).onConflictDoNothing({ target: [
+      interestEventEmailDeliveries.registrationId,
+      interestEventEmailDeliveries.kind,
+    ] });
+    await emitEvent(tx, {
+      eventType: EventTypes.InterestEventAttendanceRecorded,
+      aggregateType: "interest_event_registration",
+      aggregateId: record.registrationId,
+      actorPersonId: context.actorPersonId,
+      organizationId: record.organizationId,
+      siteId: record.siteId,
+      programId: record.programId,
+      payload: { eventId: record.eventId, attendanceStatus: data.attendanceStatus },
+    });
+    await writeAudit(tx, context, {
+      action: "interest_event.attendance.record",
+      entityType: "interest_event_registration",
+      entityId: record.registrationId,
+      scope: { organizationId: record.organizationId, siteId: record.siteId, programId: record.programId },
+      after: { attendanceStatus: data.attendanceStatus, attendanceMarkedAt: now.toISOString() },
+    });
+    return { created: true, attendanceStatus: data.attendanceStatus };
+  });
+}
+
 export async function listPublicInterestEventsForInvitation(batchId: string, recipientKey: string) {
-  if (process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED !== "true") return [];
-  const { communicationThreads } = await import("@/db/schema");
   const [batch] = await db.select({
     programId: communicationThreads.contextId,
     metadata: communicationThreads.metadata,
+    createdAt: communicationThreads.createdAt,
   }).from(communicationThreads).where(and(
     eq(communicationThreads.id, batchId),
     eq(communicationThreads.contextType, "program"),
   )).limit(1);
   if (!batch?.programId) return [];
-  const metadata = (await import("@/domain/family-invitations"))
-    .familyInvitationBatchMetadataSchema.safeParse(batch.metadata);
+  const metadata = familyInvitationBatchMetadataSchema.safeParse(batch.metadata);
   if (!metadata.success || metadata.data.destination !== "preopening_interest" ||
+    isFamilyInvitationExpired(batch.createdAt) ||
     !metadata.data.recipients.some(recipient => recipient.key === recipientKey)) return [];
+  const [program] = await db.select({ siteId: programs.siteId, siteSlug: sites.slug })
+    .from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
+    .where(eq(programs.id, batch.programId)).limit(1);
+  if (!program || program.siteId !== metadata.data.siteId) return [];
+  let publicProgramListed = false;
+  if (process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true") {
+    const catalog = await readPublishedSiteCatalog(program.siteSlug);
+    publicProgramListed = Boolean(catalog?.academicPrograms?.some(item => item.programId === batch.programId));
+  }
   const events = await db.select({
     id: interestEvents.id,
     title: interestEvents.title,
     startsAt: calendarEvents.startsAt,
     endsAt: calendarEvents.endsAt,
     timezone: calendarEvents.timezone,
+    visibility: interestEvents.visibility,
   }).from(interestEvents).innerJoin(calendarEvents, and(
     eq(calendarEvents.sourceType, "interest_event"),
     eq(calendarEvents.sourceId, interestEvents.id),
   )).where(and(
     eq(interestEvents.programId, batch.programId),
-    eq(interestEvents.visibility, "public"),
+    inArray(interestEvents.visibility, ["public", "invitation_only"]),
     eq(interestEvents.status, "published"),
     gt(calendarEvents.startsAt, new Date()),
   )).orderBy(calendarEvents.startsAt).limit(5);
-  const [site] = await db.select({ slug: sites.slug }).from(interestEvents)
-    .innerJoin(sites, eq(sites.id, interestEvents.siteId))
-    .where(eq(interestEvents.programId, batch.programId)).limit(1);
-  if (!site) return [];
-  const catalog = await readPublishedSiteCatalog(site.slug);
-  if (!catalog?.academicPrograms?.some(program => program.programId === batch.programId)) return [];
-  return events.filter(event => event.startsAt > new Date()).map(event => ({
+  return events.filter(event => event.startsAt > new Date() &&
+    (event.visibility === "invitation_only" || publicProgramListed)).map(event => ({
     id: event.id,
     title: event.title,
     startsAt: event.startsAt.toISOString(),
     timezone: event.timezone,
-    rsvpUrl: interestEventRsvpLink(configuredPublicOrigin(), event.id),
+    rsvpUrl: event.visibility === "invitation_only"
+      ? interestEventInvitationRsvpLink(configuredPublicOrigin(), event.id, batchId, recipientKey)
+      : interestEventRsvpLink(configuredPublicOrigin(), event.id),
   }));
 }

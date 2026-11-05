@@ -1,5 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   confirmAskCanAction,
   sendAskCanMessage,
@@ -27,6 +30,7 @@ export function AskCanConversation() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [attempted, setAttempted] = useState(false);
   const selection = useRef(0);
   const [threads, setThreads] = useState<{ id: string; lastActiveAt: Date }[]>([]);
   useEffect(() => {
@@ -73,6 +77,7 @@ export function AskCanConversation() {
 
   async function send() {
     const body = input.trim();
+    setAttempted(true);
     if (!body || busy || loading) return;
     setBusy(true);
     setError("");
@@ -82,6 +87,7 @@ export function AskCanConversation() {
       });
       setConversationId(turn.conversationId);
       setInput("");
+      setAttempted(false);
       setMessages((prev) => [...prev,
         { id: `sent-${Date.now()}`, role: "user", body, evidenceRefs: [], actionPreview: null },
         turn.message,
@@ -202,29 +208,22 @@ export function AskCanConversation() {
         ))}
       </section>
 
-      <form
-        className="mt-8 flex gap-2"
+      <form noValidate
+        className="mt-8 flex flex-wrap items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           void send();
         }}
       >
-        <input
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Ask CAN anything…"
-          aria-label="Message CAN"
-          maxLength={4000}
-          disabled={loading || busy}
-          className="min-w-0 flex-1 rounded-full border bg-card px-4 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={busy || loading || !input.trim()}
-          className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-50"
-        >
+        <div className="min-w-0 flex-1">
+          <Input value={input} onChange={(event) => setInput(event.target.value)}
+            placeholder="Ask CAN anything…" aria-label="Message CAN" maxLength={4000}
+            disabled={loading || busy}/>
+          {attempted&&!input.trim()&&<FieldError className="mt-2">Enter a message for CAN.</FieldError>}
+        </div>
+        <Button type="submit" disabled={busy || loading}>
           {busy ? "Working..." : "Send"}
-        </button>
+        </Button>
       </form>
 
     </div>

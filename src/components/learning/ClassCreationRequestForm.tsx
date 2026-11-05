@@ -2,7 +2,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -25,6 +25,7 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
   const [desiredTerm, setDesiredTerm] = useState("");
   const [schedulePreference, setSchedulePreference] = useState("");
   const [notes, setNotes] = useState("");
+  const [attempted, setAttempted] = useState(false);
 
   function resetRequestId() {
     requestId.current = null;
@@ -32,6 +33,7 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
 
   function clearSavedDraft() {
     requestId.current = null;
+    setAttempted(false);
     setRequestedClassTitle("");
     setRequestedCourseOrSubject("");
     setDesiredTerm("");
@@ -58,8 +60,10 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
           to set up your program access before requesting a class.
         </p>
       ) : (
-        <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
+        <form noValidate className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
           event.preventDefault();
+          setAttempted(true);
+          if (!programId || requestedClassTitle.trim().length < 2 || requestedCourseOrSubject.trim().length < 2 || desiredTerm.trim().length < 2) return;
           const id = requestId.current ?? crypto.randomUUID();
           requestId.current = id;
           void mutation.run(() => submitTeacherClassRequest({ data: {
@@ -78,49 +82,46 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
           });
         }}>
           <fieldset disabled={busy} className="contents" aria-busy={mutation.pending}>
-          <Label className="sm:col-span-2">
-            School program
-            <Select required value={programId} onChange={event => {
+          <Field className="sm:col-span-2" label="School program" required
+            error={attempted&&!programId?"Choose a school Program.":undefined}>
+            <Select value={programId} onChange={event => {
               resetRequestId();
               setProgramId(event.target.value);
-            }} className="mt-1">
+            }}>
               {options.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
             </Select>
-          </Label>
-          <Label>
-            Proposed class title
-            <Input required minLength={2} maxLength={160} value={requestedClassTitle}
+          </Field>
+          <Field label="Proposed class title" required
+            error={attempted&&requestedClassTitle.trim().length<2?"Enter a class title with at least 2 characters.":undefined}>
+            <Input minLength={2} maxLength={160} value={requestedClassTitle}
               onChange={event => { resetRequestId(); setRequestedClassTitle(event.target.value); }}
-              className="mt-1"/>
-          </Label>
-          <Label>
-            Course or subject
-            <Input required minLength={2} maxLength={120} value={requestedCourseOrSubject}
+              />
+          </Field>
+          <Field label="Course or subject" required
+            error={attempted&&requestedCourseOrSubject.trim().length<2?"Enter a course or subject with at least 2 characters.":undefined}>
+            <Input minLength={2} maxLength={120} value={requestedCourseOrSubject}
               onChange={event => { resetRequestId(); setRequestedCourseOrSubject(event.target.value); }}
               placeholder="For example, Biology"
-              className="mt-1"/>
-          </Label>
-          <Label>
-            Desired term
-            <Input required minLength={2} maxLength={100} value={desiredTerm}
+              />
+          </Field>
+          <Field label="Desired term" required
+            error={attempted&&desiredTerm.trim().length<2?"Enter a desired term with at least 2 characters.":undefined}>
+            <Input minLength={2} maxLength={100} value={desiredTerm}
               onChange={event => { resetRequestId(); setDesiredTerm(event.target.value); }}
               placeholder="For example, Fall 2026"
-              className="mt-1"/>
-          </Label>
-          <Label>
-            Schedule preference
+              />
+          </Field>
+          <Field label="Schedule preference">
             <Input maxLength={500} value={schedulePreference}
               onChange={event => { resetRequestId(); setSchedulePreference(event.target.value); }}
-              placeholder="Optional"
-              className="mt-1"/>
-          </Label>
-          <Label className="sm:col-span-2">
-            Notes for the registrar
+              placeholder="Optional"/>
+          </Field>
+          <Field className="sm:col-span-2" label="Notes for the registrar">
             <Textarea maxLength={1000} value={notes}
               onChange={event => { resetRequestId(); setNotes(event.target.value); }}
-              rows={3} className="mt-1"/>
-          </Label>
-          <Button type="submit" disabled={busy || !programId}>
+              rows={3}/>
+          </Field>
+          <Button type="submit" disabled={busy}>
             Submit class request
           </Button>
           </fieldset>

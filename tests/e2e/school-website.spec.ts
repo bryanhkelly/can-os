@@ -77,8 +77,12 @@ test("school administrator reviews, publishes and renames a standalone school we
   await inquiryForm.getByLabel("Last name").fill("Parent");
   await inquiryForm.getByLabel("Email", { exact: true }).fill(parentEmail);
   await inquiryForm.getByRole("checkbox").check();
+  // Embedded/headless Chromium can emit Origin: null for form navigations;
+  // send the actual same-origin value so the endpoint's CSRF guard stays active.
+  await page.setExtraHTTPHeaders({ origin: new URL(page.url()).origin });
   await inquiryForm.getByRole("button", { name: "Request information" }).click();
   await expect(page.getByRole("heading", { name: "Thank you for your interest." })).toBeVisible();
+  await page.setExtraHTTPHeaders({});
   const [interest] = await sql`
     SELECT source, status FROM public_admissions_interests
     WHERE contact_email = ${parentEmail} LIMIT 1

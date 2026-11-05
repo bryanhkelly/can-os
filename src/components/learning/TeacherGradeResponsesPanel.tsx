@@ -4,12 +4,16 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { getTeacherGradeResponses, resolveTeacherGradeResponse } from "@/modules/learning/teacher-grade-response.functions";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 
 export type TeacherGradeResponseItem = Awaited<ReturnType<typeof getTeacherGradeResponses>>["items"][number];
 type Item = TeacherGradeResponseItem;
 
 function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: string, answer: string) => void; selected: boolean }) {
   const [response, setResponse] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const mutation=useMutationFeedback(async()=>{});
   const busy=mutation.pending||mutation.refreshFailed;
   const [savedResponse, setSavedResponse] = useState<string | null>(null);
@@ -31,25 +35,28 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
       className="mt-3 inline-block text-sm underline">Open current class gradebook</Link>
     {(item.status === "resolved" || savedResponse !== null)
       ? <p className="mt-3 whitespace-pre-wrap text-sm" role="status">School response: {savedResponse ?? item.resolutionNote}</p>
-      : <form className="mt-3 space-y-3" onSubmit={async event => {
+      : <form noValidate className="mt-3 space-y-3" onSubmit={async event => {
         event.preventDefault();
+        setAttempted(true);
+        if(response.trim().length<10)return;
         if (busy) return;
         await mutation.run(async()=>{
           await resolveTeacherGradeResponse({ data: { actionId: item.id, response } });
           // Preserve the confirmed resolution even if refreshing the queue fails.
           setSavedResponse(response.trim());
+          setAttempted(false);
         },{successMessage:"School response recorded.",commandErrorMessage:"Unable to record the school response.",
           refresh:async()=>onSaved(item.id,response.trim())});
       }}>
-        <label className="block text-sm font-semibold">Response to the guardian
-          <textarea value={response} onChange={event => setResponse(event.target.value)} required
-            minLength={10} maxLength={2000} rows={3} disabled={busy}
-            className="mt-2 block w-full rounded-lg border bg-background p-3"/>
-        </label>
+        <Field label="Response to the guardian" className="text-sm" required
+          error={attempted&&response.trim().length<10?"Enter at least 10 characters in your response.":undefined}>
+          <Textarea value={response} onChange={event => setResponse(event.target.value)}
+            minLength={10} maxLength={2000} rows={3} disabled={busy}/>
+        </Field>
         <p className="text-xs text-muted-foreground">This answer resolves the existing follow-up and is visible to the requesting guardian while their academic access remains active.</p>
-        <button disabled={busy} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+        <Button type="submit" variant="outline" disabled={busy}>
           {busy ? "Saving…" : "Respond and resolve"}
-        </button>
+        </Button>
       </form>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording school response..."/>
   </article>;

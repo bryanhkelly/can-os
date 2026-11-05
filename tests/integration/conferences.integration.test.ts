@@ -209,9 +209,11 @@ integration("GF39 parent-teacher conferences", () => {
     }
     await conferences.queueConferenceReminder(teacherContext, bookingId);
 
-    const reminders = await db.select().from(schema.notifications)
-      .where(eq(schema.notifications.recipientPersonId, guardian.id));
+    const reminders = await db.select().from(schema.scheduledReminders)
+      .where(eq(schema.scheduledReminders.recipientPersonId, guardian.id));
     expect(reminders.some((n) => n.type === "conference_reminder")).toBe(true);
+    expect(await db.select().from(schema.notifications)
+      .where(eq(schema.notifications.resourceId, bookingId))).toEqual([]);
 
     await expect(conferences.completeConference(teacherContext, { bookingId, outcome: "held" }))
       .rejects.toThrow("before the appointment starts");

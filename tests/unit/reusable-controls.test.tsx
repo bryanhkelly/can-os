@@ -84,4 +84,9 @@ describe("reusable workflow presentation", () => {
       expect(renderToStaticMarkup(<QueryState {...props}><p>Stale records</p></QueryState>)).not.toContain("Stale records");
     }
   });
+  it("renders custom loading content", () => {
+    const html = renderToStaticMarkup(<QueryState loading={<strong>Loading records</strong>}/>);
+    expect(html).toContain("<strong>Loading records</strong>");
+    expect(html).toContain('role="status"');
+  });
 });

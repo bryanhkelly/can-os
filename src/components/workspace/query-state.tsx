@@ -17,9 +17,9 @@ export interface QueryStateProps {
 function QueryState({ loading, error, isEmpty, empty, children, onRetry, retrying }: QueryStateProps) {
   if (loading) {
     return (
-      <p className="mt-8 text-sm" role="status">
-        {typeof loading === "string" ? loading : "Loading…"}
-      </p>
+      <div className="mt-8 text-sm" role="status">
+        {loading}
+      </div>
     );
   }
   if (error) {

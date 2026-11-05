@@ -3,6 +3,9 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   getHostProgramSiteAuthorizationFn, requestProgramSiteAuthorizationFn,
   revokeProgramSiteAuthorizationFn,
@@ -21,6 +24,8 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
   const [error,setError] = useState("");
   const [notice,setNotice] = useState("");
   const [revokeReason,setRevokeReason] = useState("");
+  const [revokeAttempted,setRevokeAttempted] = useState(false);
+  const [requestAttempted,setRequestAttempted] = useState(false);
   const load = useCallback(async () => {
     try {
       const result = await getHostProgramSiteAuthorizationFn({data:{programId}});
@@ -61,6 +66,8 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
   }
   async function request() {
     setError("");setNotice("");
+    setRequestAttempted(true);
+    if(!selected.length)return;
     await mutation.run(
       () => requestProgramSiteAuthorizationFn({data:{programId,services:selected}}),
       {
@@ -72,6 +79,8 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
   }
   async function revoke() {
     if(!status?.authorization) return;
+    setRevokeAttempted(true);
+    if(revokeReason.trim().length<10)return;
     const authorization=status.authorization;
     setError("");setNotice("");
     await mutation.run(
@@ -135,13 +144,12 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       {status.authorization.reviewReason&&<p className="mt-2 text-xs">
         Institutional review: {status.authorization.reviewReason}
       </p>}
-      {(status.authorization.status==="approved"||status.authorization.status==="suspended")&&<form onSubmit={e=>{e.preventDefault();void revoke();}} className="mt-3 space-y-2">
-        <label className="block text-xs">Reason for withdrawing church-hosted authority
-          <input className="mt-1 w-full rounded border bg-background p-2" value={revokeReason}
-            onChange={e=>setRevokeReason(e.target.value)} minLength={10} maxLength={500} required/>
-        </label>
-        <button type="submit" disabled={busy||revokeReason.trim().length<10}
-          className="rounded border px-3 py-2 text-xs disabled:opacity-50">Revoke authorization</button>
+      {(status.authorization.status==="approved"||status.authorization.status==="suspended")&&<form noValidate onSubmit={e=>{e.preventDefault();void revoke();}} className="mt-3 space-y-2">
+        <Field label="Reason for withdrawing church-hosted authority" className="text-xs" required
+          error={revokeAttempted&&revokeReason.trim().length<10?"Enter at least 10 characters explaining this revocation.":undefined}>
+          <Input value={revokeReason} onChange={e=>setRevokeReason(e.target.value)} maxLength={500}/>
+        </Field>
+        <Button type="submit" variant="outline" disabled={busy}>Revoke authorization</Button>
       </form>}
       {(status.authorization.status==="denied"||status.authorization.status==="revoked")&&
         <button type="button" disabled={busy} onClick={()=>void request()}
@@ -157,10 +165,10 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
           {service.replace(/_/g," ")}
         </label>)}
       </div>
-      <button type="button" disabled={busy||!selected.length} onClick={()=>void request()}
-        className="mt-3 rounded border px-4 py-2 text-sm disabled:opacity-50">
+      {requestAttempted&&!selected.length&&<FieldError className="mt-2">Select at least one requested service.</FieldError>}
+      <Button type="button" variant="outline" className="mt-3" disabled={busy} onClick={()=>void request()}>
         {busy?"Requesting…":"Request CAN operating authorization"}
-      </button>
+      </Button>
       <p className="mt-2 text-xs text-muted-foreground">
         This proposal includes admissions and academic records because students
         need both to progress from family application into classes and official results.

@@ -81,8 +81,9 @@ export async function readPreopeningFamilyWelcome(batchId: string, recipientKey:
   )).limit(1);
   if (!batch?.contextId) throw new AuthorizationError("pre-opening family invitation");
   const metadata = familyInvitationBatchMetadataSchema.parse(batch.metadata);
+  const recipient = metadata.recipients.find(row => row.key === recipientKey);
   if (metadata.destination !== "preopening_interest" ||
-    !metadata.recipients.some(recipient => recipient.key === recipientKey)) {
+    !recipient) {
     throw new AuthorizationError("pre-opening family invitation recipient");
   }
   if (isFamilyInvitationExpired(batch.createdAt)) {
@@ -113,6 +114,11 @@ export async function readPreopeningFamilyWelcome(batchId: string, recipientKey:
     programName: school.programName,
     programStatus: school.status,
     introduction: metadata.introduction,
+    invitedFamily: {
+      firstName: recipient.firstName,
+      lastName: recipient.lastName,
+      email: recipient.email,
+    },
     events: await listPublicInterestEventsForInvitation(batchId, recipientKey),
   };
 }

@@ -36,9 +36,9 @@ const baseRoleCapabilities = {
  site_website_editor: ["site.website.draft.read", "site.website.local.publish"],
  // First-observer site personnel: report-only capability, NEVER incident.read,
  // counseling access, enrollment editing or automatic emergency dispatch.
- room_facilitator: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit"],
- site_staff: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit"],
- site_leader: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit"],
+ room_facilitator: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
+ site_staff: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
+ site_leader: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit","communication.send"],
  paraeducator: ["safeguarding.concern.submit"],
  student: ["student:read","profiles.self_profile.manage","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create"],
  teacher: ["teacher:read","class.request","profiles.credentials.submit","profiles.professional_profile.manage","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","calendar.event.manage","insights:read","capacity.read","conference.manage","conference.complete","conference.remind"],

@@ -1,10 +1,16 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { useQuery } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
+import { QueryState, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { getGuardianHealthWorkspace } from "@/modules/health/guardian-health.functions";
 import { requestGuardianHealthUpdate } from "@/modules/health/guardian-health-updates.functions";
+import { normalizeClientError } from "@/lib/client-error";
 
 export const Route = createFileRoute("/guardian/health")({
   validateSearch: (search: Record<string, unknown>): { student?: string } => ({
@@ -17,34 +23,32 @@ type Workspace = Awaited<ReturnType<typeof getGuardianHealthWorkspace>>;
 
 function GuardianHealthPage() {
   const { student } = Route.useSearch();
-  const [data, setData] = useState<Workspace | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-  useEffect(() => {
-    let current = true;
-    setLoading(true); setData(null); setError("");
-    void getGuardianHealthWorkspace({ data: { studentPersonId: student } })
-      .then(result => { if (current) setData(result); })
-      .catch(() => { if (current) setError("Unable to verify family access to school health records."); })
-      .finally(() => { if (current) setLoading(false); });
-    return () => { current = false; };
-  }, [student, refreshKey]);
+  const healthQuery = useQuery({
+    queryKey: ["guardian-health", student],
+    queryFn: () => getGuardianHealthWorkspace({ data: { studentPersonId: student } }),
+    retry: (count, error) => normalizeClientError(error).retryable && count < 1,
+  });
+  const data = healthQuery.data as Workspace | undefined;
+  const failure = healthQuery.error
+    ? normalizeClientError(healthQuery.error, "Unable to verify family access to school health records.")
+    : null;
 
   return <WorkspaceShell width="wide" eyebrow="Family"
     title="Health and return-to-school"
     subtitle="Review the school's recorded health instructions, compliance status and return clearance. Medical decisions and changes require authorized school review."
     breadcrumbs={<><Link to="/home" search={{student}} className="underline">Family home</Link><span>/</span><span>Health</span></>}>
     <div className="mt-6 flex flex-wrap gap-3 text-sm">
-      <button type="button" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}
+      <button type="button" disabled={healthQuery.isFetching} onClick={() => void healthQuery.refetch()}
         className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
-        {loading ? "Checking school review…" : "Refresh school review status"}
+        {healthQuery.isFetching ? "Checking school review…" : "Refresh school review status"}
       </button>
       <Link to="/messages" className="rounded-lg border px-4 py-2 font-semibold">Contact the school about a health update</Link>
       <Link to="/guardian/attendance" search={{student}} className="rounded-lg border px-4 py-2">Attendance and excuses</Link>
     </div>
-    {loading && <p className="mt-6" role="status">Loading verified school health records…</p>}
-    {error && <p className="mt-6 rounded-lg border p-4" role="alert">{error}</p>}
+    <QueryState loading={healthQuery.isPending ? "Loading verified school health records…" : undefined}
+      error={failure?.message}
+      onRetry={failure?.retryable ? () => void healthQuery.refetch() : undefined}
+      retrying={healthQuery.isFetching}/>
     {data && data.children.length === 0 && <p className="mt-6 rounded-lg border p-4">No health records are available for this authorized student. If the child has recently enrolled or transferred, contact the school.</p>}
     {data?.children.map(child => <section key={child.studentPersonId} className="mt-6 space-y-4 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">{child.studentName}</h2>
@@ -103,7 +107,8 @@ function GuardianHealthPage() {
         </div>
       </div>
       <GuardianHealthUpdateForm child={child} onSubmitted={async () => {
-        setData(await getGuardianHealthWorkspace({ data: { studentPersonId: student } }));
+        const refreshed = await healthQuery.refetch();
+        if (refreshed.isError) throw refreshed.error;
       }}/>
       <div className="rounded-lg border p-4">
         <h3 className="font-semibold">Recent health-office visits</h3>
@@ -148,29 +153,17 @@ function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:(
   <h3 className="font-semibold">Update emergency and health information</h3>
   <p className="text-sm text-muted-foreground">Request corrections to the existing school medical record. Only authorized school staff can approve them. If your child needs immediate help, call the school directly; this form is not monitored as an emergency service.</p>
   {child.awaitingSchoolHealthReview?<p role="status" className="rounded border p-3 text-sm">A previous update is pending school review. Contact the office for urgent changes.</p>:<>
-   <label className="block text-sm font-medium">Allergy instructions
-    <textarea value={allergies} onChange={e=>setAllergies(e.target.value)} maxLength={2000} rows={2} className="mt-1 block w-full rounded border bg-background p-2"/>
-   </label>
-   <label className="block text-sm font-medium">Emergency instructions
-    <textarea value={emergency} onChange={e=>setEmergency(e.target.value)} maxLength={2000} rows={2} className="mt-1 block w-full rounded border bg-background p-2"/>
-   </label>
-   <label className="block text-sm font-medium">Accommodations requiring school review
-    <textarea value={accommodations} onChange={e=>setAccommodations(e.target.value)} maxLength={2000} rows={2} className="mt-1 block w-full rounded border bg-background p-2"/>
-   </label>
+  <Field label="Allergy instructions" className="text-sm font-medium"><Textarea value={allergies} onChange={e=>setAllergies(e.target.value)} maxLength={2000} rows={2}/></Field>
+  <Field label="Emergency instructions" className="text-sm font-medium"><Textarea value={emergency} onChange={e=>setEmergency(e.target.value)} maxLength={2000} rows={2}/></Field>
+  <Field label="Accommodations requiring school review" className="text-sm font-medium"><Textarea value={accommodations} onChange={e=>setAccommodations(e.target.value)} maxLength={2000} rows={2}/></Field>
    <div className="grid gap-3 sm:grid-cols-2">
-    <label className="block text-sm font-medium">Emergency contact's legal name
-     <input value={name} onChange={e=>setName(e.target.value)} maxLength={150} className="mt-1 block w-full rounded border bg-background p-2"/>
-    </label>
-    <label className="block text-sm font-medium">Emergency contact phone
-     <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} maxLength={40} className="mt-1 block w-full rounded border bg-background p-2"/>
-    </label>
-    <label className="block text-sm font-medium">Relationship to child
-     <input value={relationship} onChange={e=>setRelationship(e.target.value)} maxLength={80} className="mt-1 block w-full rounded border bg-background p-2"/>
-    </label>
+   <Field label="Emergency contact's legal name" className="text-sm font-medium"><Input value={name} onChange={e=>setName(e.target.value)} maxLength={150}/></Field>
+   <Field label="Emergency contact phone" className="text-sm font-medium"><Input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} maxLength={40}/></Field>
+   <Field label="Relationship to child" className="text-sm font-medium"><Input value={relationship} onChange={e=>setRelationship(e.target.value)} maxLength={80}/></Field>
    </div>
-   <button type="submit" disabled={busy||submitted} className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+  <Button type="submit" disabled={busy||submitted}>
     {busy?"Submitting…":submitted?"Awaiting school review":"Submit for school review"}
-   </button>
+  </Button>
   </>}
   {child.approvedEmergencyContact?.phone&&<p className="text-sm"><strong>Current school-approved contact:</strong> {child.approvedEmergencyContact.name} · {child.approvedEmergencyContact.phone} · {child.approvedEmergencyContact.relationship}</p>}
   <MutationFeedback state={mutation} pendingMessage="Submitting for school review..."/>

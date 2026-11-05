@@ -1,0 +1,135 @@
+import type { FileRoutesByTo } from "@/routeTree.gen";
+import { roleCapabilities } from "@/domain/access-context";
+import type { WorkspaceRole } from "./workspace-navigation.registry";
+
+export type RouteNavigationMetadata = {
+  visibility: "navigation"; personas: readonly WorkspaceRole[];
+  owner: keyof FileRoutesByTo | Partial<Record<WorkspaceRole, keyof FileRoutesByTo>>;
+} | { visibility: "hidden" | "non-navigable"; personas: readonly WorkspaceRole[]; reason: string };
+
+const all = ["site_website_editor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead", "student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor", "network_admin", "can_network_steward", "can_jurisdiction_reviewer"] as const;
+const messagingRoles = (Object.keys(roleCapabilities) as WorkspaceRole[])
+  .filter(role => roleCapabilities[role]?.includes("communication.send"));
+const admins = ["registrar", "site_admin"] as const;
+const staff = [...admins, "teacher", "site_leader", "site_staff", "specialist", "counselor"] as const;
+const page = (owner: keyof FileRoutesByTo | Partial<Record<WorkspaceRole, keyof FileRoutesByTo>>, personas: readonly WorkspaceRole[]): RouteNavigationMetadata => ({ visibility: "navigation", owner, personas });
+const hidden = (reason: string, personas: readonly WorkspaceRole[] = all): RouteNavigationMetadata => ({ visibility: "hidden", personas, reason });
+const endpoint: RouteNavigationMetadata = { visibility: "non-navigable", personas: [], reason: "Transport endpoint" };
+const publicPage = hidden("Public or authentication flow outside workspace navigation", []);
+const learn = { student: "/student/courses", teacher: "/classes", guardian: "/guardian/academics" } as const;
+const schoolProfile = { site_admin: "/sites", registrar: "/home" } as const;
+
+export const routeNavigation = {
+  "/": publicPage,
+  "/admin": page("/admin", admins),
+  "/ask": hidden("Shared command overlay and conversation workspace"),
+  "/calendar": page({ registrar: "/home", site_admin: "/home", student: "/calendar", guardian: "/calendar", teacher: "/calendar", room_facilitator: "/calendar", site_staff: "/calendar", site_leader: "/calendar", specialist: "/calendar", counselor: "/calendar" }, [...staff, "student", "guardian", "room_facilitator"]),
+  "/calendar-export": endpoint,
+  "/classes": page(learn, ["student", "teacher", "guardian"]),
+  "/enrichment": hidden("Contextual extended-learning registration"),
+  "/enrichment-review": hidden("Contextual extended-learning review", admins),
+  "/groups": page(learn, ["student", "teacher", "guardian"]),
+  "/home": page("/home", all),
+  "/interest-event": publicPage,
+  "/messages": page("/messages", messagingRoles),
+  "/notifications": hidden("Shared notification tray and recipient-scoped center"),
+  "/operations": hidden("Legacy operations redirect", admins),
+  "/profiles": hidden("Contextual identity and qualification workspace"),
+  "/published-site": publicPage,
+  "/readiness": page("/home", admins),
+  "/safeguarding": hidden("Restricted reports and assigned-case workspace"),
+  "/site-website": page("/site-website", ["site_website_editor", "site_leader"]),
+  "/student": hidden("Student layout redirect", ["student"]),
+  "/support": page("/student/support", ["student"]),
+  "/access/logout": endpoint,
+  "/access/request": endpoint,
+  "/access/session": endpoint,
+  "/access/sessions": endpoint,
+  "/access/verify": endpoint,
+  "/account/sessions": hidden("Account menu session management"),
+  "/actions/$actionId": hidden("Contextual action detail"),
+  "/admissions/capacity": page("/admissions", admins),
+  "/admissions/credential-delivery": page("/admissions", admins),
+  "/admissions/families": page("/admissions", admins),
+  "/admissions/graduation": page("/admissions", admins),
+  "/admissions/intake": page("/admissions", admins),
+  "/admissions/invite-families": page("/admissions", admins),
+  "/admissions/my-credentials": hidden("Recipient-owned credential retrieval", ["student", "guardian"]),
+  "/admissions/transcripts": page("/admissions", admins),
+  "/api/family-alert-delivery": endpoint,
+  "/api/jobs": endpoint,
+  "/api/school-family-deliveries": endpoint,
+  "/church/apply": publicPage,
+  "/family/interest": publicPage,
+  "/family/join": publicPage,
+  "/guardian/academics": page("/guardian/academics", ["guardian"]),
+  "/guardian/admission-offers": page("/home", ["guardian"]),
+  "/guardian/apply": page("/home", ["guardian"]),
+  "/guardian/attendance": page("/guardian/academics", ["guardian"]),
+  "/guardian/course-approvals": page("/guardian/academics", ["guardian"]),
+  "/guardian/enrichment": page("/guardian/experiences", ["guardian"]),
+  "/guardian/enrollment-changes": page("/home", ["guardian"]),
+  "/guardian/experiences": page("/guardian/experiences", ["guardian"]),
+  "/guardian/field-trips": page("/guardian/experiences", ["guardian"]),
+  "/guardian/group-permissions": page("/guardian/experiences", ["guardian"]),
+  "/guardian/health": page("/guardian/experiences", ["guardian"]),
+  "/guardian/report-cards": page("/guardian/academics", ["guardian"]),
+  "/guardian/study-group-consent": page("/guardian/experiences", ["guardian"]),
+  "/guardian/watching": page("/guardian/academics", ["guardian"]),
+  "/operations/course-policies": page("/home", admins),
+  "/operations/course-requests": page("/home", admins),
+  "/operations/curriculum": page("/operations/curriculum", admins),
+  "/operations/curriculum-marketplace": page("/operations/curriculum", admins),
+  "/operations/family-alerts": page("/home", admins),
+  "/operations/field-trips": page("/home", admins),
+  "/operations/health-review": page("/home", admins),
+  "/operations/insights": page("/home", admins),
+  "/operations/interest-events": page("/operations/launch", admins),
+  "/operations/jurisdiction-profiles": page("/operations/jurisdiction-profiles", ["can_network_steward"]),
+  "/operations/school-years": page("/operations/school-years", admins),
+  "/operations/teacher-marketplace": page("/operations/teacher-marketplace", admins),
+  "/operations/transfer-records": page("/home", admins),
+  "/operations/workflows": page({ registrar: "/home", site_admin: "/home", site_leader: "/operations/workflows", network_admin: "/operations/workflows" }, [...admins, "site_leader", "network_admin"]),
+  "/published-site/$page": publicPage,
+  "/published-site/family-start": publicPage,
+  "/published-site/inquiry": publicPage,
+  "/schools/new": publicPage,
+  "/staff/attendance": page({ registrar: "/home", site_admin: "/home", teacher: "/home", room_facilitator: "/staff/attendance", site_leader: "/staff/attendance", site_staff: "/home" }, [...admins, "teacher", "room_facilitator", "site_leader", "site_staff"]),
+  "/staff/teachers": page("/staff/teachers", ["site_leader"]),
+  "/student/assignments": page("/student/courses", ["student"]),
+  "/student/courses": page("/student/courses", ["student"]),
+  "/student/discussions": page("/student/courses", ["student"]),
+  "/student/experiences": page("/student/my-school", ["student"]),
+  "/student/my-school": page("/student/my-school", ["student"]),
+  "/student/notifications": hidden("Legacy recipient notification redirect", ["student"]),
+  "/student/report-card": page("/student/my-school", ["student"]),
+  "/student/settings": page("/home", ["student"]),
+  "/student/study-groups": page("/student/courses", ["student"]),
+  "/student/support": page("/student/support", ["student"]),
+  "/teacher/discussions": page("/classes", ["teacher"]),
+  "/teacher/gradebook": page("/teacher/gradebook", ["teacher"]),
+  "/teacher/missing-work": page("/teacher/gradebook", ["teacher"]),
+  "/teacher/notices": page("/home", ["teacher"]),
+  "/teacher/study-groups": page("/classes", ["teacher"]),
+  "/access": publicPage,
+  "/admissions": page("/admissions", admins),
+  "/sites": page("/sites", ["site_admin"]),
+  "/operations/launch/$programId": page("/operations/launch", admins),
+  "/operations/school-years/$yearId": page("/operations/school-years", admins),
+  "/operations/school-years/new": page("/operations/school-years", admins),
+  "/published-site/media/$assetId": endpoint,
+  "/sites/$siteId/parent-information": page(schoolProfile, admins),
+  "/sites/$siteId/profile": page(schoolProfile, admins),
+  "/sites/$siteId/publish": page({ ...schoolProfile, site_leader: "/site-website" }, [...admins, "site_leader"]),
+  "/staff/students/$personId": page("/staff/students", staff),
+  "/student/study-groups/new": page("/student/courses", ["student"]),
+  "/operations/launch": page("/operations/launch", admins),
+  "/sites/$siteId": page("/home", [...admins, "site_leader", "site_staff"]),
+  "/staff/students": page("/staff/students", staff),
+} satisfies Record<keyof FileRoutesByTo, RouteNavigationMetadata>;
+
+export function ownedRoutes(role: WorkspaceRole, owner: string): string[] {
+  return Object.entries(routeNavigation).filter(([, metadata]) => metadata.visibility === "navigation" &&
+    metadata.personas.includes(role) && (typeof metadata.owner === "string" ? metadata.owner : metadata.owner[role]) === owner)
+    .map(([path]) => path).filter(path => path !== owner);
+}

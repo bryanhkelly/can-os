@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -33,6 +32,8 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
   const [recipient,setRecipient]=useState("");
   const [reason,setReason]=useState("");
   const [transferConfirmed,setTransferConfirmed]=useState(false);
+  const [transferAttempted,setTransferAttempted]=useState(false);
+  const [acknowledgmentAttempted,setAcknowledgmentAttempted]=useState(false);
   const transferRequestId=useRef<string|null>(null);
   const hydrated=useHydrated();
   return <article className="rounded-lg border p-4">
@@ -46,8 +47,10 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
     {handoff.lastTransfer&&<p className="mt-2 text-sm">Responsibility transferred at {new Date(handoff.lastTransfer.transferredAt).toLocaleString()}: {handoff.lastTransfer.reason}</p>}
     {handoff.status==="open"&&!handoff.recipientEligible&&<p role="alert" className="mt-3 text-sm">
       The named recipient is no longer eligible. An explicitly granted opening-handoff manager must select a replacement.</p>}
-    {handoff.replacementOperators.length>0&&<form className="mt-4 space-y-3" onSubmit={async event=>{
+    {handoff.replacementOperators.length>0&&<form noValidate className="mt-4 space-y-3" onSubmit={async event=>{
       event.preventDefault();
+      setTransferAttempted(true);
+      if(!recipient||reason.trim().length<10||!transferConfirmed)return;
       const requestId=transferRequestId.current??crypto.randomUUID();transferRequestId.current=requestId;
       const result=await mutation.run(
         ()=>transferLaunchHandoff({data:{actionId:handoff.id,expectedRevision:handoff.revision,
@@ -57,43 +60,48 @@ function HandoffCard({ handoff }: { handoff: Handoff }) {
       if(result.status==="saved"){transferRequestId.current=null;setTransferConfirmed(false);}
     }}>
       <h4 className="font-semibold">Recover pending handoff</h4>
-      <Field label="Replacement site operator" required>
+      <Field label="Replacement site operator" required
+        error={transferAttempted&&!recipient?"Choose an eligible replacement operator.":undefined}>
         <Select disabled={!hydrated||busy} value={recipient} onChange={event=>{setRecipient(event.target.value);transferRequestId.current=null;}}>
           <option value="">Select a replacement</option>
           {handoff.replacementOperators.map(operator=><option key={operator.personId} value={operator.personId}>
             {operator.firstName} {operator.lastName}</option>)}
         </Select>
       </Field>
-      <Field label="Reason for recovery" required description="Explain why a replacement operator must receive this handoff.">
+      <Field label="Reason for recovery" required description="Explain why a replacement operator must receive this handoff."
+        error={transferAttempted&&reason.trim().length<10?"Enter at least 10 characters explaining the recovery.":undefined}>
         <Textarea disabled={!hydrated||busy} minLength={10} maxLength={2000} value={reason}
           onChange={event=>{setReason(event.target.value);transferRequestId.current=null;}}/>
       </Field>
-      <Label className="flex items-start gap-2 leading-6">
+      <Field label="I confirm the previous recipient is no longer eligible and the replacement must independently acknowledge receipt." required
+        error={transferAttempted&&!transferConfirmed?"Confirm the replacement handoff before transferring.":undefined}>
         <Checkbox disabled={!hydrated||busy} checked={transferConfirmed} onChange={event=>setTransferConfirmed(event.target.checked)}/>
-        I confirm the previous recipient is no longer eligible and the replacement must independently acknowledge receipt.
-      </Label>
-      <Button type="submit" variant="outline" disabled={!hydrated||busy||!recipient||reason.trim().length<10||!transferConfirmed}>Transfer pending handoff</Button>
+      </Field>
+      <Button type="submit" variant="outline" disabled={!hydrated||busy}>Transfer pending handoff</Button>
     </form>}
     {handoff.programId && handoff.siteId && <div className="mt-3 flex flex-wrap gap-3 text-sm">
       <Link to="/operations/launch/$programId" params={{ programId: handoff.programId }} className="underline">Review classes and staffing</Link>
       <Link to="/operations/school-years" search={{ siteId: handoff.siteId, programId: handoff.programId }} className="underline">Review school year</Link>
       <Link to="/home" search={{ siteId: handoff.siteId, programId: handoff.programId }} className="underline">Program operations</Link>
     </div>}
-    {handoff.canAcknowledge ? <form className="mt-4 space-y-3" onSubmit={async event => {
+    {handoff.canAcknowledge ? <form noValidate className="mt-4 space-y-3" onSubmit={async event => {
       event.preventDefault();
+      setAcknowledgmentAttempted(true);
+      if(!confirmed||note.trim().length<10)return;
       await mutation.run(
         ()=>acknowledgeLaunchHandoff({ data: { actionId: handoff.id, note, confirmed: true } }),
         {successMessage:"Opening handoff acknowledged.",commandErrorMessage:"Unable to acknowledge opening handoff."},
       );
     }}>
-      <Field label="Acknowledgment note" required>
+      <Field label="Acknowledgment note" required
+        error={acknowledgmentAttempted&&note.trim().length<10?"Enter at least 10 characters for the acknowledgment note.":undefined}>
         <Textarea disabled={!hydrated||busy} minLength={10} maxLength={2000} value={note} onChange={event => setNote(event.target.value)}/>
       </Field>
-      <Label className="flex items-start gap-2 leading-6">
+      <Field label="I reviewed the opening record, school-year setup and classes, and received responsibility for daily operations." required
+        error={acknowledgmentAttempted&&!confirmed?"Confirm receipt and review of the opening record.":undefined}>
         <Checkbox disabled={!hydrated||busy} checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/>
-        I reviewed the opening record, school-year setup and classes, and received responsibility for daily operations.
-      </Label>
-      <Button type="submit" variant="outline" disabled={!hydrated||busy || !confirmed || note.trim().length < 10}>Acknowledge receipt</Button>
+      </Field>
+      <Button type="submit" variant="outline" disabled={!hydrated||busy}>Acknowledge receipt</Button>
     </form> : handoff.status !== "resolved" && <p className="mt-3 text-sm text-muted-foreground">
       Only the named recipient with a current site operator grant can acknowledge this handoff.</p>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving opening handoff..."/>

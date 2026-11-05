@@ -9,6 +9,9 @@ import {
 } from "@/modules/enrollment/transfer-records-handoff.functions";
 
 export const Route=createFileRoute("/operations/transfer-records")({
+  validateSearch:(search:Record<string,unknown>):{action?:string}=>({
+    action:typeof search.action==="string"?search.action:undefined,
+  }),
   loader:safeLoader(()=>listTransferRecordsHandoffs(),{
     authMessage:"Sign in as the authorized institutional records registrar.",
   }),
@@ -19,11 +22,12 @@ type DeliveryMethod="approved_secure_exchange"|"verified_secure_portal"|"physica
 
 function TransferRecordsRoute(){
  const outcome=Route.useLoaderData();
+ const {action}=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="Registrar"
    title="Academic records transfer" outcome={outcome}/>;
- return <TransferRecordsWorkspace items={outcome.data.items}/>;
+ return <TransferRecordsWorkspace items={outcome.data.items} action={action}/>;
 }
-function TransferRecordsWorkspace({items}:{items:Items}){
+function TransferRecordsWorkspace({items,action}:{items:Items;action?:string}){
  const router=useRouter();
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
@@ -66,16 +70,18 @@ function TransferRecordsWorkspace({items}:{items:Items}){
      <Link to="/admissions/transcripts" search={{query:""}} className="rounded border px-3 py-2 text-sm">Official transcripts</Link>
    </div>}>
    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving records handoff..."/>
+   {action&&<Link to="/operations/transfer-records" className="mt-4 inline-block text-sm underline">All records handoffs</Link>}
+   {action&&!items.some(item=>item.id===action)&&<p role="status" className="mt-5 rounded border p-4 text-sm">This records handoff is unavailable in your current school scope.</p>}
    <section className="mt-7 space-y-4">
-    {items.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
-      <h2 className="text-lg font-semibold">{item.studentName}</h2>
+    {items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
+      <h2 className="text-lg font-semibold"><Link to="/operations/transfer-records" search={{action:item.id}} className="underline">{item.studentName}</Link></h2>
       <p className="mt-1 text-sm">Destination: <strong>{item.destinationSchoolName}</strong></p>
       {item.destinationContactEmail&&<p className="mt-1 text-sm">Destination records contact (verify independently): {item.destinationContactEmail}</p>}
       <p className="mt-2 text-sm">Guardian release authorization: {item.consentRecorded?"Recorded":"Missing or revoked — contact the family"}</p>
       {item.status==="resolved"?<p className="mt-3 rounded-lg border p-3 text-sm">Records handoff attested by the school. Issued transcript: {item.issuedTranscriptId??"Recorded in original request"}</p>:
       <div className="mt-4 space-y-4 border-t pt-4">
         <p className="text-sm">Issue an official transcript for this student before recording delivery. The registrar must hold the correct credit-issuer authority.</p>
-        <Link to="/admissions/transcripts" search={{query:item.studentName}}
+        <Link to="/admissions/transcripts" search={{query:item.studentName,student:item.studentPersonId}}
          className="text-sm font-semibold underline">Open official transcript issuance for {item.studentName}</Link>
         <label className="block text-sm font-medium">Previously issued official transcript
           <select className="mt-2 w-full rounded-lg border bg-background p-3"

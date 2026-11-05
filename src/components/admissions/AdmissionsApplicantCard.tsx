@@ -17,17 +17,18 @@ export function admissionsNextStep(stage:string,disposition:string|null|undefine
  if(stage==="declined"||stage==="withdrawn")return "No further admissions action: this application is closed.";
  return "Admissions registrar: review the application record for its next step.";
 }
-export function AdmissionsApplicantCard({r,busy,onVerify,onProvision,onInvite,onDecision}:{
+export function AdmissionsApplicantCard({r,busy,onVerify,onProvision,onInvite,onDecision,showSummary=true}:{
  r:Applicant;busy:boolean;
  onVerify:(id:string,verification:GuardianVerification)=>void;onProvision:(id:string)=>void;onInvite:(id:string)=>void;
  onDecision:(id:string,decision:AdmissionsDecision,label:string)=>void;
+ showSummary?:boolean;
 }){
  return <>
-   <article className="rounded-xl border bg-card p-5">
-    <div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-semibold">{r.studentFirst} {r.studentLast}</h3>
+   <article aria-label={showSummary?undefined:"Admissions application actions"} className="rounded-xl border bg-card p-5">
+    {showSummary&&<div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-semibold">{r.studentFirst} {r.studentLast}</h3>
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
-    </div>
+    </div>}
     <p role="status" className="mt-3 rounded-lg bg-muted p-3 text-sm"><strong>Next admissions step: </strong>{admissionsNextStep(r.stage,r.disposition)}</p>
     <AdmissionsTransferStatus applicationId={r.id} transferOriginStatus={r.transferOriginStatus}
      transferNamedDestination={r.transferNamedDestination} transferRecordsStatus={r.transferRecordsStatus}

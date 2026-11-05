@@ -2,6 +2,11 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { useEffect,useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
  consentToStudentLearningAccount, getStudentLearningHandoff,
  provisionStudentLearningAccess,
@@ -32,6 +37,8 @@ function ApplicationLearningAccessHandoff({
  const [error,setError]=useState("");
  const [retry,setRetry]=useState(0);
  const [independentReviewConfirmed,setIndependentReviewConfirmed]=useState(false);
+ const [guardianConsentConfirmed,setGuardianConsentConfirmed]=useState(false);
+ const [attempted,setAttempted]=useState(false);
  const [reviewMethod,setReviewMethod]=useState<"institutional_school_record"|"verified_in_person">("institutional_school_record");
  useEffect(()=>{
   let live=true;
@@ -50,6 +57,9 @@ function ApplicationLearningAccessHandoff({
  },[applicationId,retry]);
  async function submit(event:React.FormEvent){
   event.preventDefault();
+  setAttempted(true);
+  if(role==="guardian"&&status==="not_requested"&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())||!guardianConsentConfirmed))return;
+  if(role!=="guardian"&&status==="pending_review"&&!independentReviewConfirmed)return;
   setBusy(true);setError("");setNotice("");
   try{
    if(role==="guardian"){
@@ -57,6 +67,7 @@ function ApplicationLearningAccessHandoff({
      applicationId,studentEmail:email,acknowledged:true,
     }});
     setStatus("pending_review");
+    setGuardianConsentConfirmed(false);setAttempted(false);
     setNotice("Student account request signed. Admissions must independently verify the identity and approve the invitation.");
    }else{
     const result=await provisionStudentLearningAccess({data:{
@@ -65,6 +76,7 @@ function ApplicationLearningAccessHandoff({
         ?{confirmedIndependentIdentity:true as const,reviewMethod}:{}),
     }});
     setStatus("approved");
+    setIndependentReviewConfirmed(false);setAttempted(false);
     setNotice("Student access approval is saved.");
     if(result.signInRequest==="failed"){
       setError("The sign-in link could not be requested. Wait at least a minute, then request it again below. Approval does not need to be repeated.");
@@ -109,48 +121,42 @@ function ApplicationLearningAccessHandoff({
  return <section className="mt-4 rounded-lg border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
   {status==="loading"?<p className="mt-2">Checking the active class and access status…</p>:
-   <form onSubmit={event=>void submit(event)} className="mt-3 space-y-3">
+  <form noValidate onSubmit={event=>void submit(event)} className="mt-3 space-y-3">
     {role==="guardian" && status==="not_requested" ? <>
      <p>Authorize a separate student account after classroom placement.
       Student email verification and school approval are required; this does not authorize your guardian login to act as a student.</p>
-     <label className="block">Student's own email address
-      <input required type="email" maxLength={254} value={email}
-       onChange={event=>setEmail(event.target.value)}
-       className="mt-1 block w-full rounded border bg-background p-2"
-       autoComplete="off"/>
-     </label>
-     <label className="flex items-start gap-2">
-      <input type="checkbox" required/>
-      I am the verified parent or legal guardian and authorize this separate
-      student learning sign-in request.
-     </label>
-     <button disabled={busy||!email.trim()} className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
+     <Field label="Student's own email address" required
+      error={attempted&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())?"Enter a valid email address for the student.":undefined}>
+      <Input type="email" maxLength={254} value={email} onChange={event=>setEmail(event.target.value)} autoComplete="off"/>
+     </Field>
+     <Field label="I am the verified parent or legal guardian and authorize this separate student learning sign-in request." required
+      error={attempted&&!guardianConsentConfirmed?"Confirm your guardian authorization before requesting student sign-in.":undefined}>
+      <Checkbox checked={guardianConsentConfirmed} onChange={event=>setGuardianConsentConfirmed(event.target.checked)}/>
+     </Field>
+     <Button type="submit" variant="outline" disabled={busy}>
       {busy?"Saving…":"Authorize student sign-in request"}
-     </button>
+     </Button>
     </>:status==="pending_review"?<>
      <p>Guardian authorization received. A registrar must verify the student's
       identity and email destination before access is granted.</p>
      {role==="guardian"&&<Link to="/messages" className="mt-3 inline-block underline">Ask admissions about student access</Link>}
      {hasRegistrarAuthority(role)&&<>
       <p>Guardian-approved student address: <strong>{email}</strong></p>
-      <label className="block">Independent student identity check
-       <select value={reviewMethod} onChange={event=>setReviewMethod(
+      <Field label="Independent student identity check">
+       <Select value={reviewMethod} onChange={event=>setReviewMethod(
          event.target.value==="verified_in_person"?"verified_in_person":"institutional_school_record")}
-        className="mt-1 block w-full rounded border bg-background p-2">
+       >
         <option value="institutional_school_record">Matched institutional student records</option>
         <option value="verified_in_person">Verified student identity in person</option>
-       </select>
-      </label>
-      <label className="flex items-start gap-2">
-       <input type="checkbox" required checked={independentReviewConfirmed}
-        onChange={event=>setIndependentReviewConfirmed(event.target.checked)}/>
-       I independently checked the student's identity and separate email destination
-       using the selected method, not solely the public form or parent's statement.
-      </label>
-      <button disabled={busy||!independentReviewConfirmed}
-       className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
+       </Select>
+      </Field>
+      <Field label="I independently checked the student's identity and separate email destination using the selected method, not solely the public form or parent's statement." required
+       error={attempted&&!independentReviewConfirmed?"Confirm that you independently reviewed the student's identity.":undefined}>
+       <Checkbox checked={independentReviewConfirmed} onChange={event=>setIndependentReviewConfirmed(event.target.checked)}/>
+      </Field>
+      <Button type="submit" variant="outline" disabled={busy}>
        {busy?"Reviewing…":"Approve verified student account and send sign-in link"}
-      </button>
+      </Button>
      </>}
     </>:status==="approved"?<>
      <p>Student access is approved. The student uses their own verified email address—not the parent’s account—to request a short-lived sign-in link and open assigned classes.</p>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { siteTimezoneSchema } from "./site-timezone";
 
 export const churchApplicationLimits = {
   churchName: 160, siteName: 160, firstName: 80, lastName: 80,
@@ -13,7 +14,7 @@ const text = (min: number, max: number) => z.string().trim()
 export const churchApplicationSchema = z.object({
   churchName: text(2, churchApplicationLimits.churchName),
   siteName: text(2, churchApplicationLimits.siteName),
-  timezone: text(3, 80),
+  timezone: siteTimezoneSchema,
   churchWebsite: z.string().trim().max(churchApplicationLimits.churchWebsite)
     .refine(value => !value || (z.string().url().safeParse(value).success && value.startsWith("https://")),
       "Enter a complete website address starting with https://, or leave it blank.").optional(),

@@ -1,14 +1,15 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   addRestrictedSafeguardingEvidence,
   recordIndependentSafeguardingExternalReport,
 } from "@/modules/safeguarding/safeguarding.functions";
-
-const control = "mt-1 min-h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function SafeguardingEvidenceForm({ incidentId, onSaved }: {
   incidentId: string;
@@ -20,11 +21,13 @@ export function SafeguardingEvidenceForm({ incidentId, onSaved }: {
   const [documentId, setDocumentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [attempted,setAttempted]=useState(false);
   const idempotencyKey = useRef("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    setAttempted(true);
+    if (busy||description.trim().length<3) return;
     setBusy(true); setError("");
     idempotencyKey.current ||= crypto.randomUUID();
     try {
@@ -43,20 +46,21 @@ export function SafeguardingEvidenceForm({ incidentId, onSaved }: {
     <Button variant="outline" size="sm" onClick={() => setOpen(value => !value)} aria-expanded={open}>
       {open ? "Close evidence form" : "Add evidence record"}
     </Button>
-    {open && <form onSubmit={event => void submit(event)} aria-busy={busy} className="mt-4 rounded-xl border p-4">
+    {open && <form noValidate onSubmit={event => void submit(event)} aria-busy={busy} className="mt-4 rounded-xl border p-4">
       <fieldset disabled={busy} className="grid gap-4">
-        <label className="text-sm font-medium">Evidence source
-          <select className={control} value={type} onChange={event => setType(event.target.value as typeof type)}>
+        <Field label="Evidence source" className="text-sm">
+          <Select value={type} onChange={event => setType(event.target.value as typeof type)}>
             <option value="observation">Observation note</option><option value="document">Restricted document</option>
             <option value="photograph">Photograph</option><option value="other">Other</option>
-          </select>
-        </label>
-        <label className="text-sm font-medium">Factual description
-          <textarea required minLength={3} maxLength={2000} rows={3} className={control} value={description} onChange={event => setDescription(event.target.value)} />
-        </label>
-        <label className="text-sm font-medium">Restricted document ID (optional)
+          </Select>
+        </Field>
+        <Field label="Factual description" className="text-sm" required
+          error={attempted&&description.trim().length<3?"Enter a factual description with at least 3 characters.":undefined}>
+          <Textarea minLength={3} maxLength={2000} rows={3} value={description} onChange={event => setDescription(event.target.value)} />
+        </Field>
+        <Field label="Restricted document ID (optional)" className="text-sm">
           <Input value={documentId} onChange={event => setDocumentId(event.target.value)} placeholder="Only an existing document attached to this incident" />
-        </label>
+        </Field>
         <p className="text-xs text-muted-foreground">This preserves an evidence reference; it does not upload a file or establish a finding.</p>
         <Button type="submit" disabled={busy}>{busy ? "Saving evidence…" : "Save evidence record"}</Button>
       </fieldset>
@@ -79,11 +83,13 @@ export function SafeguardingExternalReportForm({ incidentId, onSaved }: {
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [attempted,setAttempted]=useState(false);
   const idempotencyKey = useRef("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    setAttempted(true);
+    if (busy||agencyLabel.trim().length<2||!occurredAt||!Number.isFinite(new Date(occurredAt).getTime())) return;
     setBusy(true); setError("");
     idempotencyKey.current ||= crypto.randomUUID();
     try {
@@ -92,7 +98,7 @@ export function SafeguardingExternalReportForm({ incidentId, onSaved }: {
         agencyLabel, channel, occurredAt: new Date(occurredAt).toISOString(),
         reference: reference.trim() || undefined, details: details.trim() || undefined,
       } });
-      idempotencyKey.current = ""; setOpen(false); setDetails(""); setReference("");
+      idempotencyKey.current = ""; setOpen(false); setDetails(""); setReference("");setAttempted(false);
       await onSaved();
     } catch (cause) {
       setError(mutationErrorMessage(cause, "The outside action was not recorded. Retry; do not infer submission from an error."));
@@ -103,38 +109,40 @@ export function SafeguardingExternalReportForm({ incidentId, onSaved }: {
     <Button variant="outline" onClick={() => setOpen(value => !value)} aria-expanded={open}>
       {open ? "Close outside-action form" : "Record outside action"}
     </Button>
-    {open && <form onSubmit={event => void submit(event)} aria-busy={busy} className="mt-5 grid gap-4">
+    {open && <form noValidate onSubmit={event => void submit(event)} aria-busy={busy} className="mt-5 grid gap-4">
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-medium">Record status
-          <select className={control} value={status} onChange={event => setStatus(event.target.value as typeof status)}>
+        <Field label="Record status" className="text-sm">
+          <Select value={status} onChange={event => setStatus(event.target.value as typeof status)}>
             <option value="attempted">Attempted</option><option value="submitted">Submitted</option>
             <option value="agency_acknowledged">Agency acknowledged</option>
-          </select>
-        </label>
-        <label className="text-sm font-medium">Channel
-          <select className={control} value={channel} onChange={event => setChannel(event.target.value as typeof channel)}>
+          </Select>
+        </Field>
+        <Field label="Channel" className="text-sm">
+          <Select value={channel} onChange={event => setChannel(event.target.value as typeof channel)}>
             <option value="phone">Phone</option><option value="online">Online</option>
             <option value="in_person">In person</option><option value="formal_notice">Formal notice</option><option value="other">Other</option>
-          </select>
-        </label>
-        <label className="text-sm font-medium">Outside destination
-          <select className={control} value={agencyType} onChange={event => setAgencyType(event.target.value as typeof agencyType)}>
+          </Select>
+        </Field>
+        <Field label="Outside destination" className="text-sm">
+          <Select value={agencyType} onChange={event => setAgencyType(event.target.value as typeof agencyType)}>
             <option value="child_welfare">Child welfare</option><option value="emergency_services">Emergency services</option>
             <option value="law_enforcement">Law enforcement</option><option value="medical">Medical</option><option value="other">Other</option>
-          </select>
-        </label>
-        <label className="text-sm font-medium">Agency or service name
-          <Input required minLength={2} maxLength={200} value={agencyLabel} onChange={event => setAgencyLabel(event.target.value)} />
-        </label>
-        <label className="text-sm font-medium">When this happened
-          <Input required type="datetime-local" value={occurredAt} onChange={event => setOccurredAt(event.target.value)} />
-        </label>
-        <label className="text-sm font-medium">Receipt or reference (only if known)
+          </Select>
+        </Field>
+        <Field label="Agency or service name" className="text-sm" required
+          error={attempted&&agencyLabel.trim().length<2?"Enter the name of the outside agency or service.":undefined}>
+          <Input minLength={2} maxLength={200} value={agencyLabel} onChange={event => setAgencyLabel(event.target.value)} />
+        </Field>
+        <Field label="When this happened" className="text-sm" required
+          error={attempted&&(!occurredAt||!Number.isFinite(new Date(occurredAt).getTime()))?"Choose a valid date and time.":undefined}>
+          <Input type="datetime-local" value={occurredAt} onChange={event => setOccurredAt(event.target.value)} />
+        </Field>
+        <Field label="Receipt or reference (only if known)" className="text-sm">
           <Input maxLength={300} value={reference} onChange={event => setReference(event.target.value)} />
-        </label>
-        <label className="text-sm font-medium sm:col-span-2">Factual details (optional)
-          <textarea rows={3} maxLength={2000} className={control} value={details} onChange={event => setDetails(event.target.value)} />
-        </label>
+        </Field>
+        <Field label="Factual details (optional)" className="text-sm sm:col-span-2">
+          <Textarea rows={3} maxLength={2000} value={details} onChange={event => setDetails(event.target.value)} />
+        </Field>
         <div className="sm:col-span-2"><Button type="submit" disabled={busy}>{busy ? "Recording…" : "Save outside-action record"}</Button></div>
       </fieldset>
       {error && <WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}

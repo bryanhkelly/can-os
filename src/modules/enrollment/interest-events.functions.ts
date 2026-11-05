@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { interestEventCreateInput } from "@/domain/interest-events";
+import { interestEventAttendanceInput, interestEventCreateInput } from "@/domain/interest-events";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
   createInterestEvent,
   listInterestEvents,
+  recordInterestEventAttendance,
   rotateInterestEventInvitationLink,
 } from "./interest-events.server";
 
@@ -24,4 +25,10 @@ export const rotateSchoolInterestEventLink = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ eventId: z.string().uuid() }).strict().parse(value))
   .handler(async ({ data }) => rotateInterestEventInvitationLink(
     await getCommandContext(getRequest()), data.eventId,
+  ));
+
+export const recordSchoolInterestEventAttendance = createServerFn({ method: "POST" })
+  .validator((value: unknown) => interestEventAttendanceInput.parse(value))
+  .handler(async ({ data }) => recordInterestEventAttendance(
+    await getCommandContext(getRequest()), data,
   ));

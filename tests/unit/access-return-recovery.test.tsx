@@ -24,6 +24,7 @@ vi.mock("@tanstack/react-router", async importOriginal => ({
   }) => createElement("div", { "data-to": to, "data-replace": replace,
     "data-recovered": navigationState.accessReturnFailed }),
   ErrorComponent: () => createElement("p", null, "Normal error"),
+  Link: ({ to, children }: { to: string; children: ReactNode }) => createElement("a", { href: to }, children),
 }));
 import { AccessReturnError, AccessReturnNotFound, AccessReturnRecovery } from "@/lib/access-return-recovery";
 
@@ -38,6 +39,16 @@ afterEach(() => {
 });
 
 describe("post-sign-in return recovery", () => {
+  it("renders branded unknown-page recovery separately from permission failures", () => {
+    vi.stubGlobal("document", { cookie: "" });
+    const html = renderToStaticMarkup(createElement(AccessReturnNotFound));
+    expect(html).toContain("CAN OS");
+    expect(html).toContain("404");
+    expect(html).toContain("Page not found");
+    expect(html).toContain('aria-label="Page recovery"');
+    expect(html).toContain('href="/access"');
+    expect(html).not.toContain("permission");
+  });
   it.each(["FORBIDDEN", "AUTHENTICATION_REQUIRED", "UNAVAILABLE", "VALIDATION_FAILED", "CONFLICT", "UNEXPECTED"])(
     "sends a failed %s saved-page read home using actual router outcomes", async code => {
       const root = createRootRoute();

@@ -4,6 +4,7 @@ import {z} from "zod";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 import {schoolYearServesProgram} from "@/domain/family-application-handoff";
+import {DataUnavailableError} from "@/lib/safe-loader";
 
 /** Counts actual active enrollments and unexpired held offers by school year. */
 export const getAdmissionsCapacity=createServerFn({method:"GET"})
@@ -13,7 +14,7 @@ export const getAdmissionsCapacity=createServerFn({method:"GET"})
  const scoped=await resolveOperationsSelection(actor,data);
  const granted=scoped.programIds;
  if(!granted.length)return [];
- if(!process.env.DATABASE_URL)return [];
+ if(!process.env.DATABASE_URL)throw new DataUnavailableError();
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const programs=await db.select({id:s.programs.id,name:s.programs.name}).from(s.programs).where(inArray(s.programs.id,granted)).limit(100);
  if(!programs.length)return [];
@@ -57,7 +58,8 @@ export const listSeatPoolCandidates=createServerFn({method:"GET"})
  .handler(async({data})=>{
   const actor=await requireActor(["registrar"],"enrollment.decide");
   const scoped=await resolveOperationsSelection(actor,data);
-  if(!scoped.programIds.length||!process.env.DATABASE_URL)return [];
+  if(!scoped.programIds.length)return [];
+  if(!process.env.DATABASE_URL)throw new DataUnavailableError();
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const programRows=await db.select({
    id:s.programs.id,name:s.programs.name,organizationId:s.programs.organizationId,siteId:s.programs.siteId,

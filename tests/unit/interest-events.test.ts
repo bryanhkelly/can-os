@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   interestEventCreateInput,
+  interestEventInvitationRsvpLink,
   interestEventRegistrationInput,
   interestEventRsvpLink,
 } from "@/domain/interest-events";
@@ -67,5 +68,29 @@ describe("interest event input", () => {
       .toBe(`https://can-os.example/interest-event?eventId=${eventId}`);
     expect(interestEventRsvpLink("https://can-os.example", eventId, "a token"))
       .toBe(`https://can-os.example/interest-event?eventId=${eventId}&accessToken=a+token`);
+  });
+
+  it("creates RSVP links scoped to one family invitation recipient", () => {
+    const batchId = "44444444-4444-4444-8444-444444444444";
+    const recipientKey = "55555555-5555-4555-8555-555555555555";
+    expect(interestEventInvitationRsvpLink("https://can-os.example", eventId, batchId, recipientKey))
+      .toBe(`https://can-os.example/interest-event?eventId=${eventId}&invitationBatchId=${batchId}&invitationRecipientKey=${recipientKey}`);
+  });
+
+  it("requires both family invitation identifiers on an RSVP", () => {
+    const registration = {
+      requestId,
+      eventId,
+      accessToken: "",
+      firstName: "Alex",
+      lastName: "Guardian",
+      email: "alex@example.test",
+      contactConsent: "yes",
+      website: "",
+    };
+    expect(interestEventRegistrationInput.safeParse({
+      ...registration,
+      invitationBatchId: requestId,
+    }).success).toBe(false);
   });
 });

@@ -1,6 +1,8 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { AdmissionsApplicantCard } from "@/components/admissions/AdmissionsApplicantCard";
+import type { AdmissionsDecision } from "@/components/admissions/AdmissionsDecisionActions";
+import type { GuardianVerification } from "@/components/admissions/AdmissionsGuardianActions";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import {useEffect,useState} from "react";
@@ -8,7 +10,10 @@ import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {createAdmissionsInquiry,getAdmissionsStageCounts,listAdmissionsExistingStudentsPage,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {WorkspaceShell} from "@/components/workspace";
+import {EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceShell} from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
 import { AdmissionsInquiryForm } from "@/components/admissions/AdmissionsInquiryForm";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
@@ -72,9 +77,11 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const existingStudents=data.existingStudents.filter(student=>student.programId===programId);
  const [searchDraft,setSearchDraft]=useState(selected.search??"");
  const pageNavigation=<div className="my-4 flex flex-wrap items-center gap-3">
-  <form onSubmit={e=>{e.preventDefault();void router.navigate({to:"/admissions/intake",search:{...selected,search:searchDraft||undefined,page:1}});}}>
-   <input aria-label="Search admissions" className="rounded border bg-background px-2 py-1" value={searchDraft} onChange={e=>setSearchDraft(e.target.value)} placeholder="Student, program, application ID"/>
-   <button className="ml-2 rounded border px-2 py-1" type="submit">Search</button>
+  <form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();void router.navigate({to:"/admissions/intake",search:{...selected,search:searchDraft||undefined,page:1}});}}>
+   <Field label="Search admissions" description="Search students, Programs, or application IDs.">
+    <Input value={searchDraft} onChange={e=>setSearchDraft(e.target.value)} placeholder="Student, program, application ID"/>
+   </Field>
+   <Button type="submit" variant="outline">Search</Button>
   </form>
   <AdmissionsPageNavigation selection={selected} hasMore={data.records.hasMore} kind="applications"/>
  </div>;
@@ -92,6 +99,38 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const busy=mutation.pending||mutation.refreshFailed||!interactive;
  async function perform(fn:()=>Promise<unknown>,message:string,refresh?:()=>Promise<unknown>){
   await mutation.run(fn,{successMessage:message,commandErrorMessage:"Unable to save",refresh});
+ }
+ const onVerify=(applicationId:string,verification:GuardianVerification)=>{
+  void perform(()=>verifyAdmissionsGuardianRelationship({data:{applicationId,...verification}}),
+   "Guardian relationship verified and family permissions enabled.");
+ };
+ const onProvision=(applicationId:string)=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
+  "Verified guardian sign-in access provisioned.");
+ const onInvite=(applicationId:string)=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
+  "A secure email sign-in invitation was requested for this guardian.");
+ const onDecision=(applicationId:string,decision:AdmissionsDecision,label:string)=>{
+  void perform(()=>transitionAdmissionsStage({data:{applicationId,decision}}),label+" saved.");
+ };
+ if(selected.application){
+  const record=records[0];
+  return <PageFrame width="wide">
+   <RecordLayout header={<RecordHeader eyebrow="Admissions / Application"
+    title={record?`${record.studentFirst} ${record.studentLast}`:"Application unavailable"}
+    subtitle={record?`${record.programName} · Last updated ${new Date(record.updatedAt).toLocaleDateString()}`:
+     "This application is unavailable in your authorized Site and Program scope."}
+    status={record?<StatusBadge>{record.disposition??record.stage}</StatusBadge>:undefined}
+    breadcrumbs={<Link to="/admissions/intake" search={{...selected,application:undefined}} className="underline">Admissions pipeline</Link>}/>}
+   main={record ? (
+    <div className="space-y-5">
+     <MutationFeedback state={mutation} pendingMessage="Saving admissions records..."/>
+    <AdmissionsApplicantCard r={record} busy={busy} showSummary={false} onVerify={onVerify}
+      onProvision={onProvision} onInvite={onInvite} onDecision={onDecision}/>
+    </div>
+   ) : (
+    <EmptyState title="Application unavailable"
+     description="This application is unavailable in your authorized Site and Program scope."/>
+   )} />
+  </PageFrame>;
  }
  return <WorkspaceShell eyebrow="Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
@@ -172,17 +211,8 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <AdmissionsPipelineSummary counts={data.stageCounts}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
    {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
-   {records.map(r=><AdmissionsApplicantCard key={r.id} r={r} busy={busy}
-    onVerify={(applicationId,verification)=>{
-     void perform(()=>verifyAdmissionsGuardianRelationship({data:{
-      applicationId,...verification,
-     }}),"Guardian relationship verified and family permissions enabled.");
-    }}
-    onProvision={applicationId=>void perform(()=>provisionInquiryGuardianAccount({data:{applicationId}}),
-     "Verified guardian sign-in access provisioned.")}
-    onInvite={applicationId=>void perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId}}),
-     "A secure email sign-in invitation was requested for this guardian.")}
-    onDecision={(applicationId,decision,label)=>void perform(()=>transitionAdmissionsStage({data:{applicationId,decision}}),label+" saved.")}/>)}
+  {records.map(r=><AdmissionsApplicantCard key={r.id} r={r} busy={busy}
+   onVerify={onVerify} onProvision={onProvision} onInvite={onInvite} onDecision={onDecision}/>)}
    {pageNavigation}
    {!records.length&&<p role="status" className="rounded-lg border p-5 text-sm text-muted-foreground">{selected.application?
     "This application is unavailable in your authorized programs.":"No applications recorded in your authorized programs."}</p>}

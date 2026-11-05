@@ -1,4 +1,8 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useCallback, useEffect, useState } from "react";
 import { TeacherStudentGoalForm } from "./TeacherStudentGoalForm";
 import { TeacherStudentGoalReviewForm } from "./TeacherStudentGoalReviewForm";
@@ -22,15 +26,18 @@ function TeacherFollowUpResolution({ item, onSaved }: { item: QueueItem; onSaved
   const [outcomeEvidence, setOutcomeEvidence] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [attempted, setAttempted] = useState(false);
 
   if (item.status === "resolved") return item.resolutionNote
     ? <p className="mt-2 whitespace-pre-wrap text-xs">{item.resolutionNote}</p> : null;
   return <div className="mt-3">
     {!expanded && <button type="button" className="text-sm underline"
       onClick={() => setExpanded(true)}>Document follow-up and close</button>}
-    {expanded && <form className="mt-3 grid gap-3 rounded border p-3"
+    {expanded && <form noValidate className="mt-3 grid gap-3 rounded border p-3"
       onSubmit={async event => {
         event.preventDefault();
+        setAttempted(true);
+        if(supportProvided.trim().length<15||outcomeEvidence.trim().length<15)return;
         if (busy) return;
         setBusy(true); setMessage("");
         try {
@@ -45,31 +52,30 @@ function TeacherFollowUpResolution({ item, onSaved }: { item: QueueItem; onSaved
           setBusy(false);
         }
       }}>
-      <label className="grid gap-1 text-sm">Support provided
-        <textarea className="rounded border p-2" rows={2} required disabled={busy}
-          minLength={15} maxLength={1000} value={supportProvided}
+      <Field label="Support provided" className="text-sm" required
+        error={attempted&&supportProvided.trim().length<15?"Enter at least 15 characters describing the support provided.":undefined}>
+        <Textarea rows={2} disabled={busy} minLength={15} maxLength={1000} value={supportProvided}
           onChange={e => setSupportProvided(e.target.value)}
           placeholder="What did you do to support the student?" />
-      </label>
-      <label className="grid gap-1 text-sm">Outcome assessed by you
-        <select value={outcome} disabled={busy} className="rounded border p-2"
+      </Field>
+      <Field label="Outcome assessed by you" className="text-sm">
+        <Select value={outcome} disabled={busy}
           onChange={e => setOutcome(e.target.value as Outcome)}>
           {(Object.keys(teacherFollowUpOutcomeLabels) as Outcome[]).map(key =>
             <option key={key} value={key}>{teacherFollowUpOutcomeLabels[key]}</option>)}
-        </select>
-      </label>
-      <label className="grid gap-1 text-sm">Evidence or next step
-        <textarea className="rounded border p-2" rows={2} required disabled={busy}
-          minLength={15} maxLength={1000} value={outcomeEvidence}
+        </Select>
+      </Field>
+      <Field label="Evidence or next step" className="text-sm" required
+        error={attempted&&outcomeEvidence.trim().length<15?"Enter at least 15 characters of outcome evidence or a next step.":undefined}>
+        <Textarea rows={2} disabled={busy} minLength={15} maxLength={1000} value={outcomeEvidence}
           onChange={e => setOutcomeEvidence(e.target.value)}
           placeholder="Describe student work, feedback, or the next support needed. Do not infer mastery from clicks." />
-      </label>
+      </Field>
       <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={busy} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+        <Button type="submit" variant="outline" disabled={busy}>
           {busy ? "Saving…" : "Record outcome and resolve"}
-        </button>
-        <button type="button" disabled={busy} className="text-sm underline"
-          onClick={() => setExpanded(false)}>Cancel</button>
+        </Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={() => setExpanded(false)}>Cancel</Button>
       </div>
       {message && <p role="status" className="text-sm">{message}</p>}
     </form>}

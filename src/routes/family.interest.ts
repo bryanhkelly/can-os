@@ -1,29 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { invitedFamilyInterestInput } from "@/domain/family-recruitment-interest";
 import { readSmallUrlEncodedBody } from "@/domain/public-admissions-interest";
-import { isLocalPreviewHost } from "@/domain/public-site-host-routing";
 import { escapePublicHtml } from "@/domain/public-site-html";
+import { hasConfiguredPublicOrigin, publicHtmlResponse } from "@/lib/public-html-response.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { z } from "zod";
 
-const headers = {
-  "Cache-Control": "private, no-store",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "no-referrer",
-  "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
-};
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function html(body: string, status = 200) {
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>School information request · CAN</title></head>
-    <body style="font-family:system-ui;max-width:38rem;margin:3rem auto;padding:1rem;line-height:1.5">
-    ${body}</body></html>`, {
-    status, headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+  return publicHtmlResponse(body, {
+    title: "School information request · CAN", maxWidth: "38rem", status,
   });
 }
 function unavailable() {
@@ -34,6 +22,7 @@ function welcomePage(context: {
   programName: string;
   programStatus: string;
   introduction: string;
+  invitedFamily: { firstName: string; lastName: string; email: string };
   events: { id: string; title: string; startsAt: string; timezone: string; rsvpUrl: string }[];
 }, invitationBatchId: string, invitationRecipientKey: string) {
   const events = context.events.length
@@ -46,7 +35,7 @@ function welcomePage(context: {
         <a href="${escapePublicHtml(event.rsvpUrl)}">RSVP</a></li>`).join("")}</ul></section>`
     : "";
   return html(`<p style="font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase">A personal invitation</p>
-    <h1>Welcome to ${escapePublicHtml(context.siteName)}</h1>
+    <h1>Welcome${context.invitedFamily.firstName ? `, ${escapePublicHtml(context.invitedFamily.firstName)}` : ""} to ${escapePublicHtml(context.siteName)}</h1>
     <p>${escapePublicHtml(context.programName)}</p>
     <p>${escapePublicHtml(context.introduction)}</p>
     <p>${context.programStatus === "active"
@@ -60,11 +49,11 @@ function welcomePage(context: {
       <input type="hidden" name="invitationBatchId" value="${escapePublicHtml(invitationBatchId)}">
       <input type="hidden" name="invitationRecipientKey" value="${escapePublicHtml(invitationRecipientKey)}">
       <label style="display:block;margin:1rem 0">First name
-        <input name="firstName" required maxlength="80" autocomplete="given-name" style="display:block;width:100%;padding:.6rem"></label>
+        <input name="firstName" value="${escapePublicHtml(context.invitedFamily.firstName)}" required maxlength="80" autocomplete="given-name" style="display:block;width:100%;padding:.6rem"></label>
       <label style="display:block;margin:1rem 0">Last name
-        <input name="lastName" required maxlength="80" autocomplete="family-name" style="display:block;width:100%;padding:.6rem"></label>
+        <input name="lastName" value="${escapePublicHtml(context.invitedFamily.lastName)}" required maxlength="80" autocomplete="family-name" style="display:block;width:100%;padding:.6rem"></label>
       <label style="display:block;margin:1rem 0">Email address that received the invitation
-        <input name="email" type="email" required maxlength="254" autocomplete="email" style="display:block;width:100%;padding:.6rem"></label>
+        <input name="email" type="email" value="${escapePublicHtml(context.invitedFamily.email)}" readonly required maxlength="254" autocomplete="email" style="display:block;width:100%;padding:.6rem"></label>
       <label style="display:block;margin:1rem 0">Questions for the school (optional)
         <textarea name="message" maxlength="500" rows="3" style="display:block;width:100%;padding:.6rem"></textarea></label>
       <div style="position:absolute;left:-9999px" aria-hidden="true">
@@ -77,20 +66,7 @@ function welcomePage(context: {
     You can ask the school to stop contacting you.</p>`);
 }
 function configuredOrigin(request: Request) {
-  const url = new URL(request.url);
-  const host = request.headers.get("host");
-  if (host && host.toLowerCase().replace(/\.$/, "") !== url.host.toLowerCase()) return false;
-  if (process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED === "true" &&
-      url.protocol === "http:" && url.pathname === "/family/interest" &&
-      isLocalPreviewHost(url.hostname)) return true;
-  const configured = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
-  if (!configured) return false;
-  try {
-    const destination = new URL(configured);
-    return destination.protocol === "https:" && destination.pathname === "/" &&
-      !destination.search && !destination.hash &&
-      url.origin === destination.origin;
-  } catch { return false; }
+  return hasConfiguredPublicOrigin(request, { localPreviewPath: "/family/interest" });
 }
 
 /** Anonymous, adult-only opt-in. The invitation ids are opaque routing context,

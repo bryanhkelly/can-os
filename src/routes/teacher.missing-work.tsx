@@ -43,10 +43,10 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
       <section className="mt-6 space-y-3">
         {items.map(x => (
           <article key={x.assessmentId + ":" + x.studentProfileId} className="rounded-xl border bg-card p-5">
-            <p className="text-xs text-muted-foreground">{x.course} · due {new Date(x.dueAt).toLocaleDateString()}</p>
-            <h2 className="mt-2 font-semibold">{x.title}</h2>
+            <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {new Date(x.dueAt).toLocaleDateString()}</p>
+            <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId}} className="underline">{x.title}</Link></h2>
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
-            <p className="mt-1 text-sm">{x.studentName} · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
+            <p className="mt-1 text-sm"><Link to="/staff/students/$personId" params={{personId:x.studentPersonId}} className="underline">{x.studentName}</Link> · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button
               disabled={busy || Boolean(followedUp[x.assessmentId + ":" + x.studentProfileId])}

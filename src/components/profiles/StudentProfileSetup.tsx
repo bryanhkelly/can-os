@@ -3,6 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { getStudentSelfProfile, saveStudentSelfProfile } from "@/modules/profiles/student-self-profile.functions";
 
 type Snapshot = Awaited<ReturnType<typeof getStudentSelfProfile>>;
@@ -65,23 +68,14 @@ export function StudentProfileEditor({ snapshot, changed }: {
     <MutationFeedback state={mutation} pendingMessage="Saving student profile..." />
     <fieldset disabled={mutation.pending || mutation.refreshFailed} className="grid gap-3 sm:grid-cols-2">
       <legend className="sr-only">Student profile setup</legend>
-      <label className="text-sm">Preferred name (optional)
-        <input maxLength={80} value={preferredName} onChange={event => setPreferredName(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
-      <label className="text-sm">Pronouns (optional)
-        <input maxLength={60} value={pronouns} onChange={event => setPronouns(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
-      <label className="text-sm sm:col-span-2">Interests or hobbies (optional)
-        <input maxLength={700} placeholder="For example: drawing, soccer, robotics"
-          value={interests} onChange={event => setInterests(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
+      <Field label="Preferred name (optional)" className="text-sm"><Input maxLength={80} value={preferredName} onChange={event => setPreferredName(event.target.value)}/></Field>
+      <Field label="Pronouns (optional)" className="text-sm"><Input maxLength={60} value={pronouns} onChange={event => setPronouns(event.target.value)}/></Field>
+      <Field label="Interests or hobbies (optional)" className="text-sm sm:col-span-2">
+        <Input maxLength={700} placeholder="For example: drawing, soccer, robotics" value={interests} onChange={event => setInterests(event.target.value)}/>
+      </Field>
     </fieldset>
     <p className="text-xs text-muted-foreground">Add or change your profile picture above. Your school manages your legal identity, grade, enrollment, and access.</p>
-    <button type="submit" disabled={mutation.pending || mutation.refreshFailed}
-      className="justify-self-start rounded border px-4 py-2 text-sm disabled:opacity-50">Save student profile</button>
+    <Button type="submit" variant="outline" disabled={mutation.pending || mutation.refreshFailed} className="justify-self-start">Save student profile</Button>
     <Link to="/home" className="justify-self-start text-sm underline">Skip for now and go to my learning workspace</Link>
   </form>;
 }

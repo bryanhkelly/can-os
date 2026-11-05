@@ -4,6 +4,7 @@ import { z } from "zod";
 import { WorkspaceShell } from "@/components/workspace";
 import { workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import { optionalSearchString, siteProgramSelectionSchema } from "@/lib/route-search";
+import { isValidDateOnly } from "@/modules/calendar/timezone";
 
 const StudentHome = lazy(() => import("@/components/home/StudentHome").then(module => ({ default: module.StudentHome })));
 const TeacherHome = lazy(() => import("@/components/home/TeacherHome").then(module => ({ default: module.TeacherHome })));
@@ -16,6 +17,8 @@ const SafeguardingHome = lazy(() => import("./safeguarding").then(module => ({ d
 const WebsiteHome = lazy(() => import("./site-website").then(module => ({ default: module.WebsiteHome })));
 const NetworkHome = lazy(() => import("@/components/home/NetworkHome").then(module => ({ default: module.NetworkHome })));
 const StewardHome = lazy(() => import("@/components/home/StewardHome").then(module => ({ default: module.CANPartnerDesk })));
+const JurisdictionReviewerDesk = lazy(() => import("@/components/operations/CANSchoolJurisdictionReviewDesk")
+  .then(module => ({ default: module.CANSchoolJurisdictionReviewDesk })));
 
 const homeSearchSchema = siteProgramSelectionSchema.extend({
   action: optionalSearchString,
@@ -24,11 +27,19 @@ const homeSearchSchema = siteProgramSelectionSchema.extend({
   case: optionalSearchString,
   person: z.string().uuid().optional(),
   returnGrantId: optionalSearchString,
+  view: z.enum(["onsite"]).optional(),
+  date: z.string().refine(isValidDateOnly, "Invalid school date").optional(),
 });
 type HomeSearch = z.infer<typeof homeSearchSchema>;
 
 // Role selects presentation only. Every reader still enforces the active server access context.
 export async function loadHomeDashboard(role: string, search: HomeSearch) {
+    if (search.view === "onsite") {
+      if (!["site_leader", "site_staff", "room_facilitator"].includes(role)) {
+        return { kind: "unavailable", message: "This workspace cannot operate the onsite school day. Select your authorized onsite membership." } as const;
+      }
+      return { kind: "site-day" } as const;
+    }
   switch (role) {
     case "student":
       return { kind: "student", outcome: await (await import("@/components/home/StudentHome")).loadStudentHome() } as const;
@@ -50,6 +61,8 @@ export async function loadHomeDashboard(role: string, search: HomeSearch) {
       return { kind: "network", outcome: await (await import("@/components/home/NetworkHome")).loadNetworkHome() } as const;
     case "can_network_steward":
       return { kind: "steward", outcome: await (await import("@/components/home/StewardHome")).loadStewardHome() } as const;
+    case "can_jurisdiction_reviewer":
+      return { kind: "jurisdiction-review" } as const;
     case "guardian":
       return { kind: "guardian" } as const;
     case "specialist":
@@ -92,7 +105,7 @@ function HomePage() {
         case "teacher": return <TeacherHome outcome={dashboard.outcome} gradeAction={search.gradeAction} />;
         case "operations": return <OperationsHome result={dashboard.outcome} selected={search} />;
         case "guardian": return <FamilyHome action={search.action} student={search.student} />;
-        case "site-day": return <SiteDayHome />;
+        case "site-day": return <SiteDayHome key={(search.siteId ?? "") + (search.date ?? "")} selection={{ siteId: search.siteId, date: search.date }} />;
         case "coach": return <CoachHome key={search.student ?? "all"} title={dashboard.title}
           studentProfileId={search.student} selectStudent={student => void navigate({ search: { student } })} />;
         case "profile": return <ProfileHome outcome={dashboard.outcome} />;
@@ -100,6 +113,11 @@ function HomePage() {
         case "website": return <WebsiteHome outcome={dashboard.outcome} selection={search} />;
         case "network": return <NetworkHome result={dashboard.outcome} />;
         case "steward": return <StewardHome outcome={dashboard.outcome} />;
+        case "jurisdiction-review": return <WorkspaceShell width="wide" eyebrow="CAN Jurisdiction"
+          title="School-specific jurisdiction reviews"
+          subtitle="Independently review current official requirements and submitted school evidence.">
+          <JurisdictionReviewerDesk />
+        </WorkspaceShell>;
         case "unavailable": return <WorkspaceShell title="Home"><p role="alert">{dashboard.message}</p></WorkspaceShell>;
       }
     })()}

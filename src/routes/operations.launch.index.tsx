@@ -11,6 +11,7 @@ import { listPublishedJurisdictionGuidance } from "@/modules/programs/jurisdicti
 import { listLaunchJurisdictionResearch } from "@/modules/programs/jurisdiction-launch-research.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { supplementaryRead } from "@/lib/supplementary-read";
 
 export const Route = createFileRoute("/operations/launch/")({
   loaderDeps: ({ search }) => ({ siteId: search.siteId, programId: search.programId }),
@@ -20,11 +21,11 @@ export const Route = createFileRoute("/operations/launch/")({
     const required = await safeLoader(async () => {
       const options = await listLaunchOptions();
       const launches = await listLaunches();
-      const preparationPrograms = await listAdmissionsPrograms().catch(() => null);
-      return { options, launches, preparationPrograms };
+      const preparation = await supplementaryRead(() => listAdmissionsPrograms(), data => data.length === 0);
+      return { options, launches, preparationPrograms: preparation.data, preparationState: preparation.state };
     })();
     if (!required.ok) return required;
-    const { options, launches, preparationPrograms } = required.data;
+    const { options, launches, preparationPrograms, preparationState } = required.data;
     const schools = (preparationPrograms ?? []).filter(program =>
       ["draft", "launching", "ready", "active"].includes(program.status));
     const selected = resolveLaunchResume(schools, deps).launch
@@ -37,14 +38,21 @@ export const Route = createFileRoute("/operations/launch/")({
     }
     return safeLoader(async () => {
       const [familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch] = await Promise.all([
-        listFamilyInvitations().catch(() => null),
-        getLaunchAdmissionsCounts({ data: deps }).catch(() => null),
-        getActiveEnrollmentCounts({ data: deps }).catch(() => null),
-        listExtendedSeasonPlanning().catch(() => null),
-        listPublishedJurisdictionGuidance().catch(() => ({})),
-        listLaunchJurisdictionResearch().catch(() => ({})),
+        supplementaryRead(() => listFamilyInvitations(), data => data.batches.length === 0),
+        supplementaryRead(() => getLaunchAdmissionsCounts({ data: deps }), data => data.total === 0),
+        supplementaryRead(() => getActiveEnrollmentCounts({ data: deps }), data => data.length === 0),
+        supplementaryRead(() => listExtendedSeasonPlanning(), data => Object.keys(data).length === 0),
+        supplementaryRead(() => listPublishedJurisdictionGuidance(), data => Object.keys(data).length === 0),
+        supplementaryRead(() => listLaunchJurisdictionResearch(), data => Object.keys(data).length === 0),
       ]);
-      return { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch, authError: "" };
+      return { options, launches, preparationPrograms,
+        familyInvitations: familyInvitations.data, admissionsCounts: admissionsCounts.data,
+        enrollmentCounts: enrollmentCounts.data, extendedPlanning: extendedPlanning.data,
+        jurisdictionGuidance: jurisdictionGuidance.data ?? {}, jurisdictionResearch: jurisdictionResearch.data ?? {},
+        reads: { preparationPrograms: preparationState, familyInvitations: familyInvitations.state,
+          admissionsCounts: admissionsCounts.state, enrollmentCounts: enrollmentCounts.state,
+          extendedPlanning: extendedPlanning.state, jurisdictionGuidance: jurisdictionGuidance.state,
+          jurisdictionResearch: jurisdictionResearch.state }, authError: "" };
     })();
   },
   component: LaunchPage,
@@ -52,8 +60,9 @@ export const Route = createFileRoute("/operations/launch/")({
 
 function LaunchPage() {
   const result = Route.useLoaderData();
+  const selection = Route.useSearch();
   if (!result.ok) {
     return <LoaderFailure title="Launch a school" eyebrow="Launch" outcome={result} />;
   }
-  return <LaunchWizardPage selection={Route.useSearch()} data={result.data} />;
+  return <LaunchWizardPage selection={selection} data={result.data} />;
 }

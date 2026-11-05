@@ -138,6 +138,7 @@ for (const eventType of [
   EventTypes.CalendarEventCancelled,
   EventTypes.InterestEventCreated,
   EventTypes.InterestEventRegistrationCreated,
+  EventTypes.InterestEventAttendanceRecorded,
   EventTypes.AttendanceExcuseWithdrawn,
   EventTypes.PickupAuthorizationCreated,
   EventTypes.PickupAuthorizationRevoked,

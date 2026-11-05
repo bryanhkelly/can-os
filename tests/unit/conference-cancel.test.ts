@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   writeAudit: vi.fn(),
   cancelProjection: vi.fn(),
   releaseClaimedSlot: vi.fn(),
+  cancelReminders: vi.fn(),
 }));
 
 function chain<T>(result: T) {
@@ -44,7 +45,7 @@ vi.mock("@/platform/scheduling/booking", () => ({
   claimAvailableSlot: vi.fn(),
   releaseClaimedSlot: state.releaseClaimedSlot,
 }));
-vi.mock("@/platform/scheduling/reminders", () => ({ scheduleReminder: vi.fn() }));
+vi.mock("@/platform/scheduling/reminders", () => ({ scheduleReminder: vi.fn(), cancelReminders: state.cancelReminders, rescheduleReminders: vi.fn() }));
 vi.mock("@/platform/scheduling/slots", () => ({ materializeSlots: vi.fn() }));
 
 import { bookConference, cancelConferenceBooking, completeConference, createConferenceSeries } from "@/modules/conferences/conference-service";
@@ -176,6 +177,7 @@ describe("cancelConferenceBooking", () => {
     expect(state.updates[0]).toMatchObject({ status: "cancelled" });
     expect(state.updates[0]?.cancelledAt).toBeInstanceOf(Date);
     expect(state.releaseClaimedSlot).toHaveBeenCalledWith(expect.anything(), "slot-1");
+    expect(state.cancelReminders).toHaveBeenCalledWith(expect.anything(), { resourceType: "conference_booking", resourceId: "booking-1" });
     expect(state.cancelProjection).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       sourceType: "conference_booking",
       sourceId: "booking-1",

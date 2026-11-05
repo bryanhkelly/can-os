@@ -1,4 +1,8 @@
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {useState} from "react";
@@ -9,7 +13,7 @@ import {createAdmissionsSeatPool,getAdmissionsCapacity,listSeatPoolCandidates,up
 import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {siteProgramSelectionSchema} from "@/lib/route-search";
+import {siteProgramHref,siteProgramSelectionSchema} from "@/lib/route-search";
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 const loadCapacity=async(selection:{siteId?:string;programId?:string}={})=>({
  rows:await getAdmissionsCapacity({data:selection}),
@@ -34,10 +38,7 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  const selection=Route.useSearch();
  const schools=[...new Map(programs.map(p=>[p.siteId,{id:p.siteId,name:p.siteName}])).values()];
  function filterTo(siteId?:string,programId?:string){
-  const query=new URLSearchParams();
-  if(siteId)query.set("siteId",siteId);
-  if(programId)query.set("programId",programId);
-  void router.navigate({href:"/admissions/capacity"+(query.size?"?"+query:"")});
+  void router.navigate({href:siteProgramHref("/admissions/capacity",{siteId,programId})});
  }
  const router=useRouter();
  const [edits,setEdits]=useState<Record<string,string>>({});
@@ -45,7 +46,9 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  const busy=mutation.pending||mutation.refreshFailed;
  const [error,setError]=useState("");
  const [newPool,setNewPool]=useState(""),[newCapacity,setNewCapacity]=useState("30");
+ const [createAttempted,setCreateAttempted]=useState(false);
  async function create(){
+  setCreateAttempted(true);
   const candidate=candidates.find(item=>`${item.programId}:${item.schoolYearId}`===newPool);
   const capacity=parseSeatCapacity(newCapacity);
   if(!candidate){setError("Choose an available program and school year.");return;}
@@ -77,26 +80,27 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  {candidates.length>0&&<section aria-label="Create seat pool" className="mt-6 rounded-xl border p-5">
   <h2 className="font-serif text-xl">Create seat pool</h2>
   <p className="mt-1 text-sm text-muted-foreground">Offers can only be issued for a program and school year with a configured seat pool.</p>
-  <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={event=>{event.preventDefault();void create();}}>
-   <label className="text-xs">Program and school year
-    <select aria-label="Seat pool program and school year" required value={newPool}
-     onChange={event=>setNewPool(event.target.value)} className="mt-1 block rounded-lg border bg-background p-2 text-sm">
+  <form noValidate className="mt-4 flex flex-wrap items-end gap-3" onSubmit={event=>{event.preventDefault();void create();}}>
+   <Field label="Program and school year" className="min-w-60 flex-1 text-xs" required
+    error={createAttempted&&!newPool?"Choose a Program and school year.":undefined}>
+    <Select aria-label="Seat pool program and school year" value={newPool}
+     onChange={event=>setNewPool(event.target.value)}>
      <option value="">Choose…</option>
      {candidates.map(candidate=><option key={`${candidate.programId}:${candidate.schoolYearId}`}
       value={`${candidate.programId}:${candidate.schoolYearId}`}>
       {candidate.programName} · {candidate.yearName}
      </option>)}
-    </select>
-   </label>
-   <label className="text-xs">Seats
-    <input aria-label="New seat pool capacity" required type="number" min={1} max={100000} step={1}
+    </Select>
+   </Field>
+   <Field label="Seats" className="text-xs" required
+    error={createAttempted&&parseSeatCapacity(newCapacity)===null?"Enter a whole-number capacity from 1 to 100,000.":undefined}>
+    <Input aria-label="New seat pool capacity" type="number" min={1} max={100000} step={1}
      value={newCapacity} onChange={event=>setNewCapacity(event.target.value)}
-     className="mt-1 block w-28 rounded-lg border bg-background p-2 text-sm"/>
-   </label>
-   <button type="submit" disabled={busy||!newPool}
-    className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+     className="w-28"/>
+   </Field>
+   <Button type="submit" disabled={busy}>
     Create seat pool
-   </button>
+   </Button>
   </form>
  </section>}
  <div className="mt-6 space-y-3">{rows.map(r=><CapacityPoolCard key={r.id} pool={r}

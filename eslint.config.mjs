@@ -14,7 +14,7 @@ const inheritedWarnings = {
 };
 
 export default tseslint.config(
-  { ignores: ["node_modules", "dist", "storybook-static", "src/routeTree.gen.ts", "playwright-report", "test-results"] },
+  { ignores: ["node_modules", "dist", ".netlify", "storybook-static", "src/routeTree.gen.ts", "playwright-report", "test-results"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

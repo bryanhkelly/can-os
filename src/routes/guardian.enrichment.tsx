@@ -5,6 +5,9 @@ import { useState, type FormEvent } from "react";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   addEnrichmentChild, getEnrichmentFamily, listEnrichmentCatalog, registerEnrichmentChild,
 } from "@/modules/activities/enrichment-family.functions";
@@ -44,16 +47,18 @@ function EnrichmentFamilyView({ data }: {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
+  const [childAttempted,setChildAttempted]=useState(false);
 
   async function addChild(event: FormEvent) {
-    event.preventDefault(); setError("");
+    event.preventDefault(); setError("");setChildAttempted(true);
+    if(!firstName.trim()||!lastName.trim())return;
     await mutation.run(async () => {
       const created = await addEnrichmentChild({ data: {
         firstName, lastName, gradeLevel,
         ...(householdId ? { householdId } : {}),
       } });
       if (!householdId) setHouseholdId(created.householdId);
-      setChildFormOpen(false); setFirstName(""); setLastName(""); setGradeLevel("");
+      setChildFormOpen(false); setFirstName(""); setLastName(""); setGradeLevel("");setChildAttempted(false);
     }, { successMessage: "Child added to your family. This does not enroll them in CAN Academy.",
       commandErrorMessage: "Could not add child." });
   }
@@ -118,23 +123,18 @@ function EnrichmentFamilyView({ data }: {
           {data.family.households.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
         </select>
       </label>}
-      {childFormOpen && <form onSubmit={addChild} className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="text-sm">First name
-          <input required value={firstName} maxLength={80} onChange={e => setFirstName(e.target.value)}
-            className="mt-1 w-full rounded-lg border bg-background p-2"/>
-        </label>
-        <label className="text-sm">Last name
-          <input required value={lastName} maxLength={80} onChange={e => setLastName(e.target.value)}
-            className="mt-1 w-full rounded-lg border bg-background p-2"/>
-        </label>
-        <label className="text-sm">Grade (optional)
-          <input value={gradeLevel} maxLength={20} onChange={e => setGradeLevel(e.target.value)}
-            className="mt-1 w-full rounded-lg border bg-background p-2"/>
-        </label>
+      {childFormOpen && <form noValidate onSubmit={addChild} className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Field label="First name" className="text-sm" required error={childAttempted&&!firstName.trim()?"Enter the child's first name.":undefined}>
+          <Input value={firstName} maxLength={80} onChange={e => setFirstName(e.target.value)}/>
+        </Field>
+        <Field label="Last name" className="text-sm" required error={childAttempted&&!lastName.trim()?"Enter the child's last name.":undefined}>
+          <Input value={lastName} maxLength={80} onChange={e => setLastName(e.target.value)}/>
+        </Field>
+        <Field label="Grade (optional)" className="text-sm"><Input value={gradeLevel} maxLength={20} onChange={e => setGradeLevel(e.target.value)}/></Field>
         <div className="sm:col-span-3">
-          <button type="submit" disabled={busy} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
+          <Button type="submit" variant="outline" disabled={busy}>
             Add child
-          </button>
+          </Button>
         </div>
       </form>}
     </section>

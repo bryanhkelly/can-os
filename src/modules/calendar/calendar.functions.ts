@@ -1,6 +1,7 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { personDisplayName } from "@/domain/person-name";
 import { EventTypes } from "@/domain/event-types";
 import { actorSiteIds,recordAudit,requireActor,type ActorRole } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
@@ -10,9 +11,11 @@ import { and,asc,eq,gt,gte,inArray,isNull,lt,ne,notExists,or } from "drizzle-orm
 import { z } from "zod";
 import { reviseCalendarEventForActor } from "./calendar-events.server";
 import { visibleStudyGroupCalendarEventIds } from "./group-calendar-visibility.server";
+import { activeFacilitatorSectionIds } from "@/modules/operations/site-section-facilitators.server";
 import { isValidTimeZone } from "./timezone";
 
 const allRoles: readonly ActorRole[] = ["student", "teacher", "guardian", "registrar", "specialist", "counselor"];
+const calendarReadRoles: readonly ActorRole[] = [...allRoles, "room_facilitator"];
 
 export type CalendarFeedItem = {
   id: string;
@@ -26,12 +29,13 @@ export type CalendarFeedItem = {
   cancelled: boolean;
   manageable: boolean;
   sectionId?: string | null;
+  guardianStudents?: { studentPersonId: string; studentName: string }[];
 };
 
 type Schema = typeof import("@/db/schema");
 
 /** Section ids the actor may read: enrolled (student), taught (teacher), related students (guardian). */
-async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Schema, actor: Awaited<ReturnType<typeof requireActor>>, sites: string[]): Promise<string[]> {
+async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Schema, actor: Awaited<ReturnType<typeof requireActor>>, sites: string[], guardianStudents: Map<string, NonNullable<CalendarFeedItem["guardianStudents"]>>): Promise<string[]> {
   if (actor.role === "student") {
     const rows = await db
       .select({ sectionId: schema.enrollments.sectionId })
@@ -53,9 +57,13 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
   }
   if (actor.role === "guardian") {
     const rows = await db
-      .select({ sectionId: schema.enrollments.sectionId })
+      .select({ sectionId: schema.enrollments.sectionId,
+        studentPersonId: schema.studentProfiles.personId,
+        legalFirstName: schema.people.legalFirstName, legalLastName: schema.people.legalLastName,
+        preferredName: schema.people.preferredName })
       .from(schema.guardianRelationships)
       .innerJoin(schema.studentProfiles, eq(schema.studentProfiles.personId, schema.guardianRelationships.studentPersonId))
+      .innerJoin(schema.people, eq(schema.people.id, schema.studentProfiles.personId))
       .innerJoin(schema.enrollments, and(
         eq(schema.enrollments.studentProfileId, schema.studentProfiles.id),
         eq(schema.enrollments.status, "active"),
@@ -71,7 +79,19 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
         inArray(schema.sections.siteId, sites),
         inArray(schema.sections.programId, actor.scope.programIds ?? []),
       ));
-    return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
+    for (const row of rows) {
+      if (!row.sectionId) continue;
+      const students = guardianStudents.get(row.sectionId) ?? [];
+      if (!students.some(student => student.studentPersonId === row.studentPersonId)) {
+        students.push({ studentPersonId: row.studentPersonId, studentName: personDisplayName(row) });
+      }
+      guardianStudents.set(row.sectionId, students);
+    }
+    return [...guardianStudents.keys()];
+  }
+  if (actor.role === "room_facilitator") {
+    return (await Promise.all((actor.scope.programIds ?? []).map(programId =>
+      activeFacilitatorSectionIds(db, actor, programId)))).flat();
   }
   return [];
 }
@@ -80,11 +100,14 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
     setResponseHeader("Cache-Control", "private, no-store");
     const viewerRole = actor.role as ActorRole;
     if (!process.env.DATABASE_URL) return { connected: false, viewerRole, items: [] as CalendarFeedItem[], truncated:false };
-    const sites = actorSiteIds(actor);
+    const sites = actor.role === "room_facilitator"
+      ? actor.grantSiteId ? [actor.grantSiteId] : []
+      : actorSiteIds(actor);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
 
-    const sectionIds = await visibleSectionIds(db, schema, actor, sites);
-    const visibleStudyGroupEventIds = await visibleStudyGroupCalendarEventIds(
+    const guardianStudents = new Map<string, NonNullable<CalendarFeedItem["guardianStudents"]>>();
+    const sectionIds = await visibleSectionIds(db, schema, actor, sites, guardianStudents);
+    const visibleStudyGroupEventIds = actor.role === "room_facilitator" ? [] : await visibleStudyGroupCalendarEventIds(
       actor,
       sites,
       sectionIds,
@@ -126,10 +149,10 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
           sectionIds.length ? and(inArray(schema.scheduledOccurrences.sectionId, sectionIds),
             ne(schema.calendarEvents.type, "study_group"),
             notExists(hasExplicitParticipants)) : undefined,
-          and(
+          actor.role !== "room_facilitator" ? and(
             ne(schema.calendarEvents.type, "study_group"),
             inArray(schema.calendarEvents.id, participantEventIds),
-          ),
+          ) : undefined,
           visibleStudyGroupEventIds.length
             ? inArray(schema.calendarEvents.id, visibleStudyGroupEventIds)
             : undefined,
@@ -198,7 +221,7 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
     });
 
     let deadlinesTruncated = false;
-    if (sectionIds.length) {
+    if (sectionIds.length && actor.role !== "room_facilitator") {
       const dueRows = await db
         .select({
           id: schema.assessments.id,
@@ -232,6 +255,7 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
           cancelled: false,
           manageable: false,
           sectionId: row.sectionId,
+          ...(actor.role === "guardian" ? { guardianStudents: guardianStudents.get(row.sectionId) ?? [] } : {}),
         });
       }
     }
@@ -247,7 +271,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       month: z.number().int().min(1).max(12),
     }).parse(value))
   .handler(async ({ data }) => readCalendarWindow(
-    await requireActor(allRoles),
+    await requireActor(calendarReadRoles),
     new Date(Date.UTC(data.year, data.month - 1, 1)),
     new Date(Date.UTC(data.year, data.month, 1)),
   ));
@@ -262,7 +286,7 @@ export const getCalendarRange = createServerFn({ method:"GET" })
     return duration>0 && duration<=3*24*60*60*1000;
   },{message:"Calendar range must be positive and at most three days"}).parse(value))
   .handler(async({data})=>readCalendarWindow(
-    await requireActor(allRoles),new Date(data.startsAt),new Date(data.endsAt),
+    await requireActor(calendarReadRoles),new Date(data.startsAt),new Date(data.endsAt),
   ));
 
 export const createPersonalEvent = createServerFn({ method: "POST" })

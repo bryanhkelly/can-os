@@ -31,7 +31,7 @@ import {
 claimAvailableSlot,
 releaseClaimedSlot,
 } from "@/platform/scheduling/booking";
-import { scheduleReminder } from "@/platform/scheduling/reminders";
+import { cancelReminders, rescheduleReminders, scheduleReminder } from "@/platform/scheduling/reminders";
 import { materializeSlots } from "@/platform/scheduling/slots";
 import { and,eq,inArray,sql } from "drizzle-orm";
 import { conferenceOutcomeProblem, conferenceWindowProblem } from "./eligibility";
@@ -541,6 +541,13 @@ export async function rescheduleConferenceBooking(
 
     await releaseClaimedSlot(tx, current.oldSlotId);
 
+    await rescheduleReminders(tx, {
+      resourceType: "conference_booking", resourceId: current.bookingId,
+    }, {
+      deliverAt: new Date(nextSlot.startsAt.getTime() - 86_400_000),
+      body: `Your conference is scheduled for ${nextSlot.startsAt.toISOString()}.`,
+    });
+
     await emitEvent(tx, {
       eventType: EventTypes.ConferenceRescheduled,
       aggregateType: "conference_booking",
@@ -570,9 +577,8 @@ export async function rescheduleConferenceBooking(
  * Cancel an active booking and free its slot. The booking guardian cancels
  * with the same "conference.book" capability used to book; the owning teacher
  * cancels with "conference.manage". Cancelling an already-cancelled booking
- * is an idempotent no-op so retries and double-clicks stay safe. Deferred
- * reminder delivery is a documented schema limitation, so cancellation only stops the slot and calendar
- * projection (see the TODO on the reminders platform).
+ * is an idempotent no-op so retries and double-clicks stay safe. Pending
+ * reminders and the calendar projection are cancelled in the same transaction.
  */
 export async function cancelConferenceBooking(
   context: CommandContext,
@@ -641,6 +647,8 @@ export async function cancelConferenceBooking(
 
     await releaseClaimedSlot(tx, current.slotId);
 
+    await cancelReminders(tx, { resourceType: "conference_booking", resourceId: current.bookingId });
+
     await emitEvent(tx, {
       eventType: EventTypes.ConferenceCancelled,
       aggregateType: "conference_booking",
@@ -675,6 +683,7 @@ export async function queueConferenceReminder(
     const [booking] = await tx
       .select({
         guardianPersonId: conferenceBookings.guardianPersonId,
+        status: conferenceBookings.status,
         startsAt: conferenceSlots.startsAt,
         siteId: conferenceSeries.siteId,
       })
@@ -688,12 +697,19 @@ export async function queueConferenceReminder(
         eq(conferenceSeries.id, conferenceSlots.conferenceSeriesId),
       )
       .where(eq(conferenceBookings.id, bookingId))
+      .for("update")
       .limit(1);
 
     if (!booking) throw new Error("Conference booking not found");
     assertSiteScope(context, booking.siteId);
 
-    const notificationId = await scheduleReminder(tx, {
+    if (booking.status !== "booked" || booking.startsAt <= new Date()) {
+      throw new DomainError("CONFLICT", "Only a future booked conference can receive a reminder");
+    }
+    const deliverAt = new Date(booking.startsAt.getTime() - 86_400_000);
+    const reminderId = await scheduleReminder(tx, {
+      idempotencyKey: `conference:${bookingId}:reminder`,
+      deliverAt,
       recipientPersonId: booking.guardianPersonId,
       type: "conference_reminder",
       title: "Parent-teacher conference reminder",
@@ -706,7 +722,7 @@ export async function queueConferenceReminder(
       entityType: "conference_booking",
       entityId: bookingId,
       scope: { siteId: booking.siteId },
-      after: { notificationId },
+      after: { reminderId, deliverAt: deliverAt.toISOString() },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ConferenceReminderQueued,
@@ -714,7 +730,7 @@ export async function queueConferenceReminder(
       aggregateId: bookingId,
       actorPersonId: context.actorPersonId,
       siteId: booking.siteId,
-      payload: { notificationId },
+      payload: { reminderId, deliverAt: deliverAt.toISOString() },
     });
   });
 }

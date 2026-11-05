@@ -17,7 +17,7 @@ export const Route = createFileRoute("/sites/$siteId/profile")({
     return {
       site,
       organizationName: site.organization.name,
-      siteCount: sites?.length ?? 1,
+      siteCount: sites?.length ?? null,
       activeStudents: counts && Object.fromEntries(counts.map(row => [row.programId, row.activeStudents])),
     };
   }, { authMessage: "Only an authorized school administrator or registrar can view this school profile." })(),

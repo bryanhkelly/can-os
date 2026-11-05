@@ -1,6 +1,11 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/choice";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "@tanstack/react-router";
 import {
   createExtendedSeasonDraftFn,
@@ -39,6 +44,9 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [scheduleFrom, setScheduleFrom] = useState("");
   const [scheduleThrough, setScheduleThrough] = useState("");
   const [scheduleDays, setScheduleDays] = useState<number[]>([]);
+  const [scheduleAttempted, setScheduleAttempted] = useState(false);
+  const [draftAttempted, setDraftAttempted] = useState(false);
+  const [publicationAttempted, setPublicationAttempted] = useState(false);
   const [scheduleStart, setScheduleStart] = useState("09:00");
   const [scheduleEnd, setScheduleEnd] = useState("15:00");
   const [scheduleLocation, setScheduleLocation] = useState("");
@@ -63,6 +71,9 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
 
   async function createDraft(event: React.FormEvent) {
     event.preventDefault();
+    setDraftAttempted(true);
+    if (!selected || offeringName.trim().length < 2 || seasonName.trim().length < 2 ||
+      !startsOn || !endsOn || endsOn < startsOn || !Number.isInteger(capacity) || capacity < 1 || capacity > 10000) return;
     setError("");
     const outcome = await mutation.run(async () => {
       if (!selected) throw new Error("Choose a program in your site");
@@ -76,12 +87,15 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       refreshErrorMessage: "The draft season was saved, but current planning records could not be loaded. Retry the refresh before creating another season.",
     });
     if (outcome.status === "saved" || outcome.status === "refresh-failed") {
-      setOfferingName(""); setSeasonName("");
+      setOfferingName(""); setSeasonName(""); setDraftAttempted(false);
     }
   }
 
   async function publishSeason(event: React.FormEvent) {
-    event.preventDefault(); setError("");
+    event.preventDefault(); setError("");setPublicationAttempted(true);
+    const dollars=Number(feeDollars);
+    if(!publishSeasonId||!operatorConfirmed||!permissionVersion.trim()||permissionText.trim().length<30||
+      !Number.isFinite(dollars)||dollars<0||Math.abs(Math.round(dollars*100)-dollars*100)>1e-6)return;
     const outcome = await mutation.run(async () => {
       if (!publishSeasonId || !operatorConfirmed) throw new Error("Confirm the release responsibility");
       const dollars = Number(feeDollars);
@@ -168,6 +182,8 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
 
   async function saveSessions(event: React.FormEvent) {
     event.preventDefault(); setError("");
+    setScheduleAttempted(true);
+    if (!scheduleDays.length) return;
     const outcome = await mutation.run(async () => {
       if (!scheduleSeasonId) throw new Error("Choose a season");
       return scheduleExtendedSessionsFn({ data: {
@@ -199,21 +215,24 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       </p>
       {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving season changes…"/>
-      <form onSubmit={createDraft} className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-xs sm:col-span-2">Extended-learning program
-          <select className={inputClass} value={programId} onChange={e => setProgramId(e.target.value)} required>
+      <form noValidate onSubmit={createDraft} className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="Extended-learning program" className="text-xs sm:col-span-2" required
+          error={draftAttempted&&!selected?"Choose an active noncredit program.":undefined}>
+          <Select value={programId} onChange={e => setProgramId(e.target.value)}>
             <option value="">Select a noncredit summer or after-school program</option>
             {selectable.map(p => <option key={p.id} value={p.id}>{p.name} · {programTypeLabels[p.type]}</option>)}
-          </select>
-        </label>
-        <label className="text-xs">Offering name
-          <input className={inputClass} value={offeringName} onChange={e => setOfferingName(e.target.value)} placeholder="Robotics lab" required minLength={2} maxLength={160} />
-        </label>
-        <label className="text-xs">Season name
-          <input className={inputClass} value={seasonName} onChange={e => setSeasonName(e.target.value)} placeholder="Summer 2027 / June" required minLength={2} maxLength={120} />
-        </label>
-        <label className="text-xs">Category
-          <select className={inputClass} value={activityType} onChange={e => setActivityType(e.target.value as typeof activityType)}>
+          </Select>
+        </Field>
+        <Field label="Offering name" className="text-xs" required
+          error={draftAttempted&&offeringName.trim().length<2?"Enter an offering name with at least 2 characters.":undefined}>
+          <Input value={offeringName} onChange={e => setOfferingName(e.target.value)} placeholder="Robotics lab" minLength={2} maxLength={160} />
+        </Field>
+        <Field label="Season name" className="text-xs" required
+          error={draftAttempted&&seasonName.trim().length<2?"Enter a season name with at least 2 characters.":undefined}>
+          <Input value={seasonName} onChange={e => setSeasonName(e.target.value)} placeholder="Summer 2027 / June" minLength={2} maxLength={120} />
+        </Field>
+        <Field label="Category" className="text-xs">
+          <Select value={activityType} onChange={e => setActivityType(e.target.value as typeof activityType)}>
             <option value="other">Other enrichment</option>
             <option value="stem">STEM / robotics</option>
             <option value="faith">Faith / discipleship</option>
@@ -223,21 +242,22 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
             <option value="arts">Arts</option>
             <option value="athletics">Athletics</option>
             <option value="service">Service</option>
-          </select>
-        </label>
-        <label className="text-xs">Seat capacity
-          <input type="number" className={inputClass} min={1} max={10000} required value={capacity}
-            onChange={e => setCapacity(Number(e.target.value))} />
-        </label>
-        <label className="text-xs">Start date
-          <input type="date" className={inputClass} required value={startsOn} onChange={e => setStartsOn(e.target.value)} />
-        </label>
-        <label className="text-xs">End date
-          <input type="date" className={inputClass} required min={startsOn||undefined} value={endsOn}
-            onChange={e => setEndsOn(e.target.value)} />
-        </label>
+          </Select>
+        </Field>
+        <Field label="Seat capacity" className="text-xs" required
+          error={draftAttempted&&(!Number.isInteger(capacity)||capacity<1||capacity>10000)?"Enter a whole number from 1 to 10,000.":undefined}>
+          <Input type="number" min={1} max={10000} value={capacity} onChange={e => setCapacity(Number(e.target.value))} />
+        </Field>
+        <Field label="Start date" className="text-xs" required
+          error={draftAttempted&&!startsOn?"Choose a start date.":undefined}>
+          <Input type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} />
+        </Field>
+        <Field label="End date" className="text-xs" required
+          error={draftAttempted&&(!endsOn||endsOn<startsOn)?"Choose an end date on or after the start date.":undefined}>
+          <Input type="date" min={startsOn||undefined} value={endsOn} onChange={e => setEndsOn(e.target.value)} />
+        </Field>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={!selected || busy} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          <button type="submit" disabled={busy} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
             {busy ? "Saving…" : "Save draft season"}
           </button>
           {!selectable.length && <p className="mt-2 text-xs text-muted-foreground">Create a hosted noncredit summer or after-school Program above first.</p>}
@@ -286,15 +306,15 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                    </p>}
                   {!isProgramActive && <p className="mt-2 text-xs">Activate the program through the existing launch controls first.</p>}
                   {!scheduled.length && <p className="mt-2 text-xs">Plan dated sessions first.</p>}
-                  {active && <form onSubmit={publishSeason} className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs">Fee per participant (USD)
-                      <input className={inputClass} type="number" min={0} max={100000}
-                        step="0.01" required value={feeDollars} onChange={e => setFeeDollars(e.target.value)}/>
-                    </label>
-                    <label className="text-xs">Consent version
-                      <input className={inputClass} required maxLength={80} value={permissionVersion}
-                        placeholder="summer-2027-v1" onChange={e => setPermissionVersion(e.target.value)}/>
-                    </label>
+                  {active && <form noValidate onSubmit={publishSeason} className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Field label="Fee per participant (USD)" className="text-xs" required
+                      error={publicationAttempted&&(!Number.isFinite(Number(feeDollars))||Number(feeDollars)<0)?"Enter a nonnegative fee in dollars and cents.":undefined}>
+                      <Input type="number" min={0} max={100000} step="0.01" value={feeDollars} onChange={e => setFeeDollars(e.target.value)}/>
+                    </Field>
+                    <Field label="Consent version" className="text-xs" required
+                      error={publicationAttempted&&!permissionVersion.trim()?"Enter the approved consent version.":undefined}>
+                      <Input maxLength={80} value={permissionVersion} placeholder="summer-2027-v1" onChange={e => setPermissionVersion(e.target.value)}/>
+                    </Field>
                     <div className="sm:col-span-2 rounded-lg border p-3">
                       <p className="text-sm font-semibold">Optional week / weekday / day packages</p>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -351,20 +371,19 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                         </button>
                       </div>
                     </div>
-                    <label className="text-xs sm:col-span-2">Published guardian participation permission
-                      <textarea className={inputClass} rows={5} required minLength={30} maxLength={6000}
+                    <Field label="Published guardian participation permission" className="text-xs sm:col-span-2" required
+                      error={publicationAttempted&&permissionText.trim().length<30?"Enter the approved permission text (at least 30 characters).":undefined}>
+                      <Textarea rows={5} minLength={30} maxLength={6000}
                         placeholder="Write the approved participation permission families must acknowledge."
                         value={permissionText} onChange={e => setPermissionText(e.target.value)}/>
-                    </label>
-                    <label className="sm:col-span-2 flex items-start gap-2 text-xs">
-                      <input type="checkbox" required checked={operatorConfirmed} className="mt-1"
-                        onChange={e => setOperatorConfirmed(e.target.checked)}/>
-                      I am the authorized registrar publishing this offering and accept responsibility
-                      for confirming site operations, supervision, emergency procedures and child release.
-                      This records my attestation; CAN OS does not certify regulatory compliance.
-                    </label>
+                    </Field>
+                    <Field className="sm:col-span-2" required
+                      label="I am the authorized registrar publishing this offering and accept responsibility for confirming site operations, supervision, emergency procedures and child release. This records my attestation; CAN OS does not certify regulatory compliance."
+                      error={publicationAttempted&&!operatorConfirmed?"Confirm your responsibility before publishing enrollment.":undefined}>
+                      <Checkbox checked={operatorConfirmed} onChange={e => setOperatorConfirmed(e.target.checked)}/>
+                    </Field>
                     <div className="sm:col-span-2">
-                      <button type="submit" disabled={busy || !operatorConfirmed || !canPublish}
+                      <button type="submit" disabled={busy || !canPublish}
                         className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
                         {busy ? "Publishing…" : "Publish enrollment to families"}
                       </button>
@@ -448,6 +467,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                               {label}
                             </label>)}
                         </div>
+                        {scheduleAttempted&&!scheduleDays.length&&<FieldError>Select at least one day of the week.</FieldError>}
                       </fieldset>
                       <label className="text-xs">Start time
                         <input type="time" required className={inputClass} value={scheduleStart}
@@ -472,7 +492,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                         </select>
                       </label>
                       <div className="sm:col-span-2">
-                        <button type="submit" disabled={busy || scheduleDays.length===0}
+                        <button type="submit" disabled={busy}
                           className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
                           {busy ? "Scheduling…" : "Save draft sessions"}
                         </button>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getStudent360 } from "@/modules/profiles/directory.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
+import { PageFrame, RecordHeader, RecordLayout, WorkspaceShell, WorkspacePanel, SectionTab, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
 import { plural } from "@/lib/format";
 
 const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
@@ -44,16 +44,14 @@ function Student360Page({ personId }: { personId: string }) {
 
 export function Student360View({ profile, tab = "overview" }: { profile: Student360; tab?: ProfileTab }) {
   const canOpenReferrals = ["teacher", "specialist", "counselor"].includes(profile.viewerRole);
-  return <WorkspaceShell width="wide" eyebrow="Staff" title={profile.identity.name}
-    subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${plural(profile.sections.length, "active class", "active classes")}`}
-    breadcrumbs={<><Link to="/staff/students" className="underline">Students</Link><span>/</span><span>{profile.identity.name}</span></>}
-    actions={<ProfilePhoto personId={profile.identity.personId} name={profile.identity.name}/>}
-    rail={<WorkspacePanel title="Record context">
-      <p className="text-sm leading-6 text-muted-foreground">This profile contains the records returned by your authorized staff view. Private notes and domain decisions remain in their owning workflows.</p>
-      <Link to="/messages" className="mt-4 inline-block text-sm underline">Open staff inbox</Link>
-    </WorkspacePanel>}>
-    <DetailNavigation label="Student profile sections">{tabs.map(value => <SectionTab key={value} current={tab === value} className="capitalize"
-      link={{ to: "/staff/students/$personId", params: { personId: profile.identity.personId }, search: { tab: value } }}>{value}</SectionTab>)}</DetailNavigation>
+  return <PageFrame width="wide">
+    <RecordLayout header={<RecordHeader eyebrow="Staff" title={profile.identity.name}
+      subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${plural(profile.sections.length, "active class", "active classes")}`}
+      breadcrumbs={<><Link to="/staff/students" className="underline">Students</Link><span>/</span><span>{profile.identity.name}</span></>}
+      actions={<ProfilePhoto personId={profile.identity.personId} name={profile.identity.name}/>}/ >}
+    navigation={tabs.map(value => <SectionTab key={value} current={tab === value} className="capitalize"
+      link={{ to: "/staff/students/$personId", params: { personId: profile.identity.personId }, search: { tab: value } }}>{value}</SectionTab>)}
+    main={<>
     <div className="mb-6 grid gap-3 sm:grid-cols-3">
       <StatCard label="Missing work" value={profile.academics.openMissingWorkCount}/>
       <StatCard label="Absences · last 30 days" value={profile.attendance.absenceCount}/>
@@ -129,5 +127,10 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         {!profile.guardians.length && <p className="text-sm text-muted-foreground">No guardians on record.</p>}
       </WorkspacePanel>}
     </div>
-  </WorkspaceShell>;
+    </>}
+    rail={<WorkspacePanel title="Record context">
+      <p className="text-sm leading-6 text-muted-foreground">This profile contains the records returned by your authorized staff view. Private notes and domain decisions remain in their owning workflows.</p>
+      <Link to="/messages" className="mt-4 inline-block text-sm underline">Open staff inbox</Link>
+    </WorkspacePanel>} />
+  </PageFrame>;
 }

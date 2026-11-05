@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach,describe,expect,it,vi } from "vitest";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
-import { closeStaleAttendanceExcuse, listGuardianEffectiveAbsences } from "@/modules/attendance/onsite-attendance-workflow.functions";
+import { closeStaleAttendanceExcuse, listGuardianEffectiveAbsences, markExpectedOnsiteAttendance } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
 const state=vi.hoisted(()=>({
  actor:{role:"registrar",actorPersonId:"registrar",capabilities:new Set(["attendance.excuse.review"]),
@@ -35,6 +35,13 @@ const input={excuseId:"a1000000-0000-4000-8000-000000000001",
  expectedCurrentEventId:"a1000000-0000-4000-8000-000000000002",
  reason:"The school corrected the earlier attendance mark.",confirmed:true as const};
 describe("obsolete attendance excuse closure boundary",()=>{
+ it("rejects a foreign offline queue context before reading or mutating attendance", async () => {
+  state.actor.capabilities = new Set(["attendance.write"]);
+  await expect(markExpectedOnsiteAttendance({ data: {
+    date: "2026-11-04", programId: input.excuseId, studentProfileId: input.excuseId,
+    mutationId: input.excuseId, status: "present", queueContext: "another-account-or-grant",
+  } })).rejects.toThrow("another account or membership");
+ });
  beforeEach(()=>{
   vi.clearAllMocks();
   state.actor.role="registrar";

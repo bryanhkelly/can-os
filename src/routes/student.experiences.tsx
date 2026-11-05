@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { LiveQuickWins } from "@/components/student/LiveQuickWins";
 import { getQuickWinActions } from "@/modules/actions/student-actions.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { WorkspaceShell } from "@/components/workspace";
 
 // School announcements, events and conferences belong to /student/my-school.
 const loadExperiences = async (action?: string) => ({
@@ -26,5 +27,9 @@ function StudentExperiencesPage() {
   if (!outcome.ok) return <LoaderFailure eyebrow="Student" title="Student experiences" outcome={outcome} />;
   const { quickWins } = outcome.data;
   const { connected, actions } = quickWins;
-  return <LiveQuickWins key={action??"all"} connected={connected} actions={actions} actionId={action}/>;
+  return <WorkspaceShell width="wide" eyebrow="Student" title="Your actions"
+    subtitle="Your saved actions and next steps."
+    breadcrumbs={<Link to="/home" className="underline">Student Today</Link>}>
+    <LiveQuickWins key={action??"all"} connected={connected} actions={actions} actionId={action}/>
+  </WorkspaceShell>;
 }

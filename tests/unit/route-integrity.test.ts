@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import ts from "typescript";
+import { createRouteInventory } from "../../scripts/route-inventory.mjs";
 import {
   workspaceLinks,
   workspaceHome,
@@ -20,22 +21,9 @@ vi.mock("@/modules/identity/workspace-session.functions",()=>({getWorkspaceSessi
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..");
 const routesDir = join(repoRoot, "src", "routes");
-
-/** "student.assignments.tsx" -> "/student/assignments"; "student.index.tsx" -> "/home" */
-function routePathFor(file: string): string | null {
-  const base = file.replace(/\.(tsx|ts)$/, "");
-  if (base === "__root") return null;
-  const segments = base.split(".");
-  if (segments[segments.length - 1] === "index") segments.pop();
-  return "/" + segments.map(segment => segment.replace(/_$/, "")).join("/");
-}
-
-const routeFiles = readdirSync(routesDir).filter((f) => /\.(tsx|ts)$/.test(f));
-const routePaths = new Set(
-  routeFiles
-    .map(routePathFor)
-    .filter((p): p is string => p !== null),
-);
+const routeInventory = createRouteInventory(repoRoot);
+const routeFiles = routeInventory.map(route => route.file.split("/").at(-1)!);
+const routePaths = new Set(routeInventory.map(route => route.route).filter((route): route is string => route !== null));
 
 function linkPath(target: string): string {
   return target.split(/[?#]/)[0].replace(/\/$/, "") || "/";
@@ -75,6 +63,27 @@ describe("route tree freshness", () => {
       unregistered,
       `route files missing from routeTree.gen.ts (stale generated tree — run the dev server or build to regenerate): ${unregistered.join(", ")}`,
     ).toEqual([]);
+  });
+
+  it("shares normalized ownership, dynamic parameters and declared route coverage", () => {
+    const home = routeInventory.find(route => route.route === "/home");
+    const profile = routeInventory.find(route => route.route === "/sites/$siteId/profile");
+    expect(home).toMatchObject({
+      kind: "page",
+      registered: true,
+      routeNavigationDeclared: true,
+      testCoverage: {
+        routeContractDeclared: true,
+        signedOutSmokeDeclared: true,
+        authenticatedPersonaSmokeDeclared: true,
+      },
+    });
+    expect(profile).toMatchObject({
+      dynamicParameters: ["siteId"],
+      owner: expect.any(String),
+      testCoverage: { authenticatedPersonaSmokeDeclared: true },
+    });
+    expect(routeInventory.every(route => route.owner && route.registered && route.declared)).toBe(true);
   });
 });
 

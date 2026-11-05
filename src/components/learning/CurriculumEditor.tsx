@@ -1,5 +1,9 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import type { ClassContent } from "@/domain/class-content";
 import { curriculumReleaseReadiness } from "@/domain/curriculum-release-readiness";
 import type { ClassTeacherGuides } from "@/domain/class-teacher-guides";
@@ -16,6 +20,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
  const [previewLessonId,setPreviewLessonId]=useState(release.content?.modules[0]?.lessons[0]?.id??"");
  const [teacherGuides,setTeacherGuides]=useState<ClassTeacherGuides|null>(release.teacherGuides??null);
  const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
+ const [publicationAttempted,setPublicationAttempted]=useState(false);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const saved=useRef(JSON.stringify(release.content??{version:1,syllabus:"",modules:[],resources:[]}));
  const guidesSaved=useRef(JSON.stringify(release.teacherGuides??null));
@@ -282,9 +287,10 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
     <p className="text-xs text-muted-foreground">Completeness does not indicate accreditation, academic-credit approval, standards alignment, classroom delivery or school acceptance. The server validates the saved release again at publication.</p>
     {dirty&&<p className="text-sm font-medium">Save the draft before publishing; this readiness view reflects unsaved edits.</p>}
   </section>
-  <form className="space-y-3 rounded border p-4" onSubmit={async event=>{
+  <form noValidate className="space-y-3 rounded border p-4" onSubmit={async event=>{
    event.preventDefault();setError("");setNotice("");
-   if(dirty||!readiness.readyForPublisherPublication||!confirmed||reason.trim().length<10){setError("Resolve publication blockers, save your draft, provide a reason and confirm publication first.");return;}
+   setPublicationAttempted(true);
+   if(dirty||!readiness.readyForPublisherPublication||!confirmed||reason.trim().length<10)return;
    setBusy(true);
    try{
     await publishAuthoredCurriculum({data:{programId,versionId:release.id,expectedRevision:revision,reason,confirmed:true}});
@@ -292,12 +298,15 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    }catch(cause){setError(mutationErrorMessage(cause, "Unable to publish curriculum"));}
    finally{setBusy(false);}
   }}>
-   <label className="block text-sm">Release reason<textarea required minLength={10} maxLength={2000}
-    value={reason} onChange={event=>setReason(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="flex gap-2 text-sm"><input type="checkbox" required checked={confirmed}
-    onChange={event=>setConfirmed(event.target.checked)}/>I reviewed this release. Publication is immutable and does not upgrade existing classes.</label>
-   <button type="submit" disabled={busy||dirty||!readiness.readyForPublisherPublication||!confirmed||reason.trim().length<10}
-    className="rounded border px-4 py-2 text-sm disabled:opacity-50">Publish curriculum release</button>
+  <Field label="Release reason" required
+   error={publicationAttempted&&reason.trim().length<10?"Enter at least 10 characters explaining this release.":undefined}>
+   <Textarea minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/>
+  </Field>
+  <Field label="I reviewed this release. Publication is immutable and does not upgrade existing classes." required
+   error={publicationAttempted&&!confirmed?"Confirm that you reviewed the release and understand its effect.":undefined}>
+   <Checkbox checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
+  </Field>
+  <Button type="submit" variant="outline" disabled={busy||dirty||!readiness.readyForPublisherPublication}>Publish curriculum release</Button>
   </form>
  </section>;
 }

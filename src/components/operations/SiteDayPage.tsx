@@ -2,15 +2,18 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
-import { StatCard, StatusBadge } from "@/components/workspace";
+import { QueryState, StatCard, StatusBadge } from "@/components/workspace";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
 import { ClipboardList, ShieldCheck, Users, CalendarDays } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { addCalendarDays, formatDateOnly } from "@/modules/calendar/timezone";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { getCalendarRange, type CalendarFeedItem } from "@/modules/calendar/calendar.functions";
+import { addCalendarDays, dateKeyInTimezone, dateOnlyDayStartInTimezone, formatDateOnly, formatTimestamp } from "@/modules/calendar/timezone";
+import { useState } from "react";
+import { normalizeClientError } from "@/lib/client-error";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
@@ -34,72 +37,113 @@ const openingBlockerLabels: Record<string, string> = {
   site_director: "no current verified site director is appointed",
 };
 
+function RoomUpcomingEvents({ date, timezone }: { date: string; timezone: string }) {
+  const eventsQuery = useQuery({
+    queryKey: ["site-day-upcoming-events", date, timezone],
+    queryFn: async () => {
+      const windows = [];
+      for (let offset = 0; offset < 7; offset += 2) {
+        const windowStart = addCalendarDays(date, offset);
+        const windowEnd = addCalendarDays(date, Math.min(offset + 2, 7));
+        windows.push(getCalendarRange({ data: {
+          startsAt: dateOnlyDayStartInTimezone(windowStart, timezone).toISOString(),
+          endsAt: dateOnlyDayStartInTimezone(windowEnd, timezone).toISOString(),
+        } }));
+      }
+      const results = await Promise.all(windows);
+      if (results.some(result => !result.connected)) throw new Error("Upcoming school events are unavailable");
+      const unique = new Map<string, CalendarFeedItem>();
+      for (const item of results.flatMap(result => result.items)) {
+        const localDate = dateKeyInTimezone(item.startsAt, timezone);
+        if ((item.source === "site" || item.source === "section") && localDate >= date &&
+            localDate < addCalendarDays(date, 7)) unique.set(item.id, item);
+      }
+      return [...unique.values()].sort((left, right) => left.startsAt.localeCompare(right.startsAt)).slice(0, 8);
+    },
+    retry: (count, error) => normalizeClientError(error).retryable && count < 1,
+  });
+  const eventsFailure = eventsQuery.error
+    ? normalizeClientError(eventsQuery.error, "Upcoming events are unavailable.") : null;
+
+  return <section aria-labelledby="room-upcoming-heading" className="border-y py-4">
+    <div className="flex items-center justify-between gap-3">
+      <h2 id="room-upcoming-heading" className="font-semibold">Coming up</h2>
+      <Link to="/calendar" className="text-sm underline">Full calendar</Link>
+    </div>
+    <QueryState loading={eventsQuery.isPending ? "Loading this week’s events…" : undefined}
+      error={eventsFailure?.message} onRetry={eventsFailure?.retryable ? () => void eventsQuery.refetch() : undefined}
+      retrying={eventsQuery.isFetching}/>
+    {eventsQuery.data?.length === 0 && <p className="mt-3 text-sm text-muted-foreground">No school or room events are scheduled in the next seven days.</p>}
+    {!!eventsQuery.data?.length && <ul className="mt-3 divide-y">
+      {eventsQuery.data.map(item => <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 first:pt-0 last:pb-0">
+        <Link to="/calendar" search={{ date: dateKeyInTimezone(item.startsAt, timezone), event: item.id }} className="font-medium underline">{item.title}</Link>
+        <span className="text-sm text-muted-foreground">{formatTimestamp(item.startsAt, item.timezone, {
+          weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+        })}</span>
+      </li>)}
+    </ul>}
+  </section>;
+}
+
 /**
  * Onsite facilitator surface: one site and its scheduled school-day roster.
  * No family excuse details, counseling records, schoolwide action lists,
  * student grades, sign-out/release authorization, or local-storage PII.
  */
-export function SiteDayPage() {
-  const [context, setContext] = useState<
-    Awaited<ReturnType<typeof getOnsiteStaffDayContext>> | null>(null);
-  const [date, setDate] = useState("");
-  const [roster, setRoster] = useState<Roster | null>(null);
+export function SiteDayPage({ selection }: { selection?: { siteId?: string; date?: string } } = {}) {
+  const contextQuery = useQuery({
+    queryKey: ["site-day-context"],
+    queryFn: () => getOnsiteStaffDayContext(),
+    retry: (count, error) => normalizeClientError(error).retryable && count < 1,
+  });
+  const context = contextQuery.data ?? null;
+  const [dateOverride, setDateOverride] = useState<string>();
+  const date = dateOverride ?? selection?.date ?? context?.date ?? "";
   const [preparing,setPreparing]=useState(false);
-  const [preparation,setPreparation]=useState<Awaited<ReturnType<typeof getOnsiteSchoolDayPreparation>>|null>(null);
-  const [openings, setOpenings] = useState<OpeningStatuses>([]);
-  const [openingStatusState, setOpeningStatusState] = useState<"loading" | "available" | "unavailable">("loading");
+  const siteSelectionMismatch = Boolean(context && selection?.siteId && selection.siteId !== context.siteId);
+  const futureAttendanceDate = Boolean(context && !preparing && date > context.date);
+  const workspaceError = siteSelectionMismatch
+    ? "This school does not match your verified onsite membership. Select the matching membership before operating the day."
+    : futureAttendanceDate
+      ? "Future dates are preparation only. Open the current school day to record attendance."
+      : "";
+  const noProgramNotice = context && !context.hasPrograms
+    ? "No academic Program is configured for this school yet. Room assignments can be planned now; attendance requires linked classes and an approved calendar."
+    : "";
+  const dayQuery = useQuery({
+    queryKey: ["site-day-records", context?.siteId, date, preparing],
+    queryFn: async () => preparing
+      ? { kind: "preparation" as const, data: await getOnsiteSchoolDayPreparation({ data: { date } }) }
+      : { kind: "roster" as const, data: await listExpectedOnsiteRoster({ data: { date } }) },
+    enabled: Boolean(context?.hasPrograms && date && !siteSelectionMismatch && !futureAttendanceDate),
+    retry: (count, error) => normalizeClientError(error).retryable && count < 1,
+  });
+  const roster = dayQuery.data?.kind === "roster" ? dayQuery.data.data as Roster : null;
+  const preparation = dayQuery.data?.kind === "preparation"
+    ? dayQuery.data.data as Awaited<ReturnType<typeof getOnsiteSchoolDayPreparation>> : null;
+  const openingQuery = useQuery({
+    queryKey: ["site-day-opening-status", context?.siteId],
+    queryFn: () => getSiteDayOpeningStatuses(),
+    enabled: Boolean(context && !siteSelectionMismatch),
+    retry: (count, error) => normalizeClientError(error).retryable && count < 1,
+  });
+  const openings: OpeningStatuses = openingQuery.data?.statuses ?? [];
+  const contextFailure = contextQuery.error
+    ? normalizeClientError(contextQuery.error, "Verify your onsite membership and try again.") : null;
+  const dayFailure = dayQuery.error
+    ? normalizeClientError(dayQuery.error, "Scheduled school-day records are unavailable.") : null;
   const [schoolDayRevision, setSchoolDayRevision] = useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const loadSequence=useRef(0);
-  const load = useCallback(async (targetDate: string, prepare=false) => {
-    const sequence=++loadSequence.current;
-    setLoading(true); setError(""); setRoster(null); setPreparation(null);
-    try {
-      if(prepare){
-        const result=await getOnsiteSchoolDayPreparation({data:{date:targetDate}});
-        if(sequence===loadSequence.current)setPreparation(result);
-      }else{
-        const result=await listExpectedOnsiteRoster({data:{date:targetDate}});
-        if(sequence===loadSequence.current)setRoster(result);
-      }
-    } catch {
-      if(sequence!==loadSequence.current)return;
-      setError(prepare?"Unable to load school-day preparation. Verify your current director appointment and calendar.":"Unable to load scheduled onsite attendance. Verify your active site membership and calendar.");
-    } finally { if(sequence===loadSequence.current)setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    void getOnsiteStaffDayContext().then(site => {
-      if (!active) return;
-      setContext(site);
-      setDate(site.date);
-      if (site.hasPrograms) void load(site.date);
-      else {
-        setNotice("No academic Program is configured for this school yet. Room assignments can be planned now; attendance requires linked classes and an approved calendar.");
-        setLoading(false);
-      }
-    }).catch(() => {
-      if (!active) return;
-      setError("Sign in with a room facilitator, site staff or site leader membership for this site.");
-      setLoading(false);
-    });
-    // Opening status is an advisory banner; a failure here must not block the
-    // roster, which reports its own hard failures.
-    void getSiteDayOpeningStatuses().then(result => {
-      if (!active) return;
-      setOpenings(result.statuses);
-      setOpeningStatusState("available");
-    }).catch(() => {
-      if (active) setOpeningStatusState("unavailable");
-    });
-    return () => { active = false; };
-  }, [load]);
+  const load = async (targetDate: string, prepare = false) => {
+    setError("");
+    setPreparing(prepare);
+    if (date !== targetDate) setDateOverride(targetDate);
+    else if (preparing === prepare) await dayQuery.refetch();
+  };
 
   async function mark(student: Student, status: (typeof marks)[number]) {
     if (!context || busy) return;
@@ -137,24 +181,20 @@ export function SiteDayPage() {
     rail={context ? <DashboardCalendar date={date||context.date} timezone={context.timeZone} /> : undefined}
     actions={<><Link to="/safeguarding">Report a safety concern →</Link><Link to="/calendar">Open calendar →</Link></>}
     priority={<>
+    {context?.canViewRoomCoverage && <RoomUpcomingEvents date={date || context.date} timezone={context.timeZone} />}
     {context?.canViewRoomCoverage && <RoomCoverageWorkspace/>}
     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
       <span>{date ? formatDateOnly(date) : "Loading school date"}</span>
       {context && <span>{context.timeZone}</span>}
       <span>Attendance does not authorize student release.</span>
     </div>
-    {openingStatusState === "loading" && <p role="status" className="mt-4 rounded-xl border p-3 text-sm">Checking current school-opening authorization…</p>}
-    {openingStatusState === "unavailable" && <section role="alert" aria-label="School opening verification unavailable"
+    {openingQuery.isPending && <p role="status" className="mt-4 rounded-xl border p-3 text-sm">Checking current school-opening authorization…</p>}
+    {openingQuery.isError && <section role="alert" aria-label="School opening verification unavailable"
       className="mt-4 border-l-4 border-destructive bg-muted/40 px-5 py-4">
       <h2 className="font-semibold">School-opening status could not be verified</h2>
       <p className="mt-1 text-sm">The authorization summary is unavailable. Do not infer that this site is approved to operate. Contact the site director or CAN school-opening officer to verify before receiving students. Existing server-side restrictions still apply.</p>
-      <Button type="button" variant="outline" className="mt-3" onClick={() => {
-        setOpeningStatusState("loading");
-        void getSiteDayOpeningStatuses().then(result => {
-          setOpenings(result.statuses);
-          setOpeningStatusState("available");
-        }).catch(() => setOpeningStatusState("unavailable"));
-      }}>Retry opening-status check</Button>
+      <Button type="button" variant="outline" className="mt-3" disabled={openingQuery.isFetching}
+        onClick={() => void openingQuery.refetch()}>Retry opening-status check</Button>
     </section>}
     {openings.some(opening => opening.blocked) &&
       <section role="alert" aria-label="School opening status"
@@ -185,10 +225,10 @@ export function SiteDayPage() {
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
     {context?.hasPrograms&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap items-center gap-3">
       <Button variant={!preparing ? "secondary" : "outline"} aria-pressed={!preparing}
-        onClick={()=>{setPreparing(false);setDate(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</Button>
+        onClick={()=>{setPreparing(false);setDateOverride(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</Button>
       {context.canPrepareSchoolDays&&<Button variant={preparing ? "secondary" : "outline"} aria-pressed={preparing}
         onClick={()=>{const target=addCalendarDays(context.date,1);
-          setPreparing(true);setDate(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</Button>}
+          setPreparing(true);setDateOverride(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</Button>}
       {!preparing&&<><Button asChild variant="ghost" size="sm" className="underline">
           <a href="#supervision">1. Staff coverage</a>
         </Button>
@@ -208,14 +248,21 @@ export function SiteDayPage() {
       <Input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
         className="mt-2"
         onChange={event => {
-          setDate(event.target.value); setNotice(""); setNotes({});
+          setDateOverride(event.target.value); setNotice(""); setNotes({});
           if (event.target.value) void load(event.target.value,preparing);
         }} />
       <span className="mt-1 block text-xs text-muted-foreground">{context.timeZone}</span>
     </Label>}
-    {notice && <p role="status" className="mt-4 rounded border p-3 text-sm">{notice}</p>}
-    {error && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
-    {loading && !error && <p role="status" className="mt-5 text-sm">Loading scheduled roster…</p>}
+    {(notice || noProgramNotice) && <p role="status" className="mt-4 rounded border p-3 text-sm">{notice || noProgramNotice}</p>}
+    {(error || workspaceError) && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error || workspaceError}</p>}
+    <QueryState loading={!context && contextQuery.isPending ? "Loading your verified site workspace…" : undefined}
+      error={!context && contextFailure?.message}
+      onRetry={!context && contextFailure?.retryable ? () => void contextQuery.refetch() : undefined}
+      retrying={contextQuery.isFetching}/>
+    <QueryState loading={context && !workspaceError && dayQuery.isPending ? "Loading scheduled school-day records…" : undefined}
+      error={!workspaceError && dayFailure?.message}
+      onRetry={!workspaceError && dayFailure?.retryable ? () => void dayQuery.refetch() : undefined}
+      retrying={dayQuery.isFetching}/>
     {preparing&&preparation&&<SchoolDayPreparationPanel preparation={preparation} onChanged={()=>void load(date,true)}/>}
     {roster && !preparing && <section aria-label="Today's operational steps" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
       <h2 className="font-serif text-2xl font-semibold">Run today's school day</h2>

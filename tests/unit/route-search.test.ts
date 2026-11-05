@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   groupSessionSelectionSchema, optionalSearchString, optionalSearchUuid,
-  siteProgramSelectionSchema, uuidProgramSelectionSchema,
+  siteProgramHref, siteProgramSelectionSchema, uuidProgramSelectionSchema,
 } from "@/lib/route-search";
 import { Route as Capacity } from "@/routes/admissions.capacity";
 import { Route as Families } from "@/routes/admissions.families";
@@ -50,6 +50,12 @@ function loaderDeps(route: { options: { validateSearch?: unknown; loaderDeps?: u
 }
 
 describe("shared selection fields", () => {
+  it("preserves scoped navigation order and encoding while omitting absent selections", () => {
+    expect(siteProgramHref("/admissions", { siteId: "school one", programId: "program" }))
+      .toBe("/admissions?siteId=school+one&programId=program");
+    expect(siteProgramHref("/home", { siteId: "school" })).toBe("/home?siteId=school");
+    expect(siteProgramHref("/admissions/capacity", {})).toBe("/admissions/capacity");
+  });
   it.each([undefined, null, false, 1, [], ["site"], {}, { id: "site" }])("does not coerce malformed %j", value => {
     expect(optionalSearchString.parse(value)).toBeUndefined();
     expect(optionalSearchUuid.parse(value)).toBeUndefined();
@@ -128,7 +134,7 @@ describe("composed route search contracts", () => {
     ["admissions", Admissions, ["siteId", "programId", "application", "stage", "page"]],
     ["intake", Intake, ["siteId", "programId", "application", "interest", "page", "studentPage", "search"]],
     ["operations layout", Operations, ["siteId", "programId", "action"]],
-    ["home", OperationsIndex, ["siteId", "programId", "action", "student", "gradeAction", "case", "person", "returnGrantId"]],
+    ["home", OperationsIndex, ["siteId", "programId", "action", "student", "gradeAction", "case", "person", "returnGrantId", "date"]],
     ["insights", Insights, ["siteId", "programId", "insight"]],
     ["website", Website, ["siteId", "programId", "returnGrantId"]],
     ["groups", Groups, ["group"]],
@@ -136,7 +142,7 @@ describe("composed route search contracts", () => {
     ["teacher groups", TeacherGroups, ["group", "session"]],
     ["admin", Admin, ["siteId", "inviteRole"]],
     ["apply", Apply, ["programId", "application", "familyStart"]],
-    ["attendance", Attendance, ["programId"]],
+    ["attendance", Attendance, ["programId", "student", "date"]],
     ["curriculum", Curriculum, ["programId"]],
     ["marketplace", Marketplace, ["programId"]],
   ] as const)("%s retains only its supported search fields", (_name, route, keys) => {
@@ -145,7 +151,7 @@ describe("composed route search contracts", () => {
       interest: "interest", studentPage: 3, search: "query", action: "action",
       insight: "insight", returnGrantId: "grant", group: "group", session: "session",
       inviteRole: "registrar", familyStart: "token", unsupported: "discard",
-      student: "student", gradeAction: "grade", case: "case", person: uuid,
+      student: uuid, date: "2026-11-04", gradeAction: "grade", case: "case", person: uuid,
     });
     expect(Object.keys(result).sort()).toEqual([...keys].sort());
     expect(Object.values(result)).not.toContain(undefined);

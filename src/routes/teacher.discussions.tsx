@@ -9,6 +9,11 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/teacher/discussions")({
   validateSearch: (search: Record<string, unknown>): { section?: string; lesson?: string; thread?: string } => ({
@@ -34,6 +39,8 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
   const [subject, setSubject] = useState("");
   const [prompt, setPrompt] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [createAttempted, setCreateAttempted] = useState(false);
+  const [replyAttempted, setReplyAttempted] = useState<Record<string, boolean>>({});
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
   const selectedLesson = sections.find(item=>item.id===section)?.curriculumLessons.find(item=>item.id===lesson);
@@ -48,19 +55,29 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
     {section && !sections.length && <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This class is unavailable in your current teaching membership.</p>}
     {sections.length > 0 && <details className="mt-6 rounded-xl border bg-card p-5" open={lesson?true:undefined}>
       <summary className="cursor-pointer font-semibold">Start a class discussion</summary>
-      <form className="mt-4 grid gap-3" onSubmit={event => {
+      <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();
+        setCreateAttempted(true);
+        if(!sectionId||subject.trim().length<3||prompt.trim().length<3||
+          (Boolean(lesson)&&(!selectedLesson||sectionId!==section)))return;
         void run(async () => { await createCourseDiscussion({ data: { sectionId, subject, prompt,
-          ...(selectedLesson&&sectionId===section?{curriculumLessonId:selectedLesson.id}:{}) } }); setSubject(""); setPrompt(""); });
+          ...(selectedLesson&&sectionId===section?{curriculumLessonId:selectedLesson.id}:{}) } }); setSubject(""); setPrompt("");setCreateAttempted(false); });
       }}>
         {lesson&&<p className="text-sm">Publisher lesson: {selectedLesson?.title??"Unavailable in this class"}. Discussions belong to the teacher and do not change publisher content.</p>}
         {lesson&&!selectedLesson&&<p role="alert" className="text-sm">Choose an available publisher lesson before linking this discussion.</p>}
-        <label className="text-sm">Class<select value={sectionId} disabled={busy} onChange={event => setSectionId(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3">
+        <Field label="Class" className="text-sm" required>
+        <Select value={sectionId} disabled={busy} onChange={event => setSectionId(event.target.value)}>
           {sections.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-        </select></label>
-        <label className="text-sm">Title<input value={subject} disabled={busy} maxLength={160} onChange={event => setSubject(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-        <label className="text-sm">Prompt<textarea value={prompt} disabled={busy} maxLength={5000} rows={4} onChange={event => setPrompt(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-        <button disabled={busy || !sectionId || (Boolean(lesson)&&(!selectedLesson||sectionId!==section)) || subject.trim().length < 3 || prompt.trim().length < 3} className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Post discussion</button>
+        </Select></Field>
+        <Field label="Title" className="text-sm" required
+          error={createAttempted&&subject.trim().length<3?"Enter a discussion title with at least 3 characters.":undefined}>
+          <Input value={subject} disabled={busy} maxLength={160} onChange={event => setSubject(event.target.value)}/>
+        </Field>
+        <Field label="Prompt" className="text-sm" required
+          error={createAttempted&&prompt.trim().length<3?"Enter a discussion prompt with at least 3 characters.":undefined}>
+          <Textarea value={prompt} disabled={busy} maxLength={5000} rows={4} onChange={event => setPrompt(event.target.value)}/>
+        </Field>
+        <Button type="submit" disabled={busy || (Boolean(lesson)&&(!selectedLesson||sectionId!==section))}>Post discussion</Button>
       </form>
     </details>}
     <div className="mt-7 grid gap-5">{threads.map(thread => <WorkspacePanel key={thread.id} title={thread.subject}
@@ -77,16 +94,23 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
         {message.canModerate && <button type="button" disabled={busy} onClick={() => void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: !message.hidden } }))}
           className="mt-3 text-xs underline disabled:opacity-50">{message.hidden ? "Restore post" : "Hide post"}</button>}
       </article>)}</div>
-      {!thread.locked && <form className="mt-4 grid gap-3" onSubmit={event => {
+      {!thread.locked && <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();
+        const body=drafts[thread.id]??"";
+        setReplyAttempted(current=>({...current,[thread.id]:true}));
+        if(!body.trim())return;
         void run(async () => {
-          await postDiscussionMessage({ data: { threadId: thread.id, body: drafts[thread.id] ?? "", parentMessageId: null } });
+          await postDiscussionMessage({ data: { threadId: thread.id, body, parentMessageId: null } });
           setDrafts(previous => ({ ...previous, [thread.id]: "" }));
+          setReplyAttempted(previous=>({...previous,[thread.id]:false}));
         });
       }}>
-        <label className="text-sm">Teacher response<textarea disabled={busy} maxLength={5000} rows={3} value={drafts[thread.id] ?? ""}
-          onChange={event => setDrafts(previous => ({ ...previous, [thread.id]: event.target.value }))} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-        <button disabled={busy || !drafts[thread.id]?.trim()} className="justify-self-start rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Post response</button>
+        <Field label="Teacher response" className="text-sm" required
+          error={replyAttempted[thread.id]&&!(drafts[thread.id]??"").trim()?"Enter a response before posting.":undefined}>
+          <Textarea disabled={busy} maxLength={5000} rows={3} value={drafts[thread.id] ?? ""}
+            onChange={event => setDrafts(previous => ({ ...previous, [thread.id]: event.target.value }))}/>
+        </Field>
+        <Button type="submit" variant="outline" disabled={busy}>Post response</Button>
       </form>}
     </WorkspacePanel>)}</div>
     {!threads.length && <p role="status" className="mt-5 rounded-xl border p-5 text-sm text-muted-foreground">No class discussions yet.</p>}

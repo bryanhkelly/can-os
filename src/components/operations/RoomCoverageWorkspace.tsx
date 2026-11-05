@@ -5,8 +5,9 @@ import { addCalendarDays } from "@/modules/calendar/timezone";
 import { roomCoverageOccurs } from "@/domain/room-coverage";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 
 type Model = Awaited<ReturnType<typeof getRoomCoverageWorkspaceFn>>;
@@ -20,6 +21,7 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
   const [roomId, setRoomId] = useState(() => crypto.randomUUID());
   const [name, setName] = useState("");
   const [capacity, setCapacity] = useState("");
+  const [roomAttempted, setRoomAttempted] = useState(false);
   const busy = feedback.pending || feedback.refreshFailed;
   const model = query.data;
   return <section aria-label="All-day room coverage" className="mt-6 rounded-xl border p-5">
@@ -59,17 +61,25 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
       </li>)}</ul>
       {model.canManage && <>
         <h3 className="mt-5 font-semibold">Create a physical room</h3>
-        <form className="mt-3 grid gap-3 sm:grid-cols-3" onSubmit={event => {
+        <form noValidate className="mt-3 grid gap-3 sm:grid-cols-3" onSubmit={event => {
           event.preventDefault();
+          setRoomAttempted(true);
+          const roomCapacity = Number(capacity);
+          if (name.trim().length < 2 || !Number.isInteger(roomCapacity) || roomCapacity < 1 || roomCapacity > 1000) return;
           void feedback.run(async () => {
-            const result = await createRoomAtSiteFn({ data: { siteId: model.siteId, roomId, name, capacity: Number(capacity) } });
+            const result = await createRoomAtSiteFn({ data: { siteId: model.siteId, roomId, name: name.trim(), capacity: roomCapacity } });
             setRoomId(crypto.randomUUID()); setName(""); setCapacity("");
+            setRoomAttempted(false);
             return result;
           }, { successMessage: "Physical room saved. This is not an inspection or supervision approval.",
             commandErrorMessage: "Unable to save the physical room." });
         }}>
-          <Label>Room name<Input required minLength={2} maxLength={120} value={name} onChange={event => setName(event.target.value)} disabled={busy}/></Label>
-          <Label>Occupancy limit<Input required type="number" min={1} max={1000} value={capacity} onChange={event => setCapacity(event.target.value)} disabled={busy}/></Label>
+          <Field label="Room name" required error={roomAttempted&&name.trim().length<2?"Enter a room name with at least 2 characters.":undefined}>
+            <Input minLength={2} maxLength={120} value={name} onChange={event => setName(event.target.value)} disabled={busy}/>
+          </Field>
+          <Field label="Occupancy limit" required error={roomAttempted&&(!Number.isInteger(Number(capacity))||Number(capacity)<1||Number(capacity)>1000)?"Enter a whole number from 1 to 1000.":undefined}>
+            <Input type="number" min={1} max={1000} value={capacity} onChange={event => setCapacity(event.target.value)} disabled={busy}/>
+          </Field>
           <Button type="submit" className="self-end" disabled={busy}>Create room</Button>
         </form>
         <MutationFeedback state={feedback} className="mt-3" pendingMessage="Saving physical room..."/>
@@ -95,11 +105,15 @@ function RoomCoverageForm({ model, schedule, changed }: {
   const [end, setEnd] = useState(schedule?.endsAtLocal ?? "14:00");
   const [weekdays, setWeekdays] = useState(schedule?.weekdays ?? [1, 2, 3, 4, 5]);
   const [sectionIds, setSectionIds] = useState(schedule?.sectionIds ?? []);
+  const [attempted, setAttempted] = useState(false);
   const feedback = useMutationFeedback(changed);
   const busy = feedback.pending || feedback.refreshFailed;
-  const selectClass = "mt-1 block w-full rounded border bg-background p-2";
-  return <form className="mt-3 space-y-3" onSubmit={event => {
+  const datesValid = Boolean(startsOn && endsOn && endsOn >= startsOn);
+  const timesValid = Boolean(start && end && end > start);
+  return <form noValidate className="mt-3 space-y-3" onSubmit={event => {
     event.preventDefault();
+    setAttempted(true);
+    if (!roomId || !primary || !datesValid || !timesValid || !weekdays.length) return;
     void feedback.run(() => saveRoomCoverageFn({ data: {
       siteId: model.siteId, id, expectedRevision: schedule?.revision ?? null, roomId,
       primaryPersonId: primary, backupPersonId: backup || null, startsOn, endsOn,
@@ -108,23 +122,38 @@ function RoomCoverageForm({ model, schedule, changed }: {
       commandErrorMessage: "Unable to save room coverage. Verify the dates, identities and conflicting assignments." });
   }}>
     <div className="grid gap-3 sm:grid-cols-3">
-      <Label>Coverage room<select className={selectClass} required value={roomId} onChange={event => setRoomId(event.target.value)} disabled={busy}>
+      <Field label="Coverage room" required error={attempted&&!roomId?"Select a room.":undefined}>
+        <Select value={roomId} onChange={event => setRoomId(event.target.value)} disabled={busy}>
         <option value="">Select a room</option>{model.rooms.filter(room => !room.retiredAt).map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
-      </select></Label>
-      <Label>Primary facilitator<select className={selectClass} required value={primary} onChange={event => setPrimary(event.target.value)} disabled={busy}>
+        </Select>
+      </Field>
+      <Field label="Primary facilitator" required error={attempted&&!primary?"Select an accepted facilitator.":undefined}>
+        <Select value={primary} onChange={event => setPrimary(event.target.value)} disabled={busy}>
         <option value="">Select an accepted facilitator</option>{model.staff.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
-      </select></Label>
-      <Label>Backup facilitator<select className={selectClass} value={backup} onChange={event => setBackup(event.target.value)} disabled={busy}>
+        </Select>
+      </Field>
+      <Field label="Backup facilitator">
+        <Select value={backup} onChange={event => setBackup(event.target.value)} disabled={busy}>
         <option value="">Not assigned - setup incomplete</option>{model.staff.filter(person => person.id !== primary).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
-      </select></Label>
-      <Label>Coverage starts on<Input type="date" required value={startsOn} onChange={event => setStartsOn(event.target.value)} disabled={busy}/></Label>
-      <Label>Coverage ends on<Input type="date" required value={endsOn} onChange={event => setEndsOn(event.target.value)} disabled={busy}/></Label>
-      <Label>Starts at (school time)<Input type="time" required value={start} onChange={event => setStart(event.target.value)} disabled={busy}/></Label>
-      <Label>Ends at (school time)<Input type="time" required value={end} onChange={event => setEnd(event.target.value)} disabled={busy}/></Label>
+        </Select>
+      </Field>
+      <Field label="Coverage starts on" required error={attempted&&!startsOn?"Choose a start date.":undefined}>
+        <Input type="date" value={startsOn} onChange={event => setStartsOn(event.target.value)} disabled={busy}/>
+      </Field>
+      <Field label="Coverage ends on" required error={attempted&&(!endsOn||endsOn<startsOn)?"Choose an end date on or after the start date.":undefined}>
+        <Input type="date" value={endsOn} onChange={event => setEndsOn(event.target.value)} disabled={busy}/>
+      </Field>
+      <Field label="Starts at (school time)" required error={attempted&&!start?"Choose a start time.":undefined}>
+        <Input type="time" value={start} onChange={event => setStart(event.target.value)} disabled={busy}/>
+      </Field>
+      <Field label="Ends at (school time)" required error={attempted&&(!end||end<=start)?"Choose an end time later than the start time.":undefined}>
+        <Input type="time" value={end} onChange={event => setEnd(event.target.value)} disabled={busy}/>
+      </Field>
     </div>
     <fieldset disabled={busy} className="flex flex-wrap gap-3"><legend className="mb-2 text-sm font-semibold">Coverage weekdays</legend>
       {days.map((day, value) => <label key={day} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={weekdays.includes(value)}
         onChange={event => setWeekdays(current => event.target.checked ? [...current, value].sort() : current.filter(item => item !== value))}/>{day}</label>)}
+      {attempted&&!weekdays.length&&<FieldError className="w-full">Select at least one coverage weekday.</FieldError>}
     </fieldset>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-semibold">Classes whose onsite students use this room</legend>
       <p className="text-sm text-muted-foreground">Different simultaneous courses may share this room. Enrollment stays in the original classes; occupancy counts each student once.</p>
@@ -134,7 +163,7 @@ function RoomCoverageForm({ model, schedule, changed }: {
           event.target.checked ? [...current, section.id] : current.filter(id => id !== section.id))}/>{section.title} · {section.programName}
       </label>)}
     </fieldset>
-    <Button type="submit" disabled={busy || !roomId || !primary || !weekdays.length}>{feedback.pending ? "Saving coverage..." : "Save room coverage"}</Button>
+    <Button type="submit" disabled={busy}>{feedback.pending ? "Saving coverage..." : "Save room coverage"}</Button>
     <MutationFeedback state={feedback} className="mt-3" pendingMessage="Saving room coverage..."/>
     {feedback.refreshFailed && <Button type="button" disabled={feedback.pending} onClick={() => void feedback.retryRefresh()}>Refresh saved coverage</Button>}
   </form>;

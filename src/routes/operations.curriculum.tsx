@@ -11,6 +11,9 @@ import { createAuthoredCourse, getCurriculumStudio, startCurriculumDraft } from 
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export const Route=createFileRoute("/operations/curriculum")({
  validateSearch:(search:Record<string,unknown>)=>uuidProgramSelectionSchema.parse(search),
@@ -43,6 +46,7 @@ function CurriculumView({data}:{data:{
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
  const [code,setCode]=useState(""),[title,setTitle]=useState(""),[subject,setSubject]=useState("");
+ const [courseAttempted,setCourseAttempted]=useState(false);
  const requestId=useRef<string|null>(null);
  const draftRequests=useRef(new Map<string,string>());
  const studio=data.studio;
@@ -63,26 +67,31 @@ function CurriculumView({data}:{data:{
    <p className="text-sm text-muted-foreground">Author reusable courses and immutable releases with your institutional publisher grant. Existing classes keep their pinned version.</p>
    <MutationFeedback state={mutation} pendingMessage="Saving curriculum change..."/>
    <Link to="/operations/launch/$programId" params={{programId:studio.programId}} className="inline-block text-sm underline">Use published releases in section setup</Link>
-   <form className="space-y-3 rounded border p-4" onSubmit={async event=>{
+  <form noValidate className="space-y-3 rounded border p-4" onSubmit={async event=>{
     event.preventDefault();
+   setCourseAttempted(true);
+   if(code.trim().length<2||!/^[A-Za-z0-9_-]+$/.test(code.trim())||title.trim().length<2||subject.trim().length<2)return;
     const requestIdValue=requestId.current??crypto.randomUUID();
     requestId.current=requestIdValue;
     await mutation.run(async()=>{
      await createAuthoredCourse({data:{programId:studio.programId,code,title,subject,requestId:requestIdValue}});
-     requestId.current=null;setCode("");setTitle("");setSubject("");
+    requestId.current=null;setCode("");setTitle("");setSubject("");setCourseAttempted(false);
     },{
      successMessage:"Course created.",
      commandErrorMessage:"Unable to create course.",
     });
    }}>
     <h2 className="text-lg font-semibold">Create course</h2>
-    <label className="block text-sm">Course code<input required minLength={2} maxLength={32} pattern="[A-Za-z0-9_-]+"
-     value={code} onChange={event=>{requestId.current=null;setCode(event.target.value);}} className="ml-3 rounded border bg-background p-2"/></label>
-    <label className="block text-sm">Course title<input required minLength={2} maxLength={160}
-     value={title} onChange={event=>{requestId.current=null;setTitle(event.target.value);}} className="ml-3 rounded border bg-background p-2"/></label>
-    <label className="block text-sm">Subject<input required minLength={2} maxLength={100}
-     value={subject} onChange={event=>{requestId.current=null;setSubject(event.target.value);}} className="ml-3 rounded border bg-background p-2"/></label>
-    <button disabled={busy} className="rounded border px-4 py-2 text-sm">Create course</button>
+    <Field label="Course code" required error={courseAttempted&&code.trim().length<2?"Enter a course code with at least 2 characters.":courseAttempted&&!/^[A-Za-z0-9_-]+$/.test(code.trim())?"Use letters, numbers, underscores, or hyphens in the course code.":undefined}>
+     <Input minLength={2} maxLength={32} pattern="[A-Za-z0-9_-]+" value={code} onChange={event=>{requestId.current=null;setCode(event.target.value);}}/>
+    </Field>
+    <Field label="Course title" required error={courseAttempted&&title.trim().length<2?"Enter a course title with at least 2 characters.":undefined}>
+     <Input minLength={2} maxLength={160} value={title} onChange={event=>{requestId.current=null;setTitle(event.target.value);}}/>
+    </Field>
+    <Field label="Subject" required error={courseAttempted&&subject.trim().length<2?"Enter a subject with at least 2 characters.":undefined}>
+     <Input minLength={2} maxLength={100} value={subject} onChange={event=>{requestId.current=null;setSubject(event.target.value);}}/>
+    </Field>
+    <Button type="submit" variant="outline" disabled={busy}>Create course</Button>
    </form>
    {studio.courses.map(course=><section key={course.id} className="rounded border p-5">
     <h2 className="text-xl font-semibold">{course.code} · {course.title}</h2><p className="text-sm">{course.subject}</p>

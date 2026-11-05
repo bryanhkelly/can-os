@@ -1,5 +1,10 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -29,11 +34,14 @@ function Publisher({data}:{data:Data}){
  const [programId,setProgramId]=useState(data.programs[0]?.id??"");
  const [kind,setKind]=useState<Kind>("urgent_school_update");
  const [title,setTitle]=useState(""),[message,setMessage]=useState("");
+ const [attempted,setAttempted]=useState(false);
  const pendingId=useRef<string|null>(null);
  const clearPending=()=>{pendingId.current=null;};
  async function publish(event:FormEvent){
   event.preventDefault();
-  if(busy||!programId||title.trim().length<8||message.trim().length<20)return;
+  if(busy)return;
+  setAttempted(true);
+  if(!programId||title.trim().length<8||message.trim().length<20)return;
   if(!window.confirm("Publish this "+kind.replaceAll("_"," ")+" to every currently verified enrolled family in the selected Program? The message becomes visible in the family notification center. This does not close school, modify schedules, or guarantee email/SMS delivery."))return;
   pendingId.current??=crypto.randomUUID();
   await mutation.run(async()=>{
@@ -66,38 +74,35 @@ function Publisher({data}:{data:Data}){
   subtitle="Publish verified family notices through in-app notifications, school email and opt-in SMS. Provider acceptance is not evidence of inbox or phone delivery."
   actions={<Link to="/home" className="rounded border px-3 py-2 text-sm">School operations</Link>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family communication..."/>
-  <form onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
+  <form noValidate onSubmit={e=>void publish(e)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="text-lg font-semibold">Compose a school notice</h2>
-   <label className="block text-sm font-semibold">School Program
-    <select required value={programId} onChange={e=>{setProgramId(e.target.value);clearPending();}}
-     className="mt-2 w-full rounded border bg-background p-3">
+   <Field label="School Program" required error={attempted&&!programId?"Choose a Program.":undefined}>
+    <Select value={programId} onChange={e=>{setProgramId(e.target.value);clearPending();}}>
      {data.programs.map(p=><option key={p.id} value={p.id}>{p.name} · {p.siteName}</option>)}
-    </select>
-   </label>
-   <label className="block text-sm font-semibold">Type
-    <select value={kind} onChange={e=>{setKind(e.target.value as Kind);clearPending();}}
-     className="mt-2 w-full rounded border bg-background p-3">
+    </Select>
+   </Field>
+   <Field label="Type">
+    <Select value={kind} onChange={e=>{setKind(e.target.value as Kind);clearPending();}}>
      <option value="urgent_school_update">Urgent school update</option>
      <option value="schedule_change">Schedule update</option>
      <option value="school_closure">School closure information</option>
-    </select>
-   </label>
-   <label className="block text-sm font-semibold">Message heading
-    <input required minLength={8} maxLength={160} value={title}
-     onChange={e=>{setTitle(e.target.value);clearPending();}}
-     className="mt-2 w-full rounded border bg-background p-3" />
-   </label>
-   <label className="block text-sm font-semibold">What families need to know and do
-    <textarea required rows={5} minLength={20} maxLength={3000} value={message}
+    </Select>
+   </Field>
+   <Field label="Message heading" required
+    error={attempted&&title.trim().length<8?"Enter a heading with at least 8 characters.":undefined}>
+    <Input minLength={8} maxLength={160} value={title}
+     onChange={e=>{setTitle(e.target.value);clearPending();}} />
+   </Field>
+   <Field label="What families need to know and do" required
+    error={attempted&&message.trim().length<20?"Enter at least 20 characters describing what families need to know and do.":undefined}>
+    <Textarea rows={5} minLength={20} maxLength={3000} value={message}
      onChange={e=>{setMessage(e.target.value);clearPending();}}
-     placeholder="Include the effective date, affected school activities, safety instructions and how to contact the school."
-     className="mt-2 w-full rounded border bg-background p-3" />
-   </label>
+     placeholder="Include the effective date, affected school activities, safety instructions and how to contact the school." />
+   </Field>
    <p className="text-xs text-muted-foreground">Verified families receive an in-app notice and queued email. Only verified SMS opt-ins receive a text, which tells families to sign in. Quiet hours may delay delivery. This is not an emergency dispatch system, a calendar mutation or authorization to close the school.</p>
-   <button type="submit" disabled={busy||!programId||title.trim().length<8||message.trim().length<20}
-    className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+  <Button type="submit" disabled={busy}>
     {busy?"Publishing…":"Publish to currently enrolled families"}
-   </button>
+  </Button>
   </form>
   <section className="mt-8 space-y-3">
    <h2 className="text-lg font-semibold">Recent published notices</h2>

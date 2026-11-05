@@ -5,6 +5,8 @@ import { schoolSetupSchema, type SchoolSetupResult } from "@/domain/school-setup
 import { DomainError } from "@/domain/errors";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
+import { DEFAULT_SITE_TIMEZONE } from "@/domain/site-timezone";
+import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
 
 export const Route = createFileRoute("/schools/new")({
   server: { handlers: {
@@ -54,7 +56,7 @@ function SchoolSetupPage() {
   const hydrated = useHydrated();
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
-  const [timezone, setTimezone] = useState("America/Los_Angeles");
+  const [timezone, setTimezone] = useState(DEFAULT_SITE_TIMEZONE);
   const [syntheticOnly, setSyntheticOnly] = useState(false);
   const [result, setResult] = useState<SchoolSetupResult | null>(null);
   const mutation = useMutationFeedback(async () => {});
@@ -101,9 +103,7 @@ function SchoolSetupPage() {
         <input required placeholder="newschool.demo" maxLength={48} autoCapitalize="none" spellCheck={false}
           value={domain} onChange={event => setDomain(event.target.value)} className={field} />
       </label>
-      <label className="block">School timezone
-        <input required maxLength={80} value={timezone} onChange={event => setTimezone(event.target.value)} className={field} />
-      </label>
+      <SiteTimezoneField value={timezone} onChange={setTimezone} />
       <label className="flex items-start gap-3 text-sm">
         <input required type="checkbox" checked={syntheticOnly} onChange={event => setSyntheticOnly(event.target.checked)} className="mt-1" />
         <span>I will use synthetic data only. This school and its shared accounts are public demonstrations, not private records.</span>

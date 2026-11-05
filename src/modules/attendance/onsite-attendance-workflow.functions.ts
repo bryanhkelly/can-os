@@ -21,6 +21,7 @@ import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { siteDate } from "@/domain/expected-attendance";
 import { personDisplayName } from "@/domain/person-name";
+import { attendanceQueueIdentity } from "@/domain/attendance-queue";
 import { addCalendarDays, dateOnlyDayStartInTimezone, isValidDateOnly } from "@/modules/calendar/timezone";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
@@ -401,6 +402,18 @@ export const loadExpectedSchoolDayPreparation=createServerOnlyFn(async(actor:Acc
   };
 });
 
+export const getAttendanceWorkspace = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({ programId: uuid.optional() }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await staff("attendance.write");
+    const available = await scopedOnsitePrograms(actor);
+    const selected = data.programId ? available.find(program => program.id === data.programId) : available[0];
+    if (data.programId && !selected) throw new AuthorizationError("attendance workspace program");
+    return { identity: attendanceQueueIdentity(actor), programs: available,
+      selectedProgram: selected ?? null,
+      canReviewExcuses: actor.capabilities.has("attendance.excuse.review") };
+  });
+
 export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
     date: dateField, programId: uuid.optional(),
@@ -440,9 +453,13 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
     status: z.enum(["present", "absent", "tardy"]),
     mutationId: uuid, expectedPreviousEventId: uuid.nullable().optional(),
     note: z.string().max(2000).optional(),
+    queueContext: z.string().max(4000).optional(),
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await staff("attendance.write");
+    if (data.queueContext !== undefined && data.queueContext !== attendanceQueueIdentity(actor)) {
+      throw new AuthorizationError("attendance queue belongs to another account or membership");
+    }
     const [program] = await scopedOnsitePrograms(actor, data.programId, undefined, false, data.date);
     if (!program) throw new AuthorizationError("attendance program scope");
     if (data.date > siteDate(new Date(), program.timezone))

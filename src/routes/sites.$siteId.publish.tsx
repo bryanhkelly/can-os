@@ -4,6 +4,11 @@ import { DomainError } from "@/domain/errors";
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
@@ -43,9 +48,13 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [newSlug, setNewSlug] = useState(data.address?.slug ?? "");
   const [renameReason, setRenameReason] = useState("");
   const [renameReviewed, setRenameReviewed] = useState(false);
+  const [reservationAttempted, setReservationAttempted] = useState(false);
+  const [renameAttempted, setRenameAttempted] = useState(false);
 
   async function rename(event: FormEvent) {
     event.preventDefault();
+    setRenameAttempted(true);
+    if (schoolName.trim().length < 2 || !isPublicSiteSlug(newSlug) || renameReason.trim().length < 10 || !renameReviewed) return;
     await mutation.run(async () => {
       if (!data.address) throw new DomainError("CONFLICT");
       const result = await renameSitePublicIdentity({ data: {
@@ -53,7 +62,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         expectedName: data.site.name, expectedRevision: data.address.updatedAt,
         reason: renameReason, contentReviewed: renameReviewed,
       } });
-      setRenameReason(""); setRenameReviewed(false); setReachability(null);
+      setRenameReason(""); setRenameReviewed(false); setRenameAttempted(false); setReachability(null);
       return result;
     }, {
       successMessage: "School name and public address saved. The old address no longer serves this Site; external hosting is not configured by this change.",
@@ -63,11 +72,14 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
 
   async function reserve(event: FormEvent) {
     event.preventDefault();
+    setReservationAttempted(true);
+    if (!isPublicSiteSlug(slug)) return;
     setError("");
     await mutation.run(() => reserveSitePublicationAddress({ data: { siteId: data.site.id, slug } }), {
       successMessage: "Address reserved. Your site remains private; nothing has been published.",
       commandErrorMessage: "Could not reserve this address.",
     });
+    setReservationAttempted(false);
   }
 
   async function updatePublication(action: "publish" | "unpublish") {
@@ -136,15 +148,14 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
              : "Public HTTPS website cannot yet be verified. Check DNS, TLS, and deployment routing."}
           </p>}
         </div>}
-      </div> : <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={reserve}>
-        <label className="flex-1 text-sm">Subdomain
-          <input aria-label="Public site subdomain" className="mt-1 block w-full rounded-lg border bg-background p-2"
-            value={slug} onChange={event => setSlug(event.target.value)} minLength={3} maxLength={48}
-            required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="vineyard-academy"/>
-        </label>
+      </div> : <form noValidate className="mt-4 flex flex-wrap items-end gap-3" onSubmit={reserve}>
+        <Field label="Subdomain" className="flex-1" required
+          error={reservationAttempted&&!isPublicSiteSlug(slug)?"Use 3–48 lowercase letters or digits, separated by single hyphens.":undefined}>
+          <Input aria-label="Public site subdomain" value={slug} onChange={event => setSlug(event.target.value)}
+            minLength={3} maxLength={48} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="vineyard-academy"/>
+        </Field>
         <span className="pb-2 text-sm text-muted-foreground">.{data.publicSiteDomain}</span>
-        <button className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-          disabled={saving || !candidate} type="submit">{saving ? "Reserving…" : "Reserve address"}</button>
+        <Button type="submit" disabled={saving}>{saving ? "Reserving…" : "Reserve address"}</Button>
       </form>}
     </section>
     <section className="mt-6 rounded-xl border bg-card p-5">
@@ -167,29 +178,27 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         The previous public address stops resolving to this Site. Organization legal names,
         program descriptions, DNS and certificates are not changed.
       </p>
-      <form className="mt-4 space-y-3" onSubmit={rename}>
-        <label className="block text-sm">School name
-          <input value={schoolName} onChange={event => setSchoolName(event.target.value)}
-            required minLength={2} maxLength={120} className="mt-1 block w-full rounded-lg border bg-background p-2"/>
-        </label>
-        <label className="block text-sm">New public subdomain
-          <input value={newSlug} onChange={event => setNewSlug(event.target.value)}
-            required minLength={3} maxLength={48} pattern="[a-z0-9]+(-[a-z0-9]+)*"
-            className="mt-1 block w-full rounded-lg border bg-background p-2"/>
-        </label>
-        <label className="block text-sm">Name and address change reason
-          <textarea value={renameReason} onChange={event => setRenameReason(event.target.value)}
-            required minLength={10} maxLength={500} className="mt-1 block w-full rounded-lg border bg-background p-2"/>
-        </label>
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" checked={renameReviewed} onChange={event => setRenameReviewed(event.target.checked)}/>
-          <span>I reviewed the school name and new address and understand that the previous address will stop working.</span>
-        </label>
-        <button type="submit" disabled={saving || !renameReviewed || renameReason.trim().length < 10 ||
-          schoolName.trim().length < 2 || !isPublicSiteSlug(newSlug)}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+      <form noValidate className="mt-4 space-y-3" onSubmit={rename}>
+        <Field label="School name" required
+          error={renameAttempted&&schoolName.trim().length<2?"Enter a school name with at least 2 characters.":undefined}>
+          <Input value={schoolName} onChange={event => setSchoolName(event.target.value)} minLength={2} maxLength={120}/>
+        </Field>
+        <Field label="New public subdomain" required
+          error={renameAttempted&&!isPublicSiteSlug(newSlug)?"Use 3–48 lowercase letters or digits, separated by single hyphens.":undefined}>
+          <Input value={newSlug} onChange={event => setNewSlug(event.target.value)}
+            minLength={3} maxLength={48} pattern="[a-z0-9]+(-[a-z0-9]+)*"/>
+        </Field>
+        <Field label="Name and address change reason" required
+          error={renameAttempted&&renameReason.trim().length<10?"Enter at least 10 characters explaining this change.":undefined}>
+          <Textarea value={renameReason} onChange={event => setRenameReason(event.target.value)} minLength={10} maxLength={500}/>
+        </Field>
+        <Field label="I reviewed the school name and new address and understand that the previous address will stop working." required
+          error={renameAttempted&&!renameReviewed?"Confirm that you reviewed the new address and its effect.":undefined}>
+          <Checkbox checked={renameReviewed} onChange={event => setRenameReviewed(event.target.checked)}/>
+        </Field>
+        <Button type="submit" variant="outline" disabled={saving}>
           Save school name and address
-        </button>
+        </Button>
       </form>
     </section>}
     <section aria-labelledby="website-preview" className="mt-6 rounded-xl border bg-card p-5">

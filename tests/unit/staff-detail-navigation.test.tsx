@@ -3,6 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Groups } from "@/routes/teacher.study-groups";
 import { Route as Action } from "@/routes/actions.$actionId";
+import { Route as MissingWork } from "@/routes/teacher.missing-work";
+import { Route as HealthReview } from "@/routes/operations.health-review";
+import { Route as TransferRecords } from "@/routes/operations.transfer-records";
+import { Route as Transcripts } from "@/routes/admissions.transcripts";
 
 const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
 vi.mock("@tanstack/react-router",()=>({
@@ -37,6 +41,18 @@ vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({
 }));
 vi.mock("@/modules/study-groups/facilitator-query.functions",()=>({getFacilitatorStudyGroups:vi.fn()}));
 vi.mock("@/modules/actions/action-detail.functions",()=>({getActionDetail:vi.fn()}));
+vi.mock("@/modules/learning/teacher-missing-work.functions",()=>({
+  getTeacherMissingWork:vi.fn(),createMissingWorkFollowUp:vi.fn(),
+}));
+vi.mock("@/modules/health/guardian-health-updates.functions",()=>({
+  listGuardianHealthReviews:vi.fn(),reviewGuardianHealthUpdate:vi.fn(),
+}));
+vi.mock("@/modules/enrollment/transfer-records-handoff.functions",()=>({
+  listTransferRecordsHandoffs:vi.fn(),completeTransferRecordsHandoff:vi.fn(),
+}));
+vi.mock("@/modules/learning/report-cards.functions",()=>({
+  issueTranscript:vi.fn(),listTranscriptIssuanceCandidates:vi.fn(),
+}));
 
 function render(route:{options:{component?:unknown}}){
   const Page=route.options.component;
@@ -99,6 +115,55 @@ describe("facilitator record navigation",()=>{
 });
 
 describe("read-only staff Action detail",()=>{
+  it("preserves exact transcript-candidate identity even when names are identical",()=>{
+    state.search={query:"Jordan"};
+    state.data={ok:true,data:{candidates:[
+      {studentPersonId:"first-student",studentName:"Jordan Student",recordCount:1,issuer:{name:"First issuer"}},
+      {studentPersonId:"second-student",studentName:"Jordan Student",recordCount:2,issuer:{name:"Second issuer"}},
+    ]}};
+    expect(render(Transcripts)).toContain('href="/admissions/transcripts?query=Jordan&amp;student=first-student" class="underline">Jordan Student</a>');
+    state.search={query:"Jordan",student:"second-student"};
+    const selected=render(Transcripts);
+    expect(selected).toContain("Second issuer");
+    expect(selected).not.toContain("First issuer");
+    state.search={query:"Jordan",student:"missing"};
+    const unavailable=render(Transcripts);
+    expect(unavailable).toContain("This transcript candidate is unavailable");
+    expect(unavailable).not.toContain("Issue official transcript");
+  });
+  it("opens confidential health reviews by exact Action rather than a broader student profile",()=>{
+    state.data={ok:true,data:[{id:"health-review",studentName:"Jordan Student",requestedAt:"2030-01-01"}]};
+    expect(render(HealthReview)).toContain('href="/operations/health-review?action=health-review" class="underline">Jordan Student</a>');
+    state.search={action:"missing"};
+    const html=render(HealthReview);
+    expect(html).toContain("not available for review");
+    expect(html).not.toContain("Jordan Student");
+  });
+  it("selects exact transfer handoffs without falling back to another student's record",()=>{
+    state.data={ok:true,data:{items:[
+      {id:"handoff",studentName:"Jordan Student",status:"resolved",issuedTranscriptId:"transcript"},
+      {id:"other-handoff",studentName:"Casey Student",status:"resolved",issuedTranscriptId:"other-transcript"},
+    ]}};
+    expect(render(TransferRecords)).toContain('href="/operations/transfer-records?action=handoff" class="underline">Jordan Student</a>');
+    state.search={action:"handoff"};
+    expect(render(TransferRecords)).not.toContain("Casey Student");
+    state.search={action:"missing"};
+    const unavailable=render(TransferRecords);
+    expect(unavailable).toContain("This records handoff is unavailable");
+    expect(unavailable).not.toContain("Jordan Student");
+  });
+  it("links missing-work assignment, student and course names to their own records",()=>{
+    state.data={ok:true,data:{connected:true,items:[{
+      assessmentId:"essay",title:"Evidence essay",course:"English",sectionId:"english",
+      dueAt:"2030-01-01T12:00:00Z",studentProfileId:"student-profile",
+      studentPersonId:"student-person",studentName:"Jordan Student",status:"not_started",
+    }]}};
+    const html=render(MissingWork);
+    expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay" class="underline">Evidence essay</a>');
+    expect(html).toContain('href="/staff/students/student-person" class="underline">Jordan Student</a>');
+    expect(html).toContain('href="/classes?section=english" class="underline">English</a>');
+    expect(html).not.toContain('/staff/students/student-profile');
+  });
   function action(canManageOperations:boolean,status="open"){
     state.data={ok:true,data:{
       id:"action",title:"Review missing work",description:"Meet the student",type:"academic_intervention",

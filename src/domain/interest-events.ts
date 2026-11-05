@@ -28,14 +28,26 @@ export const interestEventRegistrationInput = z.object({
   requestId: uuid,
   eventId: uuid,
   accessToken: z.string().max(128).default(""),
+  invitationBatchId: uuid.optional(),
+  invitationRecipientKey: uuid.optional(),
   firstName: plainText(80, 1),
   lastName: plainText(80, 1),
   email: z.string().trim().toLowerCase().email().max(254),
   contactConsent: z.literal("yes"),
   website: z.string().max(150).default(""),
-}).strict();
+}).strict().refine(input => Boolean(input.invitationBatchId) === Boolean(input.invitationRecipientKey), {
+  message: "Both family invitation identifiers are required",
+  path: ["invitationRecipientKey"],
+});
 
 export type InterestEventRegistrationInput = z.infer<typeof interestEventRegistrationInput>;
+
+export const interestEventAttendanceInput = z.object({
+  registrationId: uuid,
+  attendanceStatus: z.enum(["attended", "no_show"]),
+}).strict();
+
+export type InterestEventAttendanceInput = z.infer<typeof interestEventAttendanceInput>;
 
 export function interestEventRegistrationMessage(title: string): string {
   return `Interest event RSVP: ${title}`;
@@ -45,5 +57,18 @@ export function interestEventRsvpLink(origin: string, eventId: string, accessTok
   const url = new URL("/interest-event", origin);
   url.searchParams.set("eventId", eventId);
   if (accessToken) url.searchParams.set("accessToken", accessToken);
+  return url.toString();
+}
+
+export function interestEventInvitationRsvpLink(
+  origin: string,
+  eventId: string,
+  invitationBatchId: string,
+  invitationRecipientKey: string,
+): string {
+  const url = new URL("/interest-event", origin);
+  url.searchParams.set("eventId", eventId);
+  url.searchParams.set("invitationBatchId", invitationBatchId);
+  url.searchParams.set("invitationRecipientKey", invitationRecipientKey);
   return url.toString();
 }

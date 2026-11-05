@@ -84,6 +84,14 @@ describe("teacher class directory", () => {
 });
 
 describe("published class workspace", () => {
+  it("links every teacher in the class header to their exact profile", () => {
+    const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, teachers: [
+      { personId: "teacher", name: "Taylor Teacher" },
+      { personId: "second-teacher", name: "Morgan Teacher" },
+    ] }} tab="overview"/>);
+    expect(html).toContain('href="/profiles?person=teacher" class="underline">Taylor Teacher</a>');
+    expect(html).toContain('href="/profiles?person=second-teacher" class="underline">Morgan Teacher</a>');
+  });
   it("shows student playback without uploads and teacher upload controls with lesson scope", () => {
     const data = { ...workspace, videoUploadsEnabled: true, supplements: [{
       id: "video", title: "Equation video", kind: "video", url: "https://youtu.be/abcdefghijk",

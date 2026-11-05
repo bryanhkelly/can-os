@@ -2,6 +2,12 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { DomainError } from "@/domain/errors";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { EnrollmentFormAnswers, enrollmentFormState } from "@/domain/enrollment-form";
 import { decideEnrollmentForm, submitGuardianEnrollmentForm } from "@/modules/enrollment/enrollment-form.functions";
 
@@ -31,6 +37,7 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
 }) {
   const [answers, setAnswers] = useState<EnrollmentFormAnswers>(record.submission?.answers ?? {});
   const [signerName, setSignerName] = useState(""), [confirmed, setConfirmed] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const mutation = useMutationFeedback(onChanged);
   const busy = mutation.pending || mutation.refreshFailed;
   const [interactive, setInteractive] = useState(false);
@@ -43,8 +50,13 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
   return <section className="space-y-3">
     <EnrollmentFormSnapshot record={record} />
     <MutationFeedback state={mutation} pendingMessage="Submitting signed enrollment form..."/>
-    {editable && <form className="space-y-3" onSubmit={async event => {
-      event.preventDefault(); requestId.current ??= crypto.randomUUID();
+    {editable && <form noValidate className="space-y-3" onSubmit={async event => {
+      event.preventDefault();setAttempted(true);
+      const missingAnswer=record.form.fields.some(field=>field.required&&
+        (answers[field.key]===undefined||answers[field.key]===null||
+          (typeof answers[field.key]==="string"&&!String(answers[field.key]).trim())));
+      if(missingAnswer||signerName.trim().length<2||!confirmed)return;
+      requestId.current ??= crypto.randomUUID();
       const id = requestId.current;
       await mutation.run(() => submitGuardianEnrollmentForm({ data: { applicationId, requirementId, answers, signerName,
         requestId: id, formRevision: record.revision, confirmed } }), {
@@ -53,13 +65,15 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
       });
     }}>
       <fieldset disabled={busy || !interactive} className="space-y-3">
-        {record.form.fields.map(field => <label key={field.key} className="block text-sm">
-          {field.label}{field.required ? " (required)" : " (optional)"}
-          {field.type === "text" ? <textarea required={field.required} maxLength={4000}
-            className="mt-1 block w-full rounded border bg-background p-2"
+        {record.form.fields.map(field => {
+          const value=answers[field.key];
+          const missing=field.required&&(value===undefined||value===null||(typeof value==="string"&&!value.trim()));
+          return <Field key={field.key} label={field.label} required={field.required}
+            error={attempted&&missing?"Complete this required answer.":undefined}>
+          {field.type === "text" ? <Textarea maxLength={4000}
             value={typeof answers[field.key] === "string" ? String(answers[field.key]) : ""}
             onChange={event => answer(field.key, event.target.value)} /> :
-            <select required={field.required} className="ml-3 rounded border bg-background p-2"
+            <Select
               value={answers[field.key] === true ? "yes" : answers[field.key] === false ? "no" : ""}
               onChange={event => {
                 if (!event.target.value) {
@@ -68,21 +82,23 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
                 } else answer(field.key, event.target.value === "yes");
               }}>
               <option value="">Choose an answer</option><option value="yes">Yes</option><option value="no">No</option>
-            </select>}
-        </label>)}
-        <label className="block text-sm">Typed full name (electronic signature)
-          <input required minLength={2} maxLength={200} value={signerName} autoComplete="name"
-            className="mt-1 block w-full rounded border bg-background p-2"
+            </Select>}
+        </Field>;
+        })}
+        <Field label="Typed full name (electronic signature)" required
+          error={attempted&&signerName.trim().length<2?"Enter your full name to sign this form.":undefined}>
+          <Input minLength={2} maxLength={200} value={signerName} autoComplete="name"
             onChange={event => { requestId.current = null; setSignerName(event.target.value); }} />
-        </label>
-        <label className="flex items-start gap-2 text-sm"><input type="checkbox" required checked={confirmed}
-          onChange={event => { requestId.current = null; setConfirmed(event.target.checked); }} />
-          I agree to the school statement above and intend my typed name to serve as my electronic signature.</label>
+        </Field>
+        <Field label="I agree to the school statement above and intend my typed name to serve as my electronic signature." required
+          error={attempted&&!confirmed?"Confirm your agreement before signing.":undefined}>
+          <Checkbox checked={confirmed} onChange={event => { requestId.current = null; setConfirmed(event.target.checked); }} />
+        </Field>
         <p className="text-xs">Your authenticated identity, answers, exact form version and signing time are recorded.
           A registrar must review this form before the requirement is complete.</p>
-        <button type="submit" disabled={!confirmed} className="rounded border px-3 py-2 text-sm">
+        <Button type="submit" disabled={busy || !interactive}>
           {busy ? "Submitting signed form..." : record.submission ? "Sign and resubmit corrected form" : "Sign and submit enrollment form"}
-        </button>
+        </Button>
       </fieldset>
     </form>}
   </section>;
@@ -93,6 +109,7 @@ export function RegistrarEnrollmentFormReview({ applicationId, requirementId, re
 }) {
   const [status, setStatus] = useState<"accepted" | "rejected">("accepted");
   const [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const mutation = useMutationFeedback(onChanged);
   const busy = mutation.pending || mutation.refreshFailed;
   const [interactive, setInteractive] = useState(false);
@@ -101,8 +118,10 @@ export function RegistrarEnrollmentFormReview({ applicationId, requirementId, re
     <EnrollmentFormSnapshot record={record} />
     <MutationFeedback state={mutation} pendingMessage="Saving enrollment form review..."/>
     {!record.submission && <p className="text-sm">A currently authorized managing guardian must sign before review. No checklist waiver is available.</p>}
-    {!closed && record.submission && !record.review && <form className="space-y-3" onSubmit={async event => {
+    {!closed && record.submission && !record.review && <form noValidate className="space-y-3" onSubmit={async event => {
       event.preventDefault();
+      setAttempted(true);
+      if(reason.trim().length<5||!confirmed)return;
       await mutation.run(() => {
         const submission = record.submission;
         if (!submission) throw new DomainError("CONFLICT", "The signed enrollment form is no longer available for review.");
@@ -114,19 +133,21 @@ export function RegistrarEnrollmentFormReview({ applicationId, requirementId, re
       });
     }}>
       <fieldset disabled={busy || !interactive} className="space-y-3">
-        <label className="block text-sm">Form decision
-          <select value={status} className="ml-3 rounded border bg-background p-2"
+        <Field label="Form decision" className="text-sm">
+          <Select value={status}
             onChange={event => setStatus(event.target.value === "accepted" ? "accepted" : "rejected")}>
             <option value="accepted">Approve signed form</option><option value="rejected">Return for correction and new signature</option>
-          </select>
-        </label>
-        <label className="block text-sm">Review reason (visible to the family)
-          <textarea required minLength={5} maxLength={400} value={reason} className="mt-1 block w-full rounded border bg-background p-2"
-            onChange={event => setReason(event.target.value)} />
-        </label>
-        <label className="flex gap-2 text-sm"><input type="checkbox" required checked={confirmed}
-          onChange={event => setConfirmed(event.target.checked)} />I confirm this decision for the displayed signed submission.</label>
-        <button type="submit" disabled={!confirmed} className="rounded border px-3 py-2 text-sm">Record form review</button>
+          </Select>
+        </Field>
+        <Field label="Review reason (visible to the family)" className="text-sm" required
+          error={attempted&&reason.trim().length<5?"Enter at least 5 characters explaining the review.":undefined}>
+          <Textarea minLength={5} maxLength={400} value={reason} onChange={event => setReason(event.target.value)} />
+        </Field>
+        <Field label="I confirm this decision for the displayed signed submission." required
+          error={attempted&&!confirmed?"Confirm this decision before recording it.":undefined}>
+          <Checkbox checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
+        </Field>
+        <Button type="submit" disabled={busy || !interactive}>Record form review</Button>
       </fieldset>
     </form>}
   </section>;

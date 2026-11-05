@@ -3,6 +3,12 @@ import { createPrivateUploadTask, documentUploadPolicy, validateUploadFile } fro
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import {QueryState} from "@/components/workspace";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {FileSelectionField,UploadedFileNotice} from "@/components/evidence/FileSelectionField";
 import {
   beginQualificationUpload, decideQualification, finishQualificationUpload,
@@ -77,6 +83,7 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }
   const [issuerName, setIssuerName] = useState(""), [jurisdictionId, setJurisdictionId] = useState("");
   const [issuedAt, setIssuedAt] = useState(""), [expiresAt, setExpiresAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [attempted,setAttempted]=useState(false);
   const [pending, setPending] = useState<{ key: string; claim: NonNullable<Parameters<typeof beginQualificationUpload>[0]>["data"] } | null>(null);
   const task = useRef<{run: () => Promise<unknown>} | null>(null);
   async function upload() {
@@ -104,34 +111,37 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }
     task.current=null;
     setPending(null); setFile(null);
   }
-  return <form className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2" onSubmit={event => {
-    event.preventDefault(); void submit(upload);
+  return <form noValidate className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2" onSubmit={event => {
+    event.preventDefault();setAttempted(true);
+    if(!pending&&(!definitionId||!issuerName.trim()||!file))return;
+    void submit(async()=>{await upload();setAttempted(false);});
   }}>
     <h3 className="font-semibold sm:col-span-2">Submit qualification evidence</h3>
     {!uploadsEnabled && <p role="alert" className="text-sm sm:col-span-2">Qualification evidence uploads are not enabled for this deployment. Existing records remain readable to authorized viewers.</p>}
     {!catalog.length && <p role="alert" className="text-sm sm:col-span-2">No supported qualification catalog entries are configured. Contact your program administrator.</p>}
     <fieldset disabled={busy || !uploadsEnabled || Boolean(pending)} className="contents">
-      <label className="text-sm">Qualification<select required value={definitionId} onChange={event => setDefinitionId(event.target.value)}
-        className="mt-1 block w-full rounded border bg-background p-2">
+      <Field label="Qualification" className="text-sm" required error={attempted&&!definitionId?"Choose a qualification.":undefined}>
+        <Select value={definitionId} onChange={event => setDefinitionId(event.target.value)}>
         <option value="">Choose qualification</option>{catalog.map(entry => <option key={entry.id} value={entry.id}>{entry.title}</option>)}
-      </select></label>
-      <label className="text-sm">Issuing institution<input required value={issuerName} maxLength={200}
-        onChange={event => setIssuerName(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
-      <label className="text-sm">Jurisdiction (optional)<select value={jurisdictionId} onChange={event => setJurisdictionId(event.target.value)}
-        className="mt-1 block w-full rounded border bg-background p-2"><option value="">Not specified</option>
+        </Select>
+      </Field>
+      <Field label="Issuing institution" className="text-sm" required error={attempted&&!issuerName.trim()?"Enter the name of the issuing institution.":undefined}>
+        <Input value={issuerName} maxLength={200} onChange={event => setIssuerName(event.target.value)}/>
+      </Field>
+      <Field label="Jurisdiction (optional)" className="text-sm">
+        <Select value={jurisdictionId} onChange={event => setJurisdictionId(event.target.value)}><option value="">Not specified</option>
         {jurisdictions.map(entry => <option key={entry.id} value={entry.id}>{entry.name} ({entry.code})</option>)}
-      </select></label>
-      <label className="text-sm">Issued at (optional, your local time)<input type="datetime-local" value={issuedAt}
-        onChange={event => setIssuedAt(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
-      <label className="text-sm">Expires at (optional, your local time)<input type="datetime-local" value={expiresAt}
-        onChange={event => setExpiresAt(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2" /></label>
+        </Select>
+      </Field>
+      <Field label="Issued at (optional, your local time)" className="text-sm"><Input type="datetime-local" value={issuedAt} onChange={event => setIssuedAt(event.target.value)}/></Field>
+      <Field label="Expires at (optional, your local time)" className="text-sm"><Input type="datetime-local" value={expiresAt} onChange={event => setExpiresAt(event.target.value)}/></Field>
       <FileSelectionField label="Evidence (PDF, JPEG or PNG, up to 10 MB)" accept="application/pdf,image/jpeg,image/png"
         file={file} onChange={setFile} required/>
+      {attempted&&!pending&&!file&&<FieldError className="sm:col-span-2">Choose a PDF, JPEG, or PNG evidence file.</FieldError>}
     </fieldset>
     <p className="text-xs text-muted-foreground sm:col-span-2">Submit a new claim for renewal or corrected evidence. Prior claims and review history are retained. Storage verification does not approve your qualification.</p>
     {pending && <div className="sm:col-span-2"><UploadedFileNotice>The file uploaded, but submission has not been confirmed. Retry the same submission without uploading again.</UploadedFileNotice></div>}
-    <button type="submit" disabled={busy || !uploadsEnabled || (!pending && (!file || !definitionId))}
-      className="justify-self-start rounded border px-3 py-2 text-sm disabled:opacity-50">{pending ? "Retry submission" : "Submit for review"}</button>
+    <Button type="submit" disabled={busy || !uploadsEnabled} className="justify-self-start">{pending ? "Retry submission" : "Submit for review"}</Button>
   </form>;
 }
 
@@ -141,6 +151,7 @@ function Claim({ claim, canReview, selection, busy, run }: {
 }) {
   const [reason, setReason] = useState(""), [evidenceUrl, setEvidenceUrl] = useState("");
   const [reviewed, setReviewed] = useState(false);
+  const [attempted,setAttempted]=useState(false);
   const expired = claim.expiresAt !== null && new Date(claim.expiresAt) <= new Date();
   return <article className="rounded-lg border p-4">
     <h3 className="font-semibold">{claim.title}</h3>
@@ -161,18 +172,25 @@ function Claim({ claim, canReview, selection, busy, run }: {
         setEvidenceUrl(result.url); setReviewed(false); }, "Evidence link ready for 60 seconds.")}>Get private evidence link</button>}
     {evidenceUrl && <a className="ml-3 text-sm underline" href={evidenceUrl} target="_blank" rel="noreferrer">Open evidence (short-lived link)</a>}
     {canReview && (claim.status === "pending" || claim.status === "verified") && <div className="mt-3 space-y-2">
-      <label className="block text-sm">Review reason<textarea value={reason} maxLength={2000} onChange={event => setReason(event.target.value)}
-        className="mt-1 block w-full rounded border bg-background p-2" /></label>
-      {claim.status === "pending" && <label className="flex gap-2 text-sm">
-        <input type="checkbox" disabled={!evidenceUrl} checked={reviewed} onChange={event => setReviewed(event.target.checked)} />
-        I independently reviewed this evidence and the recorded issuer, jurisdiction and validity dates.
-      </label>}
+      <Field label="Review reason" className="text-sm" required
+        error={attempted&&reason.trim().length<5?"Enter at least 5 characters explaining this decision.":undefined}>
+        <Textarea value={reason} maxLength={2000} onChange={event => setReason(event.target.value)}/>
+      </Field>
+      {claim.status === "pending" && <Field className="text-sm" required
+        label="I independently reviewed this evidence and the recorded issuer, jurisdiction and validity dates."
+        error={attempted&&!reviewed?"Confirm the independent evidence review before approving.":undefined}>
+        <Checkbox disabled={!evidenceUrl} checked={reviewed} onChange={event => setReviewed(event.target.checked)}/>
+      </Field>}
+      {attempted&&expired&&<FieldError>This evidence is expired; it cannot be approved.</FieldError>}
       <div className="flex gap-2">{(claim.status === "pending" ? ["approve", "reject"] as const : ["revoke"] as const).map(decision =>
-        <button key={decision} type="button" disabled={busy || reason.trim().length < 5 ||
-          (decision === "approve" && (!reviewed || expired))}
-          onClick={() => void run(() => decideQualification({ data: { ...selection, claimId: claim.id,
-            expectedSequence: claim.sequence, decision, reason } }), "Review saved; launch eligibility will be recalculated.")}
-          className="rounded border px-3 py-2 text-sm capitalize disabled:opacity-50">{decision}</button>)}</div>
+        <Button key={decision} type="button" variant="outline" disabled={busy||(!evidenceUrl&&decision==="approve")}
+          onClick={() => {
+            setAttempted(true);
+            if(reason.trim().length<5||(decision==="approve"&&(!reviewed||expired)))return;
+            void run(() => decideQualification({ data: { ...selection, claimId: claim.id,
+              expectedSequence: claim.sequence, decision, reason } }), "Review saved; launch eligibility will be recalculated.")
+              .then(()=>setAttempted(false));
+          }}>{decision}</Button>)}</div>
     </div>}
     <details className="mt-3 text-sm"><summary>Immutable review history</summary>
       <ol className="mt-2 space-y-1">{claim.history.map(event => <li key={event.sequence}>

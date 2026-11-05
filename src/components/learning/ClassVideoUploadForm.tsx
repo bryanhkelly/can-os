@@ -5,6 +5,10 @@ import { createPrivateUploadTask } from "@/platform/storage/private-upload";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: {
   sectionId: string;
@@ -19,11 +23,13 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
   const [file, setFile] = useState<File | null>(null);
   const [rights, setRights] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const [validationAttempted, setValidationAttempted] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const task = useRef<{ run: () => Promise<unknown> } | null>(null);
   const busy = feedback.pending || feedback.refreshFailed;
   async function submit() {
-    if (!file) return;
+    setValidationAttempted(true);
+    if (title.trim().length < 3 || !file || !rights) return;
     await feedback.run(async () => {
       const videoFile = classVideoFileSchema.parse({ fileName: file.name, size: file.size, contentType: file.type });
       task.current ??= createPrivateUploadTask({
@@ -41,12 +47,13 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
       await task.current.run();
       task.current = null;
       setAttempted(false);
+      setValidationAttempted(false);
       setTitle(""); setFile(null); setRights(false);
       if (fileInput.current) fileInput.current.value = "";
     }, { successMessage: "Video uploaded and attached to this class.",
       commandErrorMessage: "Unable to upload this video. Check the file, connection and deployment storage settings, then retry." });
   }
-  return <form className="mb-5 grid gap-3 rounded-lg border p-4" aria-label="Upload class video"
+  return <form noValidate className="mb-5 grid gap-3 rounded-lg border p-4" aria-label="Upload class video"
     aria-busy={feedback.pending} onSubmit={event => { event.preventDefault(); void submit(); }}>
     <h3 className="text-sm font-semibold">Upload a video</h3>
     <p className="text-xs text-muted-foreground">Private MP4 or WebM, up to 500 MB. Use browser-compatible codecs.
@@ -54,25 +61,29 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
     {!enabled && <p role="status" className="text-sm">Video uploads are not enabled on this deployment. You can still add a video link.</p>}
     <MutationFeedback state={feedback} pendingMessage="Uploading and verifying video. Keep this page open..."/>
     <fieldset disabled={!enabled || busy || attempted} className="grid gap-3">
-      <label className="text-sm">Video title<input required minLength={3} maxLength={200} value={title}
-        onChange={event => setTitle(event.target.value)} className="mt-1 w-full rounded border p-2"/></label>
-      <label className="text-sm">Video file<input ref={fileInput} required type="file" accept="video/mp4,video/webm,.mp4,.webm"
-        onChange={event => setFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full"/></label>
+      <Field label="Video title" required error={validationAttempted&&title.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
+        <Input minLength={3} maxLength={200} value={title} onChange={event => setTitle(event.target.value)}/>
+      </Field>
+      <Field label="Video file" required error={validationAttempted&&!file?"Choose an MP4 or WebM video file.":undefined}>
+        <Input ref={fileInput} type="file" accept="video/mp4,video/webm,.mp4,.webm"
+          onChange={event => setFile(event.target.files?.[0] ?? null)}/>
+      </Field>
       {!lessonId && <label className="text-sm">Attach video to<select value={selectedLesson}
         onChange={event => setSelectedLesson(event.target.value)} className="mt-1 w-full rounded border p-2">
         <option value="">Entire class</option>
         {lessons.map(lesson => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
       </select></label>}
-      <label className="flex items-start gap-2 text-sm"><input type="checkbox" required checked={rights}
-        onChange={event => setRights(event.target.checked)}/>I have permission to share this video with the class.</label>
+      <Field label="I have permission to share this video with the class" required
+        error={validationAttempted&&!rights?"Confirm that you have permission to share this video.":undefined}>
+        <Checkbox checked={rights} onChange={event => setRights(event.target.checked)}/>
+      </Field>
     </fieldset>
     <div className="flex gap-3">
-      <button type="submit" disabled={!enabled || busy || !file || !rights}
-        className="justify-self-start rounded border px-4 py-2 text-sm disabled:opacity-50">
+      <Button type="submit" disabled={!enabled || busy}>
         {attempted ? "Retry video upload" : "Upload video"}
-      </button>
-      {attempted && <button type="button" disabled={busy} className="text-sm underline"
-        onClick={() => { task.current = null; setAttempted(false); }}>Choose another file</button>}
+      </Button>
+      {attempted && <Button type="button" variant="outline" disabled={busy}
+        onClick={() => { task.current = null; setAttempted(false); }}>Choose another file</Button>}
     </div>
   </form>;
 }

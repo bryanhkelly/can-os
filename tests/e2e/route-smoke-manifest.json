@@ -1,0 +1,31 @@
+{
+  "publicRoutes": [
+    ["/access", "Access CAN OS"],
+    ["/schools/new", "Create a school"],
+    ["/church/apply", "Bring a school to your church"],
+    ["/family/join", "Confirm your school application email"]
+  ],
+  "signedOutRoutes": [
+    "/home", "/student/courses", "/student/assignments", "/student/discussions",
+    "/student/my-school", "/student/report-card", "/student/support", "/student/settings",
+    "/teacher/gradebook", "/teacher/missing-work", "/teacher/discussions",
+    "/guardian/academics", "/guardian/attendance", "/guardian/admission-offers",
+    "/classes", "/sites", "/calendar", "/messages", "/notifications",
+    "/operations/curriculum", "/operations/launch", "/admissions",
+    "/staff/students", "/profiles", "/account/sessions"
+  ],
+  "authenticatedPersonas": [
+    { "persona": "student", "destination": "/student/courses" },
+    { "persona": "guardian", "destination": "/guardian/academics" },
+    { "persona": "teacher", "destination": "/classes" },
+    { "persona": "registrar", "destination": "/admissions" },
+    { "persona": "site_admin", "destination": "/sites" },
+    { "persona": "site_leader", "destination": "/staff/attendance" },
+    { "persona": "room_facilitator", "destination": "/staff/attendance" },
+    { "persona": "can_network_steward", "destination": "/operations/jurisdiction-profiles" },
+    { "persona": "can_jurisdiction_reviewer", "destination": "/home" }
+  ],
+  "authenticatedDynamicRoutes": [
+    { "persona": "site_admin", "route": "/sites/$siteId/profile" }
+  ]
+}

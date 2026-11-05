@@ -1,4 +1,8 @@
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { WorkspacePanel } from "@/components/workspace";
 
 export function ClassAnnouncementComposer({
@@ -11,26 +15,30 @@ export function ClassAnnouncementComposer({
   onBodyChange: (value: string) => void;
   onSubmit: () => void;
 }) {
+  const [attempted, setAttempted] = useState(false);
+  const titleError = attempted && title.trim().length < 3 ? "Enter a title with at least 3 characters." : undefined;
+  const bodyError = attempted && !body.trim() ? "Enter an announcement." : undefined;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setAttempted(true);
+    if (title.trim().length < 3 || !body.trim()) return;
+    setAttempted(false);
     onSubmit();
   };
   return <WorkspacePanel title="Post a class announcement"
     description="Visible to enrolled students and academically authorized guardians.">
-    <form className="grid gap-3" onSubmit={submit}>
-      <label className="text-sm">Title
-        <input maxLength={160} disabled={busy} value={title} onChange={event => onTitleChange(event.target.value)}
-          className="mt-2 block w-full rounded-lg border bg-background p-3"/>
-      </label>
-      <label className="text-sm">Announcement
-        <textarea maxLength={5000} rows={4} disabled={busy} value={body}
-          onChange={event => onBodyChange(event.target.value)}
-          className="mt-2 block w-full rounded-lg border bg-background p-3"/>
-      </label>
-      <button disabled={busy || title.trim().length < 3 || !body.trim()}
-        className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">
+    <form noValidate className="grid gap-3" onSubmit={submit}>
+      <Field label="Title" required error={titleError}>
+        <Input minLength={3} maxLength={160} disabled={busy} value={title}
+          onChange={event => onTitleChange(event.target.value)} />
+      </Field>
+      <Field label="Announcement" required error={bodyError}>
+        <Textarea maxLength={5000} rows={4} disabled={busy} value={body}
+          onChange={event => onBodyChange(event.target.value)} />
+      </Field>
+      <Button type="submit" disabled={busy} className="justify-self-start">
         {busy ? "Publishing..." : "Publish announcement"}
-      </button>
+      </Button>
     </form>
   </WorkspacePanel>;
 }

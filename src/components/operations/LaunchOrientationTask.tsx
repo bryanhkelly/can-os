@@ -1,5 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { dateTimeInputValue } from "@/modules/calendar/timezone";
 import { unambiguousInstant } from "@/components/operations/launch-orientation-time";
 import type { listLaunches } from "@/modules/programs/launch.functions";
@@ -15,6 +18,7 @@ export function LaunchOrientationTask({ launch, busy, save }: {
   const [endsAt, setEndsAt] = useState("");
   const timezone = launch.siteTimezone ?? "America/Los_Angeles";
   const [timeError, setTimeError] = useState("");
+  const [attempted, setAttempted] = useState(false);
   function useRecommendation() {
     try {
       const start = new Date(Date.now() + 7 * 24 * 60 * 60_000);
@@ -28,9 +32,10 @@ export function LaunchOrientationTask({ launch, busy, save }: {
       setTimeError(mutationErrorMessage(error, "Unable to suggest an orientation time"));
     }
   }
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+  return <form noValidate className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
-    if (!startsAt || !endsAt) return;
+    setAttempted(true);
+    if (!title.trim() || !startsAt || !endsAt) return;
     try {
       const startIso = unambiguousInstant(startsAt, timezone);
       const endIso = unambiguousInstant(endsAt, timezone);
@@ -52,23 +57,22 @@ export function LaunchOrientationTask({ launch, busy, save }: {
     </p>
     {timeError && <p role="alert" className="mt-3 text-sm">{timeError}</p>}
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm sm:col-span-2">Title
-        <input required value={title} onChange={event => setTitle(event.target.value)}
-          className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-      <label className="text-sm">Start
-        <input aria-label="Orientation start" required type="datetime-local" value={startsAt}
-          onChange={event => setStartsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
-      <label className="text-sm">End
-        <input aria-label="Orientation end" required type="datetime-local" value={endsAt}
-          onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
-      </label>
+      <Field label="Title" className="text-sm sm:col-span-2" required
+        error={attempted&&!title.trim()?"Enter an orientation title.":undefined}>
+        <Input value={title} onChange={event => setTitle(event.target.value)} />
+      </Field>
+      <Field label="Start" className="text-sm" required
+        error={attempted&&!startsAt?"Choose an orientation start time.":undefined}>
+        <Input aria-label="Orientation start" type="datetime-local" value={startsAt}
+          onChange={event => setStartsAt(event.target.value)} />
+      </Field>
+      <Field label="End" className="text-sm" required
+        error={attempted&&!endsAt?"Choose an orientation end time.":undefined}>
+        <Input aria-label="Orientation end" type="datetime-local" value={endsAt}
+          onChange={event => setEndsAt(event.target.value)} />
+      </Field>
     </div>
-    <button type="submit" disabled={busy || !startsAt || !endsAt}
-      className="mt-4 min-h-11 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-      Save orientation
-    </button>
+    <Button type="submit" className="mt-4" disabled={busy}>Save orientation</Button>
   </form>;
 }
 

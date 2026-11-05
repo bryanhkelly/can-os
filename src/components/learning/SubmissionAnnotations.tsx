@@ -1,5 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { addSubmissionAnnotation, getSubmissionAnnotations } from "@/modules/learning/submission-annotations.functions";
 
 export function SubmissionAnnotations({ submissionId, responseText }: { submissionId: string; responseText?: string }) {
@@ -9,6 +12,7 @@ export function SubmissionAnnotations({ submissionId, responseText }: { submissi
   const [error, setError] = useState("");
   const [range, setRange] = useState<{ start: number; end: number; quote: string } | null>(null);
   const [comment, setComment] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const requestId = useRef<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -20,13 +24,14 @@ export function SubmissionAnnotations({ submissionId, responseText }: { submissi
     return () => { active = false; };
   }, [submissionId]);
   async function save() {
-    if (!range) { setError("Select text from the submitted response first."); return; }
+    setAttempted(true);
+    if (!range || !comment.trim()) return;
     setBusy(true); setError(""); requestId.current ??= crypto.randomUUID();
     try {
       await addSubmissionAnnotation({ data: { id: requestId.current, submissionId,
         startOffset: range.start, endOffset: range.end, quote: range.quote, comment } });
       const result = await getSubmissionAnnotations({ data: { submissionId } });
-      setAnnotations(result.annotations); setComment(""); setRange(null); requestId.current = null;
+      setAnnotations(result.annotations); setComment(""); setRange(null); requestId.current = null;setAttempted(false);
     } catch (cause) { setError(mutationErrorMessage(cause, "Unable to save annotation.")); }
     finally { setBusy(false); }
   }
@@ -48,10 +53,14 @@ export function SubmissionAnnotations({ submissionId, responseText }: { submissi
           }} className="mt-2 block w-full rounded-lg border bg-muted/40 p-3"/>
       </label>
       {range && <blockquote className="mt-3 whitespace-pre-wrap border-l-2 pl-3 text-sm">{range.quote}</blockquote>}
-      <form onSubmit={event => { event.preventDefault(); void save(); }} className="mt-3 grid gap-3">
-        <label className="text-sm">Annotation comment<textarea maxLength={4000} rows={3} disabled={busy} value={comment}
-          onChange={event => { setComment(event.target.value); requestId.current = null; }} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-        <button disabled={busy || !range || !comment.trim()} className="justify-self-start rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{busy ? "Saving..." : "Save annotation"}</button>
+      <form noValidate onSubmit={event => { event.preventDefault(); void save(); }} className="mt-3 grid gap-3">
+        {!range&&attempted&&<FieldError>Select text from the submitted response first.</FieldError>}
+        <Field label="Annotation comment" className="text-sm" required
+          error={attempted&&!comment.trim()?"Enter an annotation comment.":undefined}>
+          <Textarea maxLength={4000} rows={3} disabled={busy} value={comment}
+            onChange={event => { setComment(event.target.value); requestId.current = null; }}/>
+        </Field>
+        <Button type="submit" variant="outline" disabled={busy} className="justify-self-start">{busy ? "Saving..." : "Save annotation"}</Button>
       </form>
     </details>}
     <ul className="space-y-3">{annotations.map(item => <li key={item.id} className="rounded-lg border p-4">

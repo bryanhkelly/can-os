@@ -79,6 +79,34 @@ delivery and deployment boundaries.
 
 ### Dates, timestamps and Site timezones
 
+Staff attendance resolves its permitted Program and Site timezone on the server
+before choosing the initial date. Offline marks are isolated in tab-lifetime
+`sessionStorage` by verified account, grant, actor, effective scope, Site and
+Program. The previous unscoped localStorage queues are discarded, never adopted
+by whichever account next opens attendance. Restoration follows an authenticated
+workspace read; synchronization revalidates that context and every replay carries
+the expected identity for server comparison before the normal resource checks.
+Workspace changes remount attendance state and stop subsequent replay requests.
+Tab-only pending marks are lost when the tab closes; encrypted durable offline
+attendance is not enabled. Supporting that requires a separately reviewed device
+key lifecycle, expiry, logout purge, retention and shared-device threat model.
+
+Launch supplementary reads distinguish `ready`, `empty`, `unavailable` and
+`unauthorized`. A successful empty result is not a failed read. Program configuration
+requires available jurisdiction guidance/research; outreach requires invitation
+data; enrollment review requires admissions/enrollment counts; opening guidance
+requires jurisdiction and enrollment reads. These are presentation prerequisites,
+not new operating authority: canonical server Journey and independent opening
+checks remain mandatory. A failed read cannot establish zero outstanding work.
+
+`components/shell/route-navigation.ts` classifies every generated TanStack
+destination with a primary navigation owner, supported personas and visibility,
+or a reason for being hidden/non-navigable. Typecheck and the route-metadata unit
+test reject unclassified routes. This is presentation metadata, never server
+authorization. Interest Events belongs to Launch. The onsite-day deep link is
+`/home?view=onsite&siteId=<site>&date=<school-date>`; the day view verifies the
+requested Site against its server-returned onsite membership before loading it.
+
 `src/modules/calendar/timezone.ts` owns calendar-date validation/arithmetic,
 timezone date keys, local-input conversion, day boundaries and display.
 Date-only values are strict `YYYY-MM-DD` calendar dates, not instants:

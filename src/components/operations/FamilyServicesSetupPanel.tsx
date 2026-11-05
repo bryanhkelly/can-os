@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { getSiteFamilyServicesSetup, saveSiteFamilyServicesSetup } from
   "@/modules/sites/site-family-services.functions";
 import type { SiteFamilyServices } from "@/domain/site-family-services";
@@ -27,6 +33,7 @@ export function FamilyServicesSetupPanel({siteId}:{siteId:string}) {
   const [message,setMessage]=useState("");
   const [reviewed,setReviewed]=useState(false);
   const [reason,setReason]=useState("");
+  const [attempted,setAttempted]=useState(false);
   useEffect(()=>{
     let live=true;
     setLoading(true);
@@ -51,13 +58,15 @@ export function FamilyServicesSetupPanel({siteId}:{siteId:string}) {
   }
   async function save(event:React.FormEvent) {
     event.preventDefault();setError("");setMessage("");
-    if(!reviewed)return setError("Review the statements before recording approval.");
+    setAttempted(true);
+    if(!reviewed||reason.trim().length<10)return;
     setBusy(true);
     try {
       const saved=await saveSiteFamilyServicesSetup({data:{
         siteId,expectedRevision:revision,entries,reason,contentReviewed:true,
       }});
       setRevision(saved.revision);setReviewed(false);setReason("");
+      setAttempted(false);
       setMessage("Family-service review saved. The public site must still pass its separate publishing gate.");
     }catch{
       setError("The review could not be saved. Check evidence and refresh before retrying.");
@@ -70,55 +79,53 @@ export function FamilyServicesSetupPanel({siteId}:{siteId:string}) {
       These statements come from Site configuration. Only the institutional Site publisher
       may review them. Proposed programs are never described as operating services.
     </p>
-    <form onSubmit={save} className="space-y-4">
+    <form noValidate onSubmit={save} className="space-y-4">
       {categories.map(({key,label})=>{
         const item=entries.find(value=>value.category===key)??blank(key);
         return <fieldset key={key} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
           <legend className="px-1 text-sm font-semibold">{label}</legend>
-          <label className="text-xs">Current status
-            <select className="mt-1 block w-full rounded border bg-background p-2 text-sm"
+          <Field label="Current status" className="text-xs">
+            <Select
               value={item.status} disabled={busy}
               onChange={event=>update(key,{status:event.target.value as Entry["status"]})}>
               <option value="not_offered">Not offered</option>
               <option value="planned">Planned, not yet available</option>
               <option value="confirmed">Confirmed, availability not opened</option>
               <option value="available">Available</option>
-            </select>
-          </label>
-          <label className="text-xs">Review date for this statement (optional expiry)
-            <input className="mt-1 block w-full rounded border bg-background p-2 text-sm" type="date"
+            </Select>
+          </Field>
+          <Field label="Review date for this statement (optional expiry)" className="text-xs">
+            <Input type="date"
               disabled={busy} value={item.expiresOn??""}
               onChange={event=>update(key,{expiresOn:event.target.value||null})}/>
-          </label>
-          <label className="text-xs sm:col-span-2">Parent-friendly description
-            <textarea className="mt-1 block w-full rounded border bg-background p-2 text-sm"
+          </Field>
+          <Field label="Parent-friendly description" className="text-xs sm:col-span-2">
+            <Textarea
               value={item.description} disabled={busy} maxLength={1200} rows={2}
               onChange={event=>update(key,{description:event.target.value})}/>
-          </label>
-          <label className="text-xs sm:col-span-2">Internal supporting evidence (not shown publicly)
-            <input className="mt-1 block w-full rounded border bg-background p-2 text-sm"
+          </Field>
+          <Field label="Internal supporting evidence (not shown publicly)" className="text-xs sm:col-span-2">
+            <Input
               value={item.evidenceReference??""} disabled={busy} maxLength={500}
               placeholder="Reference to reviewed vendor, staff or operating decision"
               onChange={event=>update(key,{evidenceReference:event.target.value||null})}/>
-          </label>
+          </Field>
         </fieldset>;
       })}
-      <label className="block text-xs">Publication review reason
-        <textarea className="mt-1 block w-full rounded border bg-background p-2 text-sm"
-          value={reason} disabled={busy} minLength={10} maxLength={500} rows={2}
+      <Field label="Publication review reason" className="text-xs" required
+        error={attempted&&reason.trim().length<10?"Enter a review reason with at least 10 characters.":undefined}>
+        <Textarea value={reason} disabled={busy} minLength={10} maxLength={500} rows={2}
           onChange={event=>setReason(event.target.value)} required/>
-      </label>
-      <label className="flex gap-2 text-sm">
-        <input type="checkbox" checked={reviewed} disabled={busy}
-          onChange={event=>setReviewed(event.target.checked)}/>
-        I reviewed each current service statement and its supporting evidence.
-      </label>
+      </Field>
+      <Field label="I reviewed each current service statement and its supporting evidence" required
+        error={attempted&&!reviewed?"Confirm your review before saving.":undefined}>
+        <Checkbox checked={reviewed} disabled={busy} onChange={event=>setReviewed(event.target.checked)}/>
+      </Field>
       {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
       {message&&<p role="status" className="text-sm">{message}</p>}
-      <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-        type="submit" disabled={busy||!reviewed||reason.trim().length<10}>
+      <Button type="submit" disabled={busy}>
         {busy?"Saving review…":"Save verified service information"}
-      </button>
+      </Button>
     </form>
   </section>;
 }

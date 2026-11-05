@@ -512,6 +512,20 @@
       "when": 1793814563404,
       "tag": "0072_interest_events",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793825622698,
+      "tag": "0073_scheduled_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793826818304,
+      "tag": "0074_omniscient_hulk",
+      "breakpoints": true
     }
   ]
 }

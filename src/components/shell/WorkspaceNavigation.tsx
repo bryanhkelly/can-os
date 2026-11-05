@@ -4,10 +4,12 @@ import {useEffect,useState,useSyncExternalStore,type ReactNode} from "react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
-import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks,isFocusedClassroomRoute} from "./workspace-navigation.registry";
+import {getActiveWorkspacePath,getWorkspaceLinks,isFocusedClassroomRoute} from "./workspace-navigation.registry";
 import {WorkspaceSidebar} from "./WorkspaceSidebar";
 import {WorkspaceTopBar} from "./WorkspaceTopBar";
 import {WorkspaceNavigationPanels} from "./WorkspaceNavigationPanels";
+import {useQueryClient} from "@tanstack/react-query";
+import {switchVerifiedMembership} from "@/lib/workspace-membership-switch";
 
 export {SidebarLinks} from "./WorkspaceSidebarLinks";
 export {workspaceHome,workspaceLinks} from "./workspace-navigation.registry";
@@ -34,6 +36,7 @@ function subscribeSidebarPreference(listener:()=>void){
 
 export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const location=useLocation();
+ const queryClient=useQueryClient();
  const {session,error:sessionError}=useWorkspaceSession();
  const [error,setError]=useState("");
  const [switcherError,setSwitcherError]=useState("");
@@ -55,11 +58,8 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const links=current?(getWorkspaceLinks(current.role)??[]):[];
  const activePath=getActiveWorkspacePath(links,location.pathname);
  const switchGrant=async(id:string)=>{
-  const target=grants.find(g=>g.id===id);
-  if(!target)throw new Error("This membership is unavailable.");
-  const response=await fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:id})});
-  if(!response.ok)throw new Error("Unable to change membership");
-  window.location.assign(getWorkspaceHome(target.role)??"/");
+    if(!authenticated)throw new Error("Sign in to change membership.");
+    await switchVerifiedMembership({grants,activeGrantId:authenticated.activeGrantId,grantId:id,queryClient});
  };
  const signOut=async()=>{
   const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});

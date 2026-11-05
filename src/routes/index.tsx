@@ -1,20 +1,32 @@
-import { createFileRoute, Link, Navigate, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useLocation } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
+import { useWorkspaceSession, workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import { getWorkspaceHome } from "@/components/shell/workspace-navigation.registry";
 import { defaultStudentDisplayPreferences, studentHomePath } from "@/domain/student-display-preferences";
 
-export const Route = createFileRoute("/")({ component: HomePage });
+export const Route = createFileRoute("/")({
+  loader: async ({ context, location }) => {
+    const { session, error } = await context.queryClient.fetchQuery(workspaceSessionQueryOptions());
+    if (location.state.accessReturnFailed === true || error) return;
+    if (session && !session.authenticated) {
+      throw redirect({ to: "/access", search: { returnTo: "/" } });
+    }
+    if (!session?.authenticated) return;
+    const destination = session.role === "student"
+      ? studentHomePath(session.studentPreferences ?? defaultStudentDisplayPreferences)
+      : getWorkspaceHome(session.role);
+    if (destination && destination !== "/") throw redirect({ to: destination });
+  },
+  component: HomePage,
+});
 
 /** Authenticated application entry, never a synthetic-feature showcase. */
 function HomePage() {
   const { session, error } = useWorkspaceSession();
   const recovered = useLocation({ select: location => location.state.accessReturnFailed === true });
-  if (session && !session.authenticated) return <Navigate to="/access" search={{returnTo:"/"}} replace />;
   const destination = session?.authenticated ? session.role==="student"
     ? studentHomePath(session.studentPreferences??defaultStudentDisplayPreferences)
     : getWorkspaceHome(session.role) : undefined;
-  if (destination && !recovered && !error) return <Navigate to={destination} replace />;
   if (recovered) return (
     <WorkspaceShell title="Home" eyebrow="CAN OS">
       <p role="status">The previous page could not be opened with your current account. You are home.</p>

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { getActionDetail } from "@/modules/actions/action-detail.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { PageFrame, RecordHeader, RecordLayout, WorkspacePanel, StatusBadge } from "@/components/workspace";
 
 export const Route = createFileRoute("/actions/$actionId")({
   loader: ({ params }) => safeLoader(() => getActionDetail({ data: { actionId: params.actionId } }), {
@@ -18,11 +18,12 @@ function ActionDetailPage() {
   const statusTone = action.status === "resolved" ? "success"
     : action.status === "waiting" ? "attention"
       : action.status === "in_progress" ? "info" : "neutral";
-  return <WorkspaceShell eyebrow="Action" title={action.title}
-    breadcrumbs={<Link to={action.workspaceHome} className="underline">Back to workspace</Link>}
-    subtitle="Recorded work and follow-through. Changes remain in the owning workflow.">
-    <WorkspacePanel title="Action details" className="mt-6">
-      <StatusBadge tone={statusTone}><span className="capitalize">{action.status.replaceAll("_", " ")}</span></StatusBadge>
+  return <PageFrame>
+    <RecordLayout header={<RecordHeader eyebrow="Action" title={action.title}
+      breadcrumbs={<Link to={action.workspaceHome} className="underline">Back to workspace</Link>}
+      subtitle="Recorded work and follow-through. Changes remain in the owning workflow."
+      status={<StatusBadge tone={statusTone}><span className="capitalize">{action.status.replaceAll("_", " ")}</span></StatusBadge>} />}
+    main={<WorkspacePanel title="Action details">
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         <div><dt className="text-xs text-muted-foreground">Type</dt><dd className="mt-1 capitalize">{action.type.replaceAll("_", " ")}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Priority</dt><dd className="mt-1 capitalize">{action.priority}</dd></div>
@@ -34,6 +35,6 @@ function ActionDetailPage() {
       {action.canManageOperations && !["resolved", "cancelled"].includes(action.status) &&
         <Link to="/home" search={{ action: action.id, siteId: action.siteId ?? undefined, programId: action.programId ?? undefined }}
           className="mt-5 inline-block text-sm font-semibold underline">Open owning operations workflow</Link>}
-    </WorkspacePanel>
-  </WorkspaceShell>;
+    </WorkspacePanel>} />
+  </PageFrame>;
 }

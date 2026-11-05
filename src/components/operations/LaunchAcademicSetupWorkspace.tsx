@@ -17,6 +17,7 @@ import {Qualifications} from "@/components/profiles/Qualifications";
 import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +44,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const suggestedSchedule=data.scheduleOptions.find(option=>option.schoolYearId===selectedTerm?.schoolYearId);
  const effectiveScheduleId=data.scheduleOptions.some(option=>option.id===scheduleId&&option.schoolYearId===selectedTerm?.schoolYearId)?scheduleId:suggestedSchedule?.id||"";
  const [courseCredits,setCourseCredits]=useState("");
+ const [creationAttempted,setCreationAttempted]=useState(false);
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
@@ -211,8 +213,12 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
    {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
    <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
-   <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
-    e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
+   <form noValidate className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
+    e.preventDefault();setCreationAttempted(true);
+    if(!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||
+      !selectedCourse?.recommendation.recommended||!selectedCourse.recommendation.instructionReady||
+      !data.academicAuthority.teacherAssignment||reviewedSectionAlreadyExists)return;
+    void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
      code:code.trim()||(selectedCourse?selectedCourse.code+"-A":""),title:title.trim()||selectedCourse?.title||"",teacherPersonId:effectiveTeacherId,scheduleTemplateId:effectiveScheduleId,
      ...(classRequestId?{classRequestId}:{}),
@@ -220,14 +226,16 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
      setClassRequestId(null);
     },classRequestId?"Requested class provisioned. Verify its saved Section and first-week readiness below.":"Class command accepted. Verify the saved Section and first-week readiness below.");
    }}>
-    <Label>Academic term<Select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1">
+    <Field label="Academic term" required error={creationAttempted&&!termId?"Choose an academic term.":undefined}><Select value={termId} onChange={e=>setTermId(e.target.value)}>
      <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
-    </Select></Label>
-    <Label>Published curriculum<Select required value={versionId} onChange={e=>setVersionId(e.target.value)} className="mt-1">
+    </Select></Field>
+    <Field label="Published curriculum" required
+      error={creationAttempted&&!versionId?"Choose published curriculum.":creationAttempted&&selectedCourse&&!selectedCourse.recommendation.recommended?selectedCourse.recommendation.explanation:undefined}>
+     <Select value={versionId} onChange={e=>setVersionId(e.target.value)}>
      <option value="">Choose curriculum</option>{data.catalog.map(x=><option key={x.versionId} value={x.versionId}>
       {x.code} · {x.title} · v{x.version} · {x.origin==="adopted"?`Adopted from ${x.publisherName}`:"Institution-owned"} · {x.recommendation.recommended?"Recommended for a first class":"Needs instructional content"}
      </option>)}
-    </Select></Label>
+    </Select></Field>
     {selectedTerm&&<div className="sm:col-span-2 rounded border p-3 text-sm" role="status">
       <p>Scheduling for <strong>{selectedYear?.name??"the selected school year"}</strong> · {selectedTerm.name}.</p>
       {selectedCourse&&<div className="mt-1">
@@ -240,21 +248,23 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       </div>}
       <p className="mt-1 text-xs text-muted-foreground">Adoption eligibility is currently program-scoped, not yet versioned by academic year. Annual adoption rollover is a separate release.</p>
     </div>}
-    <Label className="sm:col-span-2">Instructional schedule<Select required value={effectiveScheduleId} onChange={e=>setScheduleId(e.target.value)} className="mt-1">
+    <Field className="sm:col-span-2" label="Instructional schedule" required
+      error={creationAttempted&&!effectiveScheduleId?"Choose a schedule for the selected academic term.":undefined}><Select value={effectiveScheduleId} onChange={e=>setScheduleId(e.target.value)}>
      <option value="">Choose a school-year schedule</option>{data.scheduleOptions.filter(option=>option.schoolYearId===selectedTerm?.schoolYearId).map(option=><option key={option.id} value={option.id}>{option.name}</option>)}
-    </Select></Label>
+    </Select></Field>
     <Label>Class code<Input value={code} onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1"/></Label>
     <Label>Class title<Input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1"/></Label>
-    <Label className="sm:col-span-2">Instructor (required for guided launch)<Select required value={effectiveTeacherId} disabled={!data.academicAuthority.teacherAssignment||!data.teachingStaff.length} onChange={e=>setTeacherId(e.target.value)} className="mt-1">
+    <Field className="sm:col-span-2" label="Instructor (required for guided launch)" required
+      error={creationAttempted&&!effectiveTeacherId?"Choose an authorized instructor.":undefined}><Select value={effectiveTeacherId} disabled={!data.academicAuthority.teacherAssignment||!data.teachingStaff.length} onChange={e=>setTeacherId(e.target.value)}>
      <option value="">{data.teachingStaff.length?"Choose an authorized instructor":"Awaiting instructor assignment"}</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
-    </Select></Label>
+    </Select></Field>
     <Label className="sm:col-span-2">Course credit units
      <Input aria-label="Credit units for new section" type="number" min="0.01" max="10" step="0.01"
       value={courseCredits} disabled={!data.academicAuthority.creditConfiguration} onChange={e=>setCourseCredits(e.target.value)} placeholder="E.g. 0.50 or 1.00"
       className="mt-1"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </Label>
-    <Button type="submit" disabled={busy||reviewedSectionAlreadyExists||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||(!selectedCourse?.recommendation.recommended||!selectedCourse?.recommendation.instructionReady)||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)}>{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and instructor"}</Button>
+    <Button type="submit" disabled={busy||reviewedSectionAlreadyExists||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)}>{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and instructor"}</Button>
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">

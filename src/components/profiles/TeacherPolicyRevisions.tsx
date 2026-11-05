@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
-import { Field } from "@/components/ui/field";
+import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +22,7 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   if (!policies.length) return null;
   return <section className="mt-5 border-t pt-4">
     <h3 className="font-semibold">Published policy versions</h3>
@@ -34,8 +35,10 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
         ?? "Specialized requirements: this editor cannot revise this policy."}</p>
     </li>)}</ol>
     {!canRevise ? <p className="mt-3 text-sm">Revisions require an explicit institutional staffing-policy publisher grant
-      and a pre-opening program.</p> : latest && <form className="mt-4 space-y-3" onSubmit={async event => {
+      and a pre-opening program.</p> : latest && <form noValidate className="mt-4 space-y-3" onSubmit={async event => {
       event.preventDefault();
+      setAttempted(true);
+      if (!keys.length || !effectiveFrom || reason.trim().length < 10 || !confirmed) return;
       const outcome = await mutation.run(
         () => reviseLaunchTeacherPolicy({ data: {
           programId, expectedVersionId: latest.id, qualificationKeys: keys,
@@ -51,22 +54,25 @@ export function TeacherPolicyRevisions({ programId, policies, catalog, canRevise
       <h3 className="font-semibold">Publish a reviewed revision</h3>
       <p className="text-sm">Select the complete replacement requirement set, not just additions.
         No claims, reviews or teaching assignments are changed. This is not a policy exception or regulatory approval.</p>
+      {attempted&&!keys.length&&<FieldError>Select at least one qualification requirement.</FieldError>}
       {catalog.map(item => <Label key={item.key} className="flex items-center gap-2 leading-6">
         <Checkbox disabled={busy} checked={keys.includes(item.key)} onChange={event =>
           setKeys(current => event.target.checked ? [...current, item.key] : current.filter(key => key !== item.key))}/>
         {item.title} ({item.key})
       </Label>)}
-      <Field label="Future effective date and time (UTC)" required>
+      <Field label="Future effective date and time (UTC)" required
+        error={attempted&&!effectiveFrom?"Choose the UTC effective date and time.":undefined}>
         <Input disabled={busy} type="datetime-local" value={effectiveFrom} onChange={event => setEffectiveFrom(event.target.value)}/>
       </Field>
-      <Field label="Reason for revision" required>
+      <Field label="Reason for revision" required
+        error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining this revision.":undefined}>
         <Textarea disabled={busy} minLength={10} maxLength={2000} value={reason} onChange={event => setReason(event.target.value)}/>
       </Field>
-      <Label className="flex items-start gap-2 leading-6">
+      <Field label="I reviewed the complete requirement set and effective instant. Earlier policy history will be preserved." required
+        error={attempted&&!confirmed?"Confirm the full requirement set and effective instant.":undefined}>
         <Checkbox disabled={busy} checked={confirmed} onChange={event => setConfirmed(event.target.checked)}/>
-        I reviewed the complete requirement set and effective instant. Earlier policy history will be preserved.
-      </Label>
-      <Button type="submit" variant="outline" disabled={busy || !confirmed || !keys.length || !effectiveFrom || reason.trim().length < 10}>Publish policy revision</Button>
+      </Field>
+      <Button type="submit" variant="outline" disabled={busy}>Publish policy revision</Button>
       <MutationFeedback state={mutation} pendingMessage="Publishing policy revision..."/>
     </form>}
   </section>;

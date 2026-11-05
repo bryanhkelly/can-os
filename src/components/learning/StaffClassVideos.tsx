@@ -3,6 +3,9 @@ import { ClassVideoUploadForm } from "./ClassVideoUploadForm";
 import { ClassVideoPlayer } from "./ClassVideoPlayer";
 import { getStaffClassVideoOptions, getStaffClassVideoPreview } from "@/modules/learning/class-video-upload.functions";
 import { normalizeClientError } from "@/lib/client-error";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 
 export function StaffClassVideos({ sections, videos }: {
   sections: readonly { id: string; title: string }[];
@@ -12,6 +15,7 @@ export function StaffClassVideos({ sections, videos }: {
   const [options, setOptions] = useState<Awaited<ReturnType<typeof getStaffClassVideoOptions>> | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [attempted, setAttempted] = useState(false);
   async function load() {
     if (!sectionId || pending) return;
     setPending(true); setError(""); setOptions(null);
@@ -22,16 +26,20 @@ export function StaffClassVideos({ sections, videos }: {
   return <section className="space-y-4 rounded-xl border p-5" aria-label="Staff class videos">
     <h2 className="font-serif text-2xl">Class videos</h2>
     <p className="text-sm text-muted-foreground">Upload classwide or lesson-linked videos for students. Staff can preview before sharing the class page.</p>
-    <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); void load(); }}>
-      <label className="text-sm">Video class<select required value={sectionId} disabled={pending}
+    <form noValidate className="flex flex-wrap items-end gap-3" onSubmit={event => {
+      event.preventDefault();setAttempted(true);if(sectionId)void load();
+    }}>
+      <Field label="Video class" required className="min-w-52 flex-1"
+        error={attempted&&!sectionId?"Select a class to manage its videos.":undefined}>
+        <Select value={sectionId} disabled={pending}
         onChange={event => { setSectionId(event.target.value); setOptions(null); setError(""); }}
-        className="mt-1 block rounded border p-2">
+        >
         <option value="">Select a class</option>
         {sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}
-      </select></label>
-      <button type="submit" disabled={!sectionId || pending} className="rounded border px-4 py-2 text-sm">
+      </Select></Field>
+      <Button type="submit" variant="outline" disabled={pending}>
         {pending ? "Loading..." : "Manage class videos"}
-      </button>
+      </Button>
     </form>
     {error && <p role="alert" className="text-sm">{error}</p>}
     {options && <ClassVideoUploadForm key={sectionId} sectionId={sectionId} lessons={options.lessons} enabled={options.enabled}/>}

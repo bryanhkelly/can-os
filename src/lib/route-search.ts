@@ -11,6 +11,13 @@ export const siteProgramSelectionSchema = z.object({
   programId: optionalSearchString,
 });
 
+export function siteProgramHref(path: string, selection: { siteId?: string; programId?: string }): string {
+  const search = new URLSearchParams();
+  if (selection.siteId) search.set("siteId", selection.siteId);
+  if (selection.programId) search.set("programId", selection.programId);
+  return path + (search.size ? `?${search.toString()}` : "");
+}
+
 export const groupSessionSelectionSchema = z.object({
   group: optionalSearchString,
   session: optionalSearchString,

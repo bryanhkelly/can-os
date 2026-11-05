@@ -1,5 +1,9 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   delegateCANAcademicProgramStaffFn,
   listCANAcademicProgramStaffFn,
@@ -15,6 +19,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
+  const [attempted,setAttempted]=useState(false);
   const load=useCallback(async()=>{
     setDesk(await listCANAcademicProgramStaffFn({data:{programId}}));
   },[programId]);
@@ -23,6 +28,8 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
   ));},[load]);
   const grant=async(event:React.FormEvent)=>{
     event.preventDefault();
+    setAttempted(true);
+    if(!selected||reason.trim().length<10)return;
     const person=desk?.candidates.find(c=>c.personId+":"+c.role===selected);
     if(!person)return;
     setBusy(true);setError("");setNotice("");
@@ -37,6 +44,7 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
     finally{setBusy(false);}
   };
   const revoke=async(roleAssignmentId:string)=>{
+    if(reason.trim().length<10){setError("Enter at least 10 characters explaining this revocation.");return;}
     setBusy(true);setNotice("");setError("");
     try{
       await revokeCANAcademicProgramStaffFn({data:{roleAssignmentId,reason}});
@@ -44,7 +52,6 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
     }catch(cause){setError(mutationErrorMessage(cause, "Unable to revoke staff"));}
     finally{setBusy(false);}
   };
-  const field="mt-1 block w-full rounded border bg-background p-2 text-sm";
   return <div className="mt-3 space-y-3 rounded-lg border p-4 text-sm">
     <p className="text-muted-foreground">Grant only to an already verified CAN staff account.
       Teacher grants permit subsequent Section assignment, not immediate student access.
@@ -53,9 +60,10 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
     {error&&<p role="alert">{error}</p>}
     {notice&&<p role="status">{notice}</p>}
     {!desk?<p>Loading authorized CAN personnel…</p>:<>
-      <form onSubmit={e=>void grant(e)} className="grid gap-2">
-        <label>Existing verified CAN employee
-          <select className={field} required value={selected}
+      <form noValidate onSubmit={e=>void grant(e)} className="grid gap-2">
+        <Field label="Existing verified CAN employee" required
+          error={attempted&&!selected?"Choose a verified CAN employee and role.":undefined}>
+          <Select value={selected}
             onChange={e=>setSelected(e.target.value)}>
             <option value="">Choose teacher or academic registrar…</option>
             {desk.candidates.map(candidate=>
@@ -64,17 +72,16 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
                 {candidate.firstName} {candidate.lastName} · {candidate.role}
               </option>
             )}
-          </select>
-        </label>
-        <label>Internal authorization or revocation reason
-          <input className={field} minLength={10} maxLength={500}
-            required value={reason} onChange={e=>setReason(e.target.value)}
+          </Select>
+        </Field>
+        <Field label="Internal authorization or revocation reason" required
+          error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining the exact academic duty.":undefined}>
+          <Input maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}
             placeholder="Explain the exact academic duty"/>
-        </label>
-        <button type="submit" disabled={busy||!selected||reason.trim().length<10}
-          className="rounded border px-3 py-2 disabled:opacity-50">
+        </Field>
+        <Button type="submit" disabled={busy}>
           Grant exact Program responsibility
-        </button>
+        </Button>
       </form>
       <div>
         <h3 className="font-semibold">Current delegated CAN staff</h3>
@@ -83,11 +90,11 @@ export function CANAcademicStaffDelegationPanel({programId}:{programId:string}) 
             const person=desk.candidates.find(c=>c.personId===grant.personId);
             return <li key={grant.id} className="flex items-center justify-between gap-2 rounded border p-2">
               <span>{person?person.firstName+" "+person.lastName:"Previously delegated CAN employee"} · {grant.role}</span>
-              <button type="button" disabled={busy||reason.trim().length<10}
+              <Button type="button" variant="outline" disabled={busy}
                 onClick={()=>void revoke(grant.id)}
-                className="rounded border px-2 py-1 text-xs disabled:opacity-50">
+                className="px-2 py-1 text-xs">
                 Revoke
-              </button>
+              </Button>
             </li>;
           })}
           {!desk.current.length&&<li className="text-muted-foreground">No current delegated CAN academic staff.</li>}

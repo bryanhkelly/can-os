@@ -1,6 +1,9 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {
   getGuardianGradeResponse, requestGuardianGradeResponse,
 } from "@/modules/learning/guardian-grade-response.functions";
@@ -14,6 +17,7 @@ type ResponseState = Awaited<ReturnType<typeof getGuardianGradeResponse>>["respo
 export function GuardianGradeResponse({ submissionId }: { submissionId: string }) {
   const [current, setCurrent] = useState<ResponseState>(null);
   const [message, setMessage] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savedRequest, setSavedRequest] = useState(false);
@@ -53,6 +57,8 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
 
   async function request(event: React.FormEvent) {
     event.preventDefault();
+    setAttempted(true);
+    if(message.trim().length<10)return;
     setError("");
     await mutation.run(async()=>{
       const result = await requestGuardianGradeResponse({ data: { submissionId, message } });
@@ -60,6 +66,7 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
       // invite the family to submit a second request.
       setSavedRequest(true);
       setMessage("");
+      setAttempted(false);
       return result;
     },{successMessage:result=>result.created?"Your question was sent to the school.":"Your existing question is already recorded.",
       commandErrorMessage:"Unable to submit your question."});
@@ -80,17 +87,16 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
         {current.resolutionNote && <p className="rounded-lg bg-muted p-3 whitespace-pre-wrap">School response: {current.resolutionNote}</p>}
       </div> : savedRequest ? (
         <p className="mt-3 text-sm" role="status">Your question is recorded. Refresh the school response to see its current status.</p>
-      ) : <form className="mt-3 space-y-3" onSubmit={request}>
-        <label className="block text-sm font-medium">Your question
-          <textarea className="mt-2 w-full rounded-lg border bg-background p-3" rows={3}
-            value={message} minLength={10} maxLength={1000} required
+      ) : <form noValidate className="mt-3 space-y-3" onSubmit={request}>
+        <Field label="Your question" className="text-sm" required
+          error={attempted&&message.trim().length<10?"Enter at least 10 characters describing your question.":undefined}>
+          <Textarea rows={3} minLength={10} maxLength={1000} value={message}
             onChange={event => setMessage(event.target.value)}
             placeholder="What would you like the school to explain or follow up on?"/>
-        </label>
-        <button type="submit" disabled={busy}
-          className="rounded-lg border bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">
+        </Field>
+        <Button type="submit" variant="outline" disabled={busy}>
           {busy ? "Sending…" : "Request school follow-up"}
-        </button>
+        </Button>
       </form>}
     {error && <p className="mt-3 text-sm" role="alert">{error}</p>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Sending school follow-up..."/>

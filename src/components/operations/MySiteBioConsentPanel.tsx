@@ -1,4 +1,8 @@
 import {useEffect,useState} from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   getMyPublicSiteBioConsent,changeMyPublicSiteBio,
 } from "@/modules/sites/site-public-people.functions";
@@ -12,6 +16,7 @@ export function MySiteBioConsentPanel({siteId}:{siteId:string}) {
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("");
+  const [attempted,setAttempted]=useState(false);
   useEffect(()=>{
     let live=true;
     getMyPublicSiteBioConsent({data:{siteId}}).then(consent=>{
@@ -28,12 +33,15 @@ export function MySiteBioConsentPanel({siteId}:{siteId:string}) {
     return ()=>{live=false};
   },[siteId]);
   async function save(event:React.FormEvent){
-    event.preventDefault();setStatus("");setSaving(true);
+    event.preventDefault();setStatus("");setAttempted(true);
+    if(displayName.trim().length<2||publicTitle.trim().length<2||biography.trim().length<30||!expiresOn)return;
+    setSaving(true);
     try{
       await changeMyPublicSiteBio({data:{
         action:"consent",siteId,displayName,publicTitle,biography,expiresOn,
       }});
       setExisting(true);
+      setAttempted(false);
       setStatus("Your Site biography permission was saved. Institutional approval is still required.");
     }catch{setStatus("Unable to save permission. Check your Site role and biography fields.")}
     finally{setSaving(false)}
@@ -55,34 +63,24 @@ export function MySiteBioConsentPanel({siteId}:{siteId:string}) {
       You can withdraw permission at any time.
     </p>
     {loading?<p role="status" className="mt-2 text-sm">Loading your biography…</p>:
-    <form onSubmit={save} className="mt-4 space-y-3">
-      <label className="block text-xs">Display name
-        <input className="mt-1 w-full rounded border bg-background p-2 text-sm"
-          value={displayName} onChange={e=>setDisplayName(e.target.value)}
-          minLength={2} maxLength={100} required disabled={saving}/>
-      </label>
-      <label className="block text-xs">Public school role/title
-        <input className="mt-1 w-full rounded border bg-background p-2 text-sm"
-          value={publicTitle} onChange={e=>setPublicTitle(e.target.value)}
-          minLength={2} maxLength={100} required disabled={saving}/>
-      </label>
-      <label className="block text-xs">Parent-facing biography
-        <textarea className="mt-1 w-full rounded border bg-background p-2 text-sm"
-          value={biography} onChange={e=>setBiography(e.target.value)}
-          minLength={30} maxLength={1200} rows={4} required disabled={saving}/>
-      </label>
-      <label className="block text-xs">Permission expires on
-        <input type="date" className="mt-1 w-full rounded border bg-background p-2 text-sm"
-          value={expiresOn} onChange={e=>setExpiresOn(e.target.value)}
-          required disabled={saving}/>
-      </label>
+    <form noValidate onSubmit={save} className="mt-4 space-y-3">
+      <Field label="Display name" className="text-xs" required error={attempted&&displayName.trim().length<2?"Enter a display name with at least 2 characters.":undefined}>
+        <Input value={displayName} onChange={e=>setDisplayName(e.target.value)} minLength={2} maxLength={100} disabled={saving}/>
+      </Field>
+      <Field label="Public school role/title" className="text-xs" required error={attempted&&publicTitle.trim().length<2?"Enter a public role or title with at least 2 characters.":undefined}>
+        <Input value={publicTitle} onChange={e=>setPublicTitle(e.target.value)} minLength={2} maxLength={100} disabled={saving}/>
+      </Field>
+      <Field label="Parent-facing biography" className="text-xs" required error={attempted&&biography.trim().length<30?"Enter a biography with at least 30 characters.":undefined}>
+        <Textarea value={biography} onChange={e=>setBiography(e.target.value)} minLength={30} maxLength={1200} rows={4} disabled={saving}/>
+      </Field>
+      <Field label="Permission expires on" className="text-xs" required error={attempted&&!expiresOn?"Choose an expiry date for this permission.":undefined}>
+        <Input type="date" value={expiresOn} onChange={e=>setExpiresOn(e.target.value)} disabled={saving}/>
+      </Field>
       <div className="flex flex-wrap gap-3">
-        <button type="submit" disabled={saving}
-          className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">
+        <Button type="submit" disabled={saving}>
           {saving?"Saving…":"Consent to publish"}
-        </button>
-        {existing&&<button type="button" onClick={()=>void revoke()} disabled={saving}
-          className="rounded-lg border px-4 py-2 text-sm">Withdraw permission</button>}
+        </Button>
+        {existing&&<Button type="button" variant="outline" onClick={()=>void revoke()} disabled={saving}>Withdraw permission</Button>}
       </div>
       {status&&<p role="status" className="text-sm">{status}</p>}
     </form>}

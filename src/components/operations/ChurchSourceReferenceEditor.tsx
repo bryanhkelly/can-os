@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   churchReferenceKinds, churchSourcesChangedEvent, type ChurchReferenceKind,
 } from "@/domain/church-source-references";
@@ -39,6 +43,7 @@ export function ChurchSourceReferenceEditor() {
   const [busy, setBusy] = useState<ChurchReferenceKind | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [attempted,setAttempted]=useState<Partial<Record<ChurchReferenceKind,boolean>>>({});
   useEffect(() => {
     let active = true;
     void getChurchSourceReferenceView({ data: {} }).then(items => {
@@ -55,6 +60,10 @@ export function ChurchSourceReferenceEditor() {
   async function save(event: FormEvent, kind: ChurchReferenceKind) {
     event.preventDefault();
     if (busy) return;
+    setAttempted(old=>({...old,[kind]:true}));
+    let validUrl=false;
+    try { const parsed=new URL(urls[kind]);validUrl=parsed.protocol==="http:"||parsed.protocol==="https:"; } catch { /* invalid URL */ }
+    if(!authorized||!validUrl)return;
     setError(""); setMessage(""); setBusy(kind);
     try {
       await saveChurchSourceReferenceCommand({
@@ -64,6 +73,7 @@ export function ChurchSourceReferenceEditor() {
       setReferences(items);
       window.dispatchEvent(new Event(churchSourcesChangedEvent));
       setMessage(`${labels[kind]} saved as a private reference. No content was imported or published.`);
+      setAttempted(old=>({...old,[kind]:false}));
       void router.invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save church reference.");
@@ -96,37 +106,40 @@ export function ChurchSourceReferenceEditor() {
       facts, grant rights to photos or videos, publish content, or change school authorization.
       This step is optional; you can always write your church story manually below.
     </p>
-    <label className="mt-4 flex items-start gap-2 text-sm">
-      <input type="checkbox" checked={authorized} onChange={event => setAuthorized(event.target.checked)}
-        className="mt-1" />
-      <span>I am authorized to provide these public church references.</span>
-    </label>
+    <Field className="mt-4 text-sm" label="I am authorized to provide these public church references." required>
+      <Checkbox checked={authorized} onChange={event => setAuthorized(event.target.checked)}/>
+    </Field>
     {loading && <p role="status" className="mt-3 text-sm">Loading saved church references…</p>}
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {message && <p role="status" className="mt-3 text-sm">{message}</p>}
     {!loading && <div className="mt-5 grid gap-4 sm:grid-cols-2">
       {churchReferenceKinds.map(kind => {
         const existing = references.find(item => item.kind === kind);
-        return <form key={kind} onSubmit={event => void save(event, kind)}
+        let validUrl=false;
+        try { const parsed=new URL(urls[kind]);validUrl=parsed.protocol==="http:"||parsed.protocol==="https:"; } catch { /* invalid URL */ }
+        return <form key={kind} noValidate onSubmit={event => void save(event, kind)}
           className="rounded-xl border border-border/70 p-4">
           <label htmlFor={`church-source-${kind}`} className="block font-semibold">{labels[kind]}</label>
           <p className="mt-1 text-xs text-muted-foreground">{descriptions[kind]}</p>
-          <input id={`church-source-${kind}`} type="url" required maxLength={2048}
+          <Field label={labels[kind]} className="sr-only" required
+            error={attempted[kind]&&!validUrl?"Enter a valid public web URL.":undefined}>
+          <Input id={`church-source-${kind}`} type="url" maxLength={2048}
             placeholder={kind === "website" ? "https://yourchurch.org" : "https://"}
             value={urls[kind]} onChange={event => setUrls(old => ({ ...old, [kind]: event.target.value }))}
-            className="mt-3 w-full rounded-lg border bg-background p-2 text-sm" />
+            className="mt-3 w-full" />
+          </Field>
+          {attempted[kind]&&!authorized&&<FieldError className="mt-2">Confirm that you are authorized to provide this reference.</FieldError>}
           {existing && <p className="mt-2 text-xs text-muted-foreground">
             {referenceStatusLabels[existing.referenceState] ?? "Reference saved privately"}
           </p>}
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="submit" disabled={!authorized || busy !== null}
-              className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+            <Button type="submit" disabled={busy !== null}>
               {busy === kind ? "Saving…" : existing ? "Update link" : "Save link"}
-            </button>
-            {existing && <button type="button" disabled={busy !== null}
-              onClick={() => void remove(kind)} className="rounded-lg border px-3 py-2 text-sm">
+            </Button>
+            {existing && <Button type="button" variant="outline" disabled={busy !== null}
+              onClick={() => void remove(kind)}>
               Remove
-            </button>}
+            </Button>}
           </div>
         </form>;
       })}

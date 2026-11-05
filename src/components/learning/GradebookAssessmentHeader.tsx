@@ -1,5 +1,6 @@
 import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEditor";
 import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
+import { Link } from "@tanstack/react-router";
 import type { getGradebook } from "@/modules/learning/gradebook.functions";
 
 type Assessment = Awaited<ReturnType<typeof getGradebook>>["assessments"][number];
@@ -7,6 +8,7 @@ type Action = "publish" | "close" | "reopen" | "reschedule";
 
 export function GradebookAssessmentHeader({
   assessment,
+  sectionId,
   busy,
   dueDate,
   onDueDateChange,
@@ -15,6 +17,7 @@ export function GradebookAssessmentHeader({
   onScheduleSaved,
 }: {
   assessment: Assessment;
+  sectionId: string;
   busy: boolean;
   dueDate: string;
   onDueDateChange: (value: string) => void;
@@ -24,7 +27,7 @@ export function GradebookAssessmentHeader({
 }) {
   return (
     <th className="min-w-32 p-3 font-semibold">
-      <span className="block">{assessment.title}</span>
+      <Link to="/teacher/gradebook" search={{section:sectionId,assessment:assessment.id}} className="block underline">{assessment.title}</Link>
       <span className="block text-xs font-normal text-muted-foreground">
         {assessment.dueAt ? `Due ${new Date(assessment.dueAt).toLocaleDateString()}` : "No due date"}
         {" · "}{assessment.pointsPossible ?? "—"} pts

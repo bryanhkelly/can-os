@@ -6,6 +6,11 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { dateTimeInputValue, formatTimestamp } from "@/modules/calendar/timezone";
 import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {groupSessionSelectionSchema} from "@/lib/route-search";
 import { getCanonicalGroupWorkspace } from "@/modules/study-groups/canonical-workspace.functions";
 import {
@@ -61,6 +66,9 @@ function GroupsView({ data }: { data: Workspace }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [reportingPost, setReportingPost] = useState("");
   const [reportReason, setReportReason] = useState("");
+  const [createAttempted,setCreateAttempted]=useState(false);
+  const [reportAttempted,setReportAttempted]=useState(false);
+  const [postAttempted,setPostAttempted]=useState<Record<string,boolean>>({});
   const [inviteGroup, setInviteGroup] = useState("");
   const [selectedInviteeIds, setSelectedInviteeIds] = useState<string[]>([]);
   const [inviteeLoad, setInviteeLoad] = useState<InviteeLoad>({
@@ -112,39 +120,33 @@ function GroupsView({ data }: { data: Workspace }) {
       {data.role === "teacher" && <section className="mt-8 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">Create a course group</h2>
         <p className="mt-1 text-sm text-muted-foreground">Only sections you actively teach can host a group.</p>
-        <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
+        <form noValidate className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
           event.preventDefault();
+          setCreateAttempted(true);
+          if(!sectionId||title.trim().length<3||description.trim().length<10||!Number.isInteger(maxMembers)||maxMembers<2||maxMembers>50)return;
           void run(async () => {
             await createFacilitatedGroup({ data: { sectionId, title, description, maxMembers } });
             setTitle(""); setDescription("");
+            setCreateAttempted(false);
           }, "Study group created.");
         }}>
-          <label className="text-sm">Section
-            <select className="mt-1 block w-full rounded border bg-background p-2"
-              value={sectionId} onChange={event => setSectionId(event.target.value)} required>
+          <Field label="Section" className="text-sm" required error={createAttempted&&!sectionId?"Choose a teaching section.":undefined}>
+            <Select value={sectionId} onChange={event => setSectionId(event.target.value)}>
               {data.sections.map(section =>
                 <option key={section.id} value={section.id}>{section.title}</option>)}
-            </select>
-          </label>
-          <label className="text-sm">Group title
-            <input className="mt-1 block w-full rounded border bg-background p-2"
-              value={title} onChange={event => setTitle(event.target.value)} minLength={3} maxLength={100} required />
-          </label>
-          <label className="text-sm sm:col-span-2">Description
-            <textarea className="mt-1 block w-full rounded border bg-background p-2"
-              value={description} onChange={event => setDescription(event.target.value)}
-              minLength={10} maxLength={2000} required />
-          </label>
-          <label className="text-sm">Capacity
-            <input className="mt-1 block w-full rounded border bg-background p-2"
-              type="number" min={2} max={50} value={maxMembers}
-              onChange={event => setMaxMembers(Number(event.target.value))} required />
-          </label>
+            </Select>
+          </Field>
+          <Field label="Group title" className="text-sm" required error={createAttempted&&title.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
+            <Input value={title} onChange={event => setTitle(event.target.value)} minLength={3} maxLength={100}/>
+          </Field>
+          <Field label="Description" className="text-sm sm:col-span-2" required error={createAttempted&&description.trim().length<10?"Enter a description with at least 10 characters.":undefined}>
+            <Textarea value={description} onChange={event => setDescription(event.target.value)} minLength={10} maxLength={2000}/>
+          </Field>
+          <Field label="Capacity" className="text-sm" required error={createAttempted&&(!Number.isInteger(maxMembers)||maxMembers<2||maxMembers>50)?"Choose a whole number from 2 to 50.":undefined}>
+            <Input type="number" min={2} max={50} value={maxMembers} onChange={event => setMaxMembers(Number(event.target.value))}/>
+          </Field>
           <div className="flex items-end">
-            <button disabled={busy || !sectionId}
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-              Create group
-            </button>
+            <Button type="submit" disabled={busy}>Create group</Button>
           </div>
         </form>
         {data.sections.length === 0 && <p className="mt-3 text-sm text-muted-foreground">
@@ -206,45 +208,42 @@ function GroupsView({ data }: { data: Workspace }) {
                   Report this post
                 </button>}
                 {data.role === "student" && reportingPost === post.id &&
-                  <form className="mt-3 flex flex-wrap items-end gap-2"
+                  <form noValidate className="mt-3 flex flex-wrap items-end gap-2"
                     onSubmit={event => { event.preventDefault();
+                      setReportAttempted(true);if(reportReason.trim().length<5)return;
                       void run(async () => {
                         await reportCanonicalGroupPost({ data: {
                           groupId: group.id, postId: post.id, reason: reportReason,
                         } });
-                        setReportingPost(""); setReportReason("");
+                        setReportingPost(""); setReportReason("");setReportAttempted(false);
                       }, "Your report was sent for facilitator review.");
                     }}>
-                    <label className="flex-1 text-xs">Why should this post be reviewed?
-                      <input required minLength={5} maxLength={1000}
-                        className="mt-1 block w-full rounded border bg-background p-2"
-                        value={reportReason} onChange={event => setReportReason(event.target.value)} />
-                    </label>
-                    <button disabled={busy} className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
+                    <Field label="Why should this post be reviewed?" className="min-w-52 flex-1 text-xs" required error={reportAttempted&&reportReason.trim().length<5?"Enter at least 5 characters explaining the report.":undefined}>
+                      <Input minLength={5} maxLength={1000} value={reportReason} onChange={event => setReportReason(event.target.value)}/>
+                    </Field>
+                    <Button type="submit" variant="outline" disabled={busy}>
                       Send report
-                    </button>
+                    </Button>
                   </form>}
               </div>)}
               {group.posts.length === 0 && <p className="text-xs text-muted-foreground">No posts yet.</p>}
-              <form className="flex flex-col gap-2" onSubmit={event => {
+              <form noValidate className="flex flex-col gap-2" onSubmit={event => {
                 event.preventDefault();
                 const body = drafts[group.id] ?? "";
+                setPostAttempted(current=>({...current,[group.id]:true}));if(!body.trim())return;
                 void run(async () => {
                   await createCanonicalGroupPost({ data: { groupId: group.id, body } });
                   setDrafts(previous => ({ ...previous, [group.id]: "" }));
+                  setPostAttempted(current=>({...current,[group.id]:false}));
                 }, "Post shared with your group.");
               }}>
-                <label className="text-xs">New post
-                  <textarea value={drafts[group.id] ?? ""}
+                <Field label="New post" className="text-xs" required error={postAttempted[group.id]&&!(drafts[group.id]??"").trim()?"Enter a post before sending.":undefined}>
+                  <Textarea value={drafts[group.id] ?? ""}
                     onChange={event => setDrafts(previous => ({ ...previous, [group.id]: event.target.value }))}
-                    required maxLength={3000}
-                    className="mt-1 block w-full rounded border bg-background p-3 text-sm"
+                    maxLength={3000}
                     placeholder="Share a question or a study tip" />
-                </label>
-                <button disabled={busy || !(drafts[group.id] ?? "").trim()}
-                  className="w-fit rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">
-                  Post message
-                </button>
+                </Field>
+                <Button type="submit" disabled={busy} className="w-fit">Post message</Button>
               </form>
             </section>
           )}
@@ -301,6 +300,8 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
   reschedules: Record<string, { start: string; end: string }>;
   setReschedules: (value: Record<string, { start: string; end: string }>) => void;
 }) {
+  const [inviteAttempted,setInviteAttempted]=useState(false);
+  const [sessionAttempted,setSessionAttempted]=useState(false);
   return <div className="mt-5 space-y-4 border-t pt-4">
     <h3 className="text-sm font-semibold">Membership requests</h3>
     {group.pendingMembers.map(member => <div key={member.id}
@@ -331,15 +332,17 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
       }}>
       {inviteGroup === group.id ? "Close invitations" : "Invite students"}
     </button>
-    {inviteGroup === group.id && <form className="space-y-3 rounded-lg border p-4"
+    {inviteGroup === group.id && <form noValidate className="space-y-3 rounded-lg border p-4"
       onSubmit={event => {
         event.preventDefault();
+        setInviteAttempted(true);if(!selectedInviteeIds.length)return;
         void run(async () => {
           await inviteCanonicalGroupMembers({ data: {
             groupId: group.id, studentPersonIds: selectedInviteeIds,
           } });
           setSelectedInviteeIds([]);
           setInviteGroup("");
+          setInviteAttempted(false);
         }, "Invitations sent. Students still need guardian permission and facilitator approval to join.");
       }}>
       <p className="text-xs text-muted-foreground">
@@ -356,10 +359,10 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
             : ids.filter(id => id !== student.personId))} />
         {student.firstName} {student.lastName}
       </label>)}
-      <button disabled={busy || inviteesLoading || selectedInviteeIds.length === 0}
-        className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
+      {inviteAttempted&&!selectedInviteeIds.length&&<FieldError>Select at least one student to invite.</FieldError>}
+      <Button type="submit" disabled={busy || inviteesLoading}>
         {busy ? "Sending invitations..." : "Send invitations"}
-      </button>
+      </Button>
     </form>}
     <h3 className="text-sm font-semibold">Content moderation</h3>
     {group.reports.map(report => <div key={report.id}
@@ -403,9 +406,11 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
       onClick={() => setSessionGroup(sessionGroup === group.id ? "" : group.id)}>
       {sessionGroup === group.id ? "Close scheduler" : "Schedule session"}
     </button>
-    {sessionGroup === group.id && <form className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
+    {sessionGroup === group.id && <form noValidate className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
       onSubmit={event => {
         event.preventDefault();
+        setSessionAttempted(true);
+        if(sessionTitle.trim().length<3||!sessionStarts||!sessionEnds||sessionEnds<=sessionStarts)return;
         void run(async () => {
           await createCanonicalGroupSession({ data: {
             groupId: group.id, title: sessionTitle, agenda, startsAt: siteLocalTimeToIso(sessionStarts, group.timezone),
@@ -413,27 +418,21 @@ function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
           } });
           setSessionTitle(""); setAgenda(""); setSessionStarts(""); setSessionEnds("");
           setSessionGroup("");
+          setSessionAttempted(false);
         }, "Session scheduled.");
       }}>
-      <label className="text-sm">Session title
-        <input required minLength={3} maxLength={150} value={sessionTitle}
-          onChange={event => setSessionTitle(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
-      <label className="text-sm">Agenda
-        <input value={agenda} onChange={event => setAgenda(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
-      <label className="text-sm">Start ({group.timezone})
-        <input required type="datetime-local" value={sessionStarts}
-          onChange={event => setSessionStarts(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
-      <label className="text-sm">End ({group.timezone})
-        <input required type="datetime-local" value={sessionEnds}
-          onChange={event => setSessionEnds(event.target.value)}
-          className="mt-1 block w-full rounded border bg-background p-2" />
-      </label>
+      <Field label="Session title" className="text-sm" required error={sessionAttempted&&sessionTitle.trim().length<3?"Enter a session title with at least 3 characters.":undefined}>
+        <Input minLength={3} maxLength={150} value={sessionTitle} onChange={event => setSessionTitle(event.target.value)}/>
+      </Field>
+      <Field label="Agenda" className="text-sm"><Input value={agenda} onChange={event => setAgenda(event.target.value)}/></Field>
+      <Field label={`Start (${group.timezone})`} className="text-sm" required
+        error={sessionAttempted&&!sessionStarts?"Choose a session start time.":undefined}>
+        <Input type="datetime-local" value={sessionStarts} onChange={event => setSessionStarts(event.target.value)}/>
+      </Field>
+      <Field label={`End (${group.timezone})`} className="text-sm" required
+        error={sessionAttempted&&(!sessionEnds||sessionEnds<=sessionStarts)?"Choose an end time later than the start.":undefined}>
+        <Input type="datetime-local" value={sessionEnds} onChange={event => setSessionEnds(event.target.value)}/>
+      </Field>
       <button disabled={busy}
         className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
         Schedule session

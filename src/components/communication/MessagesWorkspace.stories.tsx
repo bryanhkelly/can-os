@@ -22,7 +22,7 @@ function Example({ empty = false, loading = false, error = "" }: { empty?: boole
         contextType: "person", contextId: null, contextHref: null },
         messages: [{ id: "message", own: false, senderName: "Avery", body: "Let's review the course options together.",
           sentAt: "2026-11-03T16:30:00Z" }] } : null}
-      loading={loading} loadingThread={loading} error={error} onRetry={() => undefined}
+      loading={loading} loadingThread={loading || empty} error={error} onRetry={() => undefined}
       reply={reply} onReplyChange={setReply} onSend={() => { setSent(true); setReply(""); }} busy={false}
       onCompose={() => setComposeOpen(true)}
       feedback={sent ? <p role="status">Message sent.</p> : null} />
@@ -44,11 +44,14 @@ export const Conversation: Story = {
       await userEvent.click(back);
       await userEvent.click(canvas.getByRole("button", { name: /Planning next semester/ }));
     }
-    await expect(canvas.getByRole("button", { name: "Send reply" })).toBeDisabled();
-    await userEvent.type(canvas.getByLabelText("Reply to this conversation"), "Thank you. I will review the options.");
-    await userEvent.click(canvas.getByRole("button", { name: "Send reply" }));
+    const send = canvas.getByRole("button", { name: "Send reply" });
+    await expect(send).toBeEnabled();
+    await userEvent.click(send);
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Enter a reply.");
+    await userEvent.type(canvas.getByLabelText(/Reply to this conversation/), "Thank you. I will review the options.");
+    await userEvent.click(send);
     await expect(canvas.getByRole("status")).toHaveTextContent("Message sent.");
-    await expect(canvas.getByLabelText("Reply to this conversation")).toHaveValue("");
+    await expect(canvas.getByLabelText(/Reply to this conversation/)).toHaveValue("");
     const root = canvasElement.ownerDocument.documentElement;
     await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
   },
@@ -66,7 +69,14 @@ export const SearchConversations: Story = {
     await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
   },
 };
-export const Empty: Story = { args: { empty: true } };
+export const Empty: Story = {
+  args: { empty: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Select a conversation or start a new message.")).toBeVisible();
+    await expect(canvas.queryByText("Loading conversation...")).not.toBeInTheDocument();
+  },
+};
 export const NewMessageLookup: Story = {
   args: { empty: true },
   play: async ({ canvasElement }) => {

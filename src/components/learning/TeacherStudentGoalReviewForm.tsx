@@ -1,4 +1,9 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   getStudentGoalGradedEvidence, reviewStudentLearningGoal,
 } from "@/modules/learning/student-goal-review.functions";
@@ -20,6 +25,7 @@ export function TeacherStudentGoalReviewForm({
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [attempted, setAttempted] = useState(false);
 
   async function loadEvidence() {
     setBusy(true); setMessage("");
@@ -36,10 +42,11 @@ export function TeacherStudentGoalReviewForm({
     {!open && <button type="button" className="text-sm underline" onClick={() => {
       setOpen(true); void loadEvidence();
     }}>Review student learning goal</button>}
-    {open && <form className="grid gap-3 rounded-lg border p-3"
+    {open && <form noValidate className="grid gap-3 rounded-lg border p-3"
       onSubmit={async event => {
         event.preventDefault();
-        if (busy || !selected || !confirmed) return;
+        setAttempted(true);
+        if (busy || !selected || studentFeedback.trim().length<15 || !confirmed) return;
         setBusy(true); setMessage("");
         try {
           await reviewStudentLearningGoal({ data: {
@@ -60,38 +67,39 @@ export function TeacherStudentGoalReviewForm({
       {evidence && !evidence.availableEvidence.length &&
         <p className="text-sm">No eligible graded submission yet. Keep the goal open until academic evidence is available.</p>}
       {evidence && !!evidence.availableEvidence.length && <>
-        <label className="grid gap-1 text-sm">Graded assignment to review
-          <select className="rounded border p-2" required disabled={busy}
+        <Field label="Graded assignment to review" className="text-sm" required
+          error={attempted&&!selected?"Choose a graded assignment to review.":undefined}>
+          <Select disabled={busy}
             value={selected} onChange={event => setSelected(event.target.value)}>
             {evidence.availableEvidence.map(row => <option key={row.submissionId} value={row.submissionId}>
               {row.assessmentTitle} · graded {row.gradedAt ? new Date(row.gradedAt).toLocaleDateString() : "unknown date"}
               {row.score === null ? "" : ` · score ${row.score}`}
             </option>)}
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm">Teacher assessment
-          <select className="rounded border p-2" value={outcome}
+          </Select>
+        </Field>
+        <Field label="Teacher assessment" className="text-sm">
+          <Select value={outcome}
             onChange={event => setOutcome(event.target.value as StudentGoalReviewInput["outcome"])}
             disabled={busy}>
             {(Object.keys(studentGoalOutcomeLabels) as StudentGoalReviewInput["outcome"][])
               .map(key => <option value={key} key={key}>{studentGoalOutcomeLabels[key]}</option>)}
-          </select>
-        </label>
-        <label className="grid gap-1 text-sm">Feedback the student can read
-          <textarea className="rounded border p-2" rows={3} required minLength={15} maxLength={700}
+          </Select>
+        </Field>
+        <Field label="Feedback the student can read" className="text-sm" required
+          error={attempted&&studentFeedback.trim().length<15?"Enter at least 15 characters of student-visible feedback.":undefined}>
+          <Textarea rows={3} minLength={15} maxLength={700}
             value={studentFeedback} disabled={busy}
             onChange={event => setStudentFeedback(event.target.value)}
             placeholder="Describe what you saw in the student's work and a practical next step." />
-        </label>
-        <label className="flex gap-2 text-xs">
-          <input type="checkbox" required checked={confirmed} disabled={busy}
-            onChange={event => setConfirmed(event.target.checked)} />
-          I confirmed the selected academic evidence and that my feedback is appropriate to share with the student.
-        </label>
-        <button type="submit" className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50"
-          disabled={busy || !confirmed || !selected}>
+        </Field>
+        <Field className="text-xs" required
+          label="I confirmed the selected academic evidence and that my feedback is appropriate to share with the student."
+          error={attempted&&!confirmed?"Confirm the evidence and student-safety review.":undefined}>
+          <Checkbox checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)} />
+        </Field>
+        <Button type="submit" variant="outline" disabled={busy}>
           {busy ? "Saving…" : "Save teacher-reviewed outcome"}
-        </button>
+        </Button>
       </>}
       <button type="button" className="text-sm underline" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
       {message && <p role="status" className="text-sm">{message}</p>}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { siteTimezoneSchema } from "./site-timezone";
 
 /**
  * Church-supplied setup values. Location identity does NOT certify state law,
@@ -149,10 +150,7 @@ export const draftSiteContactSchema = z.object({
 export const launchOnsiteDaysPerWeekSchema=z.number().int().min(1).max(7);
 
 /** Explicit IANA zone selection; an address, ZIP, state or browser is not a reliable substitute. */
-export const siteTimezoneSchema=z.string().trim().min(3).max(80).refine(zone=>{
-  try {new Intl.DateTimeFormat("en-US",{timeZone:zone});return true;}
-  catch {return false;}
-},"Choose a valid school time zone");
+export { siteTimezoneSchema };
 
 export type PhysicalSiteAddress=z.output<typeof physicalSiteAddressSchema>;
 export type DraftSiteContact=z.output<typeof draftSiteContactSchema>;

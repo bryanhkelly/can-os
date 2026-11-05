@@ -36,6 +36,7 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
  const [householdMatches,setHouseholdMatches]=useState<Array<{id:string;programId:string;studentFirst:string;studentLast:string}>>([]);
  const [householdError,setHouseholdError]=useState("");
  const [householdLoading,setHouseholdLoading]=useState(false);
+ const [attempted,setAttempted]=useState(false);
  useEffect(()=>{
   let active=true;
   if(!programId||householdSearch.trim().length<2){
@@ -50,13 +51,21 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
  const studentKey=(student:InquiryFormProps["existingStudents"][number])=>
   `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
  return <>
-   <form className="mt-4" onSubmit={onSubmit} aria-busy={busy}>
+  <form className="mt-4" onSubmit={event=>{
+    event.preventDefault();setAttempted(true);
+    if(!programId||(convertibleInterest&&!contactReviewed))return;
+    setAttempted(false);
+    onSubmit(event);
+   }} aria-busy={busy}>
     <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
-    <Field className="sm:col-span-2" label="Program" required>
+    <Field className="sm:col-span-2" label="Program" required
+     error={attempted&&!programId?"Choose a Program before creating this inquiry.":undefined}>
      <Select disabled={convertibleInterest} value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
      </Select>
     </Field>
+    {attempted&&convertibleInterest&&!contactReviewed&&
+     <p role="alert" className="text-sm text-destructive sm:col-span-2">Review the family's contact information in the confirmation above before creating this inquiry.</p>}
     <Field className="sm:col-span-2" label="Student identity"
      description="Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.">
      <Select disabled={convertibleInterest} value={existingStudentKey}
@@ -96,7 +105,7 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
     </>}
     <Field label="Inquiry source"><Select value={source} disabled={convertibleInterest} onChange={e=>setSource(e.target.value)}><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></Select></Field>
     <Field className="sm:col-span-2" label="Notes"><Textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={2}/></Field>
-    <Button type="submit" disabled={busy||!programId||(convertibleInterest&&!contactReviewed)}>Create inquiry</Button>
+    <Button type="submit" disabled={busy}>Create inquiry</Button>
     </fieldset>
    </form>
  </>;

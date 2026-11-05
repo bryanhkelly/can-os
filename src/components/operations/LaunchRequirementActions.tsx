@@ -37,18 +37,21 @@ export function LaunchEvidenceStatement({ task, busy, submit }: {
   submit: (requirementId: string, statement: string) => Promise<boolean>;
 }) {
   const [statement, setStatement] = useState("");
+  const [attempted, setAttempted] = useState(false);
   if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state) || task.pendingEvidenceReview || task.action === "admissions" || (task.state === "needs_you" && !task.evidenceReviewRequired)) return null;
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+  return <form noValidate className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
+    setAttempted(true);
     if (statement.trim().length < 10) return;
     void submit(task.requirementId!, statement.trim()).then(saved => { if (saved) setStatement(""); });
   }}>
     <p className="text-sm font-semibold">Submit evidence statement</p>
     <p className="mt-2 text-xs text-muted-foreground">Describe the completed work or supporting evidence. This records a statement for review; it does not approve the requirement or authorize opening.</p>
-    <Field label="Evidence details" className="mt-3">
+    <Field label="Evidence details" className="mt-3" required
+      error={attempted&&statement.trim().length<10?"Enter at least 10 characters describing the evidence.":undefined}>
       <Textarea value={statement} onChange={event => setStatement(event.target.value)} maxLength={4000} rows={3} />
     </Field>
-    <Button type="submit" variant="outline" disabled={busy || statement.trim().length < 10}
+    <Button type="submit" variant="outline" disabled={busy}
       className="mt-3">Record evidence statement</Button>
   </form>;
 }
@@ -60,9 +63,12 @@ export function InstitutionalEvidenceReview({ task, busy, review }: {
 }) {
   const [reason, setReason] = useState("");
   const [decision, setDecision] = useState<"accepted" | "rejected">("rejected");
+  const [attempted, setAttempted] = useState(false);
   if (!task.requirementId || !task.pendingEvidenceReview || task.state === "complete") return null;
-  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+  return <form noValidate className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
+    setAttempted(true);
+    if (!reason.trim() || (decision === "rejected" && reason.trim().length < 5)) return;
     void review(task.requirementId!, decision, reason).then(saved => { if (saved) setReason(""); });
   }}>
     <p className="text-sm font-semibold">CAN institutional evidence review</p>
@@ -75,10 +81,13 @@ export function InstitutionalEvidenceReview({ task, busy, review }: {
         <option value="accepted">Accept evidence</option>
       </Select>
     </Field>
-    <Field label="Decision reason" className="mt-3">
+    <Field label="Decision reason" className="mt-3" required
+      error={attempted&&(!reason.trim()||(decision==="rejected"&&reason.trim().length<5))
+        ?decision==="rejected"?"Enter at least 5 characters explaining the requested correction.":"Enter a reason for accepting the evidence."
+        :undefined}>
       <Textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} rows={3} />
     </Field>
-    <Button type="submit" variant="outline" disabled={busy || (decision === "rejected" ? reason.trim().length < 5 : reason.trim().length < 1)}
+    <Button type="submit" variant="outline" disabled={busy}
       className="mt-3">
       Record institutional decision
     </Button>

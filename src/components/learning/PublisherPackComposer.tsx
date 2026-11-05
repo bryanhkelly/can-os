@@ -1,5 +1,9 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field, FieldError } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {
  createAuthoredPublisherPack, getPublisherPackStudio, publishAuthoredPublisherPack,
  saveAuthoredPublisherPack, startPublisherPackDraft,
@@ -16,6 +20,7 @@ function PackDraftEditor({programId,release,courses,onSaved}:{
  const [committed,setCommitted]=useState(release.courseVersionIds);
  const [reason,setReason]=useState("");
  const [confirmed,setConfirmed]=useState(false);
+ const [attempted,setAttempted]=useState(false);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const dirty=JSON.stringify(selected)!==JSON.stringify(committed);
@@ -51,20 +56,24 @@ function PackDraftEditor({programId,release,courses,onSaved}:{
     }});
     setRevision(result.revision);setCommitted([...selected]);setConfirmed(false);
    },"Pack draft saved. Not yet available to adopting schools.")}>Save course selection</button>
-  <form className="mt-3 space-y-3 border-t pt-3" onSubmit={e=>{
+  <form noValidate className="mt-3 space-y-3 border-t pt-3" onSubmit={e=>{
    e.preventDefault();
+   setAttempted(true);
    if(dirty||!confirmed||reason.trim().length<10||selected.length<1)return;
    void act(()=>publishAuthoredPublisherPack({data:{
     programId,versionId:release.id,expectedRevision:revision,reason,confirmed:true,
    }}),"Pack release published. Schools may now install or adopt it when entitled.");
   }}>
-   <label className="block text-sm">Publication reason<textarea required minLength={10} maxLength={2000}
-    className="mt-1 block w-full rounded border bg-background p-2" value={reason}
-    onChange={e=>setReason(e.target.value)}/></label>
-   <label className="flex items-start gap-2 text-sm"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>
-    <span>I have verified every included publisher course release and understand publication is immutable.</span></label>
-   <button type="submit" disabled={busy||dirty||!confirmed||reason.trim().length<10||!selected.length}
-    className="rounded border px-4 py-2 text-sm disabled:opacity-50">Publish pack release</button>
+  {attempted&&!selected.length&&<FieldError>Select at least one published course.</FieldError>}
+  <Field label="Publication reason" required
+   error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining this publication.":undefined}>
+   <Textarea minLength={10} maxLength={2000} value={reason} onChange={e=>setReason(e.target.value)}/>
+  </Field>
+  <Field label="I have verified every included publisher course release and understand publication is immutable." required
+   error={attempted&&!confirmed?"Confirm that you reviewed the included course releases.":undefined}>
+   <Checkbox checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>
+  </Field>
+  <Button type="submit" variant="outline" disabled={busy||dirty}>Publish pack release</Button>
   </form>
  </section>;
 }

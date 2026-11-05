@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBlocker } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkspaceNotice } from "@/components/workspace";
@@ -54,11 +56,11 @@ export function PrivateLessonNotes({ sectionId, versionId, lessonId }: {
     {loadError && <WorkspaceNotice tone="danger">{loadError}<Button variant="outline" size="sm" className="ml-2"
       onClick={() => { setLoading(true); setReload(value => value + 1); }}>Retry loading notes</Button></WorkspaceNotice>}
     {saved && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(); }}>
-      <label className="block text-sm font-semibold">Your notes
-        <textarea value={body} rows={10} maxLength={30000} disabled={busy}
-          onChange={event => setBody(event.target.value)} className="mt-2 block w-full border bg-background p-4 font-normal leading-7"
+      <Field label="Your notes" className="text-sm font-semibold">
+        <Textarea value={body} rows={10} maxLength={30000} disabled={busy}
+          onChange={event => setBody(event.target.value)} className="p-4 font-normal leading-7"
           placeholder="Capture a question, an example, or what you want to remember."/>
-      </label>
+      </Field>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={busy || !dirty}>Save notes</Button>
         <span className="text-xs text-muted-foreground">{dirty ? "Unsaved changes. Save before leaving this lesson." : saved.revision > 0 ? "Saved to your account" : "No notes saved yet"} · {body.length.toLocaleString()} / 30,000</span>

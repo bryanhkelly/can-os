@@ -32,6 +32,21 @@ describe("bounded outbound provider requests", () => {
     expect(fetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal }));
     if (channel === "email") expect(fetch.mock.calls[0]![1].headers["Idempotency-Key"]).toBe("delivery-id");
   });
+  it("includes a calendar attachment in the Resend request", async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetch);
+    await sendNotificationEmail({
+      to: "family@example.org",
+      subject: "You're registered",
+      text: "Event details",
+      attachments: [{ filename: "event.ics", content: "YmVnaW4=", contentType: "text/calendar" }],
+    }, "event-delivery-id");
+    const body = JSON.parse(fetch.mock.calls[0]![1].body as string);
+    expect(body.attachments).toEqual([{
+      filename: "event.ics", content: "YmVnaW4=", content_type: "text/calendar",
+    }]);
+    expect(fetch.mock.calls[0]![1].headers["Idempotency-Key"]).toBe("event-delivery-id");
+  });
   it.each(["email", "sms"])("reports aborted %s requests as failed, never accepted", async channel => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("Timed out", "TimeoutError")));
     vi.spyOn(console, "log").mockImplementation(() => {});

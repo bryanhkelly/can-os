@@ -2,30 +2,30 @@
 // A declared seed is not proof of execution or acceptance; this proves every
 // surfaced route has a declared, schema-valid fixture contract. Unseeded routes
 // are coverage failures (functional-completeness-audit P0).
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { createRouteInventory } from "./route-inventory.mjs";
 
 const manifestPath = "scripts/seeds/fixture-manifest.json";
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const baseSeeds = manifest.baseSeeds ?? [];
 const entries = manifest.routes ?? {};
 
-const pageFiles = readdirSync("src/routes").filter(
-  (f) => f.endsWith(".tsx") && !f.startsWith("__") && !["student.tsx", "admissions.tsx", "operations.tsx", "operations.launch.tsx", "sites.$siteId.tsx", "staff.students.tsx"].includes(f),
-);
-const pages = pageFiles.map((file) => {
-  const name = file.slice(0, -4);
-  // "list_.new" is a non-nested TanStack route served at /list/new.
-  return name === "index" ? "/" : "/" + name.replace(/\.index$/, "").replaceAll(".", "/").replace(/_(?=\/|$)/g, "");
-});
+const routes = createRouteInventory();
+const routesByPath = new Map(routes.map(entry => [entry.route, entry]));
+const pages = routes.filter(entry => entry.kind === "page").map(entry => entry.route);
 
 const errors = [];
+
+for (const route of routes.filter(entry => !entry.declared || !entry.registered || !entry.route)) {
+  errors.push(route.file + ": route declaration or generated registration is missing");
+}
 
 for (const seed of baseSeeds) {
   if (!existsSync("scripts/seeds/" + seed)) errors.push("Base seed missing: " + seed);
 }
 
 for (const [route, entry] of Object.entries(entries)) {
-  if (!pages.includes(route)) {
+  if (!routesByPath.has(route)) {
     errors.push("Manifest entry for missing route: " + route);
     continue;
   }
@@ -69,6 +69,8 @@ for (const route of unseeded) {
 const report = {
   totalRoutes: pages.length,
   declaredRoutes: pages.length - unseeded.length,
+  nonPageRoutes: routes.filter(entry => entry.kind !== "page")
+    .map(({ route, kind }) => ({ route, kind })),
   fixtureOptional: pages.filter((r) => entries[r]?.fixtureRequired === false),
   unseededRoutes: unseeded,
   verification: "STATIC_ONLY; no live database, cross-persona or browser acceptance",

@@ -5,6 +5,7 @@ import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { listOnsiteContactRelationships } from "./onsite-contact-relationships.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
@@ -23,12 +24,27 @@ const MAX_BODY_LENGTH = 4000;
 const SNIPPET_LENGTH = 120;
 const MAX_SUBJECT_LENGTH = 120;
 
+export const startThreadInputSchema = z.object({
+  recipientPersonId: z.string().uuid(),
+  subject: z
+    .string()
+    .trim()
+    .min(1, "Subject must not be empty")
+    .max(MAX_SUBJECT_LENGTH, `Subject must be ${MAX_SUBJECT_LENGTH} characters or fewer`),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Message must not be empty")
+    .max(MAX_BODY_LENGTH, `Message must be ${MAX_BODY_LENGTH} characters or fewer`),
+});
+
 const threadIdSchema = z.string().uuid();
 
 type ThreadContact = { personId: string; name: string; label: string };
 
 type Db = typeof import("@/db/client").db;
 type Schema = typeof import("@/db/schema");
+type MessagingContext = Awaited<ReturnType<typeof getCommandContext>>;
 
 async function fetchDisplayNames(
   db: Db,
@@ -61,11 +77,14 @@ async function fetchDisplayNames(
 async function listAllowedThreadContacts(
   db: Db,
   s: Schema,
-  role: string,
-  actorPersonId: string,
-  siteIds: string[],
-  programIds: string[],
+  context: MessagingContext,
 ): Promise<ThreadContact[]> {
+  const role = context.role ?? "";
+  const actorPersonId = requireActorPerson(context.actorPersonId);
+  const siteIds = role === "room_facilitator" || role === "site_staff" || role === "site_leader"
+    ? context.grantSiteId ? [context.grantSiteId] : []
+    : context.scope.siteIds ?? [];
+  const programIds = context.scope.programIds ?? [];
   const relationships = new Map<string, Set<string>>();
   const add = (personId: string, relationship: string) => {
     if (personId === actorPersonId) return;
@@ -311,8 +330,15 @@ async function listAllowedThreadContacts(
         }));
       for (const guardian of guardians) add(guardian.personId, "guardian of support student");
     }
+  } else if (role === "room_facilitator" || role === "site_staff" || role === "site_leader") {
+    for (const relation of await listOnsiteContactRelationships(db, s, context, siteIds, programIds))
+      add(relation.personId, relation.relationship);
   }
 
+  return contactsFromRelationships(db, s, relationships);
+}
+
+async function contactsFromRelationships(db: Db, s: Schema, relationships: Map<string, Set<string>>) {
   if (!relationships.size) return [];
   const names = await fetchDisplayNames(db, s, [...relationships.keys()]);
   return [...relationships.entries()]
@@ -328,34 +354,17 @@ async function listAllowedThreadContacts(
 export const listThreadContacts = createServerFn({ method: "GET" }).handler(async () => {
   const context = await getCommandContext(getRequest());
   setResponseHeader("Cache-Control", "private, no-store");
-  const actorPersonId = requireActorPerson(context.actorPersonId);
   const role = context.role;
   if (!role || !Object.hasOwn(roleCapabilities,role)) {
     return { contacts: [] as ThreadContact[] };
   }
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId, context.scope.siteIds??[], context.scope.programIds??[]);
+  const contacts = await listAllowedThreadContacts(db, s, context);
   return { contacts };
 });
 
 export const startThread = createServerFn({ method: "POST" })
-  .validator((value: unknown) =>
-    z
-      .object({
-        recipientPersonId: z.string().uuid(),
-        subject: z
-          .string()
-          .trim()
-          .min(3, "Subject must be at least 3 characters")
-          .max(MAX_SUBJECT_LENGTH, `Subject must be ${MAX_SUBJECT_LENGTH} characters or fewer`),
-        body: z
-          .string()
-          .trim()
-          .min(1, "Message must not be empty")
-          .max(MAX_BODY_LENGTH, `Message must be ${MAX_BODY_LENGTH} characters or fewer`),
-      })
-      .parse(value),
-  )
+  .validator((value: unknown) => startThreadInputSchema.parse(value))
   .handler(async ({ data }) => {
     const context = await getCommandContext(getRequest());
     assertCapability(context, "communication.send");
@@ -368,7 +377,7 @@ export const startThread = createServerFn({ method: "POST" })
 
     // Re-derive the allowed contact set server-side; fail closed if the
     // requested recipient is not reachable through a real relationship.
-    const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId, context.scope.siteIds??[], context.scope.programIds??[]);
+    const contacts = await listAllowedThreadContacts(db, s, context);
     if (!contacts.some((contact) => contact.personId === data.recipientPersonId)) {
       throw new AuthorizationError("communication thread recipient");
     }
@@ -482,19 +491,34 @@ export const listMyThreads = createServerFn({ method: "GET" }).handler(async () 
       ),
     );
 
-  const threads = [];
-  for (const thread of candidates) {
-    if (thread.metadata?.kind === "academic_conversation") {
-      const { academicConversationHref } = await import("@/modules/learning/academic-conversation-access.server");
-      try { await academicConversationHref(thread); }
-      catch (cause) {
-        // Historical participant rows do not retain access after a relationship or grant is revoked.
-        if (cause instanceof AuthorizationError) continue;
-        throw cause;
+  const academicThreads = candidates.filter(thread => thread.metadata?.kind === "academic_conversation");
+  const authorizedAcademicIds = new Set<string>();
+  if (academicThreads.length) {
+    const { academicConversationHref, resolveAcademicConversationActor } = await import("@/modules/learning/academic-conversation-access.server");
+    let actor;
+    try { actor = await resolveAcademicConversationActor(); }
+    catch (cause) {
+      if (!(cause instanceof AuthorizationError)) throw cause;
+    }
+    if (actor) {
+      // Recheck each relationship, but avoid a request waterfall for a thread list.
+      for (let offset = 0; offset < academicThreads.length; offset += 4) {
+        const batch = academicThreads.slice(offset, offset + 4);
+        const results = await Promise.all(batch.map(async thread => {
+          try {
+            await academicConversationHref(thread, undefined, actor);
+            return thread.id;
+          } catch (cause) {
+            if (cause instanceof AuthorizationError) return null;
+            throw cause;
+          }
+        }));
+        for (const id of results) if (id) authorizedAcademicIds.add(id);
       }
     }
-    threads.push(thread);
   }
+  const threads = candidates.filter(thread =>
+    thread.metadata?.kind !== "academic_conversation" || authorizedAcademicIds.has(thread.id));
   if (!threads.length) return { threads: [] };
 
   const latest = await db

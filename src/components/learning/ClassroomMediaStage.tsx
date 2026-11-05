@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { CalendarDays, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { WorkspaceNotice } from "@/components/workspace";
 import { type LoadOutcome } from "@/lib/safe-loader";
@@ -10,6 +12,9 @@ import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import type { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 
 export type ClassroomMeetings = Awaited<ReturnType<typeof getClassroomMeetings>>;
+function isHttpsMeetingUrl(value: string) {
+  try { return new URL(value).protocol === "https:"; } catch { return false; }
+}
 export type ClassroomMeetingCommands = {
   get: (request: Parameters<typeof getClassroomMeetings>[0]) => ReturnType<typeof getClassroomMeetings>;
   schedule: (request: Parameters<typeof scheduleClassroomMeeting>[0]) => ReturnType<typeof scheduleClassroomMeeting>;
@@ -29,6 +34,8 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
   const [url, setUrl] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editUrl, setEditUrl] = useState("");
+  const [scheduleAttempted, setScheduleAttempted] = useState(false);
+  const [linkAttempted, setLinkAttempted] = useState<string | null>(null);
   const request = useRef<{ id: string; specification: string } | null>(null);
   async function refresh() {
     const events = await commands.get({ data: { sectionId, studentPersonId } });
@@ -46,11 +53,14 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
   }, [outcome, role]);
   async function schedule() {
     const specification = JSON.stringify({ title: title.trim(), startsLocal, endsLocal, url: url.trim() });
+    setScheduleAttempted(true);
+    const validUrl=isHttpsMeetingUrl(url);
+    if(title.trim().length<3||!startsLocal||!endsLocal||!validUrl||endsLocal<=startsLocal)return;
     if (!request.current || request.current.specification !== specification)
       request.current = { id: crypto.randomUUID(), specification };
     await mutation.run(async () => {
       const result = await commands.schedule({ data: { id: request.current!.id, sectionId, title: title.trim(), startsLocal, endsLocal, meetingUrl: url.trim() } });
-      request.current = null; setTitle(""); setStartsLocal(""); setEndsLocal(""); setUrl("");
+      request.current = null; setTitle(""); setStartsLocal(""); setEndsLocal(""); setUrl("");setScheduleAttempted(false);
       return result;
     }, { successMessage: "Live class scheduled on the class calendar.", commandErrorMessage: "Unable to schedule this live class." });
   }
@@ -86,11 +96,18 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
             </div>
             <Link to="/calendar" search={{ section: sectionId, event: event.id, date: dateKeyInTimezone(event.startsAt, event.timezone), view: "agenda" }} className="text-xs underline">View calendar event</Link>
             {event.canManage && <div>
-              {editing === event.id ? <form className="mt-3 space-y-3" onSubmit={submit => { submit.preventDefault(); void mutation.run(async () => {
+              {editing === event.id ? <form noValidate className="mt-3 space-y-3" onSubmit={submit => {
+                submit.preventDefault();setLinkAttempted(event.id);
+                const validUrl=!editUrl.trim()||isHttpsMeetingUrl(editUrl);
+                if(!validUrl)return;
+                void mutation.run(async () => {
                 await commands.saveLink({ data: { sectionId, eventId: event.id, meetingUrl: editUrl.trim() || null, expectedMeetingUrl: event.meetingUrl } });
-                setEditing(null);
+                setEditing(null);setLinkAttempted(null);
               }, { successMessage: "Class meeting link saved.", commandErrorMessage: "Unable to save the meeting link." }); }}>
-                <label className="block text-sm">HTTPS meeting link (clear to remove)<input type="url" maxLength={2048} value={editUrl} disabled={busy} onChange={change => setEditUrl(change.target.value)} className="mt-1 block w-full border bg-background p-2"/></label>
+                <Field label="HTTPS meeting link (clear to remove)" className="text-sm"
+                  error={linkAttempted===event.id&&editUrl.trim()&&!isHttpsMeetingUrl(editUrl)?"Enter a valid HTTPS meeting URL or clear the field.":undefined}>
+                  <Input type="url" maxLength={2048} value={editUrl} disabled={busy} onChange={change => setEditUrl(change.target.value)}/>
+                </Field>
                 <div className="flex gap-2"><Button size="sm" disabled={busy}>Save link</Button><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></div>
               </form> : <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => { setEditing(event.id); setEditUrl(event.meetingUrl ?? ""); }}>Manage meeting link</Button>}
             </div>}
@@ -99,16 +116,25 @@ export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, r
         </>}
         {role === "teacher" && <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Schedule a live class</summary>
-          <form className="mt-4 grid gap-3" onSubmit={event => { event.preventDefault(); void schedule(); }}>
+          <form noValidate className="mt-4 grid gap-3" onSubmit={event => { event.preventDefault(); void schedule(); }}>
             <fieldset disabled={busy} className="grid gap-3">
-              <label className="text-sm">Meeting title<input required minLength={3} maxLength={200} value={title} onChange={event => setTitle(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></label>
+              <Field label="Meeting title" className="text-sm" required error={scheduleAttempted&&title.trim().length<3?"Enter a meeting title with at least 3 characters.":undefined}>
+                <Input minLength={3} maxLength={200} value={title} onChange={event => setTitle(event.target.value)}/>
+              </Field>
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm">Starts ({timezone})<input required type="datetime-local" value={startsLocal} onChange={event => setStartsLocal(event.target.value)} className="mt-1 block w-full min-w-0 border bg-background p-2"/></label>
-                <label className="text-sm">Ends ({timezone})<input required type="datetime-local" value={endsLocal} onChange={event => setEndsLocal(event.target.value)} className="mt-1 block w-full min-w-0 border bg-background p-2"/></label>
+                <Field label={`Starts (${timezone})`} className="text-sm" required error={scheduleAttempted&&!startsLocal?"Choose a meeting start time.":undefined}>
+                  <Input type="datetime-local" value={startsLocal} onChange={event => setStartsLocal(event.target.value)}/>
+                </Field>
+                <Field label={`Ends (${timezone})`} className="text-sm" required error={scheduleAttempted&&(!endsLocal||endsLocal<=startsLocal)?"Choose an end time later than the start.":undefined}>
+                  <Input type="datetime-local" value={endsLocal} onChange={event => setEndsLocal(event.target.value)}/>
+                </Field>
               </div>
-              <label className="text-sm">HTTPS meeting link<input required type="url" maxLength={2048} value={url} onChange={event => setUrl(event.target.value)} className="mt-1 block w-full border bg-background p-2"/></label>
+              <Field label="HTTPS meeting link" className="text-sm" required
+                error={scheduleAttempted&&!isHttpsMeetingUrl(url)?"Enter a valid HTTPS meeting URL.":undefined}>
+                <Input type="url" maxLength={2048} value={url} onChange={event => setUrl(event.target.value)}/>
+              </Field>
               <p className="text-xs text-muted-foreground">Create the meeting with your provider first. Scheduling here creates one canonical class calendar event; use Calendar to reschedule or cancel it.</p>
-              <Button className="justify-self-start">Schedule live class</Button>
+              <Button type="submit" className="justify-self-start" disabled={busy}>Schedule live class</Button>
             </fieldset>
           </form>
         </details>}

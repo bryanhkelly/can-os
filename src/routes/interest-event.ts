@@ -1,27 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { escapePublicHtml } from "@/domain/public-site-html";
+import { hasConfiguredPublicOrigin, publicHtmlResponse } from "@/lib/public-html-response.server";
 import { interestEventRegistrationInput } from "@/domain/interest-events";
 import { readSmallUrlEncodedBody } from "@/domain/public-admissions-interest";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { z } from "zod";
 
-const headers = {
-  "Cache-Control": "private, no-store",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "no-referrer",
-  "X-Robots-Tag": "noindex, nofollow",
-  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
-};
-
 function html(body: string, status = 200) {
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>School interest event · CAN</title></head>
-    <body style="font-family:system-ui;max-width:42rem;margin:3rem auto;padding:1rem;line-height:1.5">
-    ${body}</body></html>`, {
-    status, headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+  return publicHtmlResponse(body, {
+    title: "School interest event · CAN", maxWidth: "42rem", status,
   });
 }
 
@@ -30,18 +18,7 @@ function unavailable() {
 }
 
 function configuredOrigin(request: Request) {
-  const url = new URL(request.url);
-  const host = request.headers.get("host");
-  if (host && host.toLowerCase().replace(/\.$/, "") !== url.host.toLowerCase()) return false;
-  const configured = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
-  if (!configured) return false;
-  try {
-    const origin = new URL(configured);
-    return origin.protocol === "https:" && origin.pathname === "/" &&
-      !origin.search && !origin.hash && url.origin === origin.origin;
-  } catch {
-    return false;
-  }
+  return hasConfiguredPublicOrigin(request);
 }
 
 function formatEventDate(value: string, timezone: string) {
@@ -51,17 +28,27 @@ function formatEventDate(value: string, timezone: string) {
   }).format(new Date(value));
 }
 
-function eventPage(event: Awaited<ReturnType<typeof import("@/modules/enrollment/interest-events.server").readInterestEventForRsvp>>, accessToken: string) {
+function eventPage(
+  event: Awaited<ReturnType<typeof import("@/modules/enrollment/interest-events.server").readInterestEventForRsvp>>,
+  accessToken: string,
+  invitation?: { batchId: string; recipientKey: string },
+) {
+  const invitationFields = invitation
+    ? `<input type="hidden" name="invitationBatchId" value="${escapePublicHtml(invitation.batchId)}">
+      <input type="hidden" name="invitationRecipientKey" value="${escapePublicHtml(invitation.recipientKey)}">`
+    : "";
+  const invitedFamily = event.invitedFamily;
   const form = `<form method="post" action="/interest-event">
     <input type="hidden" name="requestId" value="${crypto.randomUUID()}">
     <input type="hidden" name="eventId" value="${escapePublicHtml(event.id)}">
     <input type="hidden" name="accessToken" value="${escapePublicHtml(accessToken)}">
+    ${invitationFields}
     <label style="display:block;margin:1rem 0">First name
-      <input name="firstName" required maxlength="80" autocomplete="given-name" style="display:block;width:100%;padding:.6rem"></label>
+      <input name="firstName" value="${escapePublicHtml(invitedFamily?.firstName ?? "")}" required maxlength="80" autocomplete="given-name" style="display:block;width:100%;padding:.6rem"></label>
     <label style="display:block;margin:1rem 0">Last name
-      <input name="lastName" required maxlength="80" autocomplete="family-name" style="display:block;width:100%;padding:.6rem"></label>
+      <input name="lastName" value="${escapePublicHtml(invitedFamily?.lastName ?? "")}" required maxlength="80" autocomplete="family-name" style="display:block;width:100%;padding:.6rem"></label>
     <label style="display:block;margin:1rem 0">Email address
-      <input name="email" type="email" required maxlength="254" autocomplete="email" style="display:block;width:100%;padding:.6rem"></label>
+      <input name="email" type="email" value="${escapePublicHtml(invitedFamily?.email ?? "")}" ${invitedFamily ? "readonly" : ""} required maxlength="254" autocomplete="email" style="display:block;width:100%;padding:.6rem"></label>
     <div style="position:absolute;left:-9999px" aria-hidden="true">
       <label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
     <label style="display:block;margin:1rem 0"><input name="contactConsent" type="checkbox" value="yes" required>
@@ -91,11 +78,16 @@ export const Route = createFileRoute("/interest-event")({
         const params = new URL(request.url).searchParams;
         const eventId = params.get("eventId") ?? "";
         const accessToken = params.get("accessToken") ?? "";
+        const invitationBatchId = params.get("invitationBatchId") ?? "";
+        const invitationRecipientKey = params.get("invitationRecipientKey") ?? "";
         if (!z.string().uuid().safeParse(eventId).success) return unavailable();
+        const invitation = z.object({ batchId: z.string().uuid(), recipientKey: z.string().uuid() })
+          .safeParse({ batchId: invitationBatchId, recipientKey: invitationRecipientKey });
         try {
           const { readInterestEventForRsvp } = await import("@/modules/enrollment/interest-events.server");
-          const event = await readInterestEventForRsvp(eventId, accessToken);
-          return html(eventPage(event, accessToken));
+          const event = await readInterestEventForRsvp(eventId, accessToken,
+            invitation.success ? invitation.data : undefined);
+          return html(eventPage(event, accessToken, invitation.success ? invitation.data : undefined));
         } catch (error) {
           if (error instanceof DomainError && error.code === "UNAVAILABLE") return unavailable();
           console.error("Interest event page failed", { kind: "unexpected" });
@@ -111,7 +103,10 @@ export const Route = createFileRoute("/interest-event")({
           const data = interestEventRegistrationInput.parse(Object.fromEntries(params.entries()));
           const { readInterestEventForRsvp, registerInterestEvent } =
             await import("@/modules/enrollment/interest-events.server");
-          const event = await readInterestEventForRsvp(data.eventId, data.accessToken);
+          const invitation = data.invitationBatchId && data.invitationRecipientKey
+            ? { batchId: data.invitationBatchId, recipientKey: data.invitationRecipientKey }
+            : undefined;
+          const event = await readInterestEventForRsvp(data.eventId, data.accessToken, invitation);
           const { admitPublicAdmissionsInterest } =
             await import("@/modules/enrollment/public-admissions-interest.server");
           const budget = await admitPublicAdmissionsInterest(
@@ -123,6 +118,7 @@ export const Route = createFileRoute("/interest-event")({
           }
           await registerInterestEvent(data);
           return html(`<h1>RSVP received</h1><p>Thank you for responding to ${escapePublicHtml(event.title)} at ${escapePublicHtml(event.siteName)}.</p>
+            <p>A confirmation with calendar details and event reminders will be sent to the email address provided, when email delivery is enabled.</p>
             <p>This confirms your event RSVP only. It does not create an application or enroll a student.</p>`);
         } catch (error) {
           if (error instanceof z.ZodError) {

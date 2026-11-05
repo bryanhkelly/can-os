@@ -2,14 +2,20 @@ import { and, eq } from "drizzle-orm";
 import { AuthorizationError } from "@/domain/command-context";
 import { authorizeClass, classActor, type ClassTransaction } from "./class-access.server";
 
+type ClassActor = Awaited<ReturnType<typeof classActor>>;
+
+export async function resolveAcademicConversationActor() {
+  return classActor();
+}
+
 export async function academicConversationHref(thread: {
   contextType: string | null; contextId: string | null; metadata: Record<string, unknown>;
-}, tx?: ClassTransaction) {
+}, tx?: ClassTransaction, currentActor?: ClassActor) {
   if (thread.metadata.kind !== "academic_conversation") return null;
   if (thread.contextType !== "assessment" || !thread.contextId || typeof thread.metadata.studentProfileId !== "string") {
     throw new AuthorizationError("academic conversation context");
   }
-  const actor = await classActor();
+  const actor = currentActor ?? await classActor();
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const query = tx ?? db;
   const [assessment] = await query.select({ sectionId: s.assessments.sectionId }).from(s.assessments)

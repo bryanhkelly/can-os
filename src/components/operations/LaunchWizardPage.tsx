@@ -1,4 +1,5 @@
 import type { LaunchJurisdictionResearch } from "@/domain/jurisdiction-launch-research";
+import { launchMilestoneAvailable, type LaunchReadStates } from "@/lib/supplementary-read";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useLaunchInstitutionDefaults } from "@/hooks/useLaunchInstitutionDefaults";
 import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
@@ -38,6 +39,7 @@ import {
 } from "@/modules/programs/launch.functions";
 
 export type LaunchWizardData = {
+ reads?: LaunchReadStates;
  options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
  launches: Awaited<ReturnType<typeof listLaunches>> | null;
  preparationPrograms: Awaited<ReturnType<typeof listAdmissionsPrograms>> | null;
@@ -210,6 +212,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    if (data.reads && !launchMilestoneAvailable(data.reads, "configuration")) {
+      setError("Jurisdiction information is unavailable. Refresh before saving a school Program."); return;
+    }
     if(created)return;
     if(onsite&&!siteId){setError("Choose or save a school location before continuing with onsite learning.");return;}
     const selectedSite=options?.sites.find(site=>site.id===siteId);
@@ -312,7 +317,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const needsSchoolChoice=hasSchoolPreparation&&!currentProgram;
   // All school-readiness recommendations derive from persisted Journey evidence.
   // Never promote Site publication, invitations, or Program status to opening authority.
-  const readiness = currentLaunch ? buildLaunchGuidance(currentLaunch) : null;
+  const readinessAvailable = !data.reads || launchMilestoneAvailable(data.reads, "opening");
+  const readiness = currentLaunch && readinessAvailable ? buildLaunchGuidance(currentLaunch) : null;
   const nextTask = readiness?.nextTask ?? null;
   const needsEvidenceCorrection=nextTask?.evidenceReviewCorrectionPending===true;
   const awaitingCan = !needsEvidenceCorrection && (nextTask?.state==="needs_can" || nextTask?.pendingEvidenceReview===true);
@@ -320,7 +326,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const pendingSchoolAction = nextTask?.state==="needs_you";
   const blockedTask = nextTask?.state==="blocked";
   const openingReview = nextTask?.action==="opening";
-  const nextTitle = currentSchool?.status==="active"
+  const nextTitle = !readinessAvailable ? "Readiness information unavailable" : currentSchool?.status==="active"
     ? "Continue school operations"
     : needsSchoolChoice ? "Choose a school to continue"
     : !currentProgram ? "Save your first school Program"
@@ -331,7 +337,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     : blockedTask ? "Resolve this opening blocker: "+nextTask?.title
     : pendingSchoolAction ? nextTask?.title
     : "Review the current school launch record";
-  const nextDescription = currentSchool?.status==="active"
+  const nextDescription = !readinessAvailable
+    ? "Verify jurisdiction and enrollment information before reviewing readiness. Missing reads are not evidence of zero outstanding work."
+    : currentSchool?.status==="active"
     ? "This Program is active. Current onsite opening, staffing, supervision, and custody are checked separately in Operations."
     : needsSchoolChoice ? "Your existing schools are saved. Select the exact school above to continue its own preparation, website, and family outreach without creating a duplicate Program."
     : !currentProgram ? "Save the church Site and academic Program once; return to this same school to continue."
@@ -353,6 +361,12 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       breadcrumbs={<><Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Button asChild variant="outline" size="sm"><Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}}>Connected workflows</Link></Button>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
+        {data.reads && <section aria-label="Launch data availability" className="mt-4 border p-4 text-sm">
+          {Object.entries(data.reads).map(([name, state]) => <p key={name} role={state === "unavailable" || state === "unauthorized" ? "status" : undefined}>
+            {name.replace(/([A-Z])/g, " $1")}: {state === "empty" ? "No records" : state === "ready" ? "Available" : state === "unauthorized" ? "Not authorized" : "Unavailable"}
+          </p>)}
+          {!readinessAvailable && <Button type="button" variant="ghost" className="mt-2 underline" onClick={() => void router.invalidate()}>Retry launch information</Button>}
+        </section>}
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}

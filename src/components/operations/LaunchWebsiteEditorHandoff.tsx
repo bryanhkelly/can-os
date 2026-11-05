@@ -2,11 +2,14 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import {useState} from "react";
 import {getWorkspaceSession} from "@/modules/identity/workspace-session.functions";
 import {launchWebsiteHandoffGrant} from "@/domain/launch-website-handoff";
+import {useQueryClient} from "@tanstack/react-query";
+import {switchVerifiedMembership} from "@/lib/workspace-membership-switch";
 
 /** Reuse verified membership selection; this never creates an editor grant. */
 export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,destination="editor"}:{
  siteId:string;programId:string;returnGrantId?:string;destination?:"editor"|"launch";
 }){
+ const queryClient=useQueryClient();
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
  async function open(){
   if(busy)return;setBusy(true);setError("");
@@ -19,13 +22,9 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
     :"The original school setup membership is unavailable. Use Switch workspace to select an authorized school registrar.");
    const query=new URLSearchParams({siteId,programId});
    if(destination==="editor")query.set("returnGrantId",session.activeGrantId);
-   if(grant.id!==session.activeGrantId){
-    const response=await fetch("/access/session",{method:"POST",credentials:"same-origin",
-     headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:grant.id})});
-    if(!response.ok)throw new Error("The verified workspace could not be selected. No website changes were made.");
-   }
-   // A full navigation clears the previous membership's mounted state/caches.
-   window.location.assign(`${destination==="editor"?"/site-website":"/operations/launch"}?${query.toString()}`);
+    await switchVerifiedMembership({grants:session.grants,activeGrantId:session.activeGrantId,
+     grantId:grant.id,queryClient,
+     redirectTo:`${destination==="editor"?"/site-website":"/operations/launch"}?${query.toString()}`});
   }catch(cause){setError(mutationErrorMessage(cause, "The website workspace could not be opened."));setBusy(false);}
  }
  return <span className="inline-block">

@@ -16,6 +16,7 @@ import type { z } from "zod";
 
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field";
 
 const Form = FormProvider;
 
@@ -99,17 +100,19 @@ const FormControl = React.forwardRef<
   React.ElementRef<typeof Slot>,
   React.ComponentPropsWithoutRef<typeof Slot>
 >(({ ...props }, ref) => {
-  const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
+  const { error, formItemId, formMessageId } = useFormField();
+  const describedBy = [...new Set([
+    ...(props["aria-describedby"]?.split(/\s+/).filter(Boolean) ?? []),
+    ...(error ? [formMessageId] : []),
+  ])].join(" ") || undefined;
 
   return (
     <Slot
       ref={ref}
-      id={formItemId}
-      aria-describedby={
-        !error ? `${formDescriptionId}` : `${formDescriptionId} ${formMessageId}`
-      }
-      aria-invalid={!!error}
       {...props}
+      id={formItemId}
+      aria-describedby={describedBy}
+      aria-invalid={!!error}
     />
   );
 });
@@ -126,16 +129,7 @@ const FormMessage = React.forwardRef<
     return null;
   }
 
-  return (
-    <p
-      ref={ref}
-      id={formMessageId}
-      className={cn("text-sm font-medium text-destructive", className)}
-      {...props}
-    >
-      {body}
-    </p>
-  );
+  return <FieldError ref={ref} id={formMessageId} className={cn("font-medium", className)} {...props}>{body}</FieldError>;
 });
 FormMessage.displayName = "FormMessage";
 

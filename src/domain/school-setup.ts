@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEMO_ACCOUNT_DOMAIN } from "./local-demo-access";
+import { siteTimezoneSchema } from "./site-timezone";
 
 const demoDomainPattern = /^[a-z0-9](?:[a-z0-9-]{1,41}[a-z0-9])\.demo$/;
 
@@ -13,10 +14,7 @@ export const schoolSetupSchema = z.object({
   domain: z.string().trim().toLowerCase().refine(isDemoSchoolDomain,
     "Use a school domain such as newschool.demo.").refine(
     domain => domain !== DEMO_ACCOUNT_DOMAIN, "Valor already has its own demo tenant."),
-  timezone: z.string().trim().min(3).max(80).refine(value => {
-    try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; }
-    catch { return false; }
-  }, "Choose a valid school timezone."),
+  timezone: siteTimezoneSchema,
   syntheticOnly: z.literal(true),
 }).strict();
 

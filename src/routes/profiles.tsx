@@ -9,6 +9,9 @@ import { Qualifications } from "@/components/profiles/Qualifications";
 import { TeacherProfessionalProfile } from "@/components/profiles/TeacherProfessionalProfile";
 import { StudentProfileSetup } from "@/components/profiles/StudentProfileSetup";
 import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -32,10 +35,12 @@ export function ProfileHome({outcome}:{outcome:Awaited<ReturnType<typeof loadPro
 }
 export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPersonProfile>>}){
   const [file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+  const [photoAttempted,setPhotoAttempted]=useState(false);
   const [revision,setRevision]=useState(0);
   const pending = useRef<{file: File; task: {run: () => Promise<unknown>}} | null>(null);
   const saving = useRef(false);
   async function save(){
+    setPhotoAttempted(true);
     if(!file||saving.current)return;
     saving.current=true;
     setBusy(true);setError("");setNotice("");
@@ -48,7 +53,7 @@ export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPe
       })};
       await pending.current.task.run();
       pending.current=null;
-      setRevision(value=>value+1);setFile(null);setNotice("Profile photo saved.");
+      setRevision(value=>value+1);setFile(null);setPhotoAttempted(false);setNotice("Profile photo saved.");
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to save profile photo. Retry to finish an uploaded photo without uploading again."));}
     finally{saving.current=false;setBusy(false);}
   }
@@ -56,11 +61,15 @@ export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPe
     actions={<ProfilePhoto personId={profile.personId} name={profile.name} revision={revision}/>}>
     <WorkspacePanel title="Profile" description="Your permanent person identity, with relationships verified by the current membership.">
       <p className="text-sm">Only school-connected profile information is shown. Private contact, clinical and credential evidence are not part of this view.</p>
-      {profile.isSelf&&<form className="mt-5 grid gap-3" onSubmit={event=>{event.preventDefault();void save();}}>
-        <label className="text-sm">Profile picture (JPEG or PNG, up to 2 MB)<input aria-label="Profile picture" type="file" accept="image/jpeg,image/png"
-          disabled={busy} onChange={event=>setFile(event.target.files?.[0]??null)} className="mt-2 block w-full rounded-lg border p-3"/></label>
+      {profile.isSelf&&<form noValidate className="mt-5 grid gap-3" onSubmit={event=>{event.preventDefault();void save();}}>
+        <Field label="Profile picture (JPEG or PNG, up to 2 MB)" className="text-sm" required
+          error={photoAttempted&&!file?"Choose a JPEG or PNG profile picture.":undefined}>
+          <Input aria-label="Profile picture" type="file" accept="image/jpeg,image/png"
+            disabled={busy} onChange={event=>setFile(event.target.files?.[0]??null)}/>
+        </Field>
+        {photoAttempted&&error&&<FieldError>{error}</FieldError>}
         <p className="text-xs text-muted-foreground">Your photo is visible to authorized school connections, not a public directory.</p>
-        <button disabled={busy||!file} className="justify-self-start rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{busy?"Saving...":"Save profile picture"}</button>
+        <Button type="submit" variant="outline" disabled={busy} className="justify-self-start">{busy?"Saving...":"Save profile picture"}</Button>
       </form>}
       {error&&<p role="alert" className="mt-4 text-sm">{error}</p>}{notice&&<p role="status" className="mt-4 text-sm">{notice}</p>}
     </WorkspacePanel>

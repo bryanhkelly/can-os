@@ -235,7 +235,7 @@ export function TeacherConferencePanel() {
               </Button>
               <Button type="button" variant="outline" size="sm" disabled={busy}
                 onClick={() => void perform(() => queueTeacherConferenceReminder({ data: { bookingId: booking.id } }), "Reminder queued for the guardian.")}>
-                Send reminder
+                Schedule reminder
               </Button>
               <Button type="button" variant="destructive" size="sm" disabled={busy}
                 onClick={() => { setCancelSubmitting(false); setCancelTarget(booking); }}>

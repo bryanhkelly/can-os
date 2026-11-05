@@ -148,8 +148,10 @@ describe("curriculum studio presentation",()=>{
   for(const label of ["Syllabus","Module title","Lesson title","Lesson reading","Add module","Add lesson","Add resource link","Save draft","Save this lesson only"])
    expect(html).toContain(label);
   expect(html).toContain("Publication is immutable and does not upgrade existing classes");
-  expect(html).toContain('required="" minLength="10" maxLength="2000"');
-  expect(html).toMatch(/<button type="submit" disabled=""[^>]*>Publish curriculum release<\/button>/);
+  expect(html).toMatch(/required=""/);
+  expect(html).toContain('minLength="10"');
+  expect(html).toContain('maxLength="2000"');
+  expect(html).toMatch(/<button(?=[^>]*type="submit")[^>]*>Publish curriculum release<\/button>/);
  });
  it("navigates the complete course through one selected unit without dropping other draft units",()=>{
   const second={id:"second-unit",title:"Later unit",lessons:[

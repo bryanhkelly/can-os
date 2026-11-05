@@ -78,7 +78,7 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
       id: `course-${row.id}`,
       label: row.title,
       sub: row.code,
-      to: `/student/courses?section=${encodeURIComponent(row.id)}`,
+      to: `/classes?section=${encodeURIComponent(row.id)}`,
     }));
   }
 
@@ -105,7 +105,7 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
     id: `course-${row.id}`,
     label: row.title,
     sub: row.code,
-    to: `/teacher/gradebook?section=${encodeURIComponent(row.id)}`,
+    to: `/classes?section=${encodeURIComponent(row.id)}`,
   }));
 }
 
@@ -177,7 +177,7 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
     label: row.title,
     sub: row.dueAt ? `${row.sectionTitle} · due ${day(row.dueAt)}` : row.sectionTitle,
     to: actor.role === "student"
-      ? `/student/assignments?assessment=${encodeURIComponent(row.id)}`
+      ? `/student/assignments?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`
       : `/teacher/gradebook?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`,
   }));
 }

@@ -65,9 +65,9 @@ describe("reviewed enrollment signature presentation", () => {
     expect(html).toContain(form.instructions);
     expect(html).toContain(form.consent);
     expect(html).toContain("Typed full name (electronic signature)");
-    expect(html).toMatch(/type="checkbox" required=""/);
+    expect(html).toMatch(/<input(?=[^>]*type="checkbox")(?=[^>]*required="")[^>]*>/);
     expect(html).toContain("A registrar must review this form");
-    expect(html).toMatch(/type="submit" disabled=""/);
+    expect(html).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
     expect(html).toMatch(/<fieldset disabled=""/);
     expect(html).not.toContain("Upload");
   });
@@ -98,8 +98,8 @@ describe("reviewed enrollment signature presentation", () => {
     expect(html).toContain("Return for correction and new signature");
     expect(html).toContain("Review reason (visible to the family)");
     expect(html).toMatch(/<fieldset disabled=""/);
-    expect(html).toMatch(/type="checkbox" required=""/);
-    expect(html).toMatch(/type="submit" disabled=""/);
+    expect(html).toMatch(/<input(?=[^>]*type="checkbox")(?=[^>]*required="")[^>]*>/);
+    expect(html).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
   });
   it("requires a fresh signature when a form is returned for correction", () => {
     const html = renderToStaticMarkup(<GuardianEnrollmentForm applicationId="application" requirementId="requirement"
@@ -108,7 +108,7 @@ describe("reviewed enrollment signature presentation", () => {
         reviewedAt: "2030-01-02T00:00:00.000Z" } }} closed={false} onChanged={async () => {}} />);
     expect(html).toContain("Correct the contact information");
     expect(html).toContain("Sign and resubmit corrected form");
-    expect(html).toContain('autoComplete="name" class=');
+    expect(html).toContain('autoComplete="name"');
     expect(html).toMatch(/value=""/);
   });
 });

@@ -33,7 +33,7 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
   .where(and(inArray(s.assessments.sectionId,sectionIds),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,now)));
  if(!due.length)return {connected:true,items:[]};
  const activeProgram=alias(s.enrollments,"missing_work_program_membership");
- const roster=await db.select({sectionId:s.enrollments.sectionId,studentId:s.studentProfiles.id,studentName:s.people.legalFirstName,studentLastName:s.people.legalLastName}).from(s.enrollments)
+ const roster=await db.select({sectionId:s.enrollments.sectionId,studentId:s.studentProfiles.id,studentPersonId:s.studentProfiles.personId,studentName:s.people.legalFirstName,studentLastName:s.people.legalLastName}).from(s.enrollments)
   .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
   .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(activeProgram,and(
@@ -59,7 +59,7 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  const items=due.flatMap(a=>eligible.filter(student=>student.sectionId===a.sectionId).flatMap(student=>{
   const sub=latest.get(a.id+":"+student.studentId);
   if(sub&&sub.status!=="assigned"&&sub.status!=="returned")return [];
-  return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),studentProfileId:student.studentId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started"}];
+  return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),studentProfileId:student.studentId,studentPersonId:student.studentPersonId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started"}];
  })).sort((a,b)=>a.dueAt.localeCompare(b.dueAt));
  return {connected:true,items};
 });

@@ -17,6 +17,8 @@ import {buildDailyOperationsAttention} from "@/domain/daily-operations";
 import {ActionDialog} from "@/components/workspace/action-dialog";
 import {mutationErrorMessage} from "@/lib/mutation-feedback";
 import { plural } from "@/lib/format";
+import type { SupplementaryRead } from "@/lib/supplementary-read";
+import { siteProgramHref } from "@/lib/route-search";
 
 type ActionInput =
  | {kind:"resolve";id:string;title:string}
@@ -25,29 +27,24 @@ type ActionInput =
 
 export type OperationsWorkspaceData = {
  operations: Awaited<ReturnType<typeof getOperationsActions>> | null;
- health: Awaited<ReturnType<typeof getReleaseHealth>> | null;
- commandCenter: Awaited<ReturnType<typeof getLiveOperationsCommandCenter>> | null;
- dashboard: Awaited<ReturnType<typeof getLiveFullFlowOperations>> | null;
- launches: Awaited<ReturnType<typeof listLaunches>> | null;
+ health: SupplementaryRead<Awaited<ReturnType<typeof getReleaseHealth>>>;
+ commandCenter: SupplementaryRead<Awaited<ReturnType<typeof getLiveOperationsCommandCenter>>>;
+ dashboard: SupplementaryRead<Awaited<ReturnType<typeof getLiveFullFlowOperations>>>;
+ launches: SupplementaryRead<Awaited<ReturnType<typeof listLaunches>>>;
  authError: string;
 };
 
 export function OperationsWorkspace({data: loaderData,selected}: {data:OperationsWorkspaceData;selected:{siteId?:string;programId?:string;action?:string}}){
- const {operations:data,health,commandCenter,dashboard,launches,authError}:{
-  operations:Awaited<ReturnType<typeof getOperationsActions>>|null;
-  health:Awaited<ReturnType<typeof getReleaseHealth>>|null;
-  commandCenter:Awaited<ReturnType<typeof getLiveOperationsCommandCenter>>|null;
-  dashboard:Awaited<ReturnType<typeof getLiveFullFlowOperations>>|null;
-  launches:Awaited<ReturnType<typeof listLaunches>>|null;
-  authError:string;
- }=loaderData;
+ const {operations:data,health,commandCenter,dashboard,launches,authError}=loaderData;
  const selectScope=(siteId?:string,programId?:string)=>{
-  const query=new URLSearchParams();
-  if(siteId)query.set("siteId",siteId);
-  if(programId)query.set("programId",programId);
-  void router.navigate({href:"/home"+(query.size?"?"+query.toString():"")});
+  void router.navigate({href:siteProgramHref("/home",{siteId,programId})});
  };
  const router=useRouter();
+ const retrySupplementaryReads=()=>{void router.invalidate();};
+ const healthData=health?.data??null;
+ const commandCenterData=commandCenter?.data??null;
+ const dashboardData=dashboard?.data??null;
+ const launchesData=launches?.data??null;
  const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
  const exitMutation=useWorkspaceMutation({mutationFn:(input:{actionId:string;resolutionNote:string})=>completeRegistrarEnrollmentExit({data:{actionId:input.actionId,confirmInstitutionalReview:true,resolutionNote:input.resolutionNote}}),invalidateRouter:()=>router.invalidate()});
  const [busy,setBusy]=useState<string|null>(null);
@@ -140,8 +137,8 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  const attentionItems=buildDailyOperationsAttention({
    role:"registrar",actorPersonId:"verified-server-session",
    actions:data.items.filter(item=>!selected.action||item.id===selected.action),
-   staffingIssues:commandCenter?.issues??[],
-   programs:dashboard?.programs??[],
+  staffingIssues:commandCenterData?.issues??[],
+  programs:dashboardData?.programs??[],
  });
  return <DashboardHome eyebrow="School operations"
   subtitle="Review actions and launch readiness for an authorized school and program. Operational actions remain subject to their existing permissions."
@@ -172,7 +169,10 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     </label>
    </div>
   </section>
-  {(!health || health.schemaStatus !== "aligned") && <p className="mt-4 rounded-xl border p-3 text-sm" role="status">Some operational information may be temporarily unavailable. Contact CAN support if this continues.</p>}
+  {healthData===null
+   ? <QueryState error="Operational health details could not load; alignment cannot be verified." onRetry={retrySupplementaryReads}/>
+   : healthData.schemaStatus!=="aligned"&&<p className="mt-4 rounded-xl border p-3 text-sm" role="status">Some operational information may be temporarily unavailable. Contact CAN support if this continues.</p>}
+  {commandCenterData===null&&<QueryState error="Staffing and capacity exceptions could not be loaded; operational health cannot be verified." onRetry={retrySupplementaryReads}/>}
   {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
   {mutation.refreshError&&<button type="button" disabled={mutation.isSubmitting}
    onClick={()=>void retryActionRefresh()} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">
@@ -212,13 +212,13 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     <p className="mt-4 text-xs text-muted-foreground">Reenrollment is not represented as a completed workflow here. Use authorized admissions and enrollment records to review returning families; do not infer renewal from previous enrollment.</p>
   </section>
 
-  {commandCenter&&<section aria-label="Operations exception summary" className="mt-8">
+  {commandCenterData&&<section aria-label="Operations exception summary" className="mt-8">
     <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
     <p className="mt-2 text-sm text-muted-foreground">Prioritize verified staffing and capacity exceptions before routine school monitoring. Readiness approvals remain controlled by their owning workflows.</p>
     <div className="mt-5 grid gap-4 md:grid-cols-3">
       <div className="rounded-2xl border border-destructive/40 bg-card p-5">
         <h3 className="text-sm font-semibold">Needs intervention</h3>
-        <p className="mt-2 text-3xl font-semibold">{commandCenter.issues.length}</p>
+        <p className="mt-2 text-3xl font-semibold">{commandCenterData.issues.length}</p>
         <p className="mt-2 text-xs text-muted-foreground">Reported staffing and capacity exceptions</p>
       </div>
       <div className="rounded-2xl border bg-card p-5">
@@ -227,41 +227,43 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
       </div>
       <div className="rounded-2xl border bg-muted/30 p-5">
         <h3 className="text-sm font-semibold">Healthy</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{commandCenter.summary.sections} active sections in scope. Individual readiness is not inferred from this count.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{commandCenterData.summary.sections} active sections in scope. Individual readiness is not inferred from this count.</p>
       </div>
     </div>
-    {commandCenter.issues.length>0&&<div className="mt-5 divide-y rounded-2xl border bg-card">
-      {commandCenter.issues.map(issue=><article key={issue.kind+issue.sectionId} className="flex flex-wrap items-start justify-between gap-4 p-5">
+    {commandCenterData.issues.length>0&&<div className="mt-5 divide-y rounded-2xl border bg-card">
+      {commandCenterData.issues.map(issue=><article key={issue.kind+issue.sectionId} className="flex flex-wrap items-start justify-between gap-4 p-5">
         <div><h3 className="font-semibold">{issue.title}</h3><p className="mt-1 text-sm text-muted-foreground">{issue.description}</p></div>
         <Link to="/operations/launch/$programId" params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}} className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold">Review workflow <ArrowUpRight className="size-4"/></Link>
       </article>)}
     </div>}
   </section>}
-  {commandCenter&&<section className="mt-7 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+  {commandCenterData&&<section className="mt-7 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
     <h2 className="font-serif text-2xl">Live school operations</h2>
     <div className="mt-3 flex flex-wrap gap-4 text-sm">
-     <span>{commandCenter.summary.sections} active sections</span>
-     <span>{commandCenter.summary.unstaffed} unstaffed</span>
-     <span>{commandCenter.summary.underCapacity} capacity gaps</span>
-     <span>{commandCenter.summary.waitlisted} waiting students</span>
+    <span>{commandCenterData.summary.sections} active sections</span>
+    <span>{commandCenterData.summary.unstaffed} unstaffed</span>
+    <span>{commandCenterData.summary.underCapacity} capacity gaps</span>
+    <span>{commandCenterData.summary.waitlisted} waiting students</span>
     </div>
     <div className="mt-4 space-y-2">
-     {commandCenter.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
+    {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
        <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
        <Link className="mt-2 inline-block underline" to="/operations/launch/$programId"
         params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
      </div>)}
-     {!commandCenter.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
+    {!commandCenterData.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
     </div>
    </section>}
-  {dashboard&&<section className="mt-7 space-y-4" aria-label="Guided school launch and operations">
+  {dashboardData&&<section className="mt-7 space-y-4" aria-label="Guided school launch and operations">
     <h2 className="font-serif text-2xl">Get your first students into class</h2>
     <p className="text-sm text-muted-foreground">Follow the existing launch, course, admissions and classroom workflows for each school. A website is optional to begin registrar-assisted applications; school opening and child attendance still require independent approvals.</p>
-    {dashboard.programs.filter(p=>isGuidedAcademicSchool(p.type))
+    {launchesData===null
+      ? <QueryState error="Saved launch details could not be loaded; progress and requirements cannot be verified." onRetry={retrySupplementaryReads}/>
+      : dashboardData.programs.filter(p=>isGuidedAcademicSchool(p.type))
       .slice(0,selected.programId?1:4).map(program=>
        <GuidedSchoolJourney key={program.id} program={program}
-        journey={launches?.launches.find(launch=>launch.id===program.id)??null}/>)}
-    {!dashboard.programs.some(p=>isGuidedAcademicSchool(p.type))&&
+        journey={launchesData.launches.find(launch=>launch.id===program.id)??null}/>)}
+    {!dashboardData.programs.some(p=>isGuidedAcademicSchool(p.type))&&
       <div className="rounded-xl border-2 border-primary/30 p-5">
         <p className="font-semibold">Your school is not set up yet.</p>
         <p className="mt-1 text-sm text-muted-foreground">There are no academic school programs in this scope. Launch Mode creates the canonical Program and Launch Journey, then guides the remaining setup; it never authorizes opening by itself.</p>
@@ -274,20 +276,20 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   <section className="mt-7 rounded-xl border bg-card p-5" aria-label="FullFlow operational record">
    <h2 className="font-serif text-2xl">Connected school operational record</h2>
    <p className="mt-2 text-sm text-muted-foreground">Live records from the same authorized school programs, curriculum releases, enrollments, classrooms, grades and guardian follow-ups. Numbers are not simulated readiness approvals.</p>
-   {!dashboard ? <p className="mt-4 text-sm" role="alert">The connected school record could not be loaded. Launch and grading status cannot be verified from this screen.</p> : <>
-    <p className="mt-2 text-xs text-muted-foreground">Refreshed {new Date(dashboard.asOf).toLocaleString()}</p>
+  {dashboardData===null ? <QueryState error="The connected school record could not be loaded. Launch and grading status cannot be verified from this screen." onRetry={retrySupplementaryReads}/> : <>
+   <p className="mt-2 text-xs text-muted-foreground">Refreshed {new Date(dashboardData.asOf).toLocaleString()}</p>
     <div className="mt-4 grid gap-3 sm:grid-cols-5">
-     {[["Active students",dashboard.totals.activeProgramStudents],
-       ["Awaiting class placement",dashboard.programs.reduce((sum,p)=>sum+Math.max(0,p.counts.activeProgramStudents-p.counts.placedStudents),0)],
-       ["Class placements",dashboard.totals.placedStudents],
-       ["Graded submissions",dashboard.totals.gradedWork],
-       ["Guardian questions open",dashboard.totals.unresolvedGuardianResponses]]
+       {[["Active students",dashboardData.totals.activeProgramStudents],
+         ["Awaiting class placement",dashboardData.programs.reduce((sum,p)=>sum+Math.max(0,p.counts.activeProgramStudents-p.counts.placedStudents),0)],
+         ["Class placements",dashboardData.totals.placedStudents],
+         ["Graded submissions",dashboardData.totals.gradedWork],
+         ["Guardian questions open",dashboardData.totals.unresolvedGuardianResponses]]
        .map(([label,value])=><div key={label} className="rounded-lg border p-3">
         <p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p>
        </div>)}
     </div>
     <div className="mt-5 space-y-4">
-     {dashboard.programs.map(program=><article key={program.id} className="rounded-xl border p-4">
+    {dashboardData.programs.map(program=><article key={program.id} className="rounded-xl border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
        <h3 className="font-semibold">{program.name} <span className="text-xs font-normal text-muted-foreground">· {program.status.replaceAll("_"," ")} · {program.type.replaceAll("_"," ")}</span></h3>
        <Link className="text-sm underline" to="/operations/launch/$programId" params={{programId:program.id}} search={{siteId:undefined,programId:undefined}}>Review program →</Link>
@@ -311,7 +313,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
        <p className="break-all">Credit issuer: {program.creditIssuingOrganizationId}</p>
       </details>
      </article>)}
-     {!dashboard.programs.length&&<p className="rounded-lg border p-4 text-sm">No programs match your current school and verified access scope.</p>}
+    {!dashboardData.programs.length&&<p className="rounded-lg border p-4 text-sm">No programs match your current school and verified access scope.</p>}
     </div>
    </>}
   </section>

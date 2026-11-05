@@ -3,6 +3,7 @@ import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 import {SidebarLinks,workspaceLinks} from "@/components/shell/WorkspaceNavigation";
 import {getActiveWorkspacePath,getWorkspaceHome,getWorkspaceLinks,isFocusedClassroomRoute} from "@/components/shell/workspace-navigation.registry";
+import { roleCapabilities } from "@/domain/access-context";
 import {createMemoryHistory,createRootRoute,createRouter,RouterProvider} from "@tanstack/react-router";
 import { getWorkspaceScopeLabel } from "@/components/shell/workspace-scope";
 
@@ -12,8 +13,10 @@ describe("canonical workspace navigation",()=>{
  it("provides exactly one shared messaging module for every workspace role",()=>{
   for(const [role,links] of Object.entries(workspaceLinks)){
    expect(links.filter(item=>item.path==="/messages"),role)
-    .toEqual([{title:"Messages",path:"/messages",icon:"messages"}]);
-   expect(getActiveWorkspacePath(links,"/messages"),role).toBe("/messages");
+   .toEqual(roleCapabilities[role]?.includes("communication.send")
+    ?[{title:"Messages",path:"/messages",icon:"messages"}]:[]);
+  expect(getActiveWorkspacePath(links,"/messages"),role)
+   .toBe(roleCapabilities[role]?.includes("communication.send")?"/messages":undefined);
   }
  });
  it("renders Site Admin messaging in both expanded and collapsed navigation",async()=>{
@@ -70,7 +73,7 @@ describe("canonical workspace navigation",()=>{
    expect(links.filter(item=>item.icon==="home"),role).toHaveLength(1);
   }
   expect(workspaceLinks.site_admin[0]?.path).toBe("/home");
-  expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/operations/launch")).toBe("/home");
+    expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/operations/launch")).toBe("/operations/launch");
  });
  it("marks only the exact route current when nested destinations share a prefix",async()=>{
   const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.teacher,
@@ -93,12 +96,13 @@ describe("canonical workspace navigation",()=>{
   expect(getActiveWorkspacePath(workspaceLinks.teacher,"/teacher/missing-work")).toBe("/teacher/gradebook");
   expect(getActiveWorkspacePath(workspaceLinks.guardian,"/guardian/report-cards")).toBe("/guardian/academics");
   expect(getActiveWorkspacePath(workspaceLinks.registrar,"/operations/curriculum-marketplace")).toBe("/operations/curriculum");
-  expect(getActiveWorkspacePath(workspaceLinks.registrar,"/sites/school/publish/")).toBe("/sites");
-  expect(getActiveWorkspacePath(workspaceLinks.registrar,"/sites/school/profile")).toBe("/sites");
+    expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/sites/school/publish/")).toBe("/sites");
+    expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/sites/school/profile")).toBe("/sites");
   expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/sites/school/parent-information")).toBe("/sites");
   // Site Today is a drill-in from Home for school administration, not a separate destination.
   expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/sites/school")).toBe("/home");
-  expect(workspaceLinks.registrar.find(item=>item.path==="/sites")?.title).toBe("School profile");
+    expect(workspaceLinks.site_admin.find(item=>item.path==="/sites")?.title).toBe("School profile");
+    expect(workspaceLinks.registrar.some(item=>item.path==="/sites")).toBe(false);
   expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school")).toBe("/home");
   expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school/publish")).toBe("/site-website");
   expect(getActiveWorkspacePath(workspaceLinks.registrar,"/classes")).toBeUndefined();

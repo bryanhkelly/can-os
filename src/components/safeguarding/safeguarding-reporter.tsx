@@ -2,6 +2,7 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState, type FormEvent } from "react";
 import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import type { SafeguardingObservationInput } from "@/domain/safeguarding-intake-policy";
@@ -84,7 +85,7 @@ export function SafeguardingReporter({ workspace, reload }: {
               <div className="mt-2 grid gap-2 sm:grid-cols-2">{categories.map(category => <label key={category.value} className="flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm">
                 <input type="checkbox" className="size-4" checked={concernKinds.includes(category.value)} onChange={() => toggle(category.value)} />{category.label}
               </label>)}</div>
-              {concernKinds.length === 0 && <p role="alert" className="mt-2 text-sm text-destructive">Choose at least one category; “Other or unsure” is allowed.</p>}
+              {concernKinds.length === 0 && <FieldError className="mt-2">Choose at least one category; “Other or unsure” is allowed.</FieldError>}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-medium">How do you know?
@@ -106,7 +107,7 @@ export function SafeguardingReporter({ workspace, reload }: {
             <WorkspaceNotice>
               Follow directly applicable external-reporting duties without waiting for internal approval. {workspace.policy.externalReportingInstructions} Guardians are never notified automatically.
             </WorkspaceNotice>
-            <Button type="submit" size="lg" disabled={busy || concernKinds.length === 0}><ShieldAlert aria-hidden="true" />{busy ? "Recording concern…" : "Submit restricted safety report"}</Button>
+            <Button type="submit" size="lg" disabled={busy}><ShieldAlert aria-hidden="true" />{busy ? "Recording concern…" : "Submit restricted safety report"}</Button>
           </fieldset>
           {error && <WorkspaceNotice tone="danger" className="mt-4">{error} Offline procedure: {workspace.policy.offlineInstructions}</WorkspaceNotice>}
           {notice && <WorkspaceNotice tone="success" className="mt-4">{notice}</WorkspaceNotice>}

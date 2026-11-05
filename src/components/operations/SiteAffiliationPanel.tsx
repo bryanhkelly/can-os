@@ -1,5 +1,9 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {
   listAffiliationNetworks, listSiteAffiliations, requestSiteAffiliation, withdrawSiteAffiliation,
@@ -15,6 +19,7 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [attempted,setAttempted]=useState(false);
 
   async function refresh() {
     const [options, current] = await Promise.all([
@@ -40,6 +45,8 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
 
   async function request(event: React.FormEvent) {
     event.preventDefault();
+    setAttempted(true);
+    if(!selected||note.trim().length<10)return;
     setError("");
     const outcome=await mutation.run(async()=>{
       if (!selected) throw new Error("Choose a denomination.");
@@ -52,7 +59,7 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
       refreshErrorMessage:"The affiliation request was saved, but current affiliation records could not be loaded. Retry the refresh before submitting another request.",
     });
     if(outcome.status==="saved"||outcome.status==="refresh-failed"){
-      setNote(""); setSelected("");
+      setNote(""); setSelected("");setAttempted(false);
     }
   }
 
@@ -81,24 +88,22 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
               disabled={busy} onClick={() => void withdraw(entry.id)}>Withdraw affiliation</button>}
         </li>)}
       </ul>}
-      {networks.length ? <form onSubmit={request} className="mt-4 space-y-3">
-        <label className="block text-sm font-medium">Denomination
-          <select required value={selected} onChange={e => setSelected(e.target.value)}
-            className="mt-1 w-full rounded-lg border bg-background p-2">
+      {networks.length ? <form noValidate onSubmit={request} className="mt-4 space-y-3">
+        <Field label="Denomination" className="text-sm" required error={attempted&&!selected?"Choose a denomination.":undefined}>
+          <Select value={selected} onChange={e => setSelected(e.target.value)}>
             <option value="">Choose a denomination…</option>
             {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
-          </select>
-        </label>
-        <label className="block text-sm font-medium">Reason for affiliation request
-          <textarea required minLength={10} maxLength={1000} value={note}
+          </Select>
+        </Field>
+        <Field label="Reason for affiliation request" className="text-sm" required
+          error={attempted&&note.trim().length<10?"Enter at least 10 characters explaining this affiliation request.":undefined}>
+          <Textarea minLength={10} maxLength={1000} value={note}
             onChange={e => setNote(e.target.value)} rows={3}
-            className="mt-1 w-full rounded-lg border bg-background p-2"
             placeholder="Our school would like to join this network…"/>
-        </label>
-        <button type="submit" disabled={busy}
-          className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50">
+        </Field>
+        <Button type="submit" disabled={busy}>
           {busy ? "Submitting…" : "Request affiliation"}
-        </button>
+        </Button>
       </form> : <p className="mt-3 text-sm text-muted-foreground">No denomination HQ accounts are currently available for affiliation requests.</p>}
     </>}
     {error && <p className="mt-3 text-sm" role="alert">{error}</p>}

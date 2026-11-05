@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { guardianApplicationSelection } from "@/domain/guardian-application-selection";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -110,6 +112,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (notice || error) feedbackRef.current?.focus();
@@ -137,18 +140,13 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    setAttempted(true);
     if(linkedTransfer&&!linkedStudent){
       setError("This transfer requires the student's existing verified household identity. Contact admissions rather than creating a second student.");
       return;
     }
-    if (!selectedProgram || !selection.year || selection.unavailable) {
-      setError("Choose an available school and its configured academic year before submitting.");
-      return;
-    }
-    if(selectedTransfer&&(!confirmedDestination||!authorizedDestinationRecords)){
-      setError("Confirm that you selected the intended destination school before linking this transfer.");
-      return;
-    }
+    if (!selectedProgram || !selection.year || selection.unavailable || !firstName.trim() || !lastName.trim() || !grade.trim() ||
+      selectedTransfer&&(!confirmedDestination||!authorizedDestinationRecords)) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -165,6 +163,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
       setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
+      setAttempted(false);
       setRequestId(crypto.randomUUID());
       setStudentProfileId(""); setStudentOptionId("");
       setOriginTransferActionId("");setConfirmedDestination(false);setAuthorizedDestinationRecords(false);
@@ -208,27 +207,25 @@ export function GuardianApplicationForm({ programs, households, students = [], t
       Contact that school's admissions team. No other school has been selected.
     </WorkspaceNotice> : programs.length === 0 ? <WorkspaceNotice>
       No eligible school is currently available to this verified family account. Contact the school's admissions team about your invitation and application opening.
-    </WorkspaceNotice> : <form onSubmit={event => void submit(event)} aria-busy={busy} className="grid gap-5 sm:grid-cols-2">
+    </WorkspaceNotice> : <form noValidate onSubmit={event => void submit(event)} aria-busy={busy} className="grid gap-5 sm:grid-cols-2">
       <fieldset disabled={busy} className="contents">
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor={`${id}-program`}>School and program</Label>
-          <Select id={`${id}-program`} name="programId" required value={selectedProgram?.id ?? ""}
+        <Field label="School and program" className="sm:col-span-2" required
+          error={attempted&&!selectedProgram?"Choose an available school and program.":undefined}>
+          <Select id={`${id}-program`} name="programId" value={selectedProgram?.id ?? ""}
             onChange={event => { setProgramId(event.target.value); setSchoolYearId(""); setStudentProfileId(""); setStudentOptionId(""); setOriginTransferActionId("");setConfirmedDestination(false); }}>
             <option value="">Choose a school and program</option>
             {selection.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
           </Select>
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor={`${id}-year`}>Application academic year</Label>
-          <Select id={`${id}-year`} name="schoolYearId" required value={selection.year?.id ?? ""}
+        </Field>
+        <Field label="Application academic year" className="sm:col-span-2" required
+          description={!selectedProgram?.schoolYears?.length?"This school has not opened a configured academic year for family applications. Contact admissions.":undefined}
+          error={attempted&&!selection.year?"Choose a configured academic year for this school.":undefined}>
+          <Select id={`${id}-year`} name="schoolYearId" value={selection.year?.id ?? ""}
             onChange={event => setSchoolYearId(event.target.value)}>
             <option value="">Select an academic year</option>
             {selectedProgram?.schoolYears?.map(year => <option key={year.id} value={year.id}>{year.name}</option>)}
           </Select>
-          {!selectedProgram?.schoolYears?.length && <p className="text-xs text-muted-foreground">
-            This school has not opened a configured academic year for family applications. Contact admissions.
-          </p>}
-        </div>
+        </Field>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-student`}>Student identity</Label>
           <Select id={`${id}-student`} value={studentOptionId} disabled={!!linkedTransfer}
@@ -261,20 +258,14 @@ export function GuardianApplicationForm({ programs, households, students = [], t
             {!selectedTransfer.originExited&&<WorkspaceNotice tone="info">
               Your original school has not yet completed the official exit. Destination enrollment activation will wait for that decision.
             </WorkspaceNotice>}
-            <label className="flex items-start gap-3 text-sm">
-              <input type="checkbox" checked={confirmedDestination}
-                onChange={event=>setConfirmedDestination(event.target.checked)} className="mt-1" required />
-              <span>I confirm that the selected Program is the school I am applying to for this transfer.
-                I understand that the origin-school request does not grant admission to the new school.</span>
-            </label>
-            <label className="flex items-start gap-3 text-sm">
-              <input type="checkbox" checked={authorizedDestinationRecords} required
-                onChange={event=>setAuthorizedDestinationRecords(event.target.checked)} className="mt-1"/>
-              <span>I authorize the official transcript from my child's originating CAN school to be made available
-                to this specifically selected receiving-school Program for admissions and academic placement,
-                after the issuing records office has completed its authorized transfer. This does not authorize
-                other schools or grant access to medical, custody or safeguarding records.</span>
-            </label>
+            <Field label="I confirm that the selected Program is the school I am applying to for this transfer. I understand that the origin-school request does not grant admission to the new school."
+              required error={attempted&&!confirmedDestination?"Confirm the receiving school for this transfer.":undefined}>
+              <Checkbox checked={confirmedDestination} onChange={event=>setConfirmedDestination(event.target.checked)}/>
+            </Field>
+            <Field label="I authorize the official transcript from my child's originating CAN school to be made available to this specifically selected receiving-school Program for admissions and academic placement, after the issuing records office has completed its authorized transfer. This does not authorize other schools or grant access to medical, custody or safeguarding records."
+              required error={attempted&&!authorizedDestinationRecords?"Authorize records release to this receiving-school Program.":undefined}>
+              <Checkbox checked={authorizedDestinationRecords} onChange={event=>setAuthorizedDestinationRecords(event.target.checked)}/>
+            </Field>
           </>}
         </div>}
         <div className="space-y-2 sm:col-span-2">
@@ -288,25 +279,23 @@ export function GuardianApplicationForm({ programs, households, students = [], t
             Reuse your household for siblings. The server verifies that you belong to the selected household.
           </p>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${id}-first-name`}>Student legal first name</Label>
+        <Field label="Student legal first name" required error={attempted&&!firstName.trim()?"Enter the student's legal first name.":undefined}>
           <Input id={`${id}-first-name`} name="studentFirstName" autoComplete="off" required maxLength={100}
             readOnly={!!studentProfileId} value={firstName} onChange={event => setFirstName(event.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${id}-last-name`}>Student legal last name</Label>
+        </Field>
+        <Field label="Student legal last name" required error={attempted&&!lastName.trim()?"Enter the student's legal last name.":undefined}>
           <Input id={`${id}-last-name`} name="studentLastName" autoComplete="off" required maxLength={100}
             readOnly={!!studentProfileId} value={lastName} onChange={event => setLastName(event.target.value)} />
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor={`${id}-grade`}>Entering grade level</Label>
+        </Field>
+        <Field label="Entering grade level" className="sm:col-span-2" required
+          description="Use the grade the student is applying to enter."
+          error={attempted&&!grade.trim()?"Enter the grade the student is applying to enter.":undefined}>
           <Input id={`${id}-grade`} name="gradeLevel" required maxLength={10} value={grade}
-            readOnly={!!studentProfileId} aria-describedby={`${id}-grade-hint`} placeholder="For example, 9"
+            readOnly={!!studentProfileId} placeholder="For example, 9"
             onChange={event => setGrade(event.target.value)} />
-          <p id={`${id}-grade-hint`} className="text-xs leading-5 text-muted-foreground">Use the grade the student is applying to enter.</p>
-        </div>
+        </Field>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable || !!linkedTransfer&&!linkedStudent || !!selectedTransfer&&(!confirmedDestination||!authorizedDestinationRecords)} aria-busy={busy}>
+          <Button type="submit" size="lg" disabled={busy || selection.unavailable || !!linkedTransfer&&!linkedStudent} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>

@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
+import { Route as StudentExperiences } from "@/routes/student.experiences";
 import { FamilyHomeView } from "@/components/home/GuardianHome";
 import { Route as GuardianAttendance } from "@/routes/guardian.attendance";
 import { Student360View } from "@/routes/staff.students.$personId";
@@ -16,6 +17,7 @@ vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useSearch: () => state.search, useLoaderData: () => state.data }),
   useRouter: () => ({ invalidate: vi.fn() }),
+  useSearch: () => state.search,
   Link: ({ to, search, params, children, activeOptions: _activeOptions, activeProps: _activeProps, ...props }: {
     to: string; search?: Record<string, string | undefined>; params?: Record<string, string>; children: ReactNode; activeOptions?: unknown; activeProps?: unknown;
   }) => {
@@ -64,6 +66,15 @@ describe("shared workspace presentation", () => {
     expect(html).toContain('data-width="wide"');
     expect(html).toContain("<aside");
     expect(html).toContain('href="/student/courses"');
+  });
+  it("gives student experiences one canonical main landmark", () => {
+    state.data = { ok: true, data: { quickWins: { connected: true, actions: [] }, school: null } };
+    const Page = StudentExperiences.options.component;
+    if (typeof Page !== "function") throw new Error("Missing student experiences component");
+    const html = renderToStaticMarkup(<Page />);
+    expect(html.match(/<main/g)).toHaveLength(1);
+    expect(html).toContain("Your actions");
+    expect(html).toContain("Your saved actions");
   });
 });
 

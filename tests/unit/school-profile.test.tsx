@@ -30,6 +30,12 @@ const render = (overrides: Partial<SchoolProfileData> = {}) => renderToStaticMar
 }} />);
 
 describe("School profile", () => {
+  it("preserves the profile while explicitly warning that the directory count is unavailable", () => {
+    const html = render({ siteCount: null });
+    expect(html).toContain("Valor School");
+    expect(html).toContain("number of authorized schools could not be verified");
+    expect(html).toContain('href="/sites"');
+  });
   it("names the school once and shows only authoritative counts", () => {
     const html = render();
     expect(html.match(/<h1/g)).toHaveLength(1);

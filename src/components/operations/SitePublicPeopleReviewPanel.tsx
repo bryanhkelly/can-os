@@ -1,4 +1,8 @@
 import {useEffect,useState} from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {
   listPublicSitePeopleReview,approveSitePeopleReview,
 } from "@/modules/sites/site-public-people.functions";
@@ -11,6 +15,7 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
   const [reviewed,setReviewed]=useState(false);
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState("");
+  const [attempted,setAttempted]=useState(false);
   useEffect(()=>{
     let active=true;
     listPublicSitePeopleReview({data:{siteId}}).then(result=>{
@@ -21,7 +26,8 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
   },[siteId]);
   async function approve(event:React.FormEvent){
     event.preventDefault();
-    if(!data||!reviewed)return;
+    setAttempted(true);
+    if(!data||!reviewed||reason.trim().length<10)return;
     setSaving(true);setStatus("");
     try{
       const result=await approveSitePeopleReview({data:{
@@ -29,7 +35,7 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
         reason,reviewed:true,
       }});
       setData({...data,revision:result.revision,approvedPersonIds:selected});
-      setReason("");setReviewed(false);
+      setReason("");setReviewed(false);setAttempted(false);
       setStatus("Reviewed staff directory saved. Live permissions are rechecked before every public read.");
     }catch{setStatus("Unable to approve staff. Refresh to check current consent and publication revision.")}
     finally{setSaving(false)}
@@ -41,7 +47,7 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
       Private photos and employment information are never included.
     </p>
     {!data?<p role="status" className="mt-2 text-sm">{status||"Loading consented staff…"}</p>:
-    <form onSubmit={approve} className="mt-4 space-y-3">
+    <form noValidate onSubmit={approve} className="mt-4 space-y-3">
       {data.candidates.length===0&&<p className="text-sm">No staff biographies are consented for this Site.</p>}
       {data.candidates.map(person=><label key={person.personId}
         className="flex gap-3 rounded-lg border p-3 text-sm">
@@ -57,19 +63,17 @@ export function SitePublicPeopleReviewPanel({siteId}:{siteId:string}) {
           <span className="mt-1 block text-xs">Consent valid through {person.expiresOn}</span>
         </span>
       </label>)}
-      <label className="block text-xs">Institutional review reason
-        <textarea className="mt-1 block w-full rounded border bg-background p-2 text-sm"
-          value={reason} onChange={event=>setReason(event.target.value)}
-          minLength={10} maxLength={500} required/>
-      </label>
-      <label className="flex gap-2 text-sm"><input type="checkbox" checked={reviewed}
-        onChange={event=>setReviewed(event.target.checked)} disabled={saving}/>
-        I reviewed the selected public biographies and their current permissions.
-      </label>
-      <button className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground"
-        disabled={!reviewed||reason.trim().length<10||saving} type="submit">
+      <Field label="Institutional review reason" className="text-xs" required
+        error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining this staff review.":undefined}>
+        <Textarea value={reason} onChange={event=>setReason(event.target.value)} minLength={10} maxLength={500}/>
+      </Field>
+      <Field label="I reviewed the selected public biographies and their current permissions." required
+        error={attempted&&!reviewed?"Confirm that you reviewed the selected biographies and permissions.":undefined}>
+        <Checkbox checked={reviewed} onChange={event=>setReviewed(event.target.checked)} disabled={saving}/>
+      </Field>
+      <Button type="submit" disabled={saving}>
         {saving?"Saving approval…":"Approve selected biographies"}
-      </button>
+      </Button>
       {status&&<p role="status" className="text-sm">{status}</p>}
     </form>}
   </section>;

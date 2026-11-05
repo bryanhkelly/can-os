@@ -9,13 +9,17 @@ import {
   listTranscriptIssuanceCandidates,
 } from "@/modules/learning/report-cards.functions";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 const loadTranscriptCandidates = (query: string) =>
   listTranscriptIssuanceCandidates({ data: { query } });
 
 export const Route = createFileRoute("/admissions/transcripts")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { query: string; student?: string } => ({
     query: typeof search.query === "string" ? search.query.slice(0, 100) : "",
+    student: typeof search.student === "string" ? search.student : undefined,
   }),
   loaderDeps: ({ search }) => ({ query: search.query }),
   loader: ({ deps }) => safeLoader(() => loadTranscriptCandidates(deps.query), {
@@ -31,6 +35,7 @@ function TranscriptIssuancePage() {
   }
   return <TranscriptIssuanceView
     query={Route.useSearch().query}
+    student={Route.useSearch().student}
     candidates={outcome.data.candidates}
     truncated={"truncated" in outcome.data && outcome.data.truncated === true}
   />;
@@ -40,10 +45,12 @@ type Candidates = Awaited<ReturnType<typeof loadTranscriptCandidates>>["candidat
 
 function TranscriptIssuanceView({
   query,
+  student,
   candidates,
   truncated,
 }: {
   query: string;
+  student?: string;
   candidates: Candidates;
   truncated: boolean;
 }) {
@@ -96,30 +103,28 @@ function TranscriptIssuanceView({
       {error && <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3 text-sm">{error}</p>}
       <MutationFeedback state={mutation} pendingMessage="Issuing official transcript..." className="mt-4"/>
       <form onSubmit={submitSearch} className="mt-6 flex flex-wrap items-end gap-3">
-        <label className="min-w-64 flex-1 text-sm font-semibold">
-          Student name
-          <input
+        <Field label="Student name" className="min-w-64 flex-1 text-sm font-semibold"
+          description="Search by at least two characters. Only students in your authorized school scope are returned.">
+          <Input
             value={search}
             onChange={event => setSearch(event.target.value)}
             maxLength={100}
-            className="mt-1 block w-full rounded-lg border bg-background p-3 font-normal"
             autoComplete="off"
           />
-        </label>
-        <button className="rounded-lg bg-foreground px-4 py-3 text-sm font-semibold text-background">
+        </Field>
+        <Button type="submit">
           Search
-        </button>
+        </Button>
       </form>
-      <label className="mt-4 block max-w-xl text-sm">
-        Issuance purpose (optional)
-        <input
+      <Field label="Issuance purpose (optional)" className="mt-4 max-w-xl text-sm">
+        <Input
           value={purpose}
           onChange={event => setPurpose(event.target.value)}
           maxLength={500}
-          className="mt-1 block w-full rounded-lg border bg-background p-3"
           placeholder="For example, college application"
         />
-      </label>
+      </Field>
+      {student && <Link to="/admissions/transcripts" search={{query}} className="mt-4 inline-block text-sm underline">All matching transcript candidates</Link>}
       {query.length < 2
         ? <p className="mt-6 rounded-lg border p-4 text-sm text-muted-foreground">
             Search by at least two characters. Only students with finalized grades or an approved W notation in your permitted sites and programs are returned.
@@ -129,10 +134,12 @@ function TranscriptIssuanceView({
               Too many transcript records match this search to verify credit issuers safely. Search with a more specific student name.
             </p>
           : <section aria-label="Transcript candidates" className="mt-6 space-y-3">
-            {candidates.map(candidate => (
+            {student && !candidates.some(candidate => candidate.studentPersonId === student) &&
+              <p role="status" className="rounded-lg border p-4 text-sm">This transcript candidate is unavailable in your current search and school scope.</p>}
+            {candidates.filter(candidate => !student || candidate.studentPersonId === student).map(candidate => (
               <article key={candidate.studentPersonId} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">
                 <div>
-                  <h2 className="font-semibold">{candidate.studentName}</h2>
+                  <h2 className="font-semibold"><Link to="/admissions/transcripts" search={{query,student:candidate.studentPersonId}} className="underline">{candidate.studentName}</Link></h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {candidate.recordCount} transcript record{candidate.recordCount === 1 ? "" : "s"}
                     {candidate.issuer ? ` · Credit issuer: ${candidate.issuer.name}` : ""}

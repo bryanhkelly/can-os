@@ -11,8 +11,11 @@ import {
   type CalendarFeedItem,
 } from "@/modules/calendar/calendar.functions";
 import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/timezone";
-import { calendarSources, filterCalendarItems, type CalendarSource } from "@/domain/calendar-view";
+import { calendarSources, calendarItemDestination, filterCalendarItems, type CalendarSource } from "@/domain/calendar-view";
 import { StatusBadge, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:"month"|"agenda"}=>({
@@ -92,6 +95,8 @@ function CalendarPage() {
   const [formDate, setFormDate] = useState("");
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("");
+  const [eventAttempted,setEventAttempted]=useState(false);
+  const [manageAttempted,setManageAttempted]=useState(false);
   const [manageMode, setManageMode] = useState<{ id: string; mode: "edit" | "reschedule" } | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -132,6 +137,12 @@ function CalendarPage() {
   },[search.date,search.event]);
 
   const visibleItems=useMemo(()=>filterCalendarItems(items,search),[items,search.source,search.section]);
+  function itemDestination(item: CalendarFeedItem) {
+    return calendarItemDestination(item, data?.viewerRole) ?? {
+      to: "/calendar" as const,
+      search: {...search, date: dateKeyInTimezone(item.startsAt,item.timezone), event: item.id},
+    };
+  }
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarFeedItem[]>();
     for (const item of visibleItems) {
@@ -156,6 +167,7 @@ function CalendarPage() {
   }, [year, month]);
 
   const isTeacher = data?.viewerRole === "teacher";
+  const isRoomFacilitator = data?.viewerRole === "room_facilitator";
   const monthLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
 
   const shiftMonth = (delta: number) => {
@@ -199,6 +211,7 @@ function CalendarPage() {
 
   const submitManage = (item: CalendarFeedItem) => {
     if (!manageMode || manageMode.id !== item.id) return;
+    setManageAttempted(true);
     if (manageMode.mode === "edit") {
       runRevision(
         { action: "edit", eventId: item.id, title: editTitle.trim(), description: editDescription.trim() || null },
@@ -206,7 +219,7 @@ function CalendarPage() {
       );
       return;
     }
-    if (!moveDate || !moveStart) return;
+    if (!moveDate || !moveStart || (moveEnd&&moveEnd<=moveStart)) return;
     try {
       const startsAt = dateTimeInputInTimezone(`${moveDate}T${moveStart}`, item.timezone);
       const endsAt = moveEnd ? dateTimeInputInTimezone(`${moveDate}T${moveEnd}`, item.timezone) : null;
@@ -225,7 +238,8 @@ function CalendarPage() {
 
   const submitEvent = () => {
     const title = formTitle.trim();
-    if (!title || !formDate || !formStart || saving) return;
+    setEventAttempted(true);
+    if (title.length<3 || !formDate || !formStart || (formEnd&&formEnd<=formStart) || saving) return;
     setError("");
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     let startsAt: string;
@@ -240,6 +254,7 @@ function CalendarPage() {
     void mutation.run(async () => {
         const result = await createPersonalEvent({ data: { title, startsAt, endsAt, timezone } });
         setFormTitle("");
+        setEventAttempted(false);
         return result;
       }, { successMessage: "Personal event saved.", commandErrorMessage: "Unable to save event." });
   };
@@ -305,6 +320,8 @@ function CalendarPage() {
       title={selectedEvent.title}
       subtitle={`${typeLabel(selectedEvent)} · ${formatEventDate(selectedEvent.startsAt, selectedEvent.timezone)} · ${eventTime}`}
       breadcrumbs={<><Link to="/calendar" search={{ ...search, event: undefined }} className="underline">Calendar</Link><span>/</span><span>{selectedEvent.title}</span></>}
+      actions={calendarItemDestination(selectedEvent, data?.viewerRole) &&
+        <Link {...itemDestination(selectedEvent)} className="text-sm font-semibold underline">Open assignment</Link>}
       rail={<WorkspacePanel title="Record context">
         <dl className="space-y-4 text-sm">
           <div>
@@ -350,12 +367,21 @@ function CalendarPage() {
             {selectedEvent.description || "No additional description has been provided."}
           </p>
         </WorkspacePanel>
+        {data?.viewerRole === "guardian" && selectedEvent.source === "assessment" &&
+          (selectedEvent.guardianStudents?.length ?? 0) > 1 && <WorkspacePanel title="Student assignments">
+          <ul className="space-y-3 text-sm">{selectedEvent.guardianStudents!.map(student => {
+            const destination = calendarItemDestination(selectedEvent, "guardian", student.studentPersonId);
+            return destination ? <li key={student.studentPersonId}>
+              <Link {...destination} className="font-semibold underline">{student.studentName} · {selectedEvent.title}</Link>
+            </li> : null;
+          })}</ul>
+        </WorkspacePanel>}
       </div>
     </WorkspaceShell>;
   }
 
   return (
-    <WorkspaceShell width="wide" eyebrow="Calendar" title="Calendar" subtitle="Site and section events, assignment due dates, and your personal events in one calendar.">
+    <WorkspaceShell width="wide" eyebrow={isRoomFacilitator ? "My Room" : "Calendar"} title={isRoomFacilitator ? "Room schedule" : "Calendar"} subtitle={isRoomFacilitator ? "School events and events for Sections assigned to your room." : "Site and section events, assignment due dates, and your personal events in one calendar."}>
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3">
           <nav aria-label="Calendar view" className="flex gap-2 text-sm">
             {(["month","agenda"] as const).map(view=><Link key={view} to="/calendar" search={{...search,view}} aria-current={(search.view??"month")===view?"page":undefined}
@@ -363,9 +389,10 @@ function CalendarPage() {
           </nav>
           <label className="text-sm">Show
             <select value={search.source??""} onChange={event=>void navigate({search:{...search,source:calendarSources.find(source=>source===event.target.value),event:undefined}})} className="ml-2 rounded-lg border bg-background p-2">
-              <option value="">All event types</option>
-              <option value="section">Class events</option><option value="assessment">Assignment deadlines</option>
-              <option value="site">School events</option><option value="personal">Personal</option><option value="study_group">Study groups</option>
+              <option value="">{isRoomFacilitator ? "All room events" : "All event types"}</option>
+              <option value="section">Class events</option>{!isRoomFacilitator&&<><option value="assessment">Assignment deadlines</option>
+              <option value="personal">Personal</option><option value="study_group">Study groups</option></>}
+              <option value="site">School events</option>
             </select>
           </label>
           {search.section&&<><span className="text-sm">Selected class only</span><Link to="/calendar" search={{...search,section:undefined,event:undefined}} className="text-sm underline">Show all classes</Link></>}
@@ -386,7 +413,7 @@ function CalendarPage() {
           {search.view==="agenda"?<section aria-label="Calendar agenda" className="rounded-xl border bg-card p-5">
             <h2 className="font-semibold">Agenda · {monthLabel}</h2>
             <ul className="mt-4 divide-y">{visibleItems.map(item=><li key={item.id} className="py-4">
-              <Link to="/calendar" search={{...search,date:dateKeyInTimezone(item.startsAt,item.timezone),event:item.id}} className="font-semibold underline">{item.title}</Link>
+              <Link {...itemDestination(item)} className="font-semibold underline">{item.title}</Link>
               <p className="mt-1 text-sm text-muted-foreground">{dateKeyInTimezone(item.startsAt,item.timezone)} · {formatTime(item.startsAt,item.timezone)} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
             </li>)}</ul>
             {!visibleItems.length&&!loading&&<p className="mt-4 text-sm text-muted-foreground">No events match this calendar view.</p>}
@@ -423,8 +450,7 @@ function CalendarPage() {
                       {(byDay.get(cell.key) ?? []).map((item) => (
                         <Link
                           key={item.id}
-                          to="/calendar"
-                          search={{ ...search, date: cell.key, event: item.id }}
+                          {...itemDestination(item)}
                           draggable={isTeacher && item.source === "assessment"}
                           onDragStart={(event) => onDragStart(event, item)}
                           title={`${typeLabel(item)} · ${item.title}`}
@@ -453,9 +479,7 @@ function CalendarPage() {
                 {selectedItems.map((item) => (
                   <li key={item.id} className={`rounded-lg border p-3 text-sm ${search.event===item.id?"ring-2 ring-primary ":""}${item.cancelled ? "border-red-200 bg-red-50/40" : "border-border"}`}>
                     <p className="font-semibold">
-                      {item.source==="assessment"&&data?.viewerRole==="student"
-                        ? <Link to="/student/assignments" search={{assessment:item.id.slice("assessment:".length)}} className="underline">{item.title}</Link>
-                        : <Link to="/calendar" search={{...search,date:dateKeyInTimezone(item.startsAt,item.timezone),event:item.id}} className="underline">{item.title}</Link>}
+                      <Link {...itemDestination(item)} className="underline">{item.title}</Link>
                       {item.cancelled && <span className="ml-2 rounded border border-red-300 px-1 py-0.5 text-3xs font-semibold uppercase tracking-wide text-red-700">Cancelled</span>}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -497,19 +521,16 @@ function CalendarPage() {
 
                     {manageMode?.id === item.id && manageMode.mode === "reschedule" && (
                       <div className="mt-2 space-y-2 border-t border-border pt-2">
-                        <label className="block text-xs">
-                          Date
-                          <input type="date" value={moveDate} onChange={(event) => setMoveDate(event.target.value)} required className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
-                        </label>
+                        <Field label="Date" className="text-xs" required error={manageAttempted&&!moveDate?"Choose a date.":undefined}>
+                          <Input type="date" value={moveDate} onChange={(event) => setMoveDate(event.target.value)}/>
+                        </Field>
                         <div className="grid grid-cols-2 gap-3">
-                          <label className="block text-xs">
-                            Start
-                            <input type="time" value={moveStart} onChange={(event) => setMoveStart(event.target.value)} required className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
-                          </label>
-                          <label className="block text-xs">
-                            End (optional)
-                            <input type="time" value={moveEnd} onChange={(event) => setMoveEnd(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
-                          </label>
+                          <Field label="Start" className="text-xs" required error={manageAttempted&&!moveStart?"Choose a start time.":undefined}>
+                            <Input type="time" value={moveStart} onChange={(event) => setMoveStart(event.target.value)}/>
+                          </Field>
+                          <Field label="End (optional)" className="text-xs" error={manageAttempted&&moveEnd&&moveEnd<=moveStart?"Choose an end after the start.":undefined}>
+                            <Input type="time" value={moveEnd} onChange={(event) => setMoveEnd(event.target.value)}/>
+                          </Field>
                         </div>
                         <p className="text-xs text-muted-foreground">Times use {item.timezone}.</p>
                       </div>
@@ -517,8 +538,8 @@ function CalendarPage() {
 
                     {manageMode?.id === item.id && (
                       <div className="mt-2 flex gap-2">
-                        <button type="button" disabled={saving} onClick={() => submitManage(item)} className="rounded bg-foreground px-2 py-1 text-xs font-semibold text-background disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
-                        <button type="button" onClick={() => setManageMode(null)} className="rounded border border-border px-2 py-1 text-xs font-semibold">Back</button>
+                        <Button type="button" variant="outline" disabled={saving} size="sm" onClick={() => submitManage(item)}>{saving ? "Saving…" : "Save"}</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => {setManageMode(null);setManageAttempted(false);}}>Back</Button>
                       </div>
                     )}
                   </li>
@@ -527,8 +548,8 @@ function CalendarPage() {
               </ul>
             )}
 
-            {selectedDay && (
-              <form
+            {selectedDay && !isRoomFacilitator && (
+              <form noValidate
                 className="mt-6 border-t border-border pt-4"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -536,55 +557,40 @@ function CalendarPage() {
                 }}
               >
                 <h4 className="text-sm font-semibold">Add event</h4>
-                <label className="mt-3 block text-xs">
-                  Title
-                  <input
+                <Field label="Title" className="mt-3 text-xs" required
+                  error={eventAttempted&&formTitle.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
+                  <Input
                     value={formTitle}
                     onChange={(event) => setFormTitle(event.target.value)}
-                    required
                     minLength={3}
                     maxLength={200}
-                    className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"
                   />
-                </label>
-                <label className="mt-3 block text-xs">
-                  Date
-                  <input
+                </Field>
+                <Field label="Date" className="mt-3 text-xs" required error={eventAttempted&&!formDate?"Choose an event date.":undefined}>
+                  <Input
                     type="date"
                     value={formDate}
                     onChange={(event) => setFormDate(event.target.value)}
-                    required
-                    className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"
                   />
-                </label>
+                </Field>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <label className="block text-xs">
-                    Start
-                    <input
+                  <Field label="Start" className="text-xs" required error={eventAttempted&&!formStart?"Choose a start time.":undefined}>
+                    <Input
                       type="time"
                       value={formStart}
                       onChange={(event) => setFormStart(event.target.value)}
-                      required
-                      className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"
                     />
-                  </label>
-                  <label className="block text-xs">
-                    End (optional)
-                    <input
+                  </Field>
+                  <Field label="End (optional)" className="text-xs"
+                    error={eventAttempted&&formEnd&&formEnd<=formStart?"Choose an end after the start.":undefined}>
+                    <Input
                       type="time"
                       value={formEnd}
                       onChange={(event) => setFormEnd(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"
                     />
-                  </label>
+                  </Field>
                 </div>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="mt-4 w-full rounded-lg bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save personal event"}
-                </button>
+                <Button type="submit" disabled={saving} className="mt-4 w-full">{saving ? "Saving…" : "Save personal event"}</Button>
               </form>
             )}
 

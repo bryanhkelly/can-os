@@ -1,6 +1,14 @@
-import { cloneElement, useId, type AriaAttributes, type ReactElement, type ReactNode } from "react";
+import { cloneElement, forwardRef, useId, type AriaAttributes, type HTMLAttributes, type ReactElement, type ReactNode } from "react";
 import { Label } from "./label";
 import { cn } from "@/lib/utils";
+
+export const FieldError = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
+  ({ id, className, children, ...props }, ref) => {
+    if (!children) return null;
+    return <p ref={ref} id={id} role="alert" className={cn("text-sm text-destructive", className)} {...props}>{children}</p>;
+  },
+);
+FieldError.displayName = "FieldError";
 
 export function Field({ label, description, error, required, children, className }: {
   label: ReactNode;
@@ -30,6 +38,6 @@ export function Field({ label, description, error, required, children, className
       "aria-describedby": describedBy,
     })}
     {description && <p id={descriptionId} className="text-sm text-muted-foreground">{description}</p>}
-    {error && <p id={errorId} role="alert" className="text-sm text-destructive">{error}</p>}
+    <FieldError id={errorId}>{error}</FieldError>
   </div>;
 }

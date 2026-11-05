@@ -16,11 +16,15 @@ import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, SectionTab, Sta
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import {z} from "zod";
-import {optionalSearchUuid,siteProgramSelectionSchema} from "@/lib/route-search";
+import {optionalSearchUuid,siteProgramHref,siteProgramSelectionSchema} from "@/lib/route-search";
 import { PageNavigation } from "@/components/workspace/page-navigation";
 import { SiteProgramFields } from "@/components/workspace/site-program-fields";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { plural } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 
 const admissionsSearchSchema=siteProgramSelectionSchema.extend({
  application:optionalSearchUuid,
@@ -78,10 +82,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   const pageCount=Math.max(1,Math.ceil(filteredTotal/pageSize));
   const activeEnrollmentCount=enrollmentCounts.reduce((total,row)=>total+row.activeStudents,0);
   const openScope=(siteId?:string,programId?:string)=>{
-    const query=new URLSearchParams();
-    if(siteId)query.set("siteId",siteId);
-    if(programId)query.set("programId",programId);
-    void router.navigate({href:"/admissions"+(query.size?"?"+query.toString():"")});
+    void router.navigate({href:siteProgramHref("/admissions",{siteId,programId})});
   };
   const router = useRouter();
   const mutation = useMutationFeedback(() => router.invalidate());
@@ -273,6 +274,7 @@ function nextStep(row:AdmissionsRow){
 function OfferWithdrawal({offerId}:{offerId:string}){
  const router=useRouter();
  const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
+ const [attempted,setAttempted]=useState(false);
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
  const [error,setError]=useState("");
@@ -280,21 +282,23 @@ function OfferWithdrawal({offerId}:{offerId:string}){
   <summary>Withdraw an unaccepted offer</summary>
   <p className="mt-2">This releases the offered seat without deleting the application or its history.
    Accepted offers and active enrollments cannot be withdrawn here.</p>
-  <form className="mt-3 space-y-3" onSubmit={async event=>{
+  <form noValidate className="mt-3 space-y-3" onSubmit={async event=>{
    event.preventDefault();
-   if(!confirmed||reason.trim().length<10){setError("Enter a withdrawal reason and confirm the family notification.");return;}
+   setAttempted(true);
+   if(!confirmed||reason.trim().length<10)return;
    setError("");
    await mutation.run(()=>withdrawIssuedAdmissionOffer({data:{offerId,reason,confirmed:true}}),{
     successMessage:"Offer withdrawn. The family will be notified.",commandErrorMessage:"Unable to withdraw offer"});
   }}>
-   <label className="block">Reason for withdrawal (internal)
-    <textarea required minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}
-     className="mt-1 block w-full rounded border bg-background p-2"/>
-   </label>
-   <label className="flex items-start gap-2"><input type="checkbox" required checked={confirmed}
-    onChange={event=>setConfirmed(event.target.checked)}/>I confirm withdrawal of this unaccepted offer. The family will be notified.</label>
-   <button type="submit" disabled={busy||!confirmed||reason.trim().length<10}
-    className="rounded border px-3 py-2 disabled:opacity-50">Withdraw offer</button>
+   <Field label="Reason for withdrawal (internal)" required
+    error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining the withdrawal.":undefined}>
+    <Textarea minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/>
+   </Field>
+   <Field label="I confirm withdrawal of this unaccepted offer. The family will be notified." required
+    error={attempted&&!confirmed?"Confirm the withdrawal and family notification.":undefined}>
+    <Checkbox checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
+   </Field>
+   <Button type="submit" variant="outline" disabled={busy}>Withdraw offer</Button>
    {error&&<p role="alert">{error}</p>}
    <MutationFeedback state={mutation} pendingMessage="Withdrawing offer..."/>
   </form>

@@ -255,7 +255,9 @@ describe("application contextual navigation",()=>{
       schoolDay:{
         staffing:{blocks:[],unassignedOrConflicting:0,missingAdultReports:0,substitutions:0,
           unacknowledged:0,coverageExceptions:0,witnessedBlocks:0},
-        students:[],projectionTruncated:false,note:"Source-derived school-day projection",
+        students:[{programId:"program",studentProfileId:"student-profile",studentName:"Jordan Student",
+          programName:"Test program",status:"absent",dismissalStatus:"not_applicable"}],
+        projectionTruncated:false,note:"Source-derived school-day projection",
         exceptions:{pendingGuardianExplanations:0,healthVisits:0,sentHome:0,incidents:0,
           emergencyHolds:0,openIncidents:0,uncollectedFollowUps:0},
       },
@@ -267,10 +269,13 @@ describe("application contextual navigation",()=>{
     expect(html).toContain('href="/admissions?siteId=school"');
     expect(html).toContain('href="/operations/launch/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
+    expect(html).toContain('href="/staff/attendance?programId=program&amp;date=2030-01-01&amp;student=student-profile" class="underline">Jordan Student</a>');
     expect(html).not.toContain('href="/home"');
 
     successful({...siteData,canOpenOnsiteDay:true});
-    expect(render(Site)).toContain('href="/home"');
+    expect(render(Site)).toContain('href="/home?siteId=school&amp;date=2030-01-01&amp;view=onsite"');
+    expect(html).toContain("America/Los_Angeles");
+    expect(html).not.toContain("in the site timezone");
   });
 
   it("routes a handoff to its owning workspace without generic resolve or reassignment controls",()=>{

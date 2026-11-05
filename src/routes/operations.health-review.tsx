@@ -64,7 +64,7 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
   {!items.length&&<p className="mt-5 rounded border p-4 text-sm">No pending family medical updates in your authorized schools.</p>}
   <div className="mt-6 space-y-5">
    {visible.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
-    <h2 className="text-lg font-semibold">{item.studentName}</h2>
+    <h2 className="text-lg font-semibold"><Link to="/operations/health-review" search={{action:item.id}} className="underline">{item.studentName}</Link></h2>
     <p className="mt-1 text-xs text-muted-foreground">Submitted {new Date(item.requestedAt).toLocaleString()} · Confidential medical review</p>
     <p className="mt-3 text-sm text-muted-foreground">
      Compare the existing school-approved record with the family's proposal before deciding.

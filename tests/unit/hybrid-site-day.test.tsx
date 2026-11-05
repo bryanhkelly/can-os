@@ -3,10 +3,12 @@ vi.mock("@/components/operations/RoomCoverageWorkspace",()=>({RoomCoverageWorksp
 vi.mock("@/modules/operations/onsite-room-plan.functions",()=>({getOnsiteRoomPlanningFn:vi.fn(),submitOnsiteRoomPlanFn:vi.fn(),reviewOnsiteRoomPlanFn:vi.fn()}));
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { SiteDayPage } from "@/components/operations/SiteDayPage";
 import { getWorkspaceHome, getWorkspaceLinks, workspaceLinks } from "@/components/shell/workspace-navigation.registry";
 
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router", async importOriginal => ({
   ...await importOriginal<typeof import("@tanstack/react-router")>(),
   createFileRoute: () => (config: unknown) => config,
@@ -14,6 +16,7 @@ vi.mock("@tanstack/react-router", async importOriginal => ({
 }));
 vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
   getOnsiteStaffDayContext: vi.fn(),
+  getSiteDayOpeningStatuses: vi.fn(),
   listExpectedOnsiteRoster: vi.fn(),
   markExpectedOnsiteAttendance: vi.fn(),
 }));
@@ -43,6 +46,10 @@ vi.mock("@/modules/operations/pickup.functions",()=>({
 }));
 
 describe("Hybrid Site daily facilitator workspace",()=>{
+  const renderSiteDay = () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return renderToStaticMarkup(<QueryClientProvider client={client}><SiteDayPage /></QueryClientProvider>);
+  };
   it("links only site-day and no grades, counseling or generic case consoles",()=>{
     for(const role of ["room_facilitator","site_staff","site_leader"]){
       expect(getWorkspaceHome(role)).toBe("/home");
@@ -55,11 +62,10 @@ describe("Hybrid Site daily facilitator workspace",()=>{
       {title:"Home",path:"/home",icon:"home"},
       {title:"Report a safety concern",path:"/safeguarding",icon:"safety"},
       {title:"My profile",path:"/profiles",icon:"users"},
-      {title:"Messages",path:"/messages",icon:"messages"},
     ]);
   });
   it("explains the boundary between physical presence, online activity and student release",()=>{
-    const html=renderToStaticMarkup(<SiteDayPage />);
+    const html=renderSiteDay();
     expect(html).toContain("Site Today");
     expect(html).toContain("Online learning activity is not proof of physical presence");
     expect(html).toContain("arrival marks do not authorize student release");

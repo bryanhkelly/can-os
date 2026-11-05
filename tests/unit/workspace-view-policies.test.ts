@@ -1,9 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { filterCalendarItems } from "@/domain/calendar-view";
+import { calendarItemDestination, filterCalendarItems } from "@/domain/calendar-view";
 import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
 import { launchReadiness } from "@/domain/launch-readiness";
 
 describe("calendar view filters", () => {
+  it("binds guardian assignment links to an authorized child without guessing between siblings", () => {
+    const first = { studentPersonId: "jordan", studentName: "Jordan Student" };
+    const second = { studentPersonId: "casey", studentName: "Casey Student" };
+    const item = { id: "assessment:essay", source: "assessment" as const,
+      sectionId: "english", guardianStudents: [first] };
+    expect(calendarItemDestination(item, "guardian")).toEqual({
+      to: "/guardian/academics", search: { student: "jordan", section: "english", assessment: "essay" },
+    });
+    const siblings = { ...item, guardianStudents: [first, second] };
+    expect(calendarItemDestination(siblings, "guardian")).toBeNull();
+    expect(calendarItemDestination(siblings, "guardian", "casey")).toEqual({
+      to: "/guardian/academics", search: { student: "casey", section: "english", assessment: "essay" },
+    });
+    expect(calendarItemDestination(siblings, "guardian", "unrelated")).toBeNull();
+    expect(calendarItemDestination({ ...item, guardianStudents: [] }, "guardian")).toBeNull();
+  });
+  it("opens deadlines in the exact role-specific assignment workspace", () => {
+    const item = { id: "assessment:essay", source: "assessment" as const, sectionId: "english" };
+    expect(calendarItemDestination(item, "student")).toEqual({
+      to: "/student/assignments", search: { section: "english", assessment: "essay" },
+    });
+    expect(calendarItemDestination(item, "teacher")).toEqual({
+      to: "/teacher/gradebook", search: { section: "english", assessment: "essay" },
+    });
+    expect(calendarItemDestination(item, "guardian")).toBeNull();
+    expect(calendarItemDestination({ ...item, sectionId: null }, "teacher")).toBeNull();
+    expect(calendarItemDestination({ ...item, id: "assessment:" }, "student")).toBeNull();
+    expect(calendarItemDestination({ ...item, id: "essay" }, "student")).toBeNull();
+    expect(calendarItemDestination({ ...item, source: "section" }, "student")).toBeNull();
+  });
   const items = [
     { id: "lesson", source: "section" as const, sectionId: "english" },
     { id: "essay", source: "assessment" as const, sectionId: "english" },

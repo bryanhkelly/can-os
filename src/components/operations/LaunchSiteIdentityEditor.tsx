@@ -2,7 +2,7 @@ import {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
-import {Select} from "@/components/ui/select";
+import {SiteTimezoneField} from "@/components/workspace/SiteTimezoneField";
 
 /** Safe draft-only identity editor. Public address/slug is deliberately immutable here. */
 export function LaunchSiteIdentityEditor({
@@ -18,9 +18,6 @@ export function LaunchSiteIdentityEditor({
   const [reason,setReason]=useState("");
   const [editing,setEditing]=useState(false);
   const [error,setError]=useState("");
-  const zones=[...new Set([timezone,"America/Los_Angeles","America/Denver",
-    "America/Chicago","America/New_York","America/Phoenix","America/Anchorage",
-    "Pacific/Honolulu","UTC",...Intl.supportedValuesOf("timeZone")])].filter(Boolean);
   return <section className="rounded-lg border p-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-sm font-semibold">School Site identity</p>
@@ -40,12 +37,7 @@ export function LaunchSiteIdentityEditor({
       <Field label="School location name" required>
         <Input value={name} onChange={e=>setName(e.target.value)}/>
       </Field>
-      <Field label="School time zone" required>
-        <Select value={timezone} onChange={e=>setTimezone(e.target.value)}>
-          <option value="">Choose a time zone…</option>
-          {zones.map(zone=><option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
-        </Select>
-      </Field>
+      <SiteTimezoneField label="School time zone" value={timezone} onChange={setTimezone} />
       <Field label="Reason for changing Site identity" required>
         <Input value={reason} onChange={e=>setReason(e.target.value)}
           placeholder="E.g., corrected campus display name"/>

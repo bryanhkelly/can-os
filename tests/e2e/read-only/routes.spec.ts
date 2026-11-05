@@ -1,21 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
-const publicRoutes = [
-  ["/access", "Access CAN OS"],
-  ["/schools/new", "Create a school"],
-  ["/church/apply", "Bring a school to your church"],
-  ["/family/join", "Confirm your school application email"],
-] as const;
-
-const protectedRoutes = [
-  "/home", "/student/courses", "/student/assignments", "/student/discussions",
-  "/student/my-school", "/student/report-card", "/student/support", "/student/settings",
-  "/home", "/teacher/gradebook", "/teacher/missing-work", "/teacher/discussions",
-  "/home", "/guardian/academics", "/guardian/attendance", "/guardian/admission-offers",
-  "/classes", "/sites", "/calendar", "/messages", "/notifications",
-  "/home", "/operations/curriculum", "/operations/launch", "/admissions",
-  "/staff/students", "/home", "/profiles", "/account/sessions",
-] as const;
+const smokeManifest = JSON.parse(readFileSync(new URL("../route-smoke-manifest.json", import.meta.url), "utf8")) as {
+  publicRoutes: readonly (readonly [string, string])[];
+  signedOutRoutes: readonly string[];
+};
+const publicRoutes = smokeManifest.publicRoutes;
+const protectedRoutes = smokeManifest.signedOutRoutes;
 
 test.beforeEach(async ({ page }) => {
   // These checks neither authenticate nor submit business commands.

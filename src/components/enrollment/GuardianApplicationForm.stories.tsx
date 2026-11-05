@@ -22,10 +22,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 async function fillRequiredFields(canvas: ReturnType<typeof within>) {
-  await userEvent.selectOptions(canvas.getByLabelText("Application academic year"), "school-year-story");
-  await userEvent.type(canvas.getByLabelText("Student legal first name"), "Jordan");
-  await userEvent.type(canvas.getByLabelText("Student legal last name"), "Lee");
-  await userEvent.type(canvas.getByLabelText("Entering grade level"), "9");
+  await userEvent.selectOptions(canvas.getByLabelText(/Application academic year/), "school-year-story");
+  await userEvent.type(canvas.getByLabelText(/Student legal first name/), "Jordan");
+  await userEvent.type(canvas.getByLabelText(/Student legal last name/), "Lee");
+  await userEvent.type(canvas.getByLabelText(/Entering grade level/), "9");
 }
 
 export const Ready: Story = {};
@@ -34,7 +34,7 @@ export const RequiredFieldValidation: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Submit application" }));
-    const firstName = canvas.getByLabelText("Student legal first name") as HTMLInputElement;
+    const firstName = canvas.getByLabelText(/Student legal first name/) as HTMLInputElement;
     await expect(firstName.validity.valueMissing).toBe(true);
     await expect(args.onSubmit).not.toHaveBeenCalled();
   },
@@ -59,7 +59,7 @@ export const Loading: Story = {
     await fillRequiredFields(canvas);
     await userEvent.click(canvas.getByRole("button", { name: "Submit application" }));
     await expect(canvas.getByRole("button", { name: "Submitting application…" })).toBeDisabled();
-    await expect(canvas.getByLabelText("Student legal first name")).toBeDisabled();
+    await expect(canvas.getByLabelText(/Student legal first name/)).toBeDisabled();
   },
 };
 
@@ -72,7 +72,7 @@ export const ServerError: Story = {
     const alert = await canvas.findByRole("alert");
     await expect(alert).toHaveTextContent("Unable to submit application");
     await expect(alert).not.toHaveTextContent("The application could not be saved. Try again.");
-    await expect(canvas.getByLabelText("Student legal first name")).toHaveValue("Jordan");
+    await expect(canvas.getByLabelText(/Student legal first name/)).toHaveValue("Jordan");
     await expect(canvas.getByRole("button", { name: "Submit application" })).toBeEnabled();
     await waitFor(() => expect(alert).toHaveFocus());
   },
@@ -105,7 +105,7 @@ export const ProgramDeepLinkChange: Story = {
   render: () => <ProgramDeepLinkHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const select = canvas.getByLabelText("School and program") as HTMLSelectElement;
+    const select = canvas.getByLabelText(/School and program/) as HTMLSelectElement;
     await expect(select).toHaveValue("program-one");
     await userEvent.click(canvas.getByRole("button", { name: "Switch program deep link" }));
     await waitFor(() => expect(select).toHaveValue("program-two"));
