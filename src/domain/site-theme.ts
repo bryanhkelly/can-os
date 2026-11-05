@@ -6,6 +6,31 @@ export const sitePaletteIds = ["signature","heritage","forest","copper","coastal
 export type SitePaletteId = typeof sitePaletteIds[number];
 export const siteTypographyIds = ["editorial","traditional","contemporary"] as const;
 export type SiteTypographyId = typeof siteTypographyIds[number];
+/** Independent presentation architecture, not a palette alias. */
+export const schoolSiteTemplateIds = ["heritage","community","modern","bright","summit"] as const;
+export type SchoolSiteTemplateId = typeof schoolSiteTemplateIds[number];
+export const schoolSiteTemplateNames: Record<SchoolSiteTemplateId,string> = {
+  heritage:"Heritage Academy",community:"Community & Faith",
+  modern:"Modern Learning",bright:"Bright Futures",summit:"Summit Preparatory",
+};
+/** Bounded system-font menu; no arbitrary CSS, font upload, or remote stylesheet. */
+export const schoolSiteFontIds = ["editorial","classic","humanist","modern","rounded","literary","technical","narrow"] as const;
+export type SchoolSiteFontId = typeof schoolSiteFontIds[number];
+export const schoolSiteFontNames:Record<SchoolSiteFontId,string> = {
+  editorial:"Editorial serif",classic:"Classic serif",humanist:"Humanist sans",
+  modern:"Modern sans",rounded:"Friendly sans",literary:"Literary serif",
+  technical:"Technical sans",narrow:"Condensed sans",
+};
+const schoolSiteFontStacks:Record<SchoolSiteFontId,string> = {
+  editorial:"Georgia, Cambria, 'Times New Roman', serif",
+  classic:"Cambria, Georgia, 'Times New Roman', serif",
+  humanist:"'Trebuchet MS', Arial, sans-serif",
+  modern:"Arial, Helvetica, sans-serif",
+  rounded:"'Trebuchet MS', Verdana, sans-serif",
+  literary:"'Palatino Linotype', Palatino, Georgia, serif",
+  technical:"Verdana, Geneva, sans-serif",
+  narrow:"'Arial Narrow', Arial, sans-serif",
+};
 
 export type ProposedChurchBrand = {
   siteId: string;
@@ -55,7 +80,7 @@ export function contrastRatio(a: string,b: string): number {
   return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
 }
 
-export function resolveSiteTheme(paletteId?: string, typographyId?: string): SiteTheme {
+export function resolveSiteTheme(paletteId?: string, typographyId?: string, headingFontId?: string, bodyFontId?: string): SiteTheme {
   const palette = sitePaletteIds.includes(paletteId as SitePaletteId)
     ? paletteId as SitePaletteId : "signature";
   const typography = siteTypographyIds.includes(typographyId as SiteTypographyId)
@@ -67,7 +92,10 @@ export function resolveSiteTheme(paletteId?: string, typographyId?: string): Sit
     return resolveSiteTheme("signature","editorial");
   }
   return {paletteId:palette,typographyId:typography,...colors,
-    displayFont:type.display,bodyFont:type.body,onDark:"#ffffff"};
+    displayFont:schoolSiteFontIds.includes(headingFontId as SchoolSiteFontId)
+      ?schoolSiteFontStacks[headingFontId as SchoolSiteFontId]:type.display,
+    bodyFont:schoolSiteFontIds.includes(bodyFontId as SchoolSiteFontId)
+      ?schoolSiteFontStacks[bodyFontId as SchoolSiteFontId]:type.body,onDark:"#ffffff"};
 }
 
 /** P may suggest but never publish. No network fetch or imported font binary. */
