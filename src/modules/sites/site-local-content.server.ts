@@ -93,6 +93,17 @@ export async function publishPartnerLocalContentWithinTransaction(
       content = normalizeSiteLocalContent(input.content);
     }
 
+    // The "original" behind Reset is fixed on the first saved Site revision.
+    // An editor may change any displayed wording, but subsequent requests
+    // cannot silently replace that baseline. History restores retain it too.
+    const original = latest?.content.editorialBaseline;
+    if (original && input.operation === "restore") {
+      content = { ...content, editorialBaseline: original };
+    } else if (original &&
+      JSON.stringify(content.editorialBaseline) !== JSON.stringify(original)) {
+      throw new Error("The original website copy cannot be replaced after its first save");
+    }
+
     const classified = classifySiteLocalContent(content);
     // Drafts are immutable, private revisions; never overwrite published content.
     // Protected claims are screened again when the editor requests publication.
