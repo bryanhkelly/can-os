@@ -53,7 +53,7 @@ jobs:
       - name: Generate TanStack route types and verify compilation
         run: npm run build
       - name: Source safety and URL unit tests
-        run: npx vitest run src/domain/church-source-references.test.ts src/domain/church-brand-suggestions.test.ts src/domain/church-source-editorial-safety.test.ts src/domain/church-web-fetch-diagnostics.test.ts src/modules/sites/church-public-web-fetch.server.test.ts src/modules/sites/church-content-suggestions.server.test.ts tests/unit/site-local-content-command.test.ts tests/unit/site-local-content.test.ts tests/unit/site-theme.test.ts tests/unit/website-studio-templates.test.tsx src/components/shell/workspace-navigation.registry.test.ts
+        run: npx vitest run src/domain/church-source-references.test.ts src/domain/church-brand-suggestions.test.ts src/domain/church-source-editorial-safety.test.ts src/domain/church-web-fetch-diagnostics.test.ts src/modules/sites/church-public-web-fetch.server.test.ts src/modules/sites/church-content-suggestions.server.test.ts tests/unit/site-local-content-command.test.ts tests/unit/site-local-content.test.ts tests/unit/website-editorial-starter.test.ts tests/unit/site-theme.test.ts tests/unit/website-studio-templates.test.tsx src/components/shell/workspace-navigation.registry.test.ts
       - name: Migration chain check
         run: npx drizzle-kit check
       - name: Detect uncommitted migration delta
