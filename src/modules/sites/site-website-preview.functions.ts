@@ -19,11 +19,12 @@ export const getPartnerWebsitePreviewView = createServerFn({ method: "GET" })
 
 import {
   siteLocalContentLimits, siteLocalImageConsentStates, siteLocalImageMaxBase64Length,
-  siteLocalThemes, normalizeSiteLocalContent,
+  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds,
 } from "@/domain/site-local-content";
 import { publishPartnerLocalContent } from "./site-local-content.server";
 
 const localFields = {
+  heroHeadline: z.string().max(siteLocalContentLimits.heroHeadline).optional(),
   welcomeMessage: z.string().max(siteLocalContentLimits.welcomeMessage),
   localDescription: z.string().max(siteLocalContentLimits.localDescription),
   denomination: z.string().max(siteLocalContentLimits.denomination),
@@ -35,8 +36,15 @@ const localFields = {
   leadershipWelcome: z.string().max(siteLocalContentLimits.leadershipWelcome).optional(),
   localTraditions: z.string().max(siteLocalContentLimits.localTraditions).optional(),
 };
+const starterFieldSchemas = Object.fromEntries(websiteStarterFieldIds.map(field =>
+  [field, z.string().max(siteLocalContentLimits[field])],
+)) as { [K in typeof websiteStarterFieldIds[number]]: z.ZodString };
 const localContentSchema = z.object({
   ...localFields,
+  editorialBaseline: z.object({
+    version: z.literal(1),
+    fields: z.object(starterFieldSchemas).strict(),
+  }).strict().optional(),
   branding: z.object({
     theme: z.enum(siteLocalThemes),
     paletteId: z.enum(sitePaletteIds).optional(),
