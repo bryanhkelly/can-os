@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
 import { siteWebsiteDraftReadCapability } from "@/domain/site-publication-policy";
+import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
 
 const state = vi.hoisted(() => ({
   sites: [] as Array<{ id: string; organizationId: string; name: string; organizationName: string }>,
@@ -141,6 +142,22 @@ describe("read-only church partner website", () => {
       "publicInformationReadiness", "siteId", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
+  });
+
+  it("renders proposed editor copy only inside the private scoped draft preview", async () => {
+    const initial = await getPartnerWebsitePreview(editor());
+    expect(initial.previewHtml).toContain("<h1>Partner Academy</h1>");
+    state.reads = 0;
+    const proposal = createSchoolWebsiteStarterContent("Partner Academy");
+    const draft = await getPartnerWebsitePreview(editor(), proposal);
+    expect(draft.previewHtml).toContain("<h1>A place to belong. A future to build.</h1>");
+    expect(draft.previewHtml).toContain("Partner Academy");
+    expect(draft.previewPages["/"]).toContain(proposal.localDescription);
+    expect(draft.editingContent).toBeNull();
+    expect(draft.localContentStatus).toBeNull();
+    expect(draft.previewHtml).not.toContain("editorialBaseline");
+    expect(draft.previewHtml).not.toContain("<script");
+    // The private preview is read-only. Published local content is never updated.
   });
 
   it("allows viewing without local publish privilege, but hides publishing controls", async () => {
