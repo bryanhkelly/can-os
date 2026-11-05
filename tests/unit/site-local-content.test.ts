@@ -170,7 +170,16 @@ describe("PUB-18: distributed church website ownership", () => {
       offerings: [], localContent: content,
     });
     expect(content.branding.theme).toBe("warm");
-    expect(html).toContain('<body class="theme-warm" style="--site-ink:');
+    expect(html).toContain('<body class="theme-warm template-heritage" style="--site-ink:');
+    const withTemplate = normalizeSiteLocalContent({...churchCopy,branding:{
+      theme:"warm",templateId:"summit",paletteId:"forest",typographyId:"contemporary",heroImage:{
+        dataUrl:pngDataUrl(),altText:"Community artwork",rightsConfirmed:true,
+        childImageConsent:"no_identifiable_children",
+      },
+    }});
+    expect(withTemplate.branding.templateId).toBe("summit");
+    expect(withTemplate.branding.paletteId).toBe("forest");
+    expect(withTemplate.branding.typographyId).toBe("contemporary");
     expect(html).toContain('src="data:image/png;base64,');
     expect(html).toContain('alt="Church &amp; community artwork"');
     expect(html).not.toContain("src=\"https:");
@@ -199,7 +208,7 @@ describe("PUB-18: distributed church website ownership", () => {
       } },
     })).toThrow(/metadata/);
     const { branding: _branding, ...legacy } = churchCopy;
-    expect(normalizeSiteLocalContent(legacy).branding).toEqual({ theme: "classic", paletteId: "signature", typographyId: "editorial", heroImage: null });
+    expect(normalizeSiteLocalContent(legacy).branding).toEqual({ theme: "classic", paletteId: "signature", typographyId: "editorial", templateId: "heritage", heroImage: null });
   });
 
   it("cannot persist CAN-owned academic fields through the local content payload", () => {
