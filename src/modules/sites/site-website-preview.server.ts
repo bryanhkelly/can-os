@@ -17,7 +17,7 @@ import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
 import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 
 /** Public-safe private preview; institution-owned fields are still read-only. */
-export async function getPartnerWebsitePreview(actor: AccessContext) {
+export async function getPartnerWebsitePreview(actor: AccessContext, proposedContent?: SiteLocalContent) {
   const site = await requirePartnerWebsiteEditor(actor);
   const [address] = await db.select({
     slug: sitePublications.slug, status: sitePublications.status,
@@ -46,7 +46,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     parentExtras?.admissions);
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms:authorizedPrograms, offerings, localContent: local?.content ?? null,
+    academicPrograms:authorizedPrograms, offerings, localContent: proposedContent ?? local?.content ?? null,
     ...(parentExtras ?? {}),
   });
   const previewPage = host ? {
