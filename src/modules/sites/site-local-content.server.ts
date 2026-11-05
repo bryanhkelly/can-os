@@ -40,7 +40,7 @@ export async function readLocalContentHistory(siteId: string, executor: Reader =
 export type PartnerLocalContentTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type PartnerLocalContentCommand = {
   expectedRevision: number;
-  operation: "save" | "restore";
+  operation: "save" | "restore" | "draft";
   content?: SiteLocalContent;
   restoreRevision?: number;
 };
@@ -93,7 +93,11 @@ export async function publishPartnerLocalContentWithinTransaction(
       content = normalizeSiteLocalContent(input.content);
     }
 
-    const decision = classifySiteLocalContent(content);
+    const classified = classifySiteLocalContent(content);
+    // Drafts are immutable, private revisions; never overwrite published content.
+    // Protected claims are screened again when the editor requests publication.
+    const decision = input.operation === "draft"
+      ? { status: "draft" as const, flaggedFields: [] as string[] } : classified;
     if (latest && JSON.stringify(latest.content) === JSON.stringify(content) &&
       latest.status === decision.status) {
       return { changed: false, revision: currentRevision, status: latest.status,
@@ -124,9 +128,11 @@ export async function publishPartnerLocalContentWithinTransaction(
       });
     }
     await writeAudit(tx, actor, {
-      action: decision.status === "published"
-        ? "site.website.local_content.published"
-        : "site.website.local_content.review_requested",
+      action: decision.status === "draft"
+        ? "site.website.local_content.draft_saved"
+        : decision.status === "published"
+          ? "site.website.local_content.published"
+          : "site.website.local_content.review_requested",
       entityType: "site_local_content_version", entityId: created.id,
       scope: { organizationId: site.organizationId, siteId: site.id },
       before: { revision: currentRevision, status: latest?.status ?? null },
@@ -136,9 +142,11 @@ export async function publishPartnerLocalContentWithinTransaction(
       // unrestricted event notifications or action metadata.
     });
     await emitEvent(tx, {
-      eventType: decision.status === "published"
-        ? EventTypes.SiteLocalWebsiteContentPublished
-        : EventTypes.SiteLocalWebsiteContentReviewRequested,
+      eventType: decision.status === "draft"
+        ? EventTypes.SiteLocalWebsiteDraftSaved
+        : decision.status === "published"
+          ? EventTypes.SiteLocalWebsiteContentPublished
+          : EventTypes.SiteLocalWebsiteContentReviewRequested,
       aggregateType: "site_local_content_version", aggregateId: created.id,
       actorPersonId: actor.actorPersonId,
       organizationId: site.organizationId, siteId: site.id,
