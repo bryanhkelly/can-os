@@ -9,7 +9,7 @@
 /** Same-page notification only; no content or tenant identifiers are emitted. */
 export const churchSourcesChangedEvent = "can:church-sources-changed";
 export const churchReferenceKinds = [
-  "website", "youtube", "instagram", "facebook", "tiktok",
+  "website", "school_website", "youtube", "instagram", "facebook", "tiktok",
 ] as const;
 export type ChurchReferenceKind = typeof churchReferenceKinds[number];
 export type ChurchReferenceState =
@@ -57,7 +57,7 @@ export type ChurchContentSuggestion = {
   reviewedByPersonId?: string;
 };
 
-const socialHosts: Record<Exclude<ChurchReferenceKind, "website">, readonly string[]> = {
+const socialHosts: Record<Exclude<ChurchReferenceKind, "website"|"school_website">, readonly string[]> = {
   youtube: ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"],
   instagram: ["instagram.com", "www.instagram.com"],
   facebook: ["facebook.com", "www.facebook.com", "m.facebook.com"],
@@ -97,7 +97,7 @@ export function normalizeChurchReferenceUrl(
       !host.includes(".")) {
     throw new Error("Use a public domain, not a local or IP address");
   }
-  if (kind !== "website" && !socialHosts[kind].includes(host)) {
+  if (kind !== "website" && kind !== "school_website" && !socialHosts[kind].includes(host)) {
     throw new Error("This link does not match the selected social platform");
   }
   url.hash = "";
@@ -116,7 +116,7 @@ export function normalizeChurchReferenceUrl(
 export function initialChurchReferenceState(
   kind: ChurchReferenceKind,
 ): ChurchReferenceState {
-  return kind === "website" ? "saved" : "unsupported";
+  return kind === "website" || kind === "school_website" ? "saved" : "unsupported";
 }
 
 /**
