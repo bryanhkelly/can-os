@@ -1,4 +1,4 @@
-import { sitePaletteIds, siteTypographyIds, type SitePaletteId, type SiteTypographyId } from "./site-theme";
+import { sitePaletteIds, siteTypographyIds, type SitePaletteId, type SiteTypographyId, schoolSiteTemplateIds, schoolSiteFontIds, type SchoolSiteTemplateId, type SchoolSiteFontId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
  * CAN-owned academic, admissions, tuition and institutional facts are not
@@ -39,6 +39,9 @@ export type SiteLocalBranding = {
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
   typographyId?: SiteTypographyId;
+  templateId?: SchoolSiteTemplateId;
+  headingFontId?: SchoolSiteFontId;
+  bodyFontId?: SchoolSiteFontId;
 };
 export type SiteLocalContent = SiteLocalTextContent & {
   branding: SiteLocalBranding;
@@ -50,6 +53,9 @@ export const emptySiteLocalBranding: SiteLocalBranding = Object.freeze({
   theme: "classic",
   paletteId: "signature",
   typographyId: "editorial",
+  templateId: "heritage",
+  headingFontId: "editorial",
+  bodyFontId: "modern",
   heroImage: null,
 });
 export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
@@ -88,6 +94,9 @@ export function createIllustrativeSchoolContent(schoolName: string): SiteLocalCo
       theme: "classic",
       paletteId: "heritage",
       typographyId: "editorial",
+      templateId: "heritage",
+      headingFontId: "editorial",
+      bodyFontId: "modern",
       heroImage: null,
     },
   };
@@ -209,6 +218,16 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if (!sitePaletteIds.includes(paletteId) || !siteTypographyIds.includes(typographyId)) {
     throw new Error("Choose approved school visual identity options");
   }
+  const templateId = branding.templateId ?? "heritage";
+  const headingFontId = branding.headingFontId;
+  const bodyFontId = branding.bodyFontId;
+  if (!schoolSiteTemplateIds.includes(templateId) ||
+      (headingFontId !== undefined && !schoolSiteFontIds.includes(headingFontId)) ||
+      (bodyFontId !== undefined && !schoolSiteFontIds.includes(bodyFontId))) {
+    throw new Error("Choose approved school website layout and font options");
+  }
+  const design = {templateId, ...(headingFontId ? {headingFontId} : {}),
+    ...(bodyFontId ? {bodyFontId} : {})};
   const image = branding.heroImage;
   if (image) {
     validateInlinePng(image.dataUrl);
@@ -222,12 +241,12 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       throw new Error("Confirm that no identifiable children appear or that guardian consent is documented");
     }
     result.branding = {
-      theme: branding.theme, paletteId, typographyId,
+      theme: branding.theme, paletteId, typographyId, ...design,
       heroImage: { dataUrl: image.dataUrl, altText, rightsConfirmed: true,
         childImageConsent: image.childImageConsent },
     };
   } else {
-    result.branding = { theme: branding.theme, paletteId, typographyId, heroImage: null };
+    result.branding = { theme: branding.theme, paletteId, typographyId, ...design, heroImage: null };
   }
   return result;
 }
