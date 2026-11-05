@@ -79,3 +79,9 @@ export function getJourneyById(value: string): EngagementJourney | null {
     ? engagementJourneys[value as keyof typeof engagementJourneys]
     : null;
 }
+
+/** Public pre-launch and follow-up pages share presentation, never workspace chrome. */
+export function isEngagementPath(pathname: string): boolean {
+  const path = pathname.replace(/\/$/, "");
+  return path === "/landing" || path.startsWith("/landing/") || path.startsWith("/next/");
+}
