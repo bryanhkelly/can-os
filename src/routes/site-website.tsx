@@ -380,8 +380,10 @@ function LocalWebsiteCopyEditor({
     } finally { setPreparingArtwork(false); }
   }
 
-  const primaryFields = churchFields.filter(field =>
-    ["heroHeadline", "welcomeMessage", "schoolVision", "localDescription", "communityOutreach"].includes(field.key));
+  // Stable, numbered sequence in the editor and preview. Templates decide
+  // presentation, but the administrator never orders or drags sections.
+  const primaryFields = websiteStarterFieldIds.map(key =>
+    churchFields.find(field => field.key === key)!);
   const additionalStoryFields = churchFields.filter(field =>
     ["churchHistory", "leadershipWelcome", "localTraditions", "denomination", "statementOfFaith", "spiritualFormation"].includes(field.key));
   const textField = (field: typeof churchFields[number]) => {
