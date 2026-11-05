@@ -391,18 +391,41 @@ function LocalWebsiteCopyEditor({
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website content..."/>
     <div className="space-y-5">
       {step === 0 && <div className="space-y-5">
-        <div>
-          <h3 className="text-lg font-semibold">Give families a warm welcome</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Start with a few short answers. Leave anything blank and return to it before publishing.</p>
+        <div className="border bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Before you begin</p>
+          <h3 className="mt-2 font-serif text-3xl">Your school's website, made personal.</h3>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">This guided design journey helps you choose a layout, colors, fonts and school imagery, then review the approved information CAN OS already has. Plan for approximately 15–25 minutes for initial design; this is an estimate, not a measured requirement.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Have ready:</strong> an existing public church or school website, social links if applicable, a logo, a rights-cleared photo folder and a short school welcome. All source links and imagery are optional.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Your outcome:</strong> a private, revisable website design draft. Publishing and hosting require separate authorization.</p>
         </div>
-        {primaryFields.map(textField)}
+        <details className="border border-border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Use your existing church website or social profiles (optional)</summary>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">These are the existing private Site source-reference controls. Social posts and media are not imported. Optional church website suggestions require a separate, enabled and approved discovery process.</p>
+          <div className="mt-3"><ChurchSourceReferenceEditor /></div>
+        </details>
       </div>}
       {step === 1 && <div className="space-y-5">
+        <WebsiteTemplateGallery schoolName={data.siteName}
+          value={content.branding.templateId ?? "heritage"}
+          onChange={(templateId: SiteTemplateId) => setContent(old => ({
+            ...old, branding: { ...old.branding, templateId },
+          }))}
+          paletteId={content.branding.paletteId} typographyId={content.branding.typographyId}
+          disabled={busy || !data.canPublish}/>
+        <p className="text-xs text-muted-foreground">Changing a template preserves school data, approved content and your other design choices. Select Preview current changes on the final step to see the actual rendered layout.</p>
+      </div>}
+
+      {step === 3 && <div className="space-y-5">
         <div>
           <h3 className="text-lg font-semibold">Tell the story behind your school</h3>
           <p className="mt-1 text-sm text-muted-foreground">Share the people and community behind the school. These details are optional.</p>
         </div>
+        {primaryFields.map(textField)}
         {storyFields.map(textField)}
+        <details className="border p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Review source-attributed church story suggestions (optional)</summary>
+          <div className="mt-4"><ChurchSourceSuggestionReview currentRevision={data.currentRevision}/></div>
+        </details>
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
           <div className="mt-4 space-y-5">{additionalStoryFields.map(textField)}</div>
@@ -509,7 +532,7 @@ function LocalWebsiteCopyEditor({
           enabled={data.mediaUploadsEnabled}/></div>
       </details>
       </div>}
-      {step === 3 && <div className="space-y-4">
+      {step === 4 && <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold">Review your website</h3>
           <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
@@ -523,14 +546,7 @@ function LocalWebsiteCopyEditor({
           <summary className="cursor-pointer text-sm font-semibold">Review website content quality</summary>
           <div className="mt-4"><WebsiteDesignChecklist data={data} /></div>
         </details>
-        <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Add church website and social references (optional)</summary>
-          <div className="mt-4"><ChurchSourceReferenceEditor /></div>
-        </details>
-        <details className="border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">Review private suggestions from church sources (optional)</summary>
-          <div className="mt-4"><ChurchSourceSuggestionReview currentRevision={data.currentRevision} /></div>
-        </details>
+
         {!data.canPublish && <p role="status" className="border p-3 text-sm">
           You can preview this Site, but your verified Site assignment does not include local website publishing.
         </p>}
@@ -564,8 +580,8 @@ function LocalWebsiteCopyEditor({
           className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Back
         </button>
-        {step < 3 && <button type="button"
-          onClick={() => onStepChange(Math.min(3, step + 1))}
+        {step < 4 && <button type="button"
+          onClick={() => onStepChange(Math.min(4, step + 1))}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
           Continue
         </button>}
