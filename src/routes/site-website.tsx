@@ -9,7 +9,7 @@ import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
-  prepareWebsiteEditorContent, websiteStarterFieldIds, siteLocalContentLimits, siteLocalImageMaxBytes,
+  prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalContentLimits, siteLocalImageMaxBytes,
   type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
@@ -402,7 +402,7 @@ function LocalWebsiteCopyEditor({
         {typeof starter === "string" && <button type="button"
           aria-label={`Reset ${field.label} to original suggested copy`}
           disabled={!changed || busy || !data.canPublish}
-          onClick={() => setContent(old => ({ ...old, [field.key]: starter }))}
+          onClick={() => setContent(old => restoreOriginalWebsiteField(old, field.key))}
           className="min-h-11 shrink-0 border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
           Reset to original
         </button>}
