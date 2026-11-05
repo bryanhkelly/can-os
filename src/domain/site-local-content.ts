@@ -1,4 +1,4 @@
-import { sitePaletteIds, siteTypographyIds, type SitePaletteId, type SiteTypographyId } from "./site-theme";
+import { sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
  * CAN-owned academic, admissions, tuition and institutional facts are not
@@ -35,6 +35,8 @@ export type SiteLocalImage = {
 };
 export type SiteLocalBranding = {
   theme: SiteLocalTheme;
+  /** Structural template is versioned with local branding, not Program facts. */
+  templateId?: SiteTemplateId;
   heroImage: SiteLocalImage | null;
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
@@ -50,6 +52,7 @@ export const emptySiteLocalBranding: SiteLocalBranding = Object.freeze({
   theme: "classic",
   paletteId: "signature",
   typographyId: "editorial",
+  templateId: "heritage",
   heroImage: null,
 });
 export const emptySiteLocalContent: SiteLocalContent = Object.freeze({
@@ -88,6 +91,7 @@ export function createIllustrativeSchoolContent(schoolName: string): SiteLocalCo
       theme: "classic",
       paletteId: "heritage",
       typographyId: "editorial",
+      templateId: "heritage",
       heroImage: null,
     },
   };
@@ -206,7 +210,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if (!siteLocalThemes.includes(branding.theme)) throw new Error("Choose an approved website theme");
   const paletteId = branding.paletteId ?? "signature";
   const typographyId = branding.typographyId ?? "editorial";
-  if (!sitePaletteIds.includes(paletteId) || !siteTypographyIds.includes(typographyId)) {
+  const templateId = branding.templateId ?? "heritage";
+  if (!sitePaletteIds.includes(paletteId) || !siteTypographyIds.includes(typographyId) || !siteTemplateIds.includes(templateId)) {
     throw new Error("Choose approved school visual identity options");
   }
   const image = branding.heroImage;
@@ -227,7 +232,7 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
         childImageConsent: image.childImageConsent },
     };
   } else {
-    result.branding = { theme: branding.theme, paletteId, typographyId, heroImage: null };
+    result.branding = { theme: branding.theme, paletteId, typographyId, templateId, heroImage: null };
   }
   return result;
 }
