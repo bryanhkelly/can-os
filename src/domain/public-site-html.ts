@@ -1,4 +1,5 @@
-import { resolveSiteTheme } from "./site-theme";
+import { resolveSiteTheme, resolveSiteTemplateId } from "./site-theme";
+import { composePublicSiteHome, publicSiteTemplateCss } from "./public-site-templates";
 import { canFallbackArtwork, canFallbackFamilyForPalette, type CanFallbackSlot } from "./school-site-fallback-art";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -127,6 +128,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
   const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId);
+  const templateId = resolveSiteTemplateId(local?.branding.templateId);
   const visualCss = `--site-ink:${visual.ink};--site-paper:${visual.canvas};--site-accent:${visual.accent};--site-secondary:${visual.secondary};--site-muted:${visual.muted};--site-display:${visual.displayFont};--site-body:${visual.bodyFont};`;
   const localItems = local ? [
     ["Our story", local.churchHistory],
@@ -543,15 +545,24 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <span class="explore-copy"><strong>${link.label}</strong><span>${link.description}</span></span>
         <span class="explore-arrow" aria-hidden="true">→</span></a>`).join("")}</div></section>`
     : "";
+  // Distinct template composition, one source of approved academic and Site facts.
+  const homePage = composePublicSiteHome(templateId, {
+    hero,
+    vision: local?.schoolVision
+      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Learning with purpose. Growing together.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
+    story: homeStory,
+    explore: exploreSection,
+    academics: programOverview,
+    enrichment: page.offerings.length || (demo && local) ? enrichmentSection
+      : !academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
+    closing: academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
+      <h2>Discover the right learning path</h2>
+      <p>Explore published programs and request details before making an enrollment decision.</p>
+      <a href="/academics" class="hero-button">Explore approved programs</a></section>` : "",
+    contact: reviewedContact || reviewedAddress ? contactSection : "",
+  });
   const pageContent: Record<PublicSitePath, string> = {
-    "/": hero + (local?.schoolVision ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Learning with purpose. Growing together.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "") + homeStory + exploreSection + programOverview +
-      (page.offerings.length || (demo && local) ? enrichmentSection :
-        (!academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "")) +
-      (academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
-        <h2>Discover the right learning path</h2>
-        <p>Explore published programs and request details before making an enrollment decision.</p>
-        <a href="/academics" class="hero-button">Explore approved programs</a></section>` : "") +
-      (reviewedContact || reviewedAddress ? contactSection : ""),
+    "/": homePage,
     "/about": secondaryHero("Our community", "A school rooted in community",
       "Learn about the church and local people behind this school.") + localSection + peopleSection,
     "/academics": secondaryHero("Learning", "Academic programs",
@@ -679,9 +690,10 @@ main{padding-top:clamp(22px,3vw,48px)}
 .compact-hero::after{display:none}
 .compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
 @media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
+${publicSiteTemplateCss}
 </style>
 </head>
-<body class="theme-${theme}" style="${visualCss}">
+<body class="theme-${theme} template-${templateId}" style="${visualCss}">
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
