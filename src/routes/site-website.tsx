@@ -1,4 +1,7 @@
-import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId } from "@/domain/site-theme";
+import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
+import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
+import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
+import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { GuidedSetupShell } from "@/components/workflow";
@@ -12,7 +15,7 @@ import {
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { getPartnerWebsitePreviewView, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
+import { getPartnerWebsitePreviewView, previewChurchWebsiteDraft, saveChurchWebsiteDraft, publishChurchWebsiteContent, restoreChurchWebsiteContent } from "@/modules/sites/site-website-preview.functions";
 import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSourceSuggestionReview";
 import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
 import {SchoolMediaFolderManager} from "@/components/operations/SchoolMediaFolderManager";
@@ -35,9 +38,10 @@ export const Route = createFileRoute("/site-website")({
 function PartnerSiteWebsitePage() {
   return <WebsiteHome outcome={Route.useLoaderData()} selection={Route.useSearch()} />;
 }
-export function WebsiteHome({ outcome, selection }: {
+export function WebsiteHome({ outcome, selection, studio = false }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
   selection: { siteId?: string; programId?: string; returnGrantId?: string };
+  studio?: boolean;
 }) {
   const [step, setStep] = useState(0);
   const returnToLaunch=selection.siteId&&selection.programId&&selection.returnGrantId
@@ -46,6 +50,22 @@ export function WebsiteHome({ outcome, selection }: {
     title="Your Site website" outcome={outcome} /></>;
 
   const data = outcome.data;
+  const steps = [
+    {id:"0", title:"Welcome & sources"}, {id:"1",title:"Choose a template"},
+    {id:"2",title:"Colors & photography"}, {id:"3",title:"School story"},
+    {id:"4",title:"Preview & finish"},
+  ];
+  if (studio) return <LaunchStudioShell role="Website design" subject={data.siteName}
+    title={["Bring your school online.","Find the right first impression.","Make it your own.",
+      "Tell your school's story.","Review your website."][step]}
+    description="One Site, one school website. Academic, admissions and school-opening approvals remain separate."
+    steps={steps} currentId={String(step)} onStepChange={id => setStep(Number(id))}
+    help={<p>Need editing permission? Ask your Site administrator for a verified Site website editor invitation. Previewing and saving a draft do not publish it.</p>}
+    exit={returnToLaunch ?? <Link to="/home" className="underline">Exit to your workspace</Link>}>
+    {data.host
+      ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={setStep}/>
+      : <p role="status" className="border bg-card p-5 text-sm">Your registrar must reserve a draft Site address before website design can be saved.</p>}
+  </LaunchStudioShell>;
   return <WorkspaceShell
     eyebrow="Church partner website"
     title={data.siteName + " · church website"}
@@ -53,12 +73,11 @@ export function WebsiteHome({ outcome, selection }: {
     <GuidedSetupShell
       title="Make your school website feel local"
       description="Start with a welcome, add your church's story and visual identity, then review the private preview. Your answers stay in this page as you move between steps; nothing is saved or published until you choose Publish."
-      steps={data.host ? [
-        { id: "welcome", title: "Welcome", description: "Introduce your school", status: step === 0 ? "current" : step > 0 ? "complete" : "upcoming" },
-        { id: "story", title: "Church story", description: "Add local context", status: step === 1 ? "current" : step > 1 ? "complete" : "upcoming" },
-        { id: "identity", title: "Look and feel", description: "Choose a visual identity", status: step === 2 ? "current" : step > 2 ? "complete" : "upcoming" },
-        { id: "review", title: "Review and publish", description: "Check the preview and publish", status: step === 3 ? "current" : "upcoming" },
-      ] : [
+      steps={data.host ? steps.map((item,index)=>({
+        id:item.id,title:item.title,description:index===0?"Bring current sources":index===1?"Choose a design":
+          index===2?"Personalize the look":index===3?"Approved school copy":"Private preview and publication",
+        status:step===index?"current":step>index?"complete":"upcoming",
+      })) : [
         { id: "address", title: "Site address", description: "Ask your registrar to provision a draft", status: "current" },
       ]}
       aside={<div className="space-y-3 py-1 text-sm">
