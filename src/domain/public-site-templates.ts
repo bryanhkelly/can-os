@@ -34,6 +34,9 @@ export function composePublicSiteHome(template: SiteTemplateId, sections: Public
  * navigation/hero geometry; these are not five recolors of one layout.
  * Entirely static CSS is safe in both real public pages and sandboxed previews. */
 export const publicSiteTemplateCss = `
+/* When schools choose an editorial H1, the welcome sentence is supporting
+ * copy rather than a competing second headline. Legacy headlines are unchanged. */
+.public-hero.editorial-headline .hero-subtitle{font-family:var(--site-body);font-size:clamp(1rem,1.6vw,1.35rem);line-height:1.65;font-weight:400;letter-spacing:0;max-width:740px}
 /* Heritage: refined, academic and editorial — baseline renderer proportions. */
 body.template-heritage .public-hero:not(.compact-hero){border-radius:0;min-height:clamp(520px,65vh,780px)}
 body.template-heritage .public-hero:not(.compact-hero) h1{max-width:870px}
