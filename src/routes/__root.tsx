@@ -20,6 +20,8 @@ import appCss from "../styles.css?url";
 import { AccessReturnRecovery } from "@/lib/access-return-recovery";
 import { isLaunchStudioPath } from "@/domain/launch-studio";
 import { LaunchStudioChrome } from "@/components/launch-studio/LaunchStudioShell";
+import { EngagementChrome } from "@/components/engagement/EngagementChrome";
+import { isEngagementPath } from "@/domain/engagement-context";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: ({ context }) => context.queryClient.fetchQuery(workspaceSessionQueryOptions()),
@@ -68,14 +70,18 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const session = Route.useLoaderData();
-  const standalone = useLocation({ select: location => isLaunchStudioPath(location.pathname) });
+  const pathname = useLocation({ select: location => location.pathname });
+  const standalone = isLaunchStudioPath(pathname);
+  const engagement = isEngagementPath(pathname);
 
   return (
     <QueryClientProvider client={queryClient}>
       <WorkspaceSessionProvider initial={session}>
-        {standalone
-          ? <LaunchStudioChrome><AccessReturnRecovery><Outlet /></AccessReturnRecovery></LaunchStudioChrome>
-          : <><WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation><CommandPalette /></>}
+        {engagement
+          ? <EngagementChrome><Outlet /></EngagementChrome>
+          : standalone
+            ? <LaunchStudioChrome><AccessReturnRecovery><Outlet /></AccessReturnRecovery></LaunchStudioChrome>
+            : <><WorkspaceNavigation><AccessReturnRecovery><Outlet /></AccessReturnRecovery></WorkspaceNavigation><CommandPalette /></>}
       </WorkspaceSessionProvider>
     </QueryClientProvider>
   );
