@@ -9,6 +9,7 @@ import {
   LifeBuoy,
   MessagesSquare,
   ShieldAlert,
+  Settings2,
   Users,
 } from "lucide-react";
 import type { WorkspaceNavigationItem } from "./workspace-navigation.registry";
@@ -16,7 +17,7 @@ import type { WorkspaceNavigationItem } from "./workspace-navigation.registry";
 const focusRingClass = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 const navigationIcons = {
   home: Home, building: Building2, globe: Globe, book: BookOpen, calendar: CalendarDays, clipboard: ClipboardList,
-  support: LifeBuoy, messages: MessagesSquare, safety: ShieldAlert, users: Users,
+  support: LifeBuoy, messages: MessagesSquare, safety: ShieldAlert, users: Users, settings: Settings2,
 } satisfies Record<WorkspaceNavigationItem["icon"], typeof Home>;
 
 export function SidebarLinks({ links, activePath, collapsed = false, onNavigate }: {
