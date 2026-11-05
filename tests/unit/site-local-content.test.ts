@@ -18,7 +18,7 @@ describe("PUB-18: distributed church website ownership", () => {
     const starter = createIllustrativeSchoolContent("Valor School");
     const normalized = normalizeSiteLocalContent(starter);
     expect(normalized.branding.paletteId).toBe("heritage");
-    expect(normalized.schoolVision).toContain("Curious minds");
+    expect(normalized.schoolVision).toContain("students are known");
     expect(normalized.localDescription).toContain("Valor School");
     expect(classifySiteLocalContent(normalized)).toEqual({
       status: "published", flaggedFields: [],
