@@ -94,3 +94,20 @@ Automatic church-website text suggestions remain behind `CAN_CHURCH_WEBSITE_DISC
 5. Add multi-journey Settings regression tests with real verified guardians, staff and students; note that submission-specific corrections have their own workflow.
 
 **Acceptance principle:** Five premium layouts can consume one approved Site content model. A draft can be revised later from Settings but cannot leak to the public, authorize a school, or bypass institutional review.
+
+## Editorial first-run, field resets and copy ownership
+
+Website Studio now opens every new Site with an **editable, nearly complete editorial starting point**, rather than blank fields. All proposed copy uses the Site's verified name, plus carefully phrased aspirations. The editor must review this text and explicitly save a private draft or publish under the existing permissions. Suggested words are **not institutional evidence**.
+
+- Five visible prewritten fields: **Homepage headline, Welcome to families, Your vision, Your school story, Your community**.
+- One small **Reset to original** action beside each starter field, active only after that individual answer changes. There is no drag-and-drop, section prioritization, or destructive global reset.
+- Other sensitive or Site-specific fields, including **denomination, church history, theology, actual leaders, traditions and spiritual practices**, remain blank until the authorized editor provides them.
+- The original answers are snapshotted in `SiteLocalContent.editorialBaseline` (version 1), validated and stored within the existing immutable, Site-scoped JSON revision. **No new CMS table or migration**.
+- Changing templates, colors, photos, or the school name does not rewrite the saved baseline or customized text. Legacy sites preserve their existing copy; their original suggestion snapshot is added only when an authorized editor next saves.
+- Reset modifies the selected text field in the unsaved editor state. It is neither an auto-save nor a publication. Prior published revisions remain independently restorable through the normal history command.
+- New `heroHeadline` is independently editable and used as the homepage H1 when approved local content exists. Historical Sites without a headline still render the school name as H1.
+- Suggested baseline metadata is not emitted in public HTML. Input and snapshot fields are validated on the server; protected or unsafe claims cannot be embedded in baseline metadata.
+- Preview of current unsaved changes renders the **proposed local content** with the existing approved program, admission, tuition and school status projections. The production Site still reads only published local revisions.
+- The synthetic Valor starter uses the same professionally written language; its demonstration notice remains separate and prominent. Resetting one answer no longer replaces the entire sample.
+
+**Editorial release validation:** run `npx vitest run tests/unit/website-editorial-starter.test.ts tests/unit/site-local-content.test.ts tests/unit/public-site-html.test.ts tests/unit/site-local-content-command.test.ts`. Review actual parent-facing layout, school name escaping, original-reset behavior after save/reopen, and draft-vs-public separation.
