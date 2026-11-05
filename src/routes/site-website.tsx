@@ -10,7 +10,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
   createIllustrativeSchoolContent, emptySiteLocalContent, siteLocalContentLimits, siteLocalImageMaxBytes,
-  siteLocalThemes, type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
+  type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -473,16 +473,10 @@ function LocalWebsiteCopyEditor({
       </div>
       <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
         <legend className="px-2 text-sm font-semibold">Local branding and approved artwork</legend>
-        <label className="block text-sm">
-          <span className="font-medium">Theme</span>
-          <select value={content.branding.theme} onChange={event => setContent(old => ({
-            ...old, branding: { ...old.branding, theme: event.target.value as typeof siteLocalThemes[number] },
-          }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm">
-            <option value="classic">Classic blue</option>
-            <option value="warm">Warm neutrals</option>
-            <option value="light">Simple light</option>
-          </select>
-        </label>
+        <p className="text-xs leading-5 text-muted-foreground">
+          Your layout comes from the selected template; color scheme and typography are separate.
+          Existing legacy theme values are preserved for compatibility rather than shown as a second conflicting template selector.
+        </p>
         <div className="rounded-xl border p-4">
           <p className="font-medium">Choose your school's visual identity</p>
           <p className="mt-1 text-xs text-muted-foreground">CAN Signature gives you a complete editorial design.
