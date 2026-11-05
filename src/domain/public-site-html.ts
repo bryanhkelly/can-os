@@ -1,4 +1,4 @@
-import { resolveSiteTheme } from "./site-theme";
+import { resolveSiteTheme, schoolSiteTemplateIds } from "./site-theme";
 import { canFallbackArtwork, canFallbackFamilyForPalette, type CanFallbackSlot } from "./school-site-fallback-art";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -126,7 +126,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const demo = page.demonstration === true;
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
-  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId);
+  const template = schoolSiteTemplateIds.includes(local?.branding.templateId as typeof schoolSiteTemplateIds[number])
+    ? local!.branding.templateId! : "heritage";
+  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId,
+    local?.branding.headingFontId, local?.branding.bodyFontId);
   const visualCss = `--site-ink:${visual.ink};--site-paper:${visual.canvas};--site-accent:${visual.accent};--site-secondary:${visual.secondary};--site-muted:${visual.muted};--site-display:${visual.displayFont};--site-body:${visual.bodyFont};`;
   const localItems = local ? [
     ["Our story", local.churchHistory],
@@ -679,9 +682,61 @@ main{padding-top:clamp(22px,3vw,48px)}
 .compact-hero::after{display:none}
 .compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
 @media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
+
+/* Separate visual architectures on identical approved school content. */
+body.template-heritage header{border-bottom:3px double var(--site-accent);padding-block:30px}
+body.template-heritage .brand{font-family:var(--site-display);font-size:1.35rem;letter-spacing:0;text-transform:none}
+body.template-heritage .public-hero{min-height:580px;border-radius:0;padding:clamp(40px,8vw,100px)}
+body.template-heritage .card{border-radius:0;box-shadow:none}
+body.template-community header{border:0}
+body.template-community .brand{font-family:var(--site-display);font-size:1.35rem;letter-spacing:0;text-transform:none}
+body.template-community .public-hero{border-radius:65px 8px 65px 8px;min-height:490px}
+body.template-community .public-hero .hero-background-image{left:46%;width:54%;border-radius:90px 0 0 90px}
+body.template-community .public-hero.has-image::before{background:linear-gradient(90deg,var(--site-ink) 0%,var(--site-ink) 44%,transparent 85%)}
+body.template-community .public-hero h1,body.template-community .public-hero .intro,body.template-community .public-hero .hero-subtitle{max-width:52%}
+body.template-community .home-story{border-radius:40px;background:white;padding:clamp(28px,5vw,65px)}
+body.template-community .explore-link{border:0;border-radius:26px;background:white}
+body.template-modern header{border-bottom:4px solid var(--site-ink)}
+body.template-modern .brand{font-family:var(--site-body);font-size:1.45rem;letter-spacing:-.06em}
+body.template-modern .public-hero{min-height:650px;border-radius:0}
+body.template-modern .public-hero h1{font-size:clamp(4rem,10vw,9rem);line-height:.92;text-transform:uppercase;font-weight:900;letter-spacing:-.08em}
+body.template-modern .explore-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+body.template-modern .explore-link{background:var(--site-ink);color:#fff;border:1px solid var(--site-paper);min-height:230px;flex-direction:column}
+body.template-modern .explore-number,body.template-modern .explore-copy>span{color:#eef5fa}
+body.template-modern .card{border-radius:0;box-shadow:none;border-top:5px solid var(--site-accent)}
+body.template-bright header{border:0}
+body.template-bright .brand{font-family:var(--site-display);font-size:1.4rem;letter-spacing:0;text-transform:none}
+body.template-bright .public-hero{border-radius:40px 40px 120px 40px;min-height:520px}
+body.template-bright .public-hero .hero-background-image{left:45%;width:55%}
+body.template-bright .public-hero.has-image::before{background:linear-gradient(90deg,var(--site-ink) 0%,var(--site-ink) 40%,transparent 82%)}
+body.template-bright .hero-button{border-radius:99px}
+body.template-bright .explore-link{border:0;border-radius:28px;background:white;transform:rotate(-1deg)}
+body.template-bright .explore-link:nth-child(even){transform:rotate(1deg)}
+body.template-bright .card{border-radius:30px}
+body.template-summit header{border:0;padding-block:30px}
+body.template-summit .brand{font-family:var(--site-display);font-size:1.3rem;letter-spacing:0;text-transform:none}
+body.template-summit .public-hero{min-height:760px;border-radius:0;display:flex;flex-direction:column;justify-content:flex-end}
+body.template-summit .public-hero.has-image::before{background:linear-gradient(0deg,rgba(9,15,23,.98),rgba(9,15,23,.28) 75%)}
+body.template-summit .public-hero h1{font-size:clamp(3.5rem,9vw,8rem);line-height:.94;font-weight:400;letter-spacing:-.07em}
+body.template-summit .hero-button{border-radius:0;background:var(--site-accent)}
+body.template-summit .explore-grid{grid-template-columns:1fr;gap:0}
+body.template-summit .explore-link{background:transparent;border:0;border-bottom:1px solid var(--site-accent);padding:34px 10px}
+body.template-summit .explore-copy strong{font-size:clamp(1.8rem,4vw,3.4rem)}
+body.template-summit .card{border:0;border-top:1px solid var(--site-accent);border-radius:0;box-shadow:none;background:transparent}
+@media(max-width:900px){body.template-modern .explore-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+body.template-heritage .public-hero,body.template-community .public-hero,body.template-modern .public-hero,body.template-bright .public-hero,body.template-summit .public-hero{min-height:420px;padding:26px;border-radius:12px}
+body.template-community .public-hero .hero-background-image,body.template-bright .public-hero .hero-background-image{left:0;width:100%;border-radius:0}
+body.template-community .public-hero.has-image::before,body.template-bright .public-hero.has-image::before{background:linear-gradient(90deg,rgba(8,26,34,.94),rgba(8,26,34,.6))}
+body.template-community .public-hero h1,body.template-community .public-hero .intro,body.template-community .public-hero .hero-subtitle{max-width:100%}
+body.template-modern .public-hero h1,body.template-summit .public-hero h1{font-size:clamp(2.7rem,10vw,5rem)}
+body.template-modern .explore-grid{grid-template-columns:1fr}
+body.template-bright .explore-link,body.template-bright .explore-link:nth-child(even){transform:none}
+body.template-summit .public-hero{justify-content:center}
+}
 </style>
 </head>
-<body class="theme-${theme}" style="${visualCss}">
+<body class="theme-${theme} template-${template}" style="${visualCss}">
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
