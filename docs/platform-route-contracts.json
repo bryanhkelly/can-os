@@ -472,6 +472,33 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/landing.$journeyId.tsx",
+      "route": "/landing/$journeyId",
+      "owner": "engagement",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/landing.index.tsx",
+      "route": "/landing/",
+      "owner": "engagement",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/landing.tsx",
+      "route": "/landing",
+      "owner": "engagement",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/launch.family.tsx",
       "route": "/launch/family",
       "owner": "enrollment",
@@ -547,6 +574,15 @@
       "file": "src/routes/messages.tsx",
       "route": "/messages",
       "owner": "communication",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/next.$journeyId.tsx",
+      "route": "/next/$journeyId",
+      "owner": "engagement",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
