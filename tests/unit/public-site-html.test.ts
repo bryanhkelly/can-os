@@ -4,6 +4,31 @@ import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClai
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 
 describe("standalone public site HTML", () => {
+  it("only advertises the program inquiry anchor when its form can be rendered", () => {
+    const page = {
+      host: "example.can-os.com",
+      site: { name: "Example School", organizationName: "Example Church" },
+      offerings: [],
+      academicPrograms: [{
+        programId: "program-a", title: "Hybrid Academy",
+        typeLabel: "Hybrid learning", summary: "Published school program information.",
+        grades: { min: "6", max: "12" },
+        delivery: { onsite: true, liveOnline: false, asynchronous: true, onsiteDaysPerWeek: 2 },
+        availability: "planned" as const,
+      }],
+    };
+    const preview = renderPublicSiteHtml(page, { path: "/" });
+    expect(preview).not.toContain('href="/academics#program-inquiry-program-a"');
+    expect(preview).not.toContain("<form");
+    const liveHome = renderPublicSiteHtml(page, {
+      path: "/", makeRequestId: () => "11111111-1111-4111-8111-111111111111",
+    });
+    expect(liveHome).toContain('href="/academics#program-inquiry-program-a"');
+    const liveAcademics = renderPublicSiteHtml(page, {
+      path: "/academics", makeRequestId: () => "11111111-1111-4111-8111-111111111111",
+    });
+    expect(liveAcademics).toContain('id="program-inquiry-program-a"');
+  });
   it("escapes all publisher-controlled text and contains no client script or private links", () => {
     expect(escapePublicHtml(`"&<>'`)).toBe("&quot;&amp;&lt;&gt;&#39;");
     const html = renderPublicSiteHtml({
