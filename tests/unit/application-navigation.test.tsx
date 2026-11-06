@@ -674,9 +674,9 @@ describe("application contextual navigation",()=>{
     successful({sites:[],programs:[],options:[],rows:[row]});
     const html=render(Admissions);
     expect(html).toContain("Reason for withdrawal (internal)");
-    expect(html).toMatch(/<textarea required="" minLength="10" maxLength="2000"/);
-    expect(html).toContain('type="checkbox" required=""');
-    expect(html).toMatch(/<button type="submit" disabled=""[^>]*>Withdraw offer<\/button>/);
+    expect(html).toMatch(/<textarea[^>]*minLength="10"[^>]*maxLength="2000"[^>]*required=""/);
+    expect(html).toMatch(/<input[^>]*required=""[^>]*type="checkbox"/);
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""[^>]*>Withdraw offer<\/button>/);
     successful({sites:[],programs:[],options:[],rows:[{...row,stage:"accepted",outstandingRequirements:1,
       offers:[{...row.offers[0],status:"accepted"}]}]});
     const accepted=render(Admissions);
