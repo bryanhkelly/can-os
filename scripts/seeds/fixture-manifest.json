@@ -61,8 +61,27 @@
     },
     "/operations/interest-events": {
       "persona": "site administrator or registrar",
-      "fixtureRequired": false,
-      "rationale": "The event workspace has a verified empty state; event persistence and guest RSVP require scoped database acceptance fixtures."
+      "seeds": [
+        "new-experiences-v1.sql",
+        "split-route-detail-fixtures.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "interest_events": 1,
+        "calendar_events": 1
+      },
+      "interactions": [
+        "browse the seeded interest event and open its authorized detail view",
+        "create a real interest event in the Site timezone",
+        "review a private RSVP link without assuming family registration or attendance"
+      ],
+      "downstreamRecords": [
+        "interest_events",
+        "calendar_events",
+        "interest_event_registrations",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/schools/new": {
       "persona": "anonymous visitor",
@@ -1142,16 +1161,17 @@
       "persona": "registrar",
       "seeds": [
         "new-experiences-v1.sql",
-        "staff-experiences-v1.sql"
+        "gf2-admissions-test.sql",
+        "split-route-detail-fixtures.sql"
       ],
       "recordCounts": {
         "field_trips": 1,
-        "field_trip_participants": 1
+        "student_profiles": 1
       },
       "interactions": [
-        "create a field trip",
-        "invite an enrolled student",
-        "record departure and return checkpoints"
+        "review a real proposed trip in the authorized school scope",
+        "approve versioned permission language before issuing invitations",
+        "invite an enrollment-authorized student and later record consent-gated departure and return checkpoints"
       ],
       "downstreamRecords": [
         "field_trip_participants",
@@ -1485,7 +1505,8 @@
     "/operations/family-alerts": {
       "persona": "verified registrar",
       "seeds": [
-        "new-experiences-v1.sql"
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql"
       ],
       "recordCounts": {
         "programs": 1,
@@ -1704,6 +1725,319 @@
       "persona": "public, optional already-verified CAN member",
       "fixtureRequired": false,
       "rationale": "Read-only engagement guidance, finite audience registry and optional contact handoff. No canonical school, family, employment, or enrollment records are created by visiting this page."
+    },
+    "/admin/invite": {
+      "persona": "scoped registrar with admin.manage",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "people": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "load only sites permitted by the registrar's active grant",
+        "validate email, name, role and exact Site; reject an out-of-scope Site",
+        "record an inactive exact-Site staff invitation without granting access before acceptance"
+      ],
+      "downstreamRecords": [
+        "people",
+        "access_accounts",
+        "account_person_grants",
+        "audit_events"
+      ]
+    },
+    "/admin/people": {
+      "persona": "scoped registrar with admin.manage",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "people": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "list only people connected to the registrar's organization and Site scope",
+        "search names within that permitted scope",
+        "show the permitted roles and active/inactive grants without changing them"
+      ],
+      "downstreamRecords": []
+    },
+    "/admissions/intake/new": {
+      "persona": "authorized admissions registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "applications": 1,
+        "households": 1
+      },
+      "interactions": [
+        "load authorized programs and paginated existing students",
+        "reject an out-of-scope or already-converted public interest",
+        "create an idempotent inquiry after validating student, household and contact confirmation"
+      ],
+      "downstreamRecords": [
+        "applications",
+        "journeys",
+        "journey_requirements",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/curriculum-marketplace/imports": {
+      "persona": "authorized curriculum marketplace registrar and publisher",
+      "seeds": [
+        "valor-curriculum-marketplace.sql"
+      ],
+      "recordCounts": {
+        "curriculum_packs": 1,
+        "curriculum_pack_versions": 1,
+        "curriculum_entitlements": 1
+      },
+      "interactions": [
+        "open the verified Program imports workspace without exposing unscoped packs",
+        "validate a user-supplied Common Cartridge before importing any links",
+        "import only reviewed Section-scoped cartridge mappings when publishing is permitted"
+      ],
+      "downstreamRecords": [
+        "curriculum_import_jobs",
+        "curriculum_resources",
+        "curriculum_overlays",
+        "curriculum_interop_mappings",
+        "audit_events"
+      ]
+    },
+    "/operations/curriculum-marketplace/resources": {
+      "persona": "authorized curriculum marketplace registrar and publisher",
+      "seeds": [
+        "valor-curriculum-marketplace.sql"
+      ],
+      "recordCounts": {
+        "curriculum_resources": 1,
+        "course_template_versions": 1,
+        "sections": 1
+      },
+      "interactions": [
+        "open the Program-scoped resources view with existing Section and pack resources",
+        "add an authorized HTTPS supplement to an eligible Program, Site or Section",
+        "upload a reviewed private PDF through the verified two-phase upload workflow"
+      ],
+      "downstreamRecords": [
+        "documents",
+        "curriculum_resources",
+        "curriculum_overlays",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/curriculum-marketplace/roster": {
+      "persona": "authorized registrar with separate OneRoster permissions",
+      "seeds": [
+        "valor-curriculum-marketplace.sql"
+      ],
+      "recordCounts": {
+        "sections": 1,
+        "enrollments": 1,
+        "curriculum_adoptions": 1
+      },
+      "interactions": [
+        "preview OneRoster CSV without creating students or enrollments",
+        "map reviewed external classes only within authorized Program scope",
+        "export an institution-authorized roster without leaking another school's enrollment records"
+      ],
+      "downstreamRecords": [
+        "curriculum_import_jobs",
+        "curriculum_interop_mappings",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/curriculum/$courseId": {
+      "persona": "registrar with curriculum.publish and owning Program",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "curriculum-authoring.sql"
+      ],
+      "recordCounts": {
+        "role_assignments": 1,
+        "course_templates": 1,
+        "course_template_versions": 1
+      },
+      "interactions": [
+        "open only a course available in the authorized Program's curriculum studio",
+        "show an unavailable-state for a nonmatching course ID",
+        "edit and save an explicitly authorized draft release and ordered lessons"
+      ],
+      "downstreamRecords": [
+        "course_template_versions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/curriculum/new": {
+      "persona": "registrar with curriculum.publish and owning Program",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "curriculum-authoring.sql"
+      ],
+      "recordCounts": {
+        "role_assignments": 1,
+        "course_templates": 1
+      },
+      "interactions": [
+        "show a real publisher Program or the canonical unavailable state",
+        "validate new course code, title and subject before creating a course",
+        "create an authorized course without publishing it or changing live Sections"
+      ],
+      "downstreamRecords": [
+        "course_templates",
+        "course_template_versions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/curriculum/publishing": {
+      "persona": "registrar with curriculum.publish and owning Program",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "curriculum-authoring.sql"
+      ],
+      "recordCounts": {
+        "role_assignments": 1,
+        "course_templates": 1,
+        "course_template_versions": 1
+      },
+      "interactions": [
+        "review authorized draft releases and per-course publication readiness",
+        "reject a course ID outside publisher scope",
+        "publish a validated course release or manage a publisher pack through the canonical authoring service"
+      ],
+      "downstreamRecords": [
+        "course_template_versions",
+        "curriculum_pack_versions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/family-alerts/compose": {
+      "persona": "verified institutional registrar with communication.send",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "load only active Programs and previously published notices in the registrar's exact scope",
+        "validate the urgent family notice and confirmed recipient policy before submission",
+        "publish a scoped Action and review delivery receipts separately from publication"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "notifications",
+        "notification_outbound_deliveries",
+        "domain_events",
+        "audit_events"
+      ]
+    },
+    "/operations/field-trips/$tripId": {
+      "persona": "scoped institutional registrar with enrollment:manage",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql",
+        "split-route-detail-fixtures.sql"
+      ],
+      "recordCounts": {
+        "field_trips": 1,
+        "student_profiles": 1
+      },
+      "interactions": [
+        "open the seeded proposed trip by ID and reject unavailable or out-of-scope trip IDs",
+        "approve only a current trip with versioned school permission language",
+        "invite a verified enrolled student; require separate guardian consent before boarding or return checkpoints"
+      ],
+      "downstreamRecords": [
+        "calendar_events",
+        "field_trip_participants",
+        "field_trip_attendance",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/field-trips/new": {
+      "persona": "scoped institutional registrar with enrollment:manage",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf2-admissions-test.sql",
+        "split-route-detail-fixtures.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1,
+        "field_trips": 1
+      },
+      "interactions": [
+        "load authorized Sites and Programs for a proposed trip",
+        "validate future departure, return and permission deadlines in the Site timezone",
+        "submit a proposed trip with versioned school-authored guardian permission language"
+      ],
+      "downstreamRecords": [
+        "field_trips",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/interest-events/$eventId": {
+      "persona": "scoped school administrator with calendar.event.create",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "split-route-detail-fixtures.sql"
+      ],
+      "recordCounts": {
+        "interest_events": 1,
+        "calendar_events": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "open the seeded interest event only within the authorized School/Program scope",
+        "rotate an invitation-only link without treating that link as staff authorization",
+        "display verified RSVPs and record attendance only after a real registration exists"
+      ],
+      "downstreamRecords": [
+        "interest_event_registrations",
+        "interest_event_email_deliveries",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/interest-events/new": {
+      "persona": "scoped school administrator with calendar.event.create",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "split-route-detail-fixtures.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "interest_events": 1
+      },
+      "interactions": [
+        "load only Programs authorized to the current school administrator",
+        "validate the Site timezone, event dates, visibility and school details",
+        "create a new interest event and canonical calendar projection through the existing idempotent service"
+      ],
+      "downstreamRecords": [
+        "interest_events",
+        "scheduled_occurrences",
+        "calendar_events",
+        "audit_events",
+        "domain_events"
+      ]
     }
   }
 }
