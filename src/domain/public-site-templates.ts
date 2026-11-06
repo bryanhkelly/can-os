@@ -34,6 +34,15 @@ export function composePublicSiteHome(template: SiteTemplateId, sections: Public
  * navigation/hero geometry; these are not five recolors of one layout.
  * Entirely static CSS is safe in both real public pages and sandboxed previews. */
 export const publicSiteTemplateCss = `
+.interior-community{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:40px;align-items:start}
+.interior-modern .interior-main{border-top:6px solid var(--site-accent);padding-top:24px}
+.interior-modern .compact-hero{max-width:850px;margin-inline:0}
+.interior-bright .interior-main{background:var(--site-canvas);padding:32px;border-radius:32px}
+.interior-bright .interior-related{margin:36px 0;border-top:8px solid var(--site-accent)}
+.interior-summit{max-width:960px;margin:48px auto}.interior-summit .interior-related{border-block:1px solid var(--site-ink);padding-block:32px}
+.interior-heritage{max-width:1080px;margin:40px auto}.interior-heritage .interior-related{border-top:1px solid var(--site-ink);padding-top:28px}
+@media(max-width:760px){.interior-community{grid-template-columns:1fr}.interior-bright .interior-main{padding:20px}.interior-summit{margin-block:24px}}
+
 /* When schools choose an editorial H1, the welcome sentence is supporting
  * copy rather than a competing second headline. Legacy headlines are unchanged. */
 .public-hero.editorial-headline .hero-subtitle{font-family:var(--site-body);font-size:clamp(1rem,1.6vw,1.35rem);line-height:1.65;font-weight:400;letter-spacing:0;max-width:740px}
@@ -97,3 +106,14 @@ body.template-summit .closing-action h2{margin-inline:auto}
   body.template-summit .public-hero:not(.compact-hero) h1{font-size:clamp(3rem,11vw,5rem)}
 }
 `;
+
+/** Interior compositions consume the same approved fragments; no template invents facts. */
+export function composePublicSiteInterior(template: SiteTemplateId, hero: string, primary: string, secondary = ""): string {
+  switch (template) {
+    case "community": return hero + `<div class="interior-community"><div class="interior-story">${primary}</div><aside class="interior-related">${secondary}</aside></div>`;
+    case "modern": return `<div class="interior-modern">${hero}<div class="interior-main">${primary}</div><div class="interior-related">${secondary}</div></div>`;
+    case "bright-futures": return hero + `<div class="interior-bright"><div class="interior-main">${primary}</div><div class="interior-related">${secondary}</div></div>`;
+    case "summit": return hero + `<div class="interior-summit"><div class="interior-main">${primary}</div><div class="interior-related">${secondary}</div></div>`;
+    default: return hero + `<article class="interior-heritage">${primary}<div class="interior-related">${secondary}</div></article>`;
+  }
+}

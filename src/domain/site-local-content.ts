@@ -1,4 +1,4 @@
-import { sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
+import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
  * CAN-owned academic, admissions, tuition and institutional facts are not
@@ -55,6 +55,8 @@ export type SiteLocalBranding = {
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
   typographyId?: SiteTypographyId;
+  headingFontId?: SiteFontId;
+  bodyFontId?: SiteFontId;
 };
 export type SiteLocalContent = SiteLocalTextContent & {
   branding: SiteLocalBranding;
@@ -274,6 +276,9 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if (!sitePaletteIds.includes(paletteId) || !siteTypographyIds.includes(typographyId) || !siteTemplateIds.includes(templateId)) {
     throw new Error("Choose approved school visual identity options");
   }
+  if ((branding.headingFontId !== undefined && !isSiteFontId(branding.headingFontId)) ||
+      (branding.bodyFontId !== undefined && !isSiteFontId(branding.bodyFontId))) throw new Error("Choose approved school fonts");
+  const fontOverrides = { ...(branding.headingFontId ? {headingFontId:branding.headingFontId} : {}), ...(branding.bodyFontId ? {bodyFontId:branding.bodyFontId} : {}) };
   const image = branding.heroImage;
   if (image) {
     validateInlinePng(image.dataUrl);
@@ -287,12 +292,12 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       throw new Error("Confirm that no identifiable children appear or that guardian consent is documented");
     }
     result.branding = {
-      theme: branding.theme, paletteId, typographyId, templateId,
+      theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides,
       heroImage: { dataUrl: image.dataUrl, altText, rightsConfirmed: true,
         childImageConsent: image.childImageConsent },
     };
   } else {
-    result.branding = { theme: branding.theme, paletteId, typographyId, templateId, heroImage: null };
+    result.branding = { theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides, heroImage: null };
   }
   if (input.editorialBaseline) {
     const baseline = input.editorialBaseline;

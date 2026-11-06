@@ -1,4 +1,4 @@
-import { resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
+import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
 import { Link } from "@tanstack/react-router";
@@ -481,11 +481,12 @@ function LocalWebsiteCopyEditor({
             ...old, branding: { ...old.branding, templateId },
           }))}
           paletteId={content.branding.paletteId} typographyId={content.branding.typographyId}
+          headingFontId={content.branding.headingFontId} bodyFontId={content.branding.bodyFontId}
           disabled={busy || !data.canPublish}/>
         <p className="text-xs text-muted-foreground">Changing a template preserves school data, approved content and your other design choices. Select Preview current changes on the final step to see the actual rendered layout.</p>
       </div>}
 
-      {step === 3 && <div className="space-y-5">
+      {step === 4 && <div className="space-y-5">
         <div>
           <h3 className="font-serif text-2xl">Your school story is ready to make your own.</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -542,7 +543,7 @@ function LocalWebsiteCopyEditor({
             <span className="font-medium">Approved typography pairing</span>
             <select value={content.branding.typographyId ?? "editorial"}
               onChange={event=>setContent(old=>({...old,branding:{...old.branding,
-                typographyId:event.target.value as SiteTypographyId}}))}
+                typographyId:event.target.value as SiteTypographyId, headingFontId:undefined, bodyFontId:undefined}}))}
               className="mt-2 min-h-11 w-full rounded-lg border bg-background px-3">
               {siteTypographyIds.map(id=><option key={id} value={id}>
                 {id === "editorial" ? "Editorial serif + modern sans" :
@@ -550,10 +551,26 @@ function LocalWebsiteCopyEditor({
               </option>)}
             </select>
           </label>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {(["headingFontId", "bodyFontId"] as const).map(key => <label key={key} className="block text-sm">
+              {key === "headingFontId" ? "Heading font" : "Body font"}
+              <select className="mt-2 min-h-11 w-full rounded border bg-background px-3" value={content.branding[key] ?? ""}
+                onChange={event => setContent(old => ({...old, branding:{...old.branding, [key]:event.target.value ? event.target.value as SiteFontId : undefined}}))}>
+                <option value="">Use recommended pairing</option>
+                {Object.entries(siteFontCatalog).map(([id,font]) => <option key={id} value={id}>{font.label}</option>)}
+              </select>
+            </label>)}
+          </div>
           <p className="mt-3 text-xs text-muted-foreground">All choices use a maintained, contrast-checked palette
             and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
             no logo, third-party font, photograph or CSS is copied automatically.</p>
         </div>
+      </fieldset></div>}
+      {step === 3 && <div className="space-y-5">
+      <h3 className="font-serif text-2xl">Photos &amp; artwork</h3>
+      <p className="text-sm">Gallery images are fictional template samples. They are not photos of your school and are never added to your school media library.</p>
+      <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
+        <legend className="px-2 text-sm">Your school-owned artwork</legend>
         <label className="block text-sm">
           <span className="font-medium">Church or community artwork (optional)</span>
           <span className="mt-1 block text-xs text-muted-foreground">
@@ -602,7 +619,7 @@ function LocalWebsiteCopyEditor({
           enabled={data.mediaUploadsEnabled}/></div>
       </details>
       </div>}
-      {step === 4 && <div className="space-y-4">
+      {step === 5 && <div className="space-y-4">
         <div>
           <h3 className="text-lg font-semibold">Review your website</h3>
           <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
@@ -662,8 +679,8 @@ function LocalWebsiteCopyEditor({
           className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
           {busy?"Saving...":"Save private draft"}
         </button>
-        {step < 4 && <button type="button"
-          onClick={() => onStepChange(Math.min(4, step + 1))}
+        {step < 5 && <button type="button"
+          onClick={() => onStepChange(Math.min(5, step + 1))}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
           Continue
         </button>}

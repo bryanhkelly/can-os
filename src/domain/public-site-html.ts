@@ -1,5 +1,5 @@
 import { resolveSiteTheme, resolveSiteTemplateId } from "./site-theme";
-import { composePublicSiteHome, publicSiteTemplateCss } from "./public-site-templates";
+import { composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss } from "./public-site-templates";
 import { canFallbackArtwork, canFallbackFamilyForPalette, type CanFallbackSlot } from "./school-site-fallback-art";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -101,6 +101,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   /** Caller supplies one server-generated random request ID per form. */
   makeRequestId?: () => string;
+  /** Only the isolated fictional template gallery sets this; never persisted as school media. */
+  templateGallery?: boolean;
   path?: PublicSitePath;
   localPreview?: boolean;
   /** Trusted server-resolved Site slug for local-only multipage preview. */
@@ -127,7 +129,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const demo = page.demonstration === true;
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
-  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId);
+  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId);
   const templateId = resolveSiteTemplateId(local?.branding.templateId);
   const visualCss = `--site-ink:${visual.ink};--site-paper:${visual.canvas};--site-accent:${visual.accent};--site-secondary:${visual.secondary};--site-muted:${visual.muted};--site-display:${visual.displayFont};--site-body:${visual.bodyFont};`;
   const localItems = local ? [
@@ -145,6 +147,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const fallbackFamily = canFallbackFamilyForPalette(local?.branding.paletteId);
   const fallbackHero = canFallbackArtwork(fallbackFamily,"hero");
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
+    if (options?.templateGallery) {
+      const family = {heritage:"heritage",community:"community",modern:"modern","bright-futures":"bright",summit:"summit"}[templateId];
+      return {src:`/school-template-previews/v1/${family}/${slot === "hero" ? "hero" : "story_01"}.jpg`,altText:"Fictional template sample, not this school",assetId:"template-sample",sourceRevision:"v1"};
+    }
     const candidate=page.media?.[slot];
     if(!candidate)return null;
     try{
@@ -562,19 +568,18 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   });
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
-    "/about": secondaryHero("Our community", "Rooted in purpose. Growing through community.",
-      "Discover the people, purpose, and community shaping this school.") + localSection + peopleSection,
-    "/academics": secondaryHero("Learning", "Learning that builds knowledge, confidence, and curiosity.",
-      "Explore available academic offerings, learning approaches, and pathways for your child.") + academicSection + approachSection,
-    "/student-life": secondaryHero("Beyond the classroom", "Student life",
-      "Learn about the activities and experiences currently available beyond academic lessons.") + enrichmentSection,
+    "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "Rooted in purpose. Growing through community.",
+      "Discover the people, purpose, and community shaping this school."), localSection, peopleSection),
+    "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Learning that builds knowledge, confidence, and curiosity.",
+      "Explore available academic offerings, learning approaches, and pathways for your child."), academicSection, approachSection),
+    "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", "Student life",
+      "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
     "/school-day": secondaryHero("Learning together", "What a day of learning looks like",
       "See how learning is organized, with confirmed schedules and attendance details where available.") +
       reviewedSchoolDay + schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
       (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : ""),
-    "/admissions": secondaryHero("For families", "Your family’s journey starts here",
-      "Explore the admissions process and the next step available for your family.") +
-      admissionsNextSteps + academicSection + disclosureSection,
+    "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "Your family’s journey starts here",
+      "Explore the admissions process and the next step available for your family."), admissionsNextSteps, academicSection + disclosureSection),
     "/tuition": secondaryHero("Planning your education", "Plan with confidence",
       "Find published costs, assistance details, and ways to request information for your family.") + tuitionSection,
     "/families": secondaryHero("Supporting families", "Partners in your child’s education",

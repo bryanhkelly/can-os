@@ -57,7 +57,7 @@ describe("Website Studio five-template contract", () => {
   it("uses semantic, accessible buttons and exactly one choice per template",()=>{
     const html=renderToStaticMarkup(<WebsiteTemplateGallery schoolName="Sample Academy" value="heritage"
       onChange={()=>{}}/>);
-    expect((html.match(/aria-pressed=/g)??[]).length).toBe(5);
+    expect((html.match(/aria-pressed=/g)??[]).length).toBe(7);
     expect(html).toContain("Heritage Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Modern Academy");
