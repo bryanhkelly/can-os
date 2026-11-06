@@ -2,6 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 
 const state=vi.hoisted(()=>({
@@ -60,7 +61,7 @@ import { Route as Groups } from "@/routes/groups";
 import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
 
 type Props={
-  children?:ReactNode;type?:string;value?:string;
+  children?:ReactNode;type?:string;value?:string;label?:string;
   onChange?:(event:{target:{value:string}})=>void;
   onSubmit?:(event:{preventDefault:()=>void})=>void;
   onClick?:()=>unknown;
@@ -88,7 +89,9 @@ function render(route:{options:{component?:unknown}}){
   return nodes((page.type as (props:Props)=>ReactNode)(props));
 }
 function changeLabel(controls:ReactElement<Props>[],label:string,value:string){
-  const field=controls.find(node=>(node.type==="label"||node.type===Label)&&text(node.props.children).startsWith(label));
+  const field=controls.find(node=>
+    (node.type==="label"||node.type===Label)&&text(node.props.children).startsWith(label) ||
+    (node.type===Field&&node.props.label?.startsWith(label)));
   const input=field&&nodes(field.props.children).find(node=>node.type==="input"||node.type==="select"||node.type===Input||node.type===Select);
   if(!input?.props.onChange)throw new Error(`Missing input ${label}`);
   input.props.onChange({target:{value}});
@@ -139,6 +142,7 @@ describe("site-local scheduling forms",()=>{
     const toggle=controls.find(node=>node.type==="button"&&text(node.props.children)==="Schedule session");
     toggle?.props.onClick?.();
     controls=render(Groups);
+    changeLabel(controls,"Session title","Study session");
     changeLabel(controls,"Start","2030-01-15T09:30");
     changeLabel(controls,"End","2030-01-15T10:30");
     await submit(render(Groups));
