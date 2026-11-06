@@ -136,7 +136,13 @@ describe("navigation link targets", () => {
           const value=ts.isJsxExpression(node.initializer)?node.initializer.expression:node.initializer;
           if(value)values=literalTargets(value);
         }else if(ts.isPropertyAssignment(node)&&["to","href","path"].includes(node.name.getText(source))){
-          values=literalTargets(node.initializer);
+          // The curated editorial/next-step hrefs in engagement-journeys are
+          // resolved against publicMarketingOrigin by engagementInformationHref,
+          // not against the CAN OS application router. Keep checking its
+          // canonical launch.path entries as internal routes.
+          const marketingHref = file.endsWith("engagement-journeys.ts") &&
+            node.name.getText(source)==="href";
+          if(!marketingHref)values=literalTargets(node.initializer);
         }else if(ts.isCallExpression(node)&&node.expression.getText(source)==="window.location.assign"&&node.arguments[0]){
           values=literalTargets(node.arguments[0]);
         }
