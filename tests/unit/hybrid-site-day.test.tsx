@@ -62,6 +62,7 @@ describe("Hybrid Site daily facilitator workspace",()=>{
       {title:"Home",path:"/home",icon:"home"},
       {title:"Report a safety concern",path:"/safeguarding",icon:"safety"},
       {title:"My profile",path:"/profiles",icon:"users"},
+      {title:"Settings",path:"/settings",icon:"settings"},
     ]);
   });
   it("explains the boundary between physical presence, online activity and student release",()=>{
