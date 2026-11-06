@@ -8,6 +8,7 @@ import { OperationsHome } from "@/components/home/OperationsHome";
 import { Route as Site } from "@/routes/sites.$siteId.index";
 import { Route as Admissions } from "@/routes/admissions.index";
 import { Route as Intake } from "@/routes/admissions.intake";
+import { Route as NewIntake } from "@/routes/admissions.intake_.new";
 import { Route as Capacity } from "@/routes/admissions.capacity";
 import { Route as Families } from "@/routes/admissions.families";
 import { Route as Support } from "@/routes/student.support";
@@ -69,7 +70,7 @@ vi.mock("@/modules/enrollment/capacity-preview.functions",()=>({
  updateAdmissionsCapacity:vi.fn(),
 }));
 vi.mock("@/modules/enrollment/admissions-intake.functions",()=>({
- listAdmissionsIntake:vi.fn(),listAdmissionsIntakePrograms:vi.fn(),listAdmissionsExistingStudents:vi.fn(),createAdmissionsInquiry:vi.fn(),
+ listAdmissionsIntake:vi.fn(),listAdmissionsIntakePrograms:vi.fn(),listAdmissionsExistingStudents:vi.fn(),listAdmissionsExistingStudentsPage:vi.fn(),createAdmissionsInquiry:vi.fn(),
  provisionInquiryGuardianAccount:vi.fn(),sendAdmissionsGuardianInvitation:vi.fn(),
  verifyAdmissionsGuardianRelationship:vi.fn(),transitionAdmissionsStage:vi.fn(),
 }));
@@ -435,15 +436,15 @@ describe("application contextual navigation",()=>{
 
   it("offers existing students only from the selected intake program without replacing new-student intake",()=>{
     state.search={programId:"program"};
-    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],publicInterests:{items:[],nextCursor:null},linkedInterest:null,existingStudents:[
+    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],interest:null,students:{items:[
       {programId:"program",studentProfileId:"existing",guardianPersonId:"guardian",householdId:"household",
         studentFirstName:"Existing",studentLastName:"Learner",guardianFirstName:"Managing",guardianLastName:"Guardian"},
       {programId:"program",studentProfileId:"unlinked",guardianPersonId:"unlinked-guardian",householdId:null,
         studentFirstName:"Unlinked",studentLastName:"Learner",guardianFirstName:"Unlinked",guardianLastName:"Guardian"},
       {programId:"other",studentProfileId:"outside",guardianPersonId:"other-guardian",householdId:"other-household",
         studentFirstName:"Outside",studentLastName:"Learner",guardianFirstName:"Other",guardianLastName:"Guardian"},
-    ]});
-    const html=render(Intake);
+    ],nextPage:null}});
+    const html=render(NewIntake);
     expect(html).toContain("Existing Learner");
     expect(html).toContain("Managing Guardian");
     expect(html).toContain("new household required");
