@@ -7,6 +7,20 @@ const files = [
   "src/components/workspace/local-datetime-field.tsx",
   "src/components/evidence/FileSelectionField.tsx",
   "src/components/shell/WorkspaceContextSwitcher.tsx",
+  "src/components/launch-studio/LaunchStudioShell.tsx",
+  "src/components/launch-studio/LaunchStudioEntry.tsx",
+  "src/components/launch-studio/LaunchFieldHelp.tsx",
+  "src/components/launch-studio/LaunchDraftButton.tsx",
+  "src/components/launch-studio/WebsiteTemplateGallery.tsx",
+  "src/components/operations/LaunchWebsiteStep.tsx",
+  "src/components/operations/LaunchWebsiteEditorHandoff.tsx",
+  "src/components/operations/LaunchSchoolModelPicker.tsx",
+  "src/components/operations/LaunchDeliveryModelFields.tsx",
+  "src/components/operations/LaunchProgramIdentityFields.tsx",
+  "src/routes/launch.family.tsx",
+  "src/routes/launch.staff.tsx",
+  "src/routes/launch.student.tsx",
+  "src/routes/site-website.tsx",
 ];
 describe("migrated workflow control reuse", () => {
   const eslint = new ESLint();
