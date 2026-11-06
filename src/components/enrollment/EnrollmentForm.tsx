@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { EnrollmentFormAnswers, enrollmentFormState } from "@/domain/enrollment-form";
 import { decideEnrollmentForm, submitGuardianEnrollmentForm } from "@/modules/enrollment/enrollment-form.functions";
+import { useLaunchDraftChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 
 export type EnrollmentFormRecord = NonNullable<ReturnType<typeof enrollmentFormState>> & { revision: string };
 
@@ -32,8 +33,9 @@ export function EnrollmentFormSnapshot({ record }: { record: EnrollmentFormRecor
   </div>;
 }
 
-export function GuardianEnrollmentForm({ applicationId, requirementId, record, closed, onChanged }: {
+export function GuardianEnrollmentForm({ applicationId, requirementId, record, closed, onChanged, onDirtyChange }: {
   applicationId: string; requirementId: string; record: EnrollmentFormRecord; closed: boolean; onChanged: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [answers, setAnswers] = useState<EnrollmentFormAnswers>(record.submission?.answers ?? {});
   const [signerName, setSignerName] = useState(""), [confirmed, setConfirmed] = useState(false);
@@ -44,6 +46,8 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
   useEffect(() => setInteractive(true), []);
   const requestId = useRef<string | null>(null);
   const editable = !closed && (!record.submission || record.review?.status === "rejected");
+  const changes=useLaunchDraftChanges({answers,signerName,confirmed});
+  useEffect(() => { onDirtyChange?.(editable && (changes.dirty || busy)); }, [onDirtyChange,editable,changes.dirty,busy]);
   function answer(key: string, value: string | boolean) {
     requestId.current = null; setAnswers(current => ({ ...current, [key]: value }));
   }
@@ -58,8 +62,12 @@ export function GuardianEnrollmentForm({ applicationId, requirementId, record, c
       if(missingAnswer||signerName.trim().length<2||!confirmed)return;
       requestId.current ??= crypto.randomUUID();
       const id = requestId.current;
-      await mutation.run(() => submitGuardianEnrollmentForm({ data: { applicationId, requirementId, answers, signerName,
-        requestId: id, formRevision: record.revision, confirmed } }), {
+      await mutation.run(async () => {
+        const receipt=await submitGuardianEnrollmentForm({ data: { applicationId, requirementId, answers, signerName,
+          requestId: id, formRevision: record.revision, confirmed } });
+        changes.markSaved({answers,signerName,confirmed});
+        return receipt;
+      }, {
         successMessage: "Signed enrollment form submitted for registrar review.",
         commandErrorMessage: "Unable to submit signed enrollment form.",
       });

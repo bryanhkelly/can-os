@@ -10,15 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {FileSelectionField,UploadedFileNotice} from "@/components/evidence/FileSelectionField";
-import {
-  beginQualificationUpload, decideQualification, finishQualificationUpload,
-  getQualificationEvidence, getQualifications,
-} from "@/modules/profiles/qualifications.functions";
+import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
+import { beginQualificationUpload, finishQualificationUpload, getQualificationEvidence, decideQualification, getQualifications } from "@/modules/profiles/qualifications.functions";
 
 type Snapshot = Awaited<ReturnType<typeof getQualifications>>;
 type Selection = { personId?: string; programId?: string };
 
-export function Qualifications({ personId, programId, onChanged }: Selection & { onChanged?: () => Promise<void> }) {
+export function Qualifications({ personId, programId, onChanged, onDirtyChange, embedded = false }: Selection & {
+  onChanged?: () => Promise<void>; onDirtyChange?: (dirty: boolean) => void; embedded?: boolean;
+}) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -33,17 +33,24 @@ export function Qualifications({ personId, programId, onChanged }: Selection & {
     return () => { active = false; };
   }, [personId, programId, revision]);
   return <section className="mt-6 rounded-xl border bg-card p-5">
-    <h2 className="font-serif text-2xl">School compliance and qualification evidence</h2>
+    <h2 className="font-serif text-2xl">{embedded ? "Your qualifications" : "School compliance and qualification evidence"}</h2>
+    {embedded ? <>
+      <p className="mt-2 text-sm">Upload the qualifications your school requests. Submitting a file sends it for review, not approval.</p>
+      <LaunchFieldHelp label="What qualification review means">
+        Evidence is private. Your school decides which qualifications your role needs.
+        Only upload identity documents when specifically requested. Evidence review does not authorize teaching or supervision.
+      </LaunchFieldHelp>
+    </> : <>
     <p className="mt-2 text-sm">Private credential records are separate from public profile information.
       Verification confirms evidence review, not program eligibility or legal authorization to teach.</p>
     <p className="mt-2 text-sm">Document resumes, degrees, licenses and other qualifications using the shared catalog.
       Each school chooses its required qualifications through program policy; submitting a resume does not verify a degree or license.</p>
-    <p className="mt-2 text-sm">Only upload identity documents such as a driver&apos;s license when your school requests them for an applicable role or requirement. They are private evidence, not general profile information.</p>
+    <p className="mt-2 text-sm">Only upload identity documents such as a driver&apos;s license when your school requests them for an applicable role or requirement. They are private evidence, not general profile information.</p></>}
     <QueryState loading={!snapshot&&!error?"Loading qualification records...":undefined}
       error={error?<>{error} Review requires an independent, explicitly granted credential verifier in the teacher's institution.</>:undefined}
       onRetry={()=>setRevision(value=>value+1)}>
     {snapshot && <QualificationRecords key={`${personId ?? "self"}:${revision}`} snapshot={snapshot}
-      selection={{ personId, programId }} changed={async () => {
+      embedded={embedded} onDirtyChange={onDirtyChange} selection={{ personId, programId }} changed={async () => {
         await onChanged?.();
         setSnapshot(await getQualifications({ data: { personId, programId } }));
       }} />}
@@ -51,8 +58,10 @@ export function Qualifications({ personId, programId, onChanged }: Selection & {
   </section>;
 }
 
-export function QualificationRecords({ snapshot, selection, changed }: {
+export function QualificationRecords({ snapshot, selection, changed, onDirtyChange, embedded = false }: {
   snapshot: Snapshot; selection: Selection; changed: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
+  embedded?: boolean;
 }) {
   const mutation = useMutationFeedback(changed);
   const busy = mutation.pending || mutation.refreshFailed;
@@ -66,7 +75,7 @@ export function QualificationRecords({ snapshot, selection, changed }: {
     <MutationFeedback state={mutation} pendingMessage="Saving qualification change..."/>
     {snapshot.canSubmit && <SubmissionForm catalog={snapshot.catalog} jurisdictions={snapshot.jurisdictions}
       uploadsEnabled={snapshot.uploadsEnabled}
-      busy={busy} submit={(operation) => run(operation, "Evidence submitted for independent review.")} />}
+      busy={busy} embedded={embedded} onDirtyChange={onDirtyChange} submit={(operation) => run(operation, "Evidence submitted for independent review.")} />}
     {!snapshot.claims.length && <p className="text-sm text-muted-foreground">No qualification claims have been submitted. This is not a verified or eligible status.</p>}
     {snapshot.hasMore && <p className="text-sm">Showing the 100 most recent claims. Older records remain retained.</p>}
     {snapshot.claims.map(claim => <Claim key={claim.id} claim={claim} canReview={snapshot.canReview}
@@ -74,10 +83,12 @@ export function QualificationRecords({ snapshot, selection, changed }: {
   </div>;
 }
 
-function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }: {
+function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit, onDirtyChange, embedded }: {
   catalog: Snapshot["catalog"]; jurisdictions: Snapshot["jurisdictions"]; busy: boolean;
   uploadsEnabled: boolean;
   submit: (operation: () => Promise<unknown>) => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
+  embedded: boolean;
 }) {
   const [definitionId, setDefinitionId] = useState(catalog[0]?.id ?? "");
   const [issuerName, setIssuerName] = useState(""), [jurisdictionId, setJurisdictionId] = useState("");
@@ -86,11 +97,16 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }
   const [attempted,setAttempted]=useState(false);
   const [pending, setPending] = useState<{ key: string; claim: NonNullable<Parameters<typeof beginQualificationUpload>[0]>["data"] } | null>(null);
   const task = useRef<{run: () => Promise<unknown>} | null>(null);
+  const signature = JSON.stringify({ definitionId, issuerName, jurisdictionId, issuedAt, expiresAt });
+  const [savedSignature, setSavedSignature] = useState(signature);
+  useEffect(() => { onDirtyChange?.(signature !== savedSignature || Boolean(file) || Boolean(pending) || busy); },
+    [signature, savedSignature, file, pending, busy, onDirtyChange]);
   async function upload() {
     if (task.current) {
       await task.current.run();
       task.current=null;
       setPending(null); setFile(null);
+      setSavedSignature(signature);
       return;
     }
     if (!file) throw new Error("Choose evidence before submitting.");
@@ -102,14 +118,15 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }
       fileName: file.name, mimeType, size: file.size };
     let bytesUploaded=false;
     task.current=createPrivateUploadTask({file,policy:documentUploadPolicy,
-      begin:()=>beginQualificationUpload({data:claim}),
+      begin:async()=>beginQualificationUpload({data:claim}),
       onUploaded:upload=>{bytesUploaded=true;setPending({key:upload.key,claim});},
-      finish:upload=>finishQualificationUpload({data:{key:upload.key,claim}}),
+      finish:async upload=>finishQualificationUpload({data:{key:upload.key,claim}}),
     });
     try { await task.current.run(); }
     catch(error){if(!bytesUploaded)task.current=null;throw error;}
     task.current=null;
     setPending(null); setFile(null);
+    setSavedSignature(signature);
   }
   return <form noValidate className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2" onSubmit={event => {
     event.preventDefault();setAttempted(true);
@@ -128,17 +145,21 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit }
       <Field label="Issuing institution" className="text-sm" required error={attempted&&!issuerName.trim()?"Enter the name of the issuing institution.":undefined}>
         <Input value={issuerName} maxLength={200} onChange={event => setIssuerName(event.target.value)}/>
       </Field>
-      <Field label="Jurisdiction (optional)" className="text-sm">
+      <Field label={embedded ? "State or region (optional)" : "Jurisdiction (optional)"} className="text-sm">
         <Select value={jurisdictionId} onChange={event => setJurisdictionId(event.target.value)}><option value="">Not specified</option>
         {jurisdictions.map(entry => <option key={entry.id} value={entry.id}>{entry.name} ({entry.code})</option>)}
         </Select>
       </Field>
-      <Field label="Issued at (optional, your local time)" className="text-sm"><Input type="datetime-local" value={issuedAt} onChange={event => setIssuedAt(event.target.value)}/></Field>
-      <Field label="Expires at (optional, your local time)" className="text-sm"><Input type="datetime-local" value={expiresAt} onChange={event => setExpiresAt(event.target.value)}/></Field>
+      <Field label={embedded ? "Issue date and time (optional)" : "Issued at (optional, your local time)"} className="text-sm"><Input type="datetime-local" value={issuedAt} onChange={event => setIssuedAt(event.target.value)}/></Field>
+      <Field label={embedded ? "Expiry date and time (optional)" : "Expires at (optional, your local time)"} className="text-sm"><Input type="datetime-local" value={expiresAt} onChange={event => setExpiresAt(event.target.value)}/></Field>
       <FileSelectionField label="Evidence (PDF, JPEG or PNG, up to 10 MB)" accept="application/pdf,image/jpeg,image/png"
         file={file} onChange={setFile} required/>
       {attempted&&!pending&&!file&&<FieldError className="sm:col-span-2">Choose a PDF, JPEG, or PNG evidence file.</FieldError>}
     </fieldset>
+    {embedded && <div className="sm:col-span-2"><LaunchFieldHelp label="Which state and dates should I enter?">
+      Choose the state or region where this qualification applies, if known. Enter dates in your local time.
+      Leave optional dates empty if your document does not include them.
+    </LaunchFieldHelp></div>}
     <p className="text-xs text-muted-foreground sm:col-span-2">Submit a new claim for renewal or corrected evidence. Prior claims and review history are retained. Storage verification does not approve your qualification.</p>
     {pending && <div className="sm:col-span-2"><UploadedFileNotice>The file uploaded, but submission has not been confirmed. Retry the same submission without uploading again.</UploadedFileNotice></div>}
     <Button type="submit" disabled={busy || !uploadsEnabled} className="justify-self-start">{pending ? "Retry submission" : "Submit for review"}</Button>
@@ -187,7 +208,7 @@ function Claim({ claim, canReview, selection, busy, run }: {
           onClick={() => {
             setAttempted(true);
             if(reason.trim().length<5||(decision==="approve"&&(!reviewed||expired)))return;
-            void run(() => decideQualification({ data: { ...selection, claimId: claim.id,
+            void run(async () => decideQualification({ data: { ...selection, claimId: claim.id,
               expectedSequence: claim.sequence, decision, reason } }), "Review saved; launch eligibility will be recalculated.")
               .then(()=>setAttempted(false));
           }}>{decision}</Button>)}</div>

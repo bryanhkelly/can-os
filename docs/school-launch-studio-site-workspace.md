@@ -4,6 +4,55 @@ Scope: Product specification with the source-verified implementation note below.
 
 ## November 5, 2026 implementation and verification
 
+- The shared four-audience frame now uses compact, expandable mobile step
+  navigation and a nonduplicative saved-work/help rail. Family, student and staff
+  forms share the school form's label/value hierarchy and accessible help.
+  Back/Continue changes steps; Save draft preserves a private buffer; profile,
+  application and evidence submit buttons retain their separate canonical commands.
+- School, family application, student profile and staff qualification entries
+  remain mounted across step changes. Selected qualification files are retained
+  in memory, not in a draft. Dirty forms, selected files and pending/failed-refresh
+  mutations warn before dashboard exits, context changes and browser unloading.
+  Independently edited school contact/address/identity fields still require their
+  own saves; Save draft does not save those edits. Untouched suggested school
+  defaults alone do not trigger an unsaved-change warning.
+- Student drafts include an optional saved-profile baseline. Only matching
+  baselines restore profile fields automatically; legacy or stale profile drafts
+  require an explicit restoration choice. Course choices are retained separately.
+  Saving a profile clears its dirty state, not unsaved course changes. It does
+  not rewrite the stored draft; another Save draft updates the baseline.
+- Staff Save draft saves preparation notes only, never qualification fields or
+  files. Family transfer consent is never included in a draft. Draft acknowledgments
+  mark the exact submitted snapshot as saved, so edits made during a save remain
+  protected. Save draft no longer doubles as a school dashboard-exit command.
+- Cross-audience refinement validation: production build, typecheck, 134-route
+  contract inventory, design-system inventory and 145 tests in 17 selected regression
+  files passed. Nineteen Chromium interaction/accessibility stories passed at both
+  desktop and 390 x 844 mobile sizes, including actual parent/student/staff forms,
+  retained fields/files, canceled exits, confirmed profile saves and draft-save
+  races. Storybook profile, qualification and draft commands use explicit isolated
+  mocks that reject unconfigured calls; no production mutation is made by these
+  stories. Targeted lint has no errors; existing warnings remain in older components
+  and unrelated worktree changes. Authenticated four-role end-to-end completion,
+  production deployment and identity-switch acceptance remain unverified.
+
+- School-detail forms use plain-language labels, subdued labels and emphasized
+  entered/saved values. Secondary explanations use keyboard-, pointer- and
+  touch-accessible help tooltips; state-support blockers and the fact that saving
+  is not opening approval remain visible. State guidance and website-access
+  details are expandable rather than repeated in the main form.
+- A missing matching US-state jurisdiction is reported beside the state field
+  before submission, with instructions to save a draft and ask CAN for support.
+  A different state cannot bypass this requirement. Server-side state checks use
+  explicit safe launch-error codes; no raw exception text is exposed and no
+  jurisdiction records or production data are created by this UI change.
+- Form-refinement validation: production build, typecheck, route contracts and
+  92 targeted regression tests passed. Eight Chromium Storybook interaction/axe
+  checks passed at desktop and 390 x 844 mobile sizes, including tooltip dismissal,
+  value-over-label emphasis, retained input and unsupported-state blocking.
+  Targeted lint reported no errors and one existing unused-import warning in
+  `launch.functions.ts`. Authenticated production completion remains unverified.
+
 - Launch Studio is the canonical standalone experience: `/launch`, `/launch/school`,
   `/launch/school/$programId`, `/launch/family`, `/launch/student`, and `/launch/staff`.
   The former operations-launch and guardian-application route modules were removed,

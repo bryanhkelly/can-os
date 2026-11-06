@@ -8,6 +8,7 @@ export const clientErrorCodes = [
   "SITE_ROOM_RETIRED",
   "CONFERENCE_NOT_BOOKED", "CONFERENCE_NOT_STARTED", "CONFERENCE_NOT_ENDED",
   "ATTENDANCE_CONFLICT",
+  "LAUNCH_LOCATION_UNSUPPORTED", "LAUNCH_LOCATION_MISMATCH",
 ] as const;
 export type ClientErrorCode = typeof clientErrorCodes[number];
 
@@ -34,6 +35,8 @@ export const clientErrorMessages: Record<ClientErrorCode, string> = {
   CONFERENCE_NOT_STARTED: "A conference outcome cannot be recorded before the appointment starts.",
   CONFERENCE_NOT_ENDED: "A no-show cannot be recorded before the appointment ends.",
   ATTENDANCE_CONFLICT: "The school attendance record changed after this entry was prepared. Refresh and review the conflict before trying again.",
+  LAUNCH_LOCATION_UNSUPPORTED: "School setup isn't available for your school's state yet. Ask CAN to add support. Save a draft while you wait; don't choose a different state to continue.",
+  LAUNCH_LOCATION_MISMATCH: "The selected state doesn't match your saved school address. Choose the matching state, or correct the school address before continuing.",
 };
 
 /** Diagnostic messages stay on the server; clients use the explicit code. */

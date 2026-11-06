@@ -1,12 +1,16 @@
-import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
+import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
+import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
 
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
 const selectClass = inputClass;
 
-export function LaunchProgramIdentityFields({ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }: {
+export function LaunchProgramIdentityFields({ type, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }: {
   type: (typeof programTypes)[number]; setType: (value: (typeof programTypes)[number]) => void;
   summerCreditBearing: boolean; setSummerCreditBearing: (value: boolean) => void;
   name: string; setName: (value: string) => void;
@@ -18,58 +22,57 @@ export function LaunchProgramIdentityFields({ type, setType, summerCreditBearing
 }) {
   return (
               <fieldset>
-                <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Program
+                <legend className="text-sm text-muted-foreground">
+                  Name, opening date &amp; grades
                 </legend>
                 <div className="mt-2 space-y-3">
-                  <label className="block text-xs">
-                    Program type
-                    <select aria-label="Program type" className={selectClass} value={type} onChange={(e) => setType(e.target.value as (typeof programTypes)[number])}>
-                      {programTypes.map((value) => (
-                        <option key={value} value={value}>{programTypeLabels[value]}</option>
-                      ))}
-                    </select>
-                  </label>
                   {type === "summer_program" && (
                     <label className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" checked={summerCreditBearing} onChange={e => setSummerCreditBearing(e.target.checked)} />
-                      Offer credit-bearing summer coursework (requires an authorized credit issuer)
+                      <Checkbox checked={summerCreditBearing} onChange={e => setSummerCreditBearing(e.target.checked)} />
+                      Students can earn academic credit
                     </label>
                   )}
-                  {isExtendedLearningType(type) && <p className="text-xs text-muted-foreground">Summer and after-school offerings share the Program record. Existing academic-year, section, staffing and opening gates still apply; short-course registration and recurring-session operations need further integration.</p>}
+                  {isExtendedLearningType(type) && <p className="text-sm text-muted-foreground">Summer and after-school offerings still need staffing and opening review.</p>}
                   <label className="block text-xs">
-                    Name
-                    <input aria-label="Program name" className={inputClass} value={name} onChange={(e) => {
+                    School or offering name
+                    <Input aria-label="School or offering name" className={inputClass} value={name} onChange={(e) => {
                       const value = e.target.value;
                       setName(value);
                       if (!slugEdited) setSlug(suggestedLaunchSlug(value));
-                    }} required maxLength={200} />
+                    }} required minLength={2} maxLength={200} placeholder="e.g., Barton Academy" />
                   </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
                   <label className="block text-xs">
-                    Target opening date
-                    <input aria-label="Target opening date" type="date" required value={targetOpeningDate}
+                    Planned opening date
+                    <Input aria-label="Planned opening date" type="date" required value={targetOpeningDate}
                       onChange={event => setTargetOpeningDate(event.target.value)} className={inputClass}/>
-                    <span className="mt-1 block text-muted-foreground">Planning only. Your school still needs independent opening approval.</span>
                   </label>
+                  <LaunchFieldHelp label="About the planned opening date">This is your target date, not permission to open. Your school's opening approval is reviewed separately.</LaunchFieldHelp>
+                  </div>
+                  <div>
                   <label className="block text-xs">
-                    Slug
-                    <input aria-label="Program slug" className={inputClass} value={slug} onChange={(e) => {
+                    Offering short name
+                    <Input aria-label="Offering short name" className={inputClass} value={slug} onChange={(e) => {
                       setSlugEdited(true);
                       setSlug(e.target.value);
-                    }} required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="grace-academy-hs" />
+                    }} required pattern="[a-z0-9]+(-[a-z0-9]+)*" title="Use lowercase letters, numbers and single hyphens." placeholder="barton-academy" />
                   </label>
+                  <LaunchFieldHelp label="About the offering short name">A short identifier for this offering, suggested from its name. Use lowercase letters, numbers and single hyphens. This does not set or publish your website address.</LaunchFieldHelp>
+                  </div>
+                  </div>
                   <div className="flex gap-3">
                     <label className="block flex-1 text-xs">
-                      Grade range min
-                      <select aria-label="Minimum grade" className={selectClass} value={gradeMin} onChange={(e) => setGradeMin(e.target.value)}>
+                      Lowest grade served
+                      <Select aria-label="Minimum grade" className={selectClass} value={gradeMin} onChange={(e) => setGradeMin(e.target.value)}>
                         {grades.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
-                      </select>
+                      </Select>
                     </label>
                     <label className="block flex-1 text-xs">
-                      Grade range max
-                      <select aria-label="Maximum grade" className={selectClass} value={gradeMax} onChange={(e) => setGradeMax(e.target.value)}>
+                      Highest grade served
+                      <Select aria-label="Maximum grade" className={selectClass} value={gradeMax} onChange={(e) => setGradeMax(e.target.value)}>
                         {grades.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
-                      </select>
+                      </Select>
                     </label>
                   </div>
                   {!launchGradeRangeIsOrdered({min:gradeMin,max:gradeMax})&&

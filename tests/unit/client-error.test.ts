@@ -51,6 +51,7 @@ describe("client-safe error contract",()=>{
     "SITE_ROOM_NAME_CONFLICT", "SITE_ROOM_IDENTIFIER_CONFLICT",
     "CONFERENCE_NOT_BOOKED", "CONFERENCE_NOT_STARTED", "CONFERENCE_NOT_ENDED",
     "ATTENDANCE_CONFLICT",
+    "LAUNCH_LOCATION_UNSUPPORTED", "LAUNCH_LOCATION_MISMATCH",
   ] as const)("preserves actionable %s errors across the server transport", code => {
     const error = fromJSON(toJSON(sanitizeServerError(new DomainError(code, "private record details")),
       { plugins: defaultSerovalPlugins }), { plugins: defaultSerovalPlugins });

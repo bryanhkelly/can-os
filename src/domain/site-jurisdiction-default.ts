@@ -1,3 +1,31 @@
+import { usStatesAndTerritories } from "./site-setup-configuration";
+
+export function launchSiteJurisdictionIssue(
+  address: Record<string, unknown> | null | undefined,
+  jurisdictions: Array<{ id: string; code: string; name: string }>,
+  selectedId: string,
+): { code: "LAUNCH_LOCATION_UNSUPPORTED" | "LAUNCH_LOCATION_MISMATCH"; message: string } | null {
+  if (!address || typeof address.country !== "string" ||
+      !["US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"].includes(address.country.trim().toUpperCase())) return null;
+  const state = [address.stateCode, address.state, address.regionCode, address.region]
+    .find(value => typeof value === "string" && value.trim());
+  if (typeof state !== "string") return null;
+  const key = state.trim().toUpperCase().replace(/^US[-_]/, "");
+  const name = usStatesAndTerritories[key] ??
+    Object.values(usStatesAndTerritories).find(value => value.toUpperCase() === key);
+  if (!name) return null;
+  const matchingId = addressStateJurisdiction(address, jurisdictions);
+  if (!matchingId) return {
+    code: "LAUNCH_LOCATION_UNSUPPORTED",
+    message: `School setup for ${name} isn't available yet. Ask CAN to add support for your school's state. You can save a draft while you wait; don't choose a different state to continue.`,
+  };
+  if (selectedId && selectedId !== matchingId) return {
+    code: "LAUNCH_LOCATION_MISMATCH",
+    message: `Your saved school address is in ${name}. Choose ${name} below, or correct the address if your school is elsewhere.`,
+  };
+  return null;
+}
+
 /** Resolve a school location's state only from an explicit address, never timezone. */
 export function addressStateJurisdiction(
   address: Record<string,unknown> | null | undefined,

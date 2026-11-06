@@ -21,6 +21,9 @@ const familyFields = z.object({
 const studentFields = z.object({
   preferredName: z.string().max(80), pronouns: z.string().max(60), interests: z.string().max(700),
   courseIds: z.array(z.string().uuid()).max(50),
+  profileBaseline: z.object({
+    preferredName: z.string().max(80), pronouns: z.string().max(60), interests: z.string().max(700),
+  }).strict().optional(),
 }).strict();
 const staffFields = z.object({ notes: z.string().max(4000) }).strict();
 
@@ -41,6 +44,15 @@ export const saveLaunchDraftSchema = launchDraftSelectionSchema.extend({
 export type LaunchDraftValue = z.infer<typeof launchDraftValueSchema>;
 export type LaunchDraftSelection = z.infer<typeof launchDraftSelectionSchema>;
 export type LaunchDraftRecord = { value: LaunchDraftValue; revision: number; savedAt: string };
+
+export function studentDraftMatchesProfile(
+  fields: Extract<LaunchDraftValue, { audience: "student" }>["fields"],
+  profile: { preferredName: string; preferredPronouns: string; interests: string[] },
+) {
+  const baseline = fields.profileBaseline;
+  return Boolean(baseline && baseline.preferredName === profile.preferredName &&
+    baseline.pronouns === profile.preferredPronouns && baseline.interests === profile.interests.join(", "));
+}
 
 export function assertLaunchDraftAudience(actor: AccessContext, audience: LaunchDraftSelection["audience"]) {
   assertCapability(actor, "launch.draft.manage");

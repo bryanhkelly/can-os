@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import {
   BookOpen,
   Building2,
@@ -26,12 +26,22 @@ export function SidebarLinks({ links, activePath, collapsed = false, onNavigate 
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
+  const search = useLocation({ select: location => location.searchStr });
+  const searchParams = new URLSearchParams(search);
   return <nav aria-label="CAN OS primary navigation" className="flex-1 space-y-1 overflow-y-auto p-3">
     {links.map(item => {
       const Icon = navigationIcons[item.icon];
       const active = activePath === item.path;
+      const launchSearch = new URLSearchParams();
+      if (item.path === "/launch/school") {
+        for (const key of ["siteId", "programId"] as const) {
+          const value = searchParams.get(key);
+          if (value) launchSearch.set(key, value);
+        }
+      }
+      const destination = launchSearch.size ? `${item.path}?${launchSearch.toString()}` : item.path;
 
-      return <Link key={item.path} to={item.path} activeOptions={{ exact: true, includeSearch: false }}
+      return <Link key={item.path} to={destination} activeOptions={{ exact: true, includeSearch: false }}
         aria-current={active ? "page" : undefined}
         title={collapsed ? item.title : undefined} onClick={onNavigate}
         className={`flex items-center gap-3 rounded-lg ${collapsed ? "justify-center px-1" : "px-3"} py-2.5 text-sm font-medium ${focusRingClass} ${

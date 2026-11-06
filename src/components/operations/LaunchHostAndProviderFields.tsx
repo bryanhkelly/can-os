@@ -5,7 +5,8 @@ import { LaunchSiteAddressEditor } from "@/components/operations/LaunchSiteAddre
 import type { LaunchJurisdictionResearch as LaunchResearch } from "@/domain/jurisdiction-launch-research";
 import { JurisdictionLaunchResearch } from "@/components/operations/JurisdictionLaunchResearch";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
-import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
 import { Link } from "@tanstack/react-router";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ export type LaunchSiteAddressDraft = {
   postalCode: string; country: string; county: string;
 };
 
-export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export function LaunchHostAndProviderFields({ options, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
   jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   jurisdictionResearch: Record<string,LaunchResearch>;
@@ -46,13 +47,14 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
 }) {
   const selectedSite=hostSites.find(item=>item.id===siteId);
   const siteJurisdictionId=addressStateJurisdiction(selectedSite?.address,options.jurisdictions);
+  const jurisdictionIssue=launchSiteJurisdictionIssue(selectedSite?.address,options.jurisdictions,jurisdictionId);
   return (
               <fieldset>
-                <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Organizations & jurisdiction
+                <legend className="text-sm text-muted-foreground">
+                  Location &amp; school responsibilities
                 </legend>
                 <div className="mt-2 space-y-3">
-                  <Field label="Host organization" required>
+                  <Field label="School organization" required>
                     <Select
                       value={hostOrganizationId}
                       onChange={(e) => {
@@ -61,17 +63,18 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                         setCreatedSiteDraft(null);
                       }}
                     >
-                      <option value="">Select host organization…</option>
+                      <option value="">Choose your organization…</option>
                       {options.organizations.map((organization) => (
                         <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
                     </Select>
                   </Field>
+                  <LaunchFieldHelp label="About the school organization">The church, school or organization responsible for the location. It may be different from the organization providing teaching.</LaunchFieldHelp>
                   <Field label="School location">
                     <Select value={siteId} onChange={(e) => setSiteId(e.target.value)} disabled={!hostOrganizationId}>
                       <option value="">Choose a school location…</option>
                       {hostSites.map((site) => (
-                        <option key={site.id} value={site.id}>{site.name} · {site.timezone}</option>
+                        <option key={site.id} value={site.id}>{site.name}</option>
                       ))}
                     </Select>
                   </Field>
@@ -84,32 +87,24 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                   {selectedSite && <LaunchSiteContactEditor key={"contact-"+selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
                     busy={busy} save={saveSiteContact}/> }
-                  {selectedSite && <div className="rounded-lg border px-4 py-3 text-sm">
-                    <p className="font-semibold">Saved Site · {selectedSite.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {selectedSite.addressStatus==="missing"?"Physical address not yet configured":
-                        selectedSite.addressStatus==="legacy_needs_review"?"Older physical address needs correction and review":
-                        selectedSite.addressStatus==="invalid_needs_correction"?"Saved physical address needs correction":
-                        "Physical address supplied by the church, not independently approved"}
-                      {" · "}{selectedSite.timezone}
-                    </p>
+                  {selectedSite && <details className="rounded-lg border px-4 py-3 text-sm">
+                    <summary className="cursor-pointer">Website access &amp; saved address</summary>
                     {selectedSite.websiteDraft && <p className="mt-2 text-xs text-muted-foreground">
-                      {selectedSite.websiteDraft.status==="published"?"Recorded Site website publication":"Saved private website draft"}
+                      {selectedSite.websiteDraft.status==="published"?"Published website":"Private website draft"}
                       {" · "}<span className="font-mono">{selectedSite.websiteDraft.host}</span>
                     </p>}
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Website and social references require a separate, verified Site website-editor role.
-                      This registrar session does not confer editor access, and no links are imported or published automatically.
+                      Only an assigned website editor can manage website references. Nothing is imported or published automatically.
                     </p>
                     <div className="mt-2 flex flex-wrap gap-3 text-xs">
                       <Link to="/admin" search={{siteId:selectedSite.id,inviteRole:"site_website_editor"}} className="underline">
-                        Invite or assign a church website editor
+                        Invite a website editor
                       </Link>
                       <Link to="/site-website" search={{siteId:selectedSite.id}} className="underline">
-                        Open references as the assigned editor (switch role first)
+                        Manage references (website editor access needed)
                       </Link>
                     </div>
-                  </div>}
+                  </details>}
                   <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
                     <summary className="cursor-pointer text-sm font-semibold">
                       {hostSites.length ? "Add another school location" : "Create your school location"}
@@ -118,8 +113,8 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       <Field label="School location name">
                        <Input placeholder="Campus name" value={newSiteName} onChange={e=>{const value=e.target.value;setNewSiteName(value);if(!newSiteSlug||newSiteSlug===suggestedLaunchSlug(newSiteName))setNewSiteSlug(suggestedLaunchSlug(value));}}/>
                       </Field>
-                      <Field label="School location slug">
-                       <Input placeholder="campus-slug" value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
+                      <Field label="Location short name">
+                       <Input placeholder="e.g., barton-campus" value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
                       </Field>
                       <Field label="Location time zone">
                        <Select value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}>
@@ -129,12 +124,12 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                       </Field>
                     </div>
                     <div className="mt-4 space-y-3 border-t pt-4">
-                      <p className="text-xs font-semibold">Physical location · for state guidance, not legal approval</p>
+                      <p className="text-sm text-muted-foreground">School address</p>
                       <LaunchSiteAddressFields address={newSiteAddress} onChange={setNewSiteAddress}/>
-                      <p className="text-xs text-muted-foreground">Enter the actual location of onsite learning. You can leave the address blank and complete it later; partial addresses cannot be saved. The legal jurisdiction must be reviewed separately.</p>
+                      <p className="text-sm text-muted-foreground">Use the address where students will meet. Add the full address, or leave it blank for now.</p>
                     </div>
                     {duplicateNewSite && <p role="status" className="mt-2 text-xs">
-                      This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
+                      “{duplicateNewSite.name}” is already saved. Choose it above instead of adding the same location again.
                     </p>}
                     <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||!newSiteTimezone||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
@@ -148,45 +143,43 @@ export function LaunchHostAndProviderFields({ options, jurisdictionGuidance, jur
                         className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
                     </div>}
                   </details>
-                  <Field label="Jurisdiction" required>
+                  <Field label="State or region" required error={jurisdictionIssue?.message}>
                     <Select value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)}>
-                      <option value="">Select jurisdiction…</option>
+                      <option value="">Choose your state or region…</option>
                       {options.jurisdictions.map((jurisdiction) => (
-                        <option key={jurisdiction.id} value={jurisdiction.id}>{jurisdiction.name} ({jurisdiction.code})</option>
+                        <option key={jurisdiction.id} value={jurisdiction.id}>{jurisdiction.name}</option>
                       ))}
                     </Select>
                   </Field>
-                  {selectedSite&&siteJurisdictionId&&jurisdictionId&&siteJurisdictionId!==jurisdictionId&&
-                    <p role="alert" className="rounded-lg border border-amber-600/50 p-3 text-sm">
-                      The selected jurisdiction differs from the Site address. Correct the location or jurisdiction before launch, or ask the CAN jurisdiction reviewer to document an authorized exception. A mismatched draft cannot establish legal applicability.
-                    </p>}
-                  {selectedSite&&!siteJurisdictionId&&
-                    <p role="status" className="text-xs text-muted-foreground">No verified US-state jurisdiction can be inferred from this Site address. If the country is missing, confirm it explicitly; international or unsupported territories require independent CAN applicability review. Choosing a Program jurisdiction here is not legal authorization.</p>}
-                  {jurisdictionId&&<div className="rounded-xl border border-border/70 bg-card p-4">
-                    <p className="text-xs font-bold uppercase tracking-widest text-primary">State setup guidance</p>
+                  <LaunchFieldHelp label="Why we ask for your state or region">School requirements depend on where students meet. Choosing a state records your plans; it is not legal approval to open.</LaunchFieldHelp>
+                  {selectedSite&&!siteJurisdictionId&&!jurisdictionIssue&&
+                    <p role="status" className="text-sm text-muted-foreground">We couldn't match your address to a supported state. Confirm the address and country, or ask CAN to review support for your location.</p>}
+                  {jurisdictionId&&<details className="rounded-lg border p-4">
+                    <summary className="cursor-pointer text-sm">View state setup guidance</summary>
                     <JurisdictionLaunchResearch research={jurisdictionResearch[jurisdictionId]}/>
-                  </div>}
-                  <Field label="Academic provider" required>
+                  </details>}
+                  <Field label="Teaching organization" required>
                     <Select value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)}>
-                      <option value="">Select academic provider…</option>
+                      <option value="">Choose who provides teaching…</option>
                       {options.academicProviderOrganizations.map((organization) => (
-                        <option key={organization.id} value={organization.id}>{organization.name}{organization.type === "can_network" ? " (CAN academic provider)" : ""}</option>
+                        <option key={organization.id} value={organization.id}>{organization.name}</option>
                       ))}
                     </Select>
                   </Field>
+                  <LaunchFieldHelp label="About the teaching organization">The organization providing instruction and curriculum. Selecting CAN records a proposed arrangement, not an approved agreement or access to student records.</LaunchFieldHelp>
                   {creditMode === "credit_bearing" ? (
-                    <Field label="Credit-issuing organization" required>
+                    <Field label="Transcript organization" required>
                       <Select value={creditIssuingOrganizationId} onChange={(e) => setCreditIssuingOrganizationId(e.target.value)}>
-                        <option value="">Select credit issuer…</option>
+                        <option value="">Choose who awards academic credit…</option>
                         {options.creditIssuingOrganizations.map((organization) => (
-                          <option key={organization.id} value={organization.id}>{organization.name}{organization.type === "can_network" ? " (CAN credit issuer)" : ""}</option>
+                          <option key={organization.id} value={organization.id}>{organization.name}</option>
                         ))}
                       </Select>
                     </Field>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Noncredit offering: no credit issuer required; it does not contribute to official transcripts.</p>
+                    <p className="text-sm text-muted-foreground">This offering doesn't award academic credit or appear on official transcripts.</p>
                   )}
-                  <p className="text-xs text-muted-foreground">Selecting CAN as the academic provider or credit issuer records a proposed arrangement only. It does not prove an executed agreement, school-of-record authority, accreditation or CAN staff access to the host's student records. Separate approval and access grants are required before operating.</p>
+                  {creditMode==="credit_bearing"&&<LaunchFieldHelp label="About the transcript organization">The organization responsible for awarding credit and official academic records. Its authority and any agreements must be reviewed before your school operates.</LaunchFieldHelp>}
                 </div>
               </fieldset>
   );

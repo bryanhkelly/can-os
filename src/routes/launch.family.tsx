@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { familyLaunchSearch } from "@/domain/launch-studio";
-import { LaunchStudioShell, JourneyWelcome } from "@/components/launch-studio/LaunchStudioShell";
+import { LaunchStudioShell, JourneyWelcome, LaunchStudioStepContent } from "@/components/launch-studio/LaunchStudioShell";
 import { GuardianApplicationForm } from "@/components/enrollment/GuardianApplicationForm";
 import { GuardianEnrollmentChecklist } from "@/components/enrollment/GuardianEnrollmentChecklist";
 import { getGuardianFamilyApplicationWorkspace, startGuardianFamilyApplication } from "@/modules/enrollment/guardian-family-applications.functions";
@@ -46,8 +46,10 @@ function FamilyLaunch() {
   return <LaunchStudioShell role="Family setup" subject={application?.programName ?? "Your family"}
     title={{ welcome: "A new chapter begins.", application: "Tell us about your student.",
       documents: "Your school's requested documents.", next: "What happens next." }[step]}
-    description="Prepare your application without losing sight of the school's independent review."
+    description="Prepare your application, then let your school guide the next steps."
     steps={steps} currentId={step} onStepChange={changeStep}
+    status={<p>{application ? "Your application is saved. Your school reviews your relationship, documents and admission separately." :
+      "Save draft on Student application to keep your entries. Continue does not submit an application."}</p>}
     exit={<Link to="/home" className="underline">Skip to dashboard</Link>}
     actions={<><Button variant="outline" disabled={step === "welcome"} onClick={() => changeStep(steps[steps.findIndex(item => item.id === step) - 1]!.id)}>Back</Button>
       {step !== "next" && <Button onClick={() => changeStep(steps[steps.findIndex(item => item.id === step) + 1]!.id)}>Continue</Button>}</>}>
@@ -79,10 +81,10 @@ function FamilyLaunch() {
         {workspace.applications.some(item => item.programId === search.programId) &&
           <p role="status" className="mt-3 border p-4 text-sm">You already have an application for this school. Resume it in Forms &amp; documents. Use a new application only for a different child.</p>}
       </div>
-      {step === "documents" && (application ? application.guardianVerified
-        ? <GuardianEnrollmentChecklist key={application.applicationId} applicationId={application.applicationId} />
+      <LaunchStudioStepContent key={application?.applicationId ?? "none"} active={step === "documents"}>{application ? application.guardianVerified
+        ? <GuardianEnrollmentChecklist protectUnsaved key={application.applicationId} applicationId={application.applicationId} />
         : <p role="status" className="border bg-card p-5 text-sm">Guardian verification is pending. Admissions must verify your relationship before private forms and documents become available.</p>
-        : <p role="status" className="border bg-card p-5 text-sm">Choose a saved application above. Required documents come from that school's checklist, not a generic list.</p>)}
+        : <p role="status" className="border bg-card p-5 text-sm">Choose a saved application above. Required documents come from that school's checklist, not a generic list.</p>}</LaunchStudioStepContent>
       {step === "next" && <section className="border bg-card p-6 text-sm leading-7">
         <h2 className="font-serif text-2xl">Your school will guide the next step</h2>
         <p className="mt-3">Application submission, guardian verification, document review, an admission offer, enrollment activation and class placement are separate decisions.</p>

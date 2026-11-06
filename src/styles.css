@@ -549,3 +549,25 @@
   .classroom-tools { display:block; }
   .classroom-tools > section + section { margin-top:16px; }
 }
+
+.launch-journey-form label,
+.launch-journey-form dt { font-size:14px; font-weight:400; color:var(--muted-foreground); }
+.launch-journey-form :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+.launch-journey-form dd { font-size:16px; font-weight:600; color:var(--foreground); }
+.launch-school-form dd { margin-top:4px; overflow-wrap:anywhere; }
+.launch-field-help { position:relative; display:inline-flex; vertical-align:middle; }
+.launch-field-help > button {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:44px; color:var(--muted-foreground);
+}
+.launch-field-help > button:hover { color:var(--foreground); background:var(--muted); }
+.launch-field-help > button:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+.launch-field-help [role="tooltip"] {
+  position:absolute; z-index:50; top:100%; left:0;
+  width:min(280px,calc(100vw - 48px)); padding:12px;
+  border:1px solid var(--border);
+  background:var(--popover); color:var(--popover-foreground);
+  box-shadow:0 4px 16px rgb(0 0 0 / 12%); font-size:14px; font-weight:400;
+  line-height:1.5; overflow-wrap:anywhere;
+}
+.launch-field-help[data-align="end"] [role="tooltip"] { left:auto; right:0; }

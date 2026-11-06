@@ -42,6 +42,7 @@ export function normalizeClientError(error: unknown, fallback?: string): ClientE
     CONFERENCE_NOT_BOOKED: "conflict", CONFERENCE_NOT_STARTED: "validation",
     CONFERENCE_NOT_ENDED: "validation",
     ATTENDANCE_CONFLICT: "conflict",
+    LAUNCH_LOCATION_UNSUPPORTED: "validation", LAUNCH_LOCATION_MISMATCH: "validation",
   } as const;
   return {
     code,

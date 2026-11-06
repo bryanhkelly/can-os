@@ -20,11 +20,12 @@ import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-di
 import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { LaunchStudioShell, JourneyWelcome } from "@/components/launch-studio/LaunchStudioShell";
 import { LaunchDraftButton } from "@/components/launch-studio/LaunchDraftButton";
+import { useLaunchDraftChanges, useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import { schoolLaunchSteps, launchRequirementProgress } from "@/domain/launch-studio";
 import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import { useState } from "react";
 import { hasEnteredSiteAddress, physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
-import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
@@ -61,7 +62,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   const { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch, authError } = data;
   const draft = data.draft?.value.audience === "school" ? data.draft.value.fields : undefined;
-  const step = selection.step ?? "welcome";
+  const requestedStep = selection.step ?? "welcome";
   const initialProgram = selection.programId
     ? [...(launches?.launches ?? []), ...(preparationPrograms ?? [])].find(item => item.id === selection.programId)
     : undefined;
@@ -204,6 +205,12 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     (newSiteName.trim().length >= 2 && site.name.trim().toLowerCase() === newSiteName.trim().toLowerCase()));
 
   useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,hostSites,type,creditMode,academicProviderOrganizationId,creditIssuingOrganizationId,jurisdictionId,setHostOrganizationId,setSiteId,setAcademicProviderOrganizationId,setCreditIssuingOrganizationId,setJurisdictionId,strictSelection:Boolean(selection.siteId||selection.programId)});
+  const draftFields = { type, summerCreditBearing, name, targetOpeningDate, slug, gradeMin, gradeMax,
+    onsite, asynchronous, liveOnline, onsiteDaysPerWeek, hostOrganizationId, jurisdictionId,
+    academicProviderOrganizationId, creditIssuingOrganizationId, siteId, newSiteName, newSiteSlug, newSiteTimezone, newSiteAddress };
+  const draftChanges = useLaunchDraftChanges(draftFields);
+  const [configurationTouched, setConfigurationTouched] = useState(false);
+  const releaseNavigation = useLaunchUnsavedChanges(!created && (configurationTouched && draftChanges.dirty || busy));
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
@@ -213,11 +220,15 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     }
     if(created)return;
     if(onsite&&!siteId){setError("Choose or save a school location before continuing with onsite learning.");return;}
+    if(!hostOrganizationId){setError("Choose the organization responsible for your school in step 1.");return;}
+    if(!jurisdictionId){setError("Choose your school's state or region in step 1.");return;}
+    if(!academicProviderOrganizationId){setError("Choose the organization providing teaching in step 1.");return;}
+    if(creditMode==="credit_bearing"&&!creditIssuingOrganizationId){setError("Choose the organization responsible for transcripts in step 1.");return;}
     const selectedSite=options?.sites.find(site=>site.id===siteId);
-    const addressJurisdiction=selectedSite&&options
-      ? addressStateJurisdiction(selectedSite.address,options.jurisdictions):null;
-    if(addressJurisdiction && jurisdictionId!==addressJurisdiction){
-      setError("The school Program's jurisdiction conflicts with the saved Site's state. Correct the location or jurisdiction, or request a CAN jurisdiction review before launch.");return;
+    const jurisdictionIssue=selectedSite&&options
+      ? launchSiteJurisdictionIssue(selectedSite.address,options.jurisdictions,jurisdictionId):null;
+    if(jurisdictionIssue){
+      setError(jurisdictionIssue.message);return;
     }
     if(!launchGradeRangeIsOrdered({min:gradeMin,max:gradeMax})){
       setError("Minimum grade must not come after maximum grade.");return;
@@ -248,6 +259,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       });
       if (submission.status === "ignored") return;
       const result = submission.value;
+      releaseNavigation();
       setCreated({...result,programType:type});
       if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
       try {
@@ -261,11 +273,11 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         setError("The school launch was saved, but automatic navigation failed. Use its saved launch handoff below, or reopen launch setup; do not start a duplicate Program.");
       }
     } catch (e) {
-      setError(mutationErrorMessage(e, "Unable to start launch"));
+      setError(mutationErrorMessage(e, "We couldn't save your school. Your entries are still here. If this continues, ask CAN for help before trying again."));
     }
   }
 
-  const {applySchoolModelPreset,applyNinthGradeHybridPreset,applyExtendedLearningPreset}=useLaunchModelPresets({setType,setGradeMin,setGradeMax,setOnsite,setOnsiteDaysPerWeek,setAsynchronous,setLiveOnline,setSummerCreditBearing});
+  const {applySchoolModelPreset,applyNinthGradeHybridPreset,applyExtendedLearningPreset}=useLaunchModelPresets({setType,setSummerCreditBearing});
 
   if (authError || !options || !launches) {
     return (
@@ -308,6 +320,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   ];
   const currentSchool=resolveLaunchResume(schools,selection).launch;
   const currentProgram=currentSchool??currentLaunch;
+  const step = !currentProgram && schoolLaunchSteps.indexOf(requestedStep) > schoolLaunchSteps.indexOf("school")
+    ? "school" : requestedStep;
   const schoolSelection={siteId:selection.siteId??currentProgram?.siteId??undefined,programId:selection.programId??currentProgram?.id};
   const hasSchoolPreparation=schools.length>0||launches.launches.length>0;
   const needsSchoolChoice=hasSchoolPreparation&&!currentProgram;
@@ -348,7 +362,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       : "No actionable task was confirmed from the available Launch Journey. Review the authoritative school record instead of assuming opening approval.";
   function changeStep(id: string) {
     const next = schoolLaunchSteps.find(item => item === id);
-    if (next) void router.navigate({ to: "/launch/school", search: { ...selection, step: next } });
+    const targetIndex = next ? schoolLaunchSteps.indexOf(next) : -1;
+    if (next && (currentProgram || targetIndex <= schoolLaunchSteps.indexOf("school"))) {
+      void router.navigate({ to: "/launch/school", search: { ...selection, step: next } });
+    }
   }
   const titles = { welcome: "Let's build your school.", school: "Your school, your foundation.",
     academics: "Prepare your academic year.", website: "Introduce your school.",
@@ -356,16 +373,19 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   return (
     <LaunchStudioShell role="School setup" subject={currentProgram?.name ?? "Your school"}
-      title={titles[step]} description="One school, connected records, independent approvals."
+      title={titles[step]} description="One school, one connected setup. Approvals are reviewed separately."
       steps={schoolLaunchSteps.map(id => ({ id, title: { welcome: "Welcome", school: "School details",
         academics: "Academics", website: "School website", families: "Families & staff",
-        readiness: "Readiness review", next: "What's next" }[id] }))}
+        readiness: "Readiness review", next: "What's next" }[id],
+        disabled: !currentProgram && !["welcome", "school"].includes(id), }))}
       currentId={step} onStepChange={changeStep}
       progress={currentLaunch && readinessAvailable ? launchRequirementProgress(currentLaunch.requirements) : undefined}
+      status={<p>{currentProgram ? nextDescription : "Save draft keeps your school details for later. Save and continue creates your school offering and opens academic setup; it does not approve opening."}</p>}
       actions={<>
         <Button type="button" variant="outline" disabled={step === "welcome"}
           onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) - 1]!)}>Back</Button>
-        {step !== "next" && <Button type="button" onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) + 1]!)}>
+        {step !== "school" && step !== "next" && <Button type="button" disabled={busy}
+          onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) + 1]!)}>
           {step === "welcome" ? "Let's get started" : "Continue"}</Button>}
       </>}
       exit={<Link to="/home" search={schoolSelection} className="underline">Skip to dashboard</Link>}>
@@ -452,14 +472,18 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           <p className="mt-3 text-sm text-muted-foreground">Continue a saved launch in the guided view, or open its academic setup. Journey requirements remain the canonical source; this summary does not duplicate or grant opening approval.</p>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>}
-        <div hidden={step !== "school"}>
+        <div hidden={step !== "school"} onChangeCapture={() => setConfigurationTouched(true)}
+          onClickCapture={event => {
+            if (event.target instanceof Element && event.target.closest('[aria-pressed]')) setConfigurationTouched(true);
+          }}>
         <div className="mt-8 grid gap-6">
+          <p className="text-sm text-muted-foreground">Not ready to continue? Save your school details and come back later.</p>
           <LaunchDraftButton key={data.draftContext} selection={{ audience: "school", context: data.draftContext ?? ":" }}
-            initial={data.draft ?? null} disabled={busy || Boolean(created)}
-            value={() => ({ audience: "school", fields: { type, summerCreditBearing, name, targetOpeningDate,
-              slug, gradeMin, gradeMax, onsite, asynchronous, liveOnline, onsiteDaysPerWeek,
-              hostOrganizationId, jurisdictionId, academicProviderOrganizationId, creditIssuingOrganizationId,
-              siteId, newSiteName, newSiteSlug, newSiteTimezone, newSiteAddress } })} />
+            initial={data.draft ?? null} disabled={busy || Boolean(created)} buttonLabel="Save draft"
+            successMessage="School details saved as a draft. Nothing was submitted or approved."
+            commandErrorMessage="Unable to save draft. Your information is still on this page."
+            onSaved={value => { if (value.audience === "school") draftChanges.markSaved(value.fields); }}
+            value={() => ({ audience: "school", fields: draftFields })} />
           <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
           <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>

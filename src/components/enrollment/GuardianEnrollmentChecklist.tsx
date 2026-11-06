@@ -9,14 +9,15 @@ import { useRouter } from "@tanstack/react-router";
 import { getGuardianEnrollmentChecklist } from "@/modules/enrollment/guardian-enrollment-checklist.functions";
 import { getEnrollmentDocumentDownload } from "@/modules/enrollment/r2-document-upload.functions";
 import { GuardianEnrollmentForm } from "./EnrollmentForm";
+import { LaunchUnsavedChangesGuard } from "@/components/launch-studio/useLaunchUnsavedChanges";
 
 type Checklist = Awaited<ReturnType<typeof getGuardianEnrollmentChecklist>>;
 
-export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: string }) {
-  return <GuardianEnrollmentChecklistView key={applicationId} applicationId={applicationId}/>;
+export function GuardianEnrollmentChecklist({ applicationId, protectUnsaved = false }: { applicationId: string; protectUnsaved?: boolean }) {
+  return <GuardianEnrollmentChecklistView key={applicationId} applicationId={applicationId} protectUnsaved={protectUnsaved}/>;
 }
 
-function GuardianEnrollmentChecklistView({ applicationId }: { applicationId: string }) {
+function GuardianEnrollmentChecklistView({ applicationId, protectUnsaved }: { applicationId: string; protectUnsaved: boolean }) {
   const router = useRouter();
   const checklistQuery = useQuery({
     queryKey: ["guardian-enrollment-checklist", applicationId],
@@ -30,6 +31,7 @@ function GuardianEnrollmentChecklistView({ applicationId }: { applicationId: str
   const availability = availabilityQuery.data;
   const [error, setError] = useState("");
   const [files, setFiles] = useState<Record<string, File | null>>({});
+  const [dirtyForms, setDirtyForms] = useState<Record<string, boolean>>({});
   const [uploads] = useState(createEnrollmentDocumentUploads);
   async function refresh() {
     await checklistQuery.refetch({ throwOnError: true });
@@ -55,6 +57,8 @@ function GuardianEnrollmentChecklistView({ applicationId }: { applicationId: str
     return downloadUrl;
   }
   return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">
+    {protectUnsaved && <LaunchUnsavedChangesGuard dirty={Object.values(files).some(Boolean) ||
+      Object.values(dirtyForms).some(Boolean) || mutation.pending || mutation.refreshFailed} />}
     <h3 className="text-lg font-semibold">Enrollment checklist</h3>
     <p className="text-sm">Complete the school's requested information here. Uploading a document does not accept an offer,
       sign a form or activate enrollment.</p>
@@ -70,19 +74,21 @@ function GuardianEnrollmentChecklistView({ applicationId }: { applicationId: str
       uploadsAvailabilityPending={availabilityQuery.isPending}
       uploadsAvailabilityError={availabilityQuery.isError}
       busy={busy} files={files} onFile={(id, file) => setFiles(current => ({ ...current, [id]: file }))}
-      onUpload={upload} onOpen={openDocument} onChanged={refresh} />}
+      onUpload={upload} onOpen={openDocument} onChanged={refresh}
+      onFormDirtyChange={(id,dirty)=>setDirtyForms(current=>current[id]===dirty?current:{...current,[id]:dirty})} />}
     </QueryState>
   </section>;
 }
 
 export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAvailabilityPending = false,
-  uploadsAvailabilityError = false, busy, files, onFile, onUpload, onOpen, onChanged }: {
+  uploadsAvailabilityError = false, busy, files, onFile, onUpload, onOpen, onChanged, onFormDirtyChange }: {
   checklist: Checklist; uploadsEnabled: boolean; uploadsAvailabilityPending?: boolean;
   uploadsAvailabilityError?: boolean; busy: string | null; files: Record<string, File | null>;
   onFile: (requirementId: string, file: File | null) => void;
   onUpload: (requirementId: string) => Promise<void>;
   onOpen: (requirementId: string, documentId: string) => Promise<string>;
   onChanged: () => Promise<void>;
+  onFormDirtyChange?: (id: string, dirty: boolean) => void;
 }) {
   return <div className="space-y-3">
     {checklist.closed && <p role="status">This checklist is now a historical record. Contact admissions for further changes.</p>}
@@ -96,7 +102,8 @@ export function EnrollmentChecklistItems({ checklist, uploadsEnabled, uploadsAva
       <h4 className="font-semibold">{requirement.title}{requirement.blocking ? " (required)" : " (optional)"}</h4>
       {requirement.form && <GuardianEnrollmentForm key={requirement.form.submission?.id ?? requirement.form.revision}
         applicationId={checklist.applicationId} requirementId={requirement.id} record={requirement.form}
-        closed={checklist.closed} onChanged={onChanged} />}
+        closed={checklist.closed} onChanged={onChanged}
+        onDirtyChange={onFormDirtyChange ? dirty=>onFormDirtyChange(requirement.id,dirty) : undefined} />}
       <p className="text-sm">Requirement: {requirement.status.replaceAll("_", " ")}
         {requirement.reviewStatus && ` · Document: ${requirement.reviewStatus.replaceAll("_", " ")}`}</p>
       {requirement.correctionReason && <p className="text-sm">Admissions instructions: {requirement.correctionReason}</p>}

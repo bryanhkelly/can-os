@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { WorkspaceNotice } from "@/components/workspace";
 import { GuidedSetupShell, type GuidedSetupStep } from "@/components/workflow";
+import { useLaunchDraftChanges, LaunchUnsavedChangesGuard } from "@/components/launch-studio/useLaunchUnsavedChanges";
+import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
 
 export interface GuardianApplicationProgram {
   id: string;
@@ -124,6 +126,9 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
+  const submitted = useRef(false);
+  const draftFields = { requestId, programId, schoolYearId, studentOptionId, householdId, firstName, lastName, grade };
+  const changes = useLaunchDraftChanges(draftFields);
 
   useEffect(() => {
     if (notice || error) feedbackRef.current?.focus();
@@ -179,6 +184,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
       setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
+      submitted.current = true;
       setAttempted(false);
       setRequestId(crypto.randomUUID());
       setStudentProfileId(""); setStudentOptionId("");
@@ -199,6 +205,8 @@ export function GuardianApplicationForm({ programs, households, students = [], t
   }
 
   const content = <>
+    {embedded && <LaunchUnsavedChangesGuard dirty={() => !submitted.current &&
+      (changes.dirty || busy || confirmedDestination || authorizedDestinationRecords)} />}
     {unavailableDraftStudent && <WorkspaceNotice tone="danger" className="mb-5">
       The student selected in this draft is no longer available to your verified household.
       No new student identity will be created from their draft details. Contact admissions to restore access.
@@ -224,17 +232,18 @@ export function GuardianApplicationForm({ programs, households, students = [], t
       Contact that school's admissions team. No other school has been selected.
     </WorkspaceNotice> : programs.length === 0 ? <WorkspaceNotice>
       No eligible school is currently available to this verified family account. Contact the school's admissions team about your invitation and application opening.
-    </WorkspaceNotice> : <form noValidate onSubmit={event => void submit(event)} aria-busy={busy} className="grid gap-5 sm:grid-cols-2">
+    </WorkspaceNotice> : <form noValidate onSubmit={event => void submit(event)} onChange={() => { submitted.current = false; }}
+      aria-busy={busy} className="grid gap-5 sm:grid-cols-2">
       <fieldset disabled={busy} className="contents">
-        <Field label="School and program" className="sm:col-span-2" required
+        <Field label="School or offering" className="sm:col-span-2" required
           error={attempted&&!selectedProgram?"Choose an available school and program.":undefined}>
           <Select id={`${id}-program`} name="programId" value={selectedProgram?.id ?? ""}
             onChange={event => { setProgramId(event.target.value); setSchoolYearId(""); setStudentProfileId(""); setStudentOptionId(""); setOriginTransferActionId("");setConfirmedDestination(false); }}>
-            <option value="">Choose a school and program</option>
+            <option value="">Choose a school or offering</option>
             {selection.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
           </Select>
         </Field>
-        <Field label="Application academic year" className="sm:col-span-2" required
+        <Field label="School year" className="sm:col-span-2" required
           description={!selectedProgram?.schoolYears?.length?"This school has not opened a configured academic year for family applications. Contact admissions.":undefined}
           error={attempted&&!selection.year?"Choose a configured academic year for this school.":undefined}>
           <Select id={`${id}-year`} name="schoolYearId" value={selection.year?.id ?? ""}
@@ -244,7 +253,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           </Select>
         </Field>
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor={`${id}-student`}>Student identity</Label>
+          <Label htmlFor={`${id}-student`}>Who are you applying for?</Label>
           <Select id={`${id}-student`} value={studentOptionId} disabled={!!linkedTransfer}
             onChange={event => selectStudent(event.target.value)}>
             <option value="">A new student</option>
@@ -253,7 +262,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
               {student.studentFirstName} {student.studentLastName}
             </option>)}
           </Select>
-          <p className="text-xs leading-5 text-muted-foreground">Existing students appear only through a verified managing relationship and shared household.</p>
+          <LaunchFieldHelp label="Why isn't my child listed?">Only students linked to your verified household appear here. If an existing child is missing, ask admissions for help instead of creating another record.</LaunchFieldHelp>
           {transferRequests.length>0&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">
             Transferring an existing student? Select that student above instead of creating a new student identity. After selecting the student, link the original transfer request below.
           </p>}
@@ -286,14 +295,14 @@ export function GuardianApplicationForm({ programs, households, students = [], t
           </>}
         </div>}
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor={`${id}-household`}>Family household</Label>
+          <Label htmlFor={`${id}-household`}>Your family</Label>
           <Select id={`${id}-household`} name="householdId" value={householdId} disabled={!!studentProfileId}
             aria-describedby={`${id}-household-hint`} onChange={event => setHouseholdId(event.target.value)}>
             <option value="">Create a new family household</option>
             {households.map(family => <option key={family.id} value={family.id}>{family.name}</option>)}
           </Select>
           <p id={`${id}-household-hint`} className="text-xs leading-5 text-muted-foreground">
-            Reuse your household for siblings. The server verifies that you belong to the selected household.
+            Choose the same family for siblings. Only families linked to your account can be used.
           </p>
         </div>
         <Field label="Student legal first name" required error={attempted&&!firstName.trim()?"Enter the student's legal first name.":undefined}>
@@ -314,6 +323,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
         <div className="sm:col-span-2">
           {draftContext !== undefined && <LaunchDraftButton initial={draft ?? null}
             selection={{ audience: "family", context: draftContext }} disabled={busy || unavailableDraftStudent}
+            onSaved={value => { if (value.audience === "family") changes.markSaved(value.fields); }}
             value={() => ({ audience: "family", fields: { requestId, programId, schoolYearId,
               studentOptionId, householdId, firstName, lastName, grade } })} />}
           <Button type="submit" size="lg" disabled={busy || unavailableDraftStudent || selection.unavailable || !!linkedTransfer&&!linkedStudent} aria-busy={busy}>
@@ -324,7 +334,9 @@ export function GuardianApplicationForm({ programs, households, students = [], t
       </fieldset>
     </form>}
   </>;
-  return embedded ? <section className="border bg-card p-5">{content}</section> :
+  return embedded ? <section className="border bg-card p-5">
+    <p className="mb-5 text-sm text-muted-foreground">Save draft keeps your entries. Submit application sends them to the school for review.</p>
+    {content}</section> :
     <GuidedSetupShell title="Student application"
       description="Start one canonical application. Return here for independent verification and next steps."
       steps={setupSteps} aside={<p className="text-sm leading-6 text-muted-foreground">

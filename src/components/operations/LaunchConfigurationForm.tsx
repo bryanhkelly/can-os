@@ -5,11 +5,14 @@ import { LaunchProgramIdentityFields } from "@/components/operations/LaunchProgr
 import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliveryModelFields";
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
 import { Button } from "@/components/ui/button";
+import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
+import { launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { siteAddressEditorDraft } from "@/domain/site-setup-configuration";
 
 export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPresets,identity,delivery,hostAndProvider,submitLaunch,busy}:{
   created:LaunchCreatedResult|null;
   hasSchoolPreparation:boolean;
-  modelPresets:ComponentProps<typeof LaunchSchoolModelPicker>;
+  modelPresets:Omit<ComponentProps<typeof LaunchSchoolModelPicker>,"value">;
   identity:ComponentProps<typeof LaunchProgramIdentityFields>;
   delivery:ComponentProps<typeof LaunchDeliveryModelFields>;
   hostAndProvider:ComponentProps<typeof LaunchHostAndProviderFields>;
@@ -23,59 +26,62 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
   const provider=options.academicProviderOrganizations.find(item=>item.id===hostAndProvider.academicProviderOrganizationId);
   const creditIssuer=options.creditIssuingOrganizations.find(item=>item.id===hostAndProvider.creditIssuingOrganizationId);
   const savedSite=Boolean(site);
-  const canSubmit=Boolean(host && jurisdiction && provider &&
-    (!delivery.onsite || savedSite) &&
-    (hostAndProvider.creditMode==="non_credit" || creditIssuer));
+  const jurisdictionIssue=launchSiteJurisdictionIssue(site?.address,options.jurisdictions,hostAndProvider.jurisdictionId);
+  const address=siteAddressEditorDraft(site?.address ?? null);
+  const physicalLocation=[address.street1,address.city,address.state,address.postalCode].filter(Boolean).join(", ");
   return <>
     <LaunchCreatedHandoff created={created}/>
-    <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
-      <summary className="cursor-pointer text-lg font-semibold">Set up a school · Save and continue</summary>
+    <details id="new-school-launch" className="launch-school-form rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
+      <summary className="cursor-pointer"><h2 className="inline font-serif text-2xl">Your school details</h2></summary>
       <p className="mt-2 text-sm text-muted-foreground">
-        Your church Site and school Program are different saved records. Start by confirming the existing church
-        and its physical location. You can return to either record without creating a second school.
+        Confirm where your school meets, then tell us what students will learn.
       </p>
       {hasSchoolPreparation&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">
-        Your existing school setup is saved in the preparation workspace above. This blank form is for
-        creating an additional Program; it does not edit, replace, or erase an existing Program.
-        To resume academics, calendars, website or family outreach, use the saved school controls above.
+        Your existing school is saved above. Use its checklist to continue setup.
+        This form adds another school offering; it won't change your existing one.
       </p>}
       <div className="mt-5 space-y-5">
-        <section aria-label="Step 1 · Church and school location" className="rounded-xl border p-4">
-          <h3 className="mb-3 text-base font-semibold">1. Confirm the church and school location</h3>
+        <section aria-label="School location" className="border-t pt-5">
+          <h3 className="mb-4 font-serif text-2xl">1. Where your school meets</h3>
           <LaunchHostAndProviderFields {...hostAndProvider}/>
         </section>
-        <section aria-label="Step 2 · School Program" className="rounded-xl border p-4">
-          <h3 className="mb-3 text-base font-semibold">2. Choose the academic model</h3>
-          <LaunchSchoolModelPicker {...modelPresets}/>
-          <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
+        <section aria-label="School offering" className="border-t pt-5">
+          <h3 className="mb-4 font-serif text-2xl">2. What your school offers</h3>
+          <LaunchSchoolModelPicker {...modelPresets} value={identity.type}/>
+          <form className="mt-6 space-y-6" onSubmit={submitLaunch} aria-busy={busy}>
+            <fieldset disabled={busy||Boolean(created)} className="space-y-6">
             <LaunchProgramIdentityFields {...identity}/>
             <LaunchDeliveryModelFields {...delivery}/>
-            <section aria-label="Review recorded Site and proposed Program" className="rounded-xl border bg-muted/30 p-4">
-              <h4 className="text-sm font-semibold">3. Review before saving the Program</h4>
-              <dl className="mt-2 grid gap-x-5 gap-y-2 text-sm sm:grid-cols-2">
-                <div><dt className="font-semibold">Church host</dt><dd>{host?.name??"Choose a host organization"}</dd></div>
-                <div><dt className="font-semibold">Saved school Site</dt><dd>{site ? `${site.name} · ${site.timezone}` : "No Site selected"}</dd></div>
-                <div><dt className="font-semibold">Physical location</dt><dd>{site?.addressStatus==="church_supplied" ? "Church supplied · independent review pending" : site ? "Not yet verified; complete Site location" : "Not selected"}</dd></div>
-                <div><dt className="font-semibold">Program</dt><dd>{identity.name.trim() || "Name needed"} · {identity.gradeMin}–{identity.gradeMax}</dd></div>
-                <div><dt className="font-semibold">Jurisdiction</dt><dd>{jurisdiction?.name??"Choose the Program jurisdiction"} · legal applicability not verified</dd></div>
-                <div><dt className="font-semibold">Academic provider</dt><dd>{provider?.name??"Choose a provider"} · proposed only</dd></div>
-                <div><dt className="font-semibold">Credit issuer</dt><dd>{hostAndProvider.creditMode==="non_credit"?"Noncredit Program":creditIssuer?.name??"Choose a credit issuer"}</dd></div>
-                <div><dt className="font-semibold">Delivery</dt><dd>{[
-                  delivery.onsite?"Onsite":null,delivery.liveOnline?"Live online":null,
-                  delivery.asynchronous?"Asynchronous":null,
+            </fieldset>
+            <section aria-label="Review your school details" className="rounded-xl bg-muted/30 p-5">
+              <h4 className="font-serif text-2xl">3. A final look</h4>
+              <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+                <div><dt>School organization</dt><dd>{host?.name??"Choose an organization"}</dd></div>
+                <div><dt>School location</dt><dd>{site?.name ?? "Choose a location"}</dd></div>
+                <div><dt>Address</dt><dd>{physicalLocation || "Not added yet"}</dd></div>
+                <div><dt>School name &amp; grades</dt><dd>{identity.name.trim() || "Add a name"} · {identity.gradeMin}–{identity.gradeMax}</dd></div>
+                <div><dt>State or region</dt><dd>{jurisdiction?.name??"Choose your state or region"}</dd></div>
+                <div><dt>Teaching organization</dt><dd>{provider?.name??"Choose an organization"}</dd></div>
+                <div><dt>Transcript organization</dt><dd>{hostAndProvider.creditMode==="non_credit"?"No academic credit":creditIssuer?.name??"Choose an organization"}</dd></div>
+                <div><dt>Learning format</dt><dd>{[
+                  delivery.onsite?"In person":null,delivery.liveOnline?"Live online":null,
+                  delivery.asynchronous?"At your own pace":null,
                 ].filter(Boolean).join(" + ") || "Select a delivery model"}</dd></div>
               </dl>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Onsite days per week are planning only. The actual per-Program academic calendar,
-                including eligible Sunday or weekend sessions, must be configured and approved separately.
-                Saving records does not grant school-opening, admissions, publication, or CAN academic authority.
-              </p>
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                Saving starts your setup. It does not approve your school to open.
+                <LaunchFieldHelp label="What saving your school means" align="end">
+                  Your calendar, school-opening approval, admissions and public website each need their own review.
+                  Choosing a teaching organization does not establish an agreement or give it access to student records.
+                </LaunchFieldHelp>
+              </div>
             </section>
-            <Button type="submit" disabled={busy||Boolean(created)||!canSubmit}>
-              {busy?"Saving your school…":created?"School saved":"Save Program and continue to launch workspace"}
+            {jurisdictionIssue&&<p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">{jurisdictionIssue.message}</p>}
+            <Button type="submit" disabled={busy||Boolean(created)||Boolean(jurisdictionIssue)}>
+              {busy?"Saving your school…":created?"School saved":"Save and continue"}
             </Button>
             {!savedSite&&delivery.onsite&&<p role="status" className="text-sm text-muted-foreground">
-              Select an existing school Site or save a new one in Step 1.
+              Choose a school location or save a new one in step 1.
             </p>}
             {!options.organizations.length&&<p className="text-xs text-muted-foreground">
               Your account does not have school setup access. Ask CAN to confirm your school setup invitation.

@@ -15,11 +15,11 @@ describe("continuous family enrollment handoff contracts", () => {
         studentFirstName:"Existing",studentLastName:"Learner",gradeLevel:"10",householdId:"household-2"}]}
       familyStartRequestId="start-1" requestedProgramId="program-1"
       onSubmit={async () => ({applicationId:"application-1"})}/>);
-    expect(html).toContain("Application academic year");
+    expect(html).toContain("School year");
     expect(html).toContain("2027–2028");
     expect(html).toContain("Existing Learner");
     expect(html).toContain('value="profile-1:household-2"');
-    expect(html).toContain("verified managing relationship and shared household");
+    expect(html).toContain("my child listed?");
   });
 
   it("does not create another Person, profile or relationship on the reuse branch", () => {

@@ -22,6 +22,7 @@ import { isLaunchStudioPath } from "@/domain/launch-studio";
 import { LaunchStudioChrome } from "@/components/launch-studio/LaunchStudioShell";
 import { EngagementChrome } from "@/components/engagement/EngagementChrome";
 import { isEngagementPath } from "@/domain/engagement-context";
+import favicon from "../assets/can-os-favicon.svg?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: ({ context }) => context.queryClient.fetchQuery(workspaceSessionQueryOptions()),
@@ -39,6 +40,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: SITE_DESCRIPTION },
     ],
     links: [
+      { rel: "icon", type: "image/svg+xml", href: favicon },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

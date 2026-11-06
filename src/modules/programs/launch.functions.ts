@@ -8,7 +8,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress, launchOnsiteDaysPerWeekSchema } from "@/domain/site-setup-configuration";
-import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { DomainError } from "@/domain/errors";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
@@ -170,12 +171,15 @@ export const startLaunch = createServerFn({ method: "POST" })
       if(site && site.organizationId===data.hostOrganizationId) {
         const address=readSitePhysicalAddress(site.address);
         if(address.value?.country==="US") {
-          const [target]=await db.select({
+          const jurisdictions=await db.select({
             id:schema.jurisdictions.id,code:schema.jurisdictions.code,
             name:schema.jurisdictions.name,
-          }).from(schema.jurisdictions).where(eq(schema.jurisdictions.id,data.jurisdictionId)).limit(1);
+          }).from(schema.jurisdictions);
+          const issue=launchSiteJurisdictionIssue(address.value,jurisdictions,data.jurisdictionId);
+          if(issue) throw new DomainError(issue.code,issue.message);
+          const target=jurisdictions.find(item=>item.id===data.jurisdictionId);
           if(target && !addressStateJurisdiction(address.value,[target]))
-            throw new Error("The selected Program jurisdiction differs from the saved school's US state. Correct the Site or select the matching jurisdiction; ask CAN for independent review of any exception.");
+            throw new DomainError("LAUNCH_LOCATION_MISMATCH");
         }
       }
     }
@@ -631,4 +635,3 @@ export const getLaunchEntry = createServerFn({ method: "GET" })
     ));
     return launchEntrySelection({ programs: records, sites: options.sites, selection: data });
   });
-

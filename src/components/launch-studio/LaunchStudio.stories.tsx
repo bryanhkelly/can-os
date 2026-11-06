@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { expect, userEvent, within } from "storybook/test";
 import { LaunchStudioChrome, LaunchStudioShell, JourneyWelcome } from "./LaunchStudioShell";
 import { LaunchStudioEntry } from "./LaunchStudioEntry";
 import { Button } from "@/components/ui/button";
+import { LaunchConfigurationForm } from "@/components/operations/LaunchConfigurationForm";
 
 const meta = {
   title: "Workflows/Launch Studio",
@@ -42,6 +43,8 @@ export const Welcome: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Let's get started" }));
+    const mobileNavigation = canvas.queryByRole("button", { name: /View steps/ });
+    if (mobileNavigation) await userEvent.click(mobileNavigation);
     await expect(canvas.getByRole("button", { name: "2 School details" })).toHaveAttribute("aria-current", "step");
     await expect(canvas.queryByText("100%")).not.toBeInTheDocument();
   },
@@ -50,3 +53,75 @@ export const PendingReview: Story = { render: () => <Journey state="pending" /> 
 export const Unavailable: Story = { render: () => <Journey state="error" /> };
 export const Forbidden: Story = { render: () => <Journey state="forbidden" /> };
 export const Unconfigured: Story = { render: () => <Journey state="empty" /> };
+
+function SchoolDetails({ unsupported = false }: { unsupported?: boolean }) {
+  const [name,setName]=useState("Example Academy");
+  const [slug,setSlug]=useState("example-academy");
+  const [slugEdited,setSlugEdited]=useState(false);
+  const [type,setType]=useState<ComponentProps<typeof LaunchConfigurationForm>["identity"]["type"]>("full_school");
+  const [date,setDate]=useState("2027-08-16");
+  const [gradeMin,setGradeMin]=useState("K");
+  const [gradeMax,setGradeMax]=useState("12");
+  const [onsite,setOnsite]=useState(true);
+  const [online,setOnline]=useState(false);
+  const [selfPaced,setSelfPaced]=useState(false);
+  const [days,setDays]=useState("5");
+  const organization={id:"org",name:"Example School Organization",type:"christian_school"} as const;
+  const options:ComponentProps<typeof LaunchConfigurationForm>["hostAndProvider"]["options"]={
+    organizations:[organization],academicProviderOrganizations:[organization],creditIssuingOrganizations:[organization],
+    schoolSetupAdministrator:true,
+    jurisdictions:[{id:"tx",code:"US-TX",name:"Texas"}],
+    sites:[{id:"site",organizationId:"org",name:"Example Academy Campus",slug:"example-campus",
+      timezone:"America/Chicago",updatedAt:"2026-11-05T00:00:00Z",
+      address:{street1:"100 Example Lane",city:"Example City",state:unsupported?"CA":"TX",postalCode:"75001",country:"US"},
+      addressStatus:"church_supplied",sitePhysicalAddressRevision:null,siteIdentityRevision:null,contactDraft:null,websiteDraft:null}],
+  };
+  return <LaunchStudioChrome><LaunchStudioShell role="School setup" subject="Example Academy"
+    title="Your school, your foundation." steps={steps} currentId="details" onStepChange={()=>{}}>
+    <LaunchConfigurationForm created={null} hasSchoolPreparation={false} busy={false}
+      modelPresets={{onSchoolModel:setType}}
+      identity={{type,setType,summerCreditBearing:false,setSummerCreditBearing:()=>{},
+        name,setName,targetOpeningDate:date,setTargetOpeningDate:setDate,slug,setSlug,slugEdited,setSlugEdited,
+        gradeMin,setGradeMin,gradeMax,setGradeMax}}
+      delivery={{onsite,setOnsite,liveOnline:online,setLiveOnline:setOnline,asynchronous:selfPaced,setAsynchronous:setSelfPaced,
+        onsiteDaysPerWeek:days,setOnsiteDaysPerWeek:setDays}}
+      hostAndProvider={{options,hostOrganizationId:"org",setHostOrganizationId:()=>{},siteId:"site",setSiteId:()=>{},
+        hostSites:options.sites,setCreatedSiteDraft:()=>{},newSiteName:"",setNewSiteName:()=>{},newSiteSlug:"",setNewSiteSlug:()=>{},
+        newSiteTimezone:"America/Chicago",setNewSiteTimezone:()=>{},
+        newSiteAddress:{street1:"",street2:"",city:"",state:"",postalCode:"",country:"US",county:""},setNewSiteAddress:()=>{},
+        saveSiteAddress:async()=>{},saveSiteContact:async()=>{},saveSiteIdentity:async()=>{},addSite:async()=>{},
+        duplicateNewSite:undefined,createdSiteDraft:null,busy:false,jurisdictionId:unsupported?"":"tx",setJurisdictionId:()=>{},
+        academicProviderOrganizationId:"org",setAcademicProviderOrganizationId:()=>{},creditIssuingOrganizationId:"org",
+        setCreditIssuingOrganizationId:()=>{},creditMode:"credit_bearing",jurisdictionGuidance:{},jurisdictionResearch:{}}}
+      submitLaunch={event=>event.preventDefault()} />
+  </LaunchStudioShell></LaunchStudioChrome>;
+}
+export const SchoolForm: Story = {
+  render:()=> <SchoolDetails />,
+  play:async({canvasElement})=>{
+    const canvas=within(canvasElement);
+    const help=canvas.getByRole("button",{name:"About the offering short name"});
+    help.focus();
+    await expect(await canvas.findByRole("tooltip")).toHaveTextContent("This does not set or publish your website address");
+    await userEvent.keyboard("{Escape}");
+    await expect(canvas.queryByRole("tooltip")).not.toBeInTheDocument();
+    await userEvent.click(help);
+    await expect(canvas.getByRole("tooltip")).toBeVisible();
+    await userEvent.click(canvas.getByRole("textbox",{name:"School or offering name"}));
+    await expect(canvas.queryByRole("tooltip")).not.toBeInTheDocument();
+    await expect(canvas.getByRole("button",{name:"Save and continue"})).toBeEnabled();
+    const input=canvas.getByRole("textbox",{name:"School or offering name"});
+    await expect(Number(getComputedStyle(input).fontWeight)).toBeGreaterThan(Number(getComputedStyle(input.closest("label")!).fontWeight));
+    await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+  },
+};
+export const UnsupportedSchoolState: Story = {
+  render:()=> <SchoolDetails unsupported />,
+  play:async({canvasElement})=>{
+    const canvas=within(canvasElement);
+    await expect(canvas.getAllByText(/School setup for California isn't available yet/).length).toBe(2);
+    await expect(canvas.getByRole("combobox",{name:/State or region.*required/})).toHaveAttribute("aria-invalid","true");
+    await expect(canvas.getByRole("button",{name:"Save and continue"})).toBeDisabled();
+    await expect(canvas.getByRole("textbox",{name:"School or offering name"})).toHaveValue("Example Academy");
+  },
+};

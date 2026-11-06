@@ -52,7 +52,7 @@ describe("GF22 guided application integration", () => {
   it("renders labelled controls and explicit non-approval guidance", () => {
     const html = renderToStaticMarkup(<GuardianApplicationForm programs={[{ id: "program", name: "High school" }]}
       households={[]} onSubmit={async () => ({ applicationId: "unused" })} />);
-    for (const label of ["School and program", "Family household", "Student legal first name", "Student legal last name", "Entering grade level"]) {
+    for (const label of ["School or offering", "Your family", "Student legal first name", "Student legal last name", "Entering grade level"]) {
       expect(html).toContain(label);
     }
     expect(html).toContain("Independent guardian review");

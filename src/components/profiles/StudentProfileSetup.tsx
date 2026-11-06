@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { getStudentSelfProfile, saveStudentSelfProfile } from "@/modules/profiles/student-self-profile.functions";
+import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
 
 type Snapshot = Awaited<ReturnType<typeof getStudentSelfProfile>>;
+type SaveProfile = (...args: Parameters<typeof saveStudentSelfProfile>) => ReturnType<typeof saveStudentSelfProfile>;
 export type StudentProfileFields = { preferredName: string; pronouns: string; interests: string };
 
 export function StudentProfileSetup() {
@@ -41,11 +43,16 @@ export function StudentProfileSetup() {
   </section>;
 }
 
-export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange }: {
+export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange, embedded = false, onSaved, onBusyChange,
+  saveProfile = saveStudentSelfProfile }: {
   snapshot: Snapshot;
   changed: () => Promise<void>;
   fields?: StudentProfileFields;
   onFieldsChange?: (fields: StudentProfileFields) => void;
+  embedded?: boolean;
+  onSaved?: (fields: StudentProfileFields) => void;
+  onBusyChange?: (busy: boolean) => void;
+  saveProfile?: SaveProfile;
 }) {
   const [localFields, setLocalFields] = useState({ preferredName: snapshot.preferredName,
     pronouns: snapshot.preferredPronouns, interests: snapshot.interests.join(", ") });
@@ -56,6 +63,8 @@ export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange
     else setLocalFields(next);
   }
   const mutation = useMutationFeedback(changed);
+  useEffect(() => { onBusyChange?.(mutation.pending || mutation.refreshFailed); },
+    [onBusyChange, mutation.pending, mutation.refreshFailed]);
 
   async function save() {
     const data = {
@@ -63,7 +72,12 @@ export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange
       preferredPronouns: pronouns.trim() || null,
       interests: interests.split(",").map(value => value.trim()).filter(Boolean),
     };
-    await mutation.run(() => saveStudentSelfProfile({ data }), {
+    await mutation.run(async () => {
+      const receipt = await saveProfile({ data });
+      onSaved?.({ preferredName: data.preferredName ?? "", pronouns: data.preferredPronouns ?? "",
+        interests: data.interests.join(", ") });
+      return receipt;
+    }, {
       successMessage: "Student profile saved.",
       commandErrorMessage: "Unable to save your student profile.",
     });
@@ -82,8 +96,12 @@ export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange
         <Input maxLength={700} placeholder="For example: drawing, soccer, robotics" value={interests} onChange={event => update({ interests: event.target.value })}/>
       </Field>
     </fieldset>
-    <p className="text-xs text-muted-foreground">Add or change your profile picture above. Your school manages your legal identity, grade, enrollment, and access.</p>
+    {embedded ? <LaunchFieldHelp label="Who can see or change my profile?">
+      Your preferred name may appear to your school. Pronouns and interests are private to you here.
+      Your school manages your legal name, grade, enrollment and access.
+    </LaunchFieldHelp> :
+      <p className="text-xs text-muted-foreground">Add or change your profile picture above. Your school manages your legal identity, grade, enrollment, and access.</p>}
     <Button type="submit" variant="outline" disabled={mutation.pending || mutation.refreshFailed} className="justify-self-start">Save student profile</Button>
-    <Link to="/home" className="justify-self-start text-sm underline">Skip for now and go to my learning workspace</Link>
+    {!embedded && <Link to="/home" className="justify-self-start text-sm underline">Skip for now and go to my learning workspace</Link>}
   </form>;
 }

@@ -1,12 +1,18 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Check, CircleHelp, Landmark, ShieldCheck } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type LaunchStudioStep = { id: string; title: string; complete?: boolean };
+export type LaunchStudioStep = { id: string; title: string; complete?: boolean; disabled?: boolean };
 export type LaunchStudioProgress = { complete: number; total: number };
+
+export function LaunchStudioStepContent({ active, children }: { active: boolean; children: ReactNode }) {
+  const [visited, setVisited] = useState(active);
+  if (active && !visited) setVisited(true);
+  return <div hidden={!active}>{visited || active ? children : null}</div>;
+}
 
 export function LaunchStudioChrome({ children }: { children: ReactNode }) {
   return <div className="launch-studio min-h-screen bg-background">
@@ -28,27 +34,33 @@ export function LaunchStudioChrome({ children }: { children: ReactNode }) {
 }
 
 export function LaunchStudioShell({ role, subject, title, description, steps, currentId, onStepChange,
-  progress, progressLabel = "Recorded requirements", help, children, actions, exit, notice }: {
+  progress, progressLabel = "School requirements", help, children, actions, exit, notice, saveAction, status }: {
   role: string; subject: string; title: ReactNode; description?: ReactNode;
   steps: readonly LaunchStudioStep[]; currentId: string; onStepChange: (id: string) => void;
   progress?: LaunchStudioProgress; progressLabel?: string; help?: ReactNode;
-  children: ReactNode; actions?: ReactNode; exit?: ReactNode; notice?: ReactNode;
+  children: ReactNode; actions?: ReactNode; exit?: ReactNode; notice?: ReactNode; saveAction?: ReactNode; status?: ReactNode;
 }) {
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const index = steps.findIndex(step => step.id === currentId);
   const percent = progress && progress.total > 0 ? Math.floor(progress.complete / progress.total * 100) : null;
-  return <PageFrame width="wide" className="launch-studio-page">
+  return <PageFrame width="wide" className="launch-studio-page launch-journey-form">
     <div className="grid items-start gap-6 xl:grid-cols-[14rem_minmax(0,1fr)_16rem]">
       <aside className="border bg-card p-5 xl:sticky xl:top-6" aria-label="Journey navigation">
-        <h2 className="font-serif text-2xl">{subject}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{role}</p>
-        <p className="mt-4 text-xs leading-5 text-muted-foreground">Return to the same school records. Visiting a step does not complete it.</p>
-        <nav className="mt-5 border-t pt-4" aria-label="Launch steps">
+        <h2 className="hidden font-serif text-2xl xl:block">{subject}</h2>
+        <p className="mt-2 hidden text-sm text-muted-foreground xl:block">{role}</p>
+        <p className="mt-4 hidden text-xs leading-5 text-muted-foreground xl:block">Your saved information stays with this journey. Visiting a step does not complete it.</p>
+        <Button variant="outline" className="w-full justify-between xl:hidden" aria-expanded={navigationOpen}
+          aria-controls="launch-step-navigation" onClick={() => setNavigationOpen(value => !value)}>
+          Step {index + 1} of {steps.length}: {steps[index]?.title} <span>{navigationOpen ? "Close" : "View steps"}</span>
+        </Button>
+        <nav id="launch-step-navigation" className={cn("mt-5 border-t pt-4 xl:block", !navigationOpen && "hidden")} aria-label="Launch steps">
           <ol className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
             {steps.map((step, position) => <li key={step.id}>
-              <button type="button" onClick={() => onStepChange(step.id)}
+              <button type="button" disabled={step.disabled} onClick={() => { onStepChange(step.id); setNavigationOpen(false); }}
                 aria-current={step.id === currentId ? "step" : undefined}
                 className={cn("flex min-h-11 w-full items-center gap-3 border-l-2 border-transparent px-2 py-3 text-left text-xs",
-                  step.id === currentId && "border-primary bg-accent font-semibold")}>
+                  step.id === currentId && "border-primary bg-accent font-semibold",
+                  step.disabled && "cursor-not-allowed opacity-50")}>
                 <span className={cn("flex size-7 shrink-0 items-center justify-center border text-xs",
                   step.complete && "border-success/30 bg-success/10 text-success",
                   step.id === currentId && !step.complete && "border-primary bg-primary text-primary-foreground")}>
@@ -59,7 +71,7 @@ export function LaunchStudioShell({ role, subject, title, description, steps, cu
             </li>)}
           </ol>
         </nav>
-        <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 shrink-0" /> Private, secure school setup</p>
+        <p className="mt-8 hidden items-center gap-2 text-xs text-muted-foreground xl:flex"><ShieldCheck className="size-4 shrink-0" /> Private, secure setup</p>
       </aside>
       <div className="min-w-0">
         <PageHeader eyebrow={`Step ${index + 1} of ${steps.length} · ${role}`} title={title} subtitle={description} />
@@ -77,18 +89,16 @@ export function LaunchStudioShell({ role, subject, title, description, steps, cu
               aria-label={progressLabel} />
             <p className="mt-3 text-xs">{progress!.complete} of {progress!.total} {progressLabel.toLowerCase()} complete</p>
           </>}
-          <p className="mt-3 text-xs leading-5">Only saved, source-verified progress is shown. Completion is not approval.</p>
+          <p className="mt-3 text-xs leading-5">Progress reflects saved school requirements, not pages visited. Completion is not approval.</p>
         </section>
         <section className="border bg-card p-5">
-          <h2 className="font-serif text-2xl">Your journey</h2>
-          <ul className="mt-4 divide-y">{steps.filter(step => step.id !== "welcome").map(step => <li key={step.id} className="flex justify-between gap-3 py-3 text-xs">
-            <span className="text-muted-foreground">{step.title}</span>
-            <span className="shrink-0 font-semibold">{step.complete ? "Recorded" : step.id === currentId ? "Current" : "Not confirmed"}</span>
-          </li>)}</ul>
+          <h2 className="font-serif text-2xl">Saved work &amp; next steps</h2>
+          <div className="mt-4 space-y-3 text-sm">{status ?? <p className="text-muted-foreground">Save draft keeps your entries for later. Continue only moves to the next page; submit actions send information for review.</p>}</div>
+          {saveAction && <div className="mt-4">{saveAction}</div>}
         </section>
         <section id="launch-help" tabIndex={-1} className="scroll-mt-6 border bg-card p-5 sm:col-span-2 xl:col-span-1">
           <h2 className="font-serif text-2xl">Need a hand?</h2>
-          <div className="mt-3 text-sm leading-6 text-muted-foreground">{help ?? "Contact your school administrator about required information or access. Keep this page open to preserve unsaved input."}</div>
+          <div className="mt-3 text-sm leading-6 text-muted-foreground">{help ?? "Ask your school administrator about access or requested information. Save your work before leaving setup."}</div>
         </section>
       </aside>
     </div>

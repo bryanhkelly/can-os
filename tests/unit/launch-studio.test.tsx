@@ -9,6 +9,7 @@ import { resolveAccessContext } from "@/domain/access-context";
 import { GuardianApplicationForm } from "@/components/enrollment/GuardianApplicationForm";
 
 vi.mock("@tanstack/react-router", () => ({
+  useBlocker: vi.fn(),
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
 }));
 vi.mock("@/modules/programs/launch-drafts.functions", () => ({ saveLaunchStudioDraft: vi.fn() }));

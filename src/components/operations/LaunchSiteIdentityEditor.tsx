@@ -3,6 +3,8 @@ import {Button} from "@/components/ui/button";
 import {Field} from "@/components/ui/field";
 import {Input} from "@/components/ui/input";
 import {SiteTimezoneField} from "@/components/workspace/SiteTimezoneField";
+import {LaunchFieldHelp} from "@/components/launch-studio/LaunchFieldHelp";
+import {useLaunchDraftChanges,useLaunchUnsavedChanges} from "@/components/launch-studio/useLaunchUnsavedChanges";
 
 /** Safe draft-only identity editor. Public address/slug is deliberately immutable here. */
 export function LaunchSiteIdentityEditor({
@@ -18,27 +20,32 @@ export function LaunchSiteIdentityEditor({
   const [reason,setReason]=useState("");
   const [editing,setEditing]=useState(false);
   const [error,setError]=useState("");
+  const changes=useLaunchDraftChanges({name,timezone,reason});
+  useLaunchUnsavedChanges(changes.dirty || (editing && busy));
   return <section className="rounded-lg border p-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm font-semibold">School Site identity</p>
+      <p className="text-sm text-muted-foreground">School location name</p>
       <Button type="button" size="sm" variant="outline" onClick={()=>setEditing(value=>!value)}>
         {editing?"Close editor":"Edit name or time zone"}
       </Button>
     </div>
-    {!editing&&<p className="mt-2 text-xs text-muted-foreground">
-      {initial.name} · {initial.timezone} · Site key: {initial.slug}
-    </p>}
+    {!editing&&<div className="mt-2">
+      <p className="text-base font-semibold">{initial.name}</p>
+      <LaunchFieldHelp label="About the saved location name and time zone">
+        Time zone: {initial.timezone.replaceAll("_"," ")}. Editing the name does not rename your website.
+        Once school calendars depend on this time zone, changes need coordinated review.
+      </LaunchFieldHelp>
+    </div>}
     {editing&&<div className="mt-3 space-y-3">
       <p className="text-xs text-muted-foreground">
-        Draft Site changes do not approve public school claims. A reserved website
-        address is not renamed here. Time zone changes are blocked when any Program,
-        school year or calendar activity already depends on the Site.
+        Update your location's name or time zone. This won't rename your website.
+        If calendars already use this time zone, ask CAN to help change it.
       </p>
       <Field label="School location name" required>
         <Input value={name} onChange={e=>setName(e.target.value)}/>
       </Field>
       <SiteTimezoneField label="School time zone" value={timezone} onChange={setTimezone} />
-      <Field label="Reason for changing Site identity" required>
+      <Field label="Why are you making this change?" required>
         <Input value={reason} onChange={e=>setReason(e.target.value)}
           placeholder="E.g., corrected campus display name"/>
       </Field>
@@ -46,9 +53,9 @@ export function LaunchSiteIdentityEditor({
       <Button type="button" size="sm" disabled={busy||name.trim().length<2||!timezone||reason.trim().length<5}
         onClick={async()=>{
           setError("");
-          try{await save({name,timezone},revision,reason);setEditing(false);}
+          try{await save({name,timezone},revision,reason);changes.markSaved({name,timezone,reason});setEditing(false);}
           catch(e){setError(e instanceof Error?e.message:"Could not update school identity");}
-        }}>Save draft identity</Button>
+        }}>Save location details</Button>
     </div>}
   </section>;
 }

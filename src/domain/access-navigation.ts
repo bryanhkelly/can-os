@@ -30,7 +30,7 @@ export function accessReturnToFromLocation(location: { pathname: string; searchS
 }
 
 /** Generic entry points that only lead to a default dashboard. A specific saved page still wins. */
-const genericReturnPaths=new Set(["/","/home"]);
+const genericReturnPaths=new Set(["/","/home","/launch"]);
 
 /** Fixed application destinations remain the fallback when no safe return path is supplied. */
 export function accessLandingPath(role: string, launchSiteId?: string, returnTo?: unknown): string {

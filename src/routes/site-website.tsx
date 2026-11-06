@@ -21,7 +21,13 @@ import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourc
 import {SchoolMediaFolderManager} from "@/components/operations/SchoolMediaFolderManager";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
 import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
-const websiteSearchSchema=siteProgramSelectionSchema.extend({returnGrantId:optionalSearchString});
+import { z } from "zod";
+
+export const websiteStudioStepIds = ["welcome", "template", "identity", "photos", "content", "preview"] as const;
+export const websiteSearchSchema=siteProgramSelectionSchema.extend({
+  returnGrantId:optionalSearchString,
+  step:z.enum(websiteStudioStepIds).optional(),
+});
 
 export const loadWebsiteHome = (siteId?: string) => safeLoader(
   () => getPartnerWebsitePreviewView({data:{siteId}}),
@@ -29,21 +35,27 @@ export const loadWebsiteHome = (siteId?: string) => safeLoader(
 )();
 
 export const Route = createFileRoute("/site-website")({
-  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;returnGrantId?:string}=>websiteSearchSchema.parse(search),
+  validateSearch:(search:Record<string,unknown>)=>websiteSearchSchema.parse(search),
   loaderDeps:({search})=>({siteId:search.siteId}),
   loader:({deps})=>loadWebsiteHome(deps.siteId),
   component: PartnerSiteWebsitePage,
 });
 
 function PartnerSiteWebsitePage() {
-  return <WebsiteHome outcome={Route.useLoaderData()} selection={Route.useSearch()} />;
+  const navigate=Route.useNavigate();
+  return <WebsiteHome outcome={Route.useLoaderData()} selection={Route.useSearch()}
+    onStepChange={step=>void navigate({search:previous=>({...previous,step:websiteStudioStepIds[step]})})}/>;
 }
-export function WebsiteHome({ outcome, selection, studio = false }: {
+export function WebsiteHome({ outcome, selection, studio = false, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
-  selection: { siteId?: string; programId?: string; returnGrantId?: string };
+  selection: { siteId?:string; programId?:string; returnGrantId?:string; step?:typeof websiteStudioStepIds[number] };
   studio?: boolean;
+  onStepChange?: (step:number)=>void;
 }) {
-  const [step, setStep] = useState(0);
+  const [localStep,setLocalStep]=useState(0);
+  const requestedStep=websiteStudioStepIds.indexOf(selection.step??"welcome");
+  const step=selection.step ? Math.max(0,requestedStep) : localStep;
+  const changeStep=onStepChange??setLocalStep;
   const returnToLaunch=selection.siteId&&selection.programId&&selection.returnGrantId
     ?<LaunchWebsiteEditorHandoff siteId={selection.siteId} programId={selection.programId} returnGrantId={selection.returnGrantId} destination="launch"/>:null;
   if (!outcome.ok) return <>{returnToLaunch}<LoaderFailure eyebrow="Partner website"
@@ -51,19 +63,20 @@ export function WebsiteHome({ outcome, selection, studio = false }: {
 
   const data = outcome.data;
   const steps = [
-    {id:"0", title:"Welcome & sources"}, {id:"1",title:"Choose a template"},
-    {id:"2",title:"Colors & photography"}, {id:"3",title:"School story"},
-    {id:"4",title:"Preview & finish"},
+    {id:"welcome",title:"Before you begin"}, {id:"template",title:"Choose template"},
+    {id:"identity",title:"Colors & typography"}, {id:"photos",title:"Photos & artwork"},
+    {id:"content",title:"School content"}, {id:"preview",title:"Preview & review"},
   ];
   if (studio) return <LaunchStudioShell role="Website design" subject={data.siteName}
     title={["Bring your school online.","Find the right first impression.","Make it your own.",
-      "Tell your school's story.","Review your website."][step]}
+      "Bring your school to life.","Your content comes with you.","See what families will see."][step]}
     description="One Site, one school website. Academic, admissions and school-opening approvals remain separate."
-    steps={steps} currentId={String(step)} onStepChange={id => setStep(Number(id))}
+    steps={steps} currentId={websiteStudioStepIds[step]??"welcome"}
+    onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}
     help={<p>Need editing permission? Ask your Site administrator for a verified Site website editor invitation. Previewing and saving a draft do not publish it.</p>}
     exit={returnToLaunch ?? <Link to="/home" className="underline">Exit to your workspace</Link>}>
     {data.host
-      ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={setStep}/>
+      ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep}/>
       : <p role="status" className="border bg-card p-5 text-sm">Your registrar must reserve a draft Site address before website design can be saved.</p>}
   </LaunchStudioShell>;
   return <WorkspaceShell
@@ -97,7 +110,7 @@ export function WebsiteHome({ outcome, selection, studio = false }: {
         </p>
       </div>}>
       {data.host
-        ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={setStep} />
+        ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} />
         : <p role="status" className="text-sm text-muted-foreground">
           Your registrar must reserve a draft Site address before website content can be edited.
         </p>}

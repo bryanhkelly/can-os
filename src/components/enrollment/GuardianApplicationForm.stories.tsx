@@ -22,7 +22,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 async function fillRequiredFields(canvas: ReturnType<typeof within>) {
-  await userEvent.selectOptions(canvas.getByLabelText(/Application academic year/), "school-year-story");
+  await userEvent.selectOptions(canvas.getByLabelText(/School year/), "school-year-story");
   await userEvent.type(canvas.getByLabelText(/Student legal first name/), "Jordan");
   await userEvent.type(canvas.getByLabelText(/Student legal last name/), "Lee");
   await userEvent.type(canvas.getByLabelText(/Entering grade level/), "9");
@@ -105,7 +105,7 @@ export const ProgramDeepLinkChange: Story = {
   render: () => <ProgramDeepLinkHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const select = canvas.getByLabelText(/School and program/) as HTMLSelectElement;
+    const select = canvas.getByLabelText(/School or offering/) as HTMLSelectElement;
     await expect(select).toHaveValue("program-one");
     await userEvent.click(canvas.getByRole("button", { name: "Switch program deep link" }));
     await waitFor(() => expect(select).toHaveValue("program-two"));

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ data: null as unknown, search: {} as Record<string, unknown>, checklist: vi.fn() }));
 vi.mock("@tanstack/react-router", () => ({
+  useBlocker: vi.fn(),
   createFileRoute: () => (options: object) => ({ options, useLoaderData: () => state.data, useSearch: () => state.search }),
   useRouter: () => ({ navigate: vi.fn(), invalidate: vi.fn() }),
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
@@ -74,7 +75,8 @@ describe("student and staff Studio drafts", () => {
     state.search = { step: "profile" };
     state.data = { ok: true, data: { profile: { preferredName: "Saved", preferredPronouns: "", interests: [] },
       registration: { sections: [], requests: [] }, draft: { revision: 1, savedAt: "2027-01-01",
-        value: { audience: "student", fields: { preferredName: "Draft name", pronouns: "", interests: "Art", courseIds: [] } } } } };
+        value: { audience: "student", fields: { preferredName: "Draft name", pronouns: "", interests: "Art", courseIds: [],
+          profileBaseline: {preferredName:"Saved",pronouns:"",interests:""} } } } } };
     const html = render(Student);
     expect(html).toContain('value="Draft name"');
     expect(html).toContain("Save draft");
@@ -86,6 +88,17 @@ describe("student and staff Studio drafts", () => {
     state.data = { ok: true, data: { profile: { preferredName: "", preferredPronouns: "", interests: [] },
       registration: { sections: [], requests: [] }, draft: null } };
     expect(render(Student)).toContain("no available courses here yet");
+  });
+  it("does not automatically replace a current student profile with an older or legacy draft", () => {
+    state.search = { step: "profile" };
+    state.data = { ok: true, data: { profile: { preferredName: "Current", preferredPronouns: "", interests: [] },
+      registration: { sections: [], requests: [] }, draft: { revision: 1, savedAt: "2027-01-01",
+        value: { audience: "student", fields: { preferredName: "Old name", pronouns: "", interests: "", courseIds: [] } } } } };
+    const html = render(Student);
+    expect(html).toContain('value="Current"');
+    expect(html).not.toContain('value="Old name"');
+    expect(html).toContain("Use the older draft profile instead");
+    expect(html).not.toContain("profile picture above");
   });
   it("saves staff notes separately from independently verified evidence", () => {
     state.search = { step: "qualifications" };
