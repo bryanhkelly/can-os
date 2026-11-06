@@ -64,7 +64,7 @@ body.template-community .closing-action{background:var(--site-secondary)}
 /* Modern: strong geometry and information-first page rhythm. */
 body.template-modern{letter-spacing:-.012em}
 body.template-modern header{border-bottom:3px solid var(--site-ink)}
-body.template-modern .brand{font:800 .86rem/1.3 var(--site-body);letter-spacing:.16em}
+body.template-modern .brand{font:800 .86rem/1.3 var(--site-display);letter-spacing:.16em}
 body.template-modern .public-hero:not(.compact-hero){min-height:490px;background:var(--site-ink);padding:clamp(28px,5vw,80px);border-radius:0}
 body.template-modern .public-hero:not(.compact-hero) h1{font:800 clamp(3.8rem,8.5vw,7.8rem)/.98 var(--site-display);letter-spacing:-.075em;max-width:980px}
 body.template-modern .public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,20,30,.96),rgba(9,20,30,.62))}
