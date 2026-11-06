@@ -1,6 +1,14 @@
 name: PX B visual website acceptance
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/capture-school-site-visuals.mjs'
+      - 'src/domain/site-theme.ts'
+      - 'src/domain/public-site-html.ts'
+      - 'src/domain/site-local-content.ts'
+      - '.github/workflows/px-b-visual-acceptance.yml'
   push:
     branches: [main]
     paths:
