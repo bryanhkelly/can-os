@@ -77,7 +77,7 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
           className={cn("min-w-0 border bg-card p-2 transition-colors",
             selected ? "border-primary ring-2 ring-primary/50" : "border-border")}>
           <Button type="button" variant="ghost" aria-pressed={selected} onClick={() => onChange(template.id)}
-            className="w-full min-w-0 justify-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            className="w-full min-w-0 flex-col items-stretch justify-start gap-0 whitespace-normal p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <TemplatePreviewFrame html={renderSample(template.id)} name={`${template.name} sample ${previewPage}`} />
             <span className="flex flex-wrap items-start justify-between gap-2 p-3">
               <span className="min-w-0 flex-1">
