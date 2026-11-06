@@ -596,7 +596,7 @@ function LocalWebsiteCopyEditor({
               const palette = resolveSiteTheme(id,content.branding.typographyId);
               return <Button variant="outline" type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
                 onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
-                className="min-h-14 rounded-lg border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
+                className="min-h-14 w-full flex-col items-stretch justify-start gap-0 whitespace-normal border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
                 <span aria-hidden="true" className="mb-2 flex h-5 overflow-hidden rounded">
                   <span className="flex-1" style={{backgroundColor:palette.ink}}/>
                   <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
