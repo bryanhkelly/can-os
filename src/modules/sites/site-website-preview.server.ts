@@ -37,7 +37,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const media = host ? projectApprovedSchoolSiteMedia(site.id,host,approvedPhotos) : {};
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
-    ? normalizeSiteLocalContent(latestContent) : null;
+    ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
   const [siteConfiguration] = host ? await db.select({metadata: sites.metadata})
     .from(sites).where(eq(sites.id, site.id)).limit(1) : [];
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
