@@ -292,7 +292,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     availablePaths.includes("/academics") ? "Explore programs" :
     availablePaths.includes("/contact") ? "Contact" : "Home";
   const firstAcademicProgram = page.academicPrograms?.[0];
-  const firstInquiryHref = firstAcademicProgram
+  // A hero inquiry link is actionable only when the renderer was given the
+  // server-side request ID factory that also creates its destination form.
+  // Read-only previews must not link to a form that does not exist.
+  const firstInquiryHref = firstAcademicProgram && submissionsEnabled && options?.makeRequestId
     ? previewSlug
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
