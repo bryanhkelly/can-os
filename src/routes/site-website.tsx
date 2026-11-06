@@ -7,10 +7,11 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type Dispatch, type SetStateAction } from "react";
+import { useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import {
   prepareWebsiteEditorContent, restoreOriginalWebsiteField, websiteStarterFieldIds, siteLocalContentLimits, siteLocalImageMaxBytes,
-  type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
+  siteLocalImagePublicationGaps, type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
 } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -315,9 +316,17 @@ function LocalWebsiteCopyEditor({
   onStepChange: (step: number) => void;
 }) {
   const router = useRouter();
-  const [content, setContent] = useState<SiteLocalContent>(() =>
-    prepareWebsiteEditorContent(data.editingContent, data.siteName),
-  );
+  const [editor, setEditor] = useState(() => {
+    const initial = prepareWebsiteEditorContent(data.editingContent, data.siteName);
+    return { content: initial, saved: initial, revision: data.currentRevision, siteId: data.siteId };
+  });
+  const content = editor.content;
+  const setContent: Dispatch<SetStateAction<SiteLocalContent>> = update =>
+    setEditor(previous => ({ ...previous, content: typeof update === "function"
+      ? update(previous.content) : update }));
+  const dirty = JSON.stringify(content) !== JSON.stringify(editor.saved);
+  const revisionConflict = editor.siteId === data.siteId && editor.revision !== data.currentRevision;
+  useLaunchUnsavedChanges(dirty);
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
@@ -327,16 +336,38 @@ function LocalWebsiteCopyEditor({
   const [previewError, setPreviewError] = useState("");
   useEffect(() => {
     setDraftPreview(null);
-    setContent(prepareWebsiteEditorContent(data.editingContent, data.siteName));
-  }, [data.currentRevision, data.editingContent, data.siteName]);
+    setEditor(previous => {
+      if (previous.siteId === data.siteId && previous.revision === data.currentRevision) return previous;
+      // A loader refresh (including media changes) must never overwrite authored copy.
+      if (previous.siteId === data.siteId &&
+          JSON.stringify(previous.content) !== JSON.stringify(previous.saved)) return previous;
+      const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
+      return { content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId };
+    });
+  }, [data.siteId, data.currentRevision, data.editingContent, data.siteName]);
+
+  function loadLatestRevision() {
+    if (dirty && !window.confirm("Discard your unsaved website changes and load the latest saved revision?")) return;
+    const latest = prepareWebsiteEditorContent(data.editingContent, data.siteName);
+    setEditor({ content: latest, saved: latest, revision: data.currentRevision, siteId: data.siteId });
+    setDraftPreview(null);
+    setError("");
+  }
+
+  function markSaved(submitted: SiteLocalContent, revision: number) {
+    setEditor(previous => ({ ...previous, content: submitted, saved: submitted, revision }));
+  }
 
   async function saveDraft() {
-    if (busy || !data.canPublish) return;
+    if (busy || !data.canPublish || revisionConflict) return;
     setError("");
-    await mutation.run(() => saveChurchWebsiteDraft({
-      data: { content, siteId: data.siteId, expectedRevision: data.currentRevision },
+    const submitted = content;
+    const outcome = await mutation.run(() => saveChurchWebsiteDraft({
+      data: { content: submitted, siteId: data.siteId, expectedRevision: editor.revision },
     }), { successMessage: "Private website draft saved. The public site and approval statuses have not changed.",
       commandErrorMessage: "Could not save the private website draft." });
+    if (outcome.status === "saved" || outcome.status === "refresh-failed")
+      markSaved(submitted, outcome.value.revision);
   }
   async function previewCurrentDraft() {
     if (previewPending) return;
@@ -359,19 +390,24 @@ function LocalWebsiteCopyEditor({
       setError("Complete the artwork description, usage rights and child-privacy confirmations before publishing.");
       return;
     }
-    await mutation.run(() => publishChurchWebsiteContent({
-        data: { content, expectedRevision: data.currentRevision,siteId:data.siteId },
+    if (revisionConflict) return;
+    const submitted = content;
+    const outcome = await mutation.run(() => publishChurchWebsiteContent({
+        data: { content: submitted, expectedRevision: editor.revision,siteId:data.siteId },
       }), { successMessage: result => result.status === "review_required"
         ? "Protected institutional language was held for CAN review. Previously published church content remains unchanged."
         : "Church content published. If this Site is publicly active, the new copy is available without separate CAN editorial approval.",
       commandErrorMessage: "Could not save church content." });
+    if (outcome.status === "saved" || outcome.status === "refresh-failed")
+      markSaved(submitted, outcome.value.revision);
   }
 
   async function restore(revision: number) {
-    if (busy) return;
+    if (busy || revisionConflict) return;
+    if (dirty && !window.confirm("Restoring an older revision will discard unsaved changes. Continue?")) return;
     setError("");
     await mutation.run(() => restoreChurchWebsiteContent({
-        data: { expectedRevision: data.currentRevision, restoreRevision: revision,siteId:data.siteId },
+        data: { expectedRevision: editor.revision, restoreRevision: revision,siteId:data.siteId },
       }), { successMessage: result => result.status === "review_required"
         ? "Historical copy needs review under current claim rules; existing public content is unchanged."
         : `Revision ${revision} was restored as a new published revision.`,
@@ -448,6 +484,13 @@ function LocalWebsiteCopyEditor({
       <p className="mt-2">To change any suggested wording, go to School story and use the Reset to original action
         beside that individual field. No other answers are affected.</p>
     </div>}
+    {revisionConflict && <div role="alert" className="mt-3 space-y-2 border border-amber-500 p-4 text-sm">
+      <p className="font-semibold">A newer website revision ({data.currentRevision}) is available.</p>
+      <p>Your unsaved edits remain here. Saving is paused to prevent overwriting someone else's revision.
+        You can review or copy your current wording, then load the latest saved version.</p>
+      <button type="button" onClick={loadLatestRevision}
+        className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</button>
+    </div>}
     {!data.canPublish && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
       You can preview this Site, but your current verified Site assignment has not
       been granted local website publishing. Ask the Site administrator to assign
@@ -458,6 +501,13 @@ function LocalWebsiteCopyEditor({
       the last published church copy remains unchanged.
     </p>}
     {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">No school photography is selected. Add approved photos in Photos &amp; artwork. No generated replacement artwork will appear.</p>}
+    {siteLocalImagePublicationGaps(content.branding.heroImage).length > 0 &&
+      <div role="status" className="mt-3 border p-3 text-sm">
+        <p className="font-semibold">Artwork is incomplete. You can save a private draft now.</p>
+        <p className="mt-1">This artwork stays private and will not appear in a preview or published page until these items are complete:</p>
+        <ul className="mt-2 list-disc pl-5">{siteLocalImagePublicationGaps(content.branding.heroImage).map(gap =>
+          <li key={gap}>{gap}</li>)}</ul>
+      </div>}
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website changes..."/>
     <div className="space-y-5">
@@ -646,7 +696,7 @@ function LocalWebsiteCopyEditor({
         {!data.canPublish && <p role="status" className="border p-3 text-sm">
           You can preview this Site, but your verified Site assignment does not include local website publishing.
         </p>}
-        <button type="button" disabled={busy || !data.canPublish} onClick={() => void submit()}
+        <button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
           {busy ? "Publishing…" : "Publish church-owned content"}
         </button>
@@ -662,7 +712,7 @@ function LocalWebsiteCopyEditor({
               <span>Revision {version.revision} · {version.status === "published" ? "Published" : version.status === "draft" ? "Private draft" : "Held for review"}
                 {" · "}{new Date(version.createdAt).toLocaleString()}</span>
               {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
-                <button type="button" disabled={busy} onClick={() => void restore(version.revision)}
+                <button type="button" disabled={busy || revisionConflict} onClick={() => void restore(version.revision)}
                   className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
                   Restore as new revision
                 </button>}
@@ -676,7 +726,7 @@ function LocalWebsiteCopyEditor({
           className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Back
         </button>
-        <button type="button" disabled={busy || !data.canPublish} onClick={()=>void saveDraft()}
+        <button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={()=>void saveDraft()}
           className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
           {busy?"Saving...":"Save private draft"}
         </button>
