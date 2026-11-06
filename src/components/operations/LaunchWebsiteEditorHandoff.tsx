@@ -1,4 +1,5 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { Button } from "@/components/ui/button";
 import {useState} from "react";
 import {getWorkspaceSession} from "@/modules/identity/workspace-session.functions";
 import {launchWebsiteHandoffGrant} from "@/domain/launch-website-handoff";
@@ -28,7 +29,7 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
   }catch(cause){setError(mutationErrorMessage(cause, "The website workspace could not be opened."));setBusy(false);}
  }
  return <span className="inline-block">
-  <button type="button" disabled={busy} onClick={()=>void open()} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Opening verified workspace…":destination==="editor"?"Edit church-owned website content":"Return to school setup"}</button>
+  <Button type="button" variant="outline" disabled={busy} onClick={()=>void open()} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Opening verified workspace…":destination==="editor"?"Edit church-owned website content":"Return to school setup"}</Button>
   {error&&<span role="alert" className="mt-2 block max-w-xl text-sm font-normal">{error}</span>}
  </span>;
 }
