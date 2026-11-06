@@ -15,6 +15,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { studentDraftMatchesProfile } from "@/domain/launch-draft";
 import { useLaunchDraftChanges, useLaunchUnsavedChanges } from "@/components/launch-studio/useLaunchUnsavedChanges";
 import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 
 const steps = [
   { id: "welcome", title: "Welcome" }, { id: "profile", title: "Your profile" },
@@ -115,9 +116,9 @@ function StudentJourney({ data }: { data: Awaited<ReturnType<typeof loadStudentL
           {!course.contentReady && <p className="mt-2 text-sm">School content preparation is pending.</p>}
           {course.policy.guardianApprovalRequired && <p className="mt-2 text-sm">Guardian permission is required.</p>}
           {!enrolled && !pending && <div className="mt-4 flex flex-wrap items-center gap-4">
-            <label className="flex min-h-11 items-center gap-2 text-sm"><Checkbox
+            <Label className="flex min-h-11 items-center gap-2 text-sm"><Checkbox
               checked={courseIds.includes(course.id)} disabled={mutation.pending || mutation.refreshFailed}
-              onChange={event => setCourseIds(ids => event.target.checked ? [...ids, course.id] : ids.filter(id => id !== course.id))} />Keep in draft choices</label>
+              onChange={event => setCourseIds(ids => event.target.checked ? [...ids, course.id] : ids.filter(id => id !== course.id))} />Keep in draft choices</Label>
             <Button variant="outline" disabled={mutation.pending || mutation.refreshFailed} onClick={() => void mutation.run(async () => {
               const receipt = await requestCourseChange({ data: { sectionId: course.id, operation: "add" } });
               setCourseIds(ids => ids.filter(id => id !== course.id));
