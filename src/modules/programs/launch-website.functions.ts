@@ -15,6 +15,8 @@ import {readAcademicProgramCatalog} from "@/modules/sites/academic-program-catal
 import {readApprovedPublicParentExtras} from "@/modules/sites/public-parent-extras.server";
 import {projectApprovedParentInformation,withVerifiedPublicApplications} from "@/domain/parent-information";
 import {readCurrentLocalContent} from "@/modules/sites/site-local-content.server";
+import {readApprovedSchoolSitePhotos} from "@/modules/sites/site-media-folder.server";
+import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 import {readEnrichmentCatalog} from "@/modules/activities/enrichment-catalog.server";
 import {toPublicSiteEnrichment} from "@/domain/public-site-catalog";
 import {checkPublishedSiteReachability} from "@/modules/sites/public-host-reachability";
@@ -48,8 +50,8 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const base={siteId:school.siteId,programId:school.programId,programName:school.programName,
    host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt,hostingDiagnostic};
   if(!address)return {...base,previewHtml:null,previewPages:{} as Record<string,string>,includesSuggestions:false};
-  const [approved,local,enrichment]=await Promise.all([
-   readAcademicProgramCatalog(school.siteId),readCurrentLocalContent(school.siteId),readEnrichmentCatalog(school.siteId),
+  const [approved,local,enrichment,photos]=await Promise.all([
+   readAcademicProgramCatalog(school.siteId),readCurrentLocalContent(school.siteId),readEnrichmentCatalog(school.siteId),readApprovedSchoolSitePhotos(school.siteId),
   ]);
   const targetOpeningDate=launchOpeningDate(school.metadata);
   const needsPlanningCard=isAcademicMarketingType(school.type)&&!approved.some(program=>program.programId===school.programId);
@@ -79,7 +81,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const site={name:school.siteName,organizationName:school.organizationName};
   const academicPrograms=[...approvedPrograms,...planning];
   const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
-    site,offerings,academicPrograms,localContent,
+    site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
     parentInformation:projectApprovedParentInformation({
       site,academicPrograms,offerings,localContent,...parentExtras,
     }),
@@ -87,7 +89,10 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.
   const previewPages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
-    path, renderPublicSiteHtml(page,{path,localPreview:true}),
+    path, renderPublicSiteHtml(page,{path,localPreview:true,
+      ...(page.demonstration && address.slug === "valorschool"
+        ? {sampleTemplate:localContent.branding.templateId ?? "heritage" as const} : {}),
+    }),
   ]));
   return {...base,includesSuggestions:needsPlanningCard||!local,
     previewHtml:previewPages["/"] ?? null, previewPages,

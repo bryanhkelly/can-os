@@ -457,6 +457,7 @@ function LocalWebsiteCopyEditor({
       Your latest proposed wording includes a protected claim. It is held for review;
       the last published church copy remains unchanged.
     </p>}
+    {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">No school photography is selected. Add approved photos in Photos &amp; artwork. No generated replacement artwork will appear.</p>}
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website changes..."/>
     <div className="space-y-5">

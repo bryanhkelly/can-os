@@ -43,7 +43,7 @@ export function LaunchWebsitePreview({data}:{data:Website}){
       During school website setup, your authorized church editor can point CAN OS to a photo folder.
       The shared media engine will automatically propose placements across Home, About, Academics,
       Student Life, Campus and Families. The church reviews rights and child-image permissions once
-      for the imported files; unapproved or missing photos use the CAN original artwork collection.
+      for the imported files. Missing or unapproved photos are not replaced with generated artwork.
     </p>
     <p className="mt-2 text-xs text-muted-foreground">
       A saved folder is private until explicit media approval. This step is optional and never

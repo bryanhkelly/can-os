@@ -1,6 +1,6 @@
-import { resolveSiteTheme, resolveSiteTemplateId } from "./site-theme";
+import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import { composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss } from "./public-site-templates";
-import { canFallbackArtwork, canFallbackFamilyForPalette, type CanFallbackSlot } from "./school-site-fallback-art";
+import { templateSampleImage } from "./template-sample-images";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
@@ -103,6 +103,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   makeRequestId?: () => string;
   /** Only the isolated fictional template gallery sets this; never persisted as school media. */
   templateGallery?: boolean;
+  /** Explicit fictional-school template presentation, used only in read-only demo previews. */
+  sampleTemplate?: SiteTemplateId;
   path?: PublicSitePath;
   localPreview?: boolean;
   /** Trusted server-resolved Site slug for local-only multipage preview. */
@@ -130,7 +132,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
   const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId);
-  const templateId = resolveSiteTemplateId(local?.branding.templateId);
+  const sampleTemplate = options?.localPreview && page.demonstration ? options.sampleTemplate : undefined;
+  const templateId = resolveSiteTemplateId(sampleTemplate ?? local?.branding.templateId);
   const visualCss = `--site-ink:${visual.ink};--site-paper:${visual.canvas};--site-accent:${visual.accent};--site-secondary:${visual.secondary};--site-muted:${visual.muted};--site-display:${visual.displayFont};--site-body:${visual.bodyFont};`;
   const localItems = local ? [
     ["Our story", local.churchHistory],
@@ -144,12 +147,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ["Spiritual formation", local.spiritualFormation],
   ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
   const image = local?.branding.heroImage;
-  const fallbackFamily = canFallbackFamilyForPalette(local?.branding.paletteId);
-  const fallbackHero = canFallbackArtwork(fallbackFamily,"hero");
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
-    if (options?.templateGallery) {
-      const family = {heritage:"heritage",community:"community",modern:"modern","bright-futures":"bright",summit:"summit"}[templateId];
-      return {src:`/school-template-previews/v1/${family}/${slot === "hero" ? "hero" : "story_01"}.jpg`,altText:"Fictional template sample, not this school",assetId:"template-sample",sourceRevision:"v1"};
+    if (options?.templateGallery || sampleTemplate) {
+      const sample = templateSampleImage(templateId, slot === "hero" ? "hero" : "story_01");
+      return sample ? {src:sample,altText:"Fictional template sample, not this school",assetId:"template-sample",sourceRevision:"v1"} : null;
     }
     const candidate=page.media?.[slot];
     if(!candidate)return null;
@@ -162,7 +163,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     }catch{return null;}
   };
   const approvedHero=ownedMedia("hero");
-  const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src ?? fallbackHero.src;
+  const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src;
   const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
   const heroHasPhoto=Boolean(image||approvedHero);
   const pageLabels: Record<PublicSitePath, string> = {
@@ -293,7 +294,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
     : null;
-  const hero = `<div id="welcome" class="public-hero has-image${heroHasPhoto ? "" : " original-artwork"}${local?.heroHeadline ? " editorial-headline" : ""}${page.site.name.length > 28 ? " long-name" : ""}"><img class="hero-background-image" src="${escapePublicHtml(heroPhotoSrc)}" alt="${escapePublicHtml(heroPhotoAlt)}"${heroHasPhoto ? "" : ' aria-hidden="true"'} decoding="async"/><p class="tag">${local?.heroHeadline ? school : foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${local?.heroHeadline ? escapePublicHtml(local.heroHeadline) : school}</h1>
+  const hero = `<div id="welcome" class="public-hero${heroHasPhoto ? " has-image" : ""}${local?.heroHeadline ? " editorial-headline" : ""}${page.site.name.length > 28 ? " long-name" : ""}">${heroPhotoSrc ? `<img class="hero-background-image" src="${escapePublicHtml(heroPhotoSrc)}" alt="${escapePublicHtml(heroPhotoAlt)}" decoding="async"/>` : ""}<p class="tag">${local?.heroHeadline ? school : foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${local?.heroHeadline ? escapePublicHtml(local.heroHeadline) : school}</h1>
     ${local?.welcomeMessage ? `<p class="hero-subtitle">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
     <p class="intro">${academicCards ? "Explore the learning pathways and community that could be part of your family's next chapter." :
       "Get to know the vision for this school as program information becomes available."}
@@ -518,19 +519,13 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ${availablePaths.includes("/faq") ? '<a class="text-action" href="/faq">Read admissions guidance →</a>' : ""}
     ${availablePaths.includes("/contact") ? '<a class="text-action" href="/contact">Contact the school →</a>' : ""}
     </section>`;
-  const interiorSlot:CanFallbackSlot = path === "/about" ? "about" :
-    path === "/academics" ? "academics" : path === "/student-life" ? "student-life" :
-    path === "/families" ? "families" : path === "/school-day" ? "details" :
-    path === "/admissions" || path === "/faq" ? "reflection" :
-    path === "/contact" ? "campus" : "details";
-  const interiorArt = canFallbackArtwork(fallbackFamily,interiorSlot);
-  const interiorMediaSlot = interiorSlot==="student-life" ? "studentLife" :
-    interiorSlot==="reflection"||interiorSlot==="details" ? "academics" : interiorSlot;
+  const interiorMediaSlot:keyof PublicSchoolSiteMedia = path === "/about" ? "about" :
+    path === "/student-life" ? "studentLife" : path === "/families" ? "families" :
+    path === "/contact" ? "campus" : "academics";
   const approvedInterior = ownedMedia(interiorMediaSlot);
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
-    `<div class="public-hero compact-hero has-image${approvedInterior?"":" original-artwork"}">
-      <img class="hero-background-image" src="${escapePublicHtml(approvedInterior?.src ?? interiorArt.src)}"
-        alt="${escapePublicHtml(approvedInterior?.altText ?? "")}"${approvedInterior?"":' aria-hidden="true"'} decoding="async"/>
+    `<div class="public-hero compact-hero${approvedInterior?" has-image":""}">
+      ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}" alt="${escapePublicHtml(approvedInterior.altText)}" decoding="async"/>` : ""}
       <p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   // The parent journey uses only pages backed by approved public projections.
   // This navigation is shared by all schools and never fabricates availability.
@@ -648,7 +643,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .public-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:var(--site-accent);opacity:.18;clip-path:polygon(0 100%,0 88%,32% 70%,56% 90%,78% 53%,100% 66%,100% 100%)}.hero-background-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}.public-hero.has-image::before{content:"";position:absolute;inset:0;background:linear-gradient(95deg,rgba(13,34,40,.94),rgba(13,34,40,.5));z-index:-1}.public-hero.has-image::after{display:none}
 .public-hero .tag{color:#e7d7bd}.hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:20px;margin-top:30px}.hero-button{display:inline-flex;align-items:center;min-height:48px;border-radius:10px;padding:12px 19px;background:#f6eee0;color:#17364d;text-decoration:none;font-weight:700}.hero-text-link{color:#fff;text-underline-offset:5px;font-weight:700}.hero-button:hover{background:#fff}.hero-button:focus-visible,.hero-text-link:focus-visible{outline:3px solid #ffda90;outline-offset:4px}
 .skip-link{position:absolute;left:12px;top:-100px;z-index:10;padding:12px;background:#fff;color:#112d34}.skip-link:focus{top:12px}.mission-split{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:clamp(24px,5vw,80px);padding:clamp(20px,4vw,42px) 0}.mission-split p:last-child{font-size:clamp(1.05rem,1.6vw,1.3rem);line-height:1.75}.editorial-section>.grid{gap:20px}.closing-action{background:var(--site-ink);color:#fff;padding:clamp(30px,6vw,70px);border-radius:12px}.closing-action .tag,.closing-action p{color:#fff}.closing-action h2{max-width:700px}.closing-action .hero-button{margin-top:15px}header nav a{min-height:44px;display:inline-flex;align-items:center}.site-nav-cta{min-height:44px;display:inline-flex;align-items:center;justify-content:center;background:var(--site-ink);color:#fff;padding:10px 17px;border-radius:5px;text-decoration:none;font-weight:700;font-size:.85rem}.site-nav-cta:hover{background:var(--site-secondary)}header .brand{color:var(--site-ink)}header{position:relative}header nav{gap:clamp(8px,1.4vw,20px)}.card{border-radius:8px}.card p{overflow-wrap:anywhere}.public-hero{border-radius:12px}.church-section{border-radius:8px}.public-hero h1{overflow-wrap:break-word;hyphens:auto}.public-hero.long-name h1{font-size:clamp(1.9rem,5.6vw,5rem);letter-spacing:-.04em;max-width:950px} .mobile-menu{display:none} .mobile-menu summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:8px 14px;border:1px solid var(--site-ink);border-radius:6px}.mobile-menu a{display:block;padding:11px 4px;min-height:44px} .mobile-menu[open]{width:100%} .mobile-menu[open] .mobile-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px} @media(max-width:800px){header>.desktop-nav,header>.site-nav-cta{display:none}.mobile-menu{display:block} .mission-split{grid-template-columns:1fr} .public-hero{min-height:350px}} @media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:12px;min-height:0;padding:clamp(24px,6vw,48px)}.card{padding:22px}header{align-items:flex-start}header nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap;padding-top:12px}main{padding-top:24px;padding-bottom:60px}}
-.section-heading{max-width:740px;margin-bottom:32px}.section-heading>p:last-child{color:#475467}.explore-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.explore-link{display:flex;align-items:flex-start;gap:16px;min-width:0;padding:clamp(18px,3vw,30px);border-top:2px solid var(--site-ink);background:#fff;color:var(--site-ink);text-decoration:none;transition:background .2s ease,transform .2s ease}.explore-link:hover{background:#f4f5f2;transform:translateY(-2px)}.explore-number{font-size:.75rem;letter-spacing:.1em;color:#526578;font-weight:700;padding-top:5px}.explore-copy{display:grid;gap:7px;flex:1;min-width:0}.explore-copy strong{font-family:var(--site-display);font-size:clamp(1.3rem,2vw,1.8rem);font-weight:500;line-height:1.2}.explore-copy>span{font-size:.9rem;color:#475467;line-height:1.55}.explore-arrow{font-size:1.4rem;line-height:1.1;align-self:center}.explore-link:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}.public-hero.original-artwork .hero-background-image{object-position:center center}.public-hero.original-artwork.has-image::before{background:linear-gradient(90deg,rgba(8,18,29,.88),rgba(8,18,29,.43))}.public-hero.original-artwork::after{display:none}
+.section-heading{max-width:740px;margin-bottom:32px}.section-heading>p:last-child{color:#475467}.explore-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.explore-link{display:flex;align-items:flex-start;gap:16px;min-width:0;padding:clamp(18px,3vw,30px);border-top:2px solid var(--site-ink);background:#fff;color:var(--site-ink);text-decoration:none;transition:background .2s ease,transform .2s ease}.explore-link:hover{background:#f4f5f2;transform:translateY(-2px)}.explore-number{font-size:.75rem;letter-spacing:.1em;color:#526578;font-weight:700;padding-top:5px}.explore-copy{display:grid;gap:7px;flex:1;min-width:0}.explore-copy strong{font-family:var(--site-display);font-size:clamp(1.3rem,2vw,1.8rem);font-weight:500;line-height:1.2}.explore-copy>span{font-size:.9rem;color:#475467;line-height:1.55}.explore-arrow{font-size:1.4rem;line-height:1.1;align-self:center}.explore-link:focus-visible{outline:3px solid var(--site-accent);outline-offset:3px}
 .public-hero.has-image{background:#16373d}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.96) 0%,rgba(9,28,38,.78) 52%,rgba(9,28,38,.32) 100%)}.public-hero .intro{position:relative}.inquiry-form input:not([type=checkbox]):focus-visible,.inquiry-form textarea:focus-visible{outline-offset:2px}@media(max-width:700px){.explore-grid{grid-template-columns:1fr}.explore-link{padding:20px}.public-hero.has-image::before{background:linear-gradient(90deg,rgba(9,28,38,.94),rgba(9,28,38,.67))}}@media(max-width:375px){.mobile-menu[open] .mobile-links{grid-template-columns:1fr}.public-hero h1{font-size:clamp(2.1rem,11vw,3.2rem)}.hero-actions{align-items:stretch;gap:12px}.hero-button{justify-content:center}.explore-link{gap:12px}}\n .contact-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:24px;margin:24px 0;padding:22px 0;border-top:1px solid #e5e2d9;border-bottom:1px solid #e5e2d9}.contact-details h3{font-family:var(--site-display);font-size:1.3rem;font-weight:500;margin:0 0 6px}.contact-details p{white-space:pre-line;overflow-wrap:anywhere;margin:0}.admissions-status{border-left:3px solid var(--site-accent);padding:12px 18px;background:#fff}.admissions-next-steps{max-width:900px}.admissions-next-steps>p:not(.tag){color:#475467;line-height:1.75}.text-action{display:inline-flex;margin:12px 20px 8px 0;color:var(--site-ink);font-weight:700;text-underline-offset:5px}.public-next-step{margin-top:32px;font-weight:700}.public-next-step a{color:var(--site-ink);text-underline-offset:5px}.disclosure-item{border-top:1px solid #e5e2d9;padding:20px 0}.disclosure-item h3{font-family:var(--site-display);font-size:1.3rem;margin:0 0 8px}.disclosure-item p{margin:0;color:#475467;white-space:pre-line;overflow-wrap:anywhere}
 .community-section{margin-top:clamp(36px,8vw,108px)}.community-heading{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(230px,.7fr);gap:clamp(20px,5vw,90px);align-items:end;border-top:2px solid var(--site-ink);padding-top:30px;margin-bottom:34px}.community-heading h2{font-size:clamp(2rem,4.5vw,4.2rem);line-height:1.13;max-width:700px}.community-heading>p{color:var(--site-muted);font-size:1.06rem;line-height:1.8}.community-stories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(22px,5vw,72px)}.community-story{padding:28px 0;border-top:1px solid #cdd2cd;min-width:0}.community-story h3{font-family:var(--site-display);font-size:clamp(1.25rem,2.4vw,1.9rem);font-weight:500;line-height:1.25;margin:8px 0 12px}.community-story p:last-child{white-space:pre-line;overflow-wrap:anywhere;color:#475467;line-height:1.75}.story-index{margin:0;font-size:.76rem;letter-spacing:.12em;font-weight:700;color:var(--site-muted)}.community-photo{width:100%;max-height:580px;object-fit:cover;margin-bottom:34px}.community-section>.availability{margin-top:16px}@media(max-width:700px){.community-heading{grid-template-columns:1fr}.community-stories{grid-template-columns:1fr}.community-story{padding:24px 0}}
 .hero-subtitle{font-family:var(--site-display);font-size:clamp(1.5rem,3vw,2.85rem);font-weight:500;line-height:1.2;letter-spacing:-.028em;max-width:760px;margin:20px 0 20px;color:#fff}.public-hero h1{max-width:1100px}.public-hero.has-image .hero-subtitle{text-shadow:0 1px 12px rgba(0,0,0,.15)}
@@ -701,7 +696,7 @@ ${publicSiteTemplateCss}
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
-<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Local read-only preview. Run npm run dev to submit eligible inquiry forms."}</p>` : ""}\n  ${pageContent[path]}\n</main>
+<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>
 <footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
