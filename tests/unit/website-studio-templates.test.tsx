@@ -65,7 +65,7 @@ describe("Website Studio five-template contract", () => {
     });
     expect(html).toContain("--site-display:'Palatino Linotype'");
     expect(html).toContain("--site-body:Verdana");
-    expect(html).toContain("body{font-family:var(--site-body);");
+    expect(html).toContain("body{font-family:var(--site-body);color:var(--site-ink);background:var(--site-paper);");
     expect(html).toContain("body.template-modern .brand{font:800 .86rem/1.3 var(--site-display)");
     expect(html).toContain("var(--site-display);letter-spacing:-.075em");
     expect(html).not.toContain("body.template-modern{--site-display:var(--site-body)");
