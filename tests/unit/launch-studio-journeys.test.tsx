@@ -101,15 +101,20 @@ describe("student and staff Studio drafts", () => {
     expect(html).not.toContain("profile picture above");
   });
   it("saves staff notes separately from independently verified evidence", () => {
-    state.search = { step: "qualifications" };
+    state.search = { step: "details" };
     state.data = { ok: true, data: { workspace: { name: "Fixture staff", role: "teacher", canSubmitQualifications: true },
       draft: { revision: 1, savedAt: "2027-01-01", value: { audience: "staff", fields: { notes: "Ask about orientation" } } } } };
-    const html = render(Staff);
-    expect(html).toContain("Canonical qualification workspace");
-    expect(html).toContain("Ask about orientation");
-    expect(html).toContain("Save draft");
-    expect(html).not.toContain("I acknowledge");
-    expect(html).not.toContain("100%");
+    const details = render(Staff);
+    expect(details).toContain("Ask about orientation");
+    expect(details).toContain("Save draft");
+    expect(details).not.toContain("Canonical qualification workspace");
+    state.search = { step: "qualifications" };
+    const qualifications = render(Staff);
+    expect(qualifications).toContain("Canonical qualification workspace");
+    expect(qualifications).not.toContain("Ask about orientation");
+    expect(qualifications).toContain("Save draft");
+    expect(qualifications).not.toContain("I acknowledge");
+    expect(qualifications).not.toContain("100%");
   });
   it("does not mount an evidence workflow for unsupported staff roles", () => {
     state.search = { step: "qualifications" };
