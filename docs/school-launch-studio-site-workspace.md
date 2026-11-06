@@ -2,6 +2,29 @@
 Status: Product design specification · 2026-10-16
 Scope: Product specification with the source-verified implementation note below. No completed end-to-end journey or release approval is implied.
 
+## PR #271 cross-journey consistency pass (pending full validation)
+
+- School, Family, Student, Staff and Website Studio retain the shared standalone
+  Launch Studio shell and V6.1 semantic tokens. The focus of this PR is component
+  consistency and route ownership, not new authentication or academic commands.
+- Website Studio, template gallery, school-model selection and verified handoffs
+  use canonical buttons and form controls. Focused lint rules now enforce that
+  contract for migrated launch files; mobile Website Studio iframe preview uses
+  an actual 390px width instead of changing its label only.
+- The School Launch website step reports publishing/hosting readiness and takes
+  the administrator into the authorized Website Studio. Detailed iframe previews
+  are no longer duplicated in School Launch. The family-invitation handoff uses
+  the existing canonical School Launch step route.
+- Staff notes appear under Your details, not under every step; drafts continue
+  to save preparation notes separately from submitted qualification evidence.
+- Academic setup copy distinguishes asynchronous recorded learning from optional
+  scheduled live teaching and from the responsible instructor's verified Section
+  staffing assignment. This PR does **not** implement student-level selection of
+  instructional presenters; that requires its own product/domain contract.
+- Added focused source-level regression checks. A successful build, lint,
+  typecheck, visual acceptance or authenticated end-to-end completion must be
+  recorded against the final PR head before being claimed.
+
 ## November 5, 2026 implementation and verification
 
 - The shared four-audience frame now uses compact, expandable mobile step

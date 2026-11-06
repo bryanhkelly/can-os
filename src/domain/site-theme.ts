@@ -15,6 +15,21 @@ export type SitePaletteId = typeof sitePaletteIds[number];
 export const siteTypographyIds = ["editorial","traditional","contemporary"] as const;
 export type SiteTypographyId = typeof siteTypographyIds[number];
 
+export const siteFontCatalog = {
+  georgia: { label: "Georgia · editorial serif", css: "Georgia, Cambria, serif" },
+  cambria: { label: "Cambria · academic serif", css: "Cambria, Georgia, serif" },
+  palatino: { label: "Palatino · literary serif", css: "'Palatino Linotype', Palatino, 'Book Antiqua', serif" },
+  times: { label: "Times · classical serif", css: "'Times New Roman', Times, serif" },
+  arial: { label: "Arial · clean sans", css: "Arial, Helvetica, sans-serif" },
+  verdana: { label: "Verdana · open sans", css: "Verdana, Geneva, sans-serif" },
+  trebuchet: { label: "Trebuchet · humanist sans", css: "'Trebuchet MS', Arial, sans-serif" },
+  system: { label: "System · modern sans", css: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
+} as const;
+export type SiteFontId = keyof typeof siteFontCatalog;
+export function isSiteFontId(value: unknown): value is SiteFontId {
+  return typeof value === "string" && Object.hasOwn(siteFontCatalog, value);
+}
+
 export type ProposedChurchBrand = {
   siteId: string;
   sourceUrl: string;
@@ -63,7 +78,7 @@ export function contrastRatio(a: string,b: string): number {
   return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
 }
 
-export function resolveSiteTheme(paletteId?: string, typographyId?: string): SiteTheme {
+export function resolveSiteTheme(paletteId?: string, typographyId?: string, headingFontId?: SiteFontId, bodyFontId?: SiteFontId): SiteTheme {
   const palette = sitePaletteIds.includes(paletteId as SitePaletteId)
     ? paletteId as SitePaletteId : "signature";
   const typography = siteTypographyIds.includes(typographyId as SiteTypographyId)
@@ -75,7 +90,7 @@ export function resolveSiteTheme(paletteId?: string, typographyId?: string): Sit
     return resolveSiteTheme("signature","editorial");
   }
   return {paletteId:palette,typographyId:typography,...colors,
-    displayFont:type.display,bodyFont:type.body,onDark:"#ffffff"};
+    displayFont:isSiteFontId(headingFontId)?siteFontCatalog[headingFontId].css:type.display,bodyFont:isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body,onDark:"#ffffff"};
 }
 
 /** P may suggest but never publish. No network fetch or imported font binary. */

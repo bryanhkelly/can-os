@@ -41,6 +41,8 @@ jobs:
       - name: Verify route ownership contracts
         run: node scripts/check-platform-route-contracts.mjs --check
       - name: Verify route fixture contracts
+        id: route_fixtures
+        continue-on-error: true
         run: node scripts/check-route-fixture-coverage.mjs
       - name: Lint
         run: npm run lint
@@ -57,6 +59,14 @@ jobs:
             echo "::error::HOLD: migration artifacts changed during static verification."
             exit 1
           fi
+      # Route fixture coverage remains a required gate, but does not mask
+      # the independent lint, typecheck and unit test outcomes.
+      - name: Enforce route fixture audit after independent checks
+        if: ${{ !cancelled() && steps.route_fixtures.outcome == 'failure' }}
+        run: |
+          echo "::error::Route fixture coverage is incomplete. Other static verification steps were not short-circuited by this gate."
+          exit 1
+
       - name: Record verification scope
         if: always()
         shell: bash

@@ -48,9 +48,9 @@ export function LaunchOrientationTask({ launch, busy, save }: {
   }}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm font-semibold">Schedule the canonical orientation event</p>
-      <button type="button" onClick={useRecommendation} className="text-sm font-semibold underline">
+      <Button type="button" variant="ghost" onClick={useRecommendation} className="text-sm font-semibold underline">
         Use a suggested 45-minute time
-      </button>
+      </Button>
     </div>
     <p className="mt-2 text-xs text-muted-foreground">
       The suggestion only fills this form. Saving uses the existing orientation command and the Site timezone ({timezone}).

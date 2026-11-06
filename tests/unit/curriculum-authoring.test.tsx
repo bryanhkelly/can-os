@@ -35,6 +35,7 @@ vi.mock("@tanstack/react-start",()=>({
  }),
 }));
 vi.mock("@tanstack/react-router",()=>({
+ useBlocker:vi.fn(),
  createFileRoute:()=>(options:object)=>({options,useLoaderData:()=>state.data}),
  useRouter:()=>({invalidate:vi.fn()}),
  Link:({children}:{children:React.ReactNode})=><a>{children}</a>,

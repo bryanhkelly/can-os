@@ -82,3 +82,72 @@ describe("synthetic fixture manifest", () => {
     }
   });
 });
+
+const splitRoutesAddedIn271 = [
+  "/admin/invite",
+  "/admin/people",
+  "/admissions/intake/new",
+  "/operations/curriculum-marketplace/imports",
+  "/operations/curriculum-marketplace/resources",
+  "/operations/curriculum-marketplace/roster",
+  "/operations/curriculum/$courseId",
+  "/operations/curriculum/new",
+  "/operations/curriculum/publishing",
+  "/operations/family-alerts/compose",
+  "/operations/field-trips/$tripId",
+  "/operations/field-trips/new",
+  "/operations/interest-events/$eventId",
+  "/operations/interest-events/new",
+] as const;
+
+describe("PR 271 split-route contract evidence", () => {
+  it("declares all fourteen as backed workflows, not waived empty-state routes", () => {
+    expect(splitRoutesAddedIn271).toHaveLength(14);
+    for (const route of splitRoutesAddedIn271) {
+      const contract = manifest.routes[route];
+      expect(contract, route).toBeDefined();
+      expect(contract.fixtureRequired, route).not.toBe(false);
+      expect(contract.seeds?.length, route).toBeGreaterThan(0);
+      expect(Object.keys(contract.recordCounts ?? {}).length, route).toBeGreaterThan(0);
+      expect(contract.interactions?.length, route).toBeGreaterThan(0);
+      expect(Array.isArray(contract.downstreamRecords), route).toBe(true);
+    }
+  });
+
+  it("seeds canonical detail records rather than falsely declaring empty pages complete", () => {
+    for (const route of [
+      "/operations/field-trips", "/operations/field-trips/$tripId",
+      "/operations/interest-events", "/operations/interest-events/$eventId",
+    ]) {
+      const contract = manifest.routes[route];
+      expect(contract.seeds).toContain("split-route-detail-fixtures.sql");
+    }
+    const fixture = readFileSync("scripts/seeds/split-route-detail-fixtures.sql", "utf8");
+    expect(fixture).toContain("Refusing split-route fixtures outside the expected synthetic school");
+    expect(fixture).toMatch(/INSERT INTO field_trips/);
+    expect(fixture).toMatch(/INSERT INTO interest_events/);
+    expect(fixture).toMatch(/INSERT INTO scheduled_occurrences/);
+    expect(fixture).toMatch(/INSERT INTO calendar_events/);
+    expect(fixture.match(/ON CONFLICT \(id\) DO NOTHING/g)?.length).toBe(4);
+    expect(fixture).not.toContain("INSERT INTO field_trip_participants");
+    expect(fixture).not.toContain("INSERT INTO interest_event_registrations");
+  });
+
+  it("keeps route coverage a hard gate without short-circuiting code checks", () => {
+    for (const path of [
+      ".github/workflows/ci.yml",
+      ".github/workflows/fullflow-acceptance-pr.yml",
+    ]) {
+      const workflow = readFileSync(path, "utf8");
+      expect(workflow, path).toMatch(/id: route_fixtures\s+continue-on-error: true/);
+      expect(workflow, path).toContain("steps.route_fixtures.outcome == 'failure'");
+      const auditIndex = workflow.indexOf("id: route_fixtures");
+      expect(auditIndex, path).toBeGreaterThan(-1);
+      expect(workflow.indexOf("npm run typecheck"), path).toBeGreaterThan(auditIndex);
+      expect(workflow.indexOf("npm run lint"), path).toBeGreaterThan(auditIndex);
+      expect(workflow.indexOf("npm test"), path).toBeGreaterThan(auditIndex);
+      expect(workflow.indexOf("Enforce route fixture audit after independent checks"), path)
+        .toBeGreaterThan(workflow.indexOf("npm test"));
+    }
+  });
+});

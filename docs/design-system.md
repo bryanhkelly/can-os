@@ -24,8 +24,14 @@ The existing frontend already used Tailwind v4, class-variance-authority, React 
 New generic UI belongs in the existing shared folders and must have a Storybook story. Route-specific composition stays beside its owning feature. Do not copy a shared component into a route or persona folder to change its appearance; extend a semantic variant or compose it instead.
 
 Launch Studio uses a deliberate root-shell boundary for `/launch` and its children,
-not CSS-hidden workspace controls. All four journeys share the same PageFrame,
-PageHeader, semantic tokens and responsive rails. Draft-save feedback distinguishes
+not CSS-hidden workspace controls. School, Family, Student, Staff and Website design
+share the same PageFrame, PageHeader, semantic tokens and responsive rails.
+PR #271 aligns their authored controls with the canonical Button, Input, Select,
+Textarea, Checkbox and Label primitives, including the school handoffs and model
+picker. The School Launch website step now owns status and verified handoff only;
+Website Studio owns actual desktop/mobile previews. Scoped ESLint enforcement
+prevents reintroducing local native controls in these migrated surfaces. This
+code-level update is not an authenticated end-to-end or visual release certificate. Draft-save feedback distinguishes
 a private saved form snapshot from submission or approval. See
 [implemented boundaries and verification](./school-launch-studio-site-workspace.md#november-5-2026-implementation-and-verification).
 

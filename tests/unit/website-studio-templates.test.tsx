@@ -54,15 +54,45 @@ describe("Website Studio five-template contract", () => {
     }
   });
 
+  it("honors an explicit heading font in Modern and uses only defined background tokens", () => {
+    const html = renderPublicSiteHtml({
+      host: "fictional.can-os.com",
+      site: { name: "Example School", organizationName: "Example Church" },
+      offerings: [], localContent: { ...emptySiteLocalContent, branding: {
+        ...emptySiteLocalContent.branding, templateId: "modern",
+        headingFontId: "palatino", bodyFontId: "verdana",
+      } },
+    });
+    expect(html).toContain("--site-display:'Palatino Linotype'");
+    expect(html).toContain("--site-body:Verdana");
+    expect(html).toContain("body{font-family:var(--site-body);color:var(--site-ink);background:var(--site-paper);");
+    expect(html).toContain("body.template-modern .brand{font:800 .86rem/1.3 var(--site-display)");
+    expect(html).toContain("var(--site-display);letter-spacing:-.075em");
+    expect(html).not.toContain("body.template-modern{--site-display:var(--site-body)");
+    expect(html).not.toContain("var(--site-canvas");
+  });
+
+  it("keeps Modern Academy's sans-serif heading when no explicit font override exists", () => {
+    const html = renderPublicSiteHtml({
+      host: "fictional.can-os.com", site: { name: "Modern School", organizationName: "Church" },
+      offerings: [], localContent: { ...emptySiteLocalContent, branding: {
+        ...emptySiteLocalContent.branding, templateId: "modern",
+      } },
+    });
+    expect(html).toContain("--site-display:Arial, Helvetica, sans-serif");
+    expect(html).toContain("--site-body:Arial, Helvetica, sans-serif");
+  });
+
   it("uses semantic, accessible buttons and exactly one choice per template",()=>{
     const html=renderToStaticMarkup(<WebsiteTemplateGallery schoolName="Sample Academy" value="heritage"
       onChange={()=>{}}/>);
-    expect((html.match(/aria-pressed=/g)??[]).length).toBe(5);
+    expect((html.match(/aria-pressed=/g)??[]).length).toBe(7);
     expect(html).toContain("Heritage Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Modern Academy");
     expect(html).toContain("Bright Futures");
     expect(html).toContain("Summit Preparatory");
     expect(html).toContain('aria-label="School website templates"');
+    expect((html.match(/Larger preview of/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
 });

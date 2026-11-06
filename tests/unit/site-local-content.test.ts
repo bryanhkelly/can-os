@@ -185,6 +185,28 @@ describe("PUB-18: distributed church website ownership", () => {
     expect(html).not.toContain("src=\"https:");
   });
 
+  it("allows unfinished image approvals only in an explicitly private draft", () => {
+    const unfinished = { ...churchCopy, branding: {
+      theme: "classic" as const, heroImage: {
+        dataUrl: pngDataUrl(), altText: "", rightsConfirmed: false,
+        childImageConsent: "unconfirmed" as const,
+      },
+    } };
+    const draft = normalizeSiteLocalContent(unfinished, { allowIncompleteImage: true });
+    expect(draft.branding.heroImage).toMatchObject({
+      altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed",
+    });
+    expect(() => normalizeSiteLocalContent(draft)).toThrow(/Describe/);
+    expect(() => normalizeSiteLocalContent({
+      ...unfinished, branding: { ...unfinished.branding,
+        heroImage: { ...unfinished.branding.heroImage, dataUrl: "https://example.test/photo.jpg" } },
+    }, { allowIncompleteImage: true })).toThrow(/PNG/);
+    expect(() => normalizeSiteLocalContent({
+      ...unfinished, branding: { ...unfinished.branding,
+        heroImage: { ...unfinished.branding.heroImage, dataUrl: pngDataUrl(true) } },
+    }, { allowIncompleteImage: true })).toThrow(/metadata/);
+  });
+
   it("rejects missing image rights, unconfirmed child consent and remote images", () => {
     for (const image of [
       { dataUrl: pngDataUrl(), altText: "Artwork", rightsConfirmed: false,

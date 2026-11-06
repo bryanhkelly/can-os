@@ -9,6 +9,9 @@ import { normalizeClientError } from "@/lib/client-error";
 import { resolveLaunchResume } from "@/domain/launch-resume";
 import { Link, useRouter } from "@tanstack/react-router";
 import { StatusBadge } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   buildLaunchGuidance,
   launchOwnershipLabel,
@@ -171,8 +174,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         School setup, published pages, family invitations, accepted applications, and active enrollments do not independently authorize opening.
       </p>}
     </section>
-    {launches.length > 1 && <label className="mt-4 block max-w-md text-sm">Resume a school launch
-      <select value={launch.id} onChange={event => {
+    {launches.length > 1 && <Label className="mt-4 block max-w-md text-sm">Resume a school launch
+      <Select value={launch.id} onChange={event => {
         const selected = launches.find(item => item.id === event.target.value);
         void router.navigate({
           to: "/launch/school",
@@ -180,15 +183,15 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         });
       }} className="mt-1 block w-full rounded-lg border bg-background p-2">
         {launches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
-    </label>}
+      </Select>
+    </Label>}
     {error && <div role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">
       <p>{error}</p>
-      <button type="button" disabled={openingSaving} className="mt-3 min-h-11 rounded-lg border px-4 py-2 font-semibold"
+      <Button variant="outline" type="button" disabled={openingSaving} className="mt-3 min-h-11 rounded-lg border px-4 py-2 font-semibold"
         onClick={() => { void router.invalidate().then(() => { setError(""); setActivationNeedsRefresh(false); }).catch(() =>
           setError("Unable to refresh the saved launch. Reopen this school from Launch before attempting activation again.")); }}>
         Refresh recorded launch status (do not reactivate)
-      </button>
+      </Button>
     </div>}
     <MutationFeedback state={mutation} pendingMessage="Saving launch progress…"/>
     {launch.status === "active" && launch.siteId && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">

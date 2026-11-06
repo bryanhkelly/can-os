@@ -99,6 +99,37 @@ describe("private launch drafts", () => {
     expect(html).toContain("Submit application");
     expect(html).not.toContain('aria-label="Setup progress"');
   });
+  it("keeps the school website step a status handoff and leaves private previews to Website Studio", () => {
+    const launchWebsite = source("src/components/operations/LaunchWebsiteStep.tsx");
+    const websiteEditor = source("src/routes/site-website.tsx");
+    expect(launchWebsite).toContain("LaunchWebsiteEditorHandoff");
+    expect(launchWebsite).not.toContain("<iframe");
+    expect(launchWebsite).not.toContain("previewPages");
+    expect(websiteEditor).toContain("<WebsitePreviewPanel");
+    expect(websiteEditor).toContain('device === "mobile" ? 390 : undefined');
+  });
+  it("renders staff preparation notes only with the staff details step", () => {
+    const staff = source("src/routes/launch.staff.tsx");
+    const details = staff.indexOf('{step === "details" && <>');
+    const notes = staff.indexOf('id="staff-launch-notes"');
+    const qualifications = staff.indexOf('<LaunchStudioStepContent active={step === "qualifications"}');
+    expect(details).toBeGreaterThan(-1);
+    expect(notes).toBeGreaterThan(details);
+    expect(qualifications).toBeGreaterThan(notes);
+    expect(staff.match(/id="staff-launch-notes"/g)).toHaveLength(1);
+  });
+  it("keeps recorded instruction distinct from scheduled live teaching and Section staffing", () => {
+    const delivery = source("src/components/operations/LaunchDeliveryModelFields.tsx");
+    const academics = source("src/components/operations/LaunchAcademicSetupWorkspace.tsx");
+    expect(delivery).toContain("Scheduled live teaching (optional)");
+    expect(delivery).toContain("Recorded or self-paced learning");
+    expect(delivery).toContain("live help for questions");
+    expect(academics).toContain("Instruction and support readiness");
+    expect(academics).toContain("administrative assignment does not select the presenter");
+    expect(academics).toContain("Responsible Section instructor");
+    expect(academics).not.toContain("Next: choose your teachers");
+  });
+
   it("does not turn a no-longer-accessible saved student into a new student", () => {
     const html = renderToStaticMarkup(<GuardianApplicationForm embedded draftContext="program:invite"
       programs={[{ id: "program", name: "School", schoolYears: [{ id: "year", name: "2027" }] }]}

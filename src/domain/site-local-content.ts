@@ -1,4 +1,4 @@
-import { sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
+import { isSiteFontId, type SiteFontId, sitePaletteIds, siteTypographyIds, siteTemplateIds, type SitePaletteId, type SiteTypographyId, type SiteTemplateId } from "./site-theme";
 /**
  * PUB-18 local website copy belongs to the Site's church partner, not to CAN.
  * CAN-owned academic, admissions, tuition and institutional facts are not
@@ -47,6 +47,17 @@ export type SiteLocalImage = {
   rightsConfirmed: boolean;
   childImageConsent: SiteLocalImageConsent;
 };
+
+/** Missing publication requirements do not prevent a private, unfinished draft. */
+export function siteLocalImagePublicationGaps(image: SiteLocalImage | null): string[] {
+  if (!image) return [];
+  const gaps: string[] = [];
+  if (!image.altText.trim()) gaps.push("Describe the website artwork for screen readers");
+  if (!image.rightsConfirmed) gaps.push("Confirm that you have rights to publish this artwork");
+  if (image.childImageConsent === "unconfirmed")
+    gaps.push("Confirm child-image privacy or documented guardian consent");
+  return gaps;
+}
 export type SiteLocalBranding = {
   theme: SiteLocalTheme;
   /** Structural template is versioned with local branding, not Program facts. */
@@ -55,6 +66,8 @@ export type SiteLocalBranding = {
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
   typographyId?: SiteTypographyId;
+  headingFontId?: SiteFontId;
+  bodyFontId?: SiteFontId;
 };
 export type SiteLocalContent = SiteLocalTextContent & {
   branding: SiteLocalBranding;
@@ -261,7 +274,7 @@ function validateInlinePng(dataUrl: string): void {
 export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   branding?: SiteLocalBranding | null;
   editorialBaseline?: SiteEditorialBaseline;
-}): SiteLocalContent {
+}, options: { allowIncompleteImage?: boolean } = {}): SiteLocalContent {
   const result = {} as SiteLocalContent;
   for (const field of Object.keys(siteLocalContentLimits) as SiteLocalTextField[]) {
     result[field] = normalizeText(input[field] ?? "", field);
@@ -274,25 +287,28 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if (!sitePaletteIds.includes(paletteId) || !siteTypographyIds.includes(typographyId) || !siteTemplateIds.includes(templateId)) {
     throw new Error("Choose approved school visual identity options");
   }
+  if ((branding.headingFontId !== undefined && !isSiteFontId(branding.headingFontId)) ||
+      (branding.bodyFontId !== undefined && !isSiteFontId(branding.bodyFontId))) throw new Error("Choose approved school fonts");
+  const fontOverrides = { ...(branding.headingFontId ? {headingFontId:branding.headingFontId} : {}), ...(branding.bodyFontId ? {bodyFontId:branding.bodyFontId} : {}) };
   const image = branding.heroImage;
   if (image) {
     validateInlinePng(image.dataUrl);
     const altText = normalizeText(image.altText, "welcomeMessage");
-    if (!altText || altText.length > 180) throw new Error("Describe the website artwork for screen readers");
-    if (image.rightsConfirmed !== true) {
-      throw new Error("Confirm that you have rights to publish this artwork");
+    if (altText.length > 180) throw new Error("Describe the website artwork in 180 characters or fewer");
+    if (typeof image.rightsConfirmed !== "boolean" ||
+        !siteLocalImageConsentStates.includes(image.childImageConsent)) {
+      throw new Error("Choose valid artwork permissions and child-image consent");
     }
-    if (image.childImageConsent !== "no_identifiable_children" &&
-      image.childImageConsent !== "guardian_consent_confirmed") {
-      throw new Error("Confirm that no identifiable children appear or that guardian consent is documented");
-    }
+    const validatedImage = { dataUrl: image.dataUrl, altText,
+      rightsConfirmed: image.rightsConfirmed, childImageConsent: image.childImageConsent };
+    const gaps = siteLocalImagePublicationGaps(validatedImage);
+    if (!options.allowIncompleteImage && gaps.length) throw new Error(gaps[0]);
     result.branding = {
-      theme: branding.theme, paletteId, typographyId, templateId,
-      heroImage: { dataUrl: image.dataUrl, altText, rightsConfirmed: true,
-        childImageConsent: image.childImageConsent },
+      theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides,
+      heroImage: validatedImage,
     };
   } else {
-    result.branding = { theme: branding.theme, paletteId, typographyId, templateId, heroImage: null };
+    result.branding = { theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides, heroImage: null };
   }
   if (input.editorialBaseline) {
     const baseline = input.editorialBaseline;

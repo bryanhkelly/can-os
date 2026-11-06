@@ -1,71 +1,82 @@
-import {useEffect,useState} from "react";
-import {Link} from "@tanstack/react-router";
-import {getLaunchWebsitePreparation} from "@/modules/programs/launch-website.functions";
-import {LaunchWebsiteEditorHandoff} from "./LaunchWebsiteEditorHandoff";
-type Website=Awaited<ReturnType<typeof getLaunchWebsitePreparation>>;
+import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { getLaunchWebsitePreparation } from "@/modules/programs/launch-website.functions";
+import { LaunchWebsiteEditorHandoff } from "./LaunchWebsiteEditorHandoff";
 
-export function LaunchWebsiteStep({programId}:{programId:string}){
- return <WebsiteStep key={programId} programId={programId}/>;
-}
-function WebsiteStep({programId}:{programId:string}){
- const [data,setData]=useState<Website|null>(null),[error,setError]=useState("");
- const [retry,setRetry]=useState(0);
- useEffect(()=>{let current=true;
-  void getLaunchWebsitePreparation({data:{programId}}).then(result=>{if(current){setData(result);setError("");}})
-   .catch(()=>{if(current){setData(null);setError("The private website preview could not be loaded. Check your school access and retry.");}});
-  return()=>{current=false;};
- },[programId,retry]);
- return <section id="launch-website" aria-label="Prepare your school website" className="mt-5 rounded-xl border bg-card p-5">
-  <p className="text-xs font-semibold uppercase text-muted-foreground">School preparation · Website</p>
-  <h2 className="mt-1 font-serif text-2xl">Your school website</h2>
-  {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-  {data?<LaunchWebsitePreview data={data}/>:!error&&<p role="status" className="mt-3 text-sm">Preparing a private preview from the school's saved records…</p>}
-  <button type="button" onClick={()=>{setData(null);setError("");setRetry(value=>value+1);}} className="mt-3 rounded border px-3 py-2 text-sm">Refresh verified website status</button>
- </section>;
-}
-export function LaunchWebsitePreview({data}:{data:Website}){
- const [selectedPage,setSelectedPage]=useState("/");
- const previewPages=data.previewPages??{};
- const previewHtml=previewPages[selectedPage]??data.previewHtml;
- return <>
-  <p className="mt-2 text-sm">Review {data.programName}'s school page here. Church-owned welcome and community copy is edited by your assigned website editor; institutional claims follow their separate approval process.</p>
-  <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"}</p>
-  <p role="status" className="mt-2 rounded border p-3 text-sm">Public website: <strong>{data.publicAvailability==="live"?"Live — HTTPS verified":data.publicAvailability==="not_published"?"Not published":data.publicAvailability==="hosting_disabled"?"Hosting not configured":"Published but not reachable"}</strong>{data.checkedAt?` · Checked ${new Date(data.checkedAt).toLocaleString()}`:""}.</p>
-  {data.host&&data.publicAvailability==="live"&&<a href={`https://${data.host}/`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline">Open verified public website</a>}
-  {data.publicAvailability!=="live"&&<p role="status" className="mt-2 rounded border p-3 text-sm"><strong>Next step: </strong>{data.publicAvailability==="not_published"
-    ? "Finish your welcome page, then ask your authorized publisher to review it. You can invite families while publication is pending."
-    : "Ask your CAN contact to finish connecting your school website address. You can continue preparing your page and inviting families in the meantime."}</p>}
+type Website = Awaited<ReturnType<typeof getLaunchWebsitePreparation>>;
 
-  {data.includesSuggestions&&<p className="mt-3 rounded border p-3 text-sm">This private preview includes suggested local welcome copy or a planned school listing. Suggestions are not saved editorial revisions or approved public claims.</p>}
-  <div className="mt-4 rounded-xl border bg-background p-4">
-    <h3 className="font-serif text-xl">Your school's photos — one folder, no individual selections</h3>
-    <p className="mt-2 text-sm text-muted-foreground">
-      During school website setup, your authorized church editor can point CAN OS to a photo folder.
-      The shared media engine will automatically propose placements across Home, About, Academics,
-      Student Life, Campus and Families. The church reviews rights and child-image permissions once
-      for the imported files; unapproved or missing photos use the CAN original artwork collection.
-    </p>
-    <p className="mt-2 text-xs text-muted-foreground">
-      A saved folder is private until explicit media approval. This step is optional and never
-      substitutes for legal authority to open or the institutional publisher's review.
-    </p>
-    <div className="mt-3"><LaunchWebsiteEditorHandoff siteId={data.siteId} programId={data.programId}/></div>
-  </div>
-  {Object.keys(previewPages).length>0&&<nav aria-label="Preview school website pages" className="mt-4 flex flex-wrap gap-2">
-    {Object.keys(previewPages).map(path=><button type="button" key={path}
-      aria-pressed={selectedPage===path} onClick={()=>setSelectedPage(path)}
-      className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
-      {path==="/"? "Home":path.slice(1).replace(/-/g," ")}
-    </button>)}
-  </nav>}
-  {previewHtml&&<iframe key={selectedPage} title={`${data.programName} ${selectedPage} private school website preview`} srcDoc={previewHtml}
-   sandbox="" referrerPolicy="no-referrer" className="mt-4 h-[34rem] w-full rounded-lg border bg-white"/>}
-  <nav aria-label="School website preparation" className="mt-4 flex flex-wrap gap-4 text-sm">
-   <LaunchWebsiteEditorHandoff siteId={data.siteId} programId={data.programId}/>
-   <Link to="/admin" search={{siteId:data.siteId,inviteRole:"site_website_editor"}} className="underline">Invite your church website editor</Link>
-   <Link to="/sites/$siteId/publish" params={{siteId:data.siteId}} className="underline">Review address and institutional publishing</Link>
-  </nav>
-  <p className="mt-3 text-xs text-muted-foreground">Editor and publisher access are independently verified. This preview does not publish the website or open admissions.</p>
-  <a href="#invite-families" className="mt-4 inline-block rounded bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">Continue to family invitations →</a>
- </>;
+/** School Launch owns readiness and access; Website Studio owns authoring and previews. */
+export function LaunchWebsiteStep({ programId }: { programId: string }) {
+  return <WebsiteStep key={programId} programId={programId} />;
+}
+
+function WebsiteStep({ programId }: { programId: string }) {
+  const [data, setData] = useState<Website | null>(null);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let current = true;
+    void getLaunchWebsitePreparation({ data: { programId } })
+      .then(result => { if (current) { setData(result); setError(""); } })
+      .catch(() => { if (current) { setData(null); setError("School website status could not be loaded. Check your access and retry."); } });
+    return () => { current = false; };
+  }, [programId, retry]);
+
+  return <section id="launch-website" aria-label="Prepare your school website" className="mt-5 border bg-card p-5">
+    <p className="text-xs font-semibold uppercase text-muted-foreground">School preparation · Website</p>
+    <h2 className="mt-1 font-serif text-2xl">Your school website</h2>
+    {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {data ? <LaunchWebsitePreview data={data} /> :
+      !error && <p role="status" className="mt-3 text-sm">Checking the school's saved website records…</p>}
+    <Button type="button" variant="outline" size="sm" className="mt-4"
+      onClick={() => { setData(null); setError(""); setRetry(value => value + 1); }}>
+      Refresh website status
+    </Button>
+  </section>;
+}
+
+export function LaunchWebsitePreview({ data }: { data: Website }) {
+  const availability = data.publicAvailability === "live" ? "Live, HTTPS verified"
+    : data.publicAvailability === "not_published" ? "Not published"
+    : data.publicAvailability === "hosting_disabled" ? "Hosting not configured"
+    : "Published but not reachable";
+  return <div className="mt-4 space-y-4 text-sm">
+    <p>Use Website Studio to choose a template, prepare school-owned photos and copy, review desktop/mobile pages, and save a private draft. Publishing requires the exact Site editor authorization.</p>
+    <dl className="grid gap-3 border bg-background p-4 sm:grid-cols-2">
+      <div><dt className="text-xs text-muted-foreground">School site</dt>
+        <dd className="mt-1 font-semibold">{data.programName}</dd></div>
+      <div><dt className="text-xs text-muted-foreground">Reserved address</dt>
+        <dd className="mt-1 break-all font-semibold">{data.host || "Not reserved"}</dd></div>
+      <div><dt className="text-xs text-muted-foreground">Content status</dt>
+        <dd className="mt-1 font-semibold">{data.status === "published" ? "Church content published" : "Private preparation"}</dd></div>
+      <div><dt className="text-xs text-muted-foreground">Public availability</dt>
+        <dd className="mt-1 font-semibold">{availability}</dd></div>
+    </dl>
+    {data.publicAvailability !== "live" && <p role="status" className="border p-3">
+      {data.publicAvailability === "not_published"
+        ? "Finish and review your school website in Website Studio. Family invitations can continue while publication is pending."
+        : "Ask CAN to verify the public address. Website preparation and family invitations can continue separately."}
+    </p>}
+    {data.includesSuggestions && <p className="border p-3 text-muted-foreground">
+      Suggested wording remains private until separately reviewed and saved. It is not approved school information.
+    </p>}
+    <div className="border bg-background p-4">
+      <h3 className="font-serif text-xl">School photography</h3>
+      <p className="mt-2 text-muted-foreground">Use Website Studio's photo-folder workflow. Image rights and child consent must be confirmed before public use. Missing school photos are not replaced with generated artwork.</p>
+    </div>
+    <nav aria-label="School website preparation" className="flex flex-wrap items-center gap-4">
+      <LaunchWebsiteEditorHandoff siteId={data.siteId} programId={data.programId} />
+      <Link to="/admin" search={{ siteId: data.siteId, inviteRole: "site_website_editor" }}
+        className="min-h-11 content-center font-semibold text-primary underline">Invite a website editor</Link>
+      <Link to="/sites/$siteId/publish" params={{ siteId: data.siteId }}
+        className="min-h-11 content-center font-semibold text-primary underline">Institutional publishing review</Link>
+    </nav>
+    {data.host && data.publicAvailability === "live" && <a href={`https://${data.host}/`}
+      target="_blank" rel="noopener noreferrer" className="inline-block font-semibold text-primary underline">
+      View the verified public website
+    </a>}
+    <p className="text-xs text-muted-foreground">Editing, publishing and school-opening approvals are separate, server-verified actions.</p>
+    <Button asChild variant="outline"><Link to="/launch/school" search={{ siteId: data.siteId, programId: data.programId, step: "families" }}>Continue to family invitations</Link></Button>
+  </div>;
 }

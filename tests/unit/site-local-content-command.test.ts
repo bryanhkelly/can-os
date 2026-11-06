@@ -119,6 +119,26 @@ describe("transactional church-local publication", () => {
     expect(state.emit).toHaveBeenCalledOnce();
   });
 
+  it("saves unfinished private artwork but refuses to publish it", async () => {
+    const unfinished = { ...copy, branding: { ...copy.branding, heroImage: {
+      dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO/9sZcAAAAASUVORK5CYII=",
+      altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed" as const,
+    } } };
+    state.rows.push([{ siteId: "site-a" }], []);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "draft", expectedRevision: 0, content: unfinished,
+    })).resolves.toMatchObject({ status: "draft", revision: 1 });
+    expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value)
+      .toMatchObject({ status: "draft", content: unfinished });
+
+    state.inserts = [];
+    state.rows.push([{ siteId: "site-a" }], [revision(1, unfinished, "draft")]);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "save", expectedRevision: 1, content: unfinished,
+    })).rejects.toThrow(/Describe the website artwork/);
+    expect(state.inserts).toHaveLength(0);
+  });
+
   it("rechecks protected claims on publishing a previously private draft", async () => {
     const proposal = { ...copy, localDescription: "We are fully accredited.",
       branding: { ...copy.branding, templateId: "modern" as const } };

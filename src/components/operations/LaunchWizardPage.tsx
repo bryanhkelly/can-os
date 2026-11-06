@@ -432,23 +432,23 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           </p>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {currentSchool?.status==="active"
-              ? <Link to="/home" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
-                  className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open school operations</Link>
+              ? <Button asChild><Link to="/home" search={{siteId:currentSchool.siteId,programId:currentSchool.id}}
+                  >Open school operations</Link></Button>
               : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.requiresRegistrarReview
-                ? <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
+                ? <Button asChild><Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
-                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review evidence requirement</Link>
+                    >Review evidence requirement</Link></Button>
               : currentLaunch && pendingSchoolAction && !awaitingCan && !openingReview && nextTask?.action==="admissions"
-                ? <Link to="/admissions/intake" search={{siteId:currentLaunch.siteId??undefined,programId:currentLaunch.id}}
-                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review authorized family intake</Link>
+                ? <Button asChild><Link to="/admissions/intake" search={{siteId:currentLaunch.siteId??undefined,programId:currentLaunch.id}}
+                    >Review authorized family intake</Link></Button>
               : currentLaunch && pendingSchoolAction && !awaitingCan && nextTask?.action==="orientation"
-                ? <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
+                ? <Button asChild><Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
-                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Complete orientation setup</Link>
+                    >Complete orientation setup</Link></Button>
               : currentLaunch && pendingSchoolAction && !awaitingCan && !openingReview && nextTask?.action==="academics"
-                ? <Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
+                ? <Button asChild><Link to="/launch/school/$programId" params={{programId:currentLaunch.id}}
                     search={{siteId:currentLaunch.siteId??undefined,programId:undefined}}
-                    className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Continue academic preparation</Link>
+                    >Continue academic preparation</Link></Button>
               : <Button type="button" onClick={() => changeStep(!currentProgram ? "school" : "readiness")}>
                   {needsSchoolChoice?"Choose a saved school":!currentProgram?"Set up school and Program":!currentLaunch?"Review preparation":needsEvidenceCorrection?"Review requested correction":awaitingCan?"See CAN review status":waitingExternal?"Review external dependency":openingReview?"Review activation checks":blockedTask?"Inspect blocker":"Review next requirement"}
                 </Button>}

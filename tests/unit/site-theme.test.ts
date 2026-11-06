@@ -77,3 +77,12 @@ describe("PX-B curated visual identities",()=>{
     expect(resolveSiteTheme().displayFont).not.toContain("UnlicensedBrandFace");
   });
 });
+
+it("preserves independent approved fonts and rejects arbitrary CSS values",()=>{
+ const content=normalizeSiteLocalContent({...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding,headingFontId:"palatino",bodyFontId:"verdana"}});
+ expect(content.branding.headingFontId).toBe("palatino");
+ expect(content.branding.bodyFontId).toBe("verdana");
+ const theme=resolveSiteTheme("heritage","editorial","palatino","verdana");
+ expect(theme.displayFont).toContain("Palatino"); expect(theme.bodyFont).toContain("Verdana");
+ expect(()=>normalizeSiteLocalContent({...emptySiteLocalContent,branding:{...emptySiteLocalContent.branding,headingFontId:"url(evil)" as any}})).toThrow("approved school fonts");
+});

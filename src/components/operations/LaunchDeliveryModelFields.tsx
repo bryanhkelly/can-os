@@ -1,6 +1,7 @@
 import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
 import { Checkbox } from "@/components/ui/choice";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }: {
   onsite: boolean; setOnsite: (value: boolean) => void;
@@ -14,20 +15,20 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                   How students will learn
                 </legend>
                 <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                  <label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
+                  <Label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
                     <Checkbox checked={onsite} onChange={(e) => setOnsite(e.target.checked)} />
                     In person
-                  </label>
-                  <label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
+                  </Label>
+                  <Label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
                     <Checkbox checked={liveOnline} onChange={(e) => setLiveOnline(e.target.checked)} />
-                    Live online
-                  </label>
-                  <label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
+                    Scheduled live teaching (optional)
+                  </Label>
+                  <Label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
                     <Checkbox checked={asynchronous} onChange={(e) => setAsynchronous(e.target.checked)} />
-                    At your own pace
-                  </label>
+                    Recorded or self-paced learning
+                  </Label>
                   {onsite && (
-                    <label className="flex items-center gap-2 text-xs">
+                    <Label className="flex items-center gap-2 text-xs">
                       In-person days per week
                       <Input
                         aria-label="Onsite days per week"
@@ -38,12 +39,11 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                         value={onsiteDaysPerWeek}
                         onChange={(e) => setOnsiteDaysPerWeek(e.target.value)}
                       />
-                    </label>
+                    </Label>
                   )}
                 </div>
                 <LaunchFieldHelp label="About learning formats">
-                  Choose every format you plan to offer. Live online means classes with a teacher at a scheduled time;
-                  at your own pace means learning without a live class. Days per week are planning only; set your actual calendar in Academics.
+                  Choose the formats this Program actually offers. Recorded or self-paced learning does not require a live lecture. Scheduled live teaching means a real-time class, not live help for questions. For asynchronous instruction with live support only, leave scheduled live teaching off. In-person days and teaching schedules are configured separately.
                 </LaunchFieldHelp>
               </fieldset>
   );

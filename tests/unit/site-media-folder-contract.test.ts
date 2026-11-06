@@ -48,7 +48,7 @@ describe("school media folder end-to-end contracts",()=>{
     expect(classifyPublicSiteRequest(host+"/media/"+image,"POST",true).kind)
       .toBe("deny");
   });
-  it("automatically composes approved photos and leaves room for fallback art",()=>{
+  it("composes approved school photos and does not invent unapproved fallback artwork",()=>{
     const approved:SiteMediaPhoto={id:image,siteId:site,tags:["school","community"],
       width:1800,height:1200,altText:"Decorative photo from the school's media folder",
       rightsStatus:"approved",subjectReleaseStatus:"not_required",
@@ -64,11 +64,11 @@ describe("school media folder end-to-end contracts",()=>{
     const about=renderPublicSiteHtml({...page,localContent:{
       ...emptySiteLocalContent,localDescription:"A local community story.",
     }},{path:"/about"});
-    expect(about).toContain("original-artwork");
+    expect(about).not.toContain("original-artwork");
     const malicious=renderPublicSiteHtml({...page,media:{hero:{...media.hero!,
       src:"https://other-school.can-os.com/media/"+image}}});
     expect(malicious).not.toContain("other-school.can-os.com/media");
-    expect(malicious).toContain("original-artwork");
+    expect(malicious).not.toContain("original-artwork");
     expect(planSchoolSiteMedia(site,[{...approved,rightsStatus:"revoked"}]).assignments).toEqual([]);
   });
 });

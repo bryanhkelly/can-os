@@ -1,3 +1,4 @@
+vi.mock("@/modules/sites/site-media-folder.server",()=>({readApprovedSchoolSitePhotos:async()=>[]}));
 import {beforeEach,describe,expect,it,vi} from "vitest";
 const state=vi.hoisted(()=>({rows:[] as any[],actor:{} as any,catalog:vi.fn(),local:vi.fn(),requireActor:vi.fn()}));
 vi.mock("@/db/client",()=>({db:{select:()=>{const query:any={from:()=>query,innerJoin:()=>query,where:()=>query,for:()=>query,limit:async()=>state.rows.shift()??[]};return query;}}}));
