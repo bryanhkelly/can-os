@@ -105,6 +105,7 @@ describe("class request reconciliation", () => {
     expect(state.submit).toHaveBeenCalledTimes(1);
     expect(render().find(node => node.type === "fieldset")?.props.disabled).toBe(false);
     title(render()).props.onChange!({ target: { value: "Physics" } });
+    completeRequiredFields();
     await submit();
     const first = state.submit.mock.calls[0][0].data.requestId;
     expect(state.submit.mock.calls[1][0].data.requestId).not.toBe(first);
