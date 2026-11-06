@@ -56,9 +56,9 @@ export function LaunchStudioShell({ role, subject, title, description, steps, cu
         <nav id="launch-step-navigation" className={cn("mt-5 border-t pt-4 xl:block", !navigationOpen && "hidden")} aria-label="Launch steps">
           <ol className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
             {steps.map((step, position) => <li key={step.id}>
-              <button type="button" disabled={step.disabled} onClick={() => { onStepChange(step.id); setNavigationOpen(false); }}
+              <Button type="button" variant="ghost" disabled={step.disabled} onClick={() => { onStepChange(step.id); setNavigationOpen(false); }}
                 aria-current={step.id === currentId ? "step" : undefined}
-                className={cn("flex min-h-11 w-full items-center gap-3 border-l-2 border-transparent px-2 py-3 text-left text-xs",
+                className={cn("flex min-h-11 w-full items-center justify-start gap-3 border-l-2 border-transparent px-2 py-3 text-left text-xs",
                   step.id === currentId && "border-primary bg-accent font-semibold",
                   step.disabled && "cursor-not-allowed opacity-50")}>
                 <span className={cn("flex size-7 shrink-0 items-center justify-center border text-xs",
@@ -67,7 +67,7 @@ export function LaunchStudioShell({ role, subject, title, description, steps, cu
                   {step.complete ? <Check className="size-4" aria-label="Recorded complete" /> : position + 1}
                 </span>
                 <span>{step.title}</span>
-              </button>
+              </Button>
             </li>)}
           </ol>
         </nav>
