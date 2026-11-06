@@ -85,6 +85,7 @@ export default tseslint.config(
       "src/components/operations/LaunchConfigurationForm.tsx",
       "src/components/operations/LaunchWizardPage.tsx",
       "src/components/operations/LaunchAcademicSetupWorkspace.tsx",
+      "src/components/operations/{SchoolPreparationNavigation,LaunchCreatedHandoff,LaunchPortfolio}.tsx",
       // Launch Studio is migrated to canonical UI controls, not route-local native widgets.
       "src/components/launch-studio/{LaunchStudioShell,LaunchStudioEntry,LaunchFieldHelp,LaunchDraftButton,WebsiteTemplateGallery}.tsx",
       "src/components/operations/{LaunchWebsiteStep,LaunchWebsiteEditorHandoff,LaunchSchoolModelPicker,LaunchDeliveryModelFields,LaunchProgramIdentityFields}.tsx",
