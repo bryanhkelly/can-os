@@ -10,6 +10,7 @@ const state=vi.hoisted(()=>({data:null as unknown}));
 vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@/hooks/useWorkspaceMutation", () => ({ useWorkspaceMutation: () => ({ isSubmitting: false, submit: vi.fn() }) }));
 vi.mock("@tanstack/react-router",()=>({
+  useBlocker:vi.fn(),
   createFileRoute:()=> (options:object)=>({options,useLoaderData:()=>state.data,useSearch:()=>({})}),
   Link:({children}: {children:ReactNode})=><a>{children}</a>,
   useRouter:()=>({invalidate:vi.fn()}),
