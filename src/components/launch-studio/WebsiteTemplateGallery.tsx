@@ -3,6 +3,7 @@ import { type SitePaletteId, type SiteTemplateId, type SiteTypographyId, type Si
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_WIDTH = 1280;
@@ -60,9 +61,9 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       fonts and photography are preserved when switching.
     </p>
     <div className="mt-3 flex gap-2" role="group" aria-label="Template preview page">
-      {(["/", "/about"] as const).map(path => <button type="button" key={path}
+      {(["/", "/about"] as const).map(path => <Button type="button" variant="outline" key={path}
         aria-pressed={previewPage === path} onClick={() => setPreviewPage(path)}
-        className="min-h-11 border px-3 text-sm">{path === "/" ? "Home" : "About"}</button>)}
+        className="min-h-11 border px-3 text-sm">{path === "/" ? "Home" : "About"}</Button>)}
     </div>
     <p className="mt-2 text-xs text-muted-foreground">
       Fictional sample imagery illustrates each design. These images are not your school’s facilities
@@ -75,8 +76,8 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
         return <div key={template.id}
           className={cn("min-w-0 border bg-card p-2 transition-colors",
             selected ? "border-primary ring-2 ring-primary/50" : "border-border")}>
-          <button type="button" aria-pressed={selected} onClick={() => onChange(template.id)}
-            className="w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Button type="button" variant="ghost" aria-pressed={selected} onClick={() => onChange(template.id)}
+            className="w-full min-w-0 justify-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <TemplatePreviewFrame html={renderSample(template.id)} name={`${template.name} sample ${previewPage}`} />
             <span className="flex flex-wrap items-start justify-between gap-2 p-3">
               <span className="min-w-0 flex-1">
@@ -89,11 +90,11 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
                 {selected ? "Selected" : "Choose"}
               </span>
             </span>
-          </button>
-          <button type="button" onClick={() => setExpanded(template.id)}
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setExpanded(template.id)}
             className="min-h-11 w-full border-t px-3 py-2 text-left text-xs font-semibold underline underline-offset-4">
             Larger preview of {template.name}
-          </button>
+          </Button>
         </div>;
       })}
     </div>
@@ -101,8 +102,8 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       className="mt-5 border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-semibold">{enlarged.name} · {previewPage === "/" ? "Home" : "About"}</h3>
-        <button type="button" onClick={() => setExpanded(null)}
-          className="min-h-11 border px-3 py-2 text-sm">Close larger preview</button>
+        <Button type="button" variant="outline" onClick={() => setExpanded(null)}
+          className="min-h-11 border px-3 py-2 text-sm">Close larger preview</Button>
       </div>
       <TemplatePreviewFrame html={renderSample(enlarged.id)}
         name={`${enlarged.name} enlarged ${previewPage}`} tall />
