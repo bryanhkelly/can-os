@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { Field, FieldError } from "@/components/ui/field";
 import { useRouter } from "@tanstack/react-router";
 import { TeacherPolicyRevisions } from "@/components/profiles/TeacherPolicyRevisions";
@@ -29,11 +30,11 @@ export function LaunchTeacherQualificationPolicy({data,busy,run}:{
     }}>
      <p className="text-sm">Assignment and opening require applicable published policies. Publish this program's reviewed requirements here; jurisdiction, organization and site policies also apply. Select every required qualification; all must be independently verified. Publishing does not certify legal or regulatory compliance.</p>
     <div className="space-y-2">{data.qualificationCatalog.map(qualification=>
-      <label key={qualification.key} className="flex items-center gap-2 text-sm">
-       <input type="checkbox" checked={qualificationKeys.includes(qualification.key)} onChange={e=>
+      <Label key={qualification.key} className="flex items-center gap-2 text-sm">
+       <Checkbox checked={qualificationKeys.includes(qualification.key)} onChange={e=>
         setQualificationKeys(keys=>e.target.checked?[...keys,qualification.key]:keys.filter(key=>key!==qualification.key))}/>
        {qualification.title} <span className="text-xs text-muted-foreground">({qualification.key})</span>
-      </label>)}</div>
+      </Label>)}</div>
       {attempted&&!qualificationKeys.length&&<FieldError>Select at least one required qualification.</FieldError>}
      {!data.qualificationCatalog.length&&<p role="alert" className="text-sm">No qualification catalog entries exist. Configure the shared qualification catalog before publishing requirements.</p>}
     <Field label="I confirm these requirements are reviewed for this program and apply to its instructional dates. Published requirements cannot be edited here." required
