@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClassContent } from "@/domain/class-content";
 import { assertPublishableCurriculum, curriculumDraftContent, assertTeacherGuidesMatchCourse } from "@/domain/curriculum-authoring";
 import { CurriculumEditor } from "@/components/learning/CurriculumEditor";
-import { Route } from "@/routes/operations.curriculum";
+import { Route, CurriculumView } from "@/routes/operations.curriculum";
 import { createAuthoredCourse, publishAuthoredCurriculum, saveAuthoredCurriculum, saveAuthoredLesson } from "@/modules/learning/curriculum-authoring.functions";
 
 const state=vi.hoisted(()=>({
@@ -219,8 +219,10 @@ describe("curriculum studio presentation",()=>{
     {id:ids.versionId,version:1,status:"published",revision:ids.expectedRevision,content,publishedAt:null},
    ]},
   ]}}};
-  const Page=Route.options.component!;
-  const html=renderToStaticMarkup(<Page/>);
+  // The library overview no longer expands publisher releases. Open the
+  // canonical authoring route to inspect the immutable release contract.
+  const data=(state.data as {data:Parameters<typeof CurriculumView>[0]["data"]}).data;
+  const html=renderToStaticMarkup(<CurriculumView data={data} mode="author" courseId="course"/>);
   expect(html).toContain("Immutable published release");
   expect(html).toContain("Create next draft");
   expect(html).not.toContain("Save draft");
