@@ -63,12 +63,21 @@ function StaffJourney({ data }: { data: Awaited<ReturnType<typeof loadStaffLaunc
     {step === "welcome" && <JourneyWelcome summary="Check your school details and prepare the qualifications requested for your role."
       requirements={["Check the school role assigned to your account", "Prepare only the qualification evidence requested for your role", "Ask your school about its policies and orientation"]}
       outcome="Invitation acceptance does not verify qualifications, approve supervision or assign classes." />}
-    {step === "details" && <section className="border bg-card p-6">
-      <h2 className="font-serif text-2xl">{data.workspace.name}</h2>
-      <p className="mt-3 text-sm text-muted-foreground">Your school role</p>
-      <p className="mt-1 text-base font-semibold">{data.workspace.role.replaceAll("_", " ")}</p>
-      <p className="mt-3 text-sm">Ask your administrator if your name or role needs correcting.</p>
-    </section>}
+    {step === "details" && <>
+      <section className="border bg-card p-6">
+        <h2 className="font-serif text-2xl">{data.workspace.name}</h2>
+        <p className="mt-3 text-sm text-muted-foreground">Your school role</p>
+        <p className="mt-1 text-base font-semibold">{data.workspace.role.replaceAll("_", " ")}</p>
+        <p className="mt-3 text-sm">Ask your administrator if your name or role needs correcting.</p>
+      </section>
+      <section className="border bg-card p-5">
+        <Field label="Private preparation notes" description="Save draft keeps these notes for later.">
+          <Textarea id="staff-launch-notes" value={notes} maxLength={4000}
+            onChange={event => setNotes(event.target.value)} rows={5} />
+        </Field>
+        <LaunchFieldHelp label="What belongs in preparation notes?">Keep questions and reminders here, not student records, medical information or credential documents. Submit qualification evidence in Qualifications.</LaunchFieldHelp>
+      </section>
+    </>}
     <LaunchStudioStepContent active={step === "qualifications"}>{data.workspace.canSubmitQualifications ?
       <Qualifications embedded onDirtyChange={setQualificationDirty} /> :
       <p role="status" className="border bg-card p-5 text-sm">This role does not use the staff qualification submission workspace. Ask your administrator what to prepare.</p>}</LaunchStudioStepContent>
@@ -79,12 +88,5 @@ function StaffJourney({ data }: { data: Awaited<ReturnType<typeof loadStaffLaunc
         <p className="text-sm text-muted-foreground">For general teaching opportunity questions, separate from verified qualifications and assignments:</p>
         <Link to="/next/$journeyId" params={{journeyId:"teach-with-can"}} className="mt-3 inline-block min-h-11 text-sm font-semibold text-primary underline">Explore teaching next steps</Link>
       </div></>}
-    <section className="border bg-card p-5">
-      <Field label="Private preparation notes" description="Save draft keeps these notes for later.">
-        <Textarea id="staff-launch-notes" value={notes} maxLength={4000}
-          onChange={event => setNotes(event.target.value)} rows={5} />
-      </Field>
-      <LaunchFieldHelp label="What belongs in preparation notes?">Keep questions and reminders here, not student records, medical information or credential documents. Submit qualification evidence in Qualifications.</LaunchFieldHelp>
-    </section>
   </LaunchStudioShell>;
 }
