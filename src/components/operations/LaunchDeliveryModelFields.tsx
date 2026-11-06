@@ -20,11 +20,11 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                   </label>
                   <label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
                     <Checkbox checked={liveOnline} onChange={(e) => setLiveOnline(e.target.checked)} />
-                    Live online
+                    Scheduled live teaching (optional)
                   </label>
                   <label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
                     <Checkbox checked={asynchronous} onChange={(e) => setAsynchronous(e.target.checked)} />
-                    At your own pace
+                    Recorded or self-paced learning
                   </label>
                   {onsite && (
                     <label className="flex items-center gap-2 text-xs">
@@ -42,8 +42,7 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                   )}
                 </div>
                 <LaunchFieldHelp label="About learning formats">
-                  Choose every format you plan to offer. Live online means classes with a teacher at a scheduled time;
-                  at your own pace means learning without a live class. Days per week are planning only; set your actual calendar in Academics.
+                  Choose the formats this Program actually offers. Recorded or self-paced learning does not require a live lecture. Scheduled live teaching means a real-time class, not live help for questions. For asynchronous instruction with live support only, leave scheduled live teaching off. In-person days and teaching schedules are configured separately.
                 </LaunchFieldHelp>
               </fieldset>
   );
