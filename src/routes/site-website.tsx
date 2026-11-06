@@ -1,5 +1,11 @@
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
@@ -236,20 +242,20 @@ function WebsitePreviewPanel({ data, draftPreview }: {
     <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Your unsaved design preview" : "Previously saved website preview"}</h2>
     <p className="mt-2 text-sm text-muted-foreground">Review every page with the same server-rendered template used by the live website. Forms and scripts stay disabled here.</p>
     {pages.length > 0 && <div role="group" aria-label="Preview a website page" className="mt-4 flex flex-wrap gap-2">
-      {pages.map(([path]) => <button key={path} type="button" aria-pressed={selected === path}
+      {pages.map(([path]) => <Button variant="outline" key={path} type="button" aria-pressed={selected === path}
         onClick={() => setSelected(path)} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
         {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
-      </button>)}
+      </Button>)}
     </div>}
     <div role="group" aria-label="Preview width" className="mt-4 flex flex-wrap gap-2">
-      <button type="button" aria-pressed={device==="desktop"} onClick={()=>setDevice("desktop")}
-        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Desktop</button>
-      <button type="button" aria-pressed={device==="mobile"} onClick={()=>setDevice("mobile")}
-        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Mobile</button>
+      <Button variant="outline" type="button" aria-pressed={device==="desktop"} onClick={()=>setDevice("desktop")}
+        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Desktop</Button>
+      <Button variant="outline" type="button" aria-pressed={device==="mobile"} onClick={()=>setDevice("mobile")}
+        className="border px-3 py-2 text-xs font-semibold aria-pressed:border-primary aria-pressed:text-primary">Mobile</Button>
     </div>
     {activeHtml ? <iframe key={selected+"-"+device} title={`${data.siteName} ${selected} read-only website preview`}
       srcDoc={activeHtml} sandbox="" referrerPolicy="no-referrer" loading="lazy"
-      className="mt-4 h-[700px] w-full rounded-lg border bg-white" />
+      className="mt-4 h-[700px] w-full border bg-white" style={{ maxWidth: device === "mobile" ? 390 : undefined }} />
       : <p className="mt-4 rounded-lg border p-4 text-sm">A private website preview becomes available when a Site draft address is reserved by your registrar.</p>}
   </section>;
 }
@@ -451,7 +457,7 @@ function LocalWebsiteCopyEditor({
     const sequence = websiteStarterFieldIds.indexOf(field.key as typeof websiteStarterFieldIds[number]);
     return <div key={field.key} className="border-b border-border pb-5 last:border-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <label className="min-w-0 flex-1 text-sm" htmlFor={`website-copy-${field.key}`}>
+        <Label className="min-w-0 flex-1 text-sm" htmlFor={`website-copy-${field.key}`}>
           <span className="flex items-center gap-3 font-semibold">
             {sequence >= 0 && <span aria-hidden="true" className="font-mono text-xs font-normal text-muted-foreground">
               {String(sequence + 1).padStart(2, "0")}
@@ -459,22 +465,22 @@ function LocalWebsiteCopyEditor({
             {field.label}
           </span>
           <span className="mt-1 block text-xs leading-5 text-muted-foreground">{field.help}</span>
-        </label>
-        {typeof starter === "string" && <button type="button"
+        </Label>
+        {typeof starter === "string" && <Button variant="outline" type="button"
           aria-label={`Reset ${field.label} to original suggested copy`}
           disabled={!changed || busy || !data.canPublish}
           onClick={() => setContent(old => restoreOriginalWebsiteField(old, field.key))}
           className="min-h-11 shrink-0 border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
           Reset to original
-        </button>}
+        </Button>}
       </div>
       {field.multi
-        ? <textarea id={`website-copy-${field.key}`} rows={field.key === "statementOfFaith" ? 6 : field.key === "heroHeadline" ? 2 : 4}
+        ? <Textarea id={`website-copy-${field.key}`} rows={field.key === "statementOfFaith" ? 6 : field.key === "heroHeadline" ? 2 : 4}
             maxLength={siteLocalContentLimits[field.key]} disabled={busy || !data.canPublish}
             value={content[field.key] ?? ""} onChange={event => setContent(old =>
               ({ ...old, [field.key]: event.target.value }))}
             className="mt-3 w-full border border-border bg-background p-3 text-sm leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-        : <input id={`website-copy-${field.key}`} type="text" maxLength={siteLocalContentLimits[field.key]}
+        : <Input id={`website-copy-${field.key}`} type="text" maxLength={siteLocalContentLimits[field.key]}
             disabled={busy || !data.canPublish} value={content[field.key] ?? ""} onChange={event => setContent(old =>
               ({ ...old, [field.key]: event.target.value }))}
             className="mt-3 min-h-11 w-full border border-border bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />}
@@ -498,8 +504,8 @@ function LocalWebsiteCopyEditor({
       <p className="font-semibold">A newer website revision ({data.currentRevision}) is available.</p>
       <p>Your unsaved edits remain here. Saving is paused to prevent overwriting someone else's revision.
         You can review or copy your current wording, then load the latest saved version.</p>
-      <button type="button" onClick={loadLatestRevision}
-        className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</button>
+      <Button variant="outline" type="button" onClick={loadLatestRevision}
+        className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</Button>
     </div>}
     {!data.canPublish && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
       You can preview this Site, but your current verified Site assignment has not
@@ -588,7 +594,7 @@ function LocalWebsiteCopyEditor({
           <div role="group" aria-label="School color palettes" className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
             {sitePaletteIds.map(id => {
               const palette = resolveSiteTheme(id,content.branding.typographyId);
-              return <button type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
+              return <Button variant="outline" type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
                 onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
                 className="min-h-14 rounded-lg border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
                 <span aria-hidden="true" className="mb-2 flex h-5 overflow-hidden rounded">
@@ -597,12 +603,12 @@ function LocalWebsiteCopyEditor({
                   <span className="flex-1" style={{backgroundColor:palette.accent}}/>
                   <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
                 </span>{id === "signature" ? "CAN Signature" : id}
-              </button>;
+              </Button>;
             })}
           </div>
-          <label className="mt-4 block text-sm">
+          <Label className="mt-4 block text-sm">
             <span className="font-medium">Approved typography pairing</span>
-            <select value={content.branding.typographyId ?? "editorial"}
+            <Select value={content.branding.typographyId ?? "editorial"}
               onChange={event=>setContent(old=>({...old,branding:{...old.branding,
                 typographyId:event.target.value as SiteTypographyId, headingFontId:undefined, bodyFontId:undefined}}))}
               className="mt-2 min-h-11 w-full rounded-lg border bg-background px-3">
@@ -610,17 +616,17 @@ function LocalWebsiteCopyEditor({
                 {id === "editorial" ? "Editorial serif + modern sans" :
                   id === "traditional" ? "Heritage serif + clean sans" : "Contemporary humanist sans"}
               </option>)}
-            </select>
-          </label>
+            </Select>
+          </Label>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {(["headingFontId", "bodyFontId"] as const).map(key => <label key={key} className="block text-sm">
+            {(["headingFontId", "bodyFontId"] as const).map(key => <Label key={key} className="block text-sm">
               {key === "headingFontId" ? "Heading font" : "Body font"}
-              <select className="mt-2 min-h-11 w-full rounded border bg-background px-3" value={content.branding[key] ?? ""}
+              <Select className="mt-2 min-h-11 w-full rounded border bg-background px-3" value={content.branding[key] ?? ""}
                 onChange={event => setContent(old => ({...old, branding:{...old.branding, [key]:event.target.value ? event.target.value as SiteFontId : undefined}}))}>
                 <option value="">Use recommended pairing</option>
                 {Object.entries(siteFontCatalog).map(([id,font]) => <option key={id} value={id}>{font.label}</option>)}
-              </select>
-            </label>)}
+              </Select>
+            </Label>)}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">All choices use a maintained, contrast-checked palette
             and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
@@ -632,34 +638,34 @@ function LocalWebsiteCopyEditor({
       <p className="text-sm">Gallery images are fictional template samples. They are not photos of your school and are never added to your school media library.</p>
       <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
         <legend className="px-2 text-sm">Your school-owned artwork</legend>
-        <label className="block text-sm">
+        <Label className="block text-sm">
           <span className="font-medium">Church or community artwork (optional)</span>
           <span className="mt-1 block text-xs text-muted-foreground">
             PNG or JPEG, re-encoded locally to a metadata-free PNG. No remote URLs, embeds or tracking.
           </span>
-          <input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event)}
+          <Input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event)}
             className="mt-2 block w-full text-sm" />
-        </label>
+        </Label>
         {content.branding.heroImage && <div className="space-y-3 rounded-lg bg-muted/40 p-3">
           <img src={content.branding.heroImage.dataUrl} alt="Selected artwork preview"
             className="max-h-52 w-full rounded-lg object-cover" />
-          <label className="block text-sm">
+          <Label className="block text-sm">
             <span className="font-medium">Artwork description for screen readers</span>
-            <input type="text" maxLength={180} value={content.branding.heroImage.altText}
+            <Input type="text" maxLength={180} value={content.branding.heroImage.altText}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 heroImage: old.branding.heroImage ? { ...old.branding.heroImage, altText: event.target.value } : null,
               } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={content.branding.heroImage.rightsConfirmed}
+          </Label>
+          <Label className="flex items-start gap-2 text-sm">
+            <Checkbox checked={content.branding.heroImage.rightsConfirmed}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 heroImage: old.branding.heroImage ? { ...old.branding.heroImage, rightsConfirmed: event.target.checked } : null,
               } }))} className="mt-1" />
             <span>I own this image or have documented permission to publish it on this public website.</span>
-          </label>
-          <label className="block text-sm">
+          </Label>
+          <Label className="block text-sm">
             <span className="font-medium">Child privacy and consent</span>
-            <select value={content.branding.heroImage.childImageConsent}
+            <Select value={content.branding.heroImage.childImageConsent}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 heroImage: old.branding.heroImage ? { ...old.branding.heroImage,
                   childImageConsent: event.target.value as SiteLocalImageConsent } : null,
@@ -667,11 +673,11 @@ function LocalWebsiteCopyEditor({
               <option value="unconfirmed">Choose a confirmation</option>
               <option value="no_identifiable_children">No identifiable children appear</option>
               <option value="guardian_consent_confirmed">Documented guardian consent covers every identifiable child</option>
-            </select>
-          </label>
-          <button type="button" onClick={() => setContent(old => ({
+            </Select>
+          </Label>
+          <Button variant="outline" type="button" onClick={() => setContent(old => ({
             ...old, branding: { ...old.branding, heroImage: null },
-          }))} className="rounded-lg border px-3 py-1 text-xs">Remove artwork</button>
+          }))} className="rounded-lg border px-3 py-1 text-xs">Remove artwork</Button>
         </div>}
       </fieldset>
       <details className="border p-4">
@@ -686,10 +692,10 @@ function LocalWebsiteCopyEditor({
           <p className="mt-1 text-sm text-muted-foreground">Preview your pages. Family information and institutional approvals are managed separately.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" disabled={previewPending} onClick={() => void previewCurrentDraft()}
+          <Button type="button" disabled={previewPending} onClick={() => void previewCurrentDraft()}
             className="min-h-11 border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
             {previewPending ? "Generating secure preview..." : "Preview current changes"}
-          </button>
+          </Button>
           <p className="text-xs text-muted-foreground">Preview is private and read-only, and does not save or publish.</p>
         </div>
         {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
@@ -706,10 +712,10 @@ function LocalWebsiteCopyEditor({
         {!data.canPublish && <p role="status" className="border p-3 text-sm">
           You can preview this Site, but your verified Site assignment does not include local website publishing.
         </p>}
-        <button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}
+        <Button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
           {busy ? "Publishing…" : "Publish church-owned content"}
-        </button>
+        </Button>
         <p className="text-xs text-muted-foreground">
           Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
           Only church-owned content is published here; CAN controls institutional information.
@@ -722,29 +728,29 @@ function LocalWebsiteCopyEditor({
               <span>Revision {version.revision} · {version.status === "published" ? "Published" : version.status === "draft" ? "Private draft" : "Held for review"}
                 {" · "}{new Date(version.createdAt).toLocaleString()}</span>
               {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
-                <button type="button" disabled={busy || revisionConflict} onClick={() => void restore(version.revision)}
+                <Button variant="outline" type="button" disabled={busy || revisionConflict} onClick={() => void restore(version.revision)}
                   className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
                   Restore as new revision
-                </button>}
+                </Button>}
             </li>)}
           </ul>
         </details>}
       </div>}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <button type="button" disabled={step === 0}
+        <Button variant="outline" type="button" disabled={step === 0}
           onClick={() => onStepChange(Math.max(0, step - 1))}
           className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Back
-        </button>
-        <button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={()=>void saveDraft()}
+        </Button>
+        <Button variant="outline" type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={()=>void saveDraft()}
           className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
           {busy?"Saving...":"Save private draft"}
-        </button>
-        {step < 5 && <button type="button"
+        </Button>
+        {step < 5 && <Button type="button"
           onClick={() => onStepChange(Math.min(5, step + 1))}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
           Continue
-        </button>}
+        </Button>}
       </div>
     </div>
   </section>;
