@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
 
 export function SchoolRoomsSetup({ programId }: { programId: string }) {
   const rooms = useQuery({ queryKey: ["school-rooms", programId],
@@ -105,12 +107,12 @@ function SectionRoomLocation({ section, rooms, busy, save }: {
     event.preventDefault(); void save(roomId||null);
   }}>
     <Label>{section.title} ({section.code}) physical room
-      <select value={roomId} disabled={busy} onChange={event => setRoomId(event.target.value)}
+      <Select value={roomId} disabled={busy} onChange={event => setRoomId(event.target.value)}
         className="mt-1 block w-full rounded border bg-background p-2">
         <option value="">Not assigned</option>
         {retiredDefault && <option value={retiredDefault.id} disabled>{retiredDefault.name} (retired - replace or clear)</option>}
         {activeRooms.map(room => <option key={room.id} value={room.id}>{room.name} · capacity {room.capacity}</option>)}
-      </select>
+      </Select>
     </Label>
     <Button type="submit" variant="outline" disabled={busy || roomId===(section.roomId??"")}>Save classroom location</Button>
     {retiredDefault && <p className="w-full text-sm" role="status">This class's default room is retired.
@@ -164,7 +166,7 @@ function RoomEditor({ room, busy, update, retire }: {
     </form>
     <Field label="I understand retirement cannot be undone here, stops new assignments and approvals, and preserves existing defaults and reviewed plans for explicit follow-up"
       required error={retireAttempted&&!confirmed?"Confirm the retirement consequences before continuing.":undefined}>
-      <input type="checkbox" checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)}/>
+      <Checkbox checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)}/>
     </Field>
     <Button type="button" variant="outline" className="mt-2" disabled={busy}
       onClick={() => {
