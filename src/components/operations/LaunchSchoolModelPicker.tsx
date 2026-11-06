@@ -1,4 +1,5 @@
 import { programTypes, programTypeLabels, type ProgramType } from "@/domain/program-offerings";
+import { Button } from "@/components/ui/button";
 
 export type SchoolModelPreset = ProgramType;
 export type ExtendedLearningPreset = Extract<ProgramType, "summer_program" | "summer_enrichment" | "after_school_enrichment">;
@@ -27,15 +28,15 @@ export function LaunchSchoolModelPicker({ value, onSchoolModel }: {
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {programTypes.map(type => {
           const selected = value === type;
-          return <button key={type} type="button" aria-pressed={selected}
+          return <Button key={type} type="button" variant="outline" aria-pressed={selected}
             onClick={() => onSchoolModel(type)}
-            className={`min-h-24 border p-4 text-left focus-visible:outline-2 focus-visible:outline-ring ${selected
+            className={`min-h-24 w-full flex-col items-start justify-start gap-1 whitespace-normal border p-4 text-left focus-visible:outline-2 focus-visible:outline-ring ${selected
               ? "border-primary bg-primary/5 ring-2 ring-primary"
               : "hover:border-primary hover:bg-muted"}`}>
             <span className="block font-semibold">{programTypeLabels[type]}</span>
             <span className="mt-1 block text-xs text-muted-foreground">{descriptions[type]}</span>
             {selected && <span className="mt-2 block text-xs font-semibold text-primary">Selected</span>}
-          </button>;
+          </Button>;
         })}
       </div>
     </section>
