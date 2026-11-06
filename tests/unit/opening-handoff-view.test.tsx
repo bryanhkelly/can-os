@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
-import { Route } from "@/routes/launch.school";
+import { LaunchOpeningTask } from "@/components/operations/LaunchOpeningTask";
 import type { getSiteToday } from "@/modules/operations/site-today.functions";
 
 const state=vi.hoisted(()=>({data:null as unknown}));
@@ -77,14 +77,13 @@ describe("opening handoff presentation",()=>{
     expect(html).toContain("Reviewed launch and received operations.");
     expect(html).not.toContain("Acknowledge receipt");
   });
+  // Opening controls moved out of the old route into the canonical task
+  // component. Exercise the actual selection/disable guard directly.
   function renderLaunch(operators:{personId:string;firstName:string;lastName:string}[]){
-    state.data={ok:true,data:{authError:"",extendedPlanning:null,options:{organizations:[],academicProviderOrganizations:[],creditIssuingOrganizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
-      id:"program",name:"Academy",siteId:"site",status:"ready",type:"full_school",
-      journey:{id:"journey",status:"ready"},requirements:[],openingOperators:operators,
-    }]} ,preparationPrograms:null,familyInvitations:null,admissionsCounts:null,enrollmentCounts:null}};
-    const Page=Route.options.component;
-    if(typeof Page!=="function")throw new Error("Missing launch page");
-    return renderToStaticMarkup(<Page/>);
+    const launch={
+      id:"program",name:"Academy",siteId:"site",openingOperators:operators,
+    } as Parameters<typeof LaunchOpeningTask>[0]["launch"];
+    return renderToStaticMarkup(<LaunchOpeningTask launch={launch} busy={false} open={vi.fn()}/>);
   }
   it("requires deliberate selection of the receiving operator before opening",()=>{
     const html=renderLaunch([{personId:"receiver",firstName:"Alex",lastName:"Operator"}]);
