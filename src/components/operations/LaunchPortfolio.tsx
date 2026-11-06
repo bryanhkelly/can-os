@@ -87,7 +87,7 @@ export function LaunchPortfolio({ launches, sites, siteId, programId }: {
               </p>
             </div>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
-              {launch.status==="active"&&launch.siteId&&<Button asChild><Link to="/home"
+              {launch.status==="active"&&launch.siteId&&<Button asChild variant="outline"><Link to="/home"
                 search={{siteId:launch.siteId,programId:launch.id}}>
                 Open school operations →
               </Link></Button>}
