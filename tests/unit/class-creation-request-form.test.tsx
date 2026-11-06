@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMutationRunner, type MutationFeedbackState } from "@/lib/mutation-feedback";
 import { ClassCreationRequestForm } from "@/components/learning/ClassCreationRequestForm";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 
 const state = vi.hoisted(() => ({
@@ -41,7 +41,7 @@ vi.mock("@/lib/mutation-feedback", async original => {
 });
 
 type Props = {
-  children?: ReactNode; value?: string; disabled?: boolean;
+  children?: ReactNode; value?: string; disabled?: boolean; label?: string;
   state?: MutationFeedbackState & { retryRefresh: () => Promise<unknown> };
   onChange?: (event: { target: { value: string } }) => void;
   onSubmit?: (event: { preventDefault: () => void }) => void;
@@ -57,12 +57,19 @@ function render() {
     programs: [{ id: "program", name: "Example program" }], requests: [],
   } }));
 }
-function title(controls: ReactElement<Props>[]) {
-  const label = controls.find(node => node.type === Label &&
-    Array.isArray(node.props.children) && node.props.children[0]?.toString().includes("Proposed class title"));
-  const input = label && nodes(label).find(node => node.type === Input);
-  if (!input) throw new Error("Missing canonical title input");
+function inputFor(label: string, controls: ReactElement<Props>[]) {
+  const field = controls.find(node => node.type === Field && node.props.label === label);
+  const input = field && nodes(field).find(node => node.type === Input);
+  if (!input) throw new Error("Missing required class request field: " + label);
   return input;
+}
+function title(controls: ReactElement<Props>[]) {
+  return inputFor("Proposed class title", controls);
+}
+function completeRequiredFields() {
+  const controls = render();
+  inputFor("Course or subject", controls).props.onChange!({ target: { value: "Biology" } });
+  inputFor("Desired term", render()).props.onChange!({ target: { value: "Fall 2027" } });
 }
 function submit() {
   const form = render().find(node => node.type === "form");
@@ -83,6 +90,7 @@ describe("class request reconciliation", () => {
     state.refresh.mockRejectedValueOnce(new Error("offline"))
       .mockRejectedValueOnce(new Error("still offline")).mockResolvedValue(undefined);
     title(render()).props.onChange!({ target: { value: "Biology" } });
+    completeRequiredFields();
     await submit();
     expect(title(render()).props.value).toBe("Biology");
     expect(state.feedback.notice).toBe("Class request sent to the registrar.");
@@ -106,6 +114,7 @@ describe("class request reconciliation", () => {
     state.submit.mockRejectedValueOnce(new Error("unavailable")).mockResolvedValue({ requestId: "saved" });
     state.refresh.mockResolvedValue(undefined);
     title(render()).props.onChange!({ target: { value: "Biology" } });
+    completeRequiredFields();
     await submit();
     expect(title(render()).props.value).toBe("Biology");
     expect(state.refresh).not.toHaveBeenCalled();
