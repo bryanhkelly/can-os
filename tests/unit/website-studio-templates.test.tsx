@@ -80,5 +80,6 @@ describe("Website Studio five-template contract", () => {
     expect(html).toContain("Bright Futures");
     expect(html).toContain("Summit Preparatory");
     expect(html).toContain('aria-label="School website templates"');
+    expect((html.match(/Larger preview of/g) ?? []).length).toBeGreaterThanOrEqual(5);
   });
 });
