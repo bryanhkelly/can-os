@@ -614,7 +614,7 @@ ${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
 ${isLive ? `<meta property="og:url" content="${canonical}"/>` : ""}
 <meta name="twitter:card" content="summary"/>
 <style>
-:root{color:var(--site-ink);background:var(--site-paper);line-height:1.65}
+:root{line-height:1.65}
 body.theme-warm,body.theme-light{color:var(--site-ink);background:var(--site-paper)}
 *{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1240px;margin:auto;padding-left:clamp(20px,4vw,52px);padding-right:clamp(20px,4vw,52px)}
 header{padding-top:24px;padding-bottom:22px;border-bottom:1px solid #dce2e8;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
@@ -670,7 +670,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 header nav{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem}header nav a[aria-current=page]{font-weight:800;text-decoration-thickness:2px}.compact-hero{padding-block:clamp(28px,5vw,52px)}.compact-hero h1{font-size:clamp(2.3rem,5vw,4rem)}header nav a{color:inherit;text-underline-offset:5px;text-decoration-color:#9ca9ab}header nav a:hover{text-decoration-color:currentColor}html{scroll-behavior:smooth}
 /* Editorial school identity: human-scale typography, generous negative space,
    photography-ready hero and a quiet, heritage-inspired visual rhythm. */
-body{font-family:var(--site-body);font-size:1.04rem;letter-spacing:-.005em}
+body{font-family:var(--site-body);color:var(--site-ink);background:var(--site-paper);font-size:1.04rem;letter-spacing:-.005em}
 header{padding-top:29px;padding-bottom:29px;gap:24px}
 header .brand{font-family:var(--site-display);font-size:.93rem;letter-spacing:.08em;font-weight:700}
 header nav{gap:clamp(14px,1.8vw,28px)}
