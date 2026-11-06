@@ -115,7 +115,8 @@ describe.each([
     expect(failed).not.toContain("matched your search");
     state.values[3] = "";
     const empty = render(route);
-    expect(empty).toContain(`No ${name} matched your search`);
+    // An unfiltered empty directory is not a failed search.
+    expect(empty).toContain(`No ${name} in your authorized school sites.`);
     expect(empty).not.toContain("<table");
   });
   it("keeps exact profile links and zero counts in successful results", () => {
