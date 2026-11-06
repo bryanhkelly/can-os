@@ -254,6 +254,10 @@ for (const eventType of [
   EventTypes.SitePublicIdentityChanged,
   EventTypes.SitePublished,
   EventTypes.SiteUnpublished,
+  // A private website draft save is an audited lifecycle fact. The shared
+  // subscription dispatcher handles any registered projections; saving a
+  // draft alone must never publish content or notify public families.
+  EventTypes.SiteLocalWebsiteDraftSaved,
   EventTypes.SiteLocalWebsiteContentPublished,
   EventTypes.SiteLocalWebsiteContentReviewRequested,
   EventTypes.QualificationDefinitionCreated,
