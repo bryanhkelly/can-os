@@ -41,6 +41,8 @@ jobs:
         run: npm run build
 
       - name: Audit route fixture coverage
+        id: route_fixtures
+        continue-on-error: true
         run: node scripts/check-route-fixture-coverage.mjs
 
       - name: Enforce shared mutation evidence writers
@@ -76,6 +78,14 @@ jobs:
             git status --short -- drizzle/
             exit 1
           fi
+
+      # Retain fixture coverage as a hard CI gate without hiding the results
+      # of typecheck, lint or unit tests when route-fixture coverage fails.
+      - name: Enforce route fixture audit after independent checks
+        if: ${{ !cancelled() && steps.route_fixtures.outcome == 'failure' }}
+        run: |
+          echo "::error::Route fixture audit failed; inspect Audit route fixture coverage. Typecheck, lint and tests were allowed to run independently."
+          exit 1
 
       - name: Upload generated migration for review
         if: always()
