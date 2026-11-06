@@ -292,13 +292,13 @@ function OfferWithdrawal({offerId}:{offerId:string}){
   }}>
    <Field label="Reason for withdrawal (internal)" required
     error={attempted&&reason.trim().length<10?"Enter at least 10 characters explaining the withdrawal.":undefined}>
-    <Textarea minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/>
+    <Textarea required minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/>
    </Field>
    <Field label="I confirm withdrawal of this unaccepted offer. The family will be notified." required
     error={attempted&&!confirmed?"Confirm the withdrawal and family notification.":undefined}>
-    <Checkbox checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
+    <Checkbox required checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>
    </Field>
-   <Button type="submit" variant="outline" disabled={busy}>Withdraw offer</Button>
+   <Button type="submit" variant="outline" disabled={busy || !confirmed || reason.trim().length<10}>Withdraw offer</Button>
    {error&&<p role="alert">{error}</p>}
    <MutationFeedback state={mutation} pendingMessage="Withdrawing offer..."/>
   </form>
