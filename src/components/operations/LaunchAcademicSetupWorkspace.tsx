@@ -67,7 +67,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   }catch(e){setError(mutationErrorMessage(e, "Unable to save launch setup"));}
  }
  return <LaunchStudioShell role="School setup" subject={data.program.name} title="Prepare your classrooms."
-  description="Turn saved plans into school-year dates, published course content and assigned instructors."
+  description="Prepare the school year, published curriculum and responsible Section staffing."
   steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
   currentId="academics" onStepChange={id=>{
     const step=schoolLaunchSteps.find(item=>item===id);
@@ -86,15 +86,14 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    <StatCard label="Published course versions" value={data.catalog.length}/>
    <StatCard label="Sections provisioned" value={data.sections.length}/>
   </div>
-  <section aria-label="Choose CAN teachers" className="mt-5 rounded-xl border bg-card p-5">
-    <h2 className="font-serif text-2xl">Next: choose your teachers</h2>
+  <section aria-label="Instruction and support readiness" className="mt-5 rounded-xl border bg-card p-5">
+    <h2 className="font-serif text-2xl">Instruction and support readiness</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Your curriculum determines which CAN Academy instructors are suggested. Review teachers by course
-      or request a specific class assignment after you complete school setup. A request does not appoint an instructor.
+      Published curriculum determines the instructional content. Each Section still needs a verified responsible instructor for academic records, oversight and support. This administrative assignment does not select the presenter of recorded lessons or require live teaching.
     </p>
     <Button asChild variant="outline" className="mt-3">
      <Link to="/operations/teacher-marketplace" search={{programId:data.program.id}}>
-      Browse CAN teachers for this school's curriculum
+      Review instructor staffing for this curriculum
      </Link>
     </Button>
   </section>
@@ -220,7 +219,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   <section id="classroom-create" className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
    {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists in the selected term. <a href={"#classroom-"+matchingSection!.id} className="font-semibold underline">Resume its saved classroom and instructor assignment</a> instead of submitting a duplicate.</p>}
-   <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
+   <p className="mt-2 text-sm">Choose published curriculum and a term, then assign a verified responsible instructor to the Section. This administrative assignment does not determine who produced its lessons or require live classes. Scheduling and readiness remain separate checks.</p>
    <form noValidate className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();setCreationAttempted(true);
     if(!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||
@@ -262,9 +261,9 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     </Select></Field>
     <Label>Class code<Input value={code} onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1"/></Label>
     <Label>Class title<Input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1"/></Label>
-    <Field className="sm:col-span-2" label="Instructor (required for guided launch)" required
+    <Field className="sm:col-span-2" label="Responsible Section instructor (required for academic records)" required
       error={creationAttempted&&!effectiveTeacherId?"Choose an authorized instructor.":undefined}><Select value={effectiveTeacherId} disabled={!data.academicAuthority.teacherAssignment||!data.teachingStaff.length} onChange={e=>setTeacherId(e.target.value)}>
-     <option value="">{data.teachingStaff.length?"Choose an authorized instructor":"Awaiting instructor assignment"}</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
+     <option value="">{data.teachingStaff.length?"Choose responsible instructor":"Awaiting instructor assignment"}</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </Select></Field>
     <Label className="sm:col-span-2">Course credit units
      <Input aria-label="Credit units for new section" type="number" min="0.01" max="10" step="0.01"
@@ -272,7 +271,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       className="mt-1"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </Label>
-    <Button type="submit" disabled={busy||reviewedSectionAlreadyExists||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)}>{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and instructor"}</Button>
+    <Button type="submit" disabled={busy||reviewedSectionAlreadyExists||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)}>{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and staffing assignment"}</Button>
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
