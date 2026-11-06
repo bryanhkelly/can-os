@@ -14,7 +14,7 @@ afterEach(() => vi.useRealTimers());
 describe("interest event timezone", () => {
   const render = (timezone: string) => renderToStaticMarkup(<InterestEventsWorkspace data={{
     programs: [{ id: "program", name: "East School", siteId: "school", timezone }], events: [],
-  }} />);
+  }} mode="create" />);
   it("disables time-sensitive submission and exposes configuration when timezone is unavailable", () => {
     const html = render("");
     expect(html).toContain("school timezone is unavailable");
