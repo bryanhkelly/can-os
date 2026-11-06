@@ -368,6 +368,11 @@ function LocalWebsiteCopyEditor({
       commandErrorMessage: "Could not save the private website draft." });
     if (outcome.status === "saved" || outcome.status === "refresh-failed")
       markSaved(submitted, outcome.value.revision);
+    else if (outcome.status === "failed" &&
+      /website content was updated/i.test(mutationErrorMessage(outcome.error, ""))) {
+      // Surface the current revision without discarding what this editor typed.
+      await router.invalidate().catch(() => undefined);
+    }
   }
   async function previewCurrentDraft() {
     if (previewPending) return;
@@ -400,6 +405,11 @@ function LocalWebsiteCopyEditor({
       commandErrorMessage: "Could not save church content." });
     if (outcome.status === "saved" || outcome.status === "refresh-failed")
       markSaved(submitted, outcome.value.revision);
+    else if (outcome.status === "failed" &&
+      /website content was updated/i.test(mutationErrorMessage(outcome.error, ""))) {
+      // Surface the current revision without discarding what this editor typed.
+      await router.invalidate().catch(() => undefined);
+    }
   }
 
   async function restore(revision: number) {
