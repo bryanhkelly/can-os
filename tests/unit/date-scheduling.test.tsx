@@ -72,7 +72,8 @@ function nodes(node:ReactNode):ReactElement<Props>[] {
   if(!isValidElement<Props>(node))return [];
   if(typeof node.type==="function"&&["TeacherGroupControls","LocalDateTimeField","SiteProgramFields"].includes(node.type.name))
     return nodes((node.type as (props:Props)=>ReactNode)(node.props));
-  return [node,...nodes(node.props.children)];
+  // RecordLayout places the active page in a typed `main` slot, not children.
+  return [node,...nodes(node.props.children),...nodes((node.props as Props & {main?:ReactNode}).main)];
 }
 function text(node:ReactNode):string {
   if(Array.isArray(node))return node.map(text).join("");
@@ -82,7 +83,9 @@ function text(node:ReactNode):string {
 function render(route:{options:{component?:unknown}}){
   state.cursor=0;
   const page=(route.options.component as ()=>ReactElement<Props>)();
-  return nodes((page.type as (props:Props)=>ReactNode)(page.props));
+  // Scheduling moved from the list page into its canonical /new route.
+  const props=route===Trips?{...page.props,mode:"create"}:page.props;
+  return nodes((page.type as (props:Props)=>ReactNode)(props));
 }
 function changeLabel(controls:ReactElement<Props>[],label:string,value:string){
   const field=controls.find(node=>(node.type==="label"||node.type===Label)&&text(node.props.children).startsWith(label));
