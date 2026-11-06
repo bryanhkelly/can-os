@@ -1,4 +1,4 @@
-import { sitePaletteIds, siteTypographyIds, siteTemplateIds } from "@/domain/site-theme";
+import { sitePaletteIds, siteTypographyIds, siteTemplateIds, siteFontCatalog, type SiteFontId } from "@/domain/site-theme";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -19,7 +19,7 @@ export const getPartnerWebsitePreviewView = createServerFn({ method: "GET" })
 
 import {
   siteLocalContentLimits, siteLocalImageConsentStates, siteLocalImageMaxBase64Length,
-  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds,
+  siteLocalThemes, normalizeSiteLocalContent, websiteStarterFieldIds, siteLocalImagePublicationGaps,
 } from "@/domain/site-local-content";
 import { publishPartnerLocalContent } from "./site-local-content.server";
 
@@ -39,6 +39,7 @@ const localFields = {
 const starterFieldSchemas = Object.fromEntries(websiteStarterFieldIds.map(field =>
   [field, z.string().max(siteLocalContentLimits[field])],
 )) as { [K in typeof websiteStarterFieldIds[number]]: z.ZodString };
+const siteFontIds = Object.keys(siteFontCatalog) as [SiteFontId, ...SiteFontId[]];
 const localContentSchema = z.object({
   ...localFields,
   editorialBaseline: z.object({
@@ -50,6 +51,8 @@ const localContentSchema = z.object({
     paletteId: z.enum(sitePaletteIds).optional(),
     typographyId: z.enum(siteTypographyIds).optional(),
     templateId: z.enum(siteTemplateIds).optional(),
+    headingFontId: z.enum(siteFontIds).optional(),
+    bodyFontId: z.enum(siteFontIds).optional(),
     heroImage: z.object({
       dataUrl: z.string().max(siteLocalImageMaxBase64Length + 32),
       altText: z.string().max(180),
@@ -70,7 +73,11 @@ export const previewChurchWebsiteDraft = createServerFn({ method: "POST" })
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
     if (data.siteId && actor.grantSiteId !== data.siteId) throw new AuthorizationError("intended church website Site");
-    const preview = await getPartnerWebsitePreview(actor, normalizeSiteLocalContent(data.content));
+    const content = normalizeSiteLocalContent(data.content, { allowIncompleteImage: true });
+    // Unapproved artwork stays in the editor but is never projected into a preview page.
+    const safeContent = siteLocalImagePublicationGaps(content.branding.heroImage).length
+      ? { ...content, branding: { ...content.branding, heroImage: null } } : content;
+    const preview = await getPartnerWebsitePreview(actor, safeContent);
     return { previewHtml: preview.previewHtml, previewPages: preview.previewPages };
   });
 
