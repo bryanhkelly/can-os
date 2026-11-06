@@ -140,7 +140,7 @@ describe("curriculum landing loader", () => {
     state.data = outcome;
     const Page = Route.options.component!;
     const html = renderToStaticMarkup(<Page />);
-    expect(html).toContain(">Curriculum</h1>");
+    expect(html).toContain(">Curriculum library</h1>");
     expect(html).not.toContain("Studio");
     expect(html).not.toContain("Create course");
     expect((html.match(/Selected curriculum/g) ?? [])).toHaveLength(2);
@@ -149,7 +149,7 @@ describe("curriculum landing loader", () => {
     await state.loader!({ deps: { programId: "program-2" } });
     expect(state.marketplace).toHaveBeenCalledExactlyOnceWith({ data: { programId: "program-2" } });
   });
-  it("preserves publisher tools as a closed secondary disclosure", async () => {
+  it("keeps publisher tools on an explicit authorized Publishing route", async () => {
     const data = market();
     data.canPublish = true;
     state.marketplace.mockResolvedValue(data);
@@ -158,9 +158,11 @@ describe("curriculum landing loader", () => {
     state.data = await state.loader!({ deps: {} });
     const Page = Route.options.component!;
     const html = renderToStaticMarkup(<Page />);
-    expect(html).toContain("Manage and publish curriculum");
+    expect(html).toContain("Publishing");
+    expect(html).not.toContain("Save draft");
     expect(html).not.toMatch(/<details[^>]*open/);
-    expect(html.indexOf("Selected curriculum")).toBeLessThan(html.indexOf("Create course"));
+    expect(html).toContain("Selected curriculum");
+    expect(html).toContain("Create course");
     expect(state.studio).toHaveBeenCalledExactlyOnceWith({ data: { programId: "program-1" } });
   });
   it("reports failed authorized reads rather than showing a false empty selection", async () => {
