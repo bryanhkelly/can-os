@@ -1,8 +1,8 @@
 # CAN OS — Website Studio within Launch Studio (V6.1)
 
-**Implementation branch:** `feature/website-studio-design-and-settings`  
-**Base:** `04a93612ef9ae2013695798194641882e9a33446` (current `main` at start)  
-**Release status:** Feature branch, **not deployed or production certified**. No database migrations required for this initial slice.
+**Initial implementation:** `feature/website-studio-design-and-settings` (PR #270).  
+**Current focused integration:** PR #271 on `fix/website-preview-fonts`, based on `main`.  
+**Release status:** Unmerged integration changes, **not deployed or production certified**. No database migrations required for the website-editor portion.
 
 ## Product contract
 
@@ -11,7 +11,7 @@ A school is created once under Organization → Site → Program. Its public web
 | Surface | Owner | Responsibility |
 | --- | --- | --- |
 | `/launch/school?step=website` | verified registrar/site administrator | Setup overview, site identity and secure handoff to an editor |
-| `/launch/website` | explicit, verified `site_website_editor` grant for exact Site | Focused 5-step Website Studio, private preview, draft revision, and authorized publishing |
+| `/launch/website` | explicit, verified `site_website_editor` grant for exact Site | Focused six-step Website Studio, private preview, draft revision, and authorized publishing |
 | `/site-website` | same verified editor grant | Existing workspace-based editor, retained for long-term revisions |
 | `/settings` | signed-in membership; delegated read/action authorizations | Return to existing school, website, family, student, staff and profile workflows |
 | Public Site renderer | institutional approved-content projection | Published materials only; no draft, church source references or protected student records |
@@ -31,11 +31,12 @@ A school is created once under Organization → Site → Program. Its public web
 
 1. **Welcome and sources.** Explain the process, estimated 15–25 minute initial design, what to prepare, saved-draft outcome and publication distinction. Optionally provide the **church website**, **existing school website**, or social references (YouTube/Instagram/Facebook/TikTok). These remain private. Social URLs are reference-only. Only church websites are eligible for the separately gated bounded text suggestion process.
 2. **Template.** Choose **Heritage Academy, Community & Faith, Modern Academy, Bright Futures or Summit Preparatory**. Selection is independent of palettes, typography, school information and approved media.
-3. **Colors and photography.** Choose existing maintained palettes/fonts, optionally upload artwork, or import a folder using the existing private R2 workflow with rights attestation.
-4. **School story.** Review and edit the school welcome, church mission/history, community outreach, values and leadership notes. Existing source-attributed suggestions are optional and reviewed individually. Never infer institutionally protected claims.
-5. **Preview and finish.** Generate a private preview of the **current unsaved content** in the same canonical public renderer at desktop/mobile widths. Save a private immutable draft. A separate publishing action is permitted only for the exact Site editor with `site.website.local.publish`. Review-required institutional claims remain held.
+3. **Colors and typography.** Select maintained color palettes and optional independent heading/body fonts. Template choice does not overwrite those preferences.
+4. **Photos and artwork.** Choose approved media, upload church-owned artwork, or import a private photo folder. Drafts can retain unfinished image approvals; publishing and public previews withhold unapproved images.
+5. **School story.** Review and edit welcome, mission, community, values and leadership copy. Source-attributed suggestions are optional and separately reviewed. Never infer protected institutional claims.
+6. **Preview and finish.** Review the **current unsaved content** in the canonical public renderer at desktop/mobile widths (mobile preview constrained to 390px). Save a private draft with revision protection. Publication requires the exact Site editor authorization and independent protected-claim review.
 
-The standalone `/launch/website` route is opened by the existing school handoff. It and `/site-website` use the **same** editor, version history, preview functions and Site records.
+The standalone `/launch/website` route is opened by the verified school handoff. It and `/site-website` use the **same** editor, version history, preview functions and Site records. The School Launch website step owns status and handoff only; it no longer embeds a duplicate iframe preview. The Launch Studio editor uses canonical UI controls, enforced by focused lint rules.
 
 ## Versioned design contract
 
