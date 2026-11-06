@@ -90,7 +90,7 @@ export async function publishPartnerLocalContentWithinTransaction(
       restoredFromRevision = input.restoreRevision!;
     } else {
       if (!input.content) throw new Error("Local website content is required");
-      content = normalizeSiteLocalContent(input.content);
+      content = normalizeSiteLocalContent(input.content, { allowIncompleteImage: input.operation === "draft" });
     }
 
     // The "original" behind Reset is fixed on the first saved Site revision.
