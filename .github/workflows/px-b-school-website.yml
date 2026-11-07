@@ -5,6 +5,10 @@ on:
     paths:
       - 'src/domain/public-site-html.ts'
       - 'src/domain/site-theme.ts'
+      - 'src/domain/public-site-templates.ts'
+      - 'src/components/launch-studio/WebsiteTemplateGallery.tsx'
+      - 'tests/unit/website-studio-templates.test.tsx'
+      - 'scripts/capture-school-site-visuals.mjs'
       - 'src/domain/public-site-host-routing.ts'
       - 'src/domain/public-site-paths.ts'
       - 'src/domain/site-local-content.ts'
@@ -39,6 +43,7 @@ jobs:
       - name: Verify scoped tenant and local story contracts
         run: |
           npx vitest run tests/unit/site-theme.test.ts \
+            tests/unit/website-studio-templates.test.tsx \
             tests/unit/public-site-host-routing.test.ts \
             tests/unit/public-site-html.test.ts \
             tests/unit/site-local-content.test.ts \
