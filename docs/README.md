@@ -5,7 +5,7 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 ## Read in order
 
 1. [CAN vision](vision/CAN-VISION.md): institutional model and product intent.
-2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md) and [operating model](product/OPERATING-MODEL.md): product scope and institutional boundaries.
+2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md), [operating model](product/OPERATING-MODEL.md), and [School Launch and Run](product/LAUNCH-AND-RUN.md): product scope, institutional boundaries, and launch journeys.
 3. [System architecture](architecture/SYSTEM.md), [domain model](architecture/DOMAIN-MODEL.md), and [acceptance standards](quality/ACCEPTANCE-STANDARDS.md).
 4. [Engineering operations and security](engineering/OPERATIONS-AND-SECURITY.md): retained runbooks and dependencies.
 5. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
