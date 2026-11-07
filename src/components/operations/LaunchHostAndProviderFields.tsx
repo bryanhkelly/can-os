@@ -5,7 +5,7 @@ import { LaunchSiteAddressEditor } from "@/components/operations/LaunchSiteAddre
 import type { LaunchJurisdictionResearch as LaunchResearch } from "@/domain/jurisdiction-launch-research";
 import { JurisdictionLaunchResearch } from "@/components/operations/JurisdictionLaunchResearch";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
-import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
 import { Link } from "@tanstack/react-router";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
@@ -46,8 +46,9 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, hos
   creditIssuingOrganizationId: string; setCreditIssuingOrganizationId: (value: string) => void;
 }) {
   const selectedSite=hostSites.find(item=>item.id===siteId);
-  const siteJurisdictionId=addressStateJurisdiction(selectedSite?.address,options.jurisdictions);
-  const jurisdictionIssue=launchSiteJurisdictionIssue(selectedSite?.address,options.jurisdictions,jurisdictionId);
+  const jurisdictionLocation=siteJurisdictionLocation(selectedSite?.address,selectedSite?.planningLocation);
+  const siteJurisdictionId=addressStateJurisdiction(jurisdictionLocation,options.jurisdictions);
+  const jurisdictionIssue=launchSiteJurisdictionIssue(jurisdictionLocation,options.jurisdictions,jurisdictionId);
   return (
               <fieldset>
                 <legend className="text-sm text-muted-foreground">
