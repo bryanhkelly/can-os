@@ -1,9 +1,12 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { organizations, sitePublications, sites } from "@/db/schema";
+import { organizations, programs, sitePublications, sites } from "@/db/schema";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
+import { isAcademicMarketingType } from "@/domain/program-offerings";
+import { AuthorizationError } from "@/domain/command-context";
+import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
@@ -42,6 +45,25 @@ export async function readPublishedSiteCatalog(slug: string) {
     // statements on one database connection.
     const offerings = await readEnrichmentCatalog(site.id, tx);
     const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
+    // Public Program descriptions retain their independent editorial publication
+    // status. An unsupported opening location must not silently hide a planned
+    // academic concept or turn it into an admissions offer.
+    const activePrograms=await tx.select({id:programs.id,type:programs.type})
+      .from(programs).where(and(eq(programs.siteId,site.id),eq(programs.status,"active"))).limit(25);
+    const academicActive=activePrograms.filter(program=>isAcademicMarketingType(program.type));
+    let operatingStatus:"authorized"|"development"|"review_required"=
+      academicActive.length?"review_required":"development";
+    for(const program of academicActive){
+      try{
+        await requireCurrentSchoolJurisdictionForOpening(tx,program.id,{});
+        operatingStatus="authorized";
+        break;
+      }catch(error){
+        // A failed authorization is an unverified opening, but a failed DB
+        // query is a server error, NOT evidence that the school is unapproved.
+        if(!(error instanceof AuthorizationError))throw error;
+      }
+    }
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
     const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
     const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
@@ -63,6 +85,7 @@ export async function readPublishedSiteCatalog(slug: string) {
         ...parentExtras,
       }),
       demonstration: site.metadata?.synthetic === true,
+      operatingStatus,
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms:authorizedPrograms,
