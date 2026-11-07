@@ -9,6 +9,7 @@ import {
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+import { DomainError } from "@/domain/errors";
 
 import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
@@ -172,9 +173,30 @@ export async function publishPartnerLocalContentWithinTransaction(
       flaggedFields: decision.flaggedFields };
 }
 
+/** Detect the deployed database's historic check rejecting immutable drafts.
+ * Do not pretend an insert succeeded; the remedy is migration 0077. */
+function draftStatusConstraintMissing(error: unknown): boolean {
+  let candidate: unknown = error;
+  for (let depth = 0; depth < 4 && candidate && typeof candidate === "object"; depth++) {
+    const info = candidate as { code?: unknown; constraint?: unknown; message?: unknown; cause?: unknown };
+    if (info.constraint === "site_local_content_status_ck" && info.code === "23514")
+      return true;
+    if (info.code === "23514" && typeof info.message === "string" &&
+        info.message.includes("site_local_content_status_ck")) return true;
+    candidate = info.cause;
+  }
+  return false;
+}
+
 export async function publishPartnerLocalContent(
   actor: AccessContext, input: PartnerLocalContentCommand,
 ) {
-  return db.transaction(tx => publishPartnerLocalContentWithinTransaction(actor, input, tx));
+  try {
+    return await db.transaction(tx => publishPartnerLocalContentWithinTransaction(actor, input, tx));
+  } catch (error) {
+    if (input.operation === "draft" && draftStatusConstraintMissing(error))
+      throw new DomainError("WEBSITE_DRAFT_STORAGE_NOT_READY");
+    throw error;
+  }
 }
 
