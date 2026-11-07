@@ -64,3 +64,7 @@ Exact snapshots of `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-
 ## 2026-11-07 legacy specification retirement
 
 After byte-identical Git blob verification, the original `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/platform-integration-map.md` were removed. Historical copies remain under `docs/archive/2026-11-fullflow/legacy-specifications/`. Identified inbound links in agent-platform, curriculum, connected-learning, feature-track, admissions, and school-launch documents were updated to canonical documents or exact archived targets. GitHub search is not a complete repository-wide reference audit; automated link checking remains outstanding.
+
+## 2026-11-07 engineering consolidation
+
+Created `docs/engineering/OPERATIONS-AND-SECURITY.md` as the entry point for active runbooks, without moving the underlying Neon, security, identity, R2, route-contract or design-system files. Archived and retired the duplicate `docs/platform-capability-matrix.md` after exact Git blob comparison; its product replacement is `docs/product/PLATFORM-CAPABILITIES.md`. Comprehensive dependency and automated link checks are still outstanding.
