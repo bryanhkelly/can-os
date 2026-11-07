@@ -30,6 +30,7 @@ import {
   familyInvitationBatchMetadataSchema,
   familyInvitationRetryMatches,
   parseFamilyInvitationRecipients,
+  preopeningFamilyInvitationText,
   processFamilyInvitationRecipients,
   type FamilyInvitationBatchMetadata,
   type FamilyInvitationRecipientUpdate,
@@ -602,7 +603,8 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   const accepted = await sendNotificationEmail({
     to: recipient.email,
     subject,
-    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services.\n\nIf you would like updates from the school, you can request them here: ${responseUrl.toString()}\n\nThis invitation link expires 30 days after the invitation was created. Only an adult who wants follow-up should submit the form. No child details are requested; receiving this email alone does not opt you in.`,
+    text: preopeningFamilyInvitationText({introduction:metadata.introduction,
+      programName:school.programName,responseUrl:responseUrl.toString()}),
   }, `${batchId}:${recipient.key}`);
   if (!accepted) throw new Error("Pre-opening family email was not accepted by the provider");
   return { requestId: recipient.key, created: true };

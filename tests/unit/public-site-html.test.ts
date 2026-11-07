@@ -4,6 +4,17 @@ import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClai
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 
 describe("standalone public site HTML", () => {
+  it("labels pre-opening public pages but not private previews or authorized schools",()=>{
+    const page={host:"school.can-os.com",site:{name:"New School",organizationName:"Local Church"},offerings:[],operatingStatus:"development" as const};
+    const html=renderPublicSiteHtml(page);
+    expect(html).toContain("School in development · Not yet open for enrollment.");
+    expect(html).toContain("Academic offerings and opening plans are subject to CAN review and applicable requirements.");
+    expect(renderPublicSiteHtml(page,{localPreview:true,localPreviewSlug:"new-school"}))
+      .not.toContain("School in development");
+    expect(renderPublicSiteHtml({...page,operatingStatus:"authorized"})).not.toContain("School in development");
+    expect(renderPublicSiteHtml({...page,operatingStatus:"review_required"}))
+      .toContain("Opening authorization is not confirmed.");
+  });
   it("escapes all publisher-controlled text and contains no client script or private links", () => {
     expect(escapePublicHtml(`"&<>'`)).toBe("&quot;&amp;&lt;&gt;&#39;");
     const html = renderPublicSiteHtml({

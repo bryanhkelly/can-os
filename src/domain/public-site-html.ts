@@ -15,6 +15,8 @@ export type PublicSitePage = {
   site: { name: string; organizationName: string };
   /** Server-derived from the canonical synthetic Site marker, never a browser claim. */
   demonstration?: boolean;
+  /** Derived from active academic Programs and the current jurisdiction opening gate. */
+  operatingStatus?: "authorized" | "development" | "review_required";
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
   /** Only institutionally reviewed claims with public display permission are rendered. */
@@ -693,10 +695,14 @@ main{padding-top:clamp(22px,3vw,48px)}
 .compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
 @media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
 ${publicSiteTemplateCss}
+.launch-status-banner{padding:10px 22px;background:var(--site-paper);color:var(--site-ink);border-bottom:1px solid rgba(18,33,29,.18);text-align:center;font-size:.82rem;line-height:1.5}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
+${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus&&page.operatingStatus!=="authorized"
+  ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"Opening authorization is not confirmed.":"School in development · Not yet open for enrollment."}</strong> Academic offerings and opening plans are subject to CAN review and applicable requirements.</div>`
+  : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 <header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
 <main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>

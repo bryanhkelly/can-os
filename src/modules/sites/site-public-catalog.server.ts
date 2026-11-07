@@ -1,8 +1,10 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { organizations, sitePublications, sites } from "@/db/schema";
+import { organizations, programs, sitePublications, sites } from "@/db/schema";
+import { AuthorizationError } from "@/domain/command-context";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
+import { isAcademicMarketingType } from "@/domain/academic-program-publication";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
@@ -10,6 +12,7 @@ import { readCurrentLocalContent } from "./site-local-content.server";
 import { readApprovedPublicParentExtras } from "./public-parent-extras.server";
 import {readApprovedSchoolSitePhotos} from "./site-media-folder.server";
 import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
+import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 
 /**
  * Public Site projection, independently gated by an approved Site publication
@@ -41,7 +44,29 @@ export async function readPublishedSiteCatalog(slug: string) {
     // Use the same locked transaction sequentially, avoiding concurrent
     // statements on one database connection.
     const offerings = await readEnrichmentCatalog(site.id, tx);
-    const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
+    const academicCandidates = await readAcademicProgramCatalog(site.id, tx);
+    const academicPrograms=[];
+    for(const program of academicCandidates){
+      try{
+        await requireCurrentSchoolJurisdictionForOpening(tx,program.programId,{});
+        academicPrograms.push(program);
+      }catch(error){
+        if(!(error instanceof AuthorizationError))throw error;
+      }
+    }
+    const activePrograms=await tx.select({id:programs.id,type:programs.type}).from(programs)
+      .where(and(eq(programs.siteId,site.id),eq(programs.status,"active"))).limit(25);
+    let operatingStatus: "authorized"|"development"|"review_required"=
+      activePrograms.some(program=>isAcademicMarketingType(program.type))?"review_required":"development";
+    for(const program of activePrograms.filter(item=>isAcademicMarketingType(item.type))){
+      try{
+        await requireCurrentSchoolJurisdictionForOpening(tx,program.id,{});
+        operatingStatus="authorized";
+        break;
+      }catch(error){
+        if(!(error instanceof AuthorizationError))throw error;
+      }
+    }
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
     const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
     const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
@@ -63,6 +88,7 @@ export async function readPublishedSiteCatalog(slug: string) {
         ...parentExtras,
       }),
       demonstration: site.metadata?.synthetic === true,
+      operatingStatus,
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms:authorizedPrograms,

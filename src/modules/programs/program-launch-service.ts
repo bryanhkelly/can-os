@@ -12,6 +12,7 @@ calendarEvents,
 journeyRequirements,
 organizations,
 programs,
+  schoolConfigurationVersions,
 schoolYears,
 sections,
 sectionTeachers,
@@ -30,13 +31,14 @@ import { EventTypes } from "@/domain/event-types";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
-import { and,eq,inArray,isNull,or,sql } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.server";
 import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
 import { listExtendedSessionStaff } from "@/modules/activities/extended-learning-sessions.server";
 import { requireCurrentProgramSiteAuthorization } from "./program-site-authorization.server";
 import { ensureExistingSitePublicationDraftForLaunch } from "@/modules/sites/site-public-provisioning.server";
+import { requireCurrentSchoolJurisdictionForOpening } from "./school-jurisdiction-opening-gate.server";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -354,7 +356,20 @@ export async function activateProgram(
     assertProgramScope(context, programId);
     if (!context.scope.organizationIds?.includes(program.organizationId))
       throw new Error("Program activation requires the verified organization grant");
-    if (program.siteId) assertSiteScope(context, program.siteId);
+    if (program.siteId) {
+      assertSiteScope(context, program.siteId);
+      const [configuration]=await tx.select({
+        createdAt:schoolConfigurationVersions.createdAt,
+        status:schoolConfigurationVersions.status,
+        approvedAt:schoolConfigurationVersions.approvedAt,
+      }).from(schoolConfigurationVersions).where(
+        eq(schoolConfigurationVersions.programId,program.id),
+      ).orderBy(desc(schoolConfigurationVersions.version)).limit(1);
+      await requireCurrentSchoolJurisdictionForOpening(tx,program.id,{
+        configurationCreatedAt:configuration?.createdAt??null,
+        openingApprovedAt:configuration?.status==="approved"?configuration.approvedAt:null,
+      });
+    }
     // Resolve host identity from the database, not user-submitted program type
     // or metadata. Church-owned sites cannot switch program type to evade the
     // independently approved CAN institutional services agreement.

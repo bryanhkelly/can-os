@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions,auditEvents,documents,jurisdictionProfileVerificationDecisions,jurisdictionProfileVersions,
-  jurisdictions,programs,schoolYears,sites } from "@/db/schema";
+  jurisdictions,programs,schoolConfigurationVersions,schoolYears,sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { evaluateSiteJurisdictionIdentity } from "@/domain/site-jurisdiction-identity";
 import { jurisdictionReviewScopeFingerprint } from "@/domain/school-jurisdiction-readiness";
@@ -32,12 +32,28 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   options: {
     now?: Date;
     openingApprovedAt?: Date | null;
-    configurationCreatedAt: Date | null;
+    configurationCreatedAt?: Date | null;
     /** Legal obligations that must be evidenced for this operation. */
     requiredPhases?: readonly ("before_opening" | "before_enrollment")[];
   },
 ) {
   const now=options.now??new Date();
+  let latestConfiguration:{createdAt:Date;status:string;approvedAt:Date|null}|undefined;
+  if(options.configurationCreatedAt===undefined || options.openingApprovedAt===undefined){
+    const [configuration]=await executor.select({
+      createdAt:schoolConfigurationVersions.createdAt,
+      status:schoolConfigurationVersions.status,
+      approvedAt:schoolConfigurationVersions.approvedAt,
+    }).from(schoolConfigurationVersions).where(
+      eq(schoolConfigurationVersions.programId,programId),
+    ).orderBy(desc(schoolConfigurationVersions.version)).limit(1);
+    latestConfiguration=configuration;
+  }
+  const configurationCreatedAt=options.configurationCreatedAt===undefined
+    ?latestConfiguration?.createdAt??null:options.configurationCreatedAt;
+  const openingApprovedAt=options.openingApprovedAt===undefined
+    ?latestConfiguration?.status==="approved"?latestConfiguration.approvedAt:null
+    :options.openingApprovedAt;
   const [school]=await executor.select({
     organizationId:programs.organizationId,siteId:programs.siteId,
     jurisdictionId:programs.jurisdictionId,type:programs.type,
@@ -210,9 +226,8 @@ export async function requireCurrentSchoolJurisdictionForOpening(
   // Fresh opening/safety approval must follow the address change; a legal review
   // alone cannot reauthorize an old school configuration or old facilities proof.
   if(physicalRevision && (
-    openingApprovalPredatesLocationChange(options.configurationCreatedAt,physicalRevision) ||
-    (options.openingApprovedAt!==undefined && openingApprovalPredatesLocationChange(
-      options.openingApprovedAt,physicalRevision))))
+    openingApprovalPredatesLocationChange(configurationCreatedAt,physicalRevision) ||
+    openingApprovalPredatesLocationChange(openingApprovedAt,physicalRevision)))
     throw new AuthorizationError("new opening configuration and evidence after Site relocation");
   return {siteId:school.siteId,programId,
     jurisdictionProfileVersionId:policy.id,scopeFingerprint:fingerprint,
@@ -226,8 +241,11 @@ export async function requireCurrentSchoolJurisdictionForOpening(
  */
 export async function requireCurrentSchoolJurisdictionForEnrollment(
   executor:Pick<typeof db,"select">,programId:string,
-  options:{now?:Date;configurationCreatedAt:Date|null;openingApprovedAt?:Date|null},
+  options:{now?:Date;configurationCreatedAt?:Date|null;openingApprovedAt?:Date|null},
 ) {
+  const [program]=await executor.select({status:programs.status}).from(programs)
+    .where(eq(programs.id,programId)).limit(1);
+  if(program?.status!=="active")throw new AuthorizationError("active Program before enrollment");
   return requireCurrentSchoolJurisdictionForOpening(executor,programId,{
     ...options,requiredPhases:["before_enrollment"],
   });

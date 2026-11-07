@@ -6,7 +6,7 @@ import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliver
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
 import { Button } from "@/components/ui/button";
 import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
-import { launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { siteAddressEditorDraft } from "@/domain/site-setup-configuration";
 
 export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPresets,identity,delivery,hostAndProvider,submitLaunch,busy}:{
@@ -26,15 +26,16 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
   const provider=options.academicProviderOrganizations.find(item=>item.id===hostAndProvider.academicProviderOrganizationId);
   const creditIssuer=options.creditIssuingOrganizations.find(item=>item.id===hostAndProvider.creditIssuingOrganizationId);
   const savedSite=Boolean(site);
-  const jurisdictionIssue=launchSiteJurisdictionIssue(site?.address,options.jurisdictions,hostAndProvider.jurisdictionId);
+  const jurisdictionIssue=launchSiteJurisdictionIssue(siteJurisdictionLocation(site?.address,site?.planningLocation),options.jurisdictions,hostAndProvider.jurisdictionId);
+  const jurisdictionMismatch=jurisdictionIssue?.code==="LAUNCH_LOCATION_MISMATCH";
   const address=siteAddressEditorDraft(site?.address ?? null);
   const physicalLocation=[address.street1,address.city,address.state,address.postalCode].filter(Boolean).join(", ");
   return <>
     <LaunchCreatedHandoff created={created}/>
     <details id="new-school-launch" className="launch-school-form rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
-      <summary className="cursor-pointer"><h2 className="inline font-serif text-2xl">Your school details</h2></summary>
+      <summary className="cursor-pointer"><h2 className="inline font-serif text-2xl">Your academic program</h2></summary>
       <p className="mt-2 text-sm text-muted-foreground">
-        Confirm where your school meets, then tell us what students will learn.
+        Confirm the school location, then plan grades, how students will learn and who is responsible for teaching and credit.
       </p>
       {hasSchoolPreparation&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">
         Your existing school is saved above. Use its checklist to continue setup.
@@ -54,7 +55,7 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
             <LaunchDeliveryModelFields {...delivery}/>
             </fieldset>
             <section aria-label="Review your school details" className="rounded-xl bg-muted/30 p-5">
-              <h4 className="font-serif text-2xl">3. A final look</h4>
+              <h4 className="font-serif text-2xl">3. Review your academic plan</h4>
               <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
                 <div><dt>School organization</dt><dd>{host?.name??"Choose an organization"}</dd></div>
                 <div><dt>School location</dt><dd>{site?.name ?? "Choose a location"}</dd></div>
@@ -76,8 +77,7 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
                 </LaunchFieldHelp>
               </div>
             </section>
-            {jurisdictionIssue&&<p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">{jurisdictionIssue.message}</p>}
-            <Button type="submit" disabled={busy||Boolean(created)||Boolean(jurisdictionIssue)}>
+            <Button type="submit" disabled={busy||Boolean(created)||jurisdictionMismatch}>
               {busy?"Saving your school…":created?"School saved":"Save and continue"}
             </Button>
             {!savedSite&&delivery.onsite&&<p role="status" className="text-sm text-muted-foreground">

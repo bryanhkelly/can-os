@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 
 const jurisdictions=[
   {id:"tx",name:"Texas",code:"US-TX"},
@@ -10,6 +10,13 @@ describe("school Site address jurisdiction",()=>{
     expect(addressStateJurisdiction({country:"US",state:"TX"},jurisdictions)).toBe("tx");
     expect(addressStateJurisdiction({country:"US",state:"Florida"},jurisdictions)).toBe("fl");
     expect(addressStateJurisdiction({country:"US",regionCode:"US-TX"},jurisdictions)).toBe("tx");
+  });
+  it("uses Site planning state until a full physical address is recorded",()=>{
+    const california={id:"ca",name:"California",code:"US-CA"};
+    const location=siteJurisdictionLocation(null,{state:"CA"});
+    expect(addressStateJurisdiction(location,[california])).toBe("ca");
+    expect(launchSiteJurisdictionIssue(location,[california],"ca")).toBeNull();
+    expect(siteJurisdictionLocation({country:"US",state:"TX"},{state:"CA"})).toMatchObject({state:"TX"});
   });
   it("does not guess a state from a timezone or unknown address",()=>{
     expect(addressStateJurisdiction({timezone:"America/New_York"},jurisdictions)).toBeNull();

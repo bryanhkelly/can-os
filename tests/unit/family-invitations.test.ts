@@ -11,6 +11,7 @@ import {
   familyInvitationSendInput,
   parseFamilyInvitationRecipients,
   processFamilyInvitationRecipients,
+  preopeningFamilyInvitationText,
   type FamilyInvitationBatchMetadata,
   type FamilyInvitationRecipient,
 } from "@/domain/family-invitations";
@@ -176,6 +177,18 @@ describe("pre-opening family interest is not an application", () => {
       introduction: "Our school is preparing", confirmed: true,
       purpose: "interest",
     }).purpose).toBe("interest");
+  });
+
+  it("labels family invitations as interest only until opening is authorized",()=>{
+    const text=preopeningFamilyInvitationText({
+      introduction:"Help shape our plans.",programName:"Summit Preparatory",
+      responseUrl:"https://app.example.test/family/interest",
+    });
+    expect(text).toContain("Summit Preparatory is a school in development and is not yet authorized to open.");
+    expect(text).toContain("This invitation is an expression of interest only");
+    expect(text).toContain("not an application, enrollment offer");
+    expect(text).toContain("https://app.example.test/family/interest");
+    expect(text).toContain("No child details are requested");
   });
 
   it.each([

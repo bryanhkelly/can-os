@@ -54,7 +54,7 @@ export const Unavailable: Story = { render: () => <Journey state="error" /> };
 export const Forbidden: Story = { render: () => <Journey state="forbidden" /> };
 export const Unconfigured: Story = { render: () => <Journey state="empty" /> };
 
-function SchoolDetails({ unsupported = false }: { unsupported?: boolean }) {
+function SchoolDetails({ needsJurisdictionReview = false }: { needsJurisdictionReview?: boolean }) {
   const [name,setName]=useState("Example Academy");
   const [slug,setSlug]=useState("example-academy");
   const [slugEdited,setSlugEdited]=useState(false);
@@ -70,10 +70,10 @@ function SchoolDetails({ unsupported = false }: { unsupported?: boolean }) {
   const options:ComponentProps<typeof LaunchConfigurationForm>["hostAndProvider"]["options"]={
     organizations:[organization],academicProviderOrganizations:[organization],creditIssuingOrganizations:[organization],
     canCreateSite: true, schoolSetupAdministrator:true,
-    jurisdictions:[{id:"tx",code:"US-TX",name:"Texas"}],
+    jurisdictions:[{id:"tx",code:"US-TX",name:"Texas"},{id:"ca",code:"US-CA",name:"California"}],
     sites:[{id:"site",organizationId:"org",name:"Example Academy Campus",slug:"example-campus",
-      timezone:"America/Chicago",updatedAt:"2026-11-05T00:00:00Z",
-      address:{street1:"100 Example Lane",city:"Example City",state:unsupported?"CA":"TX",postalCode:"75001",country:"US"},
+      timezone:"America/Chicago",updatedAt:"2026-11-05T00:00:00Z",planningLocation:null,
+      address:{street1:"100 Example Lane",city:"Example City",state:needsJurisdictionReview?"CA":"TX",postalCode:"75001",country:"US"},
       addressStatus:"church_supplied",sitePhysicalAddressRevision:null,siteIdentityRevision:null,contactDraft:null,siteInformationDraft:null,websiteDraft:null}],
   };
   return <LaunchStudioChrome><LaunchStudioShell role="School setup" subject="Example Academy"
@@ -90,7 +90,7 @@ function SchoolDetails({ unsupported = false }: { unsupported?: boolean }) {
         newSiteTimezone:"America/Chicago",setNewSiteTimezone:()=>{},
         newSiteAddress:{street1:"",street2:"",city:"",state:"",postalCode:"",country:"US",county:""},setNewSiteAddress:()=>{},
         saveSiteAddress:async()=>{},saveSiteContact:async()=>{},saveSiteIdentity:async()=>{},addSite:async()=>{},
-        duplicateNewSite:undefined,createdSiteDraft:null,busy:false,jurisdictionId:unsupported?"":"tx",setJurisdictionId:()=>{},
+        duplicateNewSite:undefined,createdSiteDraft:null,busy:false,jurisdictionId:needsJurisdictionReview?"ca":"tx",setJurisdictionId:()=>{},
         academicProviderOrganizationId:"org",setAcademicProviderOrganizationId:()=>{},creditIssuingOrganizationId:"org",
         setCreditIssuingOrganizationId:()=>{},creditMode:"credit_bearing",jurisdictionGuidance:{},jurisdictionResearch:{}}}
       submitLaunch={event=>event.preventDefault()} />
@@ -115,13 +115,13 @@ export const SchoolForm: Story = {
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
   },
 };
-export const UnsupportedSchoolState: Story = {
-  render:()=> <SchoolDetails unsupported />,
+export const NeedsJurisdictionReview: Story = {
+  render:()=> <SchoolDetails needsJurisdictionReview />,
   play:async({canvasElement})=>{
     const canvas=within(canvasElement);
-    await expect(canvas.getAllByText(/School setup for California isn't available yet/).length).toBe(2);
-    await expect(canvas.getByRole("combobox",{name:/State or region.*required/})).toHaveAttribute("aria-invalid","true");
-    await expect(canvas.getByRole("button",{name:"Save and continue"})).toBeDisabled();
+    await expect(canvas.getByRole("combobox",{name:/State or region.*required/})).toHaveValue("ca");
+    await expect(canvas.getByText(/Review needed\. You can continue planning while CAN evaluates this jurisdiction/)).toBeVisible();
+    await expect(canvas.getByRole("button",{name:"Save and continue"})).toBeEnabled();
     await expect(canvas.getByRole("textbox",{name:"School or offering name"})).toHaveValue("Example Academy");
   },
 };

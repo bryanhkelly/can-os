@@ -1,5 +1,15 @@
 import { usStatesAndTerritories } from "./site-setup-configuration";
 
+/** Planning state guides academic preparation until a full Site address is recorded. */
+export function siteJurisdictionLocation(
+  address: Record<string, unknown> | null | undefined,
+  planningLocation: { state: string } | null | undefined,
+): Record<string, unknown> | null {
+  if (address && typeof address.country === "string" && address.country.trim()) return address;
+  if (planningLocation?.state.trim()) return { country: "US", state: planningLocation.state };
+  return address ?? null;
+}
+
 export function launchSiteJurisdictionIssue(
   address: Record<string, unknown> | null | undefined,
   jurisdictions: Array<{ id: string; code: string; name: string }>,

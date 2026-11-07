@@ -1,11 +1,10 @@
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { SchoolLaunchHub } from "@/components/launch-studio/SchoolLaunchHub";
-import { schoolHubModules, type OperationalSchoolHubModule, type SchoolHubModule } from "@/domain/school-launch-hub";
+import { schoolHubModules, schoolHubSearch, type OperationalSchoolHubModule, type SchoolHubModule } from "@/domain/school-launch-hub";
 import { loadSchoolConfiguration } from "@/modules/programs/school-configuration-loader";
 import { SchoolHubWorkflow } from "@/components/launch-studio/SchoolHubWorkflow";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { schoolHubSearch } from "@/domain/school-launch-hub";
 export const Route = createFileRoute("/launch/hub/school_/$module")({
   validateSearch: search => schoolHubSearch.parse(search),
   beforeLoad: ({params}) => {

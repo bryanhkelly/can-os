@@ -9,7 +9,7 @@ export function websiteHubStatus(address:string|null,content:string|null):School
   return {state:address||content?"In Progress":"Not Started",detail:content?"A private content revision is saved.":address?"Private website address prepared.":"No website preparation recorded.",nextAction:address?"Continue website design":"Prepare school website"};
 }
 export function academicHubStatus(programs:LaunchGuidanceRecord[]):SchoolHubStatus {
-  if(!programs.length)return {state:"Not Started",detail:"No academic Program exists for this school.",nextAction:"Create your first Program"};
+  if(!programs.length)return {state:"Not Started",detail:"No academic Program yet. Plan grades and how students will learn.",nextAction:"Start academic setup"};
   const tasks=programs.flatMap(program=>{const academicIds=new Set(program.requirements.filter(item=>/academic|curriculum|teacher|section|school-year|schedule/.test(item.key)).map(item=>item.id));return buildLaunchGuidance(program).tasks.filter(task=>task.requirementId && academicIds.has(task.requirementId));});
   const pending=tasks.filter(task=>task.state!=="complete" || task.pendingEvidenceReview || task.evidenceReviewCorrectionPending);
   return {state:pending.some(task=>task.state==="blocked")?"Attention Needed":tasks.length&&!pending.length?"Complete":"In Progress",detail:`${plural(programs.length,"Program")} saved. ${pending.length} academic requirements remain.`,nextAction:pending[0]?.title??"Review academic configuration"};

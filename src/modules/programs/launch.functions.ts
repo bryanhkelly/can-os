@@ -9,7 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress, launchOnsiteDaysPerWeekSchema } from "@/domain/site-setup-configuration";
-import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { DomainError } from "@/domain/errors";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
@@ -139,7 +139,16 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), siteInformationDraft:safeJson(metadata.siteInformation??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
+      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => {
+        const planningLocation=schoolPlanningLocationSchema.safeParse(metadata.schoolPlanningLocation);
+        return {...site,updatedAt:site.updatedAt.toISOString(),address:site.address===null?null:safeJsonObject(site.address),
+          planningLocation:planningLocation.success?planningLocation.data:null,
+          addressStatus:readSitePhysicalAddress(site.address).status,
+          sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null,
+          siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null,
+          contactDraft:safeJson(metadata.setupContact??null),siteInformationDraft:safeJson(metadata.siteInformation??null),
+          websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null};
+      }),
       jurisdictions: jurisdictionRows,
       canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
         schoolSetupAdministrator: context.role === "site_admin",
@@ -162,26 +171,29 @@ export const startLaunch = createServerFn({ method: "POST" })
     if (data.siteId && !organizationWide && !context.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site scope");
     }
-    // A state mismatch is not equivalent to a manual legal exception. Reject it
-    // before creation; jurisdiction applicability remains independently reviewed by C.
+    // Keep the selected jurisdiction aligned with the Site's physical or
+    // planning location. Missing legal guidance does not block a non-active Program.
     if(data.siteId) {
       const [{db},schema,{eq}]=await Promise.all([
         import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
       ]);
-      const [site]=await db.select({address:schema.sites.address,
+      const [site]=await db.select({address:schema.sites.address,metadata:schema.sites.metadata,
         organizationId:schema.sites.organizationId}).from(schema.sites)
         .where(eq(schema.sites.id,data.siteId)).limit(1);
       if(site && site.organizationId===data.hostOrganizationId) {
         const address=readSitePhysicalAddress(site.address);
-        if(address.value?.country==="US") {
+        const planningLocation=schoolPlanningLocationSchema.safeParse(site.metadata.schoolPlanningLocation);
+        const jurisdictionLocation=siteJurisdictionLocation(address.value,
+          planningLocation.success?planningLocation.data:null);
+        if(jurisdictionLocation?.country==="US") {
           const jurisdictions=await db.select({
             id:schema.jurisdictions.id,code:schema.jurisdictions.code,
             name:schema.jurisdictions.name,
           }).from(schema.jurisdictions);
-          const issue=launchSiteJurisdictionIssue(address.value,jurisdictions,data.jurisdictionId);
-          if(issue) throw new DomainError(issue.code,issue.message);
+          const issue=launchSiteJurisdictionIssue(jurisdictionLocation,jurisdictions,data.jurisdictionId);
+          if(issue?.code==="LAUNCH_LOCATION_MISMATCH") throw new DomainError(issue.code,issue.message);
           const target=jurisdictions.find(item=>item.id===data.jurisdictionId);
-          if(target && !addressStateJurisdiction(address.value,[target]))
+          if(target && !addressStateJurisdiction(jurisdictionLocation,[target]))
             throw new DomainError("LAUNCH_LOCATION_MISMATCH");
         }
       }
@@ -567,7 +579,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
       (data.address ? samePhysicalSiteAddress(existing.address,data.address) : existing.address===null) &&
       (!data.planningLocation || (savedPlanningLocation.success &&
        savedPlanningLocation.data.city === data.planningLocation.city && savedPlanningLocation.data.state === data.planningLocation.state))) {
-      const publicSiteDraft=data.stubOnly ? null : await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
+      const publicSiteDraft=await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:existing.id,organizationId:data.organizationId,slug:existing.slug,
       });
       return {siteId:existing.id,publicSiteDraft,replayed:true};
@@ -592,9 +604,9 @@ export const createLaunchSite = createServerFn({method:"POST"})
     scope:{organizationId:data.organizationId,siteId:site.id},
     after:{name:data.name,timezone:data.timezone,address:data.address??null,
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),stubOnly:Boolean(data.stubOnly)}});
-   // Stub creation has no website reservation dependency. The legacy location
-   // flow still reserves a private draft, without publishing or issuing grants.
-   const publicSiteDraft=data.stubOnly ? null : await provisionNewSitePublicationDraft(tx,actor,{
+  // Every new Site receives a private website address in the same transaction.
+  // Reservation does not publish content, create a Program or grant editor access.
+  const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
     id:site.id,organizationId:data.organizationId,slug:data.slug,
    });
    return {siteId:site.id,publicSiteDraft,replayed:false};

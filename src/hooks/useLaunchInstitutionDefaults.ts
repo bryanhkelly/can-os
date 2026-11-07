@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { addressStateJurisdiction } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { suggestedLaunchInstitutions } from "@/domain/launch-institution-defaults";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 
@@ -23,22 +23,25 @@ export function useLaunchInstitutionDefaults({options,siteId,hostOrganizationId,
 }) {
   // When an address-backed Site is selected, use its state for initial guidance.
   // A registrar may correct it manually. Do not reapply a default on every render.
-  const previousSiteId=useRef<string | null>(null);
+  const previousLocationRevision=useRef<string | null>(null);
   const lastAutoJurisdictionId=useRef<string | null>(null);
   useEffect(() => {
-    if (!options || previousSiteId.current === siteId) return;
+    if (!options) return;
     const priorAuto = lastAutoJurisdictionId.current;
-    previousSiteId.current = siteId;
     const site = options.sites.find(item => item.id===siteId);
-    const inferred=addressStateJurisdiction(site?.address,options.jurisdictions);
-    if (inferred) {
+    const locationRevision=site?`${site.id}:${site.updatedAt}:${site.planningLocation?.state??""}`:"";
+    if(previousLocationRevision.current===locationRevision)return;
+    previousLocationRevision.current=locationRevision;
+    const location=siteJurisdictionLocation(site?.address,site?.planningLocation);
+    const inferred=addressStateJurisdiction(location,options.jurisdictions);
+    if (inferred && (!jurisdictionId || jurisdictionId===priorAuto)) {
       lastAutoJurisdictionId.current=inferred;
       setJurisdictionId(inferred);
     } else if (priorAuto && jurisdictionId===priorAuto) {
       lastAutoJurisdictionId.current=null;
       setJurisdictionId("");
     }
-  },[options,siteId, jurisdictionId]);
+  },[options,siteId,jurisdictionId,setJurisdictionId]);
   // Turnkey defaults: when the registrar grant covers exactly one church, and
   // that church has exactly one Site, preselect both instead of asking the
   // leader to find records the system already knows. Selections stay editable.

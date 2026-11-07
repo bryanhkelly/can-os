@@ -2,12 +2,14 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { programPublications, programs, sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
+import { AuthorizationError } from "@/domain/command-context";
 import {
   academicMarketingSnapshot, publishableAcademicProgram,
 } from "@/domain/academic-program-publication";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "./site-publication.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { readSchoolJurisdictionReview } from "@/modules/programs/school-jurisdiction-review.server";
 
 import { EventTypes } from "@/domain/event-types";
 export type AcademicMarketingAction = "publish" | "unpublish";
@@ -52,6 +54,11 @@ export async function changeAcademicProgramPublication(
       siteId: program.siteId, organizationId: program.organizationId,
       publicationSiteId: site.id, siteOrganizationId: site.organizationId,
     }))) throw new Error("Only current academic Programs belonging to this Site can be marketed");
+    if(input.action==="publish"){
+      const jurisdictionReview=await readSchoolJurisdictionReview(actor,program.id,tx);
+      if(jurisdictionReview.reviewRequired)
+        throw new AuthorizationError("current school-specific jurisdiction review before publishing academic claims");
+    }
 
     const [current] = await tx.select({
       status: programPublications.status,

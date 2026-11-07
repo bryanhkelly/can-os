@@ -18,7 +18,7 @@ vi.mock("@tanstack/react-router",()=>({
 vi.mock("@/components/shell/WorkspaceSession",()=>({useWorkspaceSession:()=>({session:{authenticated:true,role:state.role,activeContext:{siteIds:state.siteIds}}})}));
 vi.mock("@/modules/programs/school-configuration-loader",()=>({loadSchoolConfiguration:state.load}));
 vi.mock("@/routes/admin",()=>({ScopedAdminConsole:({selection}:{selection:{siteId:string}})=><p>Team records for {selection.siteId}</p>}));
-vi.mock("@/components/operations/LaunchWizardPage",()=>({LaunchWizardPage:()=>null}));
+vi.mock("@/components/operations/LaunchWizardPage",()=>({LaunchWizardPage:()=><p>Program setup form</p>}));
 vi.mock("@/components/operations/LaunchAcademicSetupWorkspace",()=>({LaunchAcademicSetupWorkspace:()=>null}));
 vi.mock("@/components/operations/LaunchPreparationWorkspace",()=>({LaunchPreparationWorkspace:()=>null}));
 vi.mock("@/components/operations/SchoolOpeningEvidencePanel",()=>({SchoolOpeningEvidencePanel:()=>null}));
@@ -38,7 +38,7 @@ const revision="2026-11-06T00:00:00.000Z";
 const site={id:siteId,name:"Saved School",slug:"saved-school",timezone:"America/Los_Angeles",updatedAt:revision,address:null,contactDraft:null,siteInformationDraft:null};
 beforeEach(()=>{
  vi.clearAllMocks();state.search={siteId};state.module="team";state.role="site_admin";state.siteIds=[siteId];state.saveIdentity=null;
- state.data={ok:true,data:{options:{sites:[site,{...site,id:otherSite,name:"Another School"}]},launches:[],statuses:null,selectedProgramId:null}};
+ state.data={ok:true,data:{options:{sites:[site,{...site,id:otherSite,name:"Another School"}],organizations:[],jurisdictions:[],academicProviderOrganizations:[]},launches:[],statuses:null,selectedProgramId:null}};
 });
 describe("dashboard school configuration",()=>{
  it("links all school settings to the same selected Site without sending administrators to Launch",()=>{
@@ -61,6 +61,15 @@ describe("dashboard school configuration",()=>{
   expect(html).toContain(`/settings/school/team?siteId=${siteId}&amp;teamMode=invite`);
   expect(html).toContain(`/settings?siteId=${siteId}`);
   expect(html).not.toContain('/launch/');
+ });
+ it("keeps Site identity setup separate from first academic Program setup",()=>{
+  state.module="profile";
+  const details=renderToStaticMarkup(<LaunchModule.options.component/>);
+  expect(details).toContain("Saved name: Saved School");
+  expect(details).not.toContain("Program setup form");
+  state.module="academics";
+  const academics=renderToStaticMarkup(<LaunchModule.options.component/>);
+  expect(academics).toContain("Program setup form");
  });
  it("opens Site Information as a scoped setup editor",()=>{
   state.module="information";
