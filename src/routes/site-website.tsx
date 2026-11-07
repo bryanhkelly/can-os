@@ -1,6 +1,7 @@
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 import { SchoolBrandPreview } from "@/components/launch-studio/SchoolBrandPreview";
+import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,13 +272,14 @@ function WebsitePreviewPanel({ data, draftPreview }: {
 }) {
   const [selected, setSelected] = useState("/");
   const [device, setDevice] = useState<"desktop"|"mobile">("desktop");
-  const htmlPages = draftPreview ? draftPreview.previewPages : data.previewPages;
+  const saved = data.currentRevision > 0;
+  const htmlPages = draftPreview ? draftPreview.previewPages : saved ? data.previewPages : {};
   const pages = Object.entries(htmlPages);
   // Never show another page's or an older revision's HTML for a missing page.
   const activeHtml = Object.hasOwn(htmlPages, selected) ? htmlPages[selected] : null;
   return <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
-    <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Your unsaved design preview" : "Previously saved website preview"}</h2>
-    <p className="mt-2 text-sm text-muted-foreground">Review every page with the same server-rendered template used by the live website. Forms and scripts stay disabled here.</p>
+    <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Preview of current changes · not saved" : !saved ? "No saved website design yet" : data.localContentStatus === "published" ? "Latest saved and published website" : "Latest saved private design · revision " + data.currentRevision}</h2>
+    <p className="mt-2 text-sm text-muted-foreground">This read-only preview uses the same design as the hosted site. It does not submit forms or publish changes.</p>
     {pages.length > 0 && <div role="group" aria-label="Preview a website page" className="mt-4 flex flex-wrap gap-2">
       {pages.map(([path]) => <Button variant="outline" key={path} type="button" aria-pressed={selected === path}
         onClick={() => setSelected(path)} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
@@ -295,7 +297,7 @@ function WebsitePreviewPanel({ data, draftPreview }: {
       className="mt-4 h-[700px] w-full border bg-white" style={{ maxWidth: device === "mobile" ? 390 : undefined }} />
       : <p role="status" className="mt-4 border p-4 text-sm">{pages.length
         ? "This page is not available in the selected preview. Choose an available page or generate an updated preview."
-        : "No preview pages are available for this school website. Check the reserved address and Site information."}</p>}
+        : !saved ? "No website draft has been saved. Choose Preview unsaved changes to see your current design, or save a private draft to enable the full-page link." : "No preview pages are available for this school website. Check the reserved address and Site information."}</p>}
   </section>;
 }
 
@@ -379,6 +381,7 @@ function LocalWebsiteCopyEditor({
   const [draftPreview, setDraftPreview] = useState<{source: SiteLocalContent; rendered: Awaited<ReturnType<typeof previewChurchWebsiteDraft>>} | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
   useEffect(() => {
     setDraftPreview(null);
     setEditor(previous => {
@@ -401,6 +404,8 @@ function LocalWebsiteCopyEditor({
 
   function markSaved(submitted: SiteLocalContent, revision: number) {
     setEditor(previous => ({ ...previous, content: submitted, saved: submitted, revision }));
+    setDraftPreview(null);
+    setShareMessage("");
   }
 
   async function saveDraft() {
@@ -757,10 +762,25 @@ function LocalWebsiteCopyEditor({
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" disabled={previewPending} onClick={() => void previewCurrentDraft()}
             className="min-h-11 border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-            {previewPending ? "Generating secure preview..." : "Preview current changes"}
+            {previewPending ? "Generating secure preview..." : "Preview unsaved changes"}
           </Button>
-          <p className="text-xs text-muted-foreground">Preview is private and read-only, and does not save or publish.</p>
+          {data.currentRevision > 0 && <a
+            href={privateWebsitePreviewUrl(data.siteId)}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
+            Open full-page preview
+          </a>}
+          {data.currentRevision > 0 && <Button type="button" variant="outline" className="min-h-11 border"
+            onClick={() => void navigator.clipboard.writeText(
+              new URL(privateWebsitePreviewUrl(data.siteId), window.location.origin).href,
+            ).then(() => setShareMessage("Preview link copied. Reviewers must sign in with their own authorized school account."))
+              .catch(() => setShareMessage("Copy the address from Open full-page preview; clipboard permission was unavailable."))}>
+            Copy preview link
+          </Button>}
         </div>
+        <p className="text-xs text-muted-foreground">The full-page link uses your latest saved private revision and your existing CAN OS sign-in. No draft is made public. {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
+        {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">Save the private website draft to enable the full-page preview. You can test unsaved changes below without saving.</p>}
+        {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>
         {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
         <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
         <details className="border p-4">
