@@ -33,6 +33,7 @@ export function normalizeClientError(error: unknown, fallback?: string): ClientE
     AUTHENTICATION_REQUIRED: "authentication", FORBIDDEN: "authorization",
     VALIDATION_FAILED: "validation", CONFLICT: "conflict",
     UNAVAILABLE: "unavailable", UNEXPECTED: "unexpected",
+    WEBSITE_DRAFT_STORAGE_NOT_READY: "unavailable",
     CANCELLED: "unavailable",
     COURSE_CONTENT_REQUIRED: "validation", COURSE_STAFFING_REQUIRED: "validation",
     COURSE_CAPACITY_REACHED: "validation", COURSE_CREDIT_LIMIT: "validation",
