@@ -8,7 +8,7 @@ describe("0078 US jurisdiction reference catalog", () => {
     try {
       await db.exec(`CREATE TABLE jurisdictions(
         id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        code text NOT NULL UNIQUE,
+        code text NOT NULL,
         country_code text NOT NULL, region_code text NOT NULL,
         name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now()
       )`);
