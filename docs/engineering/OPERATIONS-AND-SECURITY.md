@@ -7,7 +7,8 @@
 | Area | Source | Treatment |
 | --- | --- | --- |
 | Database environments, migrations, Neon branches | [Neon development](../neon-development.md) | Operational runbook with dated entries; validate credentials, environment and schema before commands |
-| School operations security and safeguarding | [Security gates](../school-operations-security-gates.md) | **Retain as release blockers**; do not weaken or bypass |
+| Church-hosted school opening and safeguarding | [Church-Hosted Safety Gates](../quality/CHURCH-HOSTED-SAFETY-GATES.md) | Consolidated P0 release requirements, **not an operating certificate** |
+| School operations security and safeguarding | [Security gates](../school-operations-security-gates.md) | **Retain as independent release blockers**; do not weaken or bypass |
 | Identity, authorization and demo access | [Identity and demo access](../identity-and-demo-access.md) | Security-sensitive reference; verify grants and current code |
 | Private student enrollment documents | [Cloudflare R2 enrollment](../cloudflare-r2-enrollment.md) | Storage and access-control runbook; verify bucket and environment |
 | Machine-readable route inventory | [Route contracts](../platform-route-contracts.json) | **Do not relocate independently**; `scripts/check-platform-route-contracts.mjs` consumes it |
