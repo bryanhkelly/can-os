@@ -19,15 +19,32 @@ export type PublicSiteHomeSections = {
   enrichment: string; closing: string; contact: string;
 };
 
-const homeOrders: Record<SiteTemplateId, readonly (keyof PublicSiteHomeSections)[]> = {
-  heritage: ["hero", "vision", "story", "explore", "academics", "enrichment", "closing", "contact"],
-  community: ["hero", "story", "enrichment", "vision", "explore", "academics", "contact", "closing"],
-  modern: ["hero", "academics", "explore", "story", "enrichment", "vision", "closing", "contact"],
-  "bright-futures": ["hero", "explore", "enrichment", "academics", "vision", "story", "contact", "closing"],
-  summit: ["hero", "vision", "academics", "story", "enrichment", "explore", "closing", "contact"],
-};
+/** Each design has a distinct content rhythm while preserving all approved facts. */
 export function composePublicSiteHome(template: SiteTemplateId, sections: PublicSiteHomeSections): string {
-  return homeOrders[template].map(key => sections[key]).join("");
+  const join = (keys: readonly (keyof PublicSiteHomeSections)[]) =>
+    keys.map(key => sections[key]).join("");
+  switch(template) {
+    case "heritage": return sections.hero +
+      '<div class="home-composition home-heritage"><div class="heritage-editorial-pair">' +
+      join(["vision","story"]) + '</div>' +
+      join(["explore","academics","enrichment","closing","contact"]) + '</div>';
+    case "community": return sections.hero +
+      '<div class="home-composition home-community"><div class="community-people-first">' +
+      join(["story","enrichment"]) + '</div>' +
+      join(["vision","explore","academics","contact","closing"]) + '</div>';
+    case "modern": return sections.hero +
+      '<div class="home-composition home-modern"><div class="modern-information-first">' +
+      join(["academics","explore"]) + '</div>' +
+      join(["story","enrichment","vision","closing","contact"]) + '</div>';
+    case "bright-futures": return sections.hero +
+      '<div class="home-composition home-bright"><div class="bright-family-first">' +
+      join(["explore","enrichment"]) + '</div>' +
+      join(["academics","vision","story","contact","closing"]) + '</div>';
+    case "summit": return sections.hero +
+      '<div class="home-composition home-summit"><div class="summit-manifesto">' +
+      sections.vision + '</div>' +
+      join(["academics","story","enrichment","explore","closing","contact"]) + '</div>';
+  }
 }
 
 /** Styles intentionally change composition, spacing, typographic treatment and
@@ -104,6 +121,98 @@ body.template-summit .closing-action h2{margin-inline:auto}
   body.template-bright-futures .explore-grid{grid-template-columns:1fr}
   body.template-summit .public-hero:not(.compact-hero){margin-inline:0;min-height:480px}
   body.template-summit .public-hero:not(.compact-hero) h1{font-size:clamp(3rem,11vw,5rem)}
+}
+
+/* Five school design systems: distinct mastheads, hero geometry and page rhythms.
+ * Approved Site content and renderer security are shared; no invented photos. */
+body.template-heritage header{display:flex;flex-direction:column;align-items:stretch;gap:16px;padding-top:22px;padding-bottom:18px}
+body.template-heritage header .brand{width:100%;text-align:center;border-bottom:1px solid var(--site-ink);padding-bottom:20px;font:500 clamp(1.2rem,2.4vw,2rem)/1.3 var(--site-display);letter-spacing:.13em}
+body.template-heritage header .desktop-nav{flex:1;justify-content:center}
+body.template-heritage .public-hero:not(.compact-hero){display:flex;align-items:flex-start;min-height:560px;background:var(--site-paper);color:var(--site-ink);border-block:1px solid var(--site-ink)}
+body.template-heritage .public-hero:not(.compact-hero) h1{max-width:54%;color:var(--site-ink);font-size:clamp(3.4rem,6vw,6.2rem)}
+body.template-heritage .public-hero:not(.compact-hero)>p,body.template-heritage .public-hero:not(.compact-hero) .hero-actions{max-width:54%}
+body.template-heritage .public-hero:not(.compact-hero) .hero-subtitle{color:var(--site-secondary)}
+body.template-heritage .public-hero:not(.compact-hero) .intro{color:var(--site-muted)}
+body.template-heritage .public-hero:not(.compact-hero) .tag{color:var(--site-secondary)}
+body.template-heritage .public-hero:not(.compact-hero) .hero-button{background:var(--site-ink);color:#fff}
+body.template-heritage .public-hero:not(.compact-hero) .hero-text-link{color:var(--site-ink)}
+body.template-heritage .public-hero:not(.compact-hero) .hero-background-image{left:auto;right:0;width:44%;z-index:1}
+body.template-heritage .public-hero:not(.compact-hero).has-image::before{display:none}
+body.template-heritage .heritage-editorial-pair{border-block:1px solid var(--site-ink);margin-top:58px}
+
+body.template-community header{gap:28px;border-top:7px solid var(--site-accent);background:var(--site-paper)}
+body.template-community header .brand{font:500 1.3rem/1.4 var(--site-display);letter-spacing:0;text-transform:none}
+body.template-community .public-hero:not(.compact-hero){min-height:540px;background:var(--site-secondary);padding-left:50%;padding-right:clamp(28px,5vw,76px);display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+body.template-community .public-hero:not(.compact-hero) h1{font-size:clamp(3.25rem,5.8vw,6rem)}
+body.template-community .public-hero:not(.compact-hero) .hero-background-image{left:0;right:auto;width:46%;z-index:1}
+body.template-community .public-hero:not(.compact-hero).has-image::before{display:none}
+body.template-community .community-people-first{background:var(--site-paper);padding:clamp(24px,4vw,52px);margin-top:55px}
+body.template-community .community-people-first .home-story{border:0;padding:clamp(20px,3vw,40px) 0}
+body.template-community .community-people-first .editorial-section+.editorial-section{margin-top:40px}
+
+body.template-modern header{max-width:none;background:var(--site-ink);color:#fff;padding-inline:max(24px,calc((100vw - 1240px)/2));border-bottom:5px solid var(--site-accent)}
+body.template-modern header .brand,body.template-modern header nav a{color:#fff}
+body.template-modern header .site-nav-cta{background:var(--site-accent);color:var(--site-ink);border-radius:0}
+body.template-modern .public-hero:not(.compact-hero){min-height:570px;background:var(--site-ink);padding-right:37%;border-left:12px solid var(--site-accent)}
+body.template-modern .public-hero:not(.compact-hero) h1{font-size:clamp(3.5rem,7.3vw,7rem);line-height:.93;letter-spacing:-.075em}
+body.template-modern .public-hero:not(.compact-hero) .hero-background-image{left:auto;right:0;width:33%;z-index:1}
+body.template-modern .public-hero:not(.compact-hero).has-image::before{display:none}
+body.template-modern .public-hero:not(.compact-hero) .hero-button{border-radius:0}
+body.template-modern .modern-information-first{border-top:7px solid var(--site-accent);padding-top:32px;margin-top:52px}
+body.template-modern .modern-information-first .editorial-section+.editorial-section{margin-top:46px}
+
+body.template-bright-futures header{background:var(--site-paper);border-bottom:0}
+body.template-bright-futures header .brand{font:500 1.35rem/1.4 var(--site-display);letter-spacing:0;text-transform:none}
+body.template-bright-futures header .desktop-nav{background:#fff;padding:10px 16px;border-radius:999px}
+body.template-bright-futures header .site-nav-cta{border-radius:999px;background:var(--site-secondary)}
+body.template-bright-futures .public-hero:not(.compact-hero){min-height:560px;background:var(--site-paper);color:var(--site-ink);padding-right:47%}
+body.template-bright-futures .public-hero:not(.compact-hero) h1{color:var(--site-ink);font-size:clamp(3.4rem,6.3vw,6.7rem)}
+body.template-bright-futures .public-hero:not(.compact-hero) .hero-subtitle{color:var(--site-secondary)}
+body.template-bright-futures .public-hero:not(.compact-hero) .tag{color:var(--site-secondary)}
+body.template-bright-futures .public-hero:not(.compact-hero) .intro{color:var(--site-muted)}
+body.template-bright-futures .public-hero:not(.compact-hero) .hero-text-link{color:var(--site-ink)}
+body.template-bright-futures .public-hero:not(.compact-hero) .hero-button{background:var(--site-secondary);color:#fff;border-radius:999px}
+body.template-bright-futures .public-hero:not(.compact-hero) .hero-background-image{inset:7% 4% 7% auto;width:38%;height:86%;border-radius:48% 48% 12% 12%;z-index:1}
+body.template-bright-futures .public-hero:not(.compact-hero).has-image::before{display:none}
+body.template-bright-futures .bright-family-first{background:#fff;border-radius:32px;padding:clamp(24px,4vw,54px);margin-top:52px}
+body.template-bright-futures .bright-family-first .editorial-section+.editorial-section{margin-top:40px}
+
+body.template-summit header{max-width:none;padding-inline:clamp(24px,6vw,100px);border-bottom:0}
+body.template-summit header .brand{font:500 1.35rem/1.4 var(--site-display);letter-spacing:.12em}
+body.template-summit header .site-nav-cta{border:1px solid var(--site-ink);background:transparent;color:var(--site-ink);border-radius:0}
+body.template-summit .public-hero:not(.compact-hero){min-height:clamp(630px,84vh,940px);margin-inline:calc(-1 * clamp(20px,4vw,52px));align-items:center;text-align:center;padding:clamp(48px,8vw,110px)}
+body.template-summit .public-hero:not(.compact-hero) h1{font-size:clamp(4rem,8vw,8.7rem);max-width:1050px}
+body.template-summit .public-hero:not(.compact-hero) .hero-actions{justify-content:center}
+body.template-summit .public-hero:not(.compact-hero).has-image::before{background:linear-gradient(180deg,rgba(10,24,35,.44),rgba(10,24,35,.84))}
+body.template-summit .summit-manifesto{margin-top:65px}
+body.template-summit .summit-manifesto .vision-feature{min-height:400px;border-radius:0}
+
+.home-composition>section+section,.home-composition>div+section,.home-composition>section+div,.home-composition>div+div{margin-top:clamp(54px,7vw,102px)}
+@media(max-width:800px){
+ body.template-heritage header{flex-direction:row;align-items:center;justify-content:space-between}
+ body.template-heritage header .brand{border:0;padding:0;text-align:left;width:auto}
+ body.template-modern header .mobile-menu summary{border-color:#fff;color:#fff}
+}
+@media(max-width:700px){
+ body.template-heritage .public-hero:not(.compact-hero),
+ body.template-community .public-hero:not(.compact-hero),
+ body.template-modern .public-hero:not(.compact-hero),
+ body.template-bright-futures .public-hero:not(.compact-hero){min-height:0;padding:34px 26px 320px;align-items:flex-start;text-align:left}
+ body.template-heritage .public-hero:not(.compact-hero) h1,
+ body.template-heritage .public-hero:not(.compact-hero)>p,
+ body.template-heritage .public-hero:not(.compact-hero) .hero-actions{max-width:100%}
+ body.template-heritage .public-hero:not(.compact-hero) .hero-background-image,
+ body.template-community .public-hero:not(.compact-hero) .hero-background-image,
+ body.template-modern .public-hero:not(.compact-hero) .hero-background-image,
+ body.template-bright-futures .public-hero:not(.compact-hero) .hero-background-image{
+   top:auto;bottom:0;left:0;right:0;width:100%;height:288px;border-radius:0
+ }
+ body.template-heritage .public-hero:not(.compact-hero) h1,
+ body.template-community .public-hero:not(.compact-hero) h1,
+ body.template-modern .public-hero:not(.compact-hero) h1,
+ body.template-bright-futures .public-hero:not(.compact-hero) h1{font-size:clamp(2.7rem,11vw,4.5rem)}
+ body.template-summit .public-hero:not(.compact-hero){margin-inline:0;min-height:520px}
+ .community-people-first,.bright-family-first{padding:22px}
 }
 `;
 
