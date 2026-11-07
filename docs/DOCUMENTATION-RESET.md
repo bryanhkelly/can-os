@@ -48,4 +48,6 @@
 
 **Phase 8:** Added engineering operations/security index and retired duplicate capability matrix after archive verification. Operational runbooks and machine-readable route contract remain at their original paths pending source-verified migration.
 
+**Phase 9:** Retired four dated design/integration/branch-delivery records into exact verified archive copies. Repaired FullFlow fixture's historical contract path. Current V6.1 design authority and operational runbooks remain active.
+
 **Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
