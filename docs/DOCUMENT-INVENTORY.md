@@ -17,10 +17,10 @@
 | `docs/domain-model.md` | Technical, mixed with implementation notes | Reconstruct after code verification |
 | `docs/golden-flows.md` | Product and quality, mixed with evidence | Split specifications from evidence |
 | `docs/CURRENT-STATE.md` | Historical evidence with dated updates | Archive after replacing active status references |
-| `docs/full-flow-acceptance-contract.md` | Retired delivery contract | Exact snapshot copied to archive; original pending reference check |
+| `docs/full-flow-acceptance-contract.md` | Retired delivery contract | Archived and original removed after reference update |
 | `docs/full-flow-progress.md` | Retired delivery journal | Archive after reference check |
 | `docs/integration-convergence-audit.md` | Retired branch execution plan | Exact snapshot copied to archive; original pending reference check |
-| `docs/engagement-framework.md` | Historical implementation branch plan | Exact snapshot copied to archive; original pending reference check |
+| `docs/engagement-framework.md` | Historical implementation branch plan | Archived and original removed after reference update |
 | `docs/school-launch-studio-site-workspace.md` | Product design mixed with implementation history | Rebuild product spec |
 | `docs/website-launch-studio-implementation.md` | Implementation record | Reconcile against current main |
 | `docs/school-operations-security-gates.md` | Active safety-sensitive engineering requirements | Preserve in place until verified replacement |
@@ -38,7 +38,7 @@
 - `docs/archive/2026-11-fullflow/retired-plans/integration-convergence-audit.md`
 - `docs/archive/2026-11-fullflow/retired-plans/engagement-framework.md`
 
-The copied files remain at their original paths for now. Copying does not retire their original locations. The archive copies are historical; new development must not treat them as current authority.
+The three retired plan originals were removed after archived blob SHA verification and targeted inbound-reference updates. Root snapshots remain copies only. Other historical documents remain active pending review. The archive copies are historical; new development must not treat them as current authority.
 
 ## Dependency checks required before moves
 
