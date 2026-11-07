@@ -35,7 +35,7 @@ export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   returnGrantId:optionalSearchString,
   returnToHub:z.boolean().optional(),
   returnToSettings:z.boolean().optional(),
-  step:z.enum(websiteStudioStepIds).optional(),
+  step:z.enum(websiteStudioStepIds).optional().catch(undefined),
 });
 
 export const loadWebsiteHome = (siteId?: string) => safeLoader(
@@ -73,7 +73,10 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
 }) {
   const [localStep,setLocalStep]=useState(0);
   const requestedStep=websiteStudioStepIds.indexOf(selection.step??"welcome");
-  const step=selection.step ? Math.max(0,requestedStep) : localStep;
+  // Re-entry skips the optional orientation, but the first Site visit without an
+  // address always stays in a single preparation stage until it is reserved.
+  const step=selection.step ? Math.max(0,requestedStep)
+    : studio && (selection.returnToHub || selection.returnToSettings) ? 1 : localStep;
   const changeStep=onStepChange??setLocalStep;
   const returnToLaunch=selection.returnToSettings && selection.siteId
     ? <Link to="/settings" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Settings</Link>
@@ -91,11 +94,13 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     {id:"content",title:"School content"}, {id:"preview",title:"Preview & review"},
   ];
   if (studio) return <LaunchStudioShell role="Website design" subject={data.siteName}
-    title={["Bring your school online.","Find the right first impression.","Make it your own.",
-      "Bring your school to life.","Your content comes with you.","See what families will see."][step]}
-    description="One Site, one school website. Academic, admissions and school-opening approvals remain separate."
-    steps={steps} currentId={websiteStudioStepIds[step]??"welcome"}
-    onStepChange={id=>changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]))}
+    title={data.host ? ["Bring your school online.","Find the right first impression.","Make it your own.",
+      "Bring your school to life.","Your content comes with you.","See what families will see."][step] : "Prepare your private website address."}
+    description={data.host ? "One Site, one school website. Academic, admissions and school-opening approvals remain separate." :
+      "Create a private address before choosing a design. Nothing is published yet."}
+    steps={data.host ? steps : [{id:"address",title:"Prepare private address",disabled:true}]}
+    currentId={data.host ? websiteStudioStepIds[step]??"welcome" : "address"}
+    onStepChange={id=>{if(data.host)changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]));}}
     help={<p>Unaffiliated Site Administrators manage their school website directly. Contributors need a verified Site website editor invitation. Previewing and saving a draft do not publish it.</p>}
     exit={returnToLaunch ?? <Link to="/home" className="underline">Exit to your workspace</Link>}>
     {data.host
