@@ -491,7 +491,7 @@ body.template-modern .header-modern .modern-rail-action{margin-top:auto;padding-
 body.template-modern .header-modern .site-nav-cta{width:100%;border-radius:6px;background:#68e5f4;color:#071527}
 body.template-modern .shell-modern>main#main-content{grid-column:2;grid-row:1;min-width:0;margin:0;max-width:none;padding:28px clamp(20px,3vw,54px) 75px}
 body.template-modern .shell-modern>footer{grid-column:2;grid-row:2;color:#acc0da;border-color:#31405e}
-body.template-modern .shell-modern .public-hero.seven-hero-modern{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.85fr);grid-template-rows:390px 180px;gap:14px;margin:0;background:transparent;color:#e9efff;min-height:0}
+body.template-modern .shell-modern .public-hero.seven-hero-modern{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.85fr);grid-template-rows:minmax(520px,auto) 180px;gap:14px;margin:0;padding:0;border:0;background:transparent;color:#e9efff;min-height:0}
 body.template-modern .seven-hero-modern .modern-hero-panel{border:1px solid #293852;border-radius:18px;padding:clamp(27px,3vw,47px);background:linear-gradient(120deg,#142943,#181b38);grid-column:1;grid-row:1}
 body.template-modern .seven-hero-modern .modern-panel-label{font-size:.65rem;letter-spacing:.19em;font-weight:800;color:#64e8f4}
 body.template-modern .seven-hero-modern h1{font:850 clamp(2.7rem,4.5vw,5.1rem)/1.04 var(--site-body);letter-spacing:-.075em;color:#eff7ff;margin:19px 0}
