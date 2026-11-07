@@ -68,3 +68,7 @@ After byte-identical Git blob verification, the original `docs/architecture.md`,
 ## 2026-11-07 engineering consolidation
 
 Created `docs/engineering/OPERATIONS-AND-SECURITY.md` as the entry point for active runbooks, without moving the underlying Neon, security, identity, R2, route-contract or design-system files. Archived and retired the duplicate `docs/platform-capability-matrix.md` after exact Git blob comparison; its product replacement is `docs/product/PLATFORM-CAPABILITIES.md`. Comprehensive dependency and automated link checks are still outstanding.
+
+## 2026-11-07 dated delivery evidence retirement
+
+Archived and removed `docs/design-system-implementation-plan.md`, `docs/PX-B-EXPERIENCE-PUBLISHING-HANDOFF.md`, `docs/PX-INTEGRATION-RELEASE-EVIDENCE-2026-11-03.md`, and `docs/integration/agent-branch-retirement-pass1.md` into `docs/archive/2026-11-fullflow/delivery-evidence/`, preserving exact Git blobs. Corrected a historical contract reference in `tests/e2e/full-flow-fixture.ts`. The active V6.1 design-system reference and operational/security runbooks were retained. This does not establish passing CI or exhaustive inbound-link coverage.
