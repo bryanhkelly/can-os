@@ -175,9 +175,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/admissions": "Admissions", "/tuition": "Tuition & aid", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
   };
-  const navigation = availablePaths.map(destination =>
-    `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`
-  ).join(" ");
+  const navigationLink = (destination: PublicSitePath) =>
+    `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`;
+  // Keep the complete ten-page site discoverable without crowding editorial
+  // headers. The native disclosure works without browser-side scripts.
+  const primaryNavigation = availablePaths.slice(0, 5).map(navigationLink).join(" ");
+  const otherPaths = availablePaths.slice(5);
+  const navigation = primaryNavigation + (otherPaths.length
+    ? `<details class="desktop-more"><summary>More</summary><div class="more-links">${otherPaths.map(navigationLink).join("")}</div></details>`
+    : "");
+  const mobileNavigation = availablePaths.map(navigationLink).join(" ");
   const localSection = localItems.length || image ? `<section aria-labelledby="church-identity-title" class="community-section editorial-section">
     <div class="community-heading">
       <div><p class="tag">People, place & purpose</p>
@@ -721,7 +728,7 @@ ${composePublicSiteChrome(templateId, {
   brand: school,
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
-  mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
+  mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>`,
 })}
