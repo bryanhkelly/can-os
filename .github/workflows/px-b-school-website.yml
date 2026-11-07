@@ -9,6 +9,17 @@ on:
       - 'src/routes/website-preview.ts'
       - 'drizzle/0077_website_private_drafts.sql'
       - 'drizzle/meta/_journal.json'
+      - 'drizzle/0078_jurisdiction_reference_catalog.sql'
+      - 'src/domain/site-jurisdiction-default.ts'
+      - 'src/modules/programs/school-jurisdiction-opening-gate.server.ts'
+      - 'src/modules/programs/program-launch-service.ts'
+      - 'src/hooks/useLaunchInstitutionDefaults.ts'
+      - 'src/components/operations/LaunchHostAndProviderFields.tsx'
+      - 'src/components/operations/LaunchConfigurationForm.tsx'
+      - 'src/components/operations/LaunchWizardPage.tsx'
+      - 'tests/unit/jurisdiction-reference-catalog.test.ts'
+      - 'tests/unit/site-jurisdiction-default.test.ts'
+      - 'tests/unit/site-public-catalog.server.test.ts'
       - 'src/domain/errors.ts'
       - 'src/lib/client-error.ts'
       - 'src/modules/sites/site-local-content.server.ts'
@@ -55,7 +66,11 @@ jobs:
       - run: npm ci
       - name: Verify scoped tenant and local story contracts
         run: |
-          npx vitest run tests/unit/site-theme.test.ts \
+          npx vitest run tests/unit/jurisdiction-reference-catalog.test.ts \
+            tests/unit/site-jurisdiction-default.test.ts \
+            tests/unit/site-public-catalog.server.test.ts \
+            tests/unit/school-opening-jurisdiction-guard.test.ts \
+            tests/unit/site-theme.test.ts \
             tests/unit/website-studio-templates.test.tsx \
             tests/unit/school-brand-identity.test.tsx \
             tests/unit/private-website-preview.test.ts \
