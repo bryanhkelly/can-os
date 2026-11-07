@@ -19,12 +19,12 @@ beforeEach(()=>{
 describe("exact-Site Hub reader",()=>{
  it("returns real empty preparation without inventing approvals",async()=>{
   const result=await getSchoolHubData({data:{siteId}});
-  expect(result.statuses?.website.state).toBe("Not Started");expect(result.statuses?.team.detail).toContain("1 active members");expect(result.statuses?.academics.state).toBe("Not Started");expect(result.statuses?.compliance.state).toBe("Blocked");
+  expect(result.statuses?.website?.state).toBe("Not Started");expect(result.statuses?.team?.detail).toContain("1 active members");expect(result.statuses?.academics?.state).toBe("Not Started");expect(result.statuses?.compliance?.state).toBe("Blocked");
  });
  it("isolates failed reads rather than presenting empty records",async()=>{
   state.programReadFails=true;state.websiteReadFails=true;state.teamReadFails=true;
   const result=await getSchoolHubData({data:{siteId}});
-  expect(result.statuses?.website.state).toBe("Unavailable");expect(result.statuses?.team.state).toBe("Unavailable");expect(result.statuses?.academics.state).toBe("Unavailable");expect(result.statuses?.compliance.state).toBe("Unavailable");
+  expect(result.statuses?.website?.state).toBe("Unavailable");expect(result.statuses?.team?.state).toBe("Unavailable");expect(result.statuses?.academics?.state).toBe("Unavailable");expect(result.statuses?.compliance?.state).toBe("Unavailable");
  });
  it("isolates unrelated read failures for each launch module",async()=>{
   state.websiteReadFails=true;state.teamReadFails=true;
