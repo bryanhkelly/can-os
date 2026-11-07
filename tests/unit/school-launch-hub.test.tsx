@@ -67,7 +67,7 @@ describe("school Launch Hub",()=>{
   it.each(["promote","recruitment","events"] as const)("makes the %s placeholder honest and retains its return scope",module=>{
     const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId} module={module}/>);
     expect(html).toContain(`/launch/hub/school?siteId=${siteId}`);
-    expect(html).toContain("not enabled");
+    expect(html).toContain(module === "promote" ? "not implemented" : "not enabled");
     expect(html).toContain("What this module will make possible");
     expect(html).not.toContain("<button");
   });
