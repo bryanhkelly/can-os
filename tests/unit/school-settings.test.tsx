@@ -39,8 +39,11 @@ beforeEach(()=>{
 describe("dashboard school configuration",()=>{
  it("links all school settings to the same selected Site without sending administrators to Launch",()=>{
   const html=renderToStaticMarkup(<Settings.options.component/>);
-  for(const module of ["profile","website","team","promote","recruitment","events","academics","compliance"])
+  for(const module of ["profile","website","team","academics","compliance"])
    expect(html).toContain(`/settings/school/${module}?siteId=${siteId}`);
+  for(const module of ["promote","recruitment","events"])
+   expect(html).not.toContain(`/settings/school/${module}?siteId=${siteId}`);
+  expect(html).toContain("Not available yet");
   expect(html).not.toContain('/launch/school');
  });
  it("keeps the team workflow and return link in Settings",()=>{
@@ -53,9 +56,9 @@ describe("dashboard school configuration",()=>{
  it("opens the canonical website editor in the dashboard and preserves its return context",()=>{
   state.module="website";
   const html=renderToStaticMarkup(<SettingsModule.options.component/>);
-  expect(html).toContain(`/site-website?siteId=${siteId}`);
+  expect(html).toContain(`/launch/website?siteId=${siteId}`);
   expect(html).toContain("returnToSettings=true");
-  expect(html).not.toContain('/launch/website');
+  expect(html).not.toContain('/site-website');
  });
  it("requires explicit Site selection rather than opening another school's configuration",()=>{
   state.search={};state.siteIds=[siteId,otherSite];
