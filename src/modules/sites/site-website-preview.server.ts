@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
@@ -36,6 +36,17 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const history = address ? await readLocalContentHistory(site.id) : [];
   const approvedPhotos = host ? await readApprovedSchoolSitePhotos(site.id) : [];
   const media = host ? projectApprovedSchoolSiteMedia(site.id,host,approvedPhotos) : {};
+  // Read-only environment check: legacy databases reject status='draft'
+  // until migration 0077 is applied. Do not offer a save that must fail.
+  const draftConstraint = await db.execute(sql`
+    SELECT pg_get_constraintdef(c.oid) AS definition
+    FROM pg_constraint c
+    WHERE c.conrelid = to_regclass('public.site_local_content_versions')
+      AND c.conname = 'site_local_content_status_ck'
+    LIMIT 1
+  `);
+  const draftStorageReady = draftConstraint.rows.some(row =>
+    typeof row.definition === "string" && row.definition.includes("'draft'"));
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
@@ -76,6 +87,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     siteName: site.name,
     organizationName: site.organizationName,
     canPublish: site.canPublish,
+    draftStorageReady,
     canPrepareWebsite: actor.role === "site_admin",
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteInformation:siteInformation.success?siteInformation.data:null,
