@@ -42,6 +42,8 @@ The website card must enter Website Studio **directly** for the exact selected S
 
 Website publication, external URL reachability, academic Program publication, admissions eligibility, and legal/safeguarding permission to open are separate facts. No single green card claims the others.
 
+School opening and minor safeguarding are governed by independent [Church-Hosted Safety Gates](../quality/CHURCH-HOSTED-SAFETY-GATES.md); green Hub cards cannot authorize either.
+
 ## Status, security, and data
 
 `src/domain/school-hub-status.ts` defines Not Started, In Progress, Complete, Attention Needed, Blocked, Unavailable, and Planned. Read failures must remain **Unavailable**, not silently turn into zero or Not Started. Opening authority is not inferred from Journey completion. A click, demo fixture, or navigation event is not persisted task evidence.
