@@ -128,13 +128,31 @@ test("school administrator reviews, publishes and renames a standalone school we
   await page.getByRole("link", { name: "Open local public preview" }).click();
   await page.reload();
   await expect(page.getByRole("heading", { name: renamedName, exact: true })).toBeVisible();
-  // Saved public Site re-entry starts at template selection without a second intro.
+  // Website Studio is an operational editor, not a placeholder: choose a
+  // template, edit Site-owned copy, save an immutable draft, preview and publish.
   await page.goto(`/launch/website?siteId=${siteId}&returnToHub=true`);
   await expect(page.getByRole("heading", { name: "Find the right first impression." })).toBeVisible();
+  await expect(page.getByRole("group", { name: "School website templates" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Launch steps" })
+    .getByRole("button", { name: /School content/ }).click();
+  const localHeadline = `A warm place to learn and belong ${suffix}`;
+  await page.getByLabel("Homepage headline", { exact: false }).fill(localHeadline);
+  await page.getByRole("button", { name: "Save private draft" }).click();
+  await expect(page.getByText("Private website draft saved.", { exact: false })).toBeVisible();
+  await page.getByRole("navigation", { name: "Launch steps" })
+    .getByRole("button", { name: /Preview & review/ }).click();
+  await page.getByRole("button", { name: "Preview current changes" }).click();
+  await expect(page.getByRole("heading", { name: "Your unsaved design preview" })).toBeVisible();
+  await expect(page.getByTitle(`${renamedName} / read-only website preview`)).toBeVisible();
+  await page.getByRole("button", { name: "Publish church-owned content" }).click();
+  await expect(page.getByText("Church content published.", { exact: false })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "See what families will see." })).toBeVisible();
   await page.getByRole("link", { name: "Back to Launch Hub" }).click();
   await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
   await page.goto(`/published-site?site=${renamedSlug}`);
   await expect(page.getByRole("heading", { name: renamedName, exact: true })).toBeVisible();
+  await expect(page.locator("body")).toContainText(localHeadline);
   expect((await request.get(`/published-site?site=${publicSlug}`)).status()).toBe(404);
   expect((await request.get(`/published-site?site=unknown-${suffix}`)).status()).toBe(404);
   const anonymous = await request.get(`/published-site?site=${renamedSlug}`);
