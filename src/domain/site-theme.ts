@@ -3,7 +3,7 @@
  * A suggested brand is private draft data, NOT a published theme.
  */
 /** Structural template selection is independent of colors, fonts and approved school data. */
-export const siteTemplateIds = ["heritage", "community", "modern", "bright-futures", "summit"] as const;
+export const siteTemplateIds = ["heritage", "community", "modern", "bright-futures", "summit", "classic", "campus"] as const;
 export type SiteTemplateId = typeof siteTemplateIds[number];
 export function resolveSiteTemplateId(value: unknown): SiteTemplateId {
   return typeof value === "string" && siteTemplateIds.includes(value as SiteTemplateId)
