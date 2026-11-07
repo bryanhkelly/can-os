@@ -1,5 +1,7 @@
 # School Operations Security Gates
 
+> **Active merge/release blockers.** These domain-specific protections supplement [Church-Hosted Safety Gates](./quality/CHURCH-HOSTED-SAFETY-GATES.md); they are not superseded by that document.
+
 These are **merge/release blockers**, not optional polish. Schema generation and TypeScript CI do not prove safe handling of student medical, legal, or family data.
 
 ## Authorization
