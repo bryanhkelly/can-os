@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { SchoolLaunchHub } from "@/components/launch-studio/SchoolLaunchHub";
 import { schoolHubModules, type SchoolHubModule } from "@/domain/school-launch-hub";
 import { loadSchoolConfiguration } from "@/modules/programs/school-configuration-loader";
@@ -8,7 +8,12 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { schoolHubSearch } from "@/domain/school-launch-hub";
 export const Route = createFileRoute("/launch/hub/school_/$module")({
   validateSearch: search => schoolHubSearch.parse(search),
-  beforeLoad: ({params}) => {if(!Object.hasOwn(schoolHubModules,params.module))throw notFound();},
+  beforeLoad: ({params,search}) => {
+    if(!Object.hasOwn(schoolHubModules,params.module))throw notFound();
+    // Preserve old module bookmarks without sending users through a duplicate page.
+    if(params.module==="website" && search.siteId)
+      throw redirect({to:"/launch/website",search:{siteId:search.siteId,returnToHub:true},replace:true});
+  },
   loaderDeps:({search})=>search,
   loader:({deps,params})=>safeLoader(()=>loadSchoolConfiguration(deps,params.module))(),
   component: SchoolModulePage,

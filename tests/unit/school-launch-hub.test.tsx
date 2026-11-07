@@ -2,19 +2,33 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { SchoolLaunchHub, type SchoolHubOptions } from "@/components/launch-studio/SchoolLaunchHub";
+import { schoolHubSearch } from "@/domain/school-launch-hub";
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({children,to,search,params}:{children:ReactNode;to:string;search?:{siteId?:string};params?:{module?:string}}) => <a href={`${to.replace("$module",params?.module ?? "")}?siteId=${search?.siteId ?? ""}`}>{children}</a>,
+  Link: ({children,to,search,params}:{children:ReactNode;to:string;search?:{siteId?:string;returnToHub?:boolean};params?:{module?:string}}) => {
+    const query = new URLSearchParams();
+    if(search?.siteId)query.set("siteId",search.siteId);
+    if(search?.returnToHub)query.set("returnToHub","true");
+    return <a href={`${to.replace("$module",params?.module ?? "")}?${query}`}>{children}</a>;
+  },
 }));
 const siteId="00000000-0000-4000-8000-000000000001";
 const options={sites:[{id:siteId,name:"Test School",websiteDraft:null}],schoolSetupAdministrator:true} as unknown as SchoolHubOptions;
 describe("school Launch Hub",()=>{
   it("opens all seven modules under the selected school without claiming completion",()=>{
     const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}/>);
-    expect((html.match(/Open module/g) ?? []).length).toBe(7);
+    expect((html.match(/Open module/g) ?? []).length).toBe(6);
+    expect(html).toContain(`/launch/website?siteId=${siteId}&amp;returnToHub=true`);
+    expect(html).not.toContain(`/launch/hub/school/website?siteId=${siteId}`);
     expect(html).toContain("Build Your School Community");
     expect(html).toContain(`/launch/hub/school/promote?siteId=${siteId}`);
     expect(html).not.toContain("100%");
     expect(html).not.toContain("Not Started");
+  });
+  it("treats a malformed or stale siteId URL as an unselected school, without route failure",()=>{
+    const selection=schoolHubSearch.parse({siteId:"00000000-0000-4000-8000-00000000000",programId:"invalid"});
+    expect(selection.siteId).toBeUndefined();
+    expect(selection.programId).toBeUndefined();
+    expect(renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={selection.siteId}/>)).toContain("Choose your school");
   });
   it("never silently substitutes the only authorized school for a missing or invalid selection",()=>{
     for(const selection of [undefined,"another-school"]){

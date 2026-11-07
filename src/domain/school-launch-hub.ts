@@ -1,5 +1,11 @@
 import { z } from "zod";
-export const schoolHubSearch = z.object({siteId:z.string().uuid().optional(),programId:z.string().uuid().optional(),teamMode:z.enum(["access","invite","people"]).optional()});
+/** Malformed or stale URL selections must return to the authorized school picker,
+ * not throw from route validation before a loader can handle the error. */
+export const schoolHubSearch = z.object({
+  siteId:z.string().uuid().optional().catch(undefined),
+  programId:z.string().uuid().optional().catch(undefined),
+  teamMode:z.enum(["access","invite","people"]).optional().catch(undefined),
+});
 export const schoolHubModules = {
   website: { title: "Build Website", description: "Design, preview and publish your school's website.", action: "Open website setup", step: "website" },
   team: { title: "Invite Your Team", description: "Bring in school leaders and delegate scoped permissions.", action: "Invite team member" },

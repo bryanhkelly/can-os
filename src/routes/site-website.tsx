@@ -78,7 +78,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   const returnToLaunch=selection.returnToSettings && selection.siteId
     ? <Link to="/settings" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Settings</Link>
     : selection.returnToHub && selection.siteId
-    ? <Link to="/launch/hub/school/$module" params={{module:"website"}} search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Build Website</Link>
+    ? <Link to="/launch/hub/school" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Launch Hub</Link>
     : selection.siteId&&selection.programId&&selection.returnGrantId
     ?<LaunchWebsiteEditorHandoff siteId={selection.siteId} programId={selection.programId} returnGrantId={selection.returnGrantId} destination="launch"/>:null;
   if (!outcome.ok) return <>{returnToLaunch}<LoaderFailure eyebrow="Partner website"
