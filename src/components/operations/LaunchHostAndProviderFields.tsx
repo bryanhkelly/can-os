@@ -105,7 +105,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, hos
                       </Link>
                     </div>
                   </details>}
-                  <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
+                  {options.canCreateSite && <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
                     <summary className="cursor-pointer text-sm font-semibold">
                       {hostSites.length ? "Add another school location" : "Create your school location"}
                     </summary>
@@ -142,7 +142,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, hos
                       <Link to="/sites/$siteId/publish" params={{siteId:createdSiteDraft.siteId}}
                         className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
                     </div>}
-                  </details>
+                  </details>}
                   <Field label="State or region" required error={jurisdictionIssue?.message}>
                     <Select value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)}>
                       <option value="">Choose your state or region…</option>

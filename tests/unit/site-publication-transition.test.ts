@@ -57,3 +57,9 @@ describe("site publish / unpublish decision", () => {
     expect(result.updatedAt.getTime()).toBe(t0.getTime() + 1);
   });
 });
+
+
+it("allows a reviewed Site-owned website without granting academic listing publication",()=>{
+  const current={status:"draft",publishedAt:null,updatedAt:new Date("2026-11-06T00:00:00Z")};
+  expect(planSitePublicationTransition({current,action:"publish",expectedRevision:current.updatedAt.toISOString(),reason:"Reviewed school website content",contentReviewed:true,eligibleOfferingCount:0,siteOwnedContentReady:true,now:new Date("2026-11-07T00:00:00Z")})).toMatchObject({status:"published",changed:true});
+});

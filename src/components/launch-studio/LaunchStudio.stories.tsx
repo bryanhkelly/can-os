@@ -69,7 +69,7 @@ function SchoolDetails({ unsupported = false }: { unsupported?: boolean }) {
   const organization={id:"org",name:"Example School Organization",type:"christian_school"} as const;
   const options:ComponentProps<typeof LaunchConfigurationForm>["hostAndProvider"]["options"]={
     organizations:[organization],academicProviderOrganizations:[organization],creditIssuingOrganizations:[organization],
-    schoolSetupAdministrator:true,
+    canCreateSite: true, schoolSetupAdministrator:true,
     jurisdictions:[{id:"tx",code:"US-TX",name:"Texas"}],
     sites:[{id:"site",organizationId:"org",name:"Example Academy Campus",slug:"example-campus",
       timezone:"America/Chicago",updatedAt:"2026-11-05T00:00:00Z",

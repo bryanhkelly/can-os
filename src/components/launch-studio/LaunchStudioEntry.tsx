@@ -4,7 +4,7 @@ import { PageFrame, PageHeader } from "@/components/workspace";
 import wallpaper from "@/assets/student-dashboard-wallpaper.jpg";
 
 const paths = [
-  { title: "Set up a school", description: "For administrators and school leaders", to: "/launch/school", icon: Landmark },
+  { title: "Set up a school", description: "For administrators and school leaders", to: "/launch/hub/school", icon: Landmark },
   { title: "Apply for your child", description: "For parents and guardians", to: "/launch/family", icon: Users },
   { title: "Get started as a student", description: "For enrolled or invited students", to: "/launch/student", icon: GraduationCap },
   { title: "Join your school team", description: "For teachers and school staff", to: "/launch/staff", icon: BookOpen },

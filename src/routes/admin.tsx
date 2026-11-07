@@ -58,7 +58,7 @@ function AdminConsolePage() {
   return <ScopedAdminConsole key={JSON.stringify(selection)} selection={selection}/>;
 }
 
-export function ScopedAdminConsole({selection, mode="access"}: {selection: {siteId?: string; inviteRole?: string}; mode?: "access"|"invite"|"people"}) {
+export function ScopedAdminConsole({selection, mode="access", hubMode=false, onChanged}: {onChanged?:()=>Promise<unknown>;hubMode?:boolean;selection: {siteId?: string; inviteRole?: string}; mode?: "access"|"invite"|"people"}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -134,6 +134,7 @@ export function ScopedAdminConsole({selection, mode="access"}: {selection: {site
       const defaults = launchStaffInvitationDefaults(sites, selection);
       form.reset({...inviteDefaults,siteId:defaults.siteId,role:defaults.role});
       await refresh();
+      void onChanged?.().catch(()=>setError("Changes were saved, but the Hub summary could not refresh. Reopen the Hub before retrying."));
     } catch {
       setError("Unable to invite this staff member. Check the details and your permissions.");
     } finally {
@@ -146,6 +147,7 @@ export function ScopedAdminConsole({selection, mode="access"}: {selection: {site
     try {
       await setGrantActive({ data: { grantId, active: !active } });
       await refresh();
+      void onChanged?.().catch(()=>setError("Changes were saved, but the Hub summary could not refresh. Reopen the Hub before retrying."));
     } catch {
       setError("Unable to update this grant. Check your authorized school scope and active grant.");
     }
@@ -154,11 +156,11 @@ export function ScopedAdminConsole({selection, mode="access"}: {selection: {site
   const fieldClass = "mt-2 w-full rounded-lg border bg-background p-3";
 
   return (
-    <WorkspaceShell
+    <WorkspaceShell embedded={hubMode}
       eyebrow="Admin"
       title={mode==="invite"?"Invite staff":mode==="people"?"People directory":"Staff access"}
-      breadcrumbs={mode!=="access"?<Link to="/admin" search={{siteId:selection.siteId}} className="underline">Administration</Link>:undefined}
-      actions={<div className="flex flex-wrap gap-2">
+      breadcrumbs={!hubMode && mode!=="access"?<Link to="/admin" search={{siteId:selection.siteId}} className="underline">Administration</Link>:undefined}
+      actions={!hubMode && <div className="flex flex-wrap gap-2">
         {mode!=="invite"&&<CreateAction><Link to="/admin/invite" search={adminSearchSchema.parse(selection)}>Invite staff</Link></CreateAction>}
         {mode!=="people"&&<Link to="/admin/people" search={{siteId:selection.siteId}} className={secondaryActionClassName}>People directory</Link>}
       </div>}

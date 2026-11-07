@@ -34,7 +34,7 @@ export function assertPartnerWebsitePreviewScope(
   site: { id: string; organizationId: string },
 ): void {
   if (!actor.actorPersonId ||
-      actor.role !== "site_website_editor" ||
+      !["site_website_editor", "site_admin"].includes(actor.role) ||
       actor.grantSiteId !== site.id ||
       !actor.capabilities.has(siteWebsiteDraftReadCapability) ||
       !actor.scope.organizationIds?.includes(site.organizationId) ||

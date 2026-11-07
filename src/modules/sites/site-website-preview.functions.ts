@@ -6,7 +6,7 @@ import { getPartnerWebsitePreview } from "./site-website-preview.server";
 import {AuthorizationError} from "@/domain/command-context";
 import { z } from "zod";
 
-/** Signed-in Site partner, explicit site role assignment; never an anonymous
+/** Signed-in Site editor or unaffiliated Site Administrator; never an anonymous
  * tenant-host preview, publisher approval API or family-data endpoint. */
 export const getPartnerWebsitePreviewView = createServerFn({ method: "GET" })
   .validator((value:unknown)=>z.object({siteId:z.string().uuid().optional()}).strict().parse(value??{}))
@@ -126,5 +126,21 @@ export const restoreChurchWebsiteContent = createServerFn({ method: "POST" })
     return publishPartnerLocalContent(actor, {
       operation: "restore", expectedRevision: data.expectedRevision,
       restoreRevision: data.restoreRevision,
+    });
+  });
+
+/** Explicitly prepare a private address after a Site stub exists. GETs never mutate. */
+export const prepareSchoolWebsite = createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({siteId:z.string().uuid()}).strict().parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCommandContext(getRequest());
+    const [{db},{requirePartnerWebsiteEditor},{ensureExistingSitePublicationDraftForLaunch}]=await Promise.all([
+      import("@/db/client"),import("./site-website-authorization.server"),import("./site-public-provisioning.server"),
+    ]);
+    return db.transaction(async tx=>{
+      const site=await requirePartnerWebsiteEditor(actor,tx,"site.website.local.publish");
+      if(site.id!==data.siteId || actor.role!=="site_admin")throw new AuthorizationError("Site Administrator preparation required");
+      return ensureExistingSitePublicationDraftForLaunch(tx,actor,site);
     });
   });

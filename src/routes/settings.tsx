@@ -1,12 +1,14 @@
+import { schoolHubSearch } from "@/domain/school-launch-hub";
+import { SchoolSettingsDestinations } from "@/components/launch-studio/SchoolSettingsDestinations";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { WorkspaceShell } from "@/components/workspace";
-import { ArrowRight, BookOpen, Globe, GraduationCap, School, UserRound, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Globe, GraduationCap, UserRound, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 /** Navigation only. All edits stay in their verified canonical owning journeys.
  * A saved draft is NOT an approved application, qualification or school opening. */
-export const Route = createFileRoute("/settings")({ component: SettingsHome });
+export const Route = createFileRoute("/settings")({ validateSearch:search=>schoolHubSearch.pick({siteId:true}).parse(search), component: SettingsHome });
 
 function EditDestination({ title, description, children, icon }: {
   title: string; description: string; children: ReactNode; icon: ReactNode;
@@ -22,6 +24,7 @@ function EditDestination({ title, description, children, icon }: {
 }
 const actionClass="inline-flex min-h-11 items-center gap-2 border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 function SettingsHome() {
+  const selection=Route.useSearch();
   const { session } = useWorkspaceSession();
   if (!session?.authenticated) return <WorkspaceShell title="Settings" width="reading">
     <p role="status" className="border bg-card p-5 text-sm">Sign in to an authorized school workspace to review your settings. <Link to="/access" className="underline">Sign in</Link></p>
@@ -29,7 +32,7 @@ function SettingsHome() {
   const role = session.role;
   // The session's Site scope is only a navigation hint; the destination server
   // validates the exact Site/Program grant and relationship for every edit.
-  const siteId = session.activeContext.siteIds.length === 1 ? session.activeContext.siteIds[0] : undefined;
+  const siteId = selection.siteId ?? (session.activeContext.siteIds.length === 1 ? session.activeContext.siteIds[0] : undefined);
   const schoolAdmin = role === "registrar" || role === "site_admin";
   const websiteEditor = role === "site_website_editor";
   const family = role === "guardian";
@@ -37,22 +40,11 @@ function SettingsHome() {
   const staff = ["teacher","room_facilitator","site_staff","site_leader","specialist","counselor","paraeducator"].includes(role);
   return <WorkspaceShell eyebrow="Your workspace" title="Settings" width="wide"
     subtitle="Return to the same authorized records whenever your school's information or your preferences change. No second onboarding record is created.">
+    {schoolAdmin && <SchoolSettingsDestinations siteId={siteId}/>}
     <div className="mt-7 grid gap-4">
-      {schoolAdmin && <EditDestination title="School setup" icon={<School className="size-5"/>}
-        description="Revise school identity, programs, calendars and launch preparation through your existing school setup journey. Saving a draft does not authorize opening.">
-        <Link className={actionClass} to="/launch/school" search={{siteId,step:"school"}}>Edit school setup <ArrowRight className="size-4"/></Link>
-      </EditDestination>}
-      {schoolAdmin && siteId && <EditDestination title="School profile" icon={<School className="size-5"/>}
-        description="Review your current school's Site identity, address, organization and verified academic programs without selecting the school again.">
-        <Link className={actionClass} to="/sites/$siteId/profile" params={{siteId}}>School profile <ArrowRight className="size-4"/></Link>
-      </EditDestination>}
-      {schoolAdmin && <EditDestination title="School website" icon={<Globe className="size-5"/>}
-        description="Review the Site's website and current publication status. An explicitly authorized website editor manages branding, sources, photography and local content.">
-        <Link className={actionClass} to="/launch/school" search={{siteId,step:"website"}}>Manage website handoff <ArrowRight className="size-4"/></Link>
-      </EditDestination>}
       {websiteEditor && <EditDestination title="Website design and content" icon={<Globe className="size-5"/>}
-        description="Reopen the full Website Launch Studio to change templates, colors, approved imagery, copy or public references. Save a private draft, preview and request publication separately.">
-        <Link className={actionClass} to="/launch/website" search={{siteId}}>Edit school website <ArrowRight className="size-4"/></Link>
+        description="Open the same website editor to change templates, colors, approved imagery, copy or public references. Save a private draft, preview and request publication separately.">
+        <Link className={actionClass} to="/site-website" search={{siteId,returnToSettings:true}}>Edit school website <ArrowRight className="size-4"/></Link>
       </EditDestination>}
       {family && <EditDestination title="Family applications" icon={<Users className="size-5"/>}
         description="Resume a draft, review child documents and continue authorized enrollment requests. Submitted applications follow the school's separate correction and review process.">

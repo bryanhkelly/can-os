@@ -1,3 +1,4 @@
+import { useRouter } from "@tanstack/react-router";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import {useState} from "react";
@@ -11,6 +12,7 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
  siteId:string;programId:string;returnGrantId?:string;destination?:"editor"|"launch";
 }){
  const queryClient=useQueryClient();
+ const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
  async function open(){
   if(busy)return;setBusy(true);setError("");
@@ -21,6 +23,10 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
    if(!grant)throw new Error(destination==="editor"
     ?"Your current account has no matching church website editor assignment. Invite your church's editor below, or use Switch workspace to select an independently authorized editor."
     :"The original school setup membership is unavailable. Use Switch workspace to select an authorized school registrar.");
+   if(destination==="editor" && grant.id===session.activeGrantId){
+     await router.navigate({to:"/launch/website",search:{siteId,returnToHub:true}});
+     setBusy(false);return;
+   }
    const query=new URLSearchParams({siteId,programId});
    if(destination==="editor")query.set("returnGrantId",session.activeGrantId);
     await switchVerifiedMembership({grants:session.grants,activeGrantId:session.activeGrantId,
@@ -29,7 +35,7 @@ export function LaunchWebsiteEditorHandoff({siteId,programId,returnGrantId,desti
   }catch(cause){setError(mutationErrorMessage(cause, "The website workspace could not be opened."));setBusy(false);}
  }
  return <span className="inline-block">
-  <Button type="button" variant="outline" disabled={busy} onClick={()=>void open()} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Opening verified workspace…":destination==="editor"?"Edit church-owned website content":"Return to school setup"}</Button>
+  <Button type="button" variant="outline" disabled={busy} onClick={()=>void open()} className="rounded border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy?"Opening verified workspace…":destination==="editor"?"Edit school website":"Return to school setup"}</Button>
   {error&&<span role="alert" className="mt-2 block max-w-xl text-sm font-normal">{error}</span>}
  </span>;
 }

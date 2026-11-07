@@ -143,3 +143,11 @@ describe("private launch drafts", () => {
     expect(html).toMatch(/disabled=""[^>]*>Submit application/);
   });
 });
+
+it("renders a focused module without school wizard navigation or nested main landmarks",()=>{
+  const html=renderToStaticMarkup(<LaunchStudioShell focused role="Academic Program" subject="School" title="Configure academics" steps={[{id:"school",title:"School details"}]} currentId="school" onStepChange={vi.fn()}><p>Canonical Program controls</p></LaunchStudioShell>);
+  expect(html).toContain("Canonical Program controls");
+  expect(html).not.toContain('aria-label="Launch steps"');
+  expect(html).not.toContain('aria-label="Journey navigation"');
+  expect(html).not.toContain("<main");
+});

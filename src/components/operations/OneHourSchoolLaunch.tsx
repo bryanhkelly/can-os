@@ -1,3 +1,4 @@
+import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import { LaunchOrientationTask } from "@/components/operations/LaunchOrientationTask";
 import { LaunchOpeningTask } from "@/components/operations/LaunchOpeningTask";
 import { SchoolOwnedCompletion, LaunchEvidenceStatement, InstitutionalEvidenceReview } from "@/components/operations/LaunchRequirementActions";
@@ -40,11 +41,13 @@ function taskTone(task: LaunchGuidanceTask): "success" | "attention" | "neutral"
 
 
 
-export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId }: {
+export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId, hubMode=false }: {
+  hubMode?:boolean;
   launches: Launch[];
   selectedProgramId?: string;
   selectedSiteId?: string;
 }) {
+  const navigation=useSchoolConfigurationNavigation();
   const router = useRouter();
   const [openingSaving, setOpeningSaving] = useState(false);
   const [activationNeedsRefresh, setActivationNeedsRefresh] = useState(false);
@@ -210,14 +213,14 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     <section aria-label="Launch preparation destinations" className="mt-5 rounded-xl border bg-background p-4">
       <h3 className="text-sm font-semibold">Continue school preparation</h3>
       <p className="mt-1 text-xs text-muted-foreground">These links are preparation steps, not readiness or authorization decisions. Opening and service authority remain governed by their independent server checks.</p>
-      <nav aria-label="Next school preparation actions" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
+      {!hubMode && <nav aria-label="Next school preparation actions" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
         <a href="#launch-academic-year" className="underline">Prepare recommended year</a>
         <a href="#launch-first-class" className="underline">Prepare first classroom</a>
         <Link to="/launch/school/$programId" params={{programId:launch.id}}
           hash="physical-classrooms" className="underline">Create physical classrooms</Link>
         <a href="#launch-website" className="underline">Prepare website</a>
         <a href="#invite-families" className="underline">Review invitation progress</a>
-      </nav>
+      </nav>}
     </section>
     {next ? <article className="mt-6 rounded-2xl border-2 border-primary/30 p-5" aria-label="Next launch task">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -245,7 +248,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       {next.state === "waiting_third_party" && <p className="mt-3 text-sm">
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
-      <div className="mt-4"><LaunchTaskDestination launch={launch} task={next} /></div>
+      <div className="mt-4"><LaunchTaskDestination hubMode={hubMode} launch={launch} task={next} /></div>
       {canReviewSelectedLaunch && next.pendingEvidenceReview && <InstitutionalEvidenceReview key={`review-${next.id}`} task={next} busy={busy} review={reviewEvidence} />}
       <LaunchEvidenceStatement key={`evidence-${next.id}`} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={`completion-${next.id}`} task={next} busy={busy} complete={complete} />
@@ -284,12 +287,11 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.state === "needs_you" && <span className="max-w-48 text-right text-xs text-muted-foreground">School-owned work; confirm completion only after the underlying requirement is met.</span>}
             {task.state === "blocked" && <span className="max-w-48 text-right text-xs text-muted-foreground">Review the canonical requirement record to resolve the blocker.</span>}
             {task.state !== "complete" && task.action !== "opening" &&
-              <LaunchTaskDestination launch={launch} task={task} />}
+              <LaunchTaskDestination hubMode={hubMode} launch={launch} task={task} />}
             {canReviewSelectedLaunch && task.id !== next?.id && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
             {task.id !== next?.id && (task.evidenceReviewCorrectionPending || (task.state === "needs_can" && !task.pendingEvidenceReview && !task.evidenceStatementCount)) && <LaunchEvidenceStatement key={task.id} task={task} busy={busy} submit={submitEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&
-              <Link to="/launch/school/$programId" params={{programId:launch.id}}
-                search={{siteId:launch.siteId??undefined,programId:undefined}}
+              <Link {...(hubMode?{to:navigation.modulePath,params:{module:"academics"},search:{siteId:launch.siteId??undefined,programId:launch.id}}:{to:"/launch/school/$programId" as const,params:{programId:launch.id},search:{siteId:launch.siteId??undefined,programId:undefined}})}
                 className="text-xs font-semibold underline">Review orientation setup</Link>}
           </div>
         </li>)}

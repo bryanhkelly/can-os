@@ -54,7 +54,7 @@ const baseRoleCapabilities = {
 
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
  ...baseRoleCapabilities,
- site_admin: [...baseRoleCapabilities.registrar, "school.setup.manage"],
+ site_admin: [...baseRoleCapabilities.registrar, "school.setup.manage", "site.website.draft.read", "site.website.local.publish"],
 });
 
 /** This may be called only after authenticating a server session and fetching grants from Neon. */

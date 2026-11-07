@@ -34,13 +34,19 @@ export function LaunchStudioChrome({ children }: { children: ReactNode }) {
 }
 
 export function LaunchStudioShell({ role, subject, title, description, steps, currentId, onStepChange,
-  progress, progressLabel = "School requirements", help, children, actions, exit, notice, saveAction, status }: {
-  role: string; subject: string; title: ReactNode; description?: ReactNode;
+  progress, progressLabel = "School requirements", help, children, actions, exit, notice, saveAction, status, focused = false }: {
+  focused?: boolean; role: string; subject: string; title: ReactNode; description?: ReactNode;
   steps: readonly LaunchStudioStep[]; currentId: string; onStepChange: (id: string) => void;
   progress?: LaunchStudioProgress; progressLabel?: string; help?: ReactNode;
   children: ReactNode; actions?: ReactNode; exit?: ReactNode; notice?: ReactNode; saveAction?: ReactNode; status?: ReactNode;
 }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
+  if(focused) return <section className="mt-6">
+    <PageHeader eyebrow={role} title={title} subtitle={description}/>
+    {notice}<div className="mt-6 space-y-5">{children}</div>
+    {actions && <div className="mt-6">{actions}</div>}
+    {exit && <div className="mt-6 border-t pt-5">{exit}</div>}
+  </section>;
   const index = steps.findIndex(step => step.id === currentId);
   const percent = progress && progress.total > 0 ? Math.floor(progress.complete / progress.total * 100) : null;
   return <PageFrame width="wide" className="launch-studio-page launch-journey-form">
