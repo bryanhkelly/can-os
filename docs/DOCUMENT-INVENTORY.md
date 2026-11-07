@@ -82,3 +82,13 @@ Archived and retired the dated `docs/implementation/CODE_BASED_SOURCE_MAP.md` an
 Captured the complete recursive Git tree from `main` (2,510 entries; `truncated: false`). Archived and retired 16 dated documents covering isolated FullFlow Neon migration evidence, integration/agent handoffs, visual design checkpoints, and November browser/route test findings. See [the exact source-to-archive manifest](archive/2026-11-fullflow/README.md). The operation reuses source Git blob SHAs and removes originals in a single tree update, preserving historical bytes exactly. Targeted filename searches found no active inbound document consumers for these candidates, but this is **not** exhaustive link/CI validation.
 
 Active, potentially operational instructions such as `docs/neon-development.md`, `docs/identity-and-demo-access.md`, `docs/school-operations-security-gates.md`, and `docs/platform-route-contracts.json` remain at their existing paths. Proposed SQL under `docs/migrations/` remains untouched.
+
+## Phase 11 post-move verification
+
+Verified against `main` commit `5041d51554586356b661545b00198d24f424db79`:
+
+- Compared all 16 archived paths with their source entries in the parent Git tree. **All 16 archive blobs match exactly, and all 16 original paths are absent**.
+- Inspected **69 active Markdown files** (`docs/` excluding archive, root `README.md`, `AGENTS.md`, and Copilot instructions) for inline relative Markdown links. Checked **74 local targets** (including two directory links). **No missing path targets found**. One transient read failure was retried successfully.
+- Checked the archive index's **24 local links**. All targets exist in the Git tree.
+
+This is a targeted structural audit, **not** a complete repository-wide reference audit: raw path strings in code, reference-style Markdown links, anchor fragments, archived historical links, external URLs, and semantic correctness were not validated. CI, test execution, build and runtime journeys remain unverified.
