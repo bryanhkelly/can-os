@@ -9,7 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { physicalSiteAddressSchema, siteTimezoneSchema, samePhysicalSiteAddress, readSitePhysicalAddress, launchOnsiteDaysPerWeekSchema } from "@/domain/site-setup-configuration";
-import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { DomainError } from "@/domain/errors";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes } from "@/domain/program-offerings";
@@ -139,7 +139,9 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       organizations: organizationRows, // The host selector remains scoped to the local registrar.
       academicProviderOrganizations,
       creditIssuingOrganizations: academicProviderOrganizations,
-      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), siteInformationDraft:safeJson(metadata.siteInformation??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
+      sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => {
+        const planningLocation=schoolPlanningLocationSchema.safeParse(metadata.schoolPlanningLocation);
+        return { ...site, planningLocation:planningLocation.success?planningLocation.data:null, ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), siteInformationDraft:safeJson(metadata.siteInformation??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null }; }),
       jurisdictions: jurisdictionRows,
       canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
         schoolSetupAdministrator: context.role === "site_admin",
@@ -169,19 +171,21 @@ export const startLaunch = createServerFn({ method: "POST" })
         import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
       ]);
       const [site]=await db.select({address:schema.sites.address,
-        organizationId:schema.sites.organizationId}).from(schema.sites)
+        metadata:schema.sites.metadata,organizationId:schema.sites.organizationId}).from(schema.sites)
         .where(eq(schema.sites.id,data.siteId)).limit(1);
       if(site && site.organizationId===data.hostOrganizationId) {
         const address=readSitePhysicalAddress(site.address);
-        if(address.value?.country==="US") {
+        const planningLocation=schoolPlanningLocationSchema.safeParse(site.metadata.schoolPlanningLocation);
+        const location=siteJurisdictionLocation(address.value,planningLocation.success?planningLocation.data:null);
+        if(location?.country==="US") {
           const jurisdictions=await db.select({
             id:schema.jurisdictions.id,code:schema.jurisdictions.code,
             name:schema.jurisdictions.name,
           }).from(schema.jurisdictions);
-          const issue=launchSiteJurisdictionIssue(address.value,jurisdictions,data.jurisdictionId);
-          if(issue) throw new DomainError(issue.code,issue.message);
+          const issue=launchSiteJurisdictionIssue(location,jurisdictions,data.jurisdictionId);
+          if(issue?.code==="LAUNCH_LOCATION_MISMATCH") throw new DomainError(issue.code,issue.message);
           const target=jurisdictions.find(item=>item.id===data.jurisdictionId);
-          if(target && !addressStateJurisdiction(address.value,[target]))
+          if(target && !addressStateJurisdiction(location,[target]))
             throw new DomainError("LAUNCH_LOCATION_MISMATCH");
         }
       }
