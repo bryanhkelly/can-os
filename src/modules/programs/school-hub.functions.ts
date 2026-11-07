@@ -74,8 +74,9 @@ export const getSchoolHubData=createServerFn({method:"GET"})
     if(!data.module || data.module==="academics")statuses.academics=programRead.status==="rejected"?readFailureStatus("Academic"):academicHubStatus(launches!);
     if(!data.module || data.module==="compliance")statuses.compliance=programRead.status==="rejected"?readFailureStatus("Compliance"):complianceHubStatus(launches!);
   }
-  for(const module of ["promote","recruitment","events"] as const)
-    if(!data.module || data.module===module)statuses[module]=plannedHubStatus;
+  if(!data.module)
+    for(const module of ["promote","recruitment","events"] as const)
+      statuses[module]=plannedHubStatus;
   return {options,launches,selectedProgramId,statuses,
     selectionError:invalidProgram?"The requested Program is not available at this school. Choose an authorized Program.":null};
  });
