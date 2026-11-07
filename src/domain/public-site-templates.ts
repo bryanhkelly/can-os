@@ -1,6 +1,6 @@
 import type { SiteTemplateId } from "./site-theme";
 
-/** Five distinct, finite layout systems. All consume the same approved school content.
+/** Seven distinct, finite layout systems. All consume the same approved school content.
  * No dynamic HTML, CSS, remote fonts or untrusted source styles enter this catalog. */
 export const siteTemplateCatalog: ReadonlyArray<{
   id: SiteTemplateId; name: string; description: string; character: string;
@@ -10,6 +10,8 @@ export const siteTemplateCatalog: ReadonlyArray<{
   { id: "modern", name: "Modern Academy", description: "An energetic, information-first campus experience.", character: "Bold • Precise • Contemporary" },
   { id: "bright-futures", name: "Bright Futures", description: "A clear, joyful introduction for families and younger learners.", character: "Optimistic • Open • Approachable" },
   { id: "summit", name: "Summit Preparatory", description: "An immersive, ambitious story of growth and discovery.", character: "Cinematic • Aspirational • Focused" },
+  { id: "classic", name: "Heritage Classical", description: "An enduring school prospectus with an institutional crest, pillars and traditional campus composition.", character: "Traditional • Collegiate • Refined" },
+  { id: "campus", name: "Campus Life", description: "A photographic school journal built around editorial stories and a campus mosaic.", character: "Photographic • Energetic • Human" },
 ];
 
 /** Content is already HTML-escaped/rendered by public-site-html.ts. We control
@@ -44,6 +46,14 @@ export function composePublicSiteHome(template: SiteTemplateId, sections: Public
       '<div class="home-composition home-summit"><div class="summit-manifesto">' +
       sections.vision + '</div>' +
       join(["academics","story","enrichment","explore","closing","contact"]) + '</div>';
+    case "classic": return sections.hero +
+      '<div class="home-composition home-classic"><div class="classic-pillars">' +
+      join(["academics","vision","enrichment"]) + '</div>' +
+      join(["story","explore","closing","contact"]) + '</div>';
+    case "campus": return sections.hero +
+      '<div class="home-composition home-campus"><div class="campus-stories">' +
+      join(["story","enrichment","explore"]) + '</div>' +
+      join(["vision","academics","closing","contact"]) + '</div>';
   }
 }
 
@@ -271,6 +281,8 @@ export function composePublicSiteInterior(template: SiteTemplateId, hero: string
     case "modern": return `<div class="interior-modern">${hero}<div class="interior-main">${primary}</div><div class="interior-related">${secondary}</div></div>`;
     case "bright-futures": return hero + `<div class="interior-bright"><div class="interior-main">${primary}</div><div class="interior-related">${secondary}</div></div>`;
     case "summit": return hero + `<div class="interior-summit"><div class="interior-main">${primary}</div><div class="interior-related">${secondary}</div></div>`;
+    case "classic": return hero + `<div class="interior-classic"><div class="interior-main">${primary}</div><aside class="interior-related">${secondary}</aside></div>`;
+    case "campus": return hero + `<div class="interior-campus"><div class="interior-main">${primary}</div><aside class="interior-related">${secondary}</aside></div>`;
     default: return hero + `<article class="interior-heritage">${primary}<div class="interior-related">${secondary}</div></article>`;
   }
 }
