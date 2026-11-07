@@ -73,4 +73,4 @@ For every acceptance claim, record exact commit, test environment, isolated data
 - Settings destinations: `src/components/launch-studio/SchoolSettingsDestinations.tsx`
 - Routes: `src/routes/launch.hub.school.tsx`, `src/routes/launch.hub.school_.$module.tsx`, `src/routes/launch.hub.school_.new.tsx`, `src/routes/launch.website.tsx`
 - [Operating model](OPERATING-MODEL.md), [platform capabilities](PLATFORM-CAPABILITIES.md), [architecture](../architecture/SYSTEM.md), [acceptance standards](../quality/ACCEPTANCE-STANDARDS.md)
-- [Launch Hub implementation notes](../school-launch-hub-implementation.md) remain useful dated evidence, **not** current acceptance certification.
+- [Archived Launch Hub implementation notes](../archive/2026-11-fullflow/delivery-evidence/school-launch-hub-implementation.md) remain useful dated evidence, **not** current acceptance certification.
