@@ -50,4 +50,6 @@
 
 **Phase 9:** Retired four dated design/integration/branch-delivery records into exact verified archive copies. Repaired FullFlow fixture's historical contract path. Current V6.1 design authority and operational runbooks remain active.
 
+**Phase 10:** Archived two November 3 integration coordination records after exact blob comparison. Retained the V6.1 migration checklist and public-site admissions backlog due to explicit live documentation dependencies; both require current-main verification before retirement.
+
 **Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
