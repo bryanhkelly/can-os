@@ -1,5 +1,7 @@
 # Church-Hosted School — institutional authority and full-day acceptance
 
+> **Documentation reset, November 7, 2026:** This detailed contract remains active for still-applicable institutional and safeguarding requirements. FullFlow branch/PR and dated incremental results below are historical snapshots, **not current acceptance evidence**. See [Church-Hosted Safety Gates](./quality/CHURCH-HOSTED-SAFETY-GATES.md) for consolidated P0 release requirements. Do not retire this file until all protected requirements have a verified replacement.
+
 **Status: in development; NOT accepted.** Working branch: `FullFlow`, draft PR #172.
 This is an additional operating model, not a substitute for the canonical six-stage K–8 extension FullFlow gate.
 
