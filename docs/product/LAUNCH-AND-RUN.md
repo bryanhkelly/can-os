@@ -32,6 +32,8 @@ The existing **Site Information** card describes the school setting and existing
 
 The current nine-card source catalog does **not** contain a separate Church Information card. Treat its creation as a product-to-code gap, not as implemented functionality. Reuse canonical Organization/Site relationships and reviewed publication rules rather than inventing shadow identities or a church-only workflow engine.
 
+See [Website Studio](WEBSITE-STUDIO.md) for the six-step website design, preview and publication contract.
+
 ## Website Studio and navigation
 
 The website card must enter Website Studio **directly** for the exact selected Site. Return links and browser Back must preserve Site scope without throwing, cycling through interstitials, or silently selecting another school. Invalid, missing, and unauthorized identifiers require explicit recovery. The Site Admin is the local authority for Site-owned website content; protected institutional claims retain their independent review path.
