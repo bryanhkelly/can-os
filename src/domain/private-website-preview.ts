@@ -30,9 +30,9 @@ export function renderPrivateWebsitePreviewHtml(
   availablePages: readonly string[],
 ): string {
   const links = new Set(availablePages.filter(isPublicSitePagePath));
-  const converted = html.replace(/href="(\/[a-z-]*)"/g, (match, path: string) =>
+  const converted = html.replace(/href="(\/[a-z-]*)"/g, (_match, path: string) =>
     isPublicSitePagePath(path) && links.has(path)
-      ? `href="${privateWebsitePreviewUrl(siteId, path)}"` : match);
+      ? `href="${privateWebsitePreviewUrl(siteId, path)}"` : 'aria-disabled="true"');
   const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&returnToHub=true&step=preview`;
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private school website preview</strong>
