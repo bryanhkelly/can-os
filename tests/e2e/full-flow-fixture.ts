@@ -12,7 +12,7 @@ import {
 
 /**
  * Bootstrap for the persistent multi-role FullFlow browser acceptance
- * (docs/full-flow-acceptance-contract.md).
+ * (docs/archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md).
  *
  * Only identities, safe catalogs and prerequisites are created here:
  *   - synthetic organizations (school tenant, unrelated second tenant,
