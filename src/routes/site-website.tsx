@@ -780,7 +780,7 @@ function LocalWebsiteCopyEditor({
         </div>
         <p className="text-xs text-muted-foreground">The full-page link uses your latest saved private revision and your existing CAN OS sign-in. No draft is made public. {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
         {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">Save the private website draft to enable the full-page preview. You can test unsaved changes below without saving.</p>}
-        {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>
+        {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
         {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
         <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
         <details className="border p-4">
