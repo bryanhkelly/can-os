@@ -1,6 +1,6 @@
 # CAN OS canonical capability ownership matrix
 
-This is an architectural ownership map, not a Phase 1 branch plan or a production-acceptance certificate. For code state and unresolved verification, see [CURRENT-STATE.md](./CURRENT-STATE.md).
+This is an architectural ownership map, not a Phase 1 branch plan or a production-acceptance certificate. For code state and unresolved verification, see [archived CURRENT-STATE.md](./archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md).
 
 Status reflects code evidence, **not** production acceptance.
 
