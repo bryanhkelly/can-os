@@ -30,7 +30,7 @@
 - `docs/architecture.md` and `docs/domain-model.md` include detailed implementation notes alongside canonical definitions.
 - `docs/golden-flows.md` mixes flow requirements with acceptance evidence.
 - `docs/school-launch-studio-site-workspace.md` needs reconciliation with the latest Launch Hub and Website Studio decisions.
-- Root `README.md` still contains retired FullFlow checkout guidance.
+- Root `README.md` originally contained retired FullFlow checkout guidance; the revised root file and archived snapshot supersede it.
 
 ## Migration status
 
@@ -52,4 +52,6 @@
 
 **Phase 10:** Archived two November 3 integration coordination records after exact blob comparison. Retained the V6.1 migration checklist and public-site admissions backlog due to explicit live documentation dependencies; both require current-main verification before retirement.
 
-**Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
+**Phase 11:** Captured a non-truncated recursive Git tree (2,510 entries at phase start). Atomically relocated 16 historical handoff, Neon branch evidence, and browser exploration files to the November 2026 archive, with a source-to-destination index. Preserved Git blob SHA identity for every moved artifact. Left security, database runbooks, draft SQL, route contracts and current design guidance in place.
+
+**Still outstanding:** Exhaustive source and CI reference checks, automated Markdown link validation, current-main verification of retained operational and product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.

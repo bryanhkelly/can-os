@@ -49,7 +49,7 @@ The three retired plan originals were removed after archived blob SHA verificati
 
 ## Next steps
 
-1. Obtain a complete recursive Git tree inventory of main, including .github workflows and scripts.
+1. **Completed 2026-11-07:** Obtain a complete recursive Git tree inventory of main (2,510 entries at the phase start; GitHub returned `truncated: false`).
 2. Identify all inbound references to each candidate archived document.
 3. Archive by coherent batch with atomic reference updates.
 4. Promote validated current product and engineering specifications.
@@ -59,7 +59,7 @@ The three retired plan originals were removed after archived blob SHA verificati
 
 The original `docs/CURRENT-STATE.md` and `docs/full-flow-progress.md` have been retired; historical versions are preserved under `docs/archive/2026-11-fullflow/retired-plans/`. The FullFlow progress archive was made before a final reference-only edit to the original.
 
-Exact snapshots of `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/platform-integration-map.md` are now in `docs/archive/2026-11-fullflow/legacy-specifications/`. **Their original paths remain active pending complete inbound-link review**. Copilot's instructions now point to the canonical replacements.
+Exact snapshots of `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/platform-integration-map.md` are now in `docs/archive/2026-11-fullflow/legacy-specifications/`. Their original paths were subsequently retired in Phase 7 below. Copilot's instructions now point to the canonical replacements.
 
 ## 2026-11-07 legacy specification retirement
 
@@ -76,3 +76,9 @@ Archived and removed `docs/design-system-implementation-plan.md`, `docs/PX-B-EXP
 ## 2026-11-07 convergence records
 
 Archived and retired the dated `docs/implementation/CODE_BASED_SOURCE_MAP.md` and `docs/implementation/CONTRACT_CHANGELOG.md` under `docs/archive/2026-11-fullflow/delivery-evidence/implementation/`, with exact Git blob verification. Kept `docs/design-system-v6-1-migration.md` because the active design-system documents explicitly depend on its checklist; kept `docs/public-site-admissions-remaining-work.md` because the public publishing specification links to it. These retained documents need an explicit current-main review before retirement.
+
+## Phase 11: non-truncated tree inventory and dated evidence retirement (2026-11-07)
+
+Captured the complete recursive Git tree from `main` (2,510 entries; `truncated: false`). Archived and retired 16 dated documents covering isolated FullFlow Neon migration evidence, integration/agent handoffs, visual design checkpoints, and November browser/route test findings. See [the exact source-to-archive manifest](archive/2026-11-fullflow/README.md). The operation reuses source Git blob SHAs and removes originals in a single tree update, preserving historical bytes exactly. Targeted filename searches found no active inbound document consumers for these candidates, but this is **not** exhaustive link/CI validation.
+
+Active, potentially operational instructions such as `docs/neon-development.md`, `docs/identity-and-demo-access.md`, `docs/school-operations-security-gates.md`, and `docs/platform-route-contracts.json` remain at their existing paths. Proposed SQL under `docs/migrations/` remains untouched.
