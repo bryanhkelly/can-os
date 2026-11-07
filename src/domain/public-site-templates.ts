@@ -65,6 +65,8 @@ export function composePublicSiteHome(template: SiteTemplateId, sections: Public
  */
 export type PublicSiteChrome = {
   brand: string;
+  /** Pre-escaped Site-specific monogram derived from the canonical school name. */
+  monogram: string;
   navigation: string;
   cta: string;
   mobile: string;
@@ -77,37 +79,37 @@ export function composePublicSiteChrome(template: SiteTemplateId, p: PublicSiteC
   switch (template) {
     case "heritage": return '<div class="school-shell shell-heritage">' +
       '<header class="school-masthead header-heritage"><span class="edition">A SCHOOL WITH A STORY TO TELL</span>' +
-      '<div class="school-lockup"><span class="school-crest" aria-hidden="true">H</span>' + brand + '</div>' +
+      '<div class="school-lockup"><span class="school-crest" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       '<div class="masthead-navigation">' + nav + p.cta + p.mobile + '</div></header>' +
       p.main + p.footer + '</div>';
     case "community": return '<div class="school-shell shell-community">' +
       '<div class="community-announcement">WELCOME TO OUR LEARNING COMMUNITY</div>' +
       '<header class="school-masthead header-community"><div class="community-logo">' +
-      '<span class="community-emblem" aria-hidden="true">✳</span>' + brand + '</div>' +
+      '<span class="community-emblem" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
     case "modern": return '<div class="school-shell shell-modern">' +
       '<header class="school-masthead header-modern"><div class="modern-logo">' +
-      '<span class="modern-logo-mark" aria-hidden="true">M</span>' + brand + '</div>' +
+      '<span class="modern-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       '<p class="rail-label">EXPLORE YOUR SCHOOL</p>' + nav +
       '<div class="modern-rail-action">' + p.cta + '</div>' + p.mobile + '</header>' +
       p.main + p.footer + '</div>';
     case "bright-futures": return '<div class="school-shell shell-bright">' +
       '<header class="school-masthead header-bright"><div class="bright-lockup">' +
-      '<span class="bright-sun" aria-hidden="true">☀</span>' + brand + '</div>' +
+      '<span class="bright-sun" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
     case "summit": return '<div class="school-shell shell-summit">' +
       '<div class="summit-spine" aria-hidden="true"><span>△</span><span>SUMMIT · GROWTH · DISCOVERY</span><span>↓</span></div>' +
       '<header class="school-masthead header-summit"><div class="summit-lockup">' +
-      brand + '</div>' + nav + p.cta + p.mobile + '</header>' +
+      '<span class="summit-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' + nav + p.cta + p.mobile + '</header>' +
       p.main + p.footer + '</div>';
     case "classic": return '<div class="school-shell shell-classic">' +
       '<div class="classic-utility">FAITH&nbsp;&nbsp;·&nbsp;&nbsp;SCHOLARSHIP&nbsp;&nbsp;·&nbsp;&nbsp;CHARACTER</div>' +
       '<header class="school-masthead header-classic"><div class="classic-lockup">' +
-      '<span class="classic-crest" aria-hidden="true">✦</span>' + brand + '</div>' +
+      '<span class="classic-crest" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
     case "campus": return '<div class="school-shell shell-campus">' +
       '<header class="school-masthead header-campus"><div class="campus-lockup">' +
-      brand + '<small>THE SCHOOL JOURNAL</small></div>' +
+      '<span class="campus-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand + '<small>THE SCHOOL JOURNAL</small></div>' +
       nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
   }
 }
@@ -632,6 +634,11 @@ body.template-campus .home-campus .campus-stories{display:grid;gap:clamp(20px,3v
 body.template-campus .home-campus .campus-stories>section{padding:30px;border-top:5px solid #a87645}
 body.template-campus .interior-campus{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,.6fr);gap:40px}
 
+body.template-summit .header-summit .summit-lockup{display:flex;align-items:center;gap:13px}
+body.template-summit .header-summit .summit-logo-mark{flex-shrink:0;display:grid;place-items:center;width:46px;height:46px;border:1px solid #d4c09b;color:#d4c09b;font-family:var(--site-display);font-size:1.25rem}
+body.template-campus .header-campus .campus-lockup{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;align-items:center}
+body.template-campus .header-campus .campus-logo-mark{grid-row:1/3;display:grid;place-items:center;min-width:44px;min-height:44px;padding:4px;border:2px solid var(--site-ink);font-weight:800;font-size:1.15rem}
+body.template-campus .header-campus .campus-lockup small{grid-column:2}
 /* Responsive behavior belongs to hosted school pages only. */
 @media(max-width:1180px){
   .school-shell .school-masthead{gap:12px;padding-inline:22px}
