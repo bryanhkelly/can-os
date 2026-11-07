@@ -7,10 +7,11 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 1. [CAN vision](vision/CAN-VISION.md): institutional model and product intent.
 2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md) and [operating model](product/OPERATING-MODEL.md): product scope and institutional boundaries.
 3. [System architecture](architecture/SYSTEM.md), [domain model](architecture/DOMAIN-MODEL.md), and [acceptance standards](quality/ACCEPTANCE-STANDARDS.md).
-4. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
-5. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
-6. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
-7. Current source code, migrations, and executed tests: evidence of implemented behavior.
+4. [Engineering operations and security](engineering/OPERATIONS-AND-SECURITY.md): retained runbooks and dependencies.
+5. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
+6. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
+7. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
+8. Current source code, migrations, and executed tests: evidence of implemented behavior.
 
 ## Authority rules
 
