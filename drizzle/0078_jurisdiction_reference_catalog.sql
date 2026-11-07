@@ -68,4 +68,8 @@ WHERE NOT EXISTS (
   WHERE existing."country_code"=reference.country_code
     AND lower(existing."name")=lower(reference.name)
 )
-ON CONFLICT ("code") DO NOTHING;
+AND NOT EXISTS (
+  SELECT 1 FROM "jurisdictions" same_code
+  WHERE same_code."code"=reference.code
+)
+ON CONFLICT DO NOTHING;
