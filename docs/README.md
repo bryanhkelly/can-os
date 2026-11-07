@@ -24,3 +24,5 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 ## Migration status
 
 **In progress.** The existing documentation has not yet been comprehensively inventoried or archived. Until that work is complete, existing technical and safety guidance remains applicable where not contradicted by verified current code or an explicit approved decision. See [reset register](DOCUMENTATION-RESET.md).
+
+Historical branch handoffs, release evidence and retired FullFlow plans live under [the November 2026 archive](archive/2026-11-fullflow/). These records are not current implementation or release authority.
