@@ -58,4 +58,6 @@
 
 **Phase 12:** Retired seven dated or superseded product/integration documents, preserving exact blob identities and updating the two identified live documentation references. Full test/build and broader non-Markdown dependency auditing remain pending.
 
+**Phase 13:** Added a required GitHub Actions documentation reference check plus `npm run docs:check`. CI evidence at `de28b965`: 70 active Markdown files, 109 targets, 1,926 source/CI files, 11 explicit doc references, zero missing targets. The check also passed on `94d9545d`. The earlier general CI run separately failed during TypeScript typecheck due to heap OOM, and the Phase 12 Neon acceptance workflow failed its isolated database secret precondition; neither was counted as a passing overall release gate.
+
 **Still outstanding:** Complete source and CI raw-reference checks, reproducible automated Markdown link validation (including reference-style links and anchors), current-main verification of retained operational/product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.
