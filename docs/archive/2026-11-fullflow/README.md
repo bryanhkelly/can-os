@@ -78,3 +78,7 @@ The following original Git blobs were preserved unchanged. Canonical requirement
 | `docs/design-system-editorial-v5.md` | [`design-system-editorial-v5.md`](design-history/design-system-editorial-v5.md) |
 | `docs/implementation/SCHOOL_MEDIA_FOLDER_AUTOMATION.md` | [`SCHOOL_MEDIA_FOLDER_AUTOMATION.md`](delivery-evidence/implementation/SCHOOL_MEDIA_FOLDER_AUTOMATION.md) |
 | `docs/school-launch-hub-implementation.md` | [`school-launch-hub-implementation.md`](delivery-evidence/school-launch-hub-implementation.md) |
+
+## Phase 16: Website Studio integration handoff (2026-11-07)
+
+The dated [Website Studio implementation handoff](delivery-evidence/website-launch-studio-implementation.md) was moved from `docs/website-launch-studio-implementation.md` without changing its Git blob. Its PR merge status is historical, not a current assertion. The active product contract is [Website Studio](../../product/WEBSITE-STUDIO.md), with [Website Media](../../product/WEBSITE-MEDIA.md) as its consent and media boundary.
