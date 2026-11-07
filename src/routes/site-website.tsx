@@ -764,11 +764,11 @@ function LocalWebsiteCopyEditor({
             className="min-h-11 border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
             {previewPending ? "Generating secure preview..." : "Preview unsaved changes"}
           </Button>
-          {data.currentRevision > 0 && <a
+          {<a
             href={privateWebsitePreviewUrl(data.siteId)}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center border border-primary px-4 py-2 text-sm font-semibold text-primary">
-            Open full-page preview
+            {data.currentRevision === 0 ? "Open full-page sample preview" : "Open full-page preview"}
           </a>}
           {data.currentRevision > 0 && <Button type="button" variant="outline" className="min-h-11 border"
             onClick={() => void navigator.clipboard.writeText(
@@ -778,8 +778,8 @@ function LocalWebsiteCopyEditor({
             Copy preview link
           </Button>}
         </div>
-        <p className="text-xs text-muted-foreground">The full-page link uses your latest saved private revision and your existing CAN OS sign-in. No draft is made public. {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
-        {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">Save the private website draft to enable the full-page preview. You can test unsaved changes below without saving.</p>}
+        <p className="text-xs text-muted-foreground">The full-page link uses your existing CAN OS sign-in. It never publishes a draft. {data.currentRevision > 0 ? "It shows the latest saved revision." : "Until the first save, it shows a clearly marked sample, not your unsaved edits."} {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
+        {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">No saved website draft exists yet. The full-page preview shows an illustrative sample. You can test unsaved changes below; sharing your customized design requires saving.</p>}
         {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
         {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
         <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
