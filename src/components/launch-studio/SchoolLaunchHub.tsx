@@ -30,13 +30,11 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow }:
           <Icon aria-hidden="true" className="size-9 border border-primary/20 bg-accent p-2 text-primary" />
           <h3 className="mt-4 text-base font-semibold">{item.title}</h3><p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
           {statuses?.[key] && <ModuleStatus status={statuses[key]!}/> }
-          {["promote","recruitment","events"].includes(key) || statuses?.[key]?.state==="Planned"
-            ? <span className="mt-auto text-sm font-semibold text-muted-foreground">Not available yet</span>
-            : key==="website" && (statuses?.website?.state==="Blocked" || statuses?.website?.state==="Unavailable")
-            ? <span className="mt-auto text-sm font-semibold text-muted-foreground">Website access or status needs review</span>
-            : key === "website"
+          {key === "website" && statuses?.website?.state !== "Blocked" && statuses?.website?.state !== "Unavailable"
             ? <Link to="/launch/website" search={{siteId:site.id,returnToHub:true}} className="mt-auto inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open Website Studio <ArrowRight className="size-4" /></Link>
-            : <Link to="/launch/hub/school/$module" params={{module:key}} search={search} className="mt-auto inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open module <ArrowRight className="size-4" /></Link>}
+            : <Link to="/launch/hub/school/$module" params={{module:key}} search={search} className="mt-auto inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+              {key === "website" ? "Review website access" : statuses?.[key]?.state === "Planned" ? "Explore module" : "Open module"} <ArrowRight className="size-4" />
+            </Link>}
         </article>;})}</div></section>)}</div>
       <p className="mt-6 text-xs leading-5 text-muted-foreground">These are independent workstreams. Website publication, promotion and family interest do not authorize school opening.</p>
     </> : <>{statuses?.[module] && <div className="mt-5"><ModuleStatus status={statuses[module]!}/></div>}{workflow ?? <SchoolModuleHome module={module} siteId={site.id}/>}</>}

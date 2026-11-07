@@ -8,14 +8,20 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { schoolHubSearch } from "@/domain/school-launch-hub";
 export const Route = createFileRoute("/launch/hub/school_/$module")({
   validateSearch: search => schoolHubSearch.parse(search),
-  beforeLoad: ({params,search}) => {
+  beforeLoad: ({params}) => {
     if(!Object.hasOwn(schoolHubModules,params.module))throw notFound();
-    // Preserve old module bookmarks without sending users through a duplicate page.
-    if(params.module==="website" && search.siteId)
-      throw redirect({to:"/launch/website",search:{siteId:search.siteId,returnToHub:true},replace:true});
+    // The loader verifies website access before redirecting. A blocked editor
+    // stays on a scoped explanatory page rather than opening an unauthorized studio.
   },
   loaderDeps:({search})=>search,
-  loader:({deps,params})=>safeLoader(()=>loadSchoolConfiguration(deps,params.module))(),
+  loader:async({deps,params})=>{
+    const outcome=await safeLoader(()=>loadSchoolConfiguration(deps,params.module))();
+    if(params.module==="website" && deps.siteId && outcome.ok &&
+       outcome.data.options.sites.some(site=>site.id===deps.siteId) &&
+       outcome.data.statuses?.website?.state!=="Blocked")
+      throw redirect({to:"/launch/website",search:{siteId:deps.siteId,returnToHub:true},replace:true});
+    return outcome;
+  },
   component: SchoolModulePage,
 });
 function SchoolModulePage() {
