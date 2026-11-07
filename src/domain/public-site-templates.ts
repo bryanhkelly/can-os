@@ -119,6 +119,8 @@ export type PublicSiteHeroParts = {
   intro: string;
   actions: string;
   image: string;
+  /** Additional rights-reviewed, escaped public image tags; Campus journal only. */
+  mosaicImages?: readonly string[];
 };
 /** Hero structures match the seven independent editorial architectures. */
 export function composePublicSiteHero(template: SiteTemplateId, p: PublicSiteHeroParts): string {
@@ -162,9 +164,12 @@ export function composePublicSiteHero(template: SiteTemplateId, p: PublicSiteHer
       '<p class="campus-side-note">The people. The learning. The moments that make a school.</p></div>' +
       '<div class="campus-mosaic"><div class="campus-mosaic-main">' + photo +
       '<span class="mosaic-caption">01 / OUR SCHOOL</span></div>' +
-      '<div class="campus-mosaic-tile mosaic-second"><span>02 / LEARNING</span><b>Where curiosity leads.</b></div>' +
-      '<div class="campus-mosaic-tile mosaic-third"><span>03 / COMMUNITY</span><b>Belonging looks like this.</b></div>' +
-      '<div class="campus-mosaic-tile mosaic-fourth"><span>04 / DISCOVERY</span><b>Find your next chapter.</b></div></div></section>';
+      '<div class="campus-mosaic-tile mosaic-second">' + (p.mosaicImages?.[0] || '') +
+      '<span>02 / LEARNING</span><b>Where curiosity leads.</b></div>' +
+      '<div class="campus-mosaic-tile mosaic-third">' + (p.mosaicImages?.[1] || '') +
+      '<span>03 / COMMUNITY</span><b>Belonging looks like this.</b></div>' +
+      '<div class="campus-mosaic-tile mosaic-fourth">' + (p.mosaicImages?.[2] || '') +
+      '<span>04 / DISCOVERY</span><b>Find your next chapter.</b></div></div></section>';
   }
 }
 
@@ -606,6 +611,19 @@ body.template-campus .seven-hero-campus .campus-mosaic-main .seven-photo{height:
 body.template-campus .seven-hero-campus .campus-mosaic-main .mosaic-caption{position:absolute;left:20px;bottom:20px;color:#fff;background:#253c4688;padding:8px 12px;letter-spacing:.12em;font-size:.7rem}
 body.template-campus .seven-hero-campus .campus-mosaic-tile{display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:24px;min-width:0;color:white}
 body.template-campus .seven-hero-campus .campus-mosaic-tile span{font-size:.66rem;letter-spacing:.15em;font-weight:800}
+body.template-campus .seven-hero-campus .campus-mosaic-tile{position:relative;overflow:hidden;isolation:isolate}
+body.template-campus .seven-hero-campus .campus-mosaic-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+body.template-campus .seven-hero-campus .campus-mosaic-tile:has(img)::before{
+ content:"";position:absolute;inset:0;background:linear-gradient(transparent,#0c1e2bd6);z-index:-1
+}
+body.template-campus .seven-hero-campus .campus-mosaic-tile:has(img){color:white}
+body.template-modern .seven-hero-modern .modern-hero-photo{height:100%;min-height:690px}
+body.template-modern .seven-hero-modern .modern-hero-photo .seven-photo{height:100%;min-height:690px}
+@media(max-width:650px){
+ body.template-modern .seven-hero-modern .modern-hero-photo,
+ body.template-modern .seven-hero-modern .modern-hero-photo .seven-photo{min-height:280px;height:280px}
+}
+
 body.template-campus .seven-hero-campus .campus-mosaic-tile b{font:500 clamp(1.3rem,2.1vw,2.1rem)/1.17 var(--site-display)}
 body.template-campus .seven-hero-campus .mosaic-second{background:#a56d47}
 body.template-campus .seven-hero-campus .mosaic-third{background:#385961}
