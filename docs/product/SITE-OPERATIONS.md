@@ -42,6 +42,8 @@ Physical presence is **not** inferred from a student's web session or progress. 
 
 An absent or unavailable safety reader cannot become a zero-blocker state. Fail visibly and use an approved non-app emergency or custody process whenever a system is unavailable. See [Site Student Safeguarding](../site-student-safeguarding-and-welfare.md) and [School Operations Security Gates](../school-operations-security-gates.md).
 
+[Church-Hosted Safety Gates](../quality/CHURCH-HOSTED-SAFETY-GATES.md) specify the independent opening, safeguarding, custody and verified school-day P0 requirements. Planned rosters and Section lifecycle commands do not satisfy these gates.
+
 ## School-of-record and safeguarding separation
 
 Program academic provider, credit issuer, local host and institutional school-of-record authority are different relationships. A Site Director's local operating assignment cannot override CAN academic publication, credential issuance, legal opening authorization or mandated reporting.
