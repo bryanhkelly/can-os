@@ -68,4 +68,6 @@
 
 **Phase 17:** Retired two superseded FullFlow public-site and admissions documents preserving exact Git blob content. Built canonical product and quality contracts at `docs/product/PUBLIC-SITES-AND-ADMISSIONS.md` and `docs/quality/PUBLIC-SITE-RELEASE-GATES.md`; clarified hosting provider differences in the active Netlify-oriented runbook. Source-to-release evidence remains unverified.
 
+**Phase 18:** Created canonical `docs/product/ACADEMIC-DELIVERY.md` with asynchronous core lessons, optional live support, verified rights/adoption, distinct presenter/instructor/facilitator roles, and an explicit student-facing teacher-choice implementation gap. Archived four superseded learning and annual-adoption branch records as exact historical blobs. Source review is not authenticated journey acceptance.
+
 **Still outstanding:** Complete source and CI raw-reference checks, reproducible automated Markdown link validation (including reference-style links and anchors), current-main verification of retained operational/product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.
