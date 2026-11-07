@@ -17,13 +17,13 @@ export const schoolBrandDesigns: Record<SiteTemplateId, {
   emblem: "square" | "rounded" | "circle" | "shield";
   letterSpacing: number;
 }> = {
-  heritage: { name: "Heritage Academy", caption: "THE SCHOOL JOURNAL", recommendedPalette: "heritage", recommendedTypography: "editorial", emblem: "square", letterSpacing: 3.4 },
-  community: { name: "Community & Faith", caption: "A PLACE TO BELONG", recommendedPalette: "forest", recommendedTypography: "editorial", emblem: "rounded", letterSpacing: 1.4 },
-  modern: { name: "Modern Learning", caption: "DISCOVER YOUR PATH", recommendedPalette: "coastal", recommendedTypography: "contemporary", emblem: "rounded", letterSpacing: 2.8 },
-  "bright-futures": { name: "Bright Futures", caption: "GROW WITH POSSIBILITY", recommendedPalette: "copper", recommendedTypography: "contemporary", emblem: "circle", letterSpacing: 1.5 },
-  summit: { name: "Summit Preparatory", caption: "THE JOURNEY AHEAD", recommendedPalette: "coastal", recommendedTypography: "editorial", emblem: "square", letterSpacing: 3.2 },
-  classic: { name: "Heritage Classical", caption: "FAITH · SCHOLARSHIP · CHARACTER", recommendedPalette: "heritage", recommendedTypography: "traditional", emblem: "shield", letterSpacing: 2.8 },
-  campus: { name: "Campus Life", caption: "A SCHOOL JOURNAL", recommendedPalette: "copper", recommendedTypography: "contemporary", emblem: "square", letterSpacing: 1.6 },
+  heritage: { name: "Heritage Academy", caption: "THE SCHOOL JOURNAL", recommendedPalette: "brand-heritage", recommendedTypography: "editorial", emblem: "square", letterSpacing: 3.4 },
+  community: { name: "Community & Faith", caption: "A PLACE TO BELONG", recommendedPalette: "brand-community", recommendedTypography: "editorial", emblem: "rounded", letterSpacing: 1.4 },
+  modern: { name: "Modern Learning", caption: "DISCOVER YOUR PATH", recommendedPalette: "brand-modern", recommendedTypography: "contemporary", emblem: "rounded", letterSpacing: 2.8 },
+  "bright-futures": { name: "Bright Futures", caption: "GROW WITH POSSIBILITY", recommendedPalette: "brand-bright-futures", recommendedTypography: "contemporary", emblem: "circle", letterSpacing: 1.5 },
+  summit: { name: "Summit Preparatory", caption: "THE JOURNEY AHEAD", recommendedPalette: "brand-summit", recommendedTypography: "editorial", emblem: "square", letterSpacing: 3.2 },
+  classic: { name: "Heritage Classical", caption: "FAITH · SCHOLARSHIP · CHARACTER", recommendedPalette: "brand-classic", recommendedTypography: "traditional", emblem: "shield", letterSpacing: 2.8 },
+  campus: { name: "Campus Life", caption: "A SCHOOL JOURNAL", recommendedPalette: "brand-campus", recommendedTypography: "contemporary", emblem: "square", letterSpacing: 1.6 },
 };
 
 /** Returns a per-school mark, not a mark named after the chosen design. */
