@@ -1,12 +1,12 @@
 # CAN OS — Agent development contract
 
-Applies to all coding agents, including ChatGPT, Copilot and other tools. Start with `docs/START-HERE.md`. **This file is policy; current implementation must be verified against code.**
+Applies to all coding agents, including ChatGPT, Copilot and other tools. Start with `docs/README.md` and `docs/vision/CAN-VISION.md`. **This file is policy; current implementation must be verified against code.**
 
 ## Authority and evidence
 
 1. Current checked-out code, database migrations, and executable tests establish what is implemented. A test is evidence only if its execution and result are recorded.
-2. This `AGENTS.md`, `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and the security documents define intended invariants and constraints.
-3. `docs/CURRENT-STATE.md` is a time/commit-pinned code snapshot, not a permanent truth or release certificate.
+2. `docs/vision/CAN-VISION.md` defines current product intent. This `AGENTS.md` defines agent policy. Existing technical and security documents remain provisional engineering guidance until reconciled under `docs/DOCUMENTATION-RESET.md`; verify them against current code.
+3. `docs/CURRENT-STATE.md` is historical accumulated implementation evidence, not an up-to-date release certificate. Check the exact current commit and executed tests.
 4. Other active documents provide domain-specific detail. If they conflict, investigate and surface the disagreement before implementing.
 5. `docs/archive/` holds historical artifacts **only**. Never take "current", "next", "unmerged", demo flags, or release instructions from archived notes as authority.
 
@@ -31,7 +31,7 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 
 ## Development and completion
 
-- Start work from the approved base branch; old Phase 1/2/3 branch handoffs are archived history, not active integration instructions.
+- Use `main` as the active development baseline unless a task explicitly authorizes a different branch. FullFlow is released and retired; old phase and FullFlow branch/database handoffs are historical, not active instructions.
 - Before coding, identify the canonical owning service, related callers, routes, migrations, invariants, and test coverage. Prefer deleting dead paths only after reference checks.
 - Keep route contracts in `docs/platform-route-contracts.json` aligned with source; newly added entries begin with `pending`, never invented acceptance claims. Run `node scripts/check-platform-route-contracts.mjs --check`.
 - Validate with typecheck, unit/integration, and browser tests as relevant, using disposable databases for mutation tests. If checks are deferred or cannot run, report them **unverified** rather than passed.
