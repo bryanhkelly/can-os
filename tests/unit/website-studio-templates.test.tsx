@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { siteTemplateIds, resolveSiteTemplateId } from "@/domain/site-theme";
-import { siteTemplateCatalog, composePublicSiteHome } from "@/domain/public-site-templates";
+import { siteTemplateCatalog, composePublicSiteHome, composePublicSiteInterior, publicSiteTemplateCss } from "@/domain/public-site-templates";
 import { emptySiteLocalContent, normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
@@ -16,6 +16,32 @@ describe("Website Studio five-template contract", () => {
     for (const layout of layouts) for (const value of Object.values(sections))
       expect(layout.split(value).length-1).toBe(1);
     expect(layouts.every(value=>value.startsWith("HERO"))).toBe(true);
+  });
+
+  it("renders five distinct homepage structures with responsive hero styles", () => {
+    const sections={hero:"HERO",vision:"VISION",story:"STORY",explore:"EXPLORE",
+      academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT"};
+    const interiors=siteTemplateIds.map(id=>composePublicSiteInterior(id,"HERO","PRIMARY","SECONDARY"));
+    expect(new Set(interiors).size).toBe(5);
+    for(const id of siteTemplateIds) {
+      const classId=id==="bright-futures"?"bright":id;
+      const composition=composePublicSiteHome(id,sections);
+      expect(composition).toContain(`home-${classId}`);
+      expect(publicSiteTemplateCss).toContain(`body.template-${id} .public-hero:not(.compact-hero)`);
+      for(const text of Object.values(sections)) expect(composition.split(text).length-1).toBe(1);
+      const page={host:"fictional.can-os.com",
+        site:{name:"Sample Academy",organizationName:"Sample Partner"},
+        offerings:[],demonstration:true,localContent:{
+          ...emptySiteLocalContent,heroHeadline:"Explore learning",
+          schoolVision:"Grow with purpose", localDescription:"A fictional school",
+          branding:{...emptySiteLocalContent.branding,templateId:id},
+        }};
+      const html=renderPublicSiteHtml(page);
+      expect(html).toContain(`template-${id}`);
+      expect(html).toContain(`home-${classId}`);
+      expect(html).toContain('id="welcome"');
+      expect((html.match(/<h1>/g) ?? []).length).toBe(1);
+    }
   });
 
   it("versions template choice independently of palette and typography", () => {
