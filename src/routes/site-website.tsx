@@ -27,21 +27,31 @@ import { ChurchSourceSuggestionReview } from "@/components/operations/ChurchSour
 import { ChurchSourceReferenceEditor } from "@/components/operations/ChurchSourceReferenceEditor";
 import {SchoolMediaFolderManager} from "@/components/operations/SchoolMediaFolderManager";
 import {LaunchWebsiteEditorHandoff} from "@/components/operations/LaunchWebsiteEditorHandoff";
-import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-search";
+import {siteProgramSelectionSchema} from "@/lib/route-search";
 import { z } from "zod";
 
 export const websiteStudioStepIds = ["welcome", "template", "identity", "photos", "content", "preview"] as const;
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
-  returnGrantId:optionalSearchString,
+  // Preserve supplied selectors for explicit validation; never silently omit
+  // an invalid Site and open the editor under a different active membership.
+  siteId:z.string().optional(),
+  programId:z.string().optional(),
+  returnGrantId:z.string().optional(),
   returnToHub:z.boolean().optional(),
   returnToSettings:z.boolean().optional(),
   step:z.enum(websiteStudioStepIds).optional(),
 });
 
-export const loadWebsiteHome = (siteId?: string) => safeLoader(
-  () => getPartnerWebsitePreviewView({data:{siteId}}),
-  { authMessage: "This website requires a verified Site editor or unaffiliated Site Administrator." },
-)();
+export const loadWebsiteHome = (siteId?: string) => {
+  if (siteId && !z.string().uuid().safeParse(siteId).success)
+    return Promise.resolve({ok:false as const,authError:null,
+      message:"This website link contains an invalid school identifier. Select an authorized school from the Launch Hub.",
+      retryable:false});
+  return safeLoader(
+    () => getPartnerWebsitePreviewView({data:{siteId}}),
+    { authMessage: "This website requires a verified Site editor or unaffiliated Site Administrator." },
+  )();
+};
 
 export const Route = createFileRoute("/site-website")({
   validateSearch:(search:Record<string,unknown>)=>websiteSearchSchema.parse(search),
