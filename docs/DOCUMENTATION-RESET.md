@@ -40,4 +40,6 @@
 
 **Phase 4:** Created canonical `docs/architecture/SYSTEM.md`, `docs/architecture/DOMAIN-MODEL.md`, and `docs/quality/ACCEPTANCE-STANDARDS.md`. These are architectural and quality principles, not a source-verified implementation map or executed test report.
 
+**Phase 5:** Retired the original `docs/full-flow-acceptance-contract.md`, `docs/integration-convergence-audit.md`, and `docs/engagement-framework.md` after exact archived-blob comparison. Updated identified references in the FullFlow test runner, Playwright config, e2e spec, and public-site backlog. Executable tests were not run; this is not a complete inbound-link audit.
+
 **Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
