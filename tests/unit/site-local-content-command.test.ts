@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   audit: vi.fn(),
   emit: vi.fn(),
   publishSite:vi.fn(),
+  simulatedStorageError: null as Error | null,
 }));
 vi.mock("@/modules/sites/site-publication.server",()=>({changeSitePublicationWithinTransaction:state.publishSite}));
 vi.mock("@/platform/mutation", () => ({ writeAudit: state.audit, emitEvent: state.emit }));
@@ -36,7 +37,10 @@ const tx = {
   insert: vi.fn((table: unknown) => ({ values: (value: unknown) => {
     state.inserts.push({ table, value });
     const result = {
-      returning: async () => [{ id: "revision-1" }],
+      returning: async () => {
+        if (state.simulatedStorageError) throw state.simulatedStorageError;
+        return [{ id: "revision-1" }];
+      },
       then: (resolve: (value: unknown) => unknown) => resolve(undefined),
     };
     return result;
@@ -64,7 +68,7 @@ const revision = (number: number, content = copy, status = "published") => ({
 });
 
 beforeEach(() => {
-  state.rows = []; state.inserts = []; state.denied = false;
+  state.rows = []; state.inserts = []; state.denied = false; state.simulatedStorageError = null;
   state.audit.mockReset(); state.emit.mockReset(); state.publishSite.mockReset(); tx.select.mockClear(); tx.insert.mockClear();
 });
 
@@ -104,6 +108,19 @@ describe("transactional church-local publication", () => {
     })).rejects.toThrow(/original website copy cannot be replaced/);
     expect(state.inserts).toHaveLength(0);
     expect(state.audit).not.toHaveBeenCalled();
+  });
+
+  it("explains the historical status constraint failure rather than reporting a successful draft", async () => {
+    state.rows.push([{ siteId: "site-a" }], []);
+    state.simulatedStorageError = Object.assign(
+      new Error('violates check constraint "site_local_content_status_ck"'),
+      { code: "23514", constraint: "site_local_content_status_ck" },
+    );
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "draft", expectedRevision: 0, content: copy,
+    })).rejects.toMatchObject({ code: "WEBSITE_DRAFT_STORAGE_NOT_READY" });
+    expect(state.audit).not.toHaveBeenCalled();
+    expect(state.emit).not.toHaveBeenCalled();
   });
 
   it("saves private design drafts without publishing or issuing a CAN approval Action", async () => {
