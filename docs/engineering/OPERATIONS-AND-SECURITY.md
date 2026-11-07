@@ -11,6 +11,7 @@
 | Identity, authorization and demo access | [Identity and demo access](../identity-and-demo-access.md) | Security-sensitive reference; verify grants and current code |
 | Private student enrollment documents | [Cloudflare R2 enrollment](../cloudflare-r2-enrollment.md) | Storage and access-control runbook; verify bucket and environment |
 | Machine-readable route inventory | [Route contracts](../platform-route-contracts.json) | **Do not relocate independently**; `scripts/check-platform-route-contracts.mjs` consumes it |
+| Public website host rollout | [Tenant hosting runbook](../public-tenant-hosting-release.md) and [public-site release gates](../quality/PUBLIC-SITE-RELEASE-GATES.md) | Provider-specific instructions require environment and DNS/TLS verification before use |
 | Design system | [V6.1 design system](../design-system-v6-1.md) | Approved design direction, not evidence that every screen conforms |
 | Canonical architecture | [System architecture](../architecture/SYSTEM.md) | Intended boundaries and authorization principles |
 | Canonical domain | [Domain model](../architecture/DOMAIN-MODEL.md) | Intended vocabulary and invariants |
