@@ -60,3 +60,7 @@ The three retired plan originals were removed after archived blob SHA verificati
 The original `docs/CURRENT-STATE.md` and `docs/full-flow-progress.md` have been retired; historical versions are preserved under `docs/archive/2026-11-fullflow/retired-plans/`. The FullFlow progress archive was made before a final reference-only edit to the original.
 
 Exact snapshots of `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/platform-integration-map.md` are now in `docs/archive/2026-11-fullflow/legacy-specifications/`. **Their original paths remain active pending complete inbound-link review**. Copilot's instructions now point to the canonical replacements.
+
+## 2026-11-07 legacy specification retirement
+
+After byte-identical Git blob verification, the original `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/platform-integration-map.md` were removed. Historical copies remain under `docs/archive/2026-11-fullflow/legacy-specifications/`. Identified inbound links in agent-platform, curriculum, connected-learning, feature-track, admissions, and school-launch documents were updated to canonical documents or exact archived targets. GitHub search is not a complete repository-wide reference audit; automated link checking remains outstanding.
