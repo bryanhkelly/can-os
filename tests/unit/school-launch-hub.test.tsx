@@ -33,10 +33,10 @@ describe("school Launch Hub",()=>{
     expect(html).toContain("Network authorization required");
     expect(html).not.toContain("/launch/website?");
   });
-  it("links Settings directly to Website Studio and hides unfinished modules",()=>{
+  it("routes Settings Website through scoped authorization without an interstitial",()=>{
     const html=renderToStaticMarkup(<SchoolSettingsDestinations siteId={siteId}/>);
-    expect(html).toContain(`/launch/website?siteId=${siteId}&amp;returnToSettings=true`);
-    expect(html).not.toContain("/settings/school/website?");
+    expect(html).toContain(`/settings/school/website?siteId=${siteId}`);
+    expect(html).not.toContain("returnToSettings=true");
     expect(html).not.toContain("/settings/school/promote?");
   });
   it("treats a malformed or stale siteId URL as an unselected school, without route failure",()=>{
