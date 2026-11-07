@@ -2,8 +2,30 @@ import { describe, expect, it } from "vitest";
 import { escapePublicHtml, isIndexablePublicSite, renderPublicSiteHtml, availablePublicSitePaths, withIllustrativeLocalPreview } from "@/domain/public-site-html";
 import { projectApprovedParentInformation, unconfiguredClaim, verifiedPublicClaim } from "@/domain/parent-information";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
+import { siteTemplateIds } from "@/domain/site-theme";
 
 describe("standalone public site HTML", () => {
+  it("labels unauthorised/pre-opening public pages on all seven templates without altering private previews",()=>{
+    for(const templateId of siteTemplateIds) {
+      const page={
+        host:"example-school.can-os.com",
+        site:{name:"Example School",organizationName:"Host Organization"},
+        offerings:[],
+        operatingStatus:"development" as const,
+        localContent:{...emptySiteLocalContent,
+          branding:{...emptySiteLocalContent.branding,templateId}},
+      };
+      const publicHtml=renderPublicSiteHtml(page);
+      expect(publicHtml).toContain("School in development · Not yet open for enrollment.");
+      expect(publicHtml).toContain(`template-${templateId}`);
+      expect(publicHtml).not.toContain("<script");
+      const privateHtml=renderPublicSiteHtml(page,{localPreview:true});
+      expect(privateHtml).not.toContain("School in development · Not yet open for enrollment.");
+      const authorized=renderPublicSiteHtml({...page,operatingStatus:"authorized" as const});
+      expect(authorized).not.toContain("launch-status-banner\" role");
+    }
+  });
+
   it("escapes all publisher-controlled text and contains no client script or private links", () => {
     expect(escapePublicHtml(`"&<>'`)).toBe("&quot;&amp;&lt;&gt;&#39;");
     const html = renderPublicSiteHtml({
