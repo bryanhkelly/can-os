@@ -2,6 +2,8 @@
 
 **Status:** Canonical product contract. Source references below were inspected on `main` at `08a6d832f9b9ba1d5f4d63d8c253cd995c4f34e8`. Source code is **not** authenticated browser, database, or release acceptance evidence.
 
+For family, student, staff and school onboarding in the shared frame, see [Launch Studio Audiences](LAUNCH-STUDIO-AUDIENCES.md).
+
 ## User journey
 
 A church or authorized local host is **establishing a school**, not setting up disconnected software. The intended journey is interest and partner authorization → **minimal canonical Site stub** → full-page Launch Hub → independent opening approval → Run dashboard. Creation of the Site stub does **not** create a Program, publish a website, verify a facility, authorize school opening, or fabricate a completed checklist.
