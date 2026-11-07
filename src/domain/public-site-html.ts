@@ -169,6 +169,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src;
   const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
   const heroHasPhoto=Boolean(image||approvedHero);
+  const campusMosaicImages = options?.templateGallery || sampleTemplate
+    ? [] : (["academics", "studentLife", "campus"] as const).map(slot => {
+      const media=ownedMedia(slot);
+      return media ? '<img src="' + escapePublicHtml(media.src) +
+        '" alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
+    });
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "Learning model",
@@ -333,6 +339,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     image: heroPhotoSrc
       ? '<img class="hero-background-image" src="' + escapePublicHtml(heroPhotoSrc) +
         '" alt="' + escapePublicHtml(heroPhotoAlt) + '" decoding="async"/>' : "",
+    mosaicImages: campusMosaicImages,
   });
   // The homepage introduces the school; detailed church content belongs on
   // About. No invented academic facts or unapproved identity records are used.
