@@ -177,3 +177,39 @@ test("school administrator reviews, publishes and renames a standalone school we
   });
   // Immutable audit evidence and its synthetic identities remain on the disposable branch.
 });
+
+test("a new Site Administrator prepares a school website directly in Website Studio", async ({ page }) => {
+  if (!DATABASE_URL) throw new Error("The guarded disposable database is required.");
+  const sql = neon(DATABASE_URL);
+  const [schema] = await sql`SELECT to_regclass('public.demo_school_tenants') IS NOT NULL AS ready`;
+  if (!schema?.ready) throw new Error("The isolated browser-test branch needs the current migration chain.");
+  const suffix = randomUUID().slice(0, 8);
+  const domain = `studio-${suffix}.demo`;
+
+  await page.goto("/schools/new");
+  await page.getByLabel("School name", { exact: true }).fill(`Studio School ${suffix}`);
+  await page.getByLabel("School domain").fill(domain);
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Create demo school" }).click();
+  await page.getByRole("link", { name: "Sign in and continue setup" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(`admin.demo@${domain}`);
+  await page.getByLabel("Demo access code (000000)").fill("000000");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible();
+
+  const [tenant] = await sql`SELECT site_id FROM demo_school_tenants WHERE domain = ${domain}`;
+  if (!tenant) throw new Error("The synthetic Site must be persisted before editing.");
+  const siteId = String(tenant.site_id);
+
+  await page.goto(`/launch/hub/school?siteId=${siteId}`);
+  await page.getByRole("link", { name: "Open Website Studio" }).click();
+  await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
+  await page.getByRole("button", { name: "Prepare school website" }).click();
+  await expect(page.getByRole("heading", { name: "Find the right first impression." })).toBeVisible();
+  await expect(page.getByRole("group", { name: "School website templates" })).toBeVisible();
+
+  const [publication] = await sql`SELECT status FROM site_publications WHERE site_id = ${siteId}`;
+  expect(publication?.status).toBe("draft");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Find the right first impression." })).toBeVisible();
+});
