@@ -1,6 +1,6 @@
 /**
  * FullFlow persistent multi-role browser acceptance runner
- * (contract: docs/full-flow-acceptance-contract.md).
+ * (contract: docs/archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md).
  *
  * Target: the pinned isolated FullFlow Neon branch (TEST_DATABASE_URL) only.
  * The pinned branch guards run before any browser session is allowed to write:
