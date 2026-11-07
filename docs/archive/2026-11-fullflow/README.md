@@ -93,3 +93,14 @@ Original Git blobs from the FullFlow-era website and family-intake execution pla
 | `docs/public-site-admissions-remaining-work.md` | [FullFlow Public Site → Admissions Backlog, PUB-09–22 and GATE-01–09](retired-plans/public-site-admissions-remaining-work.md) |
 
 The current product requirements are [Public Sites and Admissions](../../product/PUBLIC-SITES-AND-ADMISSIONS.md). Current production-release requirements are [Public Site Release Gates](../../quality/PUBLIC-SITE-RELEASE-GATES.md). The operational [tenant hosting runbook](../../public-tenant-hosting-release.md) remains active but is provider-specific and requires verification against the selected deployment environment.
+
+## Phase 18: curriculum and learning delivery history (2026-11-07)
+
+The prior FullFlow implementation plans and annual adoption agent handoff have been retired from their old paths with their Git blobs unchanged. The live product model is [Academic Delivery and Curriculum](../../product/ACADEMIC-DELIVERY.md); the detailed [Publisher to Classroom architecture](../../curriculum/publisher-organization-classroom-architecture.md) remains active.
+
+| Former path | Archived record |
+| --- | --- |
+| `docs/curriculum-marketplace-architecture.md` | [`curriculum-marketplace-architecture.md`](legacy-specifications/curriculum-marketplace-architecture.md) |
+| `docs/comprehensive-learning-activity-tracking.md` | [`comprehensive-learning-activity-tracking.md`](retired-plans/comprehensive-learning-activity-tracking.md) |
+| `docs/connected-learning-success-progression-hybrid.md` | [`connected-learning-success-progression-hybrid.md`](retired-plans/connected-learning-success-progression-hybrid.md) |
+| `docs/curriculum-annual-adoption-handoff.md` | [`curriculum-annual-adoption-handoff.md`](delivery-evidence/curriculum-annual-adoption-handoff.md) |
