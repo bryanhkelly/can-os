@@ -5,13 +5,14 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 ## Read in order
 
 1. [CAN vision](vision/CAN-VISION.md): institutional model and product intent.
-2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md), [operating model](product/OPERATING-MODEL.md), and [School Launch and Run](product/LAUNCH-AND-RUN.md): product scope, institutional boundaries, and launch journeys.
-3. [System architecture](architecture/SYSTEM.md), [domain model](architecture/DOMAIN-MODEL.md), and [acceptance standards](quality/ACCEPTANCE-STANDARDS.md).
-4. [Engineering operations and security](engineering/OPERATIONS-AND-SECURITY.md): retained runbooks and dependencies.
-5. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
-6. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
-7. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
-8. Current source code, migrations, and executed tests: evidence of implemented behavior.
+2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md), [operating model](product/OPERATING-MODEL.md), [School Launch and Run](product/LAUNCH-AND-RUN.md), and [Website Media](product/WEBSITE-MEDIA.md): product scope, institutional boundaries, launch journeys, and imagery rights.
+3. [Design authority](design/README.md): approved V6.1 direction, reusable components and adoption requirements.
+4. [System architecture](architecture/SYSTEM.md), [domain model](architecture/DOMAIN-MODEL.md), and [acceptance standards](quality/ACCEPTANCE-STANDARDS.md).
+5. [Engineering operations and security](engineering/OPERATIONS-AND-SECURITY.md): retained runbooks and dependencies.
+6. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
+7. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
+8. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
+9. Current source code, migrations, and executed tests: evidence of implemented behavior.
 
 ## Authority rules
 
