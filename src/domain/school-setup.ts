@@ -18,7 +18,17 @@ export const schoolSetupSchema = z.object({
   syntheticOnly: z.literal(true),
 }).strict();
 
+export const realSchoolSetupSignupSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  email: z.string().trim().toLowerCase().email().max(254)
+    .refine(email => !email.endsWith(".demo") && !email.endsWith(".invalid"),
+      "Use a real email address; demo schools use the shared-code setup."),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+}).strict();
+
 export type SchoolSetupInput = z.infer<typeof schoolSetupSchema>;
+export type RealSchoolSetupSignupInput = z.infer<typeof realSchoolSetupSignupSchema>;
 export type SchoolSetupResult = {
   organizationId: string;
   siteId: string;

@@ -8,6 +8,7 @@ import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { normalizeSiteLocalContent, type SiteLocalContent } from "@/domain/site-local-content";
+import { siteInformationSchema } from "@/domain/site-setup-configuration";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
@@ -38,8 +39,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
-  const [siteConfiguration] = host ? await db.select({metadata: sites.metadata})
-    .from(sites).where(eq(sites.id, site.id)).limit(1) : [];
+  const [siteConfiguration] = await db.select({metadata: sites.metadata})
+    .from(sites).where(eq(sites.id, site.id)).limit(1);
+  const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
     academicPrograms.map(program => program.programId), siteConfiguration?.metadata ?? null) : null;
   const authorizedPrograms=withVerifiedPublicApplications(academicPrograms,
@@ -66,6 +68,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     canPublish: site.canPublish,
     canPrepareWebsite: actor.role === "site_admin",
     demonstration: siteConfiguration?.metadata?.synthetic === true,
+    siteInformation:siteInformation.success?siteInformation.data:null,
     host,
     status: address?.status ?? null,
     approvedAcademicCount: academicPrograms.length,

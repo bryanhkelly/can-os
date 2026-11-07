@@ -16,9 +16,18 @@ vi.mock("@tanstack/react-router", () => ({
 const siteId="00000000-0000-4000-8000-000000000001";
 const options={sites:[{id:siteId,name:"Test School",websiteDraft:null}],schoolSetupAdministrator:true} as unknown as SchoolHubOptions;
 describe("school Launch Hub",()=>{
-  it("opens all seven modules under the selected school without claiming completion",()=>{
-    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}/>);
-    expect((html.match(/Open module/g) ?? []).length).toBe(6);
+  it("orders School Profile, Site Information and Website before community and opening setup",()=>{
+    const planned={state:"Planned",detail:"Module is on the roadmap",nextAction:"Explore module"} as const;
+    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
+      statuses={{promote:planned,recruitment:planned,events:planned}}/>);
+    expect((html.match(/Open module/g) ?? []).length).toBe(3);
+    expect(html).toContain("School Profile");
+    expect(html).toContain("Site Information");
+    expect(html).toContain("Build Website");
+    expect(html).toContain(`/launch/hub/school/profile?siteId=${siteId}`);
+    expect(html).toContain(`/launch/hub/school/information?siteId=${siteId}`);
+    expect(html.indexOf("School Profile")).toBeLessThan(html.indexOf("Site Information"));
+    expect(html.indexOf("Site Information")).toBeLessThan(html.indexOf("Build Website"));
     expect(html).toContain(`/launch/website?siteId=${siteId}&amp;returnToHub=true`);
     expect(html).not.toContain(`/launch/hub/school/website?siteId=${siteId}`);
     expect(html).toContain("Build Your School Community");
@@ -39,6 +48,7 @@ describe("school Launch Hub",()=>{
   it("routes Settings Website through scoped authorization without an interstitial",()=>{
     const html=renderToStaticMarkup(<SchoolSettingsDestinations siteId={siteId}/>);
     expect(html).toContain(`/settings/school/website?siteId=${siteId}`);
+    expect(html).toContain(`/settings/school/information?siteId=${siteId}`);
     expect(html).not.toContain("returnToSettings=true");
     expect(html).toContain(`/settings/school/promote?siteId=${siteId}`);
     expect(html).toContain(`/settings/school/recruitment?siteId=${siteId}`);

@@ -566,9 +566,9 @@
       "route": "/launch/website",
       "owner": "sites",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Exact-Site Website Studio follows School Profile and Site Information; a saved current website is a private source reference only",
+      "writeBoundary": "Verified Site website editor or Site Admin; immutable local drafts/publication, no automatic source import; external hosting is separate",
+      "readBoundary": "Verified exact-Site editor; approved public projection plus the Site's private self-reported setup context"
     },
     {
       "file": "src/routes/messages.tsx",
@@ -926,9 +926,9 @@
       "route": "/schools/new",
       "owner": "identity",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Shared school-name entry for real verified-email signup and isolated .demo shared-code setup; both resume the same canonical Launch Hub",
+      "writeBoundary": "Same-origin and anonymous-admission guarded; demo tenant transaction remains isolated; real Organization/Site/Site Admin are provisioned only when the single-use email challenge is redeemed",
+      "readBoundary": "Public form reads no existing tenant or account state and returns generic email acceptance without account enumeration"
     },
     {
       "file": "src/routes/settings.tsx",
@@ -1214,18 +1214,18 @@
       "route": "/launch/hub/school",
       "owner": "programs",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Exact-Site Launch Hub orders School Profile, Site Information, Website, community modules, then academics and opening requirements",
+      "writeBoundary": "Hub itself is read-only; profile, Site Information, website, team, Program and compliance commands enforce their owning server capabilities and Site scope",
+      "readBoundary": "Verified registrar-capable membership and exact selected Site; invalid or unauthorized selectors return the authorized picker"
     },
     {
       "file": "src/routes/launch.hub.school_.$module.tsx",
       "route": "/launch/hub/school_/$module",
       "owner": "programs",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Exact-Site module routes reuse canonical School Profile and Site Information editors; Website redirects to Website Studio only after access verification",
+      "writeBoundary": "Profile/contact/location and Site Information use revision-checked Site commands; operational modules use their existing scoped domain commands",
+      "readBoundary": "Verified registrar-capable membership and exact Site; Program selection is separately constrained to Programs at that Site"
     },
     {
       "file": "src/routes/launch.hub.school_.new.tsx",
@@ -1241,9 +1241,9 @@
       "route": "/settings_/school/$module",
       "owner": "programs",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Settings reuses the same exact-Site School Profile, Site Information, team, academic, compliance and Website Studio workflows as Launch Hub",
+      "writeBoundary": "Delegates to the same revision-checked, audited Site and domain commands; Settings adds no authority",
+      "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"

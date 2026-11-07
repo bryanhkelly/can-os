@@ -5,7 +5,7 @@ import type { Database } from "@/db/client";
 import * as schema from "@/db/schema";
 import * as mutation from "@/platform/mutation";
 import { setupSchool } from "@/modules/identity/school-setup.server";
-import { redeemDemoAccess } from "@/modules/identity/passwordless-access.server";
+import { redeemDemoAccess, redeemOneTimeAccess, requestSchoolSetupAccess } from "@/modules/identity/passwordless-access.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { startProgramLaunch } from "@/modules/programs/program-launch-service";
 import { assertSitePublicationScope } from "@/domain/site-publication-policy";
@@ -14,16 +14,17 @@ import { EventTypes } from "@/domain/event-types";
 import { verifiedStaffIdentityPredicate } from "@/modules/identity/verified-staff-identity.server";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
-const state = vi.hoisted(() => ({ tx: undefined as Transaction | undefined }));
+const state = vi.hoisted(() => ({ tx: undefined as Transaction | undefined, database: undefined as Database | undefined }));
 vi.mock("@/db/client", () => ({
   get db() {
-    if (!state.tx) throw new Error("School setup integration requires an isolated rollback transaction");
-    return state.tx;
+    if (!state.database) throw new Error("School setup integration requires an isolated rollback transaction");
+    return state.database;
   },
 }));
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 afterEach(() => {
   state.tx = undefined;
+  state.database = undefined;
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -36,6 +37,13 @@ integration("public demo school canonical setup", () => {
     try {
       await database.transaction(async tx => {
         state.tx = tx;
+        state.database = {
+          transaction: async (run: (transaction: Transaction) => Promise<unknown>) => run(tx),
+          select: (...args: unknown[]) => tx.select(...args as never[]),
+          insert: (...args: unknown[]) => tx.insert(...args as never[]),
+          update: (...args: unknown[]) => tx.update(...args as never[]),
+          execute: (...args: unknown[]) => tx.execute(...args as never[]),
+        } as unknown as Database;
         const table = await tx.execute(sql`select to_regclass('public.demo_school_tenants') as name`);
         if (!table.rows[0]?.name) {
           // Exercise the new DDL only inside the guarded disposable rollback.
@@ -174,6 +182,62 @@ integration("public demo school canonical setup", () => {
         await tx.update(schema.accountPersonGrants).set({ active: false }).where(eq(schema.accountPersonGrants.id, actor.grantId));
         await expect(getCommandContext(request)).rejects.toThrow("active membership");
         await expect(setupSchool(input, tx)).rejects.toMatchObject({ code: "CONFLICT" });
+        checked = true;
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+    expect(checked).toBe(true);
+  }, 120_000);
+
+  it("creates a real school only when its one-time email link is redeemed and resumes the shared Hub", async () => {
+    const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-real-school-setup");
+    let checked = false;
+    try {
+      await database.transaction(async tx => {
+        state.tx = tx;
+        state.database = {
+          transaction: async (run: (transaction: Transaction) => Promise<unknown>) => run(tx),
+          select: (...args: unknown[]) => tx.select(...args as never[]),
+          insert: (...args: unknown[]) => tx.insert(...args as never[]),
+          update: (...args: unknown[]) => tx.update(...args as never[]),
+          execute: (...args: unknown[]) => tx.execute(...args as never[]),
+        } as unknown as Database;
+        const table = await tx.execute(sql`select to_regclass('public.school_setup_signups') as name`);
+        if (!table.rows[0]?.name)
+          await tx.execute(sql.raw(readFileSync("drizzle\\0076_curly_makkari.sql", "utf8")));
+        vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "real-school-setup-isolated-integration-pepper-not-a-real-secret");
+        vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN", "https://app.example.test");
+        const suffix = crypto.randomUUID().slice(0, 8);
+        const email = `admin-${suffix}@example.test`;
+        let accessUrl = "";
+        await requestSchoolSetupAccess({ name: `Real School ${suffix}`, email,
+          firstName: "Real", lastName: "Administrator" }, async message => { accessUrl = message.accessUrl; });
+        expect(accessUrl).toContain("https://app.example.test/access/verify#token=");
+        const token = new URL(accessUrl).hash.slice("#token=".length);
+        const login = await redeemOneTimeAccess(token);
+        expect(login).toMatchObject({ role: "site_admin" });
+        expect(login.launchSiteId).toBeTruthy();
+
+        const [site] = await tx.select().from(schema.sites).where(eq(schema.sites.id, login.launchSiteId!));
+        const [organization] = await tx.select().from(schema.organizations)
+          .where(eq(schema.organizations.id, site!.organizationId));
+        const [account] = await tx.select().from(schema.accessAccounts)
+          .where(eq(schema.accessAccounts.emailNormalized, email));
+        const [grant] = await tx.select().from(schema.accountPersonGrants)
+          .where(and(eq(schema.accountPersonGrants.accountId, account!.id),
+            eq(schema.accountPersonGrants.siteId, site!.id)));
+        const [signup] = await tx.select().from(schema.schoolSetupSignups)
+          .where(eq(schema.schoolSetupSignups.accountId, account!.id));
+        expect(site?.name).toBe(`Real School ${suffix}`);
+        expect(organization?.type).toBe("christian_school");
+        expect(account?.emailVerifiedAt).toBeInstanceOf(Date);
+        expect(grant).toMatchObject({ role: "site_admin", active: true, organizationId: organization!.id, siteId: site!.id });
+        expect(signup).toMatchObject({ consumedAt: expect.any(Date), organizationId: organization!.id, siteId: site!.id });
+        expect(await isDemoTenantOrganization(organization!.id, tx)).toBe(false);
+        expect(await tx.select().from(schema.programs).where(eq(schema.programs.siteId, site!.id))).toEqual([]);
         checked = true;
         throw rollback;
       });

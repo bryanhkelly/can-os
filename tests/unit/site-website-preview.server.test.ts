@@ -139,7 +139,7 @@ describe("read-only church partner website", () => {
       "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPrepareWebsite", "canPublish",
       "currentRevision", "demonstration", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
-      "publicInformationReadiness", "siteId", "siteName", "status",
+      "publicInformationReadiness", "siteId", "siteInformation", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
   });

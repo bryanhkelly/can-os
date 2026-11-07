@@ -146,6 +146,35 @@ export const draftSiteContactSchema = z.object({
   email:contact.email.trim().toLowerCase(),
 }));
 
+export const siteInformationContexts = [
+  "church", "microschool", "homeschool", "independent_school", "other",
+] as const;
+const siteInformationBaseSchema = z.object({
+  contexts: z.array(z.enum(siteInformationContexts)).max(siteInformationContexts.length),
+  hostChurchName: z.string().trim().max(160),
+  currentWebsiteUrl: z.string().trim().max(2048).refine(value => {
+    if (!value) return true;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && Boolean(url.hostname.includes(".")) && !url.username && !url.password;
+    } catch { return false; }
+  }, "Use a public HTTPS website URL without embedded credentials."),
+  otherContext: z.string().trim().max(1000),
+}).strict();
+
+/** Private self-reported context; it is not legal classification or a Church relationship. */
+export const siteInformationSchema = siteInformationBaseSchema.superRefine((value, ctx) => {
+  if (new Set(value.contexts).size !== value.contexts.length)
+    ctx.addIssue({ code: "custom", path: ["contexts"], message: "Choose each site description once." });
+}).transform(value => ({ ...value, contexts: [...value.contexts].sort() }));
+
+export type SiteInformation = z.output<typeof siteInformationSchema>;
+
+export function sameSiteInformation(current: unknown, next: SiteInformation): boolean {
+  const parsed = siteInformationSchema.safeParse(current);
+  return parsed.success && JSON.stringify(parsed.data) === JSON.stringify(next);
+}
+
 /** Days are a count, not a Monday–Friday assumption; Sundays may be scheduled by academic-time. */
 export const launchOnsiteDaysPerWeekSchema=z.number().int().min(1).max(7);
 

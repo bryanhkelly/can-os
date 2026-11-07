@@ -3,7 +3,7 @@ import { DomainError } from "@/domain/errors";
 
 type Handler = (input: { request: Request }) => Promise<Response>;
 const state = vi.hoisted(() => ({
-  post: undefined as Handler | undefined, admit: vi.fn(), setup: vi.fn(),
+  post: undefined as Handler | undefined, admit: vi.fn(), setup: vi.fn(), signup: vi.fn(),
 }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: { server: { handlers: { POST: Handler } } }) => {
@@ -12,6 +12,7 @@ vi.mock("@tanstack/react-router", () => ({
   },
 }));
 vi.mock("@/modules/identity/school-setup.server", () => ({ setupSchool: state.setup }));
+vi.mock("@/modules/identity/passwordless-access.server", () => ({ requestSchoolSetupAccess: state.signup }));
 vi.mock("@/modules/identity/anonymous-auth-admission.server", () => ({
   admitAnonymousAuthRequest: state.admit,
   anonymousAuthAdmissionResponse: (gate: { allowed: boolean }) => gate.allowed ? null :
@@ -29,6 +30,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   state.admit.mockResolvedValue({ allowed: true });
   state.setup.mockResolvedValue({ created: true, domain: "example.demo", adminEmail: "admin.demo@example.demo" });
+  state.signup.mockResolvedValue({ accepted: true });
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -39,6 +41,16 @@ describe("public school setup HTTP boundary", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(state.admit).toHaveBeenCalledWith("school_setup");
     expect(state.setup).toHaveBeenCalledWith(input);
+  });
+  it("starts real school setup through verified email with only the submitted school and administrator fields", async () => {
+    const body = { mode: "email", name: "Example School", email: "admin@example.org",
+      firstName: "Alex", lastName: "Admin" };
+    const response = await state.post!({ request: request(body) });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ accepted: true });
+    expect(state.signup).toHaveBeenCalledWith({ name: "Example School", email: "admin@example.org",
+      firstName: "Alex", lastName: "Admin" });
+    expect(state.setup).not.toHaveBeenCalled();
   });
   it("returns an idempotent retry as existing rather than a second creation", async () => {
     state.setup.mockResolvedValue({ created: false, domain: "example.demo" });
@@ -58,6 +70,12 @@ describe("public school setup HTTP boundary", () => {
     { siteId: "foreign-school" }, { domain: "valorschool.demo" }])("rejects unsafe input %j", async change => {
     expect((await state.post!({ request: request({ ...input, ...change }) })).status).toBe(400);
     expect(state.setup).not.toHaveBeenCalled();
+  });
+  it("rejects demo identities in the real-email path", async () => {
+    const response = await state.post!({ request: request({ mode: "email", name: "Example School",
+      email: "admin@example.demo", firstName: "Alex", lastName: "Admin" }) });
+    expect(response.status).toBe(400);
+    expect(state.signup).not.toHaveBeenCalled();
   });
   it("rejects oversized payloads", async () => {
     expect((await state.post!({ request: request({ ...input, name: "x".repeat(4096) }) })).status).toBe(413);

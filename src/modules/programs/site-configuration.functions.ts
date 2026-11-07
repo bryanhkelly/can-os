@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { physicalSiteAddressSchema, draftSiteContactSchema, siteTimezoneSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
+import { physicalSiteAddressSchema, draftSiteContactSchema, siteInformationSchema, siteTimezoneSchema, nextSiteConfigurationRevision, samePhysicalSiteAddress, sameDraftSiteContact, sameSiteInformation, readSitePhysicalAddress } from "@/domain/site-setup-configuration";
 import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -152,6 +152,44 @@ export const updateLaunchSiteContact = createServerFn({method:"POST"})
         action:"site.contact.draft.update",entityType:"site",entityId:site.id,
         scope:{siteId:site.id,organizationId:site.organizationId},
         before:{contact:before},after:{contact:data.contact,publicApproved:false},
+      });
+      return {siteId:site.id,updated:true,revision:saved.updatedAt.toISOString()};
+    });
+  });
+
+/** Save private, self-reported Site context without asserting legal status or public authority. */
+export const updateLaunchSiteInformation = createServerFn({method:"POST"})
+  .validator((v:unknown)=>z.object({
+    siteId:z.string().uuid(),
+    expectedRevision:z.string().datetime({offset:true}),
+    information:siteInformationSchema,
+  }).strict().parse(v))
+  .handler(async({data})=>{
+    const actor=await getCommandContext(getRequest());
+    assertCapability(actor,"program.launch.start");
+    if(!actor.actorPersonId || !hasRegistrarAuthority(actor.role))
+      throw new AuthorizationError("verified Site information editor");
+    return db.transaction(async tx=>{
+      const [site]=await tx.select().from(sites).where(eq(sites.id,data.siteId))
+        .for("update").limit(1);
+      assertSiteSetupScope(actor,site,"program.launch.start");
+      const before=site.metadata.siteInformation??null;
+      if(sameSiteInformation(before,data.information))
+        return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString()};
+      if(site.updatedAt.toISOString()!==data.expectedRevision)
+        throw new Error("Site information changed. Refresh and review the latest values before saving.");
+      const nextRevision=nextSiteConfigurationRevision(site.updatedAt);
+      const [saved]=await tx.update(sites).set({
+        metadata:{...site.metadata,siteInformation:data.information,
+          siteInformationRevision:nextRevision.toISOString()},
+        updatedAt:nextRevision,
+      }).where(eq(sites.id,site.id)).returning({updatedAt:sites.updatedAt});
+      if(!saved)throw new Error("Could not save Site information");
+      await writeAudit(tx,actor,{
+        action:"site.information.draft.update",entityType:"site",entityId:site.id,
+        scope:{organizationId:site.organizationId,siteId:site.id},
+        before:{information:before},after:{information:data.information,
+          selfReported:true,publicApproved:false},
       });
       return {siteId:site.id,updated:true,revision:saved.updatedAt.toISOString()};
     });

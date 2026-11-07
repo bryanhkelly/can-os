@@ -8,6 +8,8 @@ import {
   nextSiteConfigurationRevision,
   samePhysicalSiteAddress,
   sameDraftSiteContact,
+  sameSiteInformation,
+  siteInformationSchema,
   readSitePhysicalAddress,
   siteAddressEditorDraft,
   launchOnsiteDaysPerWeekSchema,
@@ -32,6 +34,16 @@ describe("canonical church Site configuration input",()=>{
     expect(draftSiteContactSchema.safeParse({
       displayName:"School Office",email:"invalid",phone:"",
     }).success).toBe(false);
+  });
+  it("captures overlapping Site context and a private existing website reference",()=>{
+    const information=siteInformationSchema.parse({contexts:["microschool","church"],
+      hostChurchName:"Grace Community",currentWebsiteUrl:" https://grace.example.org ",otherContext:""});
+    expect(information).toMatchObject({contexts:["church","microschool"],
+      hostChurchName:"Grace Community",currentWebsiteUrl:"https://grace.example.org"});
+    expect(sameSiteInformation({currentWebsiteUrl:"https://grace.example.org",contexts:["church","microschool"],
+      otherContext:"",hostChurchName:"Grace Community"},information)).toBe(true);
+    expect(siteInformationSchema.safeParse({...information,currentWebsiteUrl:"http://grace.example.org"}).success).toBe(false);
+    expect(siteInformationSchema.safeParse({...information,contexts:["church","church"]}).success).toBe(false);
   });
   it("requires an explicit real time zone and does not pretend that state identifies it",()=>{
     expect(siteTimezoneSchema.safeParse("America/Los_Angeles").success).toBe(true);

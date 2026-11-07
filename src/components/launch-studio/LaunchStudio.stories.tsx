@@ -74,7 +74,7 @@ function SchoolDetails({ unsupported = false }: { unsupported?: boolean }) {
     sites:[{id:"site",organizationId:"org",name:"Example Academy Campus",slug:"example-campus",
       timezone:"America/Chicago",updatedAt:"2026-11-05T00:00:00Z",
       address:{street1:"100 Example Lane",city:"Example City",state:unsupported?"CA":"TX",postalCode:"75001",country:"US"},
-      addressStatus:"church_supplied",sitePhysicalAddressRevision:null,siteIdentityRevision:null,contactDraft:null,websiteDraft:null}],
+      addressStatus:"church_supplied",sitePhysicalAddressRevision:null,siteIdentityRevision:null,contactDraft:null,siteInformationDraft:null,websiteDraft:null}],
   };
   return <LaunchStudioChrome><LaunchStudioShell role="School setup" subject="Example Academy"
     title="Your school, your foundation." steps={steps} currentId="details" onStepChange={()=>{}}>

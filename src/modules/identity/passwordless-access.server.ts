@@ -1,6 +1,6 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs } from "@/db/schema";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs,schoolSetupSignups } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
@@ -16,6 +16,7 @@ import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 import { readDemoStaffBindings, matchesDemoStaffBinding } from "./demo-staff-access.server";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
+import { realSchoolSetupSignupSchema } from "@/domain/school-setup";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -46,7 +47,10 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
    eq(people.active,true)));
  // Existing memberships must not hide newly invited synthetic-school grants.
  const pendingInvitations=await listPendingStaffInvitations(db,account.id);
- if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return "ineligible";
+ const [schoolSignup]=await db.select({id:schoolSetupSignups.id}).from(schoolSetupSignups)
+  .where(and(eq(schoolSetupSignups.accountId,account.id),isNull(schoolSetupSignups.consumedAt),
+   gt(schoolSetupSignups.expiresAt,new Date()))).limit(1);
+ if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length&&!schoolSignup)return "ineligible";
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  // Serialize concurrent requests for the same account before enforcing cooldown.
@@ -84,6 +88,46 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  await issueOneTimeAccess(rawEmail,sender,returnTo);
  return genericResult;
 }
+/** Begin real-school setup; ordinary passwordless login remains invitation/account-only. */
+export async function requestSchoolSetupAccess(input:unknown,sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
+ const data=realSchoolSetupSignupSchema.parse(input);
+ const email=normalizeAccessEmail(data.email);
+ if(isDemoAccountEmail(email))return genericResult;
+ secretPepper();
+ await db.transaction(async tx=>{
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"school-setup-signup:"+email}))`);
+  const [existing]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
+   .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).for("update").limit(1);
+  if(existing?.disabled)return;
+  const accountId=existing?.id??(await tx.insert(accessAccounts).values({emailNormalized:email})
+   .returning({id:accessAccounts.id}))[0]?.id;
+  if(!accountId)throw new Error("School setup account could not be prepared");
+  const [activeGrant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
+   .where(and(eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
+  if(activeGrant)return;
+  const now=new Date();
+  const expiresAt=new Date(now.getTime()+CHALLENGE_LIFETIME_MS);
+  const [prior]=await tx.select().from(schoolSetupSignups)
+   .where(eq(schoolSetupSignups.accountId,accountId)).for("update").limit(1);
+  if(prior?.consumedAt)return;
+  if(prior&&prior.expiresAt>now){
+   if(prior.schoolName!==data.name||prior.firstName!==data.firstName||prior.lastName!==data.lastName)return;
+   await tx.update(schoolSetupSignups).set({expiresAt,updatedAt:now})
+    .where(eq(schoolSetupSignups.id,prior.id));
+   return;
+  }
+  if(prior){
+   await tx.update(schoolSetupSignups).set({schoolName:data.name,firstName:data.firstName,
+    lastName:data.lastName,expiresAt,consumedAt:null,organizationId:null,siteId:null,updatedAt:now})
+    .where(eq(schoolSetupSignups.id,prior.id));
+  }else{
+   await tx.insert(schoolSetupSignups).values({accountId,schoolName:data.name,
+    firstName:data.firstName,lastName:data.lastName,expiresAt});
+  }
+ });
+ await issueOneTimeAccess(email,sender);
+ return genericResult;
+}
 /** This privileged status is for already-authorized onboarding staff only.
  * Dispatched means the configured sender accepted the message, not inbox delivery. */
 export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string,returnTo?:string):Promise<AccessDispatchOutcome> {
@@ -104,15 +148,21 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   const [account]=await tx.select({id:accessAccounts.id,email:accessAccounts.emailNormalized}).from(accessAccounts)
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
   if(!account||isDemoAccountEmail(account.email))throw new InvalidAccessCredentialError("Account unavailable");
-  const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
-   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
-    eq(people.active,true)));
   const pending=await listPendingStaffInvitations(tx,account.id);
   const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
   // The verified mailbox has just redeemed the single-use access link.
   // Persist verification before resolving synthetic-school grants.
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
+  const [signup]=await tx.select().from(schoolSetupSignups)
+   .where(and(eq(schoolSetupSignups.accountId,account.id),isNull(schoolSetupSignups.consumedAt),
+    gt(schoolSetupSignups.expiresAt,now))).for("update").limit(1);
+  const provisionedSchool=signup
+   ? await (await import("./school-setup-signup.server")).provisionVerifiedSchoolSignup(tx,signup,account.id,account.email,now)
+   : null;
+  const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
+   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
+    eq(people.active,true)));
   const {grants:authorizedGrants}=await readSessionGrants(account.id,account.email,tx);
   const authorizedGrantIds=new Set(authorizedGrants.map(grant=>grant.id));
   // A newly accepted church-onboarding grant takes priority over an older
@@ -146,7 +196,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     .find(candidate=>candidate && authorizedGrantIds.has(candidate.id) &&
       Object.hasOwn(roleCapabilities,candidate.role));
   if(!activeGrant)throw new InvalidAccessCredentialError("No supported CAN OS membership");
-  const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
+  const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId??provisionedSchool?.siteId;
   // After the school becomes active, ordinary sign-in need not keep redirecting
   // the administrator through setup. Opening status is read, never inferred.
   const existingOpenSchool = candidateLaunchSiteId

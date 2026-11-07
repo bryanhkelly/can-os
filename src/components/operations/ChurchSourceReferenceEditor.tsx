@@ -33,11 +33,11 @@ const descriptions: Record<ChurchReferenceKind, string> = {
   tiktok: "Save your TikTok profile for reference; no videos are imported.",
 };
 
-export function ChurchSourceReferenceEditor() {
+export function ChurchSourceReferenceEditor({suggestedSchoolWebsiteUrl}:{suggestedSchoolWebsiteUrl?:string}) {
   const router = useRouter();
   const [references, setReferences] = useState<Reference[]>([]);
   const [urls, setUrls] = useState<Record<ChurchReferenceKind, string>>({
-    website: "", school_website: "", youtube: "", instagram: "", facebook: "", tiktok: "",
+    website: "", school_website: suggestedSchoolWebsiteUrl??"", youtube: "", instagram: "", facebook: "", tiktok: "",
   });
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);

@@ -8,6 +8,8 @@ export const schoolHubSearch = z.object({
   teamMode:z.enum(["access","invite","people"]).optional(),
 });
 export const schoolHubModules = {
+  profile: { title: "School Profile", description: "Name, location, identity and contact details." },
+  information: { title: "Site Information", description: "Describe the school setting and share its current website." },
   website: { title: "Build Website", description: "Design, preview and publish your school's website.", action: "Open website setup", step: "website" },
   team: { title: "Invite Your Team", description: "Bring in school leaders and delegate scoped permissions.", action: "Invite team member" },
   promote: { title: "Promote Your School", description: "Prepare your media kit, social graphics, captions, flyers and QR codes." },
@@ -24,7 +26,7 @@ export function isPlannedSchoolHubModule(module: SchoolHubModule): module is Pla
   return plannedSchoolHubModules.some(planned => planned === module);
 }
 export const schoolHubSections = [
-  { title: "Establish Your School", description: "Give your school a home online.", modules: ["website"] },
+  { title: "Establish Your School", description: "Set up your school profile, site context and website.", modules: ["profile", "information", "website"] },
   { title: "Build Your School Community", description: "Bring your team and prospective families into the vision.", modules: ["team", "promote", "recruitment", "events"] },
   { title: "Prepare to Open", description: "Prepare academics and work through independent opening requirements.", modules: ["academics", "compliance"] },
 ] as const;

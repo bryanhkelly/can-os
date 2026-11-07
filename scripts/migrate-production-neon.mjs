@@ -6,7 +6,11 @@ import { neon } from "@neondatabase/serverless";
 
 const projectId = "sweet-hall-62441909";
 const branchId = "br-restless-sea-ar9ooo55";
-const expectedPendingTag = "0072_interest_events";
+const expectedPendingTag = "0076_curly_makkari";
+const preflightOnly = process.argv.includes("--preflight");
+if (process.argv.slice(2).some(argument => argument !== "--preflight")) {
+  throw new Error("Unrecognized argument. Use --preflight or no additional arguments.");
+}
 
 if (existsSync(".env.local")) loadEnvFile(".env.local");
 const databaseUrl = process.env.DATABASE_URL;
@@ -44,10 +48,19 @@ async function verifyTargetApplied(ledger) {
     throw new Error(`Postflight failed: ${expectedPendingTag} hash mismatch.`);
   }
   const [objects] = await sql.query(`
-    select to_regclass('public.interest_events') is not null as interest_events,
-           to_regclass('public.interest_event_registrations') is not null as interest_registrations
+    select to_regclass('public.school_setup_signups') is not null as signup_table,
+           to_regclass('public.school_setup_signup_account_uq') is not null as account_index,
+           to_regclass('public.school_setup_signup_org_uq') is not null as organization_index,
+           to_regclass('public.school_setup_signup_site_uq') is not null as site_index,
+           to_regclass('public.school_setup_signup_expiry_idx') is not null as expiry_index,
+           (select count(*) = 3 from information_schema.table_constraints
+             where table_schema = 'public' and table_name = 'school_setup_signups'
+               and constraint_type = 'FOREIGN KEY') as foreign_keys,
+           (select count(*) = 11 from information_schema.columns
+             where table_schema = 'public' and table_name = 'school_setup_signups') as columns
   `);
-  if (!objects?.interest_events || !objects.interest_registrations) {
+  if (!objects?.signup_table || !objects.account_index || !objects.organization_index ||
+      !objects.site_index || !objects.expiry_index || !objects.foreign_keys || !objects.columns) {
     throw new Error(`Postflight failed: ${expectedPendingTag} tables are absent.`);
   }
 }
@@ -78,15 +91,25 @@ const [objects] = await sql.query(`
            to_regclass('public.room_coverage_schedules') is not null as coverage,
            to_regclass('public.room_coverage_sections') is not null as coverage_sections,
            to_regclass('public.interest_events') is not null as interest_events,
-           to_regclass('public.interest_event_registrations') is not null as interest_registrations
+           to_regclass('public.interest_event_registrations') is not null as interest_registrations,
+           to_regclass('public.scheduled_reminders') is not null as scheduled_reminders,
+           to_regclass('public.interest_event_email_deliveries') is not null as event_deliveries,
+           to_regclass('public.launch_studio_drafts') is not null as launch_drafts,
+           to_regclass('public.school_setup_signups') is not null as signup_table
   `);
-if (!objects?.profiles || !objects.coverage || !objects.coverage_sections) {
-  throw new Error("Refusing migration: expected 0070/0071 production tables are absent.");
+if (!objects?.profiles || !objects.coverage || !objects.coverage_sections ||
+    !objects.interest_events || !objects.interest_registrations || !objects.scheduled_reminders ||
+    !objects.event_deliveries || !objects.launch_drafts) {
+  throw new Error("Refusing migration: expected 0070-0075 production tables are absent.");
 }
-if (objects.interest_events || objects.interest_registrations) {
-  throw new Error("Refusing migration: 0072 target objects already exist.");
+if (objects.signup_table) {
+  throw new Error(`Refusing migration: ${expectedPendingTag} target table already exists.`);
 }
-console.log(`Verified production Neon branch ${branchId}; applying ${expectedPendingTag}.`);
+console.log(`Verified production Neon branch ${branchId}; ${expectedPendingTag} is the only pending migration.`);
+if (preflightOnly) {
+  console.log("Preflight passed; no SQL applied.");
+  process.exit(0);
+}
 
 const windows = process.platform === "win32";
 const result = spawnSync(

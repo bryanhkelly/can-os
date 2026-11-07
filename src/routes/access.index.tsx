@@ -49,8 +49,7 @@ function AccessPage(){
   </form>
   <p role="status" className="mt-4 text-sm">{status||(search.error?accessFormErrors[search.error]:"")}</p>
   <div className="mt-6 space-y-4 border-t pt-4">
-   <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/schools/new">Create a new .demo school</Link></Button></p>
-   <p className="text-sm"><Button asChild variant="ghost" className="h-auto w-full whitespace-normal text-center"><Link to="/church/apply">Church leader? Request to launch a school →</Link></Button></p>
+    <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/schools/new">Create a school</Link></Button></p>
    <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
   </div>
  </WorkspacePanel>

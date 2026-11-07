@@ -2,6 +2,7 @@ import { schoolHubModules } from "./school-launch-hub";
 export type SchoolConfigurationContext="launch"|"settings";
 export const schoolSettingsModules={
   profile:{title:"School Profile",description:"School identity, location, contact and time zone."},
+  information:{...schoolHubModules.information},
   website:{...schoolHubModules.website,title:"Website"},
   team:{...schoolHubModules.team,title:"Team & Permissions"},
   promote:{...schoolHubModules.promote,title:"Promotion"},

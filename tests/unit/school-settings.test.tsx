@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
-const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,module:"team",data:null as any,role:"site_admin",siteIds:[] as string[],load:vi.fn(),invalidate:vi.fn(),updateIdentity:vi.fn(),saveIdentity:null as null|((identity:{name:string;timezone:string},revision:string,reason:string)=>Promise<void>)}));
+const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,module:"team",data:null as any,role:"site_admin",siteIds:[] as string[],load:vi.fn(),invalidate:vi.fn(),updateIdentity:vi.fn(),updateInformation:vi.fn(),saveIdentity:null as null|((identity:{name:string;timezone:string},revision:string,reason:string)=>Promise<void>)}));
 vi.mock("@tanstack/react-router",()=>({
  createFileRoute:()=> (options:object)=>({options,useSearch:()=>state.search,useParams:()=>({module:state.module}),useLoaderData:()=>state.data}),
  notFound:()=>new Error("Not found"),useRouter:()=>({invalidate:state.invalidate}),
@@ -22,8 +22,8 @@ vi.mock("@/components/operations/LaunchWizardPage",()=>({LaunchWizardPage:()=>nu
 vi.mock("@/components/operations/LaunchAcademicSetupWorkspace",()=>({LaunchAcademicSetupWorkspace:()=>null}));
 vi.mock("@/components/operations/LaunchPreparationWorkspace",()=>({LaunchPreparationWorkspace:()=>null}));
 vi.mock("@/components/operations/SchoolOpeningEvidencePanel",()=>({SchoolOpeningEvidencePanel:()=>null}));
-vi.mock("@/hooks/useWorkspaceMutation",()=>({useWorkspaceMutation:({invalidateRouter}:{invalidateRouter:()=>Promise<unknown>})=>({submit:async(operation:()=>Promise<unknown>)=>{await operation();await invalidateRouter();return {status:"completed"};}})}));
-vi.mock("@/modules/programs/site-configuration.functions",()=>({updateLaunchSiteIdentity:state.updateIdentity,updateLaunchSiteAddress:vi.fn(),updateLaunchSiteContact:vi.fn()}));
+vi.mock("@/hooks/useWorkspaceMutation",()=>({useWorkspaceMutation:({invalidateRouter,mutationFn}:{invalidateRouter:()=>Promise<unknown>;mutationFn:(input:any)=>Promise<unknown>})=>({submit:async(input:any)=>{if(typeof input==="function")await input();else await mutationFn(input);await invalidateRouter?.();return {status:"completed"};},isSubmitting:false,refreshError:null,retryRefresh:vi.fn()})}));
+vi.mock("@/modules/programs/site-configuration.functions",()=>({updateLaunchSiteIdentity:state.updateIdentity,updateLaunchSiteAddress:vi.fn(),updateLaunchSiteContact:vi.fn(),updateLaunchSiteInformation:state.updateInformation}));
 vi.mock("@/components/operations/LaunchSiteIdentityEditor",()=>({LaunchSiteIdentityEditor:({initial,save}:any)=>{state.saveIdentity=save;return <p>Saved name: {initial.name}</p>;}}));
 vi.mock("@/components/operations/LaunchSiteAddressEditor",()=>({LaunchSiteAddressEditor:()=>null}));
 vi.mock("@/components/operations/LaunchSiteContactEditor",()=>({LaunchSiteContactEditor:()=>null}));
@@ -35,7 +35,7 @@ import { Route as LaunchModule } from "@/routes/launch.hub.school_.$module";
 const siteId="00000000-0000-4000-8000-000000000001";
 const otherSite="00000000-0000-4000-8000-000000000002";
 const revision="2026-11-06T00:00:00.000Z";
-const site={id:siteId,name:"Saved School",slug:"saved-school",timezone:"America/Los_Angeles",updatedAt:revision,address:null,contactDraft:null};
+const site={id:siteId,name:"Saved School",slug:"saved-school",timezone:"America/Los_Angeles",updatedAt:revision,address:null,contactDraft:null,siteInformationDraft:null};
 beforeEach(()=>{
  vi.clearAllMocks();state.search={siteId};state.module="team";state.role="site_admin";state.siteIds=[siteId];state.saveIdentity=null;
  state.data={ok:true,data:{options:{sites:[site,{...site,id:otherSite,name:"Another School"}]},launches:[],statuses:null,selectedProgramId:null}};
@@ -43,7 +43,7 @@ beforeEach(()=>{
 describe("dashboard school configuration",()=>{
  it("links all school settings to the same selected Site without sending administrators to Launch",()=>{
   const html=renderToStaticMarkup(<Settings.options.component/>);
-  for(const module of ["profile","website","team","promote","recruitment","events","academics","compliance"])
+  for(const module of ["profile","information","website","team","promote","recruitment","events","academics","compliance"])
    expect(html).toContain(`/settings/school/${module}?siteId=${siteId}`);
   expect(html).toContain("Explore module");
   expect(html).not.toContain('/launch/school');
@@ -61,6 +61,15 @@ describe("dashboard school configuration",()=>{
   expect(html).toContain(`/settings/school/team?siteId=${siteId}&amp;teamMode=invite`);
   expect(html).toContain(`/settings?siteId=${siteId}`);
   expect(html).not.toContain('/launch/');
+ });
+ it("opens Site Information as a scoped setup editor",()=>{
+  state.module="information";
+  const html=renderToStaticMarkup(<SettingsModule.options.component/>);
+  expect(html).toContain("Site Information");
+  expect(html).toContain("Microschool");
+  expect(html).toContain("Homeschool or cooperative");
+  expect(html).toContain("Current website (optional)");
+  expect(html).toContain("These descriptions do not establish legal status");
  });
  it("opens the canonical website editor in the dashboard and preserves its return context",()=>{
   state.module="website";

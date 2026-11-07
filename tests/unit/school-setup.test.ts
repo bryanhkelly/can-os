@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTableName } from "drizzle-orm";
-import { schoolSetupSchema, matchesDemoSchoolAdministrator } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, schoolSetupSchema, matchesDemoSchoolAdministrator } from "@/domain/school-setup";
 import { hasRegistrarAuthority, rolesAllow } from "@/domain/school-roles";
 import { resolveAccessContext, roleCapabilities } from "@/domain/access-context";
 import { getWorkspaceHome, getWorkspaceLinks } from "@/components/shell/workspace-navigation.registry";
+import { db as testDatabase } from "@/db/client";
 
 const state = vi.hoisted(() => ({
   reads: [] as unknown[][],
   writes: [] as { table: string; value: Record<string, unknown> }[],
+  updates: [] as { table: string; value: Record<string, unknown> }[],
   event: vi.fn(),
   audit: vi.fn(),
   committed: false,
+  tx: undefined as unknown,
 }));
 vi.mock("@/db/client", () => ({
   db: {
@@ -27,7 +30,14 @@ vi.mock("@/db/client", () => ({
             return { returning: async () => [{ id: `${getTableName(table)}-id`, ...value }] };
           },
         }),
+        update: (table: Parameters<typeof getTableName>[0]) => ({
+          set: (value: Record<string, unknown>) => {
+            state.updates.push({ table: getTableName(table), value });
+            return { where: () => ({ returning: async () => [{ id: `${getTableName(table)}-id` }] }) };
+          },
+        }),
       };
+      state.tx = tx;
       const value = await run(tx);
       state.committed = true;
       return value;
@@ -36,6 +46,7 @@ vi.mock("@/db/client", () => ({
 }));
 vi.mock("@/platform/mutation", () => ({ emitEvent: state.event, writeAudit: state.audit }));
 import { setupSchool } from "@/modules/identity/school-setup.server";
+import { provisionVerifiedSchoolSignup } from "@/modules/identity/school-setup-signup.server";
 
 const input = { name: "Example School", domain: "example.demo", timezone: "America/New_York", syntheticOnly: true as const };
 const school = {
@@ -51,7 +62,9 @@ const grant = {
 beforeEach(() => {
   state.reads = [];
   state.writes = [];
+  state.updates = [];
   state.committed = false;
+  state.tx = undefined;
   vi.resetAllMocks();
 });
 
@@ -67,6 +80,21 @@ describe("public school setup validation", () => {
     { role: "can_network_steward" },
   ])("rejects invalid input and caller-selected identity: %j", changes => {
     expect(schoolSetupSchema.safeParse({ ...input, ...changes }).success).toBe(false);
+  });
+});
+
+describe("real school signup validation", () => {
+  it("normalizes a verified-email signup without accepting demo identities", () => {
+    expect(realSchoolSetupSignupSchema.parse({name:"Example School",email:"  ADMIN@Example.org ",
+      firstName:"Alex",lastName:"Admin"}).email).toBe("admin@example.org");
+    expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.demo",
+      firstName:"Alex",lastName:"Admin"}).success).toBe(false);
+  });
+  it("rejects caller-supplied identity and malformed signup fields", () => {
+    expect(realSchoolSetupSignupSchema.safeParse({name:"Example School",email:"admin@example.org",
+      firstName:"Alex",lastName:"Admin",role:"site_admin"}).success).toBe(false);
+    expect(realSchoolSetupSignupSchema.safeParse({name:"A",email:"admin@example.org",
+      firstName:"",lastName:"Admin"}).success).toBe(false);
   });
 });
 
@@ -123,6 +151,48 @@ describe("canonical demo school provisioning", () => {
     state[step].mockRejectedValueOnce(new Error("persistence unavailable"));
     await expect(setupSchool(input)).rejects.toThrow("persistence unavailable");
     expect(state.committed).toBe(false);
+  });
+});
+
+describe("verified real-school signup provisioning", () => {
+  it("creates a canonical Site Admin tenant without demo identity, Program, or publication rows", async () => {
+    const now = new Date("2026-11-07T12:00:00Z");
+    const signup = {
+      id: "00000000-0000-4000-8000-000000000001", accountId: "account-real",
+      schoolName: "Example Microschool", firstName: "Alex", lastName: "Admin",
+      expiresAt: new Date(now.getTime() + 60_000), consumedAt: null,
+      organizationId: null, siteId: null, createdAt: now, updatedAt: now,
+    } as never;
+    await expect(testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now)))
+      .resolves.toEqual({ organizationId: "organizations-id", siteId: "sites-id",
+        grantId: "account_person_grants-id" });
+    expect(state.writes.map(row => row.table)).toEqual([
+      "organizations", "sites", "people", "account_person_grants", "memberships", "role_assignments",
+    ]);
+    expect(state.writes.find(row => row.table === "organizations")?.value)
+      .toMatchObject({ type: "christian_school", name: "Example Microschool" });
+    expect(state.writes.find(row => row.table === "account_person_grants")?.value)
+      .toMatchObject({ accountId: "account-real", role: "site_admin", active: true });
+    expect(state.updates).toContainEqual(expect.objectContaining({ table: "school_setup_signups",
+      value: expect.objectContaining({ consumedAt: now, organizationId: "organizations-id", siteId: "sites-id" }) }));
+    expect(state.writes.some(row => ["demo_school_tenants", "programs", "site_publications"].includes(row.table))).toBe(false);
+    expect(state.audit).toHaveBeenCalledOnce();
+    expect(state.event).toHaveBeenCalledTimes(2);
+  });
+  it.each(["expired", "consumed"]) ("refuses an %s signup without provisioning records", async condition => {
+    const now = new Date("2026-11-07T12:00:00Z");
+    const signup = {
+      id: "00000000-0000-4000-8000-000000000001", accountId: "account-real",
+      schoolName: "Example School", firstName: "Alex", lastName: "Admin",
+      expiresAt: condition === "expired" ? new Date(now.getTime() - 1) : new Date(now.getTime() + 60_000),
+      consumedAt: condition === "consumed" ? now : null,
+      organizationId: null, siteId: null, createdAt: now, updatedAt: now,
+    } as never;
+    await expect(testDatabase.transaction(tx => provisionVerifiedSchoolSignup(tx, signup, "account-real", "alex@example.org", now)))
+      .rejects.toThrow("School setup signup is no longer available");
+    expect(state.writes).toEqual([]);
+    expect(state.audit).not.toHaveBeenCalled();
+    expect(state.event).not.toHaveBeenCalled();
   });
 });
 

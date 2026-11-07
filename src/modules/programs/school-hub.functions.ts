@@ -14,7 +14,7 @@ function readFailureStatus(module: string): SchoolHubStatus {
 }
 export const getSchoolHubData=createServerFn({method:"GET"})
  .validator((value:unknown)=>z.object({siteId:z.string().optional(),programId:z.string().optional(),
-  module:z.enum(["profile","website","team","promote","recruitment","events","academics","compliance"]).optional()}).strict().parse(value))
+  module:z.enum(["profile","information","website","team","promote","recruitment","events","academics","compliance"]).optional()}).strict().parse(value))
  .handler(async({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCommandContext(getRequest());assertCapability(actor,"program.read");

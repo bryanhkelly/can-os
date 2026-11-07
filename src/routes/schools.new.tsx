@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
-import { schoolSetupSchema, type SchoolSetupResult } from "@/domain/school-setup";
+import { realSchoolSetupSignupSchema, schoolSetupSchema, type SchoolSetupResult } from "@/domain/school-setup";
 import { DomainError } from "@/domain/errors";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -31,7 +31,27 @@ export const Route = createFileRoute("/schools/new")({
       } catch {
         return Response.json({ error: "Invalid submission." }, { status: 400, headers });
       }
-      const parsed = schoolSetupSchema.safeParse(payload);
+      const requestPayload = payload && typeof payload === "object" && !Array.isArray(payload)
+        ? payload as Record<string, unknown> : null;
+      if (requestPayload?.mode === "email") {
+        const parsedSignup = realSchoolSetupSignupSchema.safeParse({
+          name: requestPayload.name, email: requestPayload.email,
+          firstName: requestPayload.firstName, lastName: requestPayload.lastName,
+        });
+        if (!parsedSignup.success) return Response.json({
+          error: "Enter your school name and a valid email address and administrator name.",
+        }, { status: 400, headers });
+        try {
+          const access = await import("@/modules/identity/passwordless-access.server");
+          await access.requestSchoolSetupAccess(parsedSignup.data);
+          return Response.json({ accepted: true }, { status: 202, headers });
+        } catch {
+          console.error("[school-setup] email signup unavailable");
+          return Response.json({ accepted: true }, { status: 202, headers });
+        }
+      }
+      const { mode: _mode, ...demoPayload } = requestPayload ?? {};
+      const parsed = schoolSetupSchema.safeParse(demoPayload);
       if (!parsed.success) return Response.json({
         error: "Enter a school name, an available .demo domain and a valid timezone, and confirm synthetic-only use.",
       }, { status: 400, headers });
@@ -54,11 +74,16 @@ export const Route = createFileRoute("/schools/new")({
 
 function SchoolSetupPage() {
   const hydrated = useHydrated();
+  const [mode, setMode] = useState<"email" | "demo">("email");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [domain, setDomain] = useState("");
   const [timezone, setTimezone] = useState(DEFAULT_SITE_TIMEZONE);
   const [syntheticOnly, setSyntheticOnly] = useState(false);
   const [result, setResult] = useState<SchoolSetupResult | null>(null);
+  const [signupRequested, setSignupRequested] = useState(false);
   const mutation = useMutationFeedback(async () => {});
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -66,19 +91,23 @@ function SchoolSetupPage() {
     const outcome = await mutation.run(async () => {
       const response = await fetch("/schools/new", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, domain, timezone, syntheticOnly }),
+        body: JSON.stringify(mode === "demo"
+          ? { mode, name, domain, timezone, syntheticOnly }
+          : { mode, name, email, firstName, lastName }),
       });
       if (!response.ok) {
         throw new DomainError(response.status === 409 ? "CONFLICT" :
           response.status === 400 ? "VALIDATION_FAILED" : "UNAVAILABLE");
       }
-      const value: SchoolSetupResult = await response.json();
-      return value;
+      return mode === "demo" ? await response.json() as SchoolSetupResult : null;
     }, {
-      successMessage: "Your demo school is ready for setup.",
-      commandErrorMessage: "Unable to create the school. Retry with the same domain.",
+      successMessage: mode === "demo" ? "Your demo school is ready for setup." : "Check your email for a secure setup link.",
+      commandErrorMessage: mode === "demo" ? "Unable to create the school. Retry with the same domain." : "Unable to start school setup. Please try again.",
     });
-    if (outcome.status === "saved") setResult(outcome.value);
+    if (outcome.status === "saved") {
+      if (mode === "demo") setResult(outcome.value!);
+      else setSignupRequested(true);
+    }
   }
 
   const field = "mt-1 block w-full rounded-lg border bg-background p-3";
@@ -86,9 +115,14 @@ function SchoolSetupPage() {
     <header>
       <p className="text-sm font-semibold text-muted-foreground">CAN OS school setup</p>
       <h1 className="mt-2 font-serif text-4xl">Create a school</h1>
-      <p className="mt-3">Use a domain ending in .demo to create an isolated demonstration school and test setup from the beginning.</p>
+      <p className="mt-3">Create a school profile and continue in its Launch Hub. Real schools use verified email; demo schools use a shared access code.</p>
     </header>
-    {result ? <section role="status" className="space-y-4 rounded-xl border bg-card p-6">
+    {signupRequested ? <section role="status" className="space-y-4 rounded-xl border bg-card p-6">
+      <h2 className="font-serif text-2xl">Check your email</h2>
+      <p>If this email can start school setup, a one-time link will arrive shortly. Open it to verify your address and continue to the Launch Hub.</p>
+      <p className="text-sm text-muted-foreground">Already have a CAN OS account? Sign in with that account instead.</p>
+      <Link to="/access" search={{ email }} className="inline-block rounded-lg border px-5 py-3">Return to sign in</Link>
+    </section> : result ? <section role="status" className="space-y-4 rounded-xl border bg-card p-6">
       <h2 className="font-serif text-2xl">Your demo school is ready</h2>
       <p>Domain: <strong>{result.domain}</strong></p>
       <p>Site Admin: <strong>{result.adminEmail}</strong></p>
@@ -99,19 +133,36 @@ function SchoolSetupPage() {
       <label className="block">School name
         <input required minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)} className={field} />
       </label>
-      <label className="block">School domain
-        <input required placeholder="newschool.demo" maxLength={48} autoCapitalize="none" spellCheck={false}
-          value={domain} onChange={event => setDomain(event.target.value)} className={field} />
-      </label>
-      <SiteTimezoneField value={timezone} onChange={setTimezone} />
-      <label className="flex items-start gap-3 text-sm">
-        <input required type="checkbox" checked={syntheticOnly} onChange={event => setSyntheticOnly(event.target.checked)} className="mt-1" />
-        <span>I will use synthetic data only. This school and its shared accounts are public demonstrations, not private records.</span>
-      </label>
-      <p className="text-sm text-muted-foreground">Each .demo domain creates a separate tenant. External email and SMS are suppressed. This domain is a demo identity, not a live website address; publishing and opening readiness remain separate.</p>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">Account type</legend>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="setup-mode" checked={mode === "email"} onChange={() => setMode("email")} />Real school</label>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="setup-mode" checked={mode === "demo"} onChange={() => setMode("demo")} />Demo school</label>
+      </fieldset>
+      {mode === "email" ? <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">Administrator first name
+          <input required autoComplete="given-name" maxLength={80} value={firstName} onChange={event => setFirstName(event.target.value)} className={field} />
+        </label>
+        <label className="block">Administrator last name
+          <input required autoComplete="family-name" maxLength={80} value={lastName} onChange={event => setLastName(event.target.value)} className={field} />
+        </label>
+        <label className="block sm:col-span-2">Administrator email
+          <input required type="email" autoComplete="email" maxLength={254} value={email} onChange={event => setEmail(event.target.value)} className={field} />
+        </label>
+      </div> : <>
+        <label className="block">School demo domain
+          <input required placeholder="newschool.demo" maxLength={48} autoCapitalize="none" spellCheck={false}
+            value={domain} onChange={event => setDomain(event.target.value)} className={field} />
+        </label>
+        <SiteTimezoneField value={timezone} onChange={setTimezone} />
+        <label className="flex items-start gap-3 text-sm">
+          <input required type="checkbox" checked={syntheticOnly} onChange={event => setSyntheticOnly(event.target.checked)} className="mt-1" />
+          <span>I will use synthetic data only. This school and its shared accounts are public demonstrations, not private records.</span>
+        </label>
+        <p className="text-sm text-muted-foreground">Each .demo domain creates an isolated tenant. External email and SMS are suppressed. Publishing and opening readiness remain separate.</p>
+      </>}
       {mutation.error && <p role="alert" className="text-sm text-destructive">{mutation.error}</p>}
       <button disabled={!hydrated || mutation.pending} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">
-        {mutation.pending ? "Creating school..." : "Create demo school"}
+        {mutation.pending ? mode === "demo" ? "Creating school..." : "Sending setup link..." : mode === "demo" ? "Create demo school" : "Continue with email"}
       </button>
     </form>}
     <Link to="/access" className="text-sm underline">Already have a school? Sign in</Link>

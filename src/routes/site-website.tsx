@@ -572,10 +572,17 @@ function LocalWebsiteCopyEditor({
           <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Have ready:</strong> an existing public church or school website, social links if applicable, a logo, a rights-cleared photo folder and a short school welcome. All source links and imagery are optional.</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Your outcome:</strong> a private, revisable website design draft. Publishing and hosting require separate authorization.</p>
         </div>
+        {data.siteInformation && (data.siteInformation.contexts.length > 0 || data.siteInformation.hostChurchName || data.siteInformation.currentWebsiteUrl) && <section className="border bg-card p-5">
+          <h3 className="font-semibold">Saved Site Information</h3>
+          {data.siteInformation.contexts.length > 0 && <p className="mt-2 text-sm">{data.siteInformation.contexts.map(context=>context.replaceAll("_"," ")).join(" · ")}</p>}
+          {data.siteInformation.hostChurchName && <p className="mt-1 text-sm">Host church or community: {data.siteInformation.hostChurchName}</p>}
+          {data.siteInformation.currentWebsiteUrl && <a className="mt-2 inline-block text-sm font-semibold text-primary underline" href={data.siteInformation.currentWebsiteUrl} target="_blank" rel="noopener noreferrer">Open current website reference</a>}
+          <p className="mt-2 text-xs text-muted-foreground">These private setup details do not verify school facts or publish content.</p>
+        </section>}
         <details className="border border-border bg-card p-4">
           <summary className="cursor-pointer text-sm font-semibold">Use your existing church website or social profiles (optional)</summary>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">These are the existing private Site source-reference controls. Social posts and media are not imported. Optional church website suggestions require a separate, enabled and approved discovery process.</p>
-          <div className="mt-3"><ChurchSourceReferenceEditor /></div>
+          <div className="mt-3"><ChurchSourceReferenceEditor suggestedSchoolWebsiteUrl={data.siteInformation?.currentWebsiteUrl}/></div>
         </details>
       </div>}
       {step === 1 && <div className="space-y-5">

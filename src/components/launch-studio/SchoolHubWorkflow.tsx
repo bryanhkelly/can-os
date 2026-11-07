@@ -7,6 +7,8 @@ import { LaunchWizardPage, type LaunchWizardData } from "@/components/operations
 import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcademicSetupWorkspace";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
+import { SchoolProfileConfiguration } from "@/components/launch-studio/SchoolProfileConfiguration";
+import { SiteInformationConfiguration } from "@/components/launch-studio/SiteInformationConfiguration";
 import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
 import type { getSchoolHubData } from "@/modules/programs/school-hub.functions";
@@ -20,6 +22,9 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
  if(!selection.siteId)throw new Error("A school must be selected before opening an operational Launch module.");
  const siteId=selection.siteId;
  const status=data.statuses?.[module];
+ const site=data.options.sites.find(item=>item.id===siteId);
+ if(module==="profile")return site?<SchoolProfileConfiguration site={site}/>:<p role="alert" className="mt-6 border p-5">This school profile is unavailable in the current selection.</p>;
+ if(module==="information")return site?<SiteInformationConfiguration key={`information:${site.updatedAt}`} site={site}/>:<p role="alert" className="mt-6 border p-5">Site information is unavailable in the current selection.</p>;
  if(module==="website")return <section className="mt-6 border bg-card p-6"><h2 className="font-serif text-3xl">Your school website</h2>
   <p className="mt-3 text-sm text-muted-foreground">Edit your school's saved website in Website Studio. Site-owned publishing and independent institutional approvals remain separate.</p>
   {status?.state==="Blocked" || status?.state==="Unavailable" ? <p role="status" className="mt-5 text-sm">{status.detail}</p> : <Button asChild className="mt-5"><Link to={navigation.websitePath} search={{siteId,returnToHub:navigation.context==="launch",returnToSettings:navigation.context==="settings"}}>Open Website Studio →</Link></Button>}
