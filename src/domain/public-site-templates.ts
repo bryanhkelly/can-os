@@ -396,6 +396,14 @@ export const sevenSchoolCss = `
 .school-shell .school-masthead .desktop-nav{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:clamp(9px,1.3vw,22px)}
 .school-shell .school-masthead .desktop-nav a{font-size:.78rem;font-weight:750;line-height:1.2;text-decoration:none;white-space:nowrap}
 .school-shell .school-masthead .desktop-nav a[aria-current=page]{text-decoration:underline;text-underline-offset:7px}
+.school-shell .school-masthead .desktop-more{position:relative;font-size:.78rem;font-weight:750}
+.school-shell .school-masthead .desktop-more summary{display:flex;align-items:center;min-height:44px;cursor:pointer;list-style:none;white-space:nowrap}
+.school-shell .school-masthead .desktop-more summary::-webkit-details-marker{display:none}
+.school-shell .school-masthead .desktop-more summary::after{content:"⌄";font-size:1.15rem;margin-left:5px}
+.school-shell .school-masthead .more-links{position:absolute;z-index:30;top:44px;right:0;width:235px;display:grid;gap:2px;padding:10px;background:var(--site-paper);color:var(--site-ink);border:1px solid #bbc6c7;box-shadow:0 16px 35px #0003}
+.school-shell .school-masthead .more-links a{display:block;min-height:39px;padding:10px;white-space:normal;font-size:.84rem}
+.school-shell .school-masthead .more-links a:hover{background:#e7e7df}
+
 .school-shell .school-masthead .site-nav-cta{flex-shrink:0}
 .school-shell>footer{max-width:none;padding:28px clamp(24px,5vw,80px);margin:0}
 .school-shell .public-hero.home-hero{border-radius:0;overflow:hidden;isolation:isolate;position:relative;margin-bottom:0;padding:0}
