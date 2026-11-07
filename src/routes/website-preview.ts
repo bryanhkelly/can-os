@@ -56,7 +56,7 @@ export const Route = createFileRoute("/website-preview")({
             "This school has not configured the requested page in its current website design.");
 
         return new Response(renderPrivateWebsitePreviewHtml(
-          html, view.siteId, Object.keys(view.previewPages), view.siteName,
+          html, view.siteId, Object.keys(view.previewPages),
         ), { status: 200, headers: privateWebsitePreviewHeaders });
       } catch (error) {
         if (error instanceof AuthorizationError)
