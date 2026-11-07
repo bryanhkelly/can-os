@@ -37,6 +37,7 @@ import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "
 import { listExtendedSessionStaff } from "@/modules/activities/extended-learning-sessions.server";
 import { requireCurrentProgramSiteAuthorization } from "./program-site-authorization.server";
 import { ensureExistingSitePublicationDraftForLaunch } from "@/modules/sites/site-public-provisioning.server";
+import { requireCurrentSchoolJurisdictionForOpening } from "./school-jurisdiction-opening-gate.server";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -398,6 +399,13 @@ export async function activateProgram(
         ),
       )
       .limit(1);
+
+    // Planned schools can prepare every setup screen, but an academic Program
+    // cannot become active without current independent Site/jurisdiction review.
+    // This check follows verified actor scope and idempotent active-status handling.
+    // Extended-learning seasons retain their separate activity authorization.
+    if(program.siteId && !isExtendedLearningType(program.type))
+      await requireCurrentSchoolJurisdictionForOpening(tx,program.id,{});
 
     if (!journey || journey.status !== "ready") {
       throw new Error("Launch Journey must be ready before Program activation");
