@@ -43,6 +43,10 @@ This matrix implements the nine mandatory [Church-Hosted Safety Gates](CHURCH-HO
 - [Admissions Neon Acceptance on `7aedd4b`](https://github.com/bryanhkelly/can-os/actions/runs/42406579625): failed at **Require isolated test database secret**; no admission or safety database acceptance should be claimed.
 - These are pipeline/environment issues, **not** observed passing or failing safety integration behavior. Retest against each actual candidate commit.
 
+## Focused CI execution evidence (Phase 21)
+
+The [CI run at `e5654c9`](https://github.com/bryanhkelly/can-os/actions/runs/42407565492) completed its **School safety and opening unit regressions** step successfully on November 7, 2026. The step ran `npm run test:safety` with the thirteen explicitly named unit test files in `package.json`. The documentation-reference check also succeeded in that run. This evidence is **limited to the focused unit step on that SHA**; it does not establish full CI completion, database integration, authenticated browser acceptance, independent safeguarding/legal review or real school-day supervision. Later commits require their own CI evidence.
+
 ## Repeatable, bounded validation
 
 Run `npm run test:safety` for the focused **unit policy regression subset**, using the safety tests selected in `package.json`; the CI workflow should record its result separately before the typecheck stage. Do not attach a pass status before the relevant GitHub job completes.
