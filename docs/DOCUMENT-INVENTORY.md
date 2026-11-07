@@ -92,3 +92,7 @@ Verified against `main` commit `5041d51554586356b661545b00198d24f424db79`:
 - Checked the archive index's **24 local links**. All targets exist in the Git tree.
 
 This is a targeted structural audit, **not** a complete repository-wide reference audit: raw path strings in code, reference-style Markdown links, anchor fragments, archived historical links, external URLs, and semantic correctness were not validated. CI, test execution, build and runtime journeys remain unverified.
+
+## Phase 12: historical product and integration evidence (2026-11-07)
+
+Retired seven additional records using one Git tree operation with original blob SHAs unchanged. These include historical GF track identifiers, prototype-production mapping, FullFlow code audit, agent integration requests, church-source status and a dated Valor snapshot. Updated live source-document references in the Launch Studio and Valor acceptance documents. See [archive index](archive/2026-11-fullflow/README.md). Active security, Neon, route contracts, design authority and admission-publishing backlogs remain in place.

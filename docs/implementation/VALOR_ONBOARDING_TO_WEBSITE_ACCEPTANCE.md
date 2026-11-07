@@ -1,6 +1,6 @@
 # CAN School Sites — Valor onboarding-to-public acceptance ledger
 
-Updated: 2026-11-03. **Not an acceptance certificate.** Based on Integration PR #264 code and the last recorded read-only Valor database inspection in `docs/valor-reference-school-baseline-2026-11-03.md`. Recheck actual current tenant state before changing published records. No production Neon writes have been authorized or performed by this patch.
+Updated: 2026-11-03. **Not an acceptance certificate.** Based on Integration PR #264 code and the last recorded read-only Valor database inspection in `docs/archive/2026-11-fullflow/acceptance-evidence/valor-reference-school-baseline-2026-11-03.md`. Recheck actual current tenant state before changing published records. No production Neon writes have been authorized or performed by this patch.
 
 ## Completion standard
 

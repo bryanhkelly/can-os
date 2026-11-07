@@ -56,4 +56,6 @@
 
 **Phase 11 validation:** Verified exact Git blob reuse and removal for all 16 moved documents. Scanned 69 active Markdown files and 74 inline local link targets against the non-truncated Git tree; no missing targets found. All 24 links in the new archive index resolved. This manual connector-based scan is limited in scope and is not an automated CI gate.
 
+**Phase 12:** Retired seven dated or superseded product/integration documents, preserving exact blob identities and updating the two identified live documentation references. Full test/build and broader non-Markdown dependency auditing remain pending.
+
 **Still outstanding:** Complete source and CI raw-reference checks, reproducible automated Markdown link validation (including reference-style links and anchors), current-main verification of retained operational/product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.

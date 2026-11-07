@@ -41,3 +41,17 @@ Search historical decisions here only to reconstruct prior work or provenance. U
 ## Protected active references
 
 The machine-readable `docs/platform-route-contracts.json`, Neon development procedures, identity and student-safety rules, Cloudflare R2 runbooks, and approved V6.1 design specification were intentionally **not** moved by this batch. Source and operational dependency checks are required before any later retirement.
+
+## Supplementary retirement batch (2026-11-07)
+
+Additional historical identifiers, prototype mapping, FullFlow source audit, church-source agent handoffs, and the dated Valor tenant snapshot were preserved using their exact Git blobs:
+
+| Original path | Archived path |
+| --- | --- |
+| `docs/FEATURE-TRACKS.md` | [`FEATURE-TRACKS.md`](legacy-specifications/FEATURE-TRACKS.md) |
+| `docs/prototype-migration.md` | [`prototype-migration.md`](legacy-specifications/prototype-migration.md) |
+| `docs/codebase-alignment-audit.md` | [`codebase-alignment-audit.md`](delivery-evidence/codebase-alignment-audit.md) |
+| `docs/parent-experience/agent-a-authoritative-source-model-request.md` | [`agent-a-authoritative-source-model-request.md`](delivery-evidence/parent-experience/agent-a-authoritative-source-model-request.md) |
+| `docs/agent-p-church-sources-integration.md` | [`agent-p-church-sources-integration.md`](delivery-evidence/agent-p-church-sources-integration.md) |
+| `docs/church-source-discovery-status.md` | [`church-source-discovery-status.md`](delivery-evidence/church-source-discovery-status.md) |
+| `docs/valor-reference-school-baseline-2026-11-03.md` | [`valor-reference-school-baseline-2026-11-03.md`](acceptance-evidence/valor-reference-school-baseline-2026-11-03.md) |
