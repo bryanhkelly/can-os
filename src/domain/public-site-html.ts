@@ -16,6 +16,8 @@ export type PublicSitePage = {
   site: { name: string; organizationName: string };
   /** Server-derived from the canonical synthetic Site marker, never a browser claim. */
   demonstration?: boolean;
+  /** Published-page-only status derived from active Program and legal evidence. */
+  operatingStatus?: "authorized" | "development" | "review_required";
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
   /** Only institutionally reviewed claims with public display permission are rendered. */
@@ -726,11 +728,15 @@ main{padding-top:clamp(22px,3vw,48px)}
 .compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
 @media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
 ${publicSiteTemplateCss}
+/* Consistent public preopening disclosure across all seven school designs. */
+.launch-status-banner{padding:14px clamp(20px,4vw,52px);background:#fff3d8;color:#3d2d15;border-bottom:1px solid #c9a663;font:600 14px/1.55 system-ui,sans-serif}
+.launch-status-banner strong{display:block;font-weight:800}
 ${sevenSchoolCss}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
+${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus&&page.operatingStatus!=="authorized" ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"School opening authorization is not currently verified.":"School in development · Not yet open for enrollment."}</strong> Academic plans and opening dates remain subject to review and applicable requirements.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 ${composePublicSiteChrome(templateId, {
   brand: school,
