@@ -54,7 +54,8 @@ describe("authenticated school full-page preview", () => {
   it("does not authorize missing or unconfigured pages", () => {
     const html = '<!doctype html><html><head><title>School</title></head><body><a href="/contact">Contact</a><a href="/about">About</a><a href="#main-content">Skip</a></body></html>';
     const preview = renderPrivateWebsitePreviewHtml(html,siteId,["/","/about"]);
-    expect(preview).toContain('href="/contact"');
+    expect(preview).not.toContain('href="/contact"');
+    expect(preview).toContain('aria-disabled="true"');
     expect(preview).toContain(`href="${privateWebsitePreviewUrl(siteId,"/about")}"`);
     expect(preview).toContain('href="#main-content"');
     expect(privateWebsitePreviewHeaders["X-Robots-Tag"]).toBe("noindex, nofollow");
