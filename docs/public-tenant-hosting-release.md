@@ -1,5 +1,7 @@
 # Public tenant host release checklist (Agent I)
 
+> **Provider-specific historical operational reference.** This runbook describes Netlify Edge setup and must not be assumed to apply unchanged to Cloudflare Workers or another current deployment target. Confirm the selected deployment provider, server/edge routing, DNS/TLS and actual runtime configuration first. See [Public Sites and Admissions](./product/PUBLIC-SITES-AND-ADMISSIONS.md) and [Public Site Release Gates](./quality/PUBLIC-SITE-RELEASE-GATES.md). No production rollout is authorized by this document.
+
 A Site's `published` database status does **not** establish that its address is reachable. Launch website preparation and the authenticated Site verification endpoint separately expose availability and diagnostics. Only a successful external HTTPS request returning recognizable CAN site HTML is reported as `live`.
 
 ## Operator setup
