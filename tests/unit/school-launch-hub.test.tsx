@@ -55,7 +55,7 @@ describe("school Launch Hub",()=>{
   it.each(["promote","recruitment","events"] as const)("makes the %s placeholder honest and retains its return scope",module=>{
     const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId} module={module}/>);
     expect(html).toContain(`/launch/hub/school?siteId=${siteId}`);
-    expect(html).toContain(module === "promote" ? "not available yet" : "coming soon");
+    expect(html).toContain("not available yet");
     expect(html).not.toContain("<button");
   });
 });
