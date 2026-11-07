@@ -47,9 +47,24 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
   const [expanded, setExpanded] = useState<SiteTemplateId | null>(null);
   const renderSample = (templateId: SiteTemplateId) => renderPublicSiteHtml({
     host: "sample.can-os.com",
+    demonstration: true,
     site: { name: schoolName, organizationName: "Illustrative template" }, offerings: [],
-    localContent: { ...emptySiteLocalContent, welcomeMessage: "A place to learn, belong and grow.",
-      localDescription: "An illustrative school story. Replace this sample with your own community’s story.",
+    academicPrograms: [
+      { programId: "sample-learning", title: "Learning pathways", typeLabel: "Illustrative learning",
+        summary: "Explore a fictional example of discovery and purposeful study.",
+        grades: { min: "6", max: "12" }, delivery: { onsite: true, asynchronous: true,
+          liveOnline: false, onsiteDaysPerWeek: 3 }, availability: "planned", applicationOpen: false },
+      { programId: "sample-community", title: "Community experiences", typeLabel: "Illustrative program",
+        summary: "An example of learning and community life coming together.",
+        grades: { min: "6", max: "12" }, delivery: { onsite: true, asynchronous: true,
+          liveOnline: false, onsiteDaysPerWeek: 3 }, availability: "planned", applicationOpen: false },
+    ],
+    localContent: { ...emptySiteLocalContent, heroHeadline: "Discover what is possible.",
+      welcomeMessage: "A place to learn, belong and grow.",
+      schoolVision: "Help young people grow in curiosity, confidence, and purpose.",
+      churchHistory: "An illustrative community history created to compare school designs.",
+      communityOutreach: "Fictional students and mentors imagine meaningful service together.",
+      localDescription: "A fictional school story for comparing templates, not an actual institution.",
       branding: { theme: "classic", heroImage: null, templateId,
         paletteId, typographyId, headingFontId, bodyFontId } },
   }, { path: previewPage, localPreview: true, templateGallery: true });
