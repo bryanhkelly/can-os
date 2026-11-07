@@ -36,4 +36,4 @@ Denominational academies may carry approved theological distinctives, governance
 
 Verify the current main code for exact Site Admin permissions, website ownership, teacher/presenter selection, Launch Hub capability routes, authorization gates, and church information models. These are explicit reconciliation tasks, not claims of existing completeness.
 
-For detailed Launch and Run behavior, see [School Launch and Run](LAUNCH-AND-RUN.md).
+For detailed Launch and Run behavior, see [School Launch and Run](LAUNCH-AND-RUN.md). For the academic institution, instructor and local facilitator distinctions, see [Academic Delivery](ACADEMIC-DELIVERY.md).
