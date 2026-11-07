@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { siteTemplateIds } from "@/domain/site-theme";
+import { siteTemplateIds, contrastRatio, resolveSiteTheme } from "@/domain/site-theme";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
 import {
   resolveSchoolBrand, renderSchoolBrandSvg, schoolBrandMonogram,
@@ -23,6 +23,18 @@ describe("Website & Brand Studio", () => {
       expect(svg).not.toContain("<script");
       expect(svg).not.toContain("@import");
       expect(svg).not.toContain("https://");
+    }
+  });
+
+  it("preserves the supplied seven reference colorways with accessible contrast", () => {
+    for (const id of siteTemplateIds) {
+      const recommendation = schoolBrandDesigns[id];
+      expect(recommendation.recommendedPalette).toBe(`brand-${id}`);
+      const colorway = resolveSiteTheme(recommendation.recommendedPalette,
+        recommendation.recommendedTypography);
+      expect(colorway.paletteId).toBe(recommendation.recommendedPalette);
+      expect(contrastRatio(colorway.ink, colorway.canvas)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colorway.muted, colorway.canvas)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
