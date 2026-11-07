@@ -54,4 +54,6 @@
 
 **Phase 11:** Captured a non-truncated recursive Git tree (2,510 entries at phase start). Atomically relocated 16 historical handoff, Neon branch evidence, and browser exploration files to the November 2026 archive, with a source-to-destination index. Preserved Git blob SHA identity for every moved artifact. Left security, database runbooks, draft SQL, route contracts and current design guidance in place.
 
-**Still outstanding:** Exhaustive source and CI reference checks, automated Markdown link validation, current-main verification of retained operational and product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.
+**Phase 11 validation:** Verified exact Git blob reuse and removal for all 16 moved documents. Scanned 69 active Markdown files and 74 inline local link targets against the non-truncated Git tree; no missing targets found. All 24 links in the new archive index resolved. This manual connector-based scan is limited in scope and is not an automated CI gate.
+
+**Still outstanding:** Complete source and CI raw-reference checks, reproducible automated Markdown link validation (including reference-style links and anchors), current-main verification of retained operational/product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.
