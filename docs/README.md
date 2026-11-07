@@ -4,15 +4,13 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 
 ## Read in order
 
-1. [CAN vision](vision/CAN-VISION.md): institutional model and product intent.
-2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md), [operating model](product/OPERATING-MODEL.md), [School Launch and Run](product/LAUNCH-AND-RUN.md), [four-audience Launch Studio](product/LAUNCH-STUDIO-AUDIENCES.md), [Website Studio](product/WEBSITE-STUDIO.md), and [Website Media](product/WEBSITE-MEDIA.md), and [Public Sites and Admissions](product/PUBLIC-SITES-AND-ADMISSIONS.md), and [Academic Delivery](product/ACADEMIC-DELIVERY.md), [Extended Learning](product/EXTENDED-LEARNING.md), and [Site Operations](product/SITE-OPERATIONS.md): product scope, institutional boundaries, launch journeys, and imagery rights.
-3. [Design authority](design/README.md): approved V6.1 direction, reusable components and adoption requirements.
-4. [System architecture](architecture/SYSTEM.md), [domain model](architecture/DOMAIN-MODEL.md), and [acceptance standards](quality/ACCEPTANCE-STANDARDS.md), and [public-site release gates](quality/PUBLIC-SITE-RELEASE-GATES.md).
-5. [Engineering operations and security](engineering/OPERATIONS-AND-SECURITY.md): retained runbooks and dependencies.
-6. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
-7. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
-8. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
-9. Current source code, migrations, and executed tests: evidence of implemented behavior.
+1. **Purpose and ownership:** [CAN Vision](vision/CAN-VISION.md), [Platform Capabilities](product/PLATFORM-CAPABILITIES.md), and [Operating Model](product/OPERATING-MODEL.md).
+2. **Launch and family:** [School Launch and Run](product/LAUNCH-AND-RUN.md), [Launch Studio Audiences](product/LAUNCH-STUDIO-AUDIENCES.md), [Website Studio](product/WEBSITE-STUDIO.md), [Website Media](product/WEBSITE-MEDIA.md), and [Public Sites and Admissions](product/PUBLIC-SITES-AND-ADMISSIONS.md).
+3. **Teaching and operating:** [Academic Delivery](product/ACADEMIC-DELIVERY.md), [Extended Learning](product/EXTENDED-LEARNING.md), and [School and Site Operations](product/SITE-OPERATIONS.md).
+4. **Architecture and design:** [System](architecture/SYSTEM.md), [Domain Model](architecture/DOMAIN-MODEL.md), and [Design Authority](design/README.md).
+5. **Required safety and acceptance:** [Acceptance Standards](quality/ACCEPTANCE-STANDARDS.md), [Church-Hosted Safety Gates](quality/CHURCH-HOSTED-SAFETY-GATES.md), [Public Site Release Gates](quality/PUBLIC-SITE-RELEASE-GATES.md), and [Engineering Operations and Security](engineering/OPERATIONS-AND-SECURITY.md).
+6. **Engineering policy:** [Agent Contract](../AGENTS.md); current code, migrations, and **executed** tests are implementation evidence.
+7. **Migration provenance:** [Inventory and Audit Log](DOCUMENT-INVENTORY.md), [Reset Register](DOCUMENTATION-RESET.md), and [Historical Archive](archive/2026-11-fullflow/README.md).
 
 ## Authority rules
 
