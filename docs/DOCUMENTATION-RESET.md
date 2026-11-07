@@ -34,4 +34,6 @@
 
 ## Migration status
 
-This register is not evidence that the archive move has been completed. A complete tracked-file inventory and atomic relocation remain outstanding. Do not delete, rewrite, or bulk-move documentation until references and critical runbooks are accounted for.
+**Phase 2 completed:** Root README, AGENTS.md, .github/copilot-instructions.md, and docs/START-HERE.md have been updated for the post-FullFlow main baseline. Pre-reset copies of README, AGENTS.md, and docs/START-HERE.md are preserved in `docs/archive/2026-11-fullflow/root-snapshot/`. The new docs/README.md and docs/vision/CAN-VISION.md are active.
+
+**Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
