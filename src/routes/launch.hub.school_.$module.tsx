@@ -1,6 +1,6 @@
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { SchoolLaunchHub } from "@/components/launch-studio/SchoolLaunchHub";
-import { schoolHubModules, type SchoolHubModule } from "@/domain/school-launch-hub";
+import { schoolHubModules, type OperationalSchoolHubModule, type SchoolHubModule } from "@/domain/school-launch-hub";
 import { loadSchoolConfiguration } from "@/modules/programs/school-configuration-loader";
 import { SchoolHubWorkflow } from "@/components/launch-studio/SchoolHubWorkflow";
 import { safeLoader } from "@/lib/safe-loader";
@@ -29,5 +29,5 @@ export const Route = createFileRoute("/launch/hub/school_/$module")({
 function SchoolModulePage() {
   const result=Route.useLoaderData();const search=Route.useSearch();const {module}=Route.useParams();
   if(!result.ok)return <LoaderFailure title="School preparation" outcome={result} />;
-  return <SchoolLaunchHub options={result.data.options} siteId={search.siteId} module={module as SchoolHubModule} statuses={result.data.statuses??undefined} workflow={search.siteId && ["website","team","academics","compliance"].includes(module) ? <SchoolHubWorkflow data={result.data} selection={search} module={module as SchoolHubModule}/> : undefined} />;
+  return <SchoolLaunchHub options={result.data.options} siteId={search.siteId} module={module as SchoolHubModule} statuses={result.data.statuses??undefined} workflow={search.siteId && ["website","team","academics","compliance"].includes(module) ? <SchoolHubWorkflow data={result.data} selection={search} module={module as OperationalSchoolHubModule}/> : undefined} />;
 }

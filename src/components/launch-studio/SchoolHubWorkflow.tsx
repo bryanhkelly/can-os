@@ -10,13 +10,15 @@ import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPrepar
 import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
 import type { getSchoolHubData } from "@/modules/programs/school-hub.functions";
-import type { SchoolHubModule } from "@/domain/school-launch-hub";
+import type { OperationalSchoolHubModule } from "@/domain/school-launch-hub";
 type Data=Awaited<ReturnType<typeof getSchoolHubData>> & {academic?:Awaited<ReturnType<typeof getLaunchAcademicSetup>>|null;academicFailed?:boolean;draft?:LaunchDraftRecord|null;draftFailed?:boolean};
-type WorkflowProps={data:Data;selection:{siteId?:string;programId?:string;teamMode?:"access"|"invite"|"people"};module:SchoolHubModule;context?:SchoolConfigurationContext};
+type WorkflowProps={data:Data;selection:{siteId?:string;programId?:string;teamMode?:"access"|"invite"|"people"};module:OperationalSchoolHubModule;context?:SchoolConfigurationContext};
 export function SchoolHubWorkflow(props:WorkflowProps){return <SchoolConfigurationContextProvider value={props.context??"launch"}><SchoolHubWorkflowContent {...props}/></SchoolConfigurationContextProvider>;}
 function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
  const navigation=useSchoolConfigurationNavigation();
- const router=useRouter();const siteId=selection.siteId!;
+ const router=useRouter();
+ if(!selection.siteId)throw new Error("A school must be selected before opening an operational Launch module.");
+ const siteId=selection.siteId;
  const status=data.statuses?.[module];
  if(module==="website")return <section className="mt-6 border bg-card p-6"><h2 className="font-serif text-3xl">Your school website</h2>
   <p className="mt-3 text-sm text-muted-foreground">Edit your school's saved website in Website Studio. Site-owned publishing and independent institutional approvals remain separate.</p>
@@ -33,5 +35,7 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
   return <LaunchWizardPage hubMode selection={{siteId,step:"school"}} data={wizardData}/>;
  }
  if(module==="compliance")return current ? <section className="mt-6"><LaunchPreparationWorkspace hubMode focus="readiness" currentLaunch={current} currentProgram={current} currentSchoolStatus={current.status} launches={data.launches} selection={{siteId,programId:current.id}} schoolSelection={{siteId,programId:current.id}} hasSchoolPreparation admissionsCounts={null} enrollmentCounts={null} familyInvitations={null}/><SchoolOpeningEvidencePanel key={current.id} programId={current.id}/></section> : <section className="mt-6 border bg-card p-6"><p>Create the first academic Program to resolve its applicable opening requirements.</p><Link to={navigation.modulePath} params={{module:"academics"}} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center text-primary">Prepare academics →</Link></section>;
- return null;
+ // Exhaustive: every operational module must return its owning workflow.
+ const unreachable:never=module;
+ throw new Error(`Unrecognized operational school module: ${unreachable}`);
 }

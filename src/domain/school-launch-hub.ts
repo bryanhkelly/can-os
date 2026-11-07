@@ -19,6 +19,7 @@ export const schoolHubModules = {
 export type SchoolHubModule = keyof typeof schoolHubModules;
 export const plannedSchoolHubModules = ["promote", "recruitment", "events"] as const;
 export type PlannedSchoolHubModule = typeof plannedSchoolHubModules[number];
+export type OperationalSchoolHubModule = Exclude<SchoolHubModule, PlannedSchoolHubModule>;
 export function isPlannedSchoolHubModule(module: SchoolHubModule): module is PlannedSchoolHubModule {
   return plannedSchoolHubModules.some(planned => planned === module);
 }
