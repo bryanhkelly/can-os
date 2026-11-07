@@ -32,6 +32,8 @@ After signup and a minimal school profile, the Site Admin enters a full-page, ca
 
 Launch readiness does not equal authorization to open. Once launched, daily work uses Run; setup and configuration remain accessible through settings.
 
+The canonical [Academic Delivery and Curriculum](ACADEMIC-DELIVERY.md) contract separates publisher/Program adoption, student teacher/presenter choice, asynchronous core instruction, optional live support and onsite supervision.
+
 ## Academic model
 
 The default delivery model is reusable asynchronous instruction, with optional live question support and tutoring. Students should select eligible curriculum and instructional presenters within the approved academic catalog. Site Admins do not simply assign a teacher to each student as a substitute for student choice. Academic accountability and credentialing must remain explicit.
