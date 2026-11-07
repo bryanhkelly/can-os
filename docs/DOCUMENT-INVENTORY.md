@@ -104,3 +104,9 @@ Added `scripts/check-documentation-links.mjs`, `npm run docs:check`, and a requi
 Executed CI on commit `de28b9653b392b1bb920be3fb3353be1d03211a6`: **70 Markdown files, 109 Markdown targets, 1,926 source/CI files, 11 explicit source references, zero missing paths.** The documentation step succeeded again on Phase 12 commit `94d9545d40c0e1a9b5e3055279a5b36d38bebd32`. These counts are not claims that anchors, remote links, dynamic references, or document semantics were tested.
 
 The earlier general CI run at `de28b965` separately failed in TypeScript typecheck due to a Node.js heap-out-of-memory error. Documentation validation passed; full CI success must not be inferred. The disposable Neon admissions workflow on Phase 12 commit failed its isolated-test-database-secret precondition. This is also separate from documentation path validation.
+
+## Phase 14: selective Launch rebuild and dated acceptance evidence (2026-11-07)
+
+Archived six additional dated records: FullFlow hybrid-site verification, November school visual and Valor website acceptance ledgers, Valor Algebra I activation, an old ESLint baseline, and November UX reconciliation. Git tree reuse preserves exact original blob SHAs. Updated the Algebra I pilot reference and the [November archive index](archive/2026-11-fullflow/README.md). Retained active security gates, source implementation notes, executable browser tests, academic content, operational runbooks, route contracts, and proposed SQL.
+
+Created [School Launch and Run](product/LAUNCH-AND-RUN.md), anchored to inspected source at `08a6d832f9b9ba1d5f4d63d8c253cd995c4f34e8`: nine Hub cards, three explicit planned modules and a distinct Church Information product gap. Corrected the operating model so initial school creation is a Site stub, not automatic Program creation. This is a product and source-reference document, **not** release acceptance.
