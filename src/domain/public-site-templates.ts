@@ -7,7 +7,7 @@ export const siteTemplateCatalog: ReadonlyArray<{
 }> = [
   { id: "heritage", name: "Heritage Academy", description: "An editorial, academically grounded school website.", character: "Classical • Spacious • Established" },
   { id: "community", name: "Community & Faith", description: "A welcoming story-led experience with people and belonging first.", character: "Warm • Relational • Rooted" },
-  { id: "modern", name: "Modern Academy", description: "An energetic, information-first campus experience.", character: "Bold • Precise • Contemporary" },
+  { id: "modern", name: "Modern Learning", description: "An energetic, information-first campus experience.", character: "Bold • Precise • Contemporary" },
   { id: "bright-futures", name: "Bright Futures", description: "A clear, joyful introduction for families and younger learners.", character: "Optimistic • Open • Approachable" },
   { id: "summit", name: "Summit Preparatory", description: "An immersive, ambitious story of growth and discovery.", character: "Cinematic • Aspirational • Focused" },
   { id: "classic", name: "Heritage Classical", description: "An enduring school prospectus with an institutional crest, pillars and traditional campus composition.", character: "Traditional • Collegiate • Refined" },
