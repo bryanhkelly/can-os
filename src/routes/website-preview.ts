@@ -47,16 +47,15 @@ export const Route = createFileRoute("/website-preview")({
         const view = await getPartnerWebsitePreview(actor);
         if (view.siteId !== selection.siteId)
           return failure(403, "Website preview access required", "This school is outside the active membership.");
-        if (view.currentRevision === 0)
-          return failure(409, "No saved design yet",
-            "Open Website & Brand Studio and save the private website draft before sharing its preview.");
+        // Preview-only use is safe with revision zero: the server renders an
+        // unsaved starter, not invented persisted content or public publication.
         const html = view.previewPages[selection.page];
         if (!html)
           return failure(404, "Page not available",
             "This school has not configured the requested page in its current website design.");
 
         return new Response(renderPrivateWebsitePreviewHtml(
-          html, view.siteId, Object.keys(view.previewPages),
+          html, view.siteId, Object.keys(view.previewPages), view.currentRevision > 0,
         ), { status: 200, headers: privateWebsitePreviewHeaders });
       } catch (error) {
         if (error instanceof AuthorizationError)
