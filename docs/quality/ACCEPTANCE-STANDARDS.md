@@ -19,6 +19,8 @@ Validate complete school journeys across signup, school profile, Launch Hub, web
 
 Extended/noncredit Programs retain independent [Extended Learning](../product/EXTENDED-LEARNING.md) safety, guardian consent and real session coverage gates. School-day and enrollment operations follow [Site Operations](../product/SITE-OPERATIONS.md).
 
+For physical school opening, custody/pickup and child protection, [Church-Hosted Safety Gates](CHURCH-HOSTED-SAFETY-GATES.md) require independent evidence. A published website or completed Launch Hub is never school-opening approval.
+
 ## Release controls
 
 Use isolated test data and disposable database branches for mutation tests. Check current environment identity before any write. Verify migrations, server authorization, privacy, safeguarding, and operational recovery where relevant. Do not treat synthetic fixtures as permission to bypass ordinary domain behavior.
