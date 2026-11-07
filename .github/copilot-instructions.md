@@ -6,7 +6,7 @@ Before changing architecture or business workflows, read:
 
 1. [Documentation home](../docs/README.md) and [CAN vision](../docs/vision/CAN-VISION.md)
 2. [Documentation migration status](../docs/DOCUMENTATION-RESET.md)
-3. Existing [architecture](../docs/architecture.md), [domain model](../docs/domain-model.md), and [golden flows](../docs/golden-flows.md), treated as provisional technical references until reconciled
+3. Existing [system architecture](../docs/architecture/SYSTEM.md), [domain model](../docs/architecture/DOMAIN-MODEL.md), and [acceptance standards](../docs/quality/ACCEPTANCE-STANDARDS.md), treated as provisional technical references until reconciled
 4. Current code, migrations, and executed tests for implementation evidence
 
 **Do not** treat `docs/archive/` notes, old draft-PR handoffs, or historical demo rollout instructions as current product requirements.
