@@ -50,6 +50,12 @@ describe("school Launch Hub",()=>{
     expect(selection.programId).toBe("invalid");
     expect(renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={selection.siteId}/>)).toContain("Choose your school");
   });
+  it("shows invalid Program selections as actionable Hub errors rather than silently ignoring them",()=>{
+    const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
+      selectionError="Requested Program is not available in this school."/>);
+    expect(html).toContain("Requested Program is not available in this school.");
+    expect(html).toContain(`/launch/hub/school/team?siteId=${siteId}`);
+  });
   it("never silently substitutes the only authorized school for a missing or invalid selection",()=>{
     for(const selection of [undefined,"another-school"]){
       const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={selection}/>);

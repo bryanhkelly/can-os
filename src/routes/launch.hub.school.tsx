@@ -13,5 +13,5 @@ export const Route = createFileRoute("/launch/hub/school")({
 function SchoolHubPage() {
   const result=Route.useLoaderData();const search=Route.useSearch();
   if(!result.ok)return <LoaderFailure title="School Launch Hub" outcome={result} />;
-  return <SchoolLaunchHub options={result.data.options} siteId={search.siteId} statuses={result.data.statuses??undefined} />;
+  return <SchoolLaunchHub options={result.data.options} siteId={search.siteId} statuses={result.data.statuses??undefined} selectionError={result.data.selectionError} />;
 }

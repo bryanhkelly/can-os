@@ -29,5 +29,5 @@ export const Route = createFileRoute("/launch/hub/school_/$module")({
 function SchoolModulePage() {
   const result=Route.useLoaderData();const search=Route.useSearch();const {module}=Route.useParams();
   if(!result.ok)return <LoaderFailure title="School preparation" outcome={result} />;
-  return <SchoolLaunchHub options={result.data.options} siteId={search.siteId} module={module as SchoolHubModule} statuses={result.data.statuses??undefined} workflow={search.siteId && ["website","team","academics","compliance"].includes(module) ? <SchoolHubWorkflow data={result.data} selection={search} module={module as OperationalSchoolHubModule}/> : undefined} />;
+  return <SchoolLaunchHub options={result.data.options} siteId={search.siteId} module={module as SchoolHubModule} statuses={result.data.statuses??undefined} selectionError={result.data.selectionError} workflow={search.siteId && ["website","team","academics","compliance"].includes(module) ? <SchoolHubWorkflow data={result.data} selection={search} module={module as OperationalSchoolHubModule}/> : undefined} />;
 }
