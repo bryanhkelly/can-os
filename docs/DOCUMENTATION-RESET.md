@@ -42,4 +42,6 @@
 
 **Phase 5:** Retired the original `docs/full-flow-acceptance-contract.md`, `docs/integration-convergence-audit.md`, and `docs/engagement-framework.md` after exact archived-blob comparison. Updated identified references in the FullFlow test runner, Playwright config, e2e spec, and public-site backlog. Executable tests were not run; this is not a complete inbound-link audit.
 
+**Phase 6:** Retired `docs/CURRENT-STATE.md` and `docs/full-flow-progress.md` into the historical archive, updated identified references, and snapshotted four legacy technical specifications. Copilot now points to canonical architecture and quality documents. The original technical specifications remain until cross-reference verification is complete.
+
 **Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
