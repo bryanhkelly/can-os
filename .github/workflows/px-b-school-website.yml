@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'src/domain/public-site-html.ts'
+      - 'src/domain/school-brand-identity.ts'
+      - 'src/components/launch-studio/SchoolBrandPreview.tsx'
+      - 'tests/unit/school-brand-identity.test.tsx'
       - 'src/domain/site-theme.ts'
       - 'src/domain/public-site-templates.ts'
       - 'src/components/launch-studio/WebsiteTemplateGallery.tsx'
@@ -44,6 +47,7 @@ jobs:
         run: |
           npx vitest run tests/unit/site-theme.test.ts \
             tests/unit/website-studio-templates.test.tsx \
+            tests/unit/school-brand-identity.test.tsx \
             tests/unit/public-site-host-routing.test.ts \
             tests/unit/public-site-html.test.ts \
             tests/unit/site-local-content.test.ts \
