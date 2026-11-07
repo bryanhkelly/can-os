@@ -57,6 +57,117 @@ export function composePublicSiteHome(template: SiteTemplateId, sections: Public
   }
 }
 
+
+/**
+ * Seven independently composed public school shells.
+ * All values are escaped or fixed HTML produced by the canonical public renderer.
+ * No Site-entered HTML, scripts, extra routes or private records are accepted here.
+ */
+export type PublicSiteChrome = {
+  brand: string;
+  navigation: string;
+  cta: string;
+  mobile: string;
+  main: string;
+  footer: string;
+};
+export function composePublicSiteChrome(template: SiteTemplateId, p: PublicSiteChrome): string {
+  const nav = '<nav class="desktop-nav" aria-label="School website navigation">' + p.navigation + '</nav>';
+  const brand = '<p class="brand">' + p.brand + '</p>';
+  switch (template) {
+    case "heritage": return '<div class="school-shell shell-heritage">' +
+      '<header class="school-masthead header-heritage"><span class="edition">A SCHOOL WITH A STORY TO TELL</span>' +
+      '<div class="school-lockup"><span class="school-crest" aria-hidden="true">H</span>' + brand + '</div>' +
+      '<div class="masthead-navigation">' + nav + p.cta + p.mobile + '</div></header>' +
+      p.main + p.footer + '</div>';
+    case "community": return '<div class="school-shell shell-community">' +
+      '<div class="community-announcement">WELCOME TO OUR LEARNING COMMUNITY</div>' +
+      '<header class="school-masthead header-community"><div class="community-logo">' +
+      '<span class="community-emblem" aria-hidden="true">✳</span>' + brand + '</div>' +
+      nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
+    case "modern": return '<div class="school-shell shell-modern">' +
+      '<header class="school-masthead header-modern"><div class="modern-logo">' +
+      '<span class="modern-logo-mark" aria-hidden="true">M</span>' + brand + '</div>' +
+      '<p class="rail-label">EXPLORE YOUR SCHOOL</p>' + nav +
+      '<div class="modern-rail-action">' + p.cta + '</div>' + p.mobile + '</header>' +
+      p.main + p.footer + '</div>';
+    case "bright-futures": return '<div class="school-shell shell-bright">' +
+      '<header class="school-masthead header-bright"><div class="bright-lockup">' +
+      '<span class="bright-sun" aria-hidden="true">☀</span>' + brand + '</div>' +
+      nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
+    case "summit": return '<div class="school-shell shell-summit">' +
+      '<div class="summit-spine" aria-hidden="true"><span>△</span><span>SUMMIT · GROWTH · DISCOVERY</span><span>↓</span></div>' +
+      '<header class="school-masthead header-summit"><div class="summit-lockup">' +
+      brand + '</div>' + nav + p.cta + p.mobile + '</header>' +
+      p.main + p.footer + '</div>';
+    case "classic": return '<div class="school-shell shell-classic">' +
+      '<div class="classic-utility">FAITH&nbsp;&nbsp;·&nbsp;&nbsp;SCHOLARSHIP&nbsp;&nbsp;·&nbsp;&nbsp;CHARACTER</div>' +
+      '<header class="school-masthead header-classic"><div class="classic-lockup">' +
+      '<span class="classic-crest" aria-hidden="true">✦</span>' + brand + '</div>' +
+      nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
+    case "campus": return '<div class="school-shell shell-campus">' +
+      '<header class="school-masthead header-campus"><div class="campus-lockup">' +
+      brand + '<small>THE SCHOOL JOURNAL</small></div>' +
+      nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
+  }
+}
+
+export type PublicSiteHeroParts = {
+  kicker: string;
+  title: string;
+  subtitle: string;
+  intro: string;
+  actions: string;
+  image: string;
+};
+/** Hero structures match the seven independent editorial architectures. */
+export function composePublicSiteHero(template: SiteTemplateId, p: PublicSiteHeroParts): string {
+  const photo = '<div class="seven-photo">' +
+    (p.image || '<span class="seven-illustration" aria-hidden="true"></span>') + '</div>';
+  const copy = '<p class="tag">' + p.kicker + '</p><h1>' + p.title + '</h1>' +
+    p.subtitle + '<p class="intro">' + p.intro + '</p>' +
+    '<div class="hero-actions">' + p.actions + '</div>';
+  const cls = 'public-hero home-hero seven-hero-' + template + (p.image ? ' has-image' : '');
+  switch(template) {
+    case "heritage": return '<section id="welcome" class="' + cls + '">' +
+      '<div class="heritage-folio"><span>VOLUME 01 · DISCOVER OUR SCHOOL</span><i></i><span>01 / 07</span></div>' +
+      '<div class="seven-hero-copy">' + copy + '</div>' + photo +
+      '<span class="heritage-photo-label">ROOTED IN PURPOSE · READY FOR POSSIBILITY</span></section>';
+    case "community": return '<section id="welcome" class="' + cls + '">' +
+      '<div class="community-stamp" aria-hidden="true">OPEN<br>HEARTS<br>OPEN DOORS</div>' +
+      '<div class="seven-hero-copy">' + copy + '</div>' +
+      '<div class="community-polaroids"><div class="community-photo-note">' + photo + '</div>' +
+      '<div class="community-photo-card" aria-hidden="true">A PLACE<br>TO BELONG</div></div></section>';
+    case "modern": return '<section id="welcome" class="' + cls + '">' +
+      '<div class="modern-hero-panel"><span class="modern-panel-label">01 / A SCHOOL BUILT FOR WHAT IS NEXT</span>' +
+      '<div class="seven-hero-copy">' + copy + '</div></div>' +
+      '<div class="modern-hero-photo">' + photo + '</div>' +
+      '<div class="modern-hero-tile"><span>02 / DISCOVER</span><strong>Find your pathway.</strong>' +
+      '<span>Explore published learning opportunities.</span></div>' +
+      '<div class="modern-hero-tile modern-tile-alt"><span>03 / COMMUNITY</span><strong>Make room to grow.</strong></div></section>';
+    case "bright-futures": return '<section id="welcome" class="' + cls + '">' +
+      '<span class="bright-spark" aria-hidden="true">✳</span>' +
+      '<div class="seven-hero-copy">' + copy + '</div>' +
+      '<div class="bright-portrait">' + photo +
+      '<span class="bright-sticker" aria-hidden="true">BE<br>YOU!</span></div></section>';
+    case "summit": return '<section id="welcome" class="' + cls + '">' + photo +
+      '<div class="summit-cover-overlay"></div>' +
+      '<div class="seven-hero-copy"><span class="summit-index">01 — DISCOVER</span>' +
+      copy + '</div><span class="summit-coordinates">A SCHOOL OF PURPOSE · COURAGE · LEARNING</span></section>';
+    case "classic": return '<section id="welcome" class="' + cls + '">' +
+      '<div class="seven-hero-copy"><div class="classic-emblem" aria-hidden="true">✦</div>' +
+      copy + '</div>' + photo + '</section>';
+    case "campus": return '<section id="welcome" class="' + cls + '">' +
+      '<div class="campus-intro"><div class="seven-hero-copy">' + copy + '</div>' +
+      '<p class="campus-side-note">The people. The learning. The moments that make a school.</p></div>' +
+      '<div class="campus-mosaic"><div class="campus-mosaic-main">' + photo +
+      '<span class="mosaic-caption">01 / OUR SCHOOL</span></div>' +
+      '<div class="campus-mosaic-tile mosaic-second"><span>02 / LEARNING</span><b>Where curiosity leads.</b></div>' +
+      '<div class="campus-mosaic-tile mosaic-third"><span>03 / COMMUNITY</span><b>Belonging looks like this.</b></div>' +
+      '<div class="campus-mosaic-tile mosaic-fourth"><span>04 / DISCOVERY</span><b>Find your next chapter.</b></div></div></section>';
+  }
+}
+
 /** Styles intentionally change composition, spacing, typographic treatment and
  * navigation/hero geometry; these are not five recolors of one layout.
  * Entirely static CSS is safe in both real public pages and sandboxed previews. */
