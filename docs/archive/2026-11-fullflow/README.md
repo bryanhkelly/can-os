@@ -104,3 +104,13 @@ The prior FullFlow implementation plans and annual adoption agent handoff have b
 | `docs/comprehensive-learning-activity-tracking.md` | [`comprehensive-learning-activity-tracking.md`](retired-plans/comprehensive-learning-activity-tracking.md) |
 | `docs/connected-learning-success-progression-hybrid.md` | [`connected-learning-success-progression-hybrid.md`](retired-plans/connected-learning-success-progression-hybrid.md) |
 | `docs/curriculum-annual-adoption-handoff.md` | [`curriculum-annual-adoption-handoff.md`](delivery-evidence/curriculum-annual-adoption-handoff.md) |
+
+## Phase 19: extended learning, school operations and audience-specific launch (2026-11-07)
+
+The following dated FullFlow implementation notes were moved without changing their original Git blobs. The authoritative replacement contracts are [Extended Learning](../../product/EXTENDED-LEARNING.md), [School and Site Operations](../../product/SITE-OPERATIONS.md), and [four-audience Launch Studio](../../product/LAUNCH-STUDIO-AUDIENCES.md).
+
+| Original path | Archived record |
+| --- | --- |
+| `docs/extended-learning-offerings.md` | [`extended-learning-offerings.md`](retired-plans/extended-learning-offerings.md) |
+| `docs/school-operations-lifecycle.md` | [`school-operations-lifecycle.md`](delivery-evidence/school-operations-lifecycle.md) |
+| `docs/school-launch-studio-site-workspace.md` | [`school-launch-studio-site-workspace.md`](legacy-specifications/school-launch-studio-site-workspace.md) |
