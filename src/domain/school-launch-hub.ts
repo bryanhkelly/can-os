@@ -10,7 +10,7 @@ export const schoolHubSearch = z.object({
 export const schoolHubModules = {
   profile: { title: "School Profile", description: "Name, location, identity and contact details." },
   information: { title: "Site Information", description: "Describe the school setting and share its current website." },
-  website: { title: "Build Website", description: "Design, preview and publish your school's website.", action: "Open website setup", step: "website" },
+  website: { title: "Website & Brand", description: "Choose a school identity, customize its brand, and build your hosted website.", action: "Open Website & Brand Studio", step: "website" },
   team: { title: "Invite Your Team", description: "Bring in school leaders and delegate scoped permissions.", action: "Invite team member" },
   promote: { title: "Promote Your School", description: "Prepare your media kit, social graphics, captions, flyers and QR codes." },
   recruitment: { title: "Recruit Families", description: "Gather prospective-family interest and plan your follow-up." },
