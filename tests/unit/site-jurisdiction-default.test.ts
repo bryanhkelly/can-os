@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 
 const jurisdictions=[
   {id:"tx",name:"Texas",code:"US-TX"},
   {id:"fl",name:"Florida",code:"FL"},
 ];
 describe("school Site address jurisdiction",()=>{
+  it("uses a saved planning state before physical address but never treats it as approval",()=>{
+    const planned=siteJurisdictionLocation(null,{state:"TX"});
+    expect(planned).toEqual({country:"US",state:"TX"});
+    expect(addressStateJurisdiction(planned,jurisdictions)).toBe("tx");
+    const physical={country:"US",state:"FL",street1:"One Way"};
+    expect(siteJurisdictionLocation(physical,{state:"TX"})).toEqual(physical);
+    expect(addressStateJurisdiction(siteJurisdictionLocation(physical,{state:"TX"}),jurisdictions))
+      .toBe("fl");
+    expect(siteJurisdictionLocation(null,null)).toBeNull();
+  });
+
   it("resolves explicit state abbreviations and full state names",()=>{
     expect(addressStateJurisdiction({country:"US",state:"TX"},jurisdictions)).toBe("tx");
     expect(addressStateJurisdiction({country:"US",state:"Florida"},jurisdictions)).toBe("fl");
