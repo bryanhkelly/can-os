@@ -68,3 +68,13 @@ These six records retain their exact original Git blobs; the original paths are 
 | `docs/curriculum/valor-algebra1-week01-activation-acceptance.md` | [`valor-algebra1-week01-activation-acceptance.md`](acceptance-evidence/curriculum/valor-algebra1-week01-activation-acceptance.md) |
 | `docs/lint-baseline.md` | [`lint-baseline.md`](delivery-evidence/lint-baseline.md) |
 | `docs/ux-workflow-reconciliation.md` | [`ux-workflow-reconciliation.md`](delivery-evidence/ux-workflow-reconciliation.md) |
+
+## Phase 15: design and school-media documentation (2026-11-07)
+
+The following original Git blobs were preserved unchanged. Canonical requirements now live in [Design Authority](../../design/README.md), [School Website Media](../../product/WEBSITE-MEDIA.md), and [School Launch and Run](../../product/LAUNCH-AND-RUN.md).
+
+| Original path | Preserved archive |
+| --- | --- |
+| `docs/design-system-editorial-v5.md` | [`design-system-editorial-v5.md`](design-history/design-system-editorial-v5.md) |
+| `docs/implementation/SCHOOL_MEDIA_FOLDER_AUTOMATION.md` | [`SCHOOL_MEDIA_FOLDER_AUTOMATION.md`](delivery-evidence/implementation/SCHOOL_MEDIA_FOLDER_AUTOMATION.md) |
+| `docs/school-launch-hub-implementation.md` | [`school-launch-hub-implementation.md`](delivery-evidence/school-launch-hub-implementation.md) |
