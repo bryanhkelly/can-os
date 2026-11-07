@@ -5,7 +5,9 @@ import type { listLaunches } from "@/modules/programs/launch.functions";
 
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 
-export function LaunchTaskDestination({ launch, task }: { launch: Launch; task: LaunchGuidanceTask }) {
+export function LaunchTaskDestination({ launch, task, hubMode=false }: { hubMode?:boolean;launch: Launch; task: LaunchGuidanceTask }) {
+  if(hubMode && (task.requiresRegistrarReview || task.action === "academics" || task.action === "review"))
+    return <Button asChild><Link to="/launch/hub/school/$module" params={{module:"academics"}} search={{siteId:launch.siteId??undefined,programId:launch.id}}>Review academic configuration</Link></Button>;
   if (task.requiresRegistrarReview) {
     return <Button asChild><Link to="/launch/school/$programId" params={{programId:launch.id}}
       search={{siteId:launch.siteId??undefined,programId:undefined}}

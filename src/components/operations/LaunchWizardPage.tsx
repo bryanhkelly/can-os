@@ -58,7 +58,7 @@ export type LaunchWizardData = {
  authError: string;
 };
 
-export function LaunchWizardPage({ selection, data }: { selection: {siteId?: string;programId?: string;step?: (typeof schoolLaunchSteps)[number]}; data: LaunchWizardData }) {
+export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode?:boolean; selection: {siteId?: string;programId?: string;step?: (typeof schoolLaunchSteps)[number]}; data: LaunchWizardData }) {
 
   const { options, launches, preparationPrograms, familyInvitations, admissionsCounts, enrollmentCounts, extendedPlanning, jurisdictionGuidance, jurisdictionResearch, authError } = data;
   const draft = data.draft?.value.audience === "school" ? data.draft.value.fields : undefined;
@@ -264,8 +264,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
       try {
         await router.navigate({
-          to: "/launch/school",
-          search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId, step: "academics" },
+          ...(hubMode ? {to:"/launch/hub/school/$module" as const,params:{module:"academics"},search:{programId:result.programId,siteId}} : {to:"/launch/school" as const,search:{programId:result.programId,siteId:result.publicSiteDraft?.siteId,step:"academics" as const}}),
         });
       } catch {
         // startLaunch already committed. Keep the handoff with canonical IDs.
@@ -372,8 +371,8 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     families: "Welcome your families.", readiness: "Review what remains.", next: "Your next beginning." };
 
   return (
-    <LaunchStudioShell role="School setup" subject={currentProgram?.name ?? "Your school"}
-      title={titles[step]} description="One school, one connected setup. Approvals are reviewed separately."
+    <LaunchStudioShell focused={hubMode} role={hubMode ? "Academic Program" : "School setup"} subject={currentProgram?.name ?? "Your school"}
+      title={hubMode ? "Create your first Program." : titles[step]} description="One school, one connected setup. Approvals are reviewed separately."
       steps={schoolLaunchSteps.map(id => ({ id, title: { welcome: "Welcome", school: "School details",
         academics: "Academics", website: "School website", families: "Families & staff",
         readiness: "Readiness review", next: "What's next" }[id],
@@ -381,7 +380,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       currentId={step} onStepChange={changeStep}
       progress={currentLaunch && readinessAvailable ? launchRequirementProgress(currentLaunch.requirements) : undefined}
       status={<p>{currentProgram ? nextDescription : "Save draft keeps your school details for later. Save and continue creates your school offering and opens academic setup; it does not approve opening."}</p>}
-      actions={<>
+      actions={!hubMode && <>
         <Button type="button" variant="outline" disabled={step === "welcome"}
           onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) - 1]!)}>Back</Button>
         {step !== "school" && step !== "next" && <Button type="button" disabled={busy}
@@ -421,7 +420,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={()=>void retryLaunchRefresh()} className="mt-2">
           Retry launch refresh
         </Button>}
-        <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/launch/school",search:{siteId:school.siteId??undefined,programId:school.id,step}})}/>
+        {!hubMode && <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/launch/school",search:{siteId:school.siteId??undefined,programId:school.id,step}})}/> }
         {(step === "welcome" || step === "readiness" || step === "next") && <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
           <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>

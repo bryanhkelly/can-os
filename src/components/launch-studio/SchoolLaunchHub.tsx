@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import type { SchoolHubStatus } from "@/domain/school-hub-status";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Globe, Megaphone, Mail, ShieldCheck, Users } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
@@ -6,7 +8,7 @@ import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 
 export type SchoolHubOptions = Awaited<ReturnType<typeof listLaunchOptions>>;
 const icons = { website: Globe, team: Users, promote: Megaphone, recruitment: Mail, events: CalendarDays, academics: BookOpen, compliance: ShieldCheck };
-export function SchoolLaunchHub({ options, siteId, module }: { options: SchoolHubOptions; siteId?: string; module?: SchoolHubModule }) {
+export function SchoolLaunchHub({ options, siteId, module, statuses, workflow }: { statuses?: Partial<Record<SchoolHubModule,SchoolHubStatus>>; workflow?:ReactNode; options: SchoolHubOptions; siteId?: string; module?: SchoolHubModule }) {
   const site = options.sites.find(item => item.id === siteId);
   if (!site) return <PageFrame width="wide"><PageHeader eyebrow="School preparation" title="Choose your school" subtitle="Open the Launch Hub for an authorized school." />
     {siteId ? <p role="alert" className="mt-6 border bg-card p-5">This school is unavailable in your current workspace. Select an authorized school explicitly.</p> : null}
@@ -26,11 +28,11 @@ export function SchoolLaunchHub({ options, siteId, module }: { options: SchoolHu
         <div className={`mt-4 grid gap-4 ${section.modules.length === 1 ? "" : section.modules.length === 4 ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2"}`}>{section.modules.map(key => {const item=schoolHubModules[key]; const Icon=icons[key];return <article key={key} className="flex min-h-56 flex-col border bg-card p-6">
           <Icon aria-hidden="true" className="size-9 border border-primary/20 bg-accent p-2 text-primary" />
           <h3 className="mt-4 text-base font-semibold">{item.title}</h3><p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
-          {key === "website" && site.websiteDraft && <p className="mb-3 text-xs text-muted-foreground">{site.websiteDraft.status === "published" ? "Website published" : "Website draft saved"}</p>}
+          {statuses?.[key] && <ModuleStatus status={statuses[key]!}/> }
           <Link to="/launch/hub/school/$module" params={{module:key}} search={search} className="mt-auto inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open module <ArrowRight className="size-4" /></Link>
         </article>;})}</div></section>)}</div>
       <p className="mt-6 text-xs leading-5 text-muted-foreground">These are independent workstreams. Website publication, promotion and family interest do not authorize school opening.</p>
-    </> : <SchoolModuleHome module={module} siteId={site.id} />}
+    </> : <>{statuses?.[module] && <div className="mt-5"><ModuleStatus status={statuses[module]!}/></div>}{workflow ?? <SchoolModuleHome module={module} siteId={site.id}/>}</>}
     <section id="launch-help" className="mt-8 border-t pt-5 text-sm text-muted-foreground">Need help? Contact your CAN school support team about setup or independent review.</section>
   </PageFrame>;
 }
@@ -47,4 +49,9 @@ function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;siteId:str
       {module === "team" ? <Link to="/admin" search={{siteId,inviteRole:"registrar"}} className={actionClass}>Invite team member <ArrowRight className="size-4" /></Link> : "step" in item ? <Link to="/launch/school" search={{siteId,step:item.step}} className={actionClass}>{item.action}<ArrowRight className="size-4" /></Link> : null}
     </>}
   </section><aside className="border bg-card p-6"><h2 className="font-serif text-2xl">{module === "compliance" ? "Independent review" : module === "academics" ? "CAN's instructional model" : "Keep building"}</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">{module === "compliance" ? "Submitting evidence does not approve opening. CAN and applicable external reviewers verify requirements through the existing opening process." : module === "academics" ? "Instruction uses asynchronous content with live support for questions. Your school provides local supervision and community." : "You can work on other modules while this work is underway. Promotion and interest are separate from applications, enrollment and permission to open."}</p><Link to="/launch/hub/school" search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Back to Launch Hub <ArrowRight className="size-4" /></Link></aside></div>;
+}
+
+function ModuleStatus({status}:{status:SchoolHubStatus}) {
+  const color=status.state==="Complete"?"text-success":status.state==="Attention Needed"||status.state==="Blocked"?"text-warning":"text-muted-foreground";
+  return <div className="mb-4 text-xs leading-5"><span className={`inline-block border bg-muted px-2 py-1 font-semibold ${color}`}>{status.state}</span><p className="mt-2">{status.detail}</p><p className="mt-1 font-semibold">Next: {status.nextAction}</p></div>;
 }

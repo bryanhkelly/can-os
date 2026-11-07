@@ -18,6 +18,7 @@ export function planSitePublicationTransition(input: {
   reason: string;
   contentReviewed: boolean;
   eligibleOfferingCount: number;
+  siteOwnedContentReady?: boolean;
   now: Date;
 }): {
   changed: boolean;
@@ -47,7 +48,7 @@ export function planSitePublicationTransition(input: {
     throw new Error("Provide a 10–500 character publication decision reason");
   }
   if (action === "publish" &&
-      (!input.contentReviewed || input.eligibleOfferingCount < 1)) {
+      (!input.contentReviewed || (input.eligibleOfferingCount < 1 && !input.siteOwnedContentReady))) {
     throw new Error("Review the public content and include at least one eligible published academic or enrichment listing");
   }
   if (!Number.isFinite(now.getTime())) throw new Error("Invalid publication clock");

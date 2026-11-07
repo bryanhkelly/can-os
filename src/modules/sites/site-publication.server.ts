@@ -1,3 +1,4 @@
+import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { db } from "@/db/client";
 import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -283,8 +284,17 @@ export async function changeSitePublication(
     contentReviewed: boolean;
   },
 ): Promise<{ siteId: string; status: "draft" | "published"; publishedAt: string | null; updatedAt: string; changed: boolean }> {
-  return db.transaction(async tx => {
-    const site = await requireSitePublisher(actor, input.siteId, tx);
+  return db.transaction(tx => changeSitePublicationWithinTransaction(actor, input, tx));
+}
+
+export async function changeSitePublicationWithinTransaction(
+  actor: AccessContext, input: {siteId:string; action:SitePublicationAction; expectedRevision:string; reason:string; contentReviewed:boolean},
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+) {
+    const site = actor.role === "site_admin"
+      ? await requirePartnerWebsiteEditor(actor, tx, "site.website.local.publish")
+      : await requireSitePublisher(actor, input.siteId, tx);
+    if(site.id !== input.siteId) throw new AuthorizationError("Site website publication scope");
     const [current] = await tx.select({
       siteId: sitePublications.siteId, slug: sitePublications.slug,
       status: sitePublications.status, publishedAt: sitePublications.publishedAt,
@@ -302,10 +312,11 @@ export async function changeSitePublication(
     const enrichmentListings = needsReadiness ? await readEnrichmentCatalog(site.id, tx) : [];
     const academicListings = needsReadiness ? await readAcademicProgramCatalog(site.id, tx) : [];
     const eligibleCount = enrichmentListings.length + academicListings.length;
+    const local = needsReadiness && actor.role === "site_admin" ? await readCurrentLocalContent(site.id, tx) : null;
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
-      eligibleOfferingCount: eligibleCount, now: new Date(),
+      eligibleOfferingCount: eligibleCount, siteOwnedContentReady: Boolean(local), now: new Date(),
     });
     if (!decision.changed) {
       return { siteId: site.id, status: decision.status,
@@ -341,5 +352,4 @@ export async function changeSitePublication(
     return { siteId: site.id, status: decision.status,
       publishedAt: decision.publishedAt?.toISOString() ?? null,
       updatedAt: decision.updatedAt.toISOString(), changed: true };
-  });
 }

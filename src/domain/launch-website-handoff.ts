@@ -8,6 +8,7 @@ export function launchWebsiteHandoffGrant(grants:readonly Grant[],input:{
 }):Grant|null{
  const current=grants.find(grant=>grant.id===input.activeGrantId);
  if(!current)return null;
+ if(input.destination==="editor" && current.role==="site_admin" && current.siteId===input.siteId)return current;
  const candidates=grants.filter(grant=>grant.personId===current.personId&&(
   input.destination==="editor"
    ?grant.role==="site_website_editor"&&grant.siteId===input.siteId&&grant.organizationId===current.organizationId

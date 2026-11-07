@@ -47,8 +47,8 @@ function SettingsHome() {
         <Link className={actionClass} to="/sites/$siteId/profile" params={{siteId}}>School profile <ArrowRight className="size-4"/></Link>
       </EditDestination>}
       {schoolAdmin && <EditDestination title="School website" icon={<Globe className="size-5"/>}
-        description="Review the Site's website and current publication status. An explicitly authorized website editor manages branding, sources, photography and local content.">
-        <Link className={actionClass} to="/launch/school" search={{siteId,step:"website"}}>Manage website handoff <ArrowRight className="size-4"/></Link>
+        description="Review the Site's website and current publication status. Unaffiliated Site Administrators manage their school branding, content and publication directly.">
+        <Link className={actionClass} to="/launch/website" search={{siteId}}>Manage school website <ArrowRight className="size-4"/></Link>
       </EditDestination>}
       {websiteEditor && <EditDestination title="Website design and content" icon={<Globe className="size-5"/>}
         description="Reopen the full Website Launch Studio to change templates, colors, approved imagery, copy or public references. Save a private draft, preview and request publication separately.">

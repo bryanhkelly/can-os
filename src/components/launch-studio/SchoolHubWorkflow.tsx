@@ -1,0 +1,32 @@
+import { Link, useRouter } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { ScopedAdminConsole } from "@/routes/admin";
+import { LaunchWizardPage, type LaunchWizardData } from "@/components/operations/LaunchWizardPage";
+import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcademicSetupWorkspace";
+import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
+import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
+import type { LaunchDraftRecord } from "@/domain/launch-draft";
+import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
+import type { getSchoolHubData } from "@/modules/programs/school-hub.functions";
+import type { SchoolHubModule } from "@/domain/school-launch-hub";
+type Data=Awaited<ReturnType<typeof getSchoolHubData>> & {academic?:Awaited<ReturnType<typeof getLaunchAcademicSetup>>|null;academicFailed?:boolean;draft?:LaunchDraftRecord|null;draftFailed?:boolean};
+export function SchoolHubWorkflow({data,selection,module}:{data:Data;selection:{siteId?:string;programId?:string;teamMode?:"access"|"invite"|"people"};module:SchoolHubModule}) {
+ const router=useRouter();const siteId=selection.siteId!;
+ const status=data.statuses?.[module];
+ if(module==="website")return <section className="mt-6 border bg-card p-6"><h2 className="font-serif text-3xl">Your school website</h2>
+  <p className="mt-3 text-sm text-muted-foreground">Edit your school's saved website in Website Studio. Site-owned publishing and independent institutional approvals remain separate.</p>
+  {status?.state==="Blocked" ? <p role="status" className="mt-5 text-sm">{status.detail}</p> : <Button asChild className="mt-5"><Link to="/launch/website" search={{siteId,returnToHub:true}}>Open Website Studio →</Link></Button>}
+ </section>;
+ if(module==="team")return <section className="mt-6"><nav className="mb-4 flex flex-wrap gap-4" aria-label="School team views">{(["access","invite","people"] as const).map(mode=><Link key={mode} to="/launch/hub/school/$module" params={{module:"team"}} search={{siteId,teamMode:mode}} className="inline-flex min-h-11 items-center border bg-card px-4 text-sm text-primary">{mode==="access"?"Members & permissions":mode==="invite"?"Invite team member":"People directory"}</Link>)}</nav><ScopedAdminConsole onChanged={()=>router.invalidate()} key={selection.teamMode??"access"} hubMode mode={selection.teamMode??"access"} selection={{siteId}}/></section>;
+ if(!data.launches)return <p role="status" className="mt-6 border p-5">Program records are unavailable. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry records</Button></p>;
+ const current=data.launches.find(program=>program.id===data.selectedProgramId);
+ if(data.launches.length && !current)return <section className="mt-6 border bg-card p-6"><h2 className="font-serif text-2xl">Choose a Program</h2><p className="mt-2 text-sm">Select the offering to configure or review. Each belongs to this school.</p><div className="mt-4 grid gap-3">{data.launches.map(program=><Link key={program.id} to="/launch/hub/school/$module" params={{module}} search={{siteId,programId:program.id}} className="border p-4 text-primary">{program.name} →</Link>)}</div></section>;
+ if(module==="academics") {
+  if(current)return data.academic ? <LaunchAcademicSetupWorkspace key={current.id} hubMode data={data.academic}/> : <p role="alert" className="mt-6 border p-5">Academic records could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry academic records</Button></p>;
+  if(data.draftFailed)return <p role="alert" className="mt-6 border p-5">Your saved Program draft could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry saved draft</Button></p>;
+  const wizardData:LaunchWizardData={options:{...data.options,canCreateSite:false,sites:data.options.sites.filter(site=>site.id===siteId),organizations:data.options.organizations.filter(org=>org.id===data.options.sites.find(site=>site.id===siteId)?.organizationId)},launches:{launches:data.launches},preparationPrograms:[],familyInvitations:null,admissionsCounts:null,enrollmentCounts:null,extendedPlanning:null,jurisdictionGuidance:{},jurisdictionResearch:{},authError:"",draft:data.draft,draftContext:`${siteId}:`};
+  return <LaunchWizardPage hubMode selection={{siteId,step:"school"}} data={wizardData}/>;
+ }
+ if(module==="compliance")return current ? <section className="mt-6"><LaunchPreparationWorkspace hubMode focus="readiness" currentLaunch={current} currentProgram={current} currentSchoolStatus={current.status} launches={data.launches} selection={{siteId,programId:current.id}} schoolSelection={{siteId,programId:current.id}} hasSchoolPreparation admissionsCounts={null} enrollmentCounts={null} familyInvitations={null}/><SchoolOpeningEvidencePanel key={current.id} programId={current.id}/></section> : <section className="mt-6 border bg-card p-6"><p>Create the first academic Program to resolve its applicable opening requirements.</p><Link to="/launch/hub/school/$module" params={{module:"academics"}} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center text-primary">Prepare academics →</Link></section>;
+ return null;
+}

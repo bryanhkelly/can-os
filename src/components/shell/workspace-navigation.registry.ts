@@ -128,7 +128,8 @@ function withHome(role: WorkspaceRole, links: readonly WorkspaceNavigationItem[]
   });
   const messages: WorkspaceNavigationItem = { title: "Messages", path: "/messages", icon: "messages" };
   const canSendMessages = roleCapabilities[role]?.includes("communication.send") === true;
-  const settings: WorkspaceNavigationItem = { title: "Settings", path: "/settings", icon: "settings" };
+  const settingsOwns = ownedRoutes(role, "/settings");
+  const settings: WorkspaceNavigationItem = { title: "Settings", path: "/settings", icon: "settings", ...(settingsOwns.length ? {owns:settingsOwns} : {}) };
   return [home, ...destinations,
     ...(canSendMessages && !destinations.some(item => item.path === messages.path) ? [messages] : []),
     settings,

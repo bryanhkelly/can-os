@@ -9,7 +9,9 @@ const state = vi.hoisted(() => ({
   denied: false,
   audit: vi.fn(),
   emit: vi.fn(),
+  publishSite:vi.fn(),
 }));
+vi.mock("@/modules/sites/site-publication.server",()=>({changeSitePublicationWithinTransaction:state.publishSite}));
 vi.mock("@/platform/mutation", () => ({ writeAudit: state.audit, emitEvent: state.emit }));
 vi.mock("@/modules/sites/site-website-authorization.server", () => ({
   requirePartnerWebsiteEditor: vi.fn(async () => {
@@ -63,7 +65,7 @@ const revision = (number: number, content = copy, status = "published") => ({
 
 beforeEach(() => {
   state.rows = []; state.inserts = []; state.denied = false;
-  state.audit.mockReset(); state.emit.mockReset(); tx.select.mockClear(); tx.insert.mockClear();
+  state.audit.mockReset(); state.emit.mockReset(); state.publishSite.mockReset(); tx.select.mockClear(); tx.insert.mockClear();
 });
 
 describe("transactional church-local publication", () => {
@@ -191,5 +193,22 @@ describe("transactional church-local publication", () => {
     expect(state.inserts).toEqual([]);
     expect(state.audit).not.toHaveBeenCalled();
     expect(state.emit).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("Site Administrator publication through the canonical Site publisher",()=>{
+  it("publishes the school shell in the same transaction as reviewed local content",async()=>{
+    const updatedAt=new Date("2026-11-06T00:00:00Z");
+    state.rows.push([{siteId:"site-a",updatedAt}],[]);
+    await publishPartnerLocalContent({...actor,role:"site_admin"},{operation:"save",expectedRevision:0,content:copy});
+    expect(state.publishSite).toHaveBeenCalledWith(expect.objectContaining({role:"site_admin"}),expect.objectContaining({siteId:"site-a",action:"publish",expectedRevision:updatedAt.toISOString(),contentReviewed:true}),tx);
+  });
+  it("does not publish a private draft or a revision requiring institutional review",async()=>{
+    for(const operation of ["draft","save"] as const){
+      state.rows.push([{siteId:"site-a",updatedAt:new Date()}],[]);
+      await publishPartnerLocalContent({...actor,role:"site_admin"},{operation,expectedRevision:0,content:{...copy,welcomeMessage:"We are fully accredited."}});
+    }
+    expect(state.publishSite).not.toHaveBeenCalled();
   });
 });

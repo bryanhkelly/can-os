@@ -23,3 +23,9 @@ describe("school launch to church website editor handoff",()=>{
   expect(launchWebsiteHandoffGrant([registrar,editor,{...editor,id:"duplicate"}],{activeGrantId:"registrar",siteId:"site",destination:"editor"})).toBeNull();
  });
 });
+
+it("retains an exact-Site Site Admin membership instead of switching to an editor",()=>{
+ const admin={...registrar,role:"site_admin"};
+ expect(launchWebsiteHandoffGrant([admin,editor],{activeGrantId:admin.id,siteId:"site",destination:"editor"})).toEqual(admin);
+ expect(launchWebsiteHandoffGrant([admin],{activeGrantId:admin.id,siteId:"other",destination:"editor"})).toBeNull();
+});

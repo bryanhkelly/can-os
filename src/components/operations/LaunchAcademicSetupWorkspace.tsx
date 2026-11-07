@@ -27,7 +27,7 @@ import { StatCard } from "@/components/workspace/stat-card";
 import { SchoolRoomsSetup } from "@/components/operations/SchoolRoomsSetup";
 
 export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
-export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
+export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot;hubMode?:boolean}){
  const router=useRouter();
  const [termId,setTermId]=useState(data.terms.find(term=>data.scheduleOptions.some(schedule=>schedule.schoolYearId===term.schoolYearId))?.id??data.terms[0]?.id??"");
  const [versionId,setVersionId]=useState(data.catalog.find(course=>course.recommendation.recommended)?.versionId??data.catalog[0]?.versionId??"");
@@ -66,15 +66,15 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
    setNotice(message);
   }catch(e){setError(mutationErrorMessage(e, "Unable to save launch setup"));}
  }
- return <LaunchStudioShell role="School setup" subject={data.program.name} title="Prepare your classrooms."
+ return <LaunchStudioShell focused={hubMode} role="School setup" subject={data.program.name} title="Prepare your classrooms."
   description="Prepare the school year, published curriculum and responsible Section staffing."
   steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
   currentId="academics" onStepChange={id=>{
     const step=schoolLaunchSteps.find(item=>item===id);
     if(step)void router.navigate({to:"/launch/school",search:{siteId:data.program.siteId??undefined,programId:data.program.id,step}});
   }}
-  exit={<Link to="/home" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Skip to dashboard</Link>}
-  actions={<Button asChild variant="outline" size="sm">
+  exit={hubMode ? <Link to="/launch/hub/school" search={{siteId:data.program.siteId??undefined}} className="text-primary">Back to Launch Hub</Link> : <Link to="/home" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Skip to dashboard</Link>}
+  actions={!hubMode && <Button asChild variant="outline" size="sm">
    <Link to="/launch/school" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Launch checklist →</Link>
   </Button>}>
   {error&&<WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
@@ -288,7 +288,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
      <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Set enrollment policies</Link>
     </Button>
     <Button asChild variant="outline" size="sm">
-     <Link to="/launch/school" search={{siteId:data.program.siteId??undefined,programId:data.program.id}}>Return to launch checklist</Link>
+     <Link {...(hubMode?{to:"/launch/hub/school/$module" as const,params:{module:"compliance"},search:{siteId:data.program.siteId??undefined,programId:data.program.id}}:{to:"/launch/school" as const,search:{siteId:data.program.siteId??undefined,programId:data.program.id}})}>Return to launch checklist</Link>
     </Button>
    </div>
   </div>}

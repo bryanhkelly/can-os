@@ -64,6 +64,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     siteName: site.name,
     organizationName: site.organizationName,
     canPublish: site.canPublish,
+    canPrepareWebsite: actor.role === "site_admin",
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host,
     status: address?.status ?? null,

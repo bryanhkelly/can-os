@@ -2038,6 +2038,54 @@
         "audit_events",
         "domain_events"
       ]
+    },
+    "/launch/hub/school": {
+      "persona": "site administrator or authorized organization-wide registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "select the exact authorized Site",
+        "review persisted module status and unavailable states",
+        "open school launch module"
+      ],
+      "downstreamRecords": []
+    },
+    "/launch/hub/school/$module": {
+      "persona": "site administrator or authorized organization-wide registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "open scoped website, team, academics and compliance workflows",
+        "return to the exact Site Hub",
+        "keep opening authority separate from module preparation"
+      ],
+      "downstreamRecords": []
+    },
+    "/launch/hub/school/new": {
+      "persona": "site administrator or authorized organization-wide registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "account_person_grants": 1
+      },
+      "interactions": [
+        "show the organization-wide authority requirement for a Site-bound actor",
+        "deny creation of a sibling school",
+        "return to the existing authorized Site Hub"
+      ],
+      "downstreamRecords": []
     }
   }
 }

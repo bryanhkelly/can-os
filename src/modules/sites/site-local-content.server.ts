@@ -1,3 +1,4 @@
+import { changeSitePublicationWithinTransaction } from "./site-publication.server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, siteLocalContentVersions, sitePublications } from "@/db/schema";
@@ -57,7 +58,7 @@ export async function publishPartnerLocalContentWithinTransaction(
     // Relationship authorization runs inside the write transaction.
     const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
     const [sitePublication] = await tx.select({
-      siteId: sitePublications.siteId,
+      siteId: sitePublications.siteId, updatedAt: sitePublications.updatedAt,
     }).from(sitePublications)
       .where(eq(sitePublications.siteId, site.id)).for("update").limit(1);
     if (!sitePublication) {
@@ -111,6 +112,8 @@ export async function publishPartnerLocalContentWithinTransaction(
       ? { status: "draft" as const, flaggedFields: [] as string[] } : classified;
     if (latest && JSON.stringify(latest.content) === JSON.stringify(content) &&
       latest.status === decision.status) {
+      if(actor.role === "site_admin" && decision.status === "published")
+        await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
       return { changed: false, revision: currentRevision, status: latest.status,
         flaggedFields: latest.flaggedFields };
     }
@@ -163,6 +166,8 @@ export async function publishPartnerLocalContentWithinTransaction(
       organizationId: site.organizationId, siteId: site.id,
       payload: { revision, status: decision.status },
     });
+    if(actor.role === "site_admin" && decision.status === "published")
+      await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
     return { changed: true, revision, status: decision.status,
       flaggedFields: decision.flaggedFields };
 }

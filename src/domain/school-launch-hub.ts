@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const schoolHubSearch = z.object({siteId:z.string().uuid().optional()});
+export const schoolHubSearch = z.object({siteId:z.string().uuid().optional(),programId:z.string().uuid().optional(),teamMode:z.enum(["access","invite","people"]).optional()});
 export const schoolHubModules = {
   website: { title: "Build Website", description: "Design, preview and publish your school's website.", action: "Open website setup", step: "website" },
   team: { title: "Invite Your Team", description: "Bring in school leaders and delegate scoped permissions.", action: "Invite team member" },
