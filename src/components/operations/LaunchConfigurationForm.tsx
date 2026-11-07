@@ -6,7 +6,7 @@ import { LaunchDeliveryModelFields } from "@/components/operations/LaunchDeliver
 import { LaunchHostAndProviderFields } from "@/components/operations/LaunchHostAndProviderFields";
 import { Button } from "@/components/ui/button";
 import { LaunchFieldHelp } from "@/components/launch-studio/LaunchFieldHelp";
-import { launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { siteAddressEditorDraft } from "@/domain/site-setup-configuration";
 
 export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPresets,identity,delivery,hostAndProvider,submitLaunch,busy}:{
@@ -26,7 +26,7 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
   const provider=options.academicProviderOrganizations.find(item=>item.id===hostAndProvider.academicProviderOrganizationId);
   const creditIssuer=options.creditIssuingOrganizations.find(item=>item.id===hostAndProvider.creditIssuingOrganizationId);
   const savedSite=Boolean(site);
-  const jurisdictionIssue=launchSiteJurisdictionIssue(site?.address,options.jurisdictions,hostAndProvider.jurisdictionId);
+  const jurisdictionIssue=launchSiteJurisdictionIssue(siteJurisdictionLocation(site?.address,site?.planningLocation),options.jurisdictions,hostAndProvider.jurisdictionId);
   const address=siteAddressEditorDraft(site?.address ?? null);
   const physicalLocation=[address.street1,address.city,address.state,address.postalCode].filter(Boolean).join(", ");
   return <>
