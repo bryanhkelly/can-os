@@ -1,5 +1,7 @@
 # CAN OS synthetic pilot — release gate
 
+> **Documentation reset, November 7, 2026:** This is a separate synthetic-only HOLD checklist, not approval for real minors. Church-hosted minor-safety requirements remain governed by [Church-Hosted Safety Gates](./quality/CHURCH-HOSTED-SAFETY-GATES.md). Dated database observations below need candidate-commit re-verification.
+
 This gate applies only to the shared **synthetic-data** pilot. It is not approval to store real student records.
 
 ## Current decision: HOLD
