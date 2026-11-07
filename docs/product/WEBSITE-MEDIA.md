@@ -53,6 +53,6 @@ Keep media handling separate from public academic claims, family recruitment, th
 - [Website Studio](WEBSITE-STUDIO.md)
 - [Platform Capabilities](PLATFORM-CAPABILITIES.md)
 - [Private R2 document handling](../cloudflare-r2-enrollment.md)
-- [School website and publication model](../site-public-publishing.md)
+- [Public Sites and Admissions](PUBLIC-SITES-AND-ADMISSIONS.md)
 - [Design authority](../design/README.md)
 - [Historical folder-first media implementation handoff](../archive/2026-11-fullflow/delivery-evidence/implementation/SCHOOL_MEDIA_FOLDER_AUTOMATION.md) (source provenance, not current approval)
