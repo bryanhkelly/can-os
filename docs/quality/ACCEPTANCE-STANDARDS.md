@@ -25,6 +25,8 @@ Use isolated test data and disposable database branches for mutation tests. Chec
 
 For each acceptance claim, record exact commit, environment, test command, observed result, failures, exclusions, and date. Mark missing evidence **unverified**. Do not copy prior branch's passing counts forward as current results.
 
+For public website and family-entry exposure, also enforce [Public Site Release Gates](PUBLIC-SITE-RELEASE-GATES.md).
+
 ## Historical artifacts
 
-The retired `docs/full-flow-acceptance-contract.md` and `docs/full-flow-progress.md` remain historical delivery records. They do not supersede this standard.
+The historical [FullFlow acceptance contract](../archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md) and [progress journal](../archive/2026-11-fullflow/retired-plans/full-flow-progress.md) remain preserved records. They do not supersede this standard.
