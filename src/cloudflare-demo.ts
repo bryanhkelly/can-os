@@ -1,4 +1,5 @@
 import handler from "@tanstack/react-start/server-entry";
+import { withRequestDatabase } from "./db/client";
 import { classifyPublicSiteRequest } from "./domain/public-site-host-routing";
 import { publicSiteDomain } from "./domain/public-site-address";
 
@@ -10,6 +11,7 @@ interface DemoEnvironment {
   ACCESS_REQUEST_LIMIT: RateLimiter;
   ACCESS_VERIFY_LIMIT: RateLimiter;
   CAN_PUBLIC_SITE_DOMAIN?: string;
+  DATABASE_URL?: string;
 }
 
 const securityHeaders = {
@@ -48,7 +50,12 @@ export default {
       }
     }
 
-    const response = await handler.fetch(request);
+    // Workerd disallows WebSocket I/O from a pool created in a different
+    // request. This encompasses SSR, server functions, and their queries.
+    const response = await withRequestDatabase(
+      () => handler.fetch(request),
+      env.DATABASE_URL ?? process.env.DATABASE_URL,
+    );
     const headers = new Headers(response.headers);
     for (const [name, value] of Object.entries(securityHeaders)) {
       if (!headers.has(name)) headers.set(name, value);
