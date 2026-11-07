@@ -5,8 +5,8 @@
 Enrichment, Communication, Operations and Legal/Compliance as canonical collaborators.
 **Scope:** The partner website and family-acquisition experience from church/school
 onboarding through inquiry, verified application and enrollment handoff. This is
-**not** a replacement for the platform-wide [FullFlow acceptance contract](./full-flow-acceptance-contract.md)
-or [integration convergence plan](./integration-convergence-audit.md).
+**not** a replacement for the platform-wide [FullFlow acceptance contract](./archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md)
+or the retired [integration convergence plan](./archive/2026-11-fullflow/retired-plans/integration-convergence-audit.md).
 
 ## Operating rules and evidence
 
@@ -489,9 +489,9 @@ authorize running them now or applying production migrations.
 This list covers **only** the public-site/marketing-to-admissions slice.
 The broader platform's P0 **single six-stage** School → Curriculum/Section →
 Family Enrollment → Student Learning → Teacher/Guardian → Operator journey
-remains governed by [FullFlow acceptance](./full-flow-acceptance-contract.md)
-and [integration convergence](./integration-convergence-audit.md).
-[FullFlow progress](./full-flow-progress.md) covers learning activity,
+was historically governed by [FullFlow acceptance](./archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md)
+and [integration convergence](./archive/2026-11-fullflow/retired-plans/integration-convergence-audit.md).
+The historical [FullFlow progress](./full-flow-progress.md) covers learning activity,
 Student 360, staffing, hybrid Site day, safeguarding, financial modeling,
 network onboarding and other independent product priorities. No item in
 this public-site backlog replaces those requirements.
