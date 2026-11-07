@@ -17,6 +17,8 @@ Every exposed capability needs evidence for authorized entry, invalid and valid 
 
 Validate complete school journeys across signup, school profile, Launch Hub, website and team setup, family inquiry, admissions, enrollment, asynchronous learning, academic support, supervised site day, attendance, communications, and Run operations. Not every release must exercise every journey, but acceptance scope and exclusions must be explicit.
 
+Extended/noncredit Programs retain independent [Extended Learning](../product/EXTENDED-LEARNING.md) safety, guardian consent and real session coverage gates. School-day and enrollment operations follow [Site Operations](../product/SITE-OPERATIONS.md).
+
 ## Release controls
 
 Use isolated test data and disposable database branches for mutation tests. Check current environment identity before any write. Verify migrations, server authorization, privacy, safeguarding, and operational recovery where relevant. Do not treat synthetic fixtures as permission to bypass ordinary domain behavior.
