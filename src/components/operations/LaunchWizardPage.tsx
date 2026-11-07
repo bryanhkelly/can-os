@@ -388,7 +388,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) + 1]!)}>
           {step === "welcome" ? "Let's get started" : "Continue"}</Button>}
       </>}
-      exit={<Link to="/home" search={schoolSelection} className="underline">Skip to dashboard</Link>}>
+      exit={<div className="flex flex-wrap justify-center gap-5">{siteId && <Link to="/launch/hub/school" search={{siteId}} className="font-semibold text-primary">Back to Launch Hub</Link>}<Link to="/home" search={schoolSelection} className="underline">Skip to dashboard</Link></div>}>
         {step === "welcome" && <JourneyWelcome summary="Bring your school to life, one clear step at a time. Your Site, academic Program, website and family applications stay connected."
           requirements={["Your school location and time zone", "Your academic model, grade range and intended opening date", "The people who will help prepare your school"]}
           outcome="Save preparation now and return later. CAN services, publication, admissions and legal opening each retain their own review." />}
