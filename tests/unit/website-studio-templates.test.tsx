@@ -1,33 +1,33 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { siteTemplateIds, resolveSiteTemplateId } from "@/domain/site-theme";
-import { siteTemplateCatalog, composePublicSiteHome, composePublicSiteInterior, publicSiteTemplateCss } from "@/domain/public-site-templates";
+import { siteTemplateCatalog, composePublicSiteHome, composePublicSiteInterior, publicSiteTemplateCss, sevenSchoolCss, composePublicSiteChrome, composePublicSiteHero } from "@/domain/public-site-templates";
 import { emptySiteLocalContent, normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 
-describe("Website Studio five-template contract", () => {
-  it("lists five different layout systems, each with a complete ordered composition", () => {
+describe("Website Studio seven-template contract", () => {
+  it("lists seven different layout systems, each with a complete ordered composition", () => {
     expect(siteTemplateCatalog.map(item => item.id)).toEqual([...siteTemplateIds]);
     const sections={hero:"HERO",vision:"VISION",story:"STORY",explore:"EXPLORE",
       academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT"};
     const layouts=siteTemplateIds.map(id=>composePublicSiteHome(id,sections));
-    expect(new Set(layouts).size).toBe(5);
+    expect(new Set(layouts).size).toBe(7);
     for (const layout of layouts) for (const value of Object.values(sections))
       expect(layout.split(value).length-1).toBe(1);
     expect(layouts.every(value=>value.startsWith("HERO"))).toBe(true);
   });
 
-  it("renders five distinct homepage structures with responsive hero styles", () => {
+  it("renders seven distinct homepage structures with responsive hero styles", () => {
     const sections={hero:"HERO",vision:"VISION",story:"STORY",explore:"EXPLORE",
       academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT"};
     const interiors=siteTemplateIds.map(id=>composePublicSiteInterior(id,"HERO","PRIMARY","SECONDARY"));
-    expect(new Set(interiors).size).toBe(5);
+    expect(new Set(interiors).size).toBe(7);
     for(const id of siteTemplateIds) {
       const classId=id==="bright-futures"?"bright":id;
       const composition=composePublicSiteHome(id,sections);
       expect(composition).toContain(`home-${classId}`);
-      expect(publicSiteTemplateCss).toContain(`body.template-${id} .public-hero:not(.compact-hero)`);
+      expect(sevenSchoolCss).toContain(`body.template-${id} .public-hero.seven-hero-${id}`);
       for(const text of Object.values(sections)) expect(composition.split(text).length-1).toBe(1);
       const page={host:"fictional.can-os.com",
         site:{name:"Sample Academy",organizationName:"Sample Partner"},
@@ -41,6 +41,37 @@ describe("Website Studio five-template contract", () => {
       expect(html).toContain(`home-${classId}`);
       expect(html).toContain('id="welcome"');
       expect((html.match(/<h1>/g) ?? []).length).toBe(1);
+    }
+  });
+
+  it("uses seven different public shells without losing live links or school identity", () => {
+    const shells=siteTemplateIds.map(template=>composePublicSiteChrome(template,{
+      brand:"SCHOOL",navigation:'<a href="/about">About</a>',
+      cta:'<a class="site-nav-cta" href="/contact">Contact</a>',
+      mobile:'<details class="mobile-menu"><summary>Menu</summary></details>',
+      main:'<main id="main-content">PAGE</main>',
+      footer:'<footer>FOOT</footer>',
+    }));
+    expect(new Set(shells).size).toBe(7);
+    for(const shell of shells) {
+      expect(shell).toContain('<header');
+      expect(shell).toContain('<nav class="desktop-nav"');
+      expect(shell).toContain('<main id="main-content">PAGE</main>');
+      expect(shell).toContain('href="/about"');
+      expect(shell).toContain('href="/contact"');
+      expect(shell).toContain('class="mobile-menu"');
+      expect(shell.split('SCHOOL').length-1).toBe(1);
+    }
+    const heroes=siteTemplateIds.map(template=>composePublicSiteHero(template,{
+      kicker:"EYEBROW",title:"HEADLINE",subtitle:"SUBTITLE",
+      intro:"SUMMARY",actions:"ACTIONS",image:"",
+    }));
+    expect(new Set(heroes).size).toBe(7);
+    for(const hero of heroes) {
+      expect(hero).toContain('id="welcome"');
+      expect(hero).toContain("<h1>HEADLINE</h1>");
+      expect(hero.split("<h1>").length-1).toBe(1);
+      expect(hero).toContain("ACTIONS");
     }
   });
 
@@ -109,16 +140,19 @@ describe("Website Studio five-template contract", () => {
     expect(html).toContain("--site-body:Arial, Helvetica, sans-serif");
   });
 
-  it("uses semantic, accessible buttons and exactly one choice per template",()=>{
+  it("uses semantic choices for all seven templates and ten previewable pages",()=>{
     const html=renderToStaticMarkup(<WebsiteTemplateGallery schoolName="Sample Academy" value="heritage"
       onChange={()=>{}}/>);
-    expect((html.match(/aria-pressed=/g)??[]).length).toBe(7);
+    expect((html.match(/aria-pressed=/g)??[]).length).toBe(9);
     expect(html).toContain("Heritage Academy");
     expect(html).toContain("Community &amp; Faith");
-    expect(html).toContain("Modern Academy");
+    expect(html).toContain("Modern Learning");
     expect(html).toContain("Bright Futures");
     expect(html).toContain("Summit Preparatory");
+    expect(html).toContain("Heritage Classical");
+    expect(html).toContain("Campus Life");
+    expect((html.match(/<option/g)??[]).length).toBe(10);
     expect(html).toContain('aria-label="School website templates"');
-    expect((html.match(/Larger preview of/g) ?? []).length).toBeGreaterThanOrEqual(5);
+    expect((html.match(/Larger preview of/g) ?? []).length).toBeGreaterThanOrEqual(7);
   });
 });
