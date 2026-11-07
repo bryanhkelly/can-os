@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/db/client", () => ({
   db: {
+    execute: async () => ({ rows: [{ definition: "CHECK (status IN ('draft','published','review_required'))" }] }),
     select: () => {
       const index = state.reads++;
       const query = {
@@ -126,6 +127,7 @@ describe("read-only church partner website", () => {
     expect(result.host).toBe("partner-academy.can-os.com");
     expect(result.status).toBe("draft");
     expect(result.canPublish).toBe(true);
+    expect(result.draftStorageReady).toBe(true);
     expect(result.approvedAcademicCount).toBe(1);
     expect(result.previewHtml).toContain("Approved Academy");
     expect(result.previewHtml).toContain("Partner Church");
@@ -137,7 +139,7 @@ describe("read-only church partner website", () => {
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
       "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPrepareWebsite", "canPublish",
-      "currentRevision", "demonstration", "editingContent", "host", "localContentStatus",
+      "currentRevision", "demonstration", "draftStorageReady", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
       "publicInformationReadiness", "siteId", "siteInformation", "siteName", "status",
     ]);
@@ -146,7 +148,7 @@ describe("read-only church partner website", () => {
 
   it("renders proposed editor copy only inside the private scoped draft preview", async () => {
     const initial = await getPartnerWebsitePreview(editor());
-    expect(initial.previewHtml).toContain("<h1>Partner Academy</h1>");
+    expect(initial.previewHtml).toContain("<h1>A place to belong. A future to build.</h1>");
     state.reads = 0;
     const proposal = createSchoolWebsiteStarterContent("Partner Academy");
     const draft = await getPartnerWebsitePreview(editor(), proposal);
