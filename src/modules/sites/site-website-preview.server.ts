@@ -7,7 +7,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { normalizeSiteLocalContent, type SiteLocalContent } from "@/domain/site-local-content";
+import { normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
 import { siteInformationSchema } from "@/domain/site-setup-configuration";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
@@ -39,6 +39,13 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const latestContent = history[0]?.content ?? local?.content;
   const editingContent: SiteLocalContent | null = latestContent
     ? normalizeSiteLocalContent(latestContent, { allowIncompleteImage: true }) : null;
+  // Editor and full-page private previews use the latest saved immutable draft,
+  // never the last published revision by accident. Unapproved child artwork
+  // remains editable but cannot escape into preview HTML.
+  const candidate = proposedContent ?? editingContent ?? local?.content ?? null;
+  const previewContent = candidate && siteLocalImagePublicationGaps(candidate.branding.heroImage).length
+    ? { ...candidate, branding: { ...candidate.branding, heroImage: null } }
+    : candidate;
   const [siteConfiguration] = await db.select({metadata: sites.metadata})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
@@ -48,18 +55,18 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     parentExtras?.admissions);
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms:authorizedPrograms, offerings, localContent: proposedContent ?? local?.content ?? null,
+    academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     ...(parentExtras ?? {}),
   });
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
-    academicPrograms:authorizedPrograms, offerings, localContent: proposedContent ?? local?.content ?? null,
+    academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media,
   } : null;
   const previewPages = previewPage
     ? Object.fromEntries(availablePublicSitePaths(previewPage).map(path => [
-      path, renderPublicSiteHtml(previewPage, { path }),
+      path, renderPublicSiteHtml(previewPage, { path, localPreview: true }),
     ])) : {};
   return {
     siteId:site.id,
