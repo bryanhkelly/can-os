@@ -57,7 +57,7 @@ CAN retains responsibility for academic records and credentialing in the intende
 - Optional classroom meetings: `src/modules/learning/classroom-meetings.functions.ts`
 - Teacher marketplace/Section capacity: `src/modules/staffing/teacher-marketplace.functions.ts`
 - Learning session/interaction events: `src/modules/learning/learning-activity.functions.ts`
-- Operational Section/enrollment changes: [School Operations Lifecycle](../school-operations-lifecycle.md)
+- Operational Section/enrollment changes: [School and Site Operations](SITE-OPERATIONS.md)
 - Technical curriculum contracts: [Publisher to Classroom Architecture](../curriculum/publisher-organization-classroom-architecture.md)
 
 ## Acceptance to execute
