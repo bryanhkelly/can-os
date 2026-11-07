@@ -118,3 +118,11 @@ Archived the V5 editorial design note, the folder-first school media implementat
 ## Phase 16: Website Studio product contract and historical PR handoff
 
 Created [Website Studio](product/WEBSITE-STUDIO.md) from a source-level inspection of `src/routes/launch.website.tsx`, `src/domain/public-site-templates.ts`, `src/domain/site-theme.ts` and local Site content publishing code. It clarifies Site ownership, independent publication/host/admissions states, five structural templates and the six-step authoring process. The code currently labels the third template **Modern Academy**; earlier product language called it **Modern Learning**, so this is a named decision to reconcile, not a silent replacement. Archived the outdated PR-status `docs/website-launch-studio-implementation.md` to `docs/archive/2026-11-fullflow/delivery-evidence/` with the original Git blob; linked the replacement from the home, Launch and media contracts. Browser/database and public host acceptance remain unverified.
+
+## Phase 17: public-site publishing and admissions (2026-11-07)
+
+The old 487-line `docs/site-public-publishing.md` and 507-line `docs/public-site-admissions-remaining-work.md` were retired from their original locations and preserved under [retired plans](archive/2026-11-fullflow/README.md) using their exact original Git blobs. These were FullFlow branch histories and priority lists, not a currently verified backlog.
+
+Created [Public Sites and Admissions](product/PUBLIC-SITES-AND-ADMISSIONS.md) as the live product contract, retaining the institutional/local authority split, canonical inquiry → verified application → offer → enrollment → learning/operations continuity, and a source-pointer map. Created [Public Site Release Gates](quality/PUBLIC-SITE-RELEASE-GATES.md) to preserve historical privacy, edge abuse-prevention, safeguarding, multi-tenant, public-hosting and legally approved claim requirements as **unverified requirements**, not inherited passing status.
+
+Updated Website Studio and Website Media links to the new contract. Retained `docs/public-tenant-hosting-release.md` as an operational reference with a warning that its Netlify-specific instructions cannot be assumed correct for Cloudflare Workers or another deployment provider. Active security gates, Neon runbook, route JSON, and SQL migration files were not moved.
