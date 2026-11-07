@@ -35,7 +35,7 @@ import { createAcademicTimeFixture } from "./helpers/academic-time";
  * GF2 acceptance harness: self-contained fixtures (no seeded demo data), one
  * synthetic household with two children across registrar, guardian, and student
  * roles, plus a second household for the single-seat concurrency scenario.
- * Implements docs/gf2-transaction-acceptance.md scenarios 1-8.
+ * Implements docs/archive/2026-10/gf2-transaction-acceptance.md scenarios 1-8.
  *
  * Run only via `npm run test:integration` against a disposable Neon branch.
  */
