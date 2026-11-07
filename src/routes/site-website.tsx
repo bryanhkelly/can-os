@@ -650,7 +650,9 @@ function LocalWebsiteCopyEditor({
             Inspired by your church uses approved palette and typography choices; automatic source discovery
             is not available until the separate church-reference integration is connected.</p>
           <div role="group" aria-label="School color palettes" className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
-            {sitePaletteIds.map(id => {
+            {sitePaletteIds.filter(id => !id.startsWith("brand-") ||
+              id === schoolBrandDesigns[content.branding.templateId ?? "heritage"].recommendedPalette ||
+              id === content.branding.paletteId).map(id => {
               const palette = resolveSiteTheme(id,content.branding.typographyId);
               return <Button variant="outline" type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
                 onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
@@ -660,7 +662,8 @@ function LocalWebsiteCopyEditor({
                   <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
                   <span className="flex-1" style={{backgroundColor:palette.accent}}/>
                   <span className="flex-1" style={{backgroundColor:palette.canvas}}/>
-                </span>{id === "signature" ? "CAN Signature" : id}
+                </span>{id === "signature" ? "CAN Signature" :
+                  id.startsWith("brand-") ? `${schoolBrandDesigns[id.slice(6) as SiteTemplateId]?.name ?? "School"} palette` : id}
               </Button>;
             })}
           </div>
