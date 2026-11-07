@@ -3,6 +3,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { renderPublicSiteHtml, availablePublicSitePaths } from "../src/domain/public-site-html.ts";
 import { valorReferenceSchool } from "./fixtures/valor-reference-school.mjs";
+import { siteTemplateIds } from "../src/domain/site-theme.ts";
 
 // Every scenario is an explicitly fictional visual-QA fixture, NOT a production
 // Site preview. Real publication, institutional approval and DNS remain separate.
@@ -20,16 +21,16 @@ function fictionalSchool(key,name,organizationName,paletteId,typographyId,academ
       churchHistory:"An illustrative congregation history for visual QA only.",
       schoolVision:"Families and educators helping young people grow.",
       statementOfFaith:"",spiritualFormation:"",denomination:"",
-      branding:{theme:"classic",paletteId,typographyId,heroImage:null}}};
+      branding:{theme:"classic",templateId:key,paletteId,typographyId,heroImage:null}}};
 }
 const fixtures=[
   valorReferenceSchool,
-  fictionalSchool("heritage","Heritage Academy","Heritage Community Church","heritage","traditional",
-    [academic("heritage-program","Heritage Academy Hybrid",3)],[activity("art","Arts and service")]),
-  fictionalSchool("microschool","Modern Microschool and Community Center","Modern Fellowship","coastal","contemporary",
-    [academic("micro-program","Community Hybrid Learning",2)],[]),
-  fictionalSchool("enrichment","Community Enrichment School","Community Neighbors Church","copper","editorial",
-    [],[activity("robotics","Robotics exploration"),activity("art","Neighborhood arts")]),
+  ...siteTemplateIds.map(id=>fictionalSchool(id,
+    id==="bright-futures" ? "Bright Futures Academy" : id[0].toUpperCase()+id.slice(1)+" Academy",
+    "Fictional Partner Community", "signature", "editorial",
+    [academic(id+"-learning","Exploration & Discovery",3)],
+    [activity(id+"-arts","Community Arts")],
+  )),
 ];
 const widths=[1440,1024,768,375,320];
 const root=process.env.SCHOOL_VISUAL_DIR || "artifacts/site-visuals";
