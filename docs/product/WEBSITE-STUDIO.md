@@ -1,10 +1,10 @@
-# CAN OS Website Studio
+# CAN OS Website & Brand Studio
 
 **Status:** Canonical product and ownership contract. Source identifiers were verified on `main` on November 7, 2026. A route or implementation file does **not** establish completed browser, database, accessibility, public-hosting, or production acceptance.
 
 ## Product experience
 
-After an authorized Site Admin creates the minimal Site profile, **Build Website** in the full-page Launch Hub should open the canonical Website Studio **directly** for that exact Site. The experience should produce a distinctively designed school website, not require the user to understand internal publications, CSS, content DTOs or Program ownership.
+After an authorized Site Admin creates the minimal Site profile, **Website & Brand** in the full-page Launch Hub should open the canonical Website & Brand Studio **directly** for that exact Site. The experience should establish a single school-specific brand and distinctively designed hosted school website, not require the user to understand internal publications, CSS, content DTOs or Program ownership.
 
 Site Admins are the final local authority over Site-owned identity, website copy and draft design **within** CAN institutional, licensing, privacy, identity/relationship, safeguarding and reviewed-claim rules. Independent academic credentials, Program approval, advertised funding and opening authorization remain outside local website publication authority.
 
@@ -13,13 +13,39 @@ The Studio must be resumable. A private saved draft, an authorized published Sit
 ## Six-step authoring experience
 
 1. **Welcome and sources.** Explain the generated website, draft/review outcomes and optional existing church/school website or social links. A third-party URL is reference information, not automatically approved content.
-2. **Template.** Select one of the seven separate structural website systems. This is not a set of palette-only variations.
-3. **Visual identity.** Choose controlled color palettes, heading/body font options and Site identity without accepting arbitrary CSS or remote untrusted style input.
+2. **Website design.** Select one of seven separate structural website systems. This is not a set of palette-only variations. The selected design also defines the starting brand language.
+3. **School brand.** Preview a unique school wordmark generated from the actual school name and selected design. Select controlled color palettes and heading/body fonts, optionally apply the design's suggested pairing, and download the generated SVG wordmark. No arbitrary CSS or untrusted SVG is imported.
 4. **School photographs.** Provide approved school-owned media in a folder-first flow; preview placements and withhold media without adequate rights/subject release. See [School Website Media](WEBSITE-MEDIA.md).
 5. **School story.** Edit verified, local welcome, vision, mission, community and leadership content. Protect official academic, legal, tuition, admissions and institutional claims from unreviewed edits.
-6. **Review and finish.** Preview the current proposed draft at desktop and mobile sizes, explicitly save with revision conflict protection, then publish only through the authorized Site workflow and any required independent reviews.
+6. **Review and finish.** Preview the proposed hosted site at desktop and mobile sizes. Save template, typography, palette, Site story and artwork together with revision conflict protection. Publishing remains separate and uses the authorized Site workflow and any independent reviews.
 
 A Site with no available address may require a **single explicit preparation step** before editing, not an unrelated interstitial or a six-step dead end. Existing Site reentry should return to usable template/design work. User Back and exit controls must preserve the selected Site and unsaved changes; invalid Site IDs must not quietly select another school.
+
+## Shared Site-owned brand
+
+The Website & Brand Studio uses the existing Site versioned local branding
+record; it does not create a second school brand database or an alternate editor.
+The Site Admin remains final local authority within existing review rules.
+
+- A school-specific monogram is derived from the canonical Site name rather than
+  carrying the sample name or placeholder logo included with each ZIP prototype.
+- The selected website design and approved palette/font tokens drive the editable
+  wordmark preview. The wordmark export is a locally generated, escaped SVG with
+  safe fonts, no embedded scripts and no external dependencies.
+- The same Site-derived monogram appears in each of the seven hosted website
+  mastheads. The visual language differs intentionally across the seven designs.
+- Switching templates preserves the school data and previously chosen branding.
+  **Apply recommended brand** is an explicit action that updates palette and
+  typography, not an automatic reset of an administrator's choices.
+- Email-header concepts may be displayed privately in the brand preview, but
+  no email messages are sent and no landing or survey pages are published by
+  this module. Recruiting and publishing those experiences are separate work.
+- The ZIP's fictional-school logo files are design references, not automatically
+  approved logos or school-owned media. Any future imported school logo needs
+  explicit rights and sanitization checks before publication.
+
+A private saved brand is not authorization to operate, a public school website,
+a published admissions CTA, or an approved claim.
 
 ## Seven hosted-school website identities
 
