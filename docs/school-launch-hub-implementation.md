@@ -61,10 +61,10 @@ because a Journey is prepared. Opening approval remains a separate server decisi
 
 - Build Website opens canonical Website Studio directly from the Hub or Settings. Old Website module bookmarks preserve scoped navigation.
 - A Site without an address presents a single preparation step, not six inactive design steps. Existing Site re-entry starts at template choice; orientation remains optional.
-- Planned Promotion, Recruitment and Events cards have no action links. The Website card does not send blocked or unavailable memberships into errors.
-- Invalid Site selection presents only the authorized school picker. Invalid Program selection requires explicit Program choice.
+- All seven Hub capabilities have a destination. Promotion, Recruitment and Events open distinct, Site-scoped, nonoperational landing pages with their intended features and clear limitations. The Website card directs blocked or unavailable memberships to an access/status page.
+- Invalid Site selection preserves the submitted identifier and presents the authorized school picker with an explicit error. Invalid Program selection requires an explicit valid Program choice. URL parameters are not silently discarded.
 - CAN OS publication alone does not verify public reachability. Hub readiness does not claim external verification.
-- Module readers load only the read models relevant to that module, retaining server-verified Site scope.
+- Module readers load only the read models relevant to that module, retaining server-verified Site scope. Planned modules do not require database reads beyond exact-Site authorization. Operational read failures are explicitly represented as Unavailable rather than silently treated as empty records.
 
 ## Basic school profile creation
 

@@ -43,12 +43,17 @@ beforeEach(()=>{
 describe("dashboard school configuration",()=>{
  it("links all school settings to the same selected Site without sending administrators to Launch",()=>{
   const html=renderToStaticMarkup(<Settings.options.component/>);
-  for(const module of ["profile","website","team","academics","compliance"])
+  for(const module of ["profile","website","team","promote","recruitment","events","academics","compliance"])
    expect(html).toContain(`/settings/school/${module}?siteId=${siteId}`);
-  for(const module of ["promote","recruitment","events"])
-   expect(html).not.toContain(`/settings/school/${module}?siteId=${siteId}`);
-  expect(html).toContain("Not available yet");
+  expect(html).toContain("Explore module");
   expect(html).not.toContain('/launch/school');
+ });
+ it.each(["promote","recruitment","events"] as const)("opens %s as a scoped, nonoperational Settings landing page",module=>{
+  state.module=module;
+  const html=renderToStaticMarkup(<SettingsModule.options.component/>);
+  expect(html).toContain("What this module will make possible");
+  expect(html).toContain(`/settings?siteId=${siteId}`);
+  expect(html).not.toContain("<button");
  });
  it("keeps the team workflow and return link in Settings",()=>{
   const html=renderToStaticMarkup(<SettingsModule.options.component/>);

@@ -26,6 +26,13 @@ describe("exact-Site Hub reader",()=>{
   const result=await getSchoolHubData({data:{siteId}});
   expect(result.statuses?.website?.state).toBe("Unavailable");expect(result.statuses?.team?.state).toBe("Unavailable");expect(result.statuses?.academics?.state).toBe("Unavailable");expect(result.statuses?.compliance?.state).toBe("Unavailable");
  });
+ it("serves planned module landing status without loading unrelated records",async()=>{
+  state.programReadFails=true;state.websiteReadFails=true;state.teamReadFails=true;
+  const result=await getSchoolHubData({data:{siteId,module:"recruitment"}});
+  expect(result.statuses?.recruitment?.state).toBe("Planned");
+  expect(result.statuses?.academics).toBeUndefined();
+  expect(result.launches).toBeNull();
+ });
  it("isolates unrelated read failures for each launch module",async()=>{
   state.websiteReadFails=true;state.teamReadFails=true;
   const academics=await getSchoolHubData({data:{siteId,module:"academics"}});
@@ -43,6 +50,7 @@ describe("exact-Site Hub reader",()=>{
  it("does not select another school, Program or membership",async()=>{
   const outOfScope=await getSchoolHubData({data:{siteId:"sibling"}});
   expect(outOfScope.statuses).toBeNull();
+  expect(outOfScope.selectionError).toContain("invalid school identifier");
   expect(outOfScope.options.sites).toHaveLength(1);
   state.launches=[{id:programId,siteId:"sibling"}];
   const invalidProgram=await getSchoolHubData({data:{siteId,programId}});
