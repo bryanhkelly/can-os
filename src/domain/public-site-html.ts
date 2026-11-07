@@ -171,9 +171,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const heroHasPhoto=Boolean(image||approvedHero);
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/academics": "Academics",
-    "/student-life": "Discover interests. Build friendships. Find your place.", "/school-day": "School day",
-    "/admissions": "Admissions", "/tuition": "Tuition", "/families": "Families",
-    "/faq": "Questions", "/contact": "Contact",
+    "/student-life": "Student life", "/school-day": "Learning model",
+    "/admissions": "Admissions", "/tuition": "Tuition & aid", "/families": "Families",
+    "/faq": "FAQs", "/contact": "Contact",
   };
   const navigation = availablePaths.map(destination =>
     `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`
