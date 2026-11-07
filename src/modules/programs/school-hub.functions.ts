@@ -13,14 +13,17 @@ function readFailureStatus(module: string): SchoolHubStatus {
   return {state:"Unavailable",detail:`${module} records could not be loaded. No readiness is assumed.`,nextAction:"Retry this module"};
 }
 export const getSchoolHubData=createServerFn({method:"GET"})
- .validator((value:unknown)=>z.object({siteId:z.string().uuid().optional(),programId:z.string().uuid().optional(),
+ .validator((value:unknown)=>z.object({siteId:z.string().optional(),programId:z.string().optional(),
   module:z.enum(["profile","website","team","promote","recruitment","events","academics","compliance"]).optional()}).strict().parse(value))
  .handler(async({data})=>{
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCommandContext(getRequest());assertCapability(actor,"program.read");
   if(!hasRegistrarAuthority(actor.role))throw new AuthorizationError("school launch workspace");
   const options=await listLaunchOptions();
-  if(!data.siteId)return {options,launches:null,statuses:null,selectedProgramId:null};
+  if(!data.siteId)return {options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
+  if(!z.string().uuid().safeParse(data.siteId).success)
+    return {options,launches:null,statuses:null,selectedProgramId:null,
+      selectionError:"This link contains an invalid school identifier. Select an authorized school."};
   const site=options.sites.find(site=>site.id===data.siteId);
   // An unauthorized or stale Site selector returns the authorized picker.
   if(!site || (actor.grantSiteId && actor.grantSiteId!==site.id))
@@ -61,7 +64,8 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   const launches=programRead.status==="fulfilled" ? programRead.value : null;
   const website=websiteRead.status==="fulfilled" ? websiteRead.value : null;
   const team=teamRead.status==="fulfilled" ? teamRead.value : null;
-  const invalidProgram=Boolean(needsPrograms && data.programId && launches && !launches.some(program=>program.id===data.programId));
+  const invalidProgram=Boolean(needsPrograms && data.programId &&
+    (!z.string().uuid().safeParse(data.programId).success || (launches && !launches.some(program=>program.id===data.programId))));
   const selectedProgramId=invalidProgram?null:(needsPrograms?data.programId??(launches?.length===1?launches[0]!.id:null):null);
   const statuses:Partial<Record<SchoolHubModule,SchoolHubStatus>>={};
   if(needsWebsite)statuses.website=websiteRead.status==="rejected"?readFailureStatus("Website"):website!;

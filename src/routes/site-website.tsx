@@ -35,7 +35,7 @@ export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   returnGrantId:optionalSearchString,
   returnToHub:z.boolean().optional(),
   returnToSettings:z.boolean().optional(),
-  step:z.enum(websiteStudioStepIds).optional().catch(undefined),
+  step:z.enum(websiteStudioStepIds).optional(),
 });
 
 export const loadWebsiteHome = (siteId?: string) => safeLoader(
@@ -253,9 +253,10 @@ function WebsitePreviewPanel({ data, draftPreview }: {
 }) {
   const [selected, setSelected] = useState("/");
   const [device, setDevice] = useState<"desktop"|"mobile">("desktop");
-  const htmlPages = draftPreview?.previewPages ?? data.previewPages ?? {};
+  const htmlPages = draftPreview ? draftPreview.previewPages : data.previewPages;
   const pages = Object.entries(htmlPages);
-  const activeHtml = htmlPages[selected] ?? draftPreview?.previewHtml ?? data.previewHtml;
+  // Never show another page's or an older revision's HTML for a missing page.
+  const activeHtml = Object.hasOwn(htmlPages, selected) ? htmlPages[selected] : null;
   return <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
     <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Your unsaved design preview" : "Previously saved website preview"}</h2>
     <p className="mt-2 text-sm text-muted-foreground">Review every page with the same server-rendered template used by the live website. Forms and scripts stay disabled here.</p>

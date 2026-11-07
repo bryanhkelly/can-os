@@ -1,10 +1,11 @@
 import { z } from "zod";
-/** Malformed or stale URL selections must return to the authorized school picker,
- * not throw from route validation before a loader can handle the error. */
+/** Preserve caller-supplied identifiers so invalid links produce an explicit
+ * recovery message instead of silently dropping their URL parameters.
+ * Server readers verify UUID format, membership, Site and Program scope. */
 export const schoolHubSearch = z.object({
-  siteId:z.string().uuid().optional().catch(undefined),
-  programId:z.string().uuid().optional().catch(undefined),
-  teamMode:z.enum(["access","invite","people"]).optional().catch(undefined),
+  siteId:z.string().optional(),
+  programId:z.string().optional(),
+  teamMode:z.enum(["access","invite","people"]).optional(),
 });
 export const schoolHubModules = {
   website: { title: "Build Website", description: "Design, preview and publish your school's website.", action: "Open website setup", step: "website" },
