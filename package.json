@@ -36,7 +36,9 @@
     "test:storybook": "vitest run --config vitest.storybook.config.ts",
     "test:visual": "npm run build-storybook && chromatic",
     "lint": "eslint . && node scripts/check-design-system.mjs",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -58,6 +60,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.67.0",
     "@eslint/js": "^10.0.1",
     "@netlify/vite-plugin-tanstack-start": "^1.3.19",
     "@playwright/test": "^1.56.1",
@@ -85,6 +88,7 @@
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.4",
     "vite-tsconfig-paths": "^6.0.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.4",
+    "wrangler": "^4.158.0"
   }
 }

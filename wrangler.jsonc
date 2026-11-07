@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "can-os",
+  "main": "src/cloudflare-demo.ts",
+  "compatibility_date": "2026-11-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "ratelimits": [
+    { "name": "ACCESS_REQUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
+    { "name": "ACCESS_VERIFY_LIMIT", "namespace_id": "1002", "simple": { "limit": 40, "period": 60 } }
+  ]
+}

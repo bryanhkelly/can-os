@@ -17,3 +17,8 @@ chromatic.log
 /test-results-routes/
 /playwright-report/
 /playwright/.cache/
+
+# Local Cloudflare state and secrets
+.wrangler/
+.dev.vars
+.dev.vars.*
