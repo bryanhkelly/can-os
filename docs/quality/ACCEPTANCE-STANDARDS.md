@@ -25,6 +25,8 @@ For physical school opening, custody/pickup and child protection, [Church-Hosted
 
 Use isolated test data and disposable database branches for mutation tests. Check current environment identity before any write. Verify migrations, server authorization, privacy, safeguarding, and operational recovery where relevant. Do not treat synthetic fixtures as permission to bypass ordinary domain behavior.
 
+[Safety Test Traceability](SAFETY-TEST-TRACEABILITY.md) tracks which child-safety policies have executable test source and what remains unverified. Focused policy unit tests do not replace legal, physical or end-to-end acceptance.
+
 ## Reporting
 
 For each acceptance claim, record exact commit, environment, test command, observed result, failures, exclusions, and date. Mark missing evidence **unverified**. Do not copy prior branch's passing counts forward as current results.
