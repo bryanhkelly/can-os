@@ -4,7 +4,7 @@ import { DATABASE_URL, TEST_ACCESS_TOKEN_PEPPER, TEST_JOB_SECRET, baseURL } from
 
 /**
  * Persistent multi-role FullFlow browser acceptance (contract:
- * docs/full-flow-acceptance-contract.md). The journey runs only against the
+ * docs/archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md). The journey runs only against the
  * pinned isolated FullFlow Neon branch via the guarded script entrypoint
  * (node scripts/run-fullflow-e2e.mjs); this config refuses every other target.
  */
