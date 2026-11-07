@@ -1244,6 +1244,15 @@
       "roleJourney": "Settings reuses the same exact-Site School Profile, Site Information, team, academic, compliance and Website Studio workflows as Launch Hub",
       "writeBoundary": "Delegates to the same revision-checked, audited Site and domain commands; Settings adds no authority",
       "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
+    },
+    {
+      "file": "src/routes/website-preview.ts",
+      "route": "/website-preview",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "signed-in Site Administrator or current Site website editor opens read-only saved draft with the existing verified email/code session",
+      "writeBoundary": "GET only; no forms or mutation endpoints; cannot publish or open an academic admission flow",
+      "readBoundary": "current verified grantSiteId must match exact Site UUID; canonical website editor relationship and draft-read capability enforced on server; cache private no-store; noindex"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
