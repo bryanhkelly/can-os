@@ -572,23 +572,23 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "Explore available academic offerings, learning approaches, and pathways for your child."), academicSection, approachSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", "Student life",
       "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
-    "/school-day": secondaryHero("Learning together", "What a day of learning looks like",
-      "See how learning is organized, with confirmed schedules and attendance details where available.") +
+    "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", "What a day of learning looks like",
+      "See how learning is organized, with confirmed schedules and attendance details where available."),
       reviewedSchoolDay + schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
-      (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : ""),
+      (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : "")),
     "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "Your family’s journey starts here",
       "Explore the admissions process and the next step available for your family."), admissionsNextSteps, academicSection + disclosureSection),
-    "/tuition": secondaryHero("Planning your education", "Plan with confidence",
-      "Find published costs, assistance details, and ways to request information for your family.") + tuitionSection,
-    "/families": secondaryHero("Supporting families", "Partners in your child’s education",
-      "Discover the resources and support information currently available to families.") +
+    "/tuition": composePublicSiteInterior(templateId, secondaryHero("Planning your education", "Plan with confidence",
+      "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
+    "/families": composePublicSiteInterior(templateId, secondaryHero("Supporting families", "Partners in your child’s education",
+      "Discover the resources and support information currently available to families."),
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
-        demo ? `<section class="mission-split editorial-section"><div><p class="tag">Illustrative family experience</p><h2>Known by name. Connected by purpose.</h2></div><p>The Valor reference experience imagines meaningful communication, shared exhibitions and a connected school community. Actual services require separate configuration and approval.</p></section>` : ""),
-    "/faq": secondaryHero("Common questions", "Questions about joining",
-      "Only reviewed public information appears here.") + faqSection,
-    "/contact": secondaryHero("Get in touch", "We’d love to hear from you",
-      "Have questions? Explore available contact and inquiry options for your school.") + contactSection + academicSection +
-      (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : ""),
+        demo ? `<section class="mission-split editorial-section"><div><p class="tag">Illustrative family experience</p><h2>Known by name. Connected by purpose.</h2></div><p>The Valor reference experience imagines meaningful communication, shared exhibitions and a connected school community. Actual services require separate configuration and approval.</p></section>` : "")),
+    "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "Questions about joining",
+      "Only reviewed public information appears here."), faqSection),
+    "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "We’d love to hear from you",
+      "Have questions? Explore available contact and inquiry options for your school."), contactSection + academicSection +
+      (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : "")),
   };
   const pageTitle = path === "/" ? `${school} | Programs` :
     `${escapePublicHtml(pageLabels[path])} | ${school}`;
