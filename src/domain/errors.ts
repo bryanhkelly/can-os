@@ -1,6 +1,6 @@
 export const clientErrorCodes = [
   "AUTHENTICATION_REQUIRED", "FORBIDDEN", "VALIDATION_FAILED", "CONFLICT",
-  "UNAVAILABLE", "CANCELLED", "UNEXPECTED",
+  "UNAVAILABLE", "CANCELLED", "UNEXPECTED", "WEBSITE_DRAFT_STORAGE_NOT_READY",
   "COURSE_CONTENT_REQUIRED", "COURSE_STAFFING_REQUIRED", "COURSE_CAPACITY_REACHED",
   "COURSE_CREDIT_LIMIT", "COURSE_SCHEDULE_CONFLICT", "COURSE_PREREQUISITES_REQUIRED",
   "COURSE_REGISTRATION_CLOSED", "COURSE_PROGRAM_REQUIRED",
@@ -18,6 +18,7 @@ export const clientErrorMessages: Record<ClientErrorCode, string> = {
   VALIDATION_FAILED: "Check the entered information and try again.",
   CONFLICT: "This record has changed. Refresh the page before trying again.",
   UNAVAILABLE: "This information is temporarily unavailable.",
+  WEBSITE_DRAFT_STORAGE_NOT_READY: "This environment has not applied the private website draft storage migration (0077). Your edits remain in the editor but are not saved.",
   CANCELLED: "The upload was cancelled. Retry when you are ready.",
   UNEXPECTED: "An unexpected error occurred. Please try again.",
   COURSE_CONTENT_REQUIRED: "Publish a course version with at least one student-accessible instructional lesson before placing students in this class.",
