@@ -1,5 +1,17 @@
 import { usStatesAndTerritories } from "./site-setup-configuration";
 
+/** Planning state is allowed for program setup; it is NEVER opening evidence.
+ * Once a verified physical address is provided it takes precedence. */
+export function siteJurisdictionLocation(
+  address: Record<string, unknown> | null | undefined,
+  planningLocation: { state: string } | null | undefined,
+): Record<string, unknown> | null {
+  if (address && typeof address.country === "string" && address.country.trim()) return address;
+  if (planningLocation?.state?.trim()) return { country: "US", state: planningLocation.state };
+  return address ?? null;
+}
+
+
 export function launchSiteJurisdictionIssue(
   address: Record<string, unknown> | null | undefined,
   jurisdictions: Array<{ id: string; code: string; name: string }>,
