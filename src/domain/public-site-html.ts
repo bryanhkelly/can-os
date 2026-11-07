@@ -1,5 +1,5 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
-import { composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss } from "./public-site-templates";
+import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { templateSampleImage } from "./template-sample-images";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -297,18 +297,36 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
     : null;
-  const hero = `<div id="welcome" class="public-hero${heroHasPhoto ? " has-image" : ""}${local?.heroHeadline ? " editorial-headline" : ""}${page.site.name.length > 28 ? " long-name" : ""}">${heroPhotoSrc ? `<img class="hero-background-image" src="${escapePublicHtml(heroPhotoSrc)}" alt="${escapePublicHtml(heroPhotoAlt)}" decoding="async"/>` : ""}<p class="tag">${local?.heroHeadline ? school : foundingFamilies ? "Welcoming founding families" : "Welcome to our school"}</p><h1>${local?.heroHeadline ? escapePublicHtml(local.heroHeadline) : school}</h1>
-    ${local?.welcomeMessage ? `<p class="hero-subtitle">${escapePublicHtml(local.welcomeMessage)}</p>` : ""}
-    <p class="intro">${academicCards ? "Explore the learning pathways and community that could be part of your family's next chapter." :
-      "Get to know the vision for this school as program information becomes available."}
-    ${hasOpenApplications ? "Applications are available for eligible approved programs, subject to verification." :
-      foundingFamilies ? "We are gathering interest from founding families. A request for information is not an application or an enrollment offer." :
-      academicCards ? "Inquire about published programs; applications are not currently open through this website." :
-      "Check back for published educational opportunities."}</p>
-    <div class="hero-actions">${availablePaths.includes("/academics") ? `<a class="hero-button" href="/academics">Explore academics</a>` : ""}
-    ${firstInquiryHref && submissionsEnabled ? `<a class="hero-text-link" href="${firstInquiryHref}">Request information</a>` : ""}
-    ${availablePaths.includes("/about") ? `<a class="hero-text-link" href="/about">Our story →</a>` : ""}
-    ${!availablePaths.includes("/academics") && availablePaths.includes("/contact") ? `<a class="hero-text-link" href="/contact">School information →</a>` : ""}</div><div class="hero-art" aria-hidden="true"><span class="art-ring"></span><span class="art-line"></span><span class="art-dot"></span></div></div>`;
+
+  // The public design is only a presentation of the same reviewed Site and
+  // Program projections. No prototype copy or browser-authored scripts ship.
+  const hero = composePublicSiteHero(templateId, {
+    kicker: local?.heroHeadline ? school :
+      foundingFamilies ? "Welcoming founding families" : "Welcome to our school",
+    title: local?.heroHeadline ? escapePublicHtml(local.heroHeadline) : school,
+    subtitle: local?.welcomeMessage
+      ? '<p class="hero-subtitle">' + escapePublicHtml(local.welcomeMessage) + '</p>' : "",
+    intro: (academicCards
+      ? "Explore the learning pathways and community that could be part of your family's next chapter."
+      : "Get to know the vision for this school as program information becomes available.") + " " +
+      (hasOpenApplications
+        ? "Applications are available for eligible approved programs, subject to verification."
+        : foundingFamilies
+          ? "We are gathering interest from founding families. A request for information is not an application or an enrollment offer."
+          : academicCards
+            ? "Inquire about published programs; applications are not currently open through this website."
+            : "Check back for published educational opportunities."),
+    actions:
+      (availablePaths.includes("/academics") ? '<a class="hero-button" href="/academics">Explore academics</a>' : "") +
+      (firstInquiryHref && submissionsEnabled
+        ? '<a class="hero-text-link" href="' + firstInquiryHref + '">Request information</a>' : "") +
+      (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
+      (!availablePaths.includes("/academics") && availablePaths.includes("/contact")
+        ? '<a class="hero-text-link" href="/contact">School information →</a>' : ""),
+    image: heroPhotoSrc
+      ? '<img class="hero-background-image" src="' + escapePublicHtml(heroPhotoSrc) +
+        '" alt="' + escapePublicHtml(heroPhotoAlt) + '" decoding="async"/>' : "",
+  });
   // The homepage introduces the school; detailed church content belongs on
   // About. No invented academic facts or unapproved identity records are used.
   const homeStory = local && availablePaths.includes("/about") ? `<section class="home-story editorial-section" aria-labelledby="home-story-title">
@@ -693,14 +711,20 @@ main{padding-top:clamp(22px,3vw,48px)}
 .compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
 @media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
 ${publicSiteTemplateCss}
+${sevenSchoolCss}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
 ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
-<header><p class="brand">${school}</p><nav class="desktop-nav" aria-label="School website navigation">${navigation}</nav><a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a><details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details></header>
-<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>
-<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>
+${composePublicSiteChrome(templateId, {
+  brand: school,
+  navigation,
+  cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
+  mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${navigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
+  main: `<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>`,
+  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>`,
+})}
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
     // Local previews have distinct same-origin page endpoints. A bare
