@@ -5,10 +5,11 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 ## Read in order
 
 1. [CAN vision](vision/CAN-VISION.md): institutional model and product intent.
-2. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
-3. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
-4. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
-5. Current source code, migrations, and executed tests: evidence of implemented behavior.
+2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md) and [operating model](product/OPERATING-MODEL.md): product scope and institutional boundaries.
+3. [Documentation inventory](DOCUMENT-INVENTORY.md): verified classifications and dependency gates.
+4. [Product and architecture migration register](DOCUMENTATION-RESET.md): what is canonical, pending review, and historical.
+5. [Root agent contract](../AGENTS.md): existing engineering and security invariants, pending reconciliation.
+6. Current source code, migrations, and executed tests: evidence of implemented behavior.
 
 ## Authority rules
 
