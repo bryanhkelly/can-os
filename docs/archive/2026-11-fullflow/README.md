@@ -55,3 +55,16 @@ Additional historical identifiers, prototype mapping, FullFlow source audit, chu
 | `docs/agent-p-church-sources-integration.md` | [`agent-p-church-sources-integration.md`](delivery-evidence/agent-p-church-sources-integration.md) |
 | `docs/church-source-discovery-status.md` | [`church-source-discovery-status.md`](delivery-evidence/church-source-discovery-status.md) |
 | `docs/valor-reference-school-baseline-2026-11-03.md` | [`valor-reference-school-baseline-2026-11-03.md`](acceptance-evidence/valor-reference-school-baseline-2026-11-03.md) |
+
+## Phase 14: dated acceptance and UX snapshots (2026-11-07)
+
+These six records retain their exact original Git blobs; the original paths are no longer active:
+
+| Former path | Archived record |
+| --- | --- |
+| `docs/hybrid-site-ops-verification.md` | [`hybrid-site-ops-verification.md`](acceptance-evidence/hybrid-site-ops-verification.md) |
+| `docs/implementation/CAN_SCHOOL_SITES_VISUAL_ACCEPTANCE.md` | [`CAN_SCHOOL_SITES_VISUAL_ACCEPTANCE.md`](acceptance-evidence/implementation/CAN_SCHOOL_SITES_VISUAL_ACCEPTANCE.md) |
+| `docs/implementation/VALOR_ONBOARDING_TO_WEBSITE_ACCEPTANCE.md` | [`VALOR_ONBOARDING_TO_WEBSITE_ACCEPTANCE.md`](acceptance-evidence/implementation/VALOR_ONBOARDING_TO_WEBSITE_ACCEPTANCE.md) |
+| `docs/curriculum/valor-algebra1-week01-activation-acceptance.md` | [`valor-algebra1-week01-activation-acceptance.md`](acceptance-evidence/curriculum/valor-algebra1-week01-activation-acceptance.md) |
+| `docs/lint-baseline.md` | [`lint-baseline.md`](delivery-evidence/lint-baseline.md) |
+| `docs/ux-workflow-reconciliation.md` | [`ux-workflow-reconciliation.md`](delivery-evidence/ux-workflow-reconciliation.md) |
