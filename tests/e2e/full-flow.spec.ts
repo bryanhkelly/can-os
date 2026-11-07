@@ -19,7 +19,7 @@ import type { Sql } from "./fixture";
 
 /**
  * Persistent multi-role FullFlow browser acceptance
- * (docs/full-flow-acceptance-contract.md). Six stages, distinct authenticated
+ * (docs/archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md). Six stages, distinct authenticated
  * sessions per role, reload persistence, outbox processing, negative
  * cross-tenant checks and session revocation. Identities, safe catalogs and
  * prerequisites come from full-flow-fixture.ts; the tested Program, adopted
