@@ -1,8 +1,8 @@
-# Documentation migration inventory (initial verified subset)
+# Documentation Migration Inventory and Audit Log
 
-**Date:** 2026-11-07. **Source:** Direct GitHub file reads on `main`. This is a verified subset, **not** a complete repository tree inventory.
+**Initiated:** 2026-11-07. The classification table below is the **initial historical snapshot**, not every file's present disposition. A non-truncated recursive Git tree was subsequently verified in Phase 11; use the phase log and [canonical documentation home](README.md) for current paths.
 
-## Current classifications
+## Initial classifications (historical; see subsequent phases)
 
 | Existing file | Classification | Disposition |
 | --- | --- | --- |
@@ -142,3 +142,11 @@ The FullFlow summer/after-school implementation journal, October Section Operati
 - [Four-audience Launch Studio](product/LAUNCH-STUDIO-AUDIENCES.md): separate school, family, student and staff entry/commands, private draft integrity and unsaved-change safeguards. Source routes and scoped draft reader were inspected. Historical six-step school launch proposal is not the active school operator Hub contract.
 
 Retained `docs/church-hosted-school-acceptance.md`, `docs/site-student-safeguarding-and-welfare.md`, `docs/school-operations-security-gates.md`, `docs/educational-capacity-model.md` and active operational runbooks because their exact safety or technical invariants require further source-level reconciliation. No app code, database schema or deployment changes in this phase.
+
+## Phase 20: child-safety and institutional opening reconciliation (2026-11-07)
+
+Created [Church-Hosted Safety Gates](quality/CHURCH-HOSTED-SAFETY-GATES.md) from main-source inspection of institutional school opening, jurisdiction versioning, five opening evidence categories, planned and witnessed adult coverage, daily onsite review, restricted safeguarding and external-report workflows, and custody/pickup commands. It traces nine required release gates and explicit negative acceptance cases.
+
+The detailed church-hosted school-day acceptance, site safeguarding, school-operations security, multidisciplinary student support, and synthetic pilot HOLD documents remain active. They now link to the consolidated gate and distinguish dated FullFlow/October implementation evidence from current acceptance. **No safety contract was retired in this phase**: source inspection is not a substitute for legal review, deployed scheduler/notifications, independent real-world supervision, disposable database integration or authenticated multi-role browser tests.
+
+Reorganized the documentation home into clear product, design, quality, engineering and archive sections. No application code, database schema or deployment configuration changed.
