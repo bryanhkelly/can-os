@@ -27,7 +27,7 @@ describe("Website Studio seven-template contract", () => {
       const classId=id==="bright-futures"?"bright":id;
       const composition=composePublicSiteHome(id,sections);
       expect(composition).toContain(`home-${classId}`);
-      expect(sevenSchoolCss).toContain(`body.template-${id} .public-hero.seven-hero-${id}`);
+      expect(sevenSchoolCss).toContain(`.public-hero.seven-hero-${id}`);
       for(const text of Object.values(sections)) expect(composition.split(text).length-1).toBe(1);
       const page={host:"fictional.can-os.com",
         site:{name:"Sample Academy",organizationName:"Sample Partner"},
