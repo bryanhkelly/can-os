@@ -18,7 +18,9 @@ export const Route = createFileRoute("/launch/hub/school_/$module")({
     const outcome=await safeLoader(()=>loadSchoolConfiguration(deps,params.module))();
     if(params.module==="website" && deps.siteId && outcome.ok &&
        outcome.data.options.sites.some(site=>site.id===deps.siteId) &&
-       outcome.data.statuses?.website?.state!=="Blocked")
+       outcome.data.statuses?.website?.state !== undefined &&
+       outcome.data.statuses.website.state!=="Blocked" &&
+       outcome.data.statuses.website.state!=="Unavailable")
       throw redirect({to:"/launch/website",search:{siteId:deps.siteId,returnToHub:true},replace:true});
     return outcome;
   },

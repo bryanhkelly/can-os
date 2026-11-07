@@ -16,6 +16,11 @@ export const schoolHubModules = {
   compliance: { title: "Opening & Compliance", description: "Prepare evidence and track independent opening reviews.", action: "Review opening requirements", step: "readiness" },
 } as const;
 export type SchoolHubModule = keyof typeof schoolHubModules;
+export const plannedSchoolHubModules = ["promote", "recruitment", "events"] as const;
+export type PlannedSchoolHubModule = typeof plannedSchoolHubModules[number];
+export function isPlannedSchoolHubModule(module: SchoolHubModule): module is PlannedSchoolHubModule {
+  return plannedSchoolHubModules.some(planned => planned === module);
+}
 export const schoolHubSections = [
   { title: "Establish Your School", description: "Give your school a home online.", modules: ["website"] },
   { title: "Build Your School Community", description: "Bring your team and prospective families into the vision.", modules: ["team", "promote", "recruitment", "events"] },

@@ -4,7 +4,7 @@ import type { SchoolHubStatus } from "@/domain/school-hub-status";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Globe, Megaphone, Mail, ShieldCheck, Users } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
-import { schoolHubModules, schoolHubSections, type SchoolHubModule } from "@/domain/school-launch-hub";
+import { schoolHubModules, schoolHubSections, isPlannedSchoolHubModule, type PlannedSchoolHubModule, type SchoolHubModule } from "@/domain/school-launch-hub";
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 
 export type SchoolHubOptions = Awaited<ReturnType<typeof listLaunchOptions>>;
@@ -37,24 +37,67 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow }:
             </Link>}
         </article>;})}</div></section>)}</div>
       <p className="mt-6 text-xs leading-5 text-muted-foreground">These are independent workstreams. Website publication, promotion and family interest do not authorize school opening.</p>
-    </> : <>{statuses?.[module] && <div className="mt-5"><ModuleStatus status={statuses[module]!}/></div>}{workflow ?? <SchoolModuleHome module={module} siteId={site.id}/>}</>}
+    </> : <>{statuses?.[module] && <div className="mt-5"><ModuleStatus status={statuses[module]!}/></div>}{isPlannedSchoolHubModule(module)
+      ? <SchoolModuleHome module={module} siteId={site.id}/>
+      : workflow ?? <p role="alert" className="mt-6 border p-5">This module has no configured workflow. Contact CAN support rather than opening an unrelated setup page.</p>}</>}
     <section id="launch-help" className="mt-8 border-t pt-5 text-sm text-muted-foreground">Need help? Contact your CAN school support team about setup or independent review.</section>
   </PageFrame>;
 }
-export function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;siteId:string}) {
+type PlannedCapability = {title:string;detail:string};
+const plannedModuleLanding: Record<PlannedSchoolHubModule, {intro:string; capabilities:readonly PlannedCapability[]; note:string}> = {
+  promote:{
+    intro:"Give your school a recognizable presence with an approved set of visual assets and shareable messages.",
+    capabilities:[
+      {title:"School media kit",detail:"Bring the approved logo, colors, story and rights-cleared photography together."},
+      {title:"Digital campaigns",detail:"Prepare social graphics, captions and links that lead to your school website."},
+      {title:"Printable materials",detail:"Create flyers, invitations and QR codes for local gatherings."},
+      {title:"Review and distribution",detail:"Separate promotional copy from academic claims and opening authorization."},
+    ],
+    note:"Asset creation, downloads and campaign distribution are not implemented. Nothing is created or published here.",
+  },
+  recruitment:{
+    intro:"Collect prospective-family interest and organize follow-up without confusing it with official applications or enrollment.",
+    capabilities:[
+      {title:"Family interest",detail:"Give prospective families a clear way to express interest in your school."},
+      {title:"Invitations",detail:"Invite families and track responses within the authorized school."},
+      {title:"Recruitment pipeline",detail:"Organize follow-up and next steps while protecting family information."},
+    ],
+    note:"Site-level recruitment forms, invitation sending and follow-up records are not enabled in this module.",
+  },
+  events:{
+    intro:"Host interest meetings, campus tours, open houses and other opportunities for families to learn about your school.",
+    capabilities:[
+      {title:"Plan events",detail:"Set an event format, date, location and capacity."},
+      {title:"Register families",detail:"Offer event registration without treating attendance as enrollment."},
+      {title:"Follow up",detail:"Keep attendee questions and subsequent communication connected to the school."},
+    ],
+    note:"Event creation, registration and notifications are not enabled in this module.",
+  },
+};
+export function SchoolModuleHome({ module, siteId }: {module:PlannedSchoolHubModule;siteId:string}) {
   const navigation=useSchoolConfigurationNavigation();
-  const item=schoolHubModules[module];
-  const actionClass="mt-6 inline-flex min-h-11 items-center gap-2 bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground";
-  const resources = module === "promote" ? ["School logo and approved photography", "Social graphics and suggested captions", "Printable flyers and QR codes", "School introduction and published website link"] : module === "recruitment" ? ["Share your school vision", "Collect prospective-family interest", "Plan follow-up with interested families"] : module === "events" ? ["Information sessions", "Open houses and campus tours", "Family registration and follow-up"] : [];
-  return <div className="mt-7 grid gap-5 lg:grid-cols-[2fr_1fr]"><section className="border bg-card p-6 sm:p-8">
-    <h2 className="font-serif text-3xl">{module === "promote" ? "Give your school a voice." : resources.length ? "Planned school tools" : "Your next step"}</h2>
-    {resources.length ? <><p className="mt-3 text-sm leading-6 text-muted-foreground">{module === "promote" ? "A dedicated place for promotional materials using your school's saved branding and information." : "This module landing page is ready. Site-level tools are planned; no action here sends invitations or creates registrations."}</p>
-      <ul className="mt-5 divide-y border-y">{resources.map(resource=><li key={resource} className="py-4 text-sm">{resource}</li>)}</ul>
-      <p role="status" className="mt-5 border bg-muted p-4 text-sm">{module === "promote" ? "Media-kit downloads and asset creation are not available yet." : "These tools are not available yet. Return to the Launch Hub to continue another module."}</p></> : <>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.description} Continue in the existing authorized workspace; saved records remain attached to this school.</p>
-      {module === "team" ? <Link to="/admin" search={{siteId,inviteRole:"registrar"}} className={actionClass}>Invite team member <ArrowRight className="size-4" /></Link> : "step" in item ? <Link to="/launch/school" search={{siteId,step:item.step}} className={actionClass}>{item.action}<ArrowRight className="size-4" /></Link> : null}
-    </>}
-  </section><aside className="border bg-card p-6"><h2 className="font-serif text-2xl">{module === "compliance" ? "Independent review" : module === "academics" ? "CAN's instructional model" : "Keep building"}</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">{module === "compliance" ? "Submitting evidence does not approve opening. CAN and applicable external reviewers verify requirements through the existing opening process." : module === "academics" ? "Instruction uses asynchronous content with live support for questions. Your school provides local supervision and community." : "You can work on other modules while this work is underway. Promotion and interest are separate from applications, enrollment and permission to open."}</p><Link to={navigation.homePath} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Back to {navigation.homeLabel} <ArrowRight className="size-4" /></Link></aside></div>;
+  const plan=plannedModuleLanding[module];
+  return <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" aria-label={`${schoolHubModules[module].title} overview`}>
+    <div className="border bg-card p-6 sm:p-8">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Planned capability · not yet operational</p>
+      <h2 className="mt-3 font-serif text-3xl">What this module will make possible</h2>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{plan.intro}</p>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        {plan.capabilities.map(capability=><article key={capability.title} className="border bg-background p-5">
+          <h3 className="font-semibold">{capability.title}</h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{capability.detail}</p>
+        </article>)}
+      </div>
+      <p role="status" className="mt-6 border bg-muted p-4 text-sm">{plan.note}</p>
+    </div>
+    <aside className="border bg-card p-6">
+      <h2 className="font-serif text-2xl">Continue building your school</h2>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">This is a dedicated landing page for future development. Other modules remain available, but no actions or records are simulated here.</p>
+      <Link to={navigation.homePath} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+        Back to {navigation.homeLabel} <ArrowRight className="size-4"/>
+      </Link>
+    </aside>
+  </section>;
 }
 
 export function ModuleStatus({status}:{status:SchoolHubStatus}) {

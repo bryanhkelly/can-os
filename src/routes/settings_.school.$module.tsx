@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Navigate, notFound } from "@tanstack/react-router";
 import { PageFrame, PageHeader } from "@/components/workspace";
-import { schoolHubSearch, type SchoolHubModule } from "@/domain/school-launch-hub";
+import { schoolHubSearch, isPlannedSchoolHubModule } from "@/domain/school-launch-hub";
 import { schoolSettingsModules, type SchoolSettingsModule } from "@/domain/school-configuration";
 import { loadSchoolConfiguration } from "@/modules/programs/school-configuration-loader";
 import { safeLoader } from "@/lib/safe-loader";
@@ -31,6 +31,6 @@ function SchoolSettingsModulePage(){
   <Link to="/settings" search={{siteId:site.id}} className="mb-5 inline-flex min-h-11 items-center text-sm font-semibold text-primary">← School Settings</Link>
   <PageHeader eyebrow={`School Settings / ${site.name}`} title={item.title} subtitle={item.description}/>
   {module!=="profile"&&data.statuses?.[module]&&<div className="mt-5"><ModuleStatus status={data.statuses[module]}/></div>}
-  {module==="profile"?<SchoolProfileConfiguration site={site}/>:(["website","team","academics","compliance"].includes(module)?<SchoolHubWorkflow context="settings" data={data} selection={selection} module={module}/>:<SchoolModuleHome module={module as SchoolHubModule} siteId={site.id}/>)}
+  {module==="profile"?<SchoolProfileConfiguration site={site}/>:isPlannedSchoolHubModule(module)?<SchoolModuleHome module={module} siteId={site.id}/>:<SchoolHubWorkflow context="settings" data={data} selection={selection} module={module}/>)}
  </PageFrame></SchoolConfigurationContextProvider>;
 }
