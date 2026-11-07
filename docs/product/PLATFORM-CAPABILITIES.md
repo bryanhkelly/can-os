@@ -38,6 +38,8 @@ The canonical [Academic Delivery and Curriculum](ACADEMIC-DELIVERY.md) contract 
 
 The default delivery model is reusable asynchronous instruction, with optional live question support and tutoring. Students should select eligible curriculum and instructional presenters within the approved academic catalog. Site Admins do not simply assign a teacher to each student as a substitute for student choice. Academic accountability and credentialing must remain explicit.
 
+See [Extended Learning](EXTENDED-LEARNING.md) for summer and after-school Programs and noncredit Activities, and [Site Operations](SITE-OPERATIONS.md) for daily supervision and Section lifecycle boundaries.
+
 ## Status and verification
 
 **Implementation status is deliberately unverified in this document.** Determine each capability's state from current source code, migrations, route contracts, and executed end-to-end tests. Historical implementation assertions under `docs/archive/` are evidence to investigate, not release certification.
