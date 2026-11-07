@@ -26,3 +26,7 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 **In progress.** The existing documentation has not yet been comprehensively inventoried or archived. Until that work is complete, existing technical and safety guidance remains applicable where not contradicted by verified current code or an explicit approved decision. See [reset register](DOCUMENTATION-RESET.md).
 
 Historical branch handoffs, release evidence and retired FullFlow plans live under [the November 2026 archive index](archive/2026-11-fullflow/README.md). These records are not current implementation or release authority.
+
+## Documentation maintenance
+
+Run `npm run docs:check` before changing or moving documentation. The CI check validates tracked local Markdown link destinations in active documentation (including the historical archive index) and explicit `docs/*.md` or `docs/*.json` references in source and workflow files. Historical archive document bodies are deliberately excluded because their original links are preserved as evidence. Remote URLs, heading anchors, unlinked prose paths, and runtime behavior are outside this check's scope.
