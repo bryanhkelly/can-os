@@ -26,9 +26,28 @@ describe("exact-Site Hub reader",()=>{
   const result=await getSchoolHubData({data:{siteId}});
   expect(result.statuses?.website.state).toBe("Unavailable");expect(result.statuses?.team.state).toBe("Unavailable");expect(result.statuses?.academics.state).toBe("Unavailable");expect(result.statuses?.compliance.state).toBe("Unavailable");
  });
+ it("isolates unrelated read failures for each launch module",async()=>{
+  state.websiteReadFails=true;state.teamReadFails=true;
+  const academics=await getSchoolHubData({data:{siteId,module:"academics"}});
+  expect(academics.statuses?.academics?.state).toBe("Not Started");
+  expect(academics.statuses?.website).toBeUndefined();
+  expect(academics.statuses?.team).toBeUndefined();
+  state.programReadFails=true;state.teamReadFails=false;
+  const team=await getSchoolHubData({data:{siteId,module:"team"}});
+  expect(team.statuses?.team?.state).toBe("Not Started");
+  expect(team.statuses?.academics).toBeUndefined();
+  const planned=await getSchoolHubData({data:{siteId,module:"promote"}});
+  expect(planned.statuses?.promote?.state).toBe("Planned");
+  expect(planned.statuses?.team).toBeUndefined();
+ });
  it("does not select another school, Program or membership",async()=>{
-  await expect(getSchoolHubData({data:{siteId:"sibling"}})).rejects.toThrow();
-  state.launches=[{id:programId,siteId:"sibling"}];await expect(getSchoolHubData({data:{siteId,programId}})).rejects.toThrow();
+  const outOfScope=await getSchoolHubData({data:{siteId:"sibling"}});
+  expect(outOfScope.statuses).toBeNull();
+  expect(outOfScope.options.sites).toHaveLength(1);
+  state.launches=[{id:programId,siteId:"sibling"}];
+  const invalidProgram=await getSchoolHubData({data:{siteId,programId}});
+  expect(invalidProgram.selectedProgramId).toBeNull();
+  expect(invalidProgram.selectionError).toContain("not available");
   const result=await getSchoolHubData({data:{}});expect(result.selectedProgramId).toBeNull();expect(result.statuses).toBeNull();
  });
 });

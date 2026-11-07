@@ -57,6 +57,15 @@ summary and next action. Academic completion means recorded academic preparation
 requirements, not independent authority. Compliance never becomes Complete solely
 because a Journey is prepared. Opening approval remains a separate server decision.
 
+## November 2026 Launch and Website Studio stabilization
+
+- Build Website opens canonical Website Studio directly from the Hub or Settings. Old Website module bookmarks preserve scoped navigation.
+- A Site without an address presents a single preparation step, not six inactive design steps. Existing Site re-entry starts at template choice; orientation remains optional.
+- Planned Promotion, Recruitment and Events cards have no action links. The Website card does not send blocked or unavailable memberships into errors.
+- Invalid Site selection presents only the authorized school picker. Invalid Program selection requires explicit Program choice.
+- CAN OS publication alone does not verify public reachability. Hub readiness does not claim external verification.
+- Module readers load only the read models relevant to that module, retaining server-verified Site scope.
+
 ## Basic school profile creation
 
 `/launch/hub/school/new` uses the existing `createLaunchSite` command with
