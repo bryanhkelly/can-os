@@ -16,6 +16,7 @@
     "demo:provision-registrar": "node --import tsx scripts/provision-demo-registrar.mjs",
     "demo:check-access": "node --import tsx scripts/check-demo-access.mjs",
     "test": "vitest run --exclude 'tests/integration/**' --exclude 'tests/e2e/**'",
+    "test:safety": "vitest run tests/unit/church-hosted-provider.test.ts tests/unit/church-academic-launch-authority.test.ts tests/unit/school-opening-jurisdiction-guard.test.ts tests/unit/school-opening-decision.test.ts tests/unit/school-opening-evidence.test.ts tests/unit/onsite-supervision-coverage.test.ts tests/unit/onsite-presence-acceptance.test.ts tests/unit/pickup-custody-independent-review.test.ts tests/unit/pickup-notification-privacy.test.ts tests/unit/safeguarding-case-access.test.ts tests/unit/safeguarding-intake-policy.test.ts tests/unit/site-safeguarding-access.test.ts tests/unit/safeguarding-site-coverage.test.ts",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck": "tsc --noEmit",
     "docs:check": "node scripts/check-documentation-links.mjs",
