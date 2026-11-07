@@ -39,8 +39,13 @@ export function resolveSchoolBrand(schoolName: string, branding: Pick<
 >) {
   const templateId = resolveSiteTemplateId(branding.templateId);
   const design = schoolBrandDesigns[templateId];
-  const theme = resolveSiteTheme(branding.paletteId, branding.typographyId,
+  const selectedTheme = resolveSiteTheme(branding.paletteId, branding.typographyId,
     branding.headingFontId, branding.bodyFontId);
+  // Match the hosted Modern template's original sans-serif heading unless
+  // the editor explicitly selected another heading font.
+  const theme = templateId === "modern" && !branding.headingFontId
+    ? { ...selectedTheme, displayFont: selectedTheme.bodyFont }
+    : selectedTheme;
   const normalizedName = schoolName.trim().slice(0, 120) || "Your School";
   const readableAccent = contrastRatio(theme.accent, theme.ink) >= 3
     ? theme.accent : theme.canvas;
