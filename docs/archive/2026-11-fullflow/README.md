@@ -82,3 +82,14 @@ The following original Git blobs were preserved unchanged. Canonical requirement
 ## Phase 16: Website Studio integration handoff (2026-11-07)
 
 The dated [Website Studio implementation handoff](delivery-evidence/website-launch-studio-implementation.md) was moved from `docs/website-launch-studio-implementation.md` without changing its Git blob. Its PR merge status is historical, not a current assertion. The active product contract is [Website Studio](../../product/WEBSITE-STUDIO.md), with [Website Media](../../product/WEBSITE-MEDIA.md) as its consent and media boundary.
+
+## Phase 17: public website and admissions backlog (2026-11-07)
+
+Original Git blobs from the FullFlow-era website and family-intake execution plan are preserved:
+
+| Original | Historical archive |
+| --- | --- |
+| `docs/site-public-publishing.md` | [FullFlow Site Publishing Bites 1–8](retired-plans/site-public-publishing.md) |
+| `docs/public-site-admissions-remaining-work.md` | [FullFlow Public Site → Admissions Backlog, PUB-09–22 and GATE-01–09](retired-plans/public-site-admissions-remaining-work.md) |
+
+The current product requirements are [Public Sites and Admissions](../../product/PUBLIC-SITES-AND-ADMISSIONS.md). Current production-release requirements are [Public Site Release Gates](../../quality/PUBLIC-SITE-RELEASE-GATES.md). The operational [tenant hosting runbook](../../public-tenant-hosting-release.md) remains active but is provider-specific and requires verification against the selected deployment environment.
