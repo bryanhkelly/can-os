@@ -66,4 +66,6 @@
 
 **Phase 16:** Replaced dated Website Studio PR-status documentation with canonical `docs/product/WEBSITE-STUDIO.md` while archiving the original implementation record. Its source-backed five-template catalog, editor, publication and rights model are differentiated from unverified browser/production acceptance. Noted the Modern Academy / Modern Learning naming decision.
 
+**Phase 17:** Retired two superseded FullFlow public-site and admissions documents preserving exact Git blob content. Built canonical product and quality contracts at `docs/product/PUBLIC-SITES-AND-ADMISSIONS.md` and `docs/quality/PUBLIC-SITE-RELEASE-GATES.md`; clarified hosting provider differences in the active Netlify-oriented runbook. Source-to-release evidence remains unverified.
+
 **Still outstanding:** Complete source and CI raw-reference checks, reproducible automated Markdown link validation (including reference-style links and anchors), current-main verification of retained operational/product specifications, and test/build execution. The new documentation structure is not yet certified as fully reconciled.
