@@ -28,6 +28,7 @@ export function renderPrivateWebsitePreviewHtml(
   html: string,
   siteId: string,
   availablePages: readonly string[],
+  saved = true,
 ): string {
   const links = new Set(availablePages.filter(isPublicSitePagePath));
   const converted = html.replace(/href="(\/[a-z-]*)"/g, (_match, path: string) =>
@@ -36,7 +37,7 @@ export function renderPrivateWebsitePreviewHtml(
   const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&returnToHub=true&step=preview`;
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private school website preview</strong>
-  <span>Saved design · not published · sign-in required</span>
+  <span>${saved ? "Saved design" : "Unsaved school starter · illustrative only"} · not published · sign-in required</span>
   <a href="${editor}">Return to Website &amp; Brand Studio</a>
   </aside>`;
   const style = `<style>
