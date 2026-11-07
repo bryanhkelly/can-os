@@ -5,6 +5,10 @@ const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,module:"team",d
 vi.mock("@tanstack/react-router",()=>({
  createFileRoute:()=> (options:object)=>({options,useSearch:()=>state.search,useParams:()=>({module:state.module}),useLoaderData:()=>state.data}),
  notFound:()=>new Error("Not found"),useRouter:()=>({invalidate:state.invalidate}),
+ Navigate:({to,search}:{to:string;search?:Record<string,unknown>})=>{
+  const query=new URLSearchParams(Object.entries(search??{}).map(([key,value])=>[key,String(value)]));
+  return <a href={to+(query.size?"?"+query.toString():"")}>Redirect to Website Studio</a>;
+ },
  Link:({to,params,search,children}:{to:string;params?:Record<string,string>;search?:Record<string,unknown>;children:ReactNode})=>{
   const path=to.replace(/\$([^/]+)/g,(_,key:string)=>params?.[key]??key);
   const query=new URLSearchParams(Object.entries(search??{}).filter(([,value])=>value!==undefined).map(([key,value])=>[key,String(value)])).toString();
@@ -59,6 +63,16 @@ describe("dashboard school configuration",()=>{
   expect(html).toContain(`/launch/website?siteId=${siteId}`);
   expect(html).toContain("returnToSettings=true");
   expect(html).not.toContain('/site-website');
+ });
+ it("redirects an authorized Website module and explains blocked access",()=>{
+  state.module="website";
+  state.data.data.statuses={website:{state:"Not Started",detail:"No private address yet",nextAction:"Prepare website"}};
+  expect(renderToStaticMarkup(<SettingsModule.options.component/>))
+    .toContain(`/launch/website?siteId=${siteId}&amp;returnToSettings=true`);
+  state.data.data.statuses={website:{state:"Blocked",detail:"Network authorization required",nextAction:"Request access"}};
+  const blocked=renderToStaticMarkup(<SettingsModule.options.component/>);
+  expect(blocked).toContain("Network authorization required");
+  expect(blocked).not.toContain("/launch/website?");
  });
  it("requires explicit Site selection rather than opening another school's configuration",()=>{
   state.search={};state.siteIds=[siteId,otherSite];
