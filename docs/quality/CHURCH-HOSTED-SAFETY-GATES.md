@@ -82,6 +82,8 @@ Before representing a church-hosted school as operationally accepted, run one en
 
 Record exact Git SHA, actual command/browser outputs, DB branch, Site/Program IDs, reviewer identity, state policy version, denied cases, failures, exclusions and responsible legal approval. School operations, production deployment, real student data, and DNS or migration changes require their own explicit approvals.
 
+See [Safety Test Traceability](SAFETY-TEST-TRACEABILITY.md) for tests mapped to each gate, mocking and skip conditions, and still-unverified browser/legal evidence. A test file is not a release certificate.
+
 ## Current source ownership / evidence limit
 
 | Source area | Code pointers | What it does not prove |
