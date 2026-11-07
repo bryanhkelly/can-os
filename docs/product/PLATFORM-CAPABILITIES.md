@@ -26,6 +26,8 @@ This catalog replaces the habit of treating delivery branches or individual scre
 
 See [School Launch and Run](LAUNCH-AND-RUN.md) for the nine-module source map, planned capabilities, and the separate Church Information gap. [School Website Media](WEBSITE-MEDIA.md) owns the rights-aware imagery and folder-first intake contract.
 
+The shared [Launch Studio Audiences](LAUNCH-STUDIO-AUDIENCES.md) contract covers distinct family, student, staff and school onboarding, including private draft boundaries.
+
 ## Launch Hub requirements
 
 After signup and a minimal school profile, the Site Admin enters a full-page, card-based Launch Hub. The hub exposes the **complete capability catalog** for school setup rather than hiding unbuilt modules. Cards distinguish not started, in progress, and completed. A capability without a finished workflow has an intentional, owned landing page describing its status, not an accidental fallback or broken route. Website Studio is a fully functional launch module, not a placeholder. Team invitation, family recruitment, compliance/readiness, and church information are separate concerns.
