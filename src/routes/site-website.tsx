@@ -102,6 +102,12 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     currentId={data.host ? websiteStudioStepIds[step]??"welcome" : "address"}
     onStepChange={id=>{if(data.host)changeStep(websiteStudioStepIds.indexOf(id as typeof websiteStudioStepIds[number]));}}
     help={<p>Unaffiliated Site Administrators manage their school website directly. Contributors need a verified Site website editor invitation. Previewing and saving a draft do not publish it.</p>}
+    status={data.host ? <div className="space-y-2">
+      <p className="font-semibold">School website address</p>
+      <p className="break-all font-mono text-xs">{data.host}</p>
+      <p>{data.status==="published" ? "Published in CAN OS. External host reachability is verified separately." : "Private draft address. Content is not published."}</p>
+      <p>Saved revision: {data.currentRevision}</p>
+    </div> : <p>No website address is reserved yet. Prepare an address to start the design workflow.</p>}
     exit={returnToLaunch ?? <Link to="/home" className="underline">Exit to your workspace</Link>}>
     {data.host
       ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep}/>
@@ -275,7 +281,9 @@ function WebsitePreviewPanel({ data, draftPreview }: {
     {activeHtml ? <iframe key={selected+"-"+device} title={`${data.siteName} ${selected} read-only website preview`}
       srcDoc={activeHtml} sandbox="" referrerPolicy="no-referrer" loading="lazy"
       className="mt-4 h-[700px] w-full border bg-white" style={{ maxWidth: device === "mobile" ? 390 : undefined }} />
-      : <p className="mt-4 rounded-lg border p-4 text-sm">A private website preview becomes available when a Site draft address is reserved by your registrar.</p>}
+      : <p role="status" className="mt-4 border p-4 text-sm">{pages.length
+        ? "This page is not available in the selected preview. Choose an available page or generate an updated preview."
+        : "No preview pages are available for this school website. Check the reserved address and Site information."}</p>}
   </section>;
 }
 
