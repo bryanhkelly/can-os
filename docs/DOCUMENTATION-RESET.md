@@ -38,4 +38,6 @@
 
 **Phase 3:** Added `docs/DOCUMENT-INVENTORY.md` with a verified subset of document classifications; exact archival snapshots of three retired delivery plans; new canonical `docs/product/PLATFORM-CAPABILITIES.md` and `docs/product/OPERATING-MODEL.md`. These product documents specify intent and boundaries, not current implementation certification.
 
+**Phase 4:** Created canonical `docs/architecture/SYSTEM.md`, `docs/architecture/DOMAIN-MODEL.md`, and `docs/quality/ACCEPTANCE-STANDARDS.md`. These are architectural and quality principles, not a source-verified implementation map or executed test report.
+
 **Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
