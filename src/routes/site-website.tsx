@@ -409,7 +409,7 @@ function LocalWebsiteCopyEditor({
   }
 
   async function saveDraft() {
-    if (busy || !data.canPublish || revisionConflict) return;
+    if (busy || !data.canPublish || !data.draftStorageReady || revisionConflict) return;
     setError("");
     const submitted = content;
     const outcome = await mutation.run(() => saveChurchWebsiteDraft({
@@ -819,13 +819,18 @@ function LocalWebsiteCopyEditor({
           </ul>
         </details>}
       </div>}
+      {!data.draftStorageReady && <p role="alert" className="border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
+        <strong>Private draft storage requires an update.</strong> This Cloudflare-connected database has not
+        applied website migration 0077. Draft saving is unavailable until an authorized database
+        migration is completed. You can still preview the website, but your changes are not saved.
+      </p>}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         <Button variant="outline" type="button" disabled={step === 0}
           onClick={() => onStepChange(Math.max(0, step - 1))}
           className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Back
         </Button>
-        <Button variant="outline" type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={()=>void saveDraft()}
+        <Button variant="outline" type="button" disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict} onClick={()=>void saveDraft()}
           className="min-h-11 border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">
           {busy?"Saving...":"Save private draft"}
         </Button>
