@@ -1,16 +1,18 @@
 import { buildLaunchGuidance, type LaunchGuidanceRecord } from "./launch-guidance";
-export type SchoolHubStatus = {state:"Not Started"|"In Progress"|"Complete"|"Attention Needed"|"Blocked"|"Unavailable"; detail:string; nextAction:string};
+import { plural } from "@/lib/format";
+export type SchoolHubStatus = {state:"Not Started"|"In Progress"|"Complete"|"Attention Needed"|"Blocked"|"Unavailable"|"Planned"; detail:string; nextAction:string};
 export const unavailableHubStatus:SchoolHubStatus={state:"Unavailable",detail:"Saved records could not be verified.",nextAction:"Refresh this module"};
+export const plannedHubStatus:SchoolHubStatus={state:"Planned",detail:"Site-level tools are not available yet.",nextAction:"Continue with another launch module"};
 export function websiteHubStatus(address:string|null,content:string|null):SchoolHubStatus {
   if(content==="review_required")return {state:"Attention Needed",detail:"The latest revision needs independent claim review.",nextAction:"Review website content"};
-  if(address==="published" && (!content||content==="published"))return {state:"Complete",detail:"School website published. Opening approval is separate.",nextAction:"Manage website"};
+  if(address==="published" && (!content||content==="published"))return {state:"In Progress",detail:"Published in CAN OS. Public website reachability has not been verified; school opening is separate.",nextAction:"Verify public website and continue setup"};
   return {state:address||content?"In Progress":"Not Started",detail:content?"A private content revision is saved.":address?"Private website address prepared.":"No website preparation recorded.",nextAction:address?"Continue website design":"Prepare school website"};
 }
 export function academicHubStatus(programs:LaunchGuidanceRecord[]):SchoolHubStatus {
   if(!programs.length)return {state:"Not Started",detail:"No academic Program exists for this school.",nextAction:"Create your first Program"};
   const tasks=programs.flatMap(program=>{const academicIds=new Set(program.requirements.filter(item=>/academic|curriculum|teacher|section|school-year|schedule/.test(item.key)).map(item=>item.id));return buildLaunchGuidance(program).tasks.filter(task=>task.requirementId && academicIds.has(task.requirementId));});
   const pending=tasks.filter(task=>task.state!=="complete" || task.pendingEvidenceReview || task.evidenceReviewCorrectionPending);
-  return {state:pending.some(task=>task.state==="blocked")?"Attention Needed":tasks.length&&!pending.length?"Complete":"In Progress",detail:`${programs.length} Program(s) saved. ${pending.length} academic requirements remain.`,nextAction:pending[0]?.title??"Review academic configuration"};
+  return {state:pending.some(task=>task.state==="blocked")?"Attention Needed":tasks.length&&!pending.length?"Complete":"In Progress",detail:`${plural(programs.length,"Program")} saved. ${pending.length} academic requirements remain.`,nextAction:pending[0]?.title??"Review academic configuration"};
 }
 export function complianceHubStatus(programs:LaunchGuidanceRecord[]):SchoolHubStatus {
   if(!programs.length)return {state:"Blocked",detail:"A Program is needed to resolve applicable opening requirements.",nextAction:"Prepare academics first"};
