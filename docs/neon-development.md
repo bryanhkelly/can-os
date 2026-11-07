@@ -358,7 +358,7 @@ concluding that an applied migration was changed. Do not rewrite migration
 history, stamp missing ledger entries or use `db:push` as a shortcut.
 
 The historical drift audit and subsequent approved production reconciliation
-are recorded in [CURRENT-STATE.md](./CURRENT-STATE.md). That rollout used a fresh
+are recorded in [archived CURRENT-STATE.md](./archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md). That rollout used a fresh
 production copy, a clean replay of committed migrations as the reference,
 catalog equivalence and existing-record preservation checks, isolated integration
 tests, and an independent pre-change recovery branch. Missing ledger entries
@@ -375,7 +375,7 @@ identity or migration status. On November 2, 2026, production was reconciled
 through journal migration `0060_tenant_demo_access`; its already-satisfied
 column-drop effect was verified rather than re-executed. The recovery and
 rehearsal branches remain retained, and older migration hash mismatches were
-preserved without rewriting history. See [CURRENT-STATE.md](./CURRENT-STATE.md)
+preserved without rewriting history. See [archived CURRENT-STATE.md](./archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md)
 for the exact branch identities and postflight evidence.
 
 On November 2, 2026, a subsequent authorized rollout applied the sole pending
@@ -386,7 +386,7 @@ isolated integration tests before production application. Recovery branch
 `br-tiny-hill-arhe41j8` and rehearsal branch `br-falling-mountain-ar0dql74`
 remain retained. Existing room values and prior migration ledger entries were
 preserved. See the migration 0063 rollout entry in
-[CURRENT-STATE.md](./CURRENT-STATE.md) for source identity and validation results.
+[archived CURRENT-STATE.md](./archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md) for source identity and validation results.
 This is not authorization to replay migrations, import sample data or run tests
 against production.
 
