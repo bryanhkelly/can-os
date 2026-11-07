@@ -44,4 +44,6 @@
 
 **Phase 6:** Retired `docs/CURRENT-STATE.md` and `docs/full-flow-progress.md` into the historical archive, updated identified references, and snapshotted four legacy technical specifications. Copilot now points to canonical architecture and quality documents. The original technical specifications remain until cross-reference verification is complete.
 
+**Phase 7:** Retired four legacy specifications from their original paths after matching archive blob SHAs and updating identified references. Canonical replacements are in `docs/architecture/` and `docs/quality/`; original details remain in `docs/archive/2026-11-fullflow/legacy-specifications/`. Full repository link and build verification is still outstanding.
+
 **Still outstanding:** A complete tracked-file inventory, dependency analysis of code/CI references, full archival of legacy docs, and selective reconstruction of technical, product, design, engineering, and quality specifications. The three archived root snapshots are not the entire historical corpus. Do not bulk-move remaining documents until active references and critical runbooks are accounted for.
