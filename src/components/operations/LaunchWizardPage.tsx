@@ -1,3 +1,4 @@
+import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import type { LaunchJurisdictionResearch } from "@/domain/jurisdiction-launch-research";
 import { launchMilestoneAvailable, type LaunchReadStates } from "@/lib/supplementary-read";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
@@ -67,6 +68,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
     ? [...(launches?.launches ?? []), ...(preparationPrograms ?? [])].find(item => item.id === selection.programId)
     : undefined;
   const initialSiteId = selection.siteId ?? initialProgram?.siteId ?? draft?.siteId ?? "";
+  const navigation=useSchoolConfigurationNavigation();
   const router = useRouter();
   const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input), invalidateRouter: () => router.invalidate() });
   const contactMutation = useWorkspaceMutation({mutationFn:(input:Parameters<typeof updateLaunchSiteContact>[0])=>updateLaunchSiteContact(input),invalidateRouter:()=>router.invalidate()});
@@ -264,7 +266,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
       if (submission.refreshError) setError("Launch started, but the page could not refresh. Reopen its checklist; do not start a duplicate launch.");
       try {
         await router.navigate({
-          ...(hubMode ? {to:"/launch/hub/school/$module" as const,params:{module:"academics"},search:{programId:result.programId,siteId}} : {to:"/launch/school" as const,search:{programId:result.programId,siteId:result.publicSiteDraft?.siteId,step:"academics" as const}}),
+          ...(hubMode ? {to:navigation.modulePath,params:{module:"academics"},search:{programId:result.programId,siteId}} : {to:"/launch/school" as const,search:{programId:result.programId,siteId:result.publicSiteDraft?.siteId,step:"academics" as const}}),
         });
       } catch {
         // startLaunch already committed. Keep the handoff with canonical IDs.
@@ -387,7 +389,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
           onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) + 1]!)}>
           {step === "welcome" ? "Let's get started" : "Continue"}</Button>}
       </>}
-      exit={<div className="flex flex-wrap justify-center gap-5">{siteId && <Link to="/launch/hub/school" search={{siteId}} className="font-semibold text-primary">Back to Launch Hub</Link>}<Link to="/home" search={schoolSelection} className="underline">Skip to dashboard</Link></div>}>
+      exit={<div className="flex flex-wrap justify-center gap-5">{siteId && <Link to={navigation.homePath} search={{siteId}} className="font-semibold text-primary">Back to {navigation.homeLabel}</Link>}<Link to="/home" search={schoolSelection} className="underline">Skip to dashboard</Link></div>}>
         {step === "welcome" && <JourneyWelcome summary="Bring your school to life, one clear step at a time. Your Site, academic Program, website and family applications stay connected."
           requirements={["Your school location and time zone", "Your academic model, grade range and intended opening date", "The people who will help prepare your school"]}
           outcome="Save preparation now and return later. CAN services, publication, admissions and legal opening each retain their own review." />}

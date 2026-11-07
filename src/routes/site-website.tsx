@@ -34,6 +34,7 @@ export const websiteStudioStepIds = ["welcome", "template", "identity", "photos"
 export const websiteSearchSchema=siteProgramSelectionSchema.extend({
   returnGrantId:optionalSearchString,
   returnToHub:z.boolean().optional(),
+  returnToSettings:z.boolean().optional(),
   step:z.enum(websiteStudioStepIds).optional(),
 });
 
@@ -66,7 +67,7 @@ function WebsiteAddressPreparation({siteId,canPrepare}:{siteId:string;canPrepare
 
 export function WebsiteHome({ outcome, selection, studio = false, onStepChange }: {
   outcome: Awaited<ReturnType<typeof loadWebsiteHome>>;
-  selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; step?:typeof websiteStudioStepIds[number] };
+  selection: { siteId?:string; programId?:string; returnGrantId?:string; returnToHub?:boolean; returnToSettings?:boolean; step?:typeof websiteStudioStepIds[number] };
   studio?: boolean;
   onStepChange?: (step:number)=>void;
 }) {
@@ -74,7 +75,9 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
   const requestedStep=websiteStudioStepIds.indexOf(selection.step??"welcome");
   const step=selection.step ? Math.max(0,requestedStep) : localStep;
   const changeStep=onStepChange??setLocalStep;
-  const returnToLaunch=selection.returnToHub && selection.siteId
+  const returnToLaunch=selection.returnToSettings && selection.siteId
+    ? <Link to="/settings" search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Settings</Link>
+    : selection.returnToHub && selection.siteId
     ? <Link to="/launch/hub/school/$module" params={{module:"website"}} search={{siteId:selection.siteId}} className="font-semibold text-primary">Back to Build Website</Link>
     : selection.siteId&&selection.programId&&selection.returnGrantId
     ?<LaunchWebsiteEditorHandoff siteId={selection.siteId} programId={selection.programId} returnGrantId={selection.returnGrantId} destination="launch"/>:null;
@@ -105,24 +108,23 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
     subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"} actions={returnToLaunch}>
     <GuidedSetupShell
       title="Make your school website feel local"
-      description="Start with a welcome, add your church's story and visual identity, then review the private preview. Your answers stay in this page as you move between steps; nothing is saved or published until you choose Publish."
+      description="Start with a welcome, add your school's story and visual identity, then review the preview. Save a private draft or publish when you are ready."
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Bring current sources":index===1?"Choose a design":
           index===2?"Personalize the look":index===3?"Approved school copy":"Private preview and publication",
         status:step===index?"current":step>index?"complete":"upcoming",
       })) : [
-        { id: "address", title: "Site address", description: "Ask your registrar to provision a draft", status: "current" },
+        { id: "address", title: "Site address", description: "Prepare a private website address", status: "current" },
       ]}
       aside={<div className="space-y-3 py-1 text-sm">
         <p className="font-semibold">Site address</p>
         {data.host ? <>
           <p className="break-all font-mono text-xs">{data.host}</p>
           <p className="text-muted-foreground">
-            {data.status === "published" ? "Marketing approved" : "Private draft"}.
-            The public hostname is not activated from this workspace.
+            {data.status === "published" ? "Published" : "Private draft"}. {data.canPrepareWebsite ? "Publish reviewed Site-owned content from this workspace." : "The Site address follows its existing approval workflow."}
           </p>
         </> : <p role="status" className="text-muted-foreground">
-          No address is reserved. Ask your CAN launch registrar to finish draft provisioning.
+          No address is reserved yet.
         </p>}
         <p className="border-t pt-3 text-xs leading-5 text-muted-foreground">
           You can publish church-owned content. CAN retains control of academic claims,
@@ -131,9 +133,7 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
       </div>}>
       {data.host
         ? <LocalWebsiteCopyEditor data={data} step={step} onStepChange={changeStep} />
-        : <p role="status" className="text-sm text-muted-foreground">
-          Your registrar must reserve a draft Site address before website content can be edited.
-        </p>}
+        : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/>}
     </GuidedSetupShell>
   </WorkspaceShell>;
 }

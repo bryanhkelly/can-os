@@ -16,8 +16,7 @@ not yet available. Recruitment and Events are Site-level landing pages only;
 they do not invoke Program-scoped sending or registration commands. No demo
 metrics or navigation-based completion are used.
 
-School lifecycle routing and dashboard Settings reorganization remain outside
-this change. Route acceptance fields remain pending. Authenticated browser and
+School lifecycle routing remains outside this change. Route acceptance fields remain pending. Authenticated browser and
 live database acceptance have not been performed.
 
 ## Direct Site Admin website authority
@@ -95,3 +94,23 @@ in 19 files. The latest broad run passed 3,935 tests and failed 21; every remain
 failure also reproduces before this follow-up. The new-profile fixture contract
 uses the existing Site-bound actor to verify denied sibling creation; positive
 organization-wide creation is command-unit-tested, not database/browser accepted.
+
+## Shared configuration in dashboard Settings
+
+Dashboard Settings presents School Profile, Website, Team & Permissions,
+Promotion, Recruitment, Events, Academics and Compliance. The Settings module
+route uses the same exact-Site loader, Program selection, status projections and
+embedded workflows as Launch. A multi-Site membership selects a school explicitly;
+return links preserve the chosen Site. Active Programs keep their saved configuration.
+
+School Profile uses the existing revision-checked identity, address and private
+contact editors and commands. Website opens the canonical dashboard editor.
+Team, Academics and Compliance stay inside the Settings navigation context,
+including Program creation and cross-module links. Promotion, Recruitment and
+Events retain the same clearly labeled placeholder scope as Launch. This connection introduces no new
+configuration tables or write commands and does not change publication permissions
+or opening decisions.
+
+Settings follow-up: 84 focused tests passed, covering shared reads, scope,
+canonical profile saves, recovery navigation and route metadata. Authenticated
+browser and database verification are still pending.

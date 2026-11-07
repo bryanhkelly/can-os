@@ -1,9 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { SchoolLaunchHub } from "@/components/launch-studio/SchoolLaunchHub";
 import { schoolHubModules, type SchoolHubModule } from "@/domain/school-launch-hub";
-import { getSchoolHubData } from "@/modules/programs/school-hub.functions";
-import { getLaunchStudioDraft } from "@/modules/programs/launch-drafts.functions";
-import { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
+import { loadSchoolConfiguration } from "@/modules/programs/school-configuration-loader";
 import { SchoolHubWorkflow } from "@/components/launch-studio/SchoolHubWorkflow";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -12,14 +10,7 @@ export const Route = createFileRoute("/launch/hub/school_/$module")({
   validateSearch: search => schoolHubSearch.parse(search),
   beforeLoad: ({params}) => {if(!Object.hasOwn(schoolHubModules,params.module))throw notFound();},
   loaderDeps:({search})=>search,
-  loader:({deps,params})=>safeLoader(async () => {
-    const data=await getSchoolHubData({data:{siteId:deps.siteId,programId:deps.programId}});
-    const academic=params.module==="academics" && data.selectedProgramId
-      ? await safeLoader(()=>getLaunchAcademicSetup({data:{programId:data.selectedProgramId!}}))() : null;
-    const draft=params.module==="academics" && deps.siteId && data.launches?.length===0
-      ? await safeLoader(()=>getLaunchStudioDraft({data:{audience:"school",context:`${deps.siteId}:`}}))() : null;
-    return {...data,academic:academic?.ok?academic.data:null,academicFailed:academic!==null&&!academic.ok,draft:draft?.ok?draft.data:null,draftFailed:draft!==null&&!draft.ok};
-  })(),
+  loader:({deps,params})=>safeLoader(()=>loadSchoolConfiguration(deps,params.module))(),
   component: SchoolModulePage,
 });
 function SchoolModulePage() {

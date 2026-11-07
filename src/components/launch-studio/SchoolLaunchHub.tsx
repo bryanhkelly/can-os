@@ -1,3 +1,4 @@
+import { useSchoolConfigurationNavigation } from "./SchoolConfigurationContext";
 import type { ReactNode } from "react";
 import type { SchoolHubStatus } from "@/domain/school-hub-status";
 import { Link } from "@tanstack/react-router";
@@ -36,7 +37,8 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow }:
     <section id="launch-help" className="mt-8 border-t pt-5 text-sm text-muted-foreground">Need help? Contact your CAN school support team about setup or independent review.</section>
   </PageFrame>;
 }
-function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;siteId:string}) {
+export function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;siteId:string}) {
+  const navigation=useSchoolConfigurationNavigation();
   const item=schoolHubModules[module];
   const actionClass="mt-6 inline-flex min-h-11 items-center gap-2 bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground";
   const resources = module === "promote" ? ["School logo and approved photography", "Social graphics and suggested captions", "Printable flyers and QR codes", "School introduction and published website link"] : module === "recruitment" ? ["Share your school vision", "Collect prospective-family interest", "Plan follow-up with interested families"] : module === "events" ? ["Information sessions", "Open houses and campus tours", "Family registration and follow-up"] : [];
@@ -48,10 +50,10 @@ function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;siteId:str
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.description} Continue in the existing authorized workspace; saved records remain attached to this school.</p>
       {module === "team" ? <Link to="/admin" search={{siteId,inviteRole:"registrar"}} className={actionClass}>Invite team member <ArrowRight className="size-4" /></Link> : "step" in item ? <Link to="/launch/school" search={{siteId,step:item.step}} className={actionClass}>{item.action}<ArrowRight className="size-4" /></Link> : null}
     </>}
-  </section><aside className="border bg-card p-6"><h2 className="font-serif text-2xl">{module === "compliance" ? "Independent review" : module === "academics" ? "CAN's instructional model" : "Keep building"}</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">{module === "compliance" ? "Submitting evidence does not approve opening. CAN and applicable external reviewers verify requirements through the existing opening process." : module === "academics" ? "Instruction uses asynchronous content with live support for questions. Your school provides local supervision and community." : "You can work on other modules while this work is underway. Promotion and interest are separate from applications, enrollment and permission to open."}</p><Link to="/launch/hub/school" search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Back to Launch Hub <ArrowRight className="size-4" /></Link></aside></div>;
+  </section><aside className="border bg-card p-6"><h2 className="font-serif text-2xl">{module === "compliance" ? "Independent review" : module === "academics" ? "CAN's instructional model" : "Keep building"}</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">{module === "compliance" ? "Submitting evidence does not approve opening. CAN and applicable external reviewers verify requirements through the existing opening process." : module === "academics" ? "Instruction uses asynchronous content with live support for questions. Your school provides local supervision and community." : "You can work on other modules while this work is underway. Promotion and interest are separate from applications, enrollment and permission to open."}</p><Link to={navigation.homePath} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Back to {navigation.homeLabel} <ArrowRight className="size-4" /></Link></aside></div>;
 }
 
-function ModuleStatus({status}:{status:SchoolHubStatus}) {
+export function ModuleStatus({status}:{status:SchoolHubStatus}) {
   const color=status.state==="Complete"?"text-success":status.state==="Attention Needed"||status.state==="Blocked"?"text-warning":"text-muted-foreground";
   return <div className="mb-4 text-xs leading-5"><span className={`inline-block border bg-muted px-2 py-1 font-semibold ${color}`}>{status.state}</span><p className="mt-2">{status.detail}</p><p className="mt-1 font-semibold">Next: {status.nextAction}</p></div>;
 }

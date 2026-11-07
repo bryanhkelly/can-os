@@ -52,6 +52,7 @@ export const routeNavigation = {
   "/readiness": page("/home", admins),
   "/safeguarding": hidden("Restricted reports and assigned-case workspace"),
   "/settings": page("/settings", all),
+  "/settings/school/$module": page("/settings", admins),
   "/site-website": page({site_website_editor:"/site-website",site_admin:"/settings",site_leader:"/site-website"}, ["site_website_editor", "site_admin", "site_leader"]),
   "/student": hidden("Student layout redirect", ["student"]),
   "/support": page("/student/support", ["student"]),

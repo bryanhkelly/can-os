@@ -1,3 +1,4 @@
+import { useSchoolConfigurationNavigation } from "@/components/launch-studio/SchoolConfigurationContext";
 import { LaunchOrientationTask } from "@/components/operations/LaunchOrientationTask";
 import { LaunchOpeningTask } from "@/components/operations/LaunchOpeningTask";
 import { SchoolOwnedCompletion, LaunchEvidenceStatement, InstitutionalEvidenceReview } from "@/components/operations/LaunchRequirementActions";
@@ -46,6 +47,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   selectedProgramId?: string;
   selectedSiteId?: string;
 }) {
+  const navigation=useSchoolConfigurationNavigation();
   const router = useRouter();
   const [openingSaving, setOpeningSaving] = useState(false);
   const [activationNeedsRefresh, setActivationNeedsRefresh] = useState(false);
@@ -289,7 +291,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {canReviewSelectedLaunch && task.id !== next?.id && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
             {task.id !== next?.id && (task.evidenceReviewCorrectionPending || (task.state === "needs_can" && !task.pendingEvidenceReview && !task.evidenceStatementCount)) && <LaunchEvidenceStatement key={task.id} task={task} busy={busy} submit={submitEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&
-              <Link {...(hubMode?{to:"/launch/hub/school/$module" as const,params:{module:"academics"},search:{siteId:launch.siteId??undefined,programId:launch.id}}:{to:"/launch/school/$programId" as const,params:{programId:launch.id},search:{siteId:launch.siteId??undefined,programId:undefined}})}
+              <Link {...(hubMode?{to:navigation.modulePath,params:{module:"academics"},search:{siteId:launch.siteId??undefined,programId:launch.id}}:{to:"/launch/school/$programId" as const,params:{programId:launch.id},search:{siteId:launch.siteId??undefined,programId:undefined}})}
                 className="text-xs font-semibold underline">Review orientation setup</Link>}
           </div>
         </li>)}
