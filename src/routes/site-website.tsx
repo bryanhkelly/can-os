@@ -1,5 +1,7 @@
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
+import { SchoolBrandPreview } from "@/components/launch-studio/SchoolBrandPreview";
+import { schoolBrandDesigns } from "@/domain/school-brand-identity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -99,14 +101,14 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
 
   const data = outcome.data;
   const steps = [
-    {id:"welcome",title:"Before you begin"}, {id:"template",title:"Choose template"},
-    {id:"identity",title:"Colors & typography"}, {id:"photos",title:"Photos & artwork"},
-    {id:"content",title:"School content"}, {id:"preview",title:"Preview & review"},
+    {id:"welcome",title:"Welcome"}, {id:"template",title:"Choose your design"},
+    {id:"identity",title:"Your school brand"}, {id:"photos",title:"School photography"},
+    {id:"content",title:"School story"}, {id:"preview",title:"Review & publish"},
   ];
-  if (studio) return <LaunchStudioShell role="Website design" subject={data.siteName}
-    title={data.host ? ["Bring your school online.","Find the right first impression.","Make it your own.",
-      "Bring your school to life.","Your content comes with you.","See what families will see."][step] : "Prepare your private website address."}
-    description={data.host ? "One Site, one school website. Academic, admissions and school-opening approvals remain separate." :
+  if (studio) return <LaunchStudioShell role="Website & Brand Studio" subject={data.siteName}
+    title={data.host ? ["Create a recognizable school identity.","Choose your school design.","Make the brand your own.",
+      "Bring your school to life.","Tell your school story.","Review your brand and website."][step] : "Prepare your private website address."}
+    description={data.host ? "One school brand, one hosted website. Draft branding does not authorize school opening, academic claims or admissions." :
       "Create a private address before choosing a design. Nothing is published yet."}
     steps={data.host ? steps : [{id:"address",title:"Prepare private address",disabled:true}]}
     currentId={data.host ? websiteStudioStepIds[step]??"welcome" : "address"}
@@ -124,15 +126,15 @@ export function WebsiteHome({ outcome, selection, studio = false, onStepChange }
       : <WebsiteAddressPreparation siteId={data.siteId} canPrepare={data.canPrepareWebsite}/> }
   </LaunchStudioShell>;
   return <WorkspaceShell
-    eyebrow="Church partner website"
-    title={data.siteName + " · church website"}
-    subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"} actions={returnToLaunch}>
+    eyebrow="Website & Brand Studio"
+    title={data.siteName + " · website & brand"}
+    subtitle={data.organizationName + " · one local identity for your hosted website and reusable school materials"} actions={returnToLaunch}>
     <GuidedSetupShell
-      title="Make your school website feel local"
-      description="Start with a welcome, add your school's story and visual identity, then review the preview. Save a private draft or publish when you are ready."
+      title="Build your school website and brand together"
+      description="Choose one of seven designs, personalize its identity, add the school's story and approved photos, then save a draft or publish when authorized."
       steps={data.host ? steps.map((item,index)=>({
         id:item.id,title:item.title,description:index===0?"Bring current sources":index===1?"Choose a design":
-          index===2?"Personalize the look":index===3?"Approved school copy":"Private preview and publication",
+          index===2?"Customize and preview your school brand":index===3?"School content and media":"Review before publishing",
         status:step===index?"current":step>index?"complete":"upcoming",
       })) : [
         { id: "address", title: "Site address", description: "Prepare a private website address", status: "current" },
@@ -568,9 +570,9 @@ function LocalWebsiteCopyEditor({
         <div className="border bg-card p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Before you begin</p>
           <h3 className="mt-2 font-serif text-3xl">Your school's website, made personal.</h3>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">This guided design journey helps you choose a layout, colors, fonts and school imagery, then review the approved information CAN OS already has. Plan for approximately 15–25 minutes for initial design; this is an estimate, not a measured requirement.</p>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">Choose one of seven distinct designs, customize the school wordmark, colors and fonts, then build a website using approved information CAN OS already has.</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Have ready:</strong> an existing public church or school website, social links if applicable, a logo, a rights-cleared photo folder and a short school welcome. All source links and imagery are optional.</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Your outcome:</strong> a private, revisable website design draft. Publishing and hosting require separate authorization.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground"><strong>Your outcome:</strong> a private, revisable school brand and website draft, with a downloadable wordmark. Publishing and hosting require separate authorization.</p>
         </div>
         {data.siteInformation && (data.siteInformation.contexts.length > 0 || data.siteInformation.hostChurchName || data.siteInformation.currentWebsiteUrl) && <section className="border bg-card p-5">
           <h3 className="font-semibold">Saved Site Information</h3>
@@ -594,7 +596,7 @@ function LocalWebsiteCopyEditor({
           paletteId={content.branding.paletteId} typographyId={content.branding.typographyId}
           headingFontId={content.branding.headingFontId} bodyFontId={content.branding.bodyFontId}
           disabled={busy || !data.canPublish}/>
-        <p className="text-xs text-muted-foreground">Changing a template preserves school data, approved content and your other design choices. Select Preview current changes on the final step to see the actual rendered layout.</p>
+        <p className="text-xs text-muted-foreground">Your design and brand are saved together. Switching designs keeps school copy, photos, colors and fonts until you explicitly apply that design's recommended branding.</p>
       </div>}
 
       {step === 4 && <div className="space-y-5">
@@ -621,15 +623,27 @@ function LocalWebsiteCopyEditor({
       </div>}
       {step === 2 && <div className="space-y-5">
       <div>
-        <h3 className="text-lg font-semibold">Choose a visual identity</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Select a ready-made theme. Artwork is optional and requires rights and privacy confirmation.</p>
+        <h3 className="text-lg font-semibold">Make your school brand your own</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Your school name and selected design produce a unique wordmark. Customize the safe palette and fonts below; see the result live before saving.</p>
       </div>
       <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
         <legend className="px-2 text-sm font-semibold">Local branding and approved artwork</legend>
         <p className="text-xs leading-5 text-muted-foreground">
-          Your layout comes from the selected template; color scheme and typography are separate.
-          Existing legacy theme values are preserved for compatibility rather than shown as a second conflicting template selector.
+          Your chosen website design provides the visual structure. These colors and fonts become the same versioned school identity used by the site and downloadable wordmark.
         </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+          <div>
+            <p className="font-medium">Recommended brand for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Apply the matching starter palette and typography without changing your school's name, copy or photos.</p>
+          </div>
+          <Button variant="outline" type="button" className="min-h-11 border" onClick={() => setContent(old => {
+            const design = schoolBrandDesigns[old.branding.templateId ?? "heritage"];
+            return { ...old, branding: { ...old.branding,
+              paletteId: design.recommendedPalette, typographyId: design.recommendedTypography,
+              headingFontId: undefined, bodyFontId: undefined,
+            } };
+          })}>Apply recommended brand</Button>
+        </div>
         <div className="rounded-xl border p-4">
           <p className="font-medium">Choose your school's visual identity</p>
           <p className="mt-1 text-xs text-muted-foreground">CAN Signature gives you a complete editorial design.
@@ -676,7 +690,9 @@ function LocalWebsiteCopyEditor({
             and safe system fonts. Church website colors and fonts, when discovered, are suggestions only;
             no logo, third-party font, photograph or CSS is copied automatically.</p>
         </div>
-      </fieldset></div>}
+      </fieldset>
+      <SchoolBrandPreview schoolName={data.siteName} branding={content.branding}/>
+      </div>}
       {step === 3 && <div className="space-y-5">
       <h3 className="font-serif text-2xl">Photos &amp; artwork</h3>
       <p className="text-sm">Gallery images are fictional template samples. They are not photos of your school and are never added to your school media library.</p>
