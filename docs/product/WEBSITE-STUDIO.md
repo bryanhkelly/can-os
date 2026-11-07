@@ -13,7 +13,7 @@ The Studio must be resumable. A private saved draft, an authorized published Sit
 ## Six-step authoring experience
 
 1. **Welcome and sources.** Explain the generated website, draft/review outcomes and optional existing church/school website or social links. A third-party URL is reference information, not automatically approved content.
-2. **Template.** Select one of the five separate structural website systems. This is not a set of palette-only variations.
+2. **Template.** Select one of the seven separate structural website systems. This is not a set of palette-only variations.
 3. **Visual identity.** Choose controlled color palettes, heading/body font options and Site identity without accepting arbitrary CSS or remote untrusted style input.
 4. **School photographs.** Provide approved school-owned media in a folder-first flow; preview placements and withhold media without adequate rights/subject release. See [School Website Media](WEBSITE-MEDIA.md).
 5. **School story.** Edit verified, local welcome, vision, mission, community and leadership content. Protect official academic, legal, tuition, admissions and institutional claims from unreviewed edits.
@@ -21,21 +21,43 @@ The Studio must be resumable. A private saved draft, an authorized published Sit
 
 A Site with no available address may require a **single explicit preparation step** before editing, not an unrelated interstitial or a six-step dead end. Existing Site reentry should return to usable template/design work. User Back and exit controls must preserve the selected Site and unsaved changes; invalid Site IDs must not quietly select another school.
 
-## Five website identities
+## Seven hosted-school website identities
 
-The current source catalog `src/domain/public-site-templates.ts` defines:
+The Website Builder controls the **public school website only**, not the internal
+CAN OS dashboard, the Launch Hub or school operating surfaces. The seven supplied
+static design studies inform the visual architecture; public facts still come from
+the existing reviewed Site/Program projection and canonical publisher.
 
-| Template ID | Name in source | Intent |
+| Saved template ID | Design | Defining public experience |
 | --- | --- | --- |
-| `heritage` | Heritage Academy | Timeless academic editorial |
-| `community` | Community & Faith | Warm people/community story |
-| `modern` | Modern Academy | Bold, contemporary and information-first |
-| `bright-futures` | Bright Futures | Bright, welcoming family orientation |
-| `summit` | Summit Preparatory | Immersive aspirational storytelling |
+| `heritage` | Heritage Academy | Academic journal with masthead, folio and split cover |
+| `community` | Community & Faith | Neighborhood poster, human-centered story, photo notes |
+| `modern` | Modern Learning | Dark digital workspace with persistent sidebar and bento |
+| `bright-futures` | Bright Futures | Oversized expressive type, round portrait, playful cards |
+| `summit` | Summit Preparatory | Cinematic cover, expedition spine and narrative chapters |
+| `classic` | Heritage Classical | Collegiate crest, formal academic layout, three pillars |
+| `campus` | Campus Life | Editorial school journal with photographic story mosaic |
 
-These five layouts use ordered content sections and template-scoped static styling, not separate publisher databases. **Naming reconciliation:** earlier product briefs used *Modern Learning*; current code calls the template *Modern Academy*. The desired public label needs an explicit product decision before changing it. Do not create duplicate template IDs to paper over the discrepancy.
+The existing IDs remain stable; the public Modern label follows the design
+source's *Modern Learning* naming. `bright-futures` retains its persisted ID
+despite the archive's shorter `bright` folder name. `src/domain/site-theme.ts`
+is the finite template allowlist. The seven structures, styles and shells are
+implemented in `src/domain/public-site-templates.ts` and rendered by the
+canonical `src/domain/public-site-html.ts`.
 
-`src/domain/site-theme.ts` defines finite template, palette, typography and font choices. The editor must use the allowlisted catalog and keep chosen structural layout independent of the palette and typography. The website design system is distinct from CAN OS's internal workspace theme. See [Design Authority](../design/README.md).
+All seven use the same ten authorized public page paths: Home, About, Academics,
+Learning Model (`/school-day`), Student Life, Families, Admissions, Tuition &
+Aid (`/tuition`), FAQ and Contact. A route appears in the live navigation only
+when the school has the corresponding eligible public facts. The private gallery
+uses explicitly fictional samples to demonstrate all ten pages and both desktop
+and phone layouts. The sample media is not published as real school photography.
+The Site Admin's saved template, local content, selected fonts and palette
+persist independently.
+
+The seven HTML prototypes and brand-kit imagery provided as reference material
+are not themselves authenticated applications or verified school media. Do not
+ship their demo-only contact forms or unreviewed academic claims. The approved
+CAN OS forms and publishing gates remain authoritative.
 
 ## Canonical data, security and publishing
 
@@ -49,7 +71,7 @@ These five layouts use ordered content sections and template-scoped static styli
 ## Current implementation pointers
 
 - Studio route: `src/routes/launch.website.tsx` delegates to the same Website Home as `src/routes/site-website.tsx`.
-- Layout catalog: `src/domain/public-site-templates.ts` supplies five finite structures.
+- Layout catalog: `src/domain/public-site-templates.ts` supplies seven finite structures.
 - Theme constraints: `src/domain/site-theme.ts`.
 - Local revisions and policy: `src/domain/site-local-content.ts`, `src/modules/sites/site-local-content.server.ts`.
 - Public renderer and publication workflow: `src/domain/public-site-html.ts`, `src/modules/sites/site-publication.server.ts`.
@@ -60,7 +82,7 @@ These paths are implementation pointers, **not** proof that all six steps, templ
 
 ## Required acceptance
 
-Test creating a Site stub; opening the Studio directly from Hub and Settings; all five templates with genuinely distinct composition; palette and typography persistence; draft save/reload/unsaved changes/Back; wrong-Site and unauthorized publishing denials; review-required claims; media rights and revocation; publish versus preview; exact Site and Program separation; mobile/desktop layout; and independent HTTPS reachability. Use an isolated database, record the exact commit and scope of observed results, and mark everything else unverified.
+Test creating a Site stub; opening the Studio directly from Hub and Settings; all seven templates with genuinely distinct composition; palette and typography persistence; draft save/reload/unsaved changes/Back; wrong-Site and unauthorized publishing denials; review-required claims; media rights and revocation; publish versus preview; exact Site and Program separation; mobile/desktop layout; and independent HTTPS reachability. Use an isolated database, record the exact commit and scope of observed results, and mark everything else unverified.
 
 ## Operational and historical references
 
