@@ -10,7 +10,9 @@ export function resolveSiteTemplateId(value: unknown): SiteTemplateId {
     ? value as SiteTemplateId : "heritage";
 }
 
-export const sitePaletteIds = ["signature","heritage","forest","copper","coastal","harbor"] as const;
+export const sitePaletteIds = ["signature","heritage","forest","copper","coastal","harbor",
+  "brand-heritage","brand-community","brand-modern","brand-bright-futures",
+  "brand-summit","brand-classic","brand-campus"] as const;
 export type SitePaletteId = typeof sitePaletteIds[number];
 export const siteTypographyIds = ["editorial","traditional","contemporary"] as const;
 export type SiteTypographyId = typeof siteTypographyIds[number];
@@ -53,6 +55,15 @@ const palettes = {
   coastal: { ink:"#174153", canvas:"#f5f9f8", accent:"#956e3e", secondary:"#427a78", muted:"#54686d" },
   // Harborlight reference: burgundy, muted rose and ivory, shared across all Sites.
   harbor: { ink:"#561c31", canvas:"#fbf6f2", accent:"#c98883", secondary:"#793a4c", muted:"#654e58" },
+  // Audited, contrast-checked equivalents of the seven supplied ZIP brand kits.
+  // All remain finite tokens; untrusted CSS/remote fonts are still forbidden.
+  "brand-heritage": { ink:"#0c2038", canvas:"#f1ede4", accent:"#dcb568", secondary:"#253e56", muted:"#536374" },
+  "brand-community": { ink:"#173c2e", canvas:"#f7f3e7", accent:"#eabf4c", secondary:"#214c3b", muted:"#4d6a5c" },
+  "brand-modern": { ink:"#080e20", canvas:"#ebf1ff", accent:"#65e8f3", secondary:"#132b48", muted:"#51617c" },
+  "brand-bright-futures": { ink:"#16326b", canvas:"#fff9e8", accent:"#f4772f", secondary:"#3856a0", muted:"#4a5f8c" },
+  "brand-summit": { ink:"#05131e", canvas:"#f7f1e8", accent:"#e9c57a", secondary:"#122d43", muted:"#536a79" },
+  "brand-classic": { ink:"#0c213c", canvas:"#f6f2e9", accent:"#c39c56", secondary:"#253d55", muted:"#56637a" },
+  "brand-campus": { ink:"#181f24", canvas:"#f7f4ea", accent:"#e6bc72", secondary:"#334b51", muted:"#566873" },
 } as const;
 const fonts = {
   editorial: { display:"Georgia, Cambria, 'Times New Roman', serif", body:"Arial, Helvetica, sans-serif" },
