@@ -96,3 +96,11 @@ This is a targeted structural audit, **not** a complete repository-wide referenc
 ## Phase 12: historical product and integration evidence (2026-11-07)
 
 Retired seven additional records using one Git tree operation with original blob SHAs unchanged. These include historical GF track identifiers, prototype-production mapping, FullFlow code audit, agent integration requests, church-source status and a dated Valor snapshot. Updated live source-document references in the Launch Studio and Valor acceptance documents. See [archive index](archive/2026-11-fullflow/README.md). Active security, Neon, route contracts, design authority and admission-publishing backlogs remain in place.
+
+## Phase 13: reproducible documentation reference gate (2026-11-07)
+
+Added `scripts/check-documentation-links.mjs`, `npm run docs:check`, and a required CI step prior to dependency installation. The validator uses Git-tracked paths, checks active Markdown inline/reference/HTML local links plus explicit `.md`/`.json` documentation references in source, scripts, tests and CI; archived historical bodies remain outside the gate, but the archive index is included.
+
+Executed CI on commit `de28b9653b392b1bb920be3fb3353be1d03211a6`: **70 Markdown files, 109 Markdown targets, 1,926 source/CI files, 11 explicit source references, zero missing paths.** The documentation step succeeded again on Phase 12 commit `94d9545d40c0e1a9b5e3055279a5b36d38bebd32`. These counts are not claims that anchors, remote links, dynamic references, or document semantics were tested.
+
+The earlier general CI run at `de28b965` separately failed in TypeScript typecheck due to a Node.js heap-out-of-memory error. Documentation validation passed; full CI success must not be inferred. The disposable Neon admissions workflow on Phase 12 commit failed its isolated-test-database-secret precondition. This is also separate from documentation path validation.
