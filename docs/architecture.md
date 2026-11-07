@@ -1,6 +1,6 @@
 # CAN OS Production Architecture
 
-For current implementation and verification status, see [CURRENT-STATE.md](./CURRENT-STATE.md). This document defines architecture, not a claim that each capability is deployed or accepted.
+For current implementation and verification status, see [archived CURRENT-STATE.md](./archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md). This document defines architecture, not a claim that each capability is deployed or accepted.
 
 ## Purpose
 
