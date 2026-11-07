@@ -54,3 +54,9 @@ The three retired plan originals were removed after archived blob SHA verificati
 3. Archive by coherent batch with atomic reference updates.
 4. Promote validated current product and engineering specifications.
 5. Run repository link, route-contract, test, and build checks and record results.
+
+## 2026-11-07 migration update
+
+The original `docs/CURRENT-STATE.md` and `docs/full-flow-progress.md` have been retired; historical versions are preserved under `docs/archive/2026-11-fullflow/retired-plans/`. The FullFlow progress archive was made before a final reference-only edit to the original.
+
+Exact snapshots of `docs/architecture.md`, `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/platform-integration-map.md` are now in `docs/archive/2026-11-fullflow/legacy-specifications/`. **Their original paths remain active pending complete inbound-link review**. Copilot's instructions now point to the canonical replacements.
