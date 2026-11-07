@@ -46,7 +46,7 @@ describe("Website Studio seven-template contract", () => {
 
   it("uses seven different public shells without losing live links or school identity", () => {
     const shells=siteTemplateIds.map(template=>composePublicSiteChrome(template,{
-      brand:"SCHOOL",navigation:'<a href="/about">About</a>',
+      brand:"SCHOOL-BRAND-ONLY",navigation:'<a href="/about">About</a>',
       cta:'<a class="site-nav-cta" href="/contact">Contact</a>',
       mobile:'<details class="mobile-menu"><summary>Menu</summary></details>',
       main:'<main id="main-content">PAGE</main>',
@@ -60,7 +60,7 @@ describe("Website Studio seven-template contract", () => {
       expect(shell).toContain('href="/about"');
       expect(shell).toContain('href="/contact"');
       expect(shell).toContain('class="mobile-menu"');
-      expect(shell.split('SCHOOL').length-1).toBe(1);
+      expect(shell.split('SCHOOL-BRAND-ONLY').length-1).toBe(1);
     }
     const heroes=siteTemplateIds.map(template=>composePublicSiteHero(template,{
       kicker:"EYEBROW",title:"HEADLINE",subtitle:"SUBTITLE",
