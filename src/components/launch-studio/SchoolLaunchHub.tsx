@@ -30,7 +30,7 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow }:
           <Icon aria-hidden="true" className="size-9 border border-primary/20 bg-accent p-2 text-primary" />
           <h3 className="mt-4 text-base font-semibold">{item.title}</h3><p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
           {statuses?.[key] && <ModuleStatus status={statuses[key]!}/> }
-          {statuses?.[key]?.state==="Planned"
+          {["promote","recruitment","events"].includes(key) || statuses?.[key]?.state==="Planned"
             ? <span className="mt-auto text-sm font-semibold text-muted-foreground">Not available yet</span>
             : key==="website" && (statuses?.website?.state==="Blocked" || statuses?.website?.state==="Unavailable")
             ? <span className="mt-auto text-sm font-semibold text-muted-foreground">Website access or status needs review</span>
