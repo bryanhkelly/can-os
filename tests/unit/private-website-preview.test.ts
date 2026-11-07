@@ -42,6 +42,10 @@ describe("authenticated school full-page preview", () => {
     const fullPage = renderPrivateWebsitePreviewHtml(html,siteId,paths);
     expect(fullPage).toContain("Private school website preview");
     expect(fullPage).toContain("Saved design · not published · sign-in required");
+    const firstVisit = renderPrivateWebsitePreviewHtml(html, siteId, paths, false);
+    expect(firstVisit).toContain("Unsaved school starter · illustrative only");
+    expect(firstVisit).not.toContain("Saved design · not published");
+    expect(firstVisit).toContain(`href="${privateWebsitePreviewUrl(siteId,"/about")}"`);
     expect(fullPage).toContain(privateWebsitePreviewUrl(siteId,"/about").replaceAll("&","&amp;").split("&amp;")[0]);
     expect(fullPage).toContain(`href="${privateWebsitePreviewUrl(siteId,"/about")}"`);
     expect(fullPage).toContain('href="#main-content"');
