@@ -13,6 +13,6 @@ export const schoolSettingsModules={
 export type SchoolSettingsModule=keyof typeof schoolSettingsModules;
 export function schoolConfigurationNavigation(context:SchoolConfigurationContext){
  return context==="settings"
-  ? {context,homePath:"/settings" as const,modulePath:"/settings/school/$module" as const,homeLabel:"School Settings",websitePath:"/site-website" as const}
+  ? {context,homePath:"/settings" as const,modulePath:"/settings/school/$module" as const,homeLabel:"School Settings",websitePath:"/launch/website" as const}
   : {context,homePath:"/launch/hub/school" as const,modulePath:"/launch/hub/school/$module" as const,homeLabel:"Launch Hub",websitePath:"/launch/website" as const};
 }

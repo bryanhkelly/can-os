@@ -30,7 +30,11 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow }:
           <Icon aria-hidden="true" className="size-9 border border-primary/20 bg-accent p-2 text-primary" />
           <h3 className="mt-4 text-base font-semibold">{item.title}</h3><p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
           {statuses?.[key] && <ModuleStatus status={statuses[key]!}/> }
-          {key === "website"
+          {statuses?.[key]?.state==="Planned"
+            ? <span className="mt-auto text-sm font-semibold text-muted-foreground">Not available yet</span>
+            : key==="website" && (statuses?.website?.state==="Blocked" || statuses?.website?.state==="Unavailable")
+            ? <span className="mt-auto text-sm font-semibold text-muted-foreground">Website access or status needs review</span>
+            : key === "website"
             ? <Link to="/launch/website" search={{siteId:site.id,returnToHub:true}} className="mt-auto inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open Website Studio <ArrowRight className="size-4" /></Link>
             : <Link to="/launch/hub/school/$module" params={{module:key}} search={search} className="mt-auto inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open module <ArrowRight className="size-4" /></Link>}
         </article>;})}</div></section>)}</div>
@@ -45,10 +49,10 @@ export function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;sit
   const actionClass="mt-6 inline-flex min-h-11 items-center gap-2 bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground";
   const resources = module === "promote" ? ["School logo and approved photography", "Social graphics and suggested captions", "Printable flyers and QR codes", "School introduction and published website link"] : module === "recruitment" ? ["Share your school vision", "Collect prospective-family interest", "Plan follow-up with interested families"] : module === "events" ? ["Information sessions", "Open houses and campus tours", "Family registration and follow-up"] : [];
   return <div className="mt-7 grid gap-5 lg:grid-cols-[2fr_1fr]"><section className="border bg-card p-6 sm:p-8">
-    <h2 className="font-serif text-3xl">{module === "promote" ? "Give your school a voice." : "Your next step"}</h2>
+    <h2 className="font-serif text-3xl">{module === "promote" ? "Give your school a voice." : resources.length ? "Planned school tools" : "Your next step"}</h2>
     {resources.length ? <><p className="mt-3 text-sm leading-6 text-muted-foreground">{module === "promote" ? "A dedicated place for promotional materials using your school's saved branding and information." : "This module landing page is ready. Site-level tools are planned; no action here sends invitations or creates registrations."}</p>
       <ul className="mt-5 divide-y border-y">{resources.map(resource=><li key={resource} className="py-4 text-sm">{resource}</li>)}</ul>
-      <p role="status" className="mt-5 border bg-muted p-4 text-sm">{module === "promote" ? "Media-kit downloads and asset creation are not available yet." : "Site-level tools coming soon."}</p></> : <>
+      <p role="status" className="mt-5 border bg-muted p-4 text-sm">{module === "promote" ? "Media-kit downloads and asset creation are not available yet." : "These tools are not available yet. Return to the Launch Hub to continue another module."}</p></> : <>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.description} Continue in the existing authorized workspace; saved records remain attached to this school.</p>
       {module === "team" ? <Link to="/admin" search={{siteId,inviteRole:"registrar"}} className={actionClass}>Invite team member <ArrowRight className="size-4" /></Link> : "step" in item ? <Link to="/launch/school" search={{siteId,step:item.step}} className={actionClass}>{item.action}<ArrowRight className="size-4" /></Link> : null}
     </>}
@@ -57,5 +61,5 @@ export function SchoolModuleHome({ module, siteId }: {module:SchoolHubModule;sit
 
 export function ModuleStatus({status}:{status:SchoolHubStatus}) {
   const color=status.state==="Complete"?"text-success":status.state==="Attention Needed"||status.state==="Blocked"?"text-warning":"text-muted-foreground";
-  return <div className="mb-4 text-xs leading-5"><span className={`inline-block border bg-muted px-2 py-1 font-semibold ${color}`}>{status.state}</span><p className="mt-2">{status.detail}</p><p className="mt-1 font-semibold">Next: {status.nextAction}</p></div>;
+  return <div className="mb-4 text-xs leading-5"><span className={`inline-block border bg-muted px-2 py-1 font-semibold ${color}`}>{status.state}</span><p className="mt-2">{status.detail}</p>{status.state!=="Planned"&&<p className="mt-1 font-semibold">Next: {status.nextAction}</p>}</div>;
 }
