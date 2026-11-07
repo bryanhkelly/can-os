@@ -59,7 +59,7 @@ try{
               formCount:document.querySelectorAll("form").length,
               skipLink:!!document.querySelector('.skip-link[href="#main-content"]'),
               headingCount:document.querySelectorAll("h1").length,
-              invalidLinks:links.filter(href=>!available.includes(href)),
+              invalidLinks:links.filter(href=>!available.includes(href.split(/[?#]/)[0])),
               mobileMenuVisible:getComputedStyle(document.querySelector(".mobile-menu")).display!=="none",
               pageTitle:document.title,
             };
