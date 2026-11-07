@@ -21,6 +21,38 @@ The Studio must be resumable. A private saved draft, an authorized published Sit
 
 A Site with no available address may require a **single explicit preparation step** before editing, not an unrelated interstitial or a six-step dead end. Existing Site reentry should return to usable template/design work. User Back and exit controls must preserve the selected Site and unsaved changes; invalid Site IDs must not quietly select another school.
 
+## Saved draft and authenticated full-page preview
+
+Website drafts are immutable revisions in `site_local_content_versions` with
+status `draft`, not public Site publications. Migration
+`drizzle/0077_website_private_drafts.sql` extends the historical status
+constraint to permit `draft`; it must be applied to the intended database
+through a verified migration procedure before saving can succeed. Deployment
+of application code alone cannot repair an unmigrated database.
+
+The Studio distinguishes three rendered states:
+- **Preview unsaved changes:** an editor-only, non-persisting scoped preview of
+  the current in-memory form, never a claimed saved revision.
+- **Latest saved private design:** the latest Site version (including a draft),
+  available in the editor and through `GET /website-preview?siteId=...&page=...`.
+- **Published hosted Site:** only locally published copy and independently
+  approved claims; it does not automatically inherit private draft edits.
+
+The full-page preview uses the exact same email/code session and active Site
+grant as CAN OS. The server checks the Site ID, current membership, exact
+Site editor/admin role, capability and relationship, re-reading the saved
+revision per request. Unauthenticated sessions return to the existing sign-in
+flow; wrong-Site and unauthorized access fail closed. Sharing a preview link
+does **not** create an invitation or grant access; separately invited reviewers
+need their own authorized Site editor account. There are no anonymous access
+tokens, application forms, indexed pages or publication side effects.
+Internal navigation stays inside the authenticated Site-specific preview, and
+headers require private/no-store and noindex. Saved previews remain
+unavailable until the first draft has actually committed.
+
+Do not treat the repository migration as evidence of a live Neon migration,
+or a successful unit test as a browser acceptance run on Cloudflare.
+
 ## Shared Site-owned brand
 
 The Website & Brand Studio uses the existing Site versioned local branding
