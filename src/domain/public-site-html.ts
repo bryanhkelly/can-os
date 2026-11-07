@@ -1,5 +1,6 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
+import { schoolBrandMonogram } from "./school-brand-identity";
 import { templateSampleImage } from "./template-sample-images";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -733,6 +734,7 @@ ${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 ${composePublicSiteChrome(templateId, {
   brand: school,
+  monogram: escapePublicHtml(schoolBrandMonogram(page.site.name)),
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
