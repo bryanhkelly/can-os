@@ -1,5 +1,7 @@
 # CAN OS — site safeguarding, welfare and urgent child-protection concerns
 
+> **Documentation reset, November 7, 2026:** Direct outside-reporting obligations, restricted case/privacy rules and first-observer rights remain active. Dated FullFlow implementation descriptions below are not current acceptance evidence. See [Church-Hosted Safety Gates](./quality/CHURCH-HOSTED-SAFETY-GATES.md).
+
 **Status:** Required product + operational safety contract, with an unaccepted restricted reporting vertical slice now in source. Database migration, jurisdiction-specific legal review, isolated integration tests and browser acceptance remain pending. **Do not deploy the generic incident API or this slice as a certified compliant child-protection service.**
 **Priority:** P0 safety architecture and jurisdictional reporting policy **before onboarding onsite minors**; P1 implementation alongside hybrid-site staff roles and multidisciplinary support.  
 **Accountability:** CAN is the school of record in the intended model; local church or partner personnel may be the first adult to observe a concern. Formal institutional reporting and local contractual responsibility must be specified by state and partner, **without transferring or delaying any individual's legal reporting duties**.  
