@@ -26,7 +26,7 @@
 
 ## Initial review findings
 
-- `docs/CURRENT-STATE.md` mixes dated implementation and migration evidence with current status.
+- `docs/archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md` mixes dated implementation and migration evidence with current status.
 - `docs/architecture.md` and `docs/domain-model.md` include detailed implementation notes alongside canonical definitions.
 - `docs/golden-flows.md` mixes flow requirements with acceptance evidence.
 - `docs/school-launch-studio-site-workspace.md` needs reconciliation with the latest Launch Hub and Website Studio decisions.
