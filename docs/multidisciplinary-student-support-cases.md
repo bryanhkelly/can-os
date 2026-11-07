@@ -1,5 +1,7 @@
 # CAN OS — unified multidisciplinary student support cases
 
+> **Documentation reset, November 7, 2026:** This student-support contract remains active. Dated FullFlow implementation comments are not current completion evidence. For urgent safeguarding and restricted child-protection controls, see [Church-Hosted Safety Gates](./quality/CHURCH-HOSTED-SAFETY-GATES.md).
+
 **Status:** Required product scope for the user-approved Teacher Intervention → Student Success workstreams. **Design and integration backlog; not yet fully implemented.**  
 **Branch:** `FullFlow`, draft PR #172. Do not merge to main or migrate production without authorization.
 
