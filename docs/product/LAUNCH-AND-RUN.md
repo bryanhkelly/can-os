@@ -18,7 +18,7 @@ The existing module catalog in `src/domain/school-launch-hub.ts` contains **nine
 | --- | --- | --- |
 | Establish Your School | School Profile | Operational route |
 | Establish Your School | Site Information | Operational route |
-| Establish Your School | Build Website | Operational route; links to canonical Website Studio |
+| Establish Your School | Website & Brand | Operational route; links directly to the unified Website & Brand Studio |
 | Build Your School Community | Invite Your Team | Operational route |
 | Build Your School Community | Promote Your School | Explicitly planned landing |
 | Build Your School Community | Recruit Families | Explicitly planned landing |
@@ -34,11 +34,11 @@ The existing **Site Information** card describes the school setting and existing
 
 The current nine-card source catalog does **not** contain a separate Church Information card. Treat its creation as a product-to-code gap, not as implemented functionality. Reuse canonical Organization/Site relationships and reviewed publication rules rather than inventing shadow identities or a church-only workflow engine.
 
-See [Website Studio](WEBSITE-STUDIO.md) for the six-step website design, preview and publication contract.
+See [Website & Brand Studio](WEBSITE-STUDIO.md) for the six-step school identity, website design, preview and publication contract.
 
-## Website Studio and navigation
+## Website & Brand Studio and navigation
 
-The website card must enter Website Studio **directly** for the exact selected Site. Return links and browser Back must preserve Site scope without throwing, cycling through interstitials, or silently selecting another school. Invalid, missing, and unauthorized identifiers require explicit recovery. The Site Admin is the local authority for Site-owned website content; protected institutional claims retain their independent review path.
+The Website & Brand card must enter the unified Studio **directly** for the exact selected Site. Return links and browser Back must preserve Site scope without throwing, cycling through interstitials, or silently selecting another school. Invalid, missing, and unauthorized identifiers require explicit recovery. The Site Admin is the local authority for Site-owned website content; protected institutional claims retain their independent review path.
 
 Website publication, external URL reachability, academic Program publication, admissions eligibility, and legal/safeguarding permission to open are separate facts. No single green card claims the others.
 
@@ -61,7 +61,7 @@ All reads and writes must verify active account, Person, role, relationship, Org
 
 1. Create an authorized minimal Site stub, refresh, and verify idempotent reentry without implicit Program creation.
 2. Open all nine Hub cards and verify distinct owned destinations. Planned cards describe limitations instead of behaving as operational tools.
-3. Open Website Studio, save a draft, return to the Hub, and use Back; Site context and unsaved-change handling remain correct.
+3. Open Website & Brand Studio, save a draft, return to the Hub, and use Back; Site context and unsaved-change handling remain correct.
 4. Test unauthorized, unknown, and invalid Site/Program IDs, including multi-Site users. No automatic alternative Site selection.
 5. Confirm Site Admin publishing authority, staff delegations, denied actions and cross-tenant isolation.
 6. Force partial read failures; verify explicit Unavailable status rather than false completion.
