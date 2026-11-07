@@ -7,7 +7,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
+import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
 import { siteInformationSchema } from "@/domain/site-setup-configuration";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
@@ -42,7 +42,10 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // Editor and full-page private previews use the latest saved immutable draft,
   // never the last published revision by accident. Unapproved child artwork
   // remains editable but cannot escape into preview HTML.
-  const candidate = proposedContent ?? editingContent ?? local?.content ?? null;
+  // A new Site can explore a complete read-only design even before its first
+  // saved draft. The starter is never persisted or published by this GET.
+  const candidate = proposedContent ?? editingContent ?? local?.content
+    ?? createSchoolWebsiteStarterContent(site.name);
   const previewContent = candidate && siteLocalImagePublicationGaps(candidate.branding.heroImage).length
     ? { ...candidate, branding: { ...candidate.branding, heroImage: null } }
     : candidate;
