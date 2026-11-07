@@ -26,7 +26,7 @@ import { schoolLaunchSteps, launchRequirementProgress } from "@/domain/launch-st
 import type { LaunchDraftRecord } from "@/domain/launch-draft";
 import { useState } from "react";
 import { hasEnteredSiteAddress, physicalSiteAddressSchema } from "@/domain/site-setup-configuration";
-import { addressStateJurisdiction, launchSiteJurisdictionIssue } from "@/domain/site-jurisdiction-default";
+import { addressStateJurisdiction, launchSiteJurisdictionIssue, siteJurisdictionLocation } from "@/domain/site-jurisdiction-default";
 import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
@@ -228,7 +228,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
     if(creditMode==="credit_bearing"&&!creditIssuingOrganizationId){setError("Choose the organization responsible for transcripts in step 1.");return;}
     const selectedSite=options?.sites.find(site=>site.id===siteId);
     const jurisdictionIssue=selectedSite&&options
-      ? launchSiteJurisdictionIssue(selectedSite.address,options.jurisdictions,jurisdictionId):null;
+      ? launchSiteJurisdictionIssue(siteJurisdictionLocation(selectedSite.address,selectedSite.planningLocation),options.jurisdictions,jurisdictionId):null;
     if(jurisdictionIssue){
       setError(jurisdictionIssue.message);return;
     }
