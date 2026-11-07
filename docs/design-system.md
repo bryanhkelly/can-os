@@ -35,7 +35,7 @@ Website Studio owns actual desktop/mobile previews. Scoped ESLint enforcement
 prevents reintroducing local native controls in these migrated surfaces. This
 code-level update is not an authenticated end-to-end or visual release certificate. Draft-save feedback distinguishes
 a private saved form snapshot from submission or approval. See
-[implemented boundaries and verification](./school-launch-studio-site-workspace.md#november-5-2026-implementation-and-verification).
+[current four-audience Launch Studio contract](./product/LAUNCH-STUDIO-AUDIENCES.md).
 
 Role homes reuse the student's refined composition through `DashboardHero` and
 `DashboardHome`. Teacher/family, school operations, Site Today, onsite staff,
