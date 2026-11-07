@@ -5,7 +5,7 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 ## Read in order
 
 1. [CAN vision](vision/CAN-VISION.md): institutional model and product intent.
-2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md), [operating model](product/OPERATING-MODEL.md), [School Launch and Run](product/LAUNCH-AND-RUN.md), [Website Studio](product/WEBSITE-STUDIO.md), and [Website Media](product/WEBSITE-MEDIA.md), and [Public Sites and Admissions](product/PUBLIC-SITES-AND-ADMISSIONS.md): product scope, institutional boundaries, launch journeys, and imagery rights.
+2. [Platform capabilities](product/PLATFORM-CAPABILITIES.md), [operating model](product/OPERATING-MODEL.md), [School Launch and Run](product/LAUNCH-AND-RUN.md), [Website Studio](product/WEBSITE-STUDIO.md), and [Website Media](product/WEBSITE-MEDIA.md), and [Public Sites and Admissions](product/PUBLIC-SITES-AND-ADMISSIONS.md), and [Academic Delivery](product/ACADEMIC-DELIVERY.md): product scope, institutional boundaries, launch journeys, and imagery rights.
 3. [Design authority](design/README.md): approved V6.1 direction, reusable components and adoption requirements.
 4. [System architecture](architecture/SYSTEM.md), [domain model](architecture/DOMAIN-MODEL.md), and [acceptance standards](quality/ACCEPTANCE-STANDARDS.md), and [public-site release gates](quality/PUBLIC-SITE-RELEASE-GATES.md).
 5. [Engineering operations and security](engineering/OPERATIONS-AND-SECURITY.md): retained runbooks and dependencies.
