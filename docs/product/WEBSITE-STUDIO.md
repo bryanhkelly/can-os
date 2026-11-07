@@ -64,7 +64,7 @@ Test creating a Site stub; opening the Studio directly from Hub and Settings; al
 
 ## Operational and historical references
 
-- [Public Site publication contract](../site-public-publishing.md)
+- [Public Sites and Admissions](PUBLIC-SITES-AND-ADMISSIONS.md)
 - [Tenant-hosting release checklist](../public-tenant-hosting-release.md)
 - [School Website Media](WEBSITE-MEDIA.md)
 - [Historical Website Studio implementation handoff](../archive/2026-11-fullflow/delivery-evidence/website-launch-studio-implementation.md) (dated PR status; not current implementation authority)
