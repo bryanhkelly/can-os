@@ -22,7 +22,7 @@ The school of record, academic provider, credit issuer, and local operating site
 ## School lifecycle
 
 1. **Express interest and qualify.** Capture institutional and local partner context; distinguish interest from authorization.
-2. **Establish a school profile.** Create a minimal canonical Site/Program record under authorized institutional topology.
+2. **Establish a school profile.** Create a minimal canonical Site stub under authorized institutional topology. Do not automatically create a Program, publish a website, or assert opening authority.
 3. **Prepare in Launch.** Configure website, team, families, academic offerings, facilities, compliance and readiness as separate capabilities.
 4. **Authorize opening.** Apply institutional, legal, safeguarding, and operational gates independently of card completion.
 5. **Operate in Run.** Support students, families, staff, academics, site day, records and communications.
@@ -35,3 +35,5 @@ Denominational academies may carry approved theological distinctives, governance
 ## Open implementation questions
 
 Verify the current main code for exact Site Admin permissions, website ownership, teacher/presenter selection, Launch Hub capability routes, authorization gates, and church information models. These are explicit reconciliation tasks, not claims of existing completeness.
+
+For detailed Launch and Run behavior, see [School Launch and Run](LAUNCH-AND-RUN.md).
