@@ -32,6 +32,6 @@ function SchoolSettingsModulePage(){
   <Link to="/settings" search={{siteId:site.id}} className="mb-5 inline-flex min-h-11 items-center text-sm font-semibold text-primary">← School Settings</Link>
   <PageHeader eyebrow={`School Settings / ${site.name}`} title={item.title} subtitle={item.description}/>
   {module!=="profile"&&data.statuses?.[module]&&<div className="mt-5"><ModuleStatus status={data.statuses[module]}/></div>}
-  {module==="profile"?<SchoolProfileConfiguration site={site}/>:isPlannedSchoolHubModule(module)?<SchoolModuleHome module={module} siteId={site.id}/>:<SchoolHubWorkflow context="settings" data={data} selection={selection} module={module}/>)}
+  {module==="profile"?<SchoolProfileConfiguration site={site}/>:isPlannedSchoolHubModule(module)?<SchoolModuleHome module={module} siteId={site.id}/>:<SchoolHubWorkflow context="settings" data={data} selection={selection} module={module}/>} 
  </PageFrame></SchoolConfigurationContextProvider>;
 }
