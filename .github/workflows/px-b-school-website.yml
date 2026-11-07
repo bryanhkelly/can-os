@@ -5,6 +5,16 @@ on:
     paths:
       - 'src/domain/public-site-html.ts'
       - 'src/domain/school-brand-identity.ts'
+      - 'src/domain/private-website-preview.ts'
+      - 'src/routes/website-preview.ts'
+      - 'drizzle/0077_website_private_drafts.sql'
+      - 'drizzle/meta/_journal.json'
+      - 'src/domain/errors.ts'
+      - 'src/lib/client-error.ts'
+      - 'src/modules/sites/site-local-content.server.ts'
+      - 'tests/unit/private-website-preview.test.ts'
+      - 'tests/unit/website-private-draft-migration.test.ts'
+      - 'tests/unit/site-local-content-command.test.ts'
       - 'src/components/launch-studio/SchoolBrandPreview.tsx'
       - 'tests/unit/school-brand-identity.test.tsx'
       - 'src/domain/site-theme.ts'
@@ -48,6 +58,9 @@ jobs:
           npx vitest run tests/unit/site-theme.test.ts \
             tests/unit/website-studio-templates.test.tsx \
             tests/unit/school-brand-identity.test.tsx \
+            tests/unit/private-website-preview.test.ts \
+            tests/unit/website-private-draft-migration.test.ts \
+            tests/unit/site-local-content-command.test.ts \
             tests/unit/public-site-host-routing.test.ts \
             tests/unit/public-site-html.test.ts \
             tests/unit/site-local-content.test.ts \
