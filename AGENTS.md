@@ -6,7 +6,7 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 
 1. Current checked-out code, database migrations, and executable tests establish what is implemented. A test is evidence only if its execution and result are recorded.
 2. `docs/vision/CAN-VISION.md` defines current product intent. This `AGENTS.md` defines agent policy. Existing technical and security documents remain provisional engineering guidance until reconciled under `docs/DOCUMENTATION-RESET.md`; verify them against current code.
-3. `docs/CURRENT-STATE.md` is historical accumulated implementation evidence, not an up-to-date release certificate. Check the exact current commit and executed tests.
+3. `docs/archive/2026-11-fullflow/retired-plans/CURRENT-STATE.md` is historical accumulated implementation evidence, not an up-to-date release certificate. Check the exact current commit and executed tests.
 4. Other active documents provide domain-specific detail. If they conflict, investigate and surface the disagreement before implementing.
 5. `docs/archive/` holds historical artifacts **only**. Never take "current", "next", "unmerged", demo flags, or release instructions from archived notes as authority.
 
