@@ -50,7 +50,7 @@ export async function readPublishedSiteCatalog(slug: string) {
     // academic concept or turn it into an admissions offer.
     const activePrograms=await tx.select({id:programs.id,type:programs.type})
       .from(programs).where(and(eq(programs.siteId,site.id),eq(programs.status,"active"))).limit(25);
-    const academicActive=activePrograms.filter(program=>isAcademicMarketingType(program.type));
+    const academicActive=activePrograms.filter(program=>program.type && isAcademicMarketingType(program.type));
     let operatingStatus:"authorized"|"development"|"review_required"=
       academicActive.length?"review_required":"development";
     for(const program of academicActive){
