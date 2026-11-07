@@ -11,7 +11,7 @@ export function SchoolLaunchHub({ options, siteId, module }: { options: SchoolHu
   if (!site) return <PageFrame width="wide"><PageHeader eyebrow="School preparation" title="Choose your school" subtitle="Open the Launch Hub for an authorized school." />
     {siteId ? <p role="alert" className="mt-6 border bg-card p-5">This school is unavailable in your current workspace. Select an authorized school explicitly.</p> : null}
     <div className="mt-6 grid gap-4 sm:grid-cols-2">{options.sites.map(item => <Link key={item.id} to="/launch/hub/school" search={{siteId:item.id}} className="flex min-h-20 items-center justify-between border bg-card p-5 font-semibold">{item.name}<ArrowRight className="size-4 text-primary" /></Link>)}</div>
-    {!options.sites.length && <Link to="/launch/school" search={{step:"school"}} className="mt-6 inline-flex min-h-11 items-center gap-2 text-primary">Create your school profile <ArrowRight className="size-4" /></Link>}
+    {options.canCreateSite && <Link to="/launch/hub/school/new" className="mt-6 inline-flex min-h-11 items-center gap-2 text-primary">Create your school profile <ArrowRight className="size-4" /></Link>}
   </PageFrame>;
   const search = {siteId:site.id};
   const selected = module ? schoolHubModules[module] : null;

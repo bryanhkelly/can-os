@@ -1,3 +1,4 @@
+import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -87,6 +88,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) {
       return { organizations: [], academicProviderOrganizations: [], creditIssuingOrganizations: [], sites: [], jurisdictions: [],
+        canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
         schoolSetupAdministrator: context.role === "site_admin" };
     }
     const [{ db }, s, { and, asc, eq, inArray, or }] = await Promise.all([
@@ -139,7 +141,8 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
       creditIssuingOrganizations: academicProviderOrganizations,
       sites: siteRows.map(({metadata,websiteSlug,websiteStatus,...site}) => ({ ...site, updatedAt:site.updatedAt.toISOString(), address: site.address === null ? null : safeJsonObject(site.address), addressStatus:readSitePhysicalAddress(site.address).status, sitePhysicalAddressRevision:typeof metadata.sitePhysicalAddressRevision==="string"?metadata.sitePhysicalAddressRevision:null, siteIdentityRevision:typeof metadata.siteIdentityRevision==="string"?metadata.siteIdentityRevision:null, contactDraft:safeJson(metadata.setupContact??null), websiteDraft:websiteSlug&&isPublicSiteSlug(websiteSlug)&&(websiteStatus==="draft"||websiteStatus==="published")?{host:publicSiteHost(websiteSlug),status:websiteStatus}:null })),
       jurisdictions: jurisdictionRows,
-      schoolSetupAdministrator: context.role === "site_admin",
+      canCreateSite: context.grantSiteId === null && context.capabilities.has("program.launch.start"),
+        schoolSetupAdministrator: context.role === "site_admin",
     };
   },
 );
@@ -529,7 +532,9 @@ export const createLaunchSite = createServerFn({method:"POST"})
   slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   timezone:siteTimezoneSchema,
   address:physicalSiteAddressSchema.optional(),
- }).strict().parse(v))
+  stubOnly:z.boolean().optional(),
+  planningLocation:schoolPlanningLocationSchema.optional(),
+ }).strict().refine(value=>!value.stubOnly||Boolean(value.planningLocation), "A school stub requires city and state").parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
@@ -544,7 +549,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:" + data.organizationId + ":" + data.name.trim().toLowerCase()}))`);
    // The unique index only covers slug; a renamed slug would otherwise fork the campus.
    const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug,
-     timezone:s.sites.timezone,address:s.sites.address})
+     timezone:s.sites.timezone,address:s.sites.address,metadata:s.sites.metadata})
     .from(s.sites)
     .where(and(eq(s.sites.organizationId,data.organizationId),or(
      eq(s.sites.slug,data.slug),
@@ -552,12 +557,15 @@ export const createLaunchSite = createServerFn({method:"POST"})
     )))
     .limit(1);
    if(existing) {
+    const savedPlanningLocation=schoolPlanningLocationSchema.safeParse(existing.metadata.schoolPlanningLocation);
     // Exact replay returns the original canonical Site and its website reservation;
     // a changed name, timezone or location must be edited, not silently adopted.
     if(existing.slug===data.slug && existing.name.trim().toLowerCase()===data.name.trim().toLowerCase() &&
       existing.timezone===data.timezone &&
-      (data.address ? samePhysicalSiteAddress(existing.address,data.address) : existing.address===null)) {
-      const publicSiteDraft=await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
+      (data.address ? samePhysicalSiteAddress(existing.address,data.address) : existing.address===null) &&
+      (!data.planningLocation || (savedPlanningLocation.success &&
+       savedPlanningLocation.data.city === data.planningLocation.city && savedPlanningLocation.data.state === data.planningLocation.state))) {
+      const publicSiteDraft=data.stubOnly ? null : await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:existing.id,organizationId:data.organizationId,slug:existing.slug,
       });
       return {siteId:existing.id,publicSiteDraft,replayed:true};
@@ -565,22 +573,26 @@ export const createLaunchSite = createServerFn({method:"POST"})
     throw new Error(`This church already has the site "${existing.name}" (${existing.slug}). Select its saved record and edit it instead of creating another Site.`);
    }
    const createdAt=new Date();
-   const [site]=await tx.insert(s.sites).values({...data,updatedAt:createdAt,
-     metadata:{siteIdentityRevision:createdAt.toISOString(),...(data.address?{sitePhysicalAddressRevision:createdAt.toISOString()}:{})}})
+   const [site]=await tx.insert(s.sites).values({organizationId:data.organizationId,name:data.name,
+     slug:data.slug,timezone:data.timezone,address:data.address,updatedAt:createdAt,
+     metadata:{siteIdentityRevision:createdAt.toISOString(),
+      ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),
+      ...(data.address?{sitePhysicalAddressRevision:createdAt.toISOString()}:{})}})
      .returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
     actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
-    siteId:site.id,payload:{name:data.name,timezone:data.timezone,addressProvided:Boolean(data.address)},
+    siteId:site.id,payload:{name:data.name,timezone:data.timezone,addressProvided:Boolean(data.address),stubOnly:Boolean(data.stubOnly)},
    });
    await writeAudit(tx,actor,{
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
-    after:{name:data.name,timezone:data.timezone,address:data.address??null}});
-   // PUB-12: create the draft within the same transaction, AFTER the Site
-   // creation evidence. Nothing is public, and no publishing grant is issued.
-   const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
+    after:{name:data.name,timezone:data.timezone,address:data.address??null,
+      ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),stubOnly:Boolean(data.stubOnly)}});
+   // Stub creation has no website reservation dependency. The legacy location
+   // flow still reserves a private draft, without publishing or issuing grants.
+   const publicSiteDraft=data.stubOnly ? null : await provisionNewSitePublicationDraft(tx,actor,{
     id:site.id,organizationId:data.organizationId,slug:data.slug,
    });
    return {siteId:site.id,publicSiteDraft,replayed:false};

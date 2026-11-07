@@ -93,8 +93,8 @@ function SchoolSetupPage() {
       <p>Domain: <strong>{result.domain}</strong></p>
       <p>Site Admin: <strong>{result.adminEmail}</strong></p>
       <p>Shared sign-in code: <strong>000000</strong></p>
-      <p>Sign in to configure programs, academics, staffing and enrollment through the normal school setup workflow.</p>
-      <Link to="/access" search={{ email: result.adminEmail }} className="inline-block rounded-lg bg-foreground px-5 py-3 text-background">Sign in and continue setup</Link>
+      <p>Your basic school profile is saved. Sign in to open its Launch Hub; academic Programs can be added later.</p>
+      <Link to="/access" search={{ email: result.adminEmail, returnTo: `/launch/hub/school?siteId=${result.siteId}` }} className="inline-block rounded-lg bg-foreground px-5 py-3 text-background">Sign in and continue setup</Link>
     </section> : <form onSubmit={submit} className="space-y-4 rounded-xl border bg-card p-6">
       <label className="block">School name
         <input required minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)} className={field} />

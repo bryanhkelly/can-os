@@ -147,7 +147,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
         ...(parsedAddress?.success ? {address:parsedAddress.data} : {})}});
       if (submission.status === "ignored") return;
       const result = submission.value;
-      setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host,status:result.publicSiteDraft.status,replayed:result.replayed});
+      if(result.publicSiteDraft)setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host,status:result.publicSiteDraft.status,replayed:result.replayed});
       setSiteId(result.siteId);
       if (submission.refreshError) setError("Site created, but the page could not refresh. Reopen launch setup; do not create another Site.");
       setNewSiteName("");setNewSiteSlug("");setNewSiteAddress(emptySiteAddress);

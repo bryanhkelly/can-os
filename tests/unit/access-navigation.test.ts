@@ -41,12 +41,12 @@ describe("access navigation", () => {
 
   it("sends a new school's registrar-authority sign-in to its launcher without a return path", () => {
     expect(accessLandingPath("site_admin", "new-school-site"))
-      .toBe("/launch/school?siteId=new-school-site");
+      .toBe("/launch/hub/school?siteId=new-school-site");
   });
 
   it.each(["/", "/home"])("prefers the school launcher over the generic %s destination", path => {
     expect(accessLandingPath("site_admin", "new-school-site", path))
-      .toBe("/launch/school?siteId=new-school-site");
+      .toBe("/launch/hub/school?siteId=new-school-site");
   });
 
   it("still honors a specific saved page over the school launcher", () => {

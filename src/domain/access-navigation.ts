@@ -38,7 +38,7 @@ export function accessLandingPath(role: string, launchSiteId?: string, returnTo?
  // A new school's first sign-in lands in its guided launcher, not a dashboard;
  // the launcher itself offers a skip to the dashboard.
  if(hasRegistrarAuthority(role)&&launchSiteId&&(!safeReturnTo||genericReturnPaths.has(safeReturnTo)))
-  return "/launch/school?siteId="+encodeURIComponent(launchSiteId);
+  return "/launch/hub/school?siteId="+encodeURIComponent(launchSiteId);
  if(safeReturnTo)return safeReturnTo;
  const home:Record<string,string>={student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/home",counselor:"/home"};
  return Object.hasOwn(home,role)?home[role]! : "/access";
