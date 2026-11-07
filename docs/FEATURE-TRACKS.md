@@ -1,6 +1,6 @@
 # Historical feature-track identifiers
 
-The formal Golden Flow catalog is [golden-flows.md](./golden-flows.md). Previous development notes used additional **implementation-track labels**, without adding corresponding formal flow specifications to the canonical catalog:
+The formal Golden Flow catalog is [archived golden-flows.md](./archive/2026-11-fullflow/legacy-specifications/golden-flows.md). Previous development notes used additional **implementation-track labels**, without adding corresponding formal flow specifications to the canonical catalog:
 
 | Historical label | Meaning | Current owner to inspect |
 | --- | --- | --- |
