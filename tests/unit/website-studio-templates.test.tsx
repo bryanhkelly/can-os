@@ -4,6 +4,7 @@ import { siteTemplateIds, resolveSiteTemplateId } from "@/domain/site-theme";
 import { siteTemplateCatalog, composePublicSiteHome, composePublicSiteInterior, publicSiteTemplateCss, sevenSchoolCss, composePublicSiteChrome, composePublicSiteHero } from "@/domain/public-site-templates";
 import { emptySiteLocalContent, normalizeSiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
+import { publicSitePagePaths } from "@/domain/public-site-paths";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
 
 describe("Website Studio seven-template contract", () => {
@@ -108,6 +109,41 @@ describe("Website Studio seven-template contract", () => {
       expect(html).not.toContain("<script");
       expect(html).not.toContain("@import");
       expect(html).not.toContain("<link rel=\"stylesheet\"");
+    }
+  });
+
+  it("renders all 70 public design/pages from canonical approved data without scripts", () => {
+    const example = {
+      host: "fictional.can-os.com",
+      site: {name:"Sample School",organizationName:"Sample Community"},
+      demonstration:true,
+      offerings:[],
+      academicPrograms:[{
+        programId:"sample-approved",title:"Example learning",
+        summary:"A fictional program for template quality assurance.",
+        typeLabel:"School program",grades:{min:"6",max:"12"},
+        delivery:{onsite:true,asynchronous:true,liveOnline:false,onsiteDaysPerWeek:3},
+        availability:"planned" as const,applicationOpen:false,
+      }],
+    };
+    for(const templateId of siteTemplateIds) {
+      const localContent={...emptySiteLocalContent,
+        schoolVision:"Families helping young people learn and grow.",
+        churchHistory:"An illustrative school for template testing.",
+        localDescription:"A fictional school community.",
+        branding:{...emptySiteLocalContent.branding,templateId},
+      };
+      for(const path of publicSitePagePaths) {
+        const html=renderPublicSiteHtml({...example,localContent},{path});
+        expect(html, `${templateId} ${path}`).toContain(`template-${templateId}`);
+        expect(html).toContain('<main id="main-content">');
+        expect(html).toContain('class="desktop-nav"');
+        expect(html).toContain('class="mobile-menu"');
+        expect((html.match(/<h1[ >]/g)??[]).length).toBe(1);
+        expect(html).toContain('content="noindex,nofollow"');
+        expect(html).not.toContain("<script");
+        expect(html).not.toContain("@import");
+      }
     }
   });
 
