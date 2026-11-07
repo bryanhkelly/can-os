@@ -72,3 +72,7 @@ Created `docs/engineering/OPERATIONS-AND-SECURITY.md` as the entry point for act
 ## 2026-11-07 dated delivery evidence retirement
 
 Archived and removed `docs/design-system-implementation-plan.md`, `docs/PX-B-EXPERIENCE-PUBLISHING-HANDOFF.md`, `docs/PX-INTEGRATION-RELEASE-EVIDENCE-2026-11-03.md`, and `docs/integration/agent-branch-retirement-pass1.md` into `docs/archive/2026-11-fullflow/delivery-evidence/`, preserving exact Git blobs. Corrected a historical contract reference in `tests/e2e/full-flow-fixture.ts`. The active V6.1 design-system reference and operational/security runbooks were retained. This does not establish passing CI or exhaustive inbound-link coverage.
+
+## 2026-11-07 convergence records
+
+Archived and retired the dated `docs/implementation/CODE_BASED_SOURCE_MAP.md` and `docs/implementation/CONTRACT_CHANGELOG.md` under `docs/archive/2026-11-fullflow/delivery-evidence/implementation/`, with exact Git blob verification. Kept `docs/design-system-v6-1-migration.md` because the active design-system documents explicitly depend on its checklist; kept `docs/public-site-admissions-remaining-work.md` because the public publishing specification links to it. These retained documents need an explicit current-main review before retirement.
