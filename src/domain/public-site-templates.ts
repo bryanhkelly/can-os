@@ -125,7 +125,10 @@ body.template-summit .closing-action h2{margin-inline:auto}
 
 /* Five school design systems: distinct mastheads, hero geometry and page rhythms.
  * Approved Site content and renderer security are shared; no invented photos. */
-body.template-heritage header{display:flex;flex-direction:column;align-items:stretch;gap:16px;padding-top:22px;padding-bottom:18px}
+body.template-heritage header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px 24px;padding-top:22px;padding-bottom:18px}
+body.template-heritage header .brand{grid-column:1/-1}
+body.template-heritage header .desktop-nav{grid-column:1;grid-row:2}
+body.template-heritage header .site-nav-cta{grid-column:2;grid-row:2}
 body.template-heritage header .brand{width:100%;text-align:center;border-bottom:1px solid var(--site-ink);padding-bottom:20px;font:500 clamp(1.2rem,2.4vw,2rem)/1.3 var(--site-display);letter-spacing:.13em}
 body.template-heritage header .desktop-nav{flex:1;justify-content:center}
 body.template-heritage .public-hero:not(.compact-hero){display:flex;align-items:flex-start;min-height:560px;background:var(--site-paper);color:var(--site-ink);border-block:1px solid var(--site-ink)}
@@ -213,6 +216,51 @@ body.template-summit .summit-manifesto .vision-feature{min-height:400px;border-r
  body.template-bright-futures .public-hero:not(.compact-hero) h1{font-size:clamp(2.7rem,11vw,4.5rem)}
  body.template-summit .public-hero:not(.compact-hero){margin-inline:0;min-height:520px}
  .community-people-first,.bright-family-first{padding:22px}
+}
+
+/* Photo-free school sites use intentional graphic artwork, never synthetic people. */
+body.template-heritage .public-hero:not(.compact-hero):not(.has-image)::before,
+body.template-community .public-hero:not(.compact-hero):not(.has-image)::before,
+body.template-modern .public-hero:not(.compact-hero):not(.has-image)::before,
+body.template-bright-futures .public-hero:not(.compact-hero):not(.has-image)::before{
+  content:"";position:absolute;top:0;bottom:0;display:block;pointer-events:none;z-index:0
+}
+body.template-heritage .public-hero:not(.compact-hero):not(.has-image)::before{
+  left:auto;right:0;width:44%;background:repeating-linear-gradient(145deg,transparent 0 44px,rgba(255,255,255,.15) 45px 47px,transparent 48px 90px),linear-gradient(135deg,var(--site-secondary),var(--site-ink))
+}
+body.template-community .public-hero:not(.compact-hero):not(.has-image)::before{
+  left:0;width:46%;background:radial-gradient(circle at 42% 38%,var(--site-accent) 0 13%,transparent 13.5%),linear-gradient(140deg,var(--site-ink),var(--site-secondary))
+}
+body.template-modern .public-hero:not(.compact-hero):not(.has-image)::before{
+  left:auto;right:0;width:33%;background:linear-gradient(155deg,var(--site-accent) 0 25%,var(--site-secondary) 25% 57%,var(--site-ink) 57%)
+}
+body.template-bright-futures .public-hero:not(.compact-hero):not(.has-image)::before{
+  top:7%;bottom:7%;left:auto;right:4%;width:38%;border-radius:48% 48% 12% 12%;
+  background:radial-gradient(circle at 54% 35%,var(--site-accent) 0 20%,transparent 21%),linear-gradient(130deg,var(--site-secondary),var(--site-ink))
+}
+body.template-heritage .public-hero:not(.compact-hero)>h1,
+body.template-heritage .public-hero:not(.compact-hero)>p,
+body.template-heritage .public-hero:not(.compact-hero)>.hero-actions,
+body.template-community .public-hero:not(.compact-hero)>h1,
+body.template-community .public-hero:not(.compact-hero)>p,
+body.template-community .public-hero:not(.compact-hero)>.hero-actions,
+body.template-modern .public-hero:not(.compact-hero)>h1,
+body.template-modern .public-hero:not(.compact-hero)>p,
+body.template-modern .public-hero:not(.compact-hero)>.hero-actions,
+body.template-bright-futures .public-hero:not(.compact-hero)>h1,
+body.template-bright-futures .public-hero:not(.compact-hero)>p,
+body.template-bright-futures .public-hero:not(.compact-hero)>.hero-actions{position:relative;z-index:2}
+@media(max-width:800px){
+  body.template-heritage header .brand{grid-column:1;grid-row:1}
+  body.template-heritage header .mobile-menu{grid-column:2;grid-row:1}
+}
+@media(max-width:700px){
+  body.template-heritage .public-hero:not(.compact-hero):not(.has-image)::before,
+  body.template-community .public-hero:not(.compact-hero):not(.has-image)::before,
+  body.template-modern .public-hero:not(.compact-hero):not(.has-image)::before,
+  body.template-bright-futures .public-hero:not(.compact-hero):not(.has-image)::before{
+    top:auto;bottom:0;left:0;right:0;width:100%;height:288px;border-radius:0
+  }
 }
 `;
 
