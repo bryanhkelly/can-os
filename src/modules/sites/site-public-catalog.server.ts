@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { organizations, programs, sitePublications, sites } from "@/db/schema";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import { isAcademicMarketingType } from "@/domain/program-offerings";
+import { isAcademicMarketingType } from "@/domain/academic-program-publication";
 import { AuthorizationError } from "@/domain/command-context";
 import { requireCurrentSchoolJurisdictionForOpening } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
