@@ -491,7 +491,7 @@ The broader platform's P0 **single six-stage** School → Curriculum/Section →
 Family Enrollment → Student Learning → Teacher/Guardian → Operator journey
 was historically governed by [FullFlow acceptance](./archive/2026-11-fullflow/retired-plans/full-flow-acceptance-contract.md)
 and [integration convergence](./archive/2026-11-fullflow/retired-plans/integration-convergence-audit.md).
-The historical [FullFlow progress](./full-flow-progress.md) covers learning activity,
+The historical [FullFlow progress](./archive/2026-11-fullflow/retired-plans/full-flow-progress.md) covers learning activity,
 Student 360, staffing, hybrid Site day, safeguarding, financial modeling,
 network onboarding and other independent product priorities. No item in
 this public-site backlog replaces those requirements.
