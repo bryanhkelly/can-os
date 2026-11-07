@@ -2,7 +2,7 @@
  * Grade-scale passing policy. A school's versioned GradeScale decides which
  * letter grades are passing; the fallback list applies only when a grade
  * carries no scale at all. Never hard-code passing rules at call sites —
- * jurisdiction/school policy belongs in configuration (see docs/domain-model).
+ * jurisdiction/school policy belongs in configuration (see docs/architecture/DOMAIN-MODEL.md).
  */
 export type GradeScaleConfiguration = {
   entries?: Array<{ label?: string; passing?: boolean }>;
