@@ -40,6 +40,34 @@ test("school administrator reviews, publishes and renames a standalone school we
   if (!tenant) throw new Error("The browser-created school was not persisted.");
   const orgId = String(tenant.organization_id);
   const siteId = String(tenant.site_id);
+  // Browser acceptance of exact-Site Launch Hub and Website Studio navigation.
+  const navigationErrors: string[] = [];
+  page.on("pageerror", error => navigationErrors.push(error.message));
+  await page.goto(`/launch/hub/school?siteId=${siteId}`);
+  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
+  await page.getByRole("link", { name: "Open Website Studio" }).click();
+  await expect(page).toHaveURL(/\/launch\/website\?/);
+  await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Launch steps" }).getByRole("button")).toHaveCount(1);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Prepare your private website address." })).toBeVisible();
+  await page.getByRole("link", { name: "Back to Launch Hub" }).click();
+  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
+  await page.getByRole("link", { name: "Open Website Studio" }).click();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
+  await page.goto(`/launch/hub/school/website?siteId=${siteId}`);
+  await expect(page).toHaveURL(/\/launch\/website\?/);
+  await page.goto(`/launch/hub/school?siteId=${randomUUID()}`);
+  await expect(page.getByRole("heading", { name: "Choose your school" })).toBeVisible();
+  await page.goto(`/settings?siteId=${siteId}`);
+  await page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Website", exact: true }) })
+    .getByRole("link", { name: "Open Website Studio" }).click();
+  await expect(page).toHaveURL(/returnToSettings=true/);
+  await page.getByRole("link", { name: "Back to Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  expect(navigationErrors).toEqual([]);
+  page.removeAllListeners("pageerror");
   const jurisdictionId = await insertFixtureId(sql,
     "INSERT INTO jurisdictions(code,name) VALUES($1,'Synthetic website testing') RETURNING id", [`website-${suffix}`]);
   const programName = `Reviewed Academic Program ${suffix}`;
@@ -99,6 +127,13 @@ test("school administrator reviews, publishes and renames a standalone school we
   await expect(page.getByRole("heading", { name: `${renamedName} · public site` })).toBeVisible();
   await page.getByRole("link", { name: "Open local public preview" }).click();
   await page.reload();
+  await expect(page.getByRole("heading", { name: renamedName, exact: true })).toBeVisible();
+  // Saved public Site re-entry starts at template selection without a second intro.
+  await page.goto(`/launch/website?siteId=${siteId}&returnToHub=true`);
+  await expect(page.getByRole("heading", { name: "Find the right first impression." })).toBeVisible();
+  await page.getByRole("link", { name: "Back to Launch Hub" }).click();
+  await expect(page.getByRole("heading", { name: "Build your school." })).toBeVisible();
+  await page.goto(`/published-site?site=${renamedSlug}`);
   await expect(page.getByRole("heading", { name: renamedName, exact: true })).toBeVisible();
   expect((await request.get(`/published-site?site=${publicSlug}`)).status()).toBe(404);
   expect((await request.get(`/published-site?site=unknown-${suffix}`)).status()).toBe(404);
