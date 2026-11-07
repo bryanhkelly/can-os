@@ -24,7 +24,7 @@ This catalog replaces the habit of treating delivery branches or individual scre
 | Reporting and intelligence | Operational reporting, progress, audit, Ask CAN | Same domain permissions for human and agent commands |
 | Security and compliance | Safeguarding, privacy, incident handling, retention, audit, release gates | Enforced by law, institution, jurisdiction, and verified scope |
 
-See [School Launch and Run](LAUNCH-AND-RUN.md) for the nine-module source map, planned capabilities, and the separate Church Information gap.
+See [School Launch and Run](LAUNCH-AND-RUN.md) for the nine-module source map, planned capabilities, and the separate Church Information gap. [School Website Media](WEBSITE-MEDIA.md) owns the rights-aware imagery and folder-first intake contract.
 
 ## Launch Hub requirements
 
