@@ -187,7 +187,7 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   result.status="active";
   // Fail without changing durable job states or sending chargeable requests
   // when the stored secret contains invalid header characters. No key data logs.
-  if(!falKey || /[^\\x21-\\x7E]/.test(falKey)){
+  if(!falKey || /[^\x21-\x7E]/.test(falKey)){
     console.error("CAN photo generation blocked: invalid FAL_KEY formatting");
     return result;
   }
