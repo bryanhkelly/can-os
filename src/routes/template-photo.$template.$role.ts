@@ -1,3 +1,5 @@
+import {liveCloudflarePhotoEnv} from "@/platform/photography/cloudflare-runtime.server";
+import {readBoundTemplatePhoto} from "@/platform/photography/cloudflare-production.server";
 import {createFileRoute} from "@tanstack/react-router";
 import legacyManifest from "@/domain/template-sample-assets.json";
 import stagedManifest from "@/domain/template-photography-v2.json";
@@ -21,7 +23,9 @@ const notFound=()=>new Response("Not found",{status:404,headers:{"Cache-Control"
  * Only manifest-listed images are allowed, and v2 is gated until uploads pass QA.
  */
 export const Route=createFileRoute("/template-photo/$template/$role")({
-  server:{handlers:{GET:async({params})=>{
+  server:{handlers:{GET:async({params,request})=>{
+    const nativeEnv=await liveCloudflarePhotoEnv();
+    if(nativeEnv)return readBoundTemplatePhoto(request,nativeEnv);
     if(!templateIds.has(params.template)||!roles.has(params.role))return notFound();
     const template=params.template as SiteTemplateId;
     const role=params.role as TemplatePhotographyRole;
