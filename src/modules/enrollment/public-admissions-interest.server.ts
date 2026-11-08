@@ -260,19 +260,49 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
       .update(school.siteId).update(":").update(batch.programId)
       .update(":").update(data.email).digest("hex");
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.invitationRecipientKey}))`);
-    const [prior] = await tx.select({ id: publicAdmissionsInterests.id })
-      .from(publicAdmissionsInterests).where(and(
-        eq(publicAdmissionsInterests.invitationBatchId, data.invitationBatchId),
-        eq(publicAdmissionsInterests.invitationRecipientKey, data.invitationRecipientKey),
-      )).limit(1);
-    if (prior) return;
+    const [prior] = await tx.select({
+      id: publicAdmissionsInterests.id,
+      message: publicAdmissionsInterests.message,
+    }).from(publicAdmissionsInterests).where(and(
+      eq(publicAdmissionsInterests.invitationBatchId, data.invitationBatchId),
+      eq(publicAdmissionsInterests.invitationRecipientKey, data.invitationRecipientKey),
+    )).limit(1);
+    const followUpAllowed = data.responseKind !== "survey" || data.contactPreference !== "none";
+    if (prior) {
+      if (data.responseKind !== "survey") return;
+      // A later survey enriches the same canonical family interest rather than
+      // inventing a second lead or bypassing its unique recipient key.
+      await tx.update(publicAdmissionsInterests).set({
+        message: [prior.message, data.message].filter(Boolean).join("\n").slice(0,500),
+        ...(followUpAllowed ? {} : { contactConsentAt: null }),
+        updatedAt: new Date(),
+      }).where(eq(publicAdmissionsInterests.id, prior.id));
+      if (!followUpAllowed) {
+        // An explicit "no follow-up" response withdraws prior contact consent.
+        await tx.update(actions).set({status:"resolved"}).where(and(
+          eq(actions.subjectType,"public_admissions_interest"),
+          eq(actions.subjectId,prior.id),
+          eq(actions.type,"public_admissions_interest_followup"),
+          eq(actions.status,"open"),
+        ));
+      }
+      await writeAudit(tx,{
+        action:"admissions.invited_interest.survey_received",
+        resourceType:"public_admissions_interest",resourceId:prior.id,
+        actorPersonId:null,scope:{siteId:school.siteId,organizationId:school.organizationId,
+          programId:batch.programId},
+        after:{surveyRecorded:true,contactConsent:followUpAllowed?"affirmative":"withdrawn"},
+        context:{anonymous:true},
+      });
+      return;
+    }
     const now = new Date();
     const [created] = await tx.insert(publicAdmissionsInterests).values({
       requestId: data.requestId,
       siteId: school.siteId, programId: batch.programId,
       contactFirstName: data.firstName, contactLastName: data.lastName,
       contactEmail: data.email, emailDigest: digest, message: data.message,
-      source: "staff_invitation", contactConsentAt: now,
+      source: "staff_invitation", contactConsentAt: followUpAllowed ? now : null,
       invitationBatchId: data.invitationBatchId,
       invitationRecipientKey: data.invitationRecipientKey,
       status: "new",
@@ -281,6 +311,7 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
     // An invited family's consented reply belongs in the same canonical
     // registrar follow-up queue as a public website inquiry. The invitation
     // itself is not consent to contact, and neither path creates an Application.
+    if (followUpAllowed) {
     const [followup] = await tx.insert(actions).values({
       type: "public_admissions_interest_followup",
       subjectType: "public_admissions_interest",
@@ -326,6 +357,7 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
       },
       context: { anonymous: true },
     });
+    }
     await emitEvent(tx, {
       eventType: EventTypes.PublicAdmissionsInterestReceived,
       aggregateType: "public_admissions_interest", aggregateId: created.id,
@@ -342,7 +374,7 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
         programId: batch.programId },
       after: { status: "new", source: "staff_invitation",
         invitationBatchId: data.invitationBatchId, invitationRecipientKey: data.invitationRecipientKey,
-        contactConsent: "affirmative" },
+        contactConsent: followUpAllowed ? "affirmative" : "declined" },
       context: { anonymous: true },
     });
   });
