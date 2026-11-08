@@ -93,6 +93,12 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     (parent?.admissions.description.canDisplay && parent.admissions.description.value));
   const contact = Boolean((parent?.site.contact.canDisplay && parent.site.contact.value?.trim()) ||
     (parent?.site.address.canDisplay && parent.site.address.value?.trim()) || academic);
+  if (page.demonstration && hasStory) {
+    // Full fictional prospectus; these additional routes never grant real
+    // admissions, pricing, schedule or program authority.
+    return ["/", "/about", "/academics", "/student-life", "/school-day",
+      "/admissions", "/tuition", "/families", "/faq", "/contact"];
+  }
   return ["/", ...(hasStory || hasReviewedPeople ? ["/about"] as const : []),
     ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
     ...(page.offerings.length || (page.demonstration && hasStory) ? ["/student-life"] as const : []),
@@ -123,15 +129,17 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const host = escapePublicHtml(page.host);
   const previewSlug = options?.localPreview && options.localPreviewSlug &&
     isPublicSiteSlug(options.localPreviewSlug) ? options.localPreviewSlug : null;
-  const submissionsEnabled = !options?.localPreview ||
-    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true);
+  const demo = page.demonstration === true;
+  // A fictional school can demonstrate an admissions journey, but cannot submit
+  // real inquiries, applications, or enrollment requests.
+  const submissionsEnabled = !demo && (!options?.localPreview ||
+    (Boolean(previewSlug) && options.localPreviewSubmissionsEnabled === true));
   const inquiryAction = previewSlug
     ? `/published-site/inquiry?site=${encodeURIComponent(previewSlug)}`
     : "/inquiry";
   const familyStartAction = previewSlug
     ? `/published-site/family-start?site=${encodeURIComponent(previewSlug)}`
     : "/apply";
-  const demo = page.demonstration === true;
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
   const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId);
@@ -209,8 +217,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <p>${escapePublicHtml(value)}</p>
       </article>`).join("\n")}
     </div>
-    <p class="availability">Content provided by the local church. Community and faith content comes from the local Site editor.
-    Academic, enrollment, and institutional statements are controlled separately by CAN.</p>
+    ${demo ? "" : `<p class="availability">Content provided by the local church. Community and faith content comes from the local Site editor.
+    Academic, enrollment, and institutional statements are controlled separately by CAN.</p>`}
   </section>` : "";
   const academicCards = (page.academicPrograms ?? []).map(program => {
     const modes = [
@@ -322,7 +330,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     title: local?.heroHeadline ? escapePublicHtml(local.heroHeadline) : school,
     subtitle: local?.welcomeMessage
       ? '<p class="hero-subtitle">' + escapePublicHtml(local.welcomeMessage) + '</p>' : "",
-    intro: (academicCards
+    intro: demo
+      ? "Discover a school experience where strong academics, meaningful relationships, and opportunities to explore come together. See how a connected community can make learning feel personal."
+      : (academicCards
       ? "Explore the learning pathways and community that could be part of your family's next chapter."
       : "Get to know the vision for this school as program information becomes available.") + " " +
       (hasOpenApplications
@@ -360,16 +370,27 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <div class="grid">${academicCards}</div>
     <a class="text-action" href="/academics">Explore all academic programs →</a>
   </section>` : "";
+  const demoAcademicCards = demo && !academicCards ? `<section aria-labelledby="demo-academics-title" class="editorial-section">
+    <p class="tag">An education with room to explore</p>
+    <h2 id="demo-academics-title">Strong foundations. Wide-open possibilities.</h2>
+    <p>Build confidence in essential subjects while discovering the connections between what you study and the world you want to shape.</p>
+    <div class="grid">
+      <article class="card"><p class="tag">Think deeply</p><h3>Humanities &amp; Communication</h3><p>Read thoughtfully, ask better questions, examine different perspectives, and learn to express ideas with clarity and conviction.</p></article>
+      <article class="card"><p class="tag">Investigate boldly</p><h3>Science, Technology &amp; Mathematics</h3><p>Explore the principles behind everyday discoveries through inquiry, careful reasoning, and challenges that reward persistence.</p></article>
+      <article class="card"><p class="tag">Create with purpose</p><h3>Design, Arts &amp; Applied Learning</h3><p>Bring imagination into practice through creative expression, collaborative projects, and opportunities to solve meaningful problems.</p></article>
+    </div></section>` : "";
   const academicSection = academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
-    <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : "";
-  const illustrativeExperiences = demo && !page.offerings.length && local ? `<div class="demo-experience-grid">
-    <article><p class="tag">Illustrative STEM studio</p><h3>Robotics &amp; Design Lab</h3><p>Imagine students prototyping ideas, testing designs, and presenting what they discover.</p></article>
-    <article><p class="tag">Illustrative arts experience</p><h3>The Creative Collective</h3><p>A sample space for writing, visual expression, collaboration and performance.</p></article>
-    <article><p class="tag">Illustrative community project</p><h3>Neighborhood Impact</h3><p>Explore the possibility of student-led projects connecting learning and service.</p></article>
-  </div><p class="availability">Fictional examples only. No activities, schedules, fees, or registrations are being offered.</p>` : "";
+    <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : demoAcademicCards;
+  const demoExperiences = demo && !page.offerings.length ? `<div class="demo-experience-grid">
+    <article><p class="tag">Innovation &amp; design</p><h3>Robotics &amp; Design Lab</h3><p>Big questions become working ideas as students sketch, build, test, and refine. The real lesson is learning to think like a problem-solver.</p></article>
+    <article><p class="tag">Arts &amp; expression</p><h3>The Creative Collective</h3><p>Where writing, photography, visual art, and performance give students new ways to discover their voice and share it with others.</p></article>
+    <article><p class="tag">Service &amp; leadership</p><h3>Neighborhood Impact</h3><p>Students connect what they learn to the world around them, turning curiosity and compassion into projects that strengthen their community.</p></article>
+  </div>` : "";
   const enrichmentSection = `<section aria-labelledby="programs-title" class="editorial-section">
-    <h2 id="programs-title">Enrichment and student experiences</h2>
-    ${cards ? `<div class="grid">${cards}</div>` : illustrativeExperiences ? illustrativeExperiences : academicCards
+    <p class="tag">Life beyond lessons</p>
+    <h2 id="programs-title">${demo ? "A place to explore what makes you, you." : "Enrichment and student experiences"}</h2>
+    ${demo ? "<p>Learning comes alive in the moments when students create something together, find a new passion, or discover the difference they can make.</p>" : ""}
+    ${cards ? `<div class="grid">${cards}</div>` : demoExperiences ? demoExperiences : academicCards
       ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
       : '<p class="empty">There are no programs to display at this time.</p>'}</section>`;
   const parentContact = page.parentInformation?.site.contact;
@@ -457,7 +478,13 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // A single fully reviewed timetable is shown only when the canonical
   // projection can truthfully represent the Site. Sunday is never excluded.
   const approvedDayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const reviewedSchoolDay = !approvedSchedules.length && schoolDayDays?.length && schoolDayStart && schoolDayEnd
+  const reviewedSchoolDay = demo && !approvedSchedules.length && !schoolDayDays?.length
+    ? `<section class="editorial-section"><p class="tag">A connected day of learning</p><h2>Time to focus. Space to connect.</h2>
+      <p>The strongest school days make room for different kinds of growth: focused study, questions and academic guidance, projects that bring ideas to life, and the relationships that help a student feel at home.</p>
+      <div class="grid"><article class="card"><h3>Focused learning</h3><p>Structured lessons and individual study create space to think, revisit ideas, and build real understanding.</p></article>
+      <article class="card"><h3>Guidance when it matters</h3><p>Questions become conversations, with opportunities for academic support and constructive feedback.</p></article>
+      <article class="card"><h3>Community in action</h3><p>Projects, shared experiences, and time together connect learning with friendships and purpose.</p></article></div></section>`
+    : !approvedSchedules.length && schoolDayDays?.length && schoolDayStart && schoolDayEnd
     ? `<section class="church-section" aria-labelledby="reviewed-day-title">
       <p class="tag">Institutionally reviewed schedule</p>
       <h2 id="reviewed-day-title">Published learning days and hours</h2>
@@ -488,15 +515,31 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p>Grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}</p>
       <ul>${modes.map(mode => `<li>${mode}</li>`).join("")}</ul></article>`;
   }).join("");
-  const approachSection = approachCards ? `<section class="approach-section editorial-section" aria-labelledby="approach-title">
+  const demoApproach = demo ? `<section class="approach-section editorial-section" aria-labelledby="approach-title">
+    <p class="tag">The learning experience</p><h2 id="approach-title">Independent thinking, never learning alone.</h2>
+    <p>Great learning combines clear direction with the freedom to ask questions. Structured lessons create a foundation; academic guidance and a connected local community help students turn information into understanding.</p>
+    <div class="approach-grid">
+      <article class="approach-card"><h3>Learn with intention</h3><p>Follow expertly structured material, revisit challenging ideas, and develop habits that last well beyond school.</p></article>
+      <article class="approach-card"><h3>Ask and discover</h3><p>Bring questions to academic support and explore concepts until they begin to make sense.</p></article>
+      <article class="approach-card"><h3>Belong and contribute</h3><p>Build relationships, collaborate on projects, and connect learning with the world around you.</p></article>
+    </div><a class="text-action" href="/school-day">Explore the learning model →</a>
+  </section>` : "";
+  const approachSection = demoApproach || (approachCards ? `<section class="approach-section editorial-section" aria-labelledby="approach-title">
     <p class="tag">The learning model</p><h2 id="approach-title">How learning is organized</h2>
     <p>These delivery modes are drawn from approved Program information; instructional hours and opening authorization are reviewed independently.</p>
     <div class="approach-grid">${approachCards}</div>
     ${availablePaths.includes("/school-day") ? '<a class="text-action" href="/school-day">Explore the school day →</a>' : ""}
-  </section>` : "";
+  </section>` : "");
   const tuitionText = verifiedText(parent?.tuition.description);
   const aidText = verifiedText(parent?.tuition.financialAid);
-  const tuitionSection = `<section class="church-section" aria-labelledby="tuition-title">
+  const demoTuitionSection = `<section class="church-section" aria-labelledby="tuition-title">
+    <p class="tag">Clarity for families</p><h2 id="tuition-title">An investment you can understand.</h2>
+    <p>A thoughtful school decision starts with a clear picture of the total cost, what is included, and which financial assistance options may be available.</p>
+    <div class="grid"><article class="card"><h3>Transparent tuition</h3><p>Explore a clear breakdown of tuition, fees, and what families receive as part of the learning experience.</p></article>
+    <article class="card"><h3>Planning together</h3><p>Understand payment timing and the questions to ask as you build an education budget.</p></article>
+    <article class="card"><h3>Financial assistance</h3><p>Learn how scholarships or other assistance could be presented alongside eligibility and application guidance.</p></article></div>
+    <p class="availability">No tuition amount, scholarship, or payment offer is available for this fictional demonstration.</p></section>`;
+  const tuitionSection = demo ? demoTuitionSection : `<section class="church-section" aria-labelledby="tuition-title">
     <h2 id="tuition-title">Tuition and costs</h2>
     <p>${tuitionText || "Reviewed tuition and fee details have not yet been published for these programs. Please request current costs before making an enrollment decision."}</p>
     <h3>Financial assistance</h3>
@@ -543,11 +586,26 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     {question:"Where is the school located?",answer:reviewedAddress},
     {question:"How do I contact the school?",answer:reviewedContact},
   ].filter(item=>Boolean(item.answer));
-  const faqSection = faqItems.length ? `<section class="faq-list editorial-section" aria-labelledby="faq-list-title">
+  const demoFaqItems = [
+    {question:"How does this approach differ from a traditional classroom?",answer:"Students can follow structured instruction at an appropriate pace, revisit demanding lessons, and connect with academic support as questions arise. Local community experiences bring opportunities for connection and collaboration."},
+    {question:"Will students have access to teachers and academic support?",answer:"The CAN model separates structured academic instruction from local supervision. Academic staff and designated support roles help learners with questions and feedback; exact availability is defined by each real Program."},
+    {question:"How do students build friendships and community?",answer:"Shared projects, local gatherings, service, and enrichment can create meaningful experiences beyond individual lessons. A real school's published program confirms which activities are available."},
+    {question:"How does a family know which program is right?",answer:"Begin with the child's strengths, interests, and support needs. Compare the school's reviewed academic offerings, ask about the daily experience, and confirm admissions requirements directly."},
+    {question:"Can we enroll in this demonstration school?",answer:"No. This is a fictional school experience designed to show what a CAN-powered school website could look like."},
+  ];
+  const displayedFaqItems = demo ? demoFaqItems : faqItems;
+  const faqSection = displayedFaqItems.length ? `<section class="faq-list editorial-section" aria-labelledby="faq-list-title">
     <p class="tag">Questions families ask</p><h2 id="faq-list-title">Frequently asked questions</h2>
-    ${faqItems.map(item=>`<details class="faq-item"><summary>${item.question}</summary><p>${item.answer}</p></details>`).join("")}
+    ${displayedFaqItems.map(item=>`<details class="faq-item"><summary>${item.question}</summary><p>${item.answer}</p></details>`).join("")}
   </section>` : "";
-  const admissionsNextSteps = `<section class="admissions-next-steps editorial-section" aria-labelledby="admissions-next-title">
+  const demoAdmissions = `<section class="admissions-next-steps editorial-section" aria-labelledby="admissions-next-title">
+    <p class="tag">Your next chapter</p><h2 id="admissions-next-title">Discover the school. Picture your place in it.</h2>
+    <p>Finding the right school begins with thoughtful questions: Does this approach fit the way your child learns? Will they find encouragement, challenge, and a sense of belonging?</p>
+    <div class="grid"><article class="card"><h3>01 · Explore</h3><p>Get to know the school's educational approach, values, and learning experiences.</p></article>
+    <article class="card"><h3>02 · Connect</h3><p>See how a family information conversation can answer questions about day-to-day learning and support.</p></article>
+    <article class="card"><h3>03 · Prepare</h3><p>Understand how a verified admissions process would guide eligible families through the next steps.</p></article></div>
+    <p class="availability">This demonstration does not accept applications, collect enrollment information, or offer places.</p></section>`;
+  const admissionsNextSteps = demo ? demoAdmissions : `<section class="admissions-next-steps editorial-section" aria-labelledby="admissions-next-title">
     <p class="tag">Planning your next step</p><h2 id="admissions-next-title">Find the answers you need to take the next step</h2>
     ${admissionExplanation ? `<p>${admissionExplanation}</p>` : ""}
     <p class="admissions-status">${hasOpenApplications
@@ -593,7 +651,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     academics: programOverview,
     enrichment: page.offerings.length || (demo && local) ? enrichmentSection
       : !academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
-    closing: academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
+    closing: demo ? `<section class="closing-action"><p class="tag">The possibilities ahead</p>
+      <h2>Every student has a story worth discovering.</h2>
+      <p>Explore what happens when purposeful instruction and a connected school community give students room to learn, create, and grow.</p>
+      <a href="/academics" class="hero-button">Discover the learning experience</a></section>` : academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
       <h2>Find the learning opportunity that fits your family.</h2>
       <p>The right educational environment can make a lasting difference. Explore available programs, ask questions, and decide what fits your family.</p>
       <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
@@ -607,22 +668,28 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", "Student life",
       "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
-    "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", "What a day of learning looks like",
-      "See how learning is organized, with confirmed schedules and attendance details where available."),
+    "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", demo ? "A day designed for more than lessons." : "What a day of learning looks like",
+      demo ? "A thoughtful rhythm of independent discovery, academic guidance, and time to connect." : "See how learning is organized, with confirmed schedules and attendance details where available."),
       reviewedSchoolDay + schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
       (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : "")),
     "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "The right school changes what feels possible",
-      "Choosing a school is a personal decision. Find reviewed admissions information and the next step currently available to your family."), admissionsNextSteps, academicSection + disclosureSection),
+      demo ? "Explore an admissions journey centered on understanding each family's questions and finding the right fit." : "Choosing a school is a personal decision. Find reviewed admissions information and the next step currently available to your family."), admissionsNextSteps, demo ? "" : academicSection + disclosureSection),
     "/tuition": composePublicSiteInterior(templateId, secondaryHero("Planning your education", "Plan with confidence",
       "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
     "/families": composePublicSiteInterior(templateId, secondaryHero("Supporting families", "Partners in your child’s education",
-      "Discover the resources and support information currently available to families."),
+      demo ? "Because learning works best when the people who care about a student can stay connected." : "Discover the resources and support information currently available to families."),
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
-        demo ? `<section class="mission-split editorial-section"><div><p class="tag">Illustrative family experience</p><h2>Known by name. Connected by purpose.</h2></div><p>The Valor reference experience imagines meaningful communication, shared exhibitions and a connected school community. Actual services require separate configuration and approval.</p></section>` : "")),
-    "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "Questions about joining",
-      "Only reviewed public information appears here."), faqSection),
+        demo ? `<section class="editorial-section"><p class="tag">Family partnership</p><h2>In the loop. In the conversation. In your child's corner.</h2>
+        <p>Families deserve more than occasional updates. Clear communication, thoughtful guidance, and opportunities to celebrate progress build a stronger connection between school and home.</p>
+        <div class="grid"><article class="card"><h3>Stay connected</h3><p>Follow learning milestones, understand upcoming priorities, and know where to turn when questions come up.</p></article>
+        <article class="card"><h3>Celebrate growth</h3><p>Recognize the small breakthroughs, new interests, and achievements that make each student's journey distinct.</p></article>
+        <article class="card"><h3>Take part</h3><p>Find meaningful opportunities to contribute to community experiences and share in the life of the school.</p></article></div></section>` : "")),
+    "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "The questions that matter most.",
+      demo ? "Explore how learning, connection, and family partnership can work together." : "Only reviewed public information appears here."), faqSection),
     "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "Start a conversation about your child's education",
-      "Find the contact and inquiry options currently published by this school."), contactSection + academicSection +
+      demo ? "See how a family can take the next step in learning about a school." : "Find the contact and inquiry options currently published by this school."), (demo ? `<section class="editorial-section"><p class="tag">Let's connect</p><h2>A good school conversation starts with a good question.</h2>
+      <p>Want to know more about academics, student life, or how the learning model works? Explore the school story and answers to common family questions.</p>
+      <a class="text-action" href="/faq">Explore family questions →</a></section>` : contactSection + academicSection) +
       (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : "")),
   };
   const pageTitle = path === "/" ? `${school} | Programs` :
@@ -735,7 +802,7 @@ ${sevenSchoolCss}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
-${demo ? `<div class="demo-banner" role="note"><strong>${school} is a fictional demonstration school.</strong> Explore a sample experience; no real enrollment or school-opening authority is represented.</div>` : ""}
+${demo ? `<div class="demo-banner" role="note"><strong>DEMONSTRATION SCHOOL</strong> · ${school} is fictional. All programs, people, activities and admissions experiences on this site are examples—not real educational offerings.</div>` : ""}
 ${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus&&page.operatingStatus!=="authorized" ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"School opening authorization is not currently verified.":"School in development · Not yet open for enrollment."}</strong> Academic plans and opening dates remain subject to review and applicable requirements.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 ${composePublicSiteChrome(templateId, {
@@ -745,7 +812,7 @@ ${composePublicSiteChrome(templateId, {
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>`,
-  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Fictional demonstration. People, programs and activities shown for illustration are not real-world offers or school-opening approvals.</p>' : ""}</footer>`,
+  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Demonstration only · No applications, enrollment or payments.</p>' : ""}</footer>`,
 })}
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
