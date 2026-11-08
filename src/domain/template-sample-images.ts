@@ -42,7 +42,7 @@ export function templateSampleImage(
   if (process.env.CAN_TEMPLATE_PHOTOS_V2_ENABLED === "true") {
     const match = stagedManifest.files.find(file =>
       file.template === stagedFamily[template] && file.role === role);
-    if (match) return "/" + match.key;
+    if (match) return `/template-photo/${encodeURIComponent(template)}/${encodeURIComponent(role)}`;
     // Incomplete v2 packages may use a same-template verified legacy photo,
     // but never inherit another template's images.
     if (template === "classic" || template === "campus") return null;
@@ -52,5 +52,5 @@ export function templateSampleImage(
   const match=legacyManifest.files.find(file =>
     "template" in file && file.template === family && file.role === role &&
     file.preview_only === "no" && "width" in file && file.width >= 1000);
-  return match ? "/" + match.key : null;
+  return match ? `/template-photo/${encodeURIComponent(template)}/${encodeURIComponent(role)}` : null;
 }
