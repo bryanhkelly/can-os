@@ -215,6 +215,7 @@ export function renderFamilyBrandEmail(context:FamilyBrandContext,kind:FamilyBra
  <tr><td style="padding:35px 34px">
  <h1 style="font:700 35px/1.15 Georgia,serif;color:${ink};margin:0 0 20px">${heading}</h1>
  <p style="font-size:16px;line-height:1.7;color:${ink}">${body}</p>
+ ${context.introduction?.trim()?`<p style="font-size:16px;line-height:1.7;color:${ink}">${escape(context.introduction.trim().slice(0,1200))}</p>`:""}
  <p style="font-size:16px;line-height:1.7;color:${ink}">${escape(copy.lead)}</p>
  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
  <td style="background:${ink};border-radius:${shape};padding:15px 23px"><a href="${actionUrl}"
@@ -229,6 +230,8 @@ export function renderFamilyBrandEmail(context:FamilyBrandContext,kind:FamilyBra
  const text=`${kind==="confirmation"?"Thank you":kind==="update"?"An update":"Your feedback matters"}, ${params.firstName||"there"}.
 
 ${body.replaceAll(/<[^>]*>/g,"")}
+
+${context.introduction?.trim()??""}
 
 ${copy.lead}
 
