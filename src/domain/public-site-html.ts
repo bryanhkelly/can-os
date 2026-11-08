@@ -38,12 +38,13 @@ export function withIllustrativeLocalPreview(page: PublicSitePage): PublicSitePa
   const isValor = page.host === "valorschool.can-os.com" &&
     page.site.name === "Valor School";
   return {...page, localContent: isValor ? {...sample,
-    welcomeMessage:"A school that sees the individual. A community that helps them grow.",
-    localDescription:"At Valor, imagine a school where students are known by name, ideas are taken seriously, and learning reaches beyond the screen. This fictional campus brings neighborhood connection together with a thoughtfully designed hybrid high-school experience.",
-    schoolVision:"Curious minds. Courageous hearts. A community that sees what each student can become. Our sample vision pairs purposeful academic learning with meaningful relationships and room for discovery.",
-    churchHistory:"Valor began as a design question: what would a school feel like if every young person had a place to belong, room to think independently, and adults who noticed their potential? This is a fictional origin story, not a real church history.",
-    communityOutreach:"Imagine student projects connecting design, technology, local history, and service—from mapping neighborhood resources to exploring science in everyday problems. These are illustrative possibilities, not scheduled activities.",
-    localTraditions:"Picture student-led exhibitions, robotics showcases, arts gatherings, and service Saturdays. These are sample traditions, not actual calendar events.",
+    heroHeadline:"Be seen. Think boldly. Build what comes next.",
+    welcomeMessage:"A place where big ideas meet personal attention—and students discover the confidence to make their mark.",
+    localDescription:"At Valor School, ambition has a human scale. Students are encouraged to challenge assumptions, explore meaningful questions, and turn knowledge into action. Thoughtful academic instruction meets a connected community where every voice has room to be heard and every new interest has room to grow.",
+    schoolVision:"We believe education should develop curious minds, courageous character, and the ability to make a positive difference. Our vision is a school where intellectual challenge and genuine belonging strengthen one another.",
+    churchHistory:"Valor grew from a simple conviction: young people deserve an education that takes their ideas seriously and sees their potential beyond a test score. That vision shaped a learning community built around rigorous questions, meaningful relationships, and discovery that reaches beyond the classroom.",
+    communityOutreach:"Learning becomes more powerful when it connects to real people and real places. From neighborhood research and creative problem-solving to service projects and collaborative design, students connect classroom ideas with the communities around them.",
+    localTraditions:"Student exhibitions turn ambitious projects into shared celebrations. Design showcases, arts gatherings, community service days, and school-wide reflections give students opportunities to lead, contribute, and recognize one another's growth.",
   } : sample};
 }
 
@@ -274,13 +275,13 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">${escapePublicHtml(modes || "Delivery details available by inquiry")}
         ${onsiteDays !== null && program.delivery.onsite ? ` · ${onsiteDays} onsite days per week` : ""}
       </p>
-      <p class="availability">${program.applicationOpen === true
+      ${demo ? "" : `<p class="availability">${program.applicationOpen === true
         ? options?.localPreview && !submissionsEnabled
           ? "Applications available on the development server only · identity verification required"
           : "Applications available · identity verification required"
         : program.availability === "planned"
           ? "Program planned · admissions not open on this page"
-          : "Current program · applications not currently available"}</p>
+          : "Current program · applications not currently available"}</p>`}
       ${applicationForm}
       ${inquiryForm}
     </article>`;
@@ -305,7 +306,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">${escapePublicHtml(registrationStatus)}</p>
     </article>`;
   }).join("\n");
-  const hasOpenApplications = (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
+  const hasOpenApplications = !demo && (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
   const foundingFamilies = !hasOpenApplications && (page.academicPrograms ?? []).some(program =>
     program.availability === "planned");
   const navigationCtaPath = availablePaths.includes("/admissions") && hasOpenApplications ? "/admissions" :
