@@ -19,13 +19,13 @@ export type FamilyBrandPageKind = "landing" | "survey";
 export type FamilyBrandPreviewKind = FamilyBrandPageKind | `email-${FamilyBrandEmailKind}`;
 
 const editorial: Record<SiteTemplateId,{headline:string;lead:string;tagline:string;eyebrow:string}> = {
-  heritage:{headline:"The making of remarkable lives.",lead:"A considered approach to learning, character and community.",tagline:"Rooted in promise. Ready for possibility.",eyebrow:"The School Journal"},
-  community:{headline:"Known by name. Growing together.",lead:"A place to belong, serve and grow with a caring community.",tagline:"A place to belong and grow.",eyebrow:"Community Bulletin"},
-  modern:{headline:"Not one path. Your path.",lead:"Purposeful independent learning supported by people who know you.",tagline:"Discover your path.",eyebrow:"School Field Notes"},
-  "bright-futures":{headline:"Big dreams start small.",lead:"A welcoming community for imagination, purpose and growth.",tagline:"Grow with possibility.",eyebrow:"Good Things Ahead"},
-  summit:{headline:"Reach beyond.",lead:"An intentional learning journey, supported every step of the way.",tagline:"The journey ahead.",eyebrow:"Summit Dispatch"},
-  classic:{headline:"An education of enduring purpose.",lead:"The lasting value of character, curiosity and careful thinking.",tagline:"Faith. Scholarship. Character.",eyebrow:"The Classical Review"},
-  campus:{headline:"Every day tells a story.",lead:"Belonging, discovery and new possibilities for every learner.",tagline:"A school journal.",eyebrow:"Campus Notes"},
+  heritage:{headline:"An education worth building a life upon.",lead:"A vision for thoughtful learning, strong character, and a community that knows its students.",tagline:"Rooted in purpose. Open to possibility.",eyebrow:"The School Journal"},
+  community:{headline:"A place to be known. A community to grow in.",lead:"Imagine learning rooted in relationships, shared purpose, and the people who call this community home.",tagline:"Known here. Growing together.",eyebrow:"Community Bulletin"},
+  modern:{headline:"Not one path. Your path.",lead:"Explore a more personal approach to structured learning, with room for independence and access to academic support.",tagline:"Make room for your future.",eyebrow:"School Field Notes"},
+  "bright-futures":{headline:"Small beginnings. Extraordinary possibilities.",lead:"A hopeful new idea for learning, belonging, and discovering what each young person can become.",tagline:"Big possibilities begin here.",eyebrow:"Good Things Ahead"},
+  summit:{headline:"The next mountain is yours to climb.",lead:"A school vision shaped by ambition, thoughtful challenge, and encouragement along the way.",tagline:"Look ahead. Reach higher.",eyebrow:"Summit Dispatch"},
+  classic:{headline:"Learn to think deeply. Live with purpose.",lead:"An enduring vision for scholarship, curiosity, character, and the habits of a thoughtful life.",tagline:"Thought. Character. Purpose.",eyebrow:"The Classical Review"},
+  campus:{headline:"Find your people. Discover your possibilities.",lead:"Explore a learning community shaped by connection, discovery, and the everyday moments that matter.",tagline:"Every student has a story.",eyebrow:"Campus Notes"},
 };
 
 function escape(value: unknown): string {
@@ -52,7 +52,7 @@ function statusFor(context:FamilyBrandContext) {
     ? "School information invitation only · This page is not an application or an enrollment offer. Official admissions and opening approvals are managed separately."
     : statusCopy;
 }
-const learningCopy="Explore structured, often asynchronous instruction; connect with adults for questions and academic support; and build confident independent learning habits.";
+const learningCopy="Explore structured lessons students can revisit, with opportunities to learn at an appropriate pace, ask questions, and build confidence. Local relationships can bring connection and encouragement to the experience.";
 
 function shell(context:FamilyBrandContext,title:string,body:string,preview:boolean,kind:FamilyBrandPageKind) {
   const {brand,copy,shape}=design(context);
@@ -135,17 +135,17 @@ export function renderFamilyBrandPage(context:FamilyBrandContext,kind:FamilyBran
  const {brand,copy}=design(context);
  const intro=context.introduction?.trim().slice(0,600);
  const hero=kind==="landing"?`<section class="hero"><div><div class="eyebrow">Family interest · ${escape(copy.eyebrow)}</div><h1>${escape(copy.headline)}</h1>
-   <p class="lead">${escape(intro||copy.lead)}</p><a class="button" href="#respond">${kind==="landing"?"Tell us what matters":"Take the survey"}</a></div>
+   <p class="lead">${escape(intro||copy.lead)}</p><a class="button" href="#respond">${kind==="landing"?"Share your perspective":"Take the survey"}</a></div>
    <div class="hero-art" aria-label="${escape(brand.schoolName)} identity"><div><strong>${escape(brand.monogram)}</strong><small>${escape(copy.tagline)}</small></div></div></section>`:
-   `<section class="hero"><div><div class="eyebrow">Three-minute family survey</div><h1>Your perspective matters.</h1>
-   <p class="lead">Tell us what you value in a school. Your feedback helps with planning; nothing here is an application.</p>
+   `<section class="hero"><div><div class="eyebrow">Three-minute family survey</div><h1>What would make this the right school for your family?</h1>
+   <p class="lead">Your answers can help shape an emerging school idea. Tell us what matters most in your child's education; this is not an application.</p>
    <a class="secondary" href="${safeHref(params.landingHref)}">Return to school introduction</a></div>
    <div class="hero-art"><div><strong>03</strong><small>MINUTES · YOUR VOICE</small></div></div></section>`;
  const learning=`<section class="panel"><span class="eyebrow">How CAN learning works</span>
-   <h2>Expert instruction. A community around every learner.</h2><p>${learningCopy}</p>
-   <div class="row"><article><strong>01 · Learn</strong><p>Follow structured, independently paced instructional material.</p></article>
-   <article><strong>02 · Ask</strong><p>Get support from designated adults and academic staff when needed.</p></article>
-   <article><strong>03 · Grow</strong><p>Receive feedback and develop stronger learning habits.</p></article></div></section>`;
+   <h2>Thoughtful lessons. Real questions. Meaningful connections.</h2><p>${learningCopy}</p>
+   <div class="row"><article><strong>01 · Learn</strong><p>Explore structured lessons with room to review and build understanding.</p></article>
+   <article><strong>02 · Ask</strong><p>Ask questions and seek support from the people designated to help.</p></article>
+   <article><strong>03 · Grow</strong><p>Practice independent learning and build confidence along the way.</p></article></div></section>`;
  const events=(context.events??[]).slice(0,6).map(event=>{
    let when="Details to be confirmed";
    try {
@@ -189,28 +189,28 @@ export function renderFamilyBrandPage(context:FamilyBrandContext,kind:FamilyBran
    <span>I am an adult and consent to this school receiving my response${kind==="survey"?", with follow-up only if I select it":" and contacting me about its plans"}. I can ask to stop updates at any time.</span></label>`;
  const form=`<form class="form" id="respond" method="post" action="/family/interest">
    <span class="eyebrow">${kind==="survey"?"Family feedback":"Stay in the conversation"}</span>
-   <h2>${kind==="survey"?"Tell us what matters to your family.":"Share your interest."}</h2>
+   <h2>${kind==="survey"?"What matters most to your family?":"What would you like to know?"}</h2>
    ${shared}
    <input type="hidden" name="responseKind" value="${kind}">
    ${kind==="survey"?survey:interest}
    ${consent}
    <p class="fine">We do not ask for children's names or application information. Your answer is not enrollment.</p>
-   <button type="submit"${params.preview?" disabled":""}>${kind==="survey"?"Submit family survey":"Request school updates"}</button>
+   <button type="submit"${params.preview?" disabled":""}>${kind==="survey"?"Share my feedback":"Request school updates"}</button>
    ${params.preview?'<p role="status" class="fine">This private design preview does not save responses.</p>':""}
    </form>`;
  const body=`<main id="main">${hero}<div class="main">${kind==="landing"?learning+eventSection:""}
-   <section style="margin:38px 0"><h2>What is available today?</h2>
-     <p>You can explore the school's proposed approach and share feedback. Applications, confirmed tuition, opening dates and admission offers are not available through this invitation.</p>
+   <section style="margin:38px 0"><h2>Help shape what comes next.</h2>
+     <p>Explore the vision, tell us what your family would value, and let us know which questions deserve answers. The school is in planning; applications, confirmed tuition, opening dates, and admission offers are not available through this invitation.</p>
    </section>${form}
    <p style="text-align:center;margin-top:30px"><a href="${safeHref(kind==="landing"?params.surveyHref:params.landingHref)}">
-   ${kind==="landing"?"Prefer to share more? Take the three-minute family survey.":"Return to the school introduction."}</a></p></div></main>`;
+   ${kind==="landing"?"Want to help shape the idea? Take the three-minute family survey.":"Return to the school introduction."}</a></p></div></main>`;
  return shell(context,kind==="survey"?"Family Survey":"Family Interest",body,params.preview,kind);
 }
 
 export function familyBrandEmailSubject(kind:FamilyBrandEmailKind,schoolName:string):string {
  const name=schoolName.trim().slice(0,120);
- return kind==="confirmation"?`Thank you for your interest in ${name}`:
-   kind==="update"?`An update from ${name}`:`Help shape ${name}: a family survey`;
+ return kind==="confirmation"?`Thank you for connecting with ${name}`:
+   kind==="update"?`What's taking shape at ${name}`:`What would you want in ${name}?`;
 }
 
 /** Email-safe tables + inline styles; no remote sample logos, fonts or tracking. */
@@ -220,12 +220,12 @@ export function renderFamilyBrandEmail(context:FamilyBrandContext,kind:FamilyBra
  const {brand,copy,shape}=design(context);
  const name=escape(brand.schoolName),first=escape(params.firstName||"there");
  const actionUrl=safeHref(params.actionUrl),subject=familyBrandEmailSubject(kind,brand.schoolName);
- const heading=kind==="confirmation"?`Thank you, ${first}.`:kind==="update"?"What we're working on.":"Help us plan with you.";
+ const heading=kind==="confirmation"?`Thank you, ${first}.`:kind==="update"?"Here's what's taking shape.":"Help shape a school for your community.";
  const body=kind==="confirmation"
-   ?`We're glad you reached out to ${name}. We have received your request and will share verified news as it becomes available.`
-   :kind==="update"?`Here is what we're exploring as our school plan develops. Nothing here represents an approved opening, admission or tuition offer.`
-   :`Your perspective helps shape a thoughtful school. Please tell us what matters most to your family in our three-minute survey.`;
- const cta=kind==="confirmation"?"Learn about the school":kind==="update"?"Read the school update":"Take the family survey";
+   ?`Thanks for taking an interest in ${name}. We received your response. As confirmed information becomes available, you can learn more about the school and the next steps.`
+   :kind==="update"?`An idea for a school becomes stronger through the questions and perspectives of its community. Explore the latest information the school has chosen to share. Opening, admission, and tuition details are not confirmed by this email.`
+   :`What would you want in a school built with your community in mind? We're exploring an educational idea and inviting families to tell us what matters most. Our three-minute survey is a chance to help shape the conversation.`;
+ const cta=kind==="confirmation"?"Explore the school vision":kind==="update"?"See what's new":"Share your perspective";
  const bg=brand.theme.canvas,ink=brand.theme.ink,accent=brand.accent;
  const disclosure=`${statusFor(context)} Receiving this email alone does not opt you in to future updates.`;
  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title></head>
