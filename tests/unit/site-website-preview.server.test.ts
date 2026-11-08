@@ -148,11 +148,11 @@ describe("read-only church partner website", () => {
 
   it("renders proposed editor copy only inside the private scoped draft preview", async () => {
     const initial = await getPartnerWebsitePreview(editor());
-    expect(initial.previewHtml).toContain("<h1>A place to belong. A future to build.</h1>");
+    expect(initial.previewHtml).toContain("<h1>A school that sees the individual. A community that helps them grow.</h1>");
     state.reads = 0;
     const proposal = createSchoolWebsiteStarterContent("Partner Academy");
     const draft = await getPartnerWebsitePreview(editor(), proposal);
-    expect(draft.previewHtml).toContain("<h1>A place to belong. A future to build.</h1>");
+    expect(draft.previewHtml).toContain("<h1>A school that sees the individual. A community that helps them grow.</h1>");
     expect(draft.previewHtml).toContain("Partner Academy");
     expect(draft.previewPages["/"]).toContain(proposal.localDescription);
     expect(draft.editingContent).toBeNull();
