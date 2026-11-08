@@ -699,7 +699,7 @@ function LocalWebsiteCopyEditor({
             no logo, third-party font, photograph or CSS is copied automatically.</p>
         </div>
       </fieldset>
-      <SchoolBrandPreview schoolName={data.siteName} branding={content.branding}/>
+      <SchoolBrandPreview siteId={data.siteId} schoolName={data.siteName} branding={content.branding}/>
       </div>}
       {step === 3 && <div className="space-y-5">
       <h3 className="font-serif text-2xl">Photos &amp; artwork</h3>
