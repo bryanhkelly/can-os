@@ -162,25 +162,31 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ["Spiritual formation", local.spiritualFormation],
   ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
   const image = local?.branding.heroImage;
+  // Fictional template photography is only for private, authenticated previews.
+  // Approved Site media takes precedence. Published pages never use these assets.
+  const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => {
+    const sample=templateSampleImage(templateId,slot==="hero"?"hero":"story_01");
+    return sample ? {src:sample,altText:"Illustrative template photography, not this school's students or facilities",
+      assetId:"template-sample",sourceRevision:"v1"} : null;
+  };
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
-    if (options?.templateGallery || sampleTemplate) {
-      const sample = templateSampleImage(templateId, slot === "hero" ? "hero" : "story_01");
-      return sample ? {src:sample,altText:"Fictional template sample, not this school",assetId:"template-sample",sourceRevision:"v1"} : null;
-    }
+    if(options?.templateGallery || sampleTemplate)return sampleMedia(slot);
     const candidate=page.media?.[slot];
-    if(!candidate)return null;
-    try{
-      const url=new URL(candidate.src);
-      if(url.protocol!=="https:" || url.host!==host ||
-        !/^\/media\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(url.pathname) ||
-        url.search || url.hash)return null;
-      return candidate;
-    }catch{return null;}
+    if(candidate) {
+      try {
+        const url=new URL(candidate.src);
+        if(url.protocol==="https:" && url.host===host &&
+          /^\\/media\\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(url.pathname) &&
+          !url.search && !url.hash)return candidate;
+      }catch{ /* Invalid photo URL: never treat it as approved. */ }
+    }
+    return options?.localPreview ? sampleMedia(slot) : null;
   };
   const approvedHero=ownedMedia("hero");
   const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src;
   const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
   const heroHasPhoto=Boolean(image||approvedHero);
+  const showingSamplePhotography=approvedHero?.assetId==="template-sample" && !image;
   const campusMosaicImages = options?.templateGallery || sampleTemplate
     ? [] : (["academics", "studentLife", "campus"] as const).map(slot => {
       const media=ownedMedia(slot);
@@ -812,7 +818,8 @@ ${composePublicSiteChrome(templateId, {
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
-  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>`,
+  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview ? `<p role="note" class="template-photo-disclosure">Illustrative template photography — not actual students or facilities of this school.</p>` : ""}
+  ${pageContent[path]}\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Demonstration only · No applications, enrollment or payments.</p>' : ""}</footer>`,
 })}
 </body>
