@@ -271,7 +271,8 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
     const followUpAllowed = data.responseKind !== "survey" || data.contactPreference !== "none";
     if (prior) {
       if (data.responseKind !== "survey") return;
-      const currentMessage = [prior.message, data.message].filter(Boolean).join("\n").slice(0,500);
+      const currentMessage = prior.message.includes(data.message)
+        ? prior.message : [prior.message, data.message].filter(Boolean).join("\n").slice(0,500);
       const consentChanged = Boolean(prior.contactConsentAt) !== followUpAllowed;
       if (currentMessage === prior.message && !consentChanged) return;
       await tx.update(publicAdmissionsInterests).set({
