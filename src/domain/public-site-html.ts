@@ -164,11 +164,18 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const image = local?.branding.heroImage;
   // Fictional template photography is only for private, authenticated previews.
   // Approved Site media takes precedence. Published pages never use these assets.
-  const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => {
-    const sample=templateSampleImage(templateId,slot==="hero"?"hero":"story_01");
-    return sample ? {src:sample,altText:"Illustrative template photography, not this school's students or facilities",
-      assetId:"template-sample",sourceRevision:"v1"} : null;
+  // Each photographic slot has its own role; do not repeat the hero or
+  // substitute another template's campus as a multi-page fallback.
+  const roleForSlot: Record<keyof PublicSchoolSiteMedia, import("./template-sample-images").TemplatePhotographyRole> = {
+    hero:"hero", about:"story_01", academics:"program_01",
+    studentLife:"community_01", families:"community_02", campus:"story_02",
   };
+  const sampleForRole = (role:import("./template-sample-images").TemplatePhotographyRole) => {
+    const sample=templateSampleImage(templateId,role);
+    return sample ? {src:sample,altText:"Illustrative template photography, not this school's students or facilities",
+      assetId:"template-sample",sourceRevision:"v2"} : null;
+  };
+  const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => sampleForRole(roleForSlot[slot]);
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
     if(options?.templateGallery || sampleTemplate)return sampleMedia(slot);
     const candidate=page.media?.[slot];
@@ -187,12 +194,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
   const heroHasPhoto=Boolean(image||approvedHero);
   const showingSamplePhotography=approvedHero?.assetId==="template-sample" && !image;
-  const campusMosaicImages = options?.templateGallery || sampleTemplate
-    ? [] : (["academics", "studentLife", "campus"] as const).map(slot => {
-      const media=ownedMedia(slot);
-      return media ? '<img src="' + escapePublicHtml(media.src) +
-        '" alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
-    });
+  const campusMosaicImages = (["academics", "studentLife", "campus"] as const).map(slot => {
+    const media=ownedMedia(slot);
+    return media ? '<img src="' + escapePublicHtml(media.src) +
+      '" alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
+  });
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/academics": "Academics",
     "/student-life": "Student life", "/school-day": "Learning model",
@@ -622,10 +628,20 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ${availablePaths.includes("/faq") ? '<a class="text-action" href="/faq">Read admissions guidance →</a>' : ""}
     ${availablePaths.includes("/contact") ? '<a class="text-action" href="/contact">Contact the school →</a>' : ""}
     </section>`;
+  const interiorRoles:Partial<Record<PublicSitePath, import("./template-sample-images").TemplatePhotographyRole>> = {
+    "/about":"story_01", "/academics":"program_01",
+    "/student-life":"community_01", "/school-day":"program_02",
+    "/admissions":"admissions", "/tuition":"story_02",
+    "/families":"community_02", "/faq":"portrait_03", "/contact":"portrait_02",
+  };
   const interiorMediaSlot:keyof PublicSchoolSiteMedia = path === "/about" ? "about" :
     path === "/student-life" ? "studentLife" : path === "/families" ? "families" :
     path === "/contact" ? "campus" : "academics";
-  const approvedInterior = ownedMedia(interiorMediaSlot);
+  const interiorRole=interiorRoles[path];
+  const siteInterior=ownedMedia(interiorMediaSlot);
+  const approvedInterior = (options?.localPreview || options?.templateGallery) && interiorRole
+    && siteInterior?.assetId === "template-sample"
+    ? sampleForRole(interiorRole) : siteInterior;
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero${approvedInterior?" has-image":""}">
       ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}" alt="${escapePublicHtml(approvedInterior.altText)}" decoding="async"/>` : ""}
