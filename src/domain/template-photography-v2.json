@@ -1,0 +1,222 @@
+{
+  "version": 2,
+  "activation": "requires R2 upload and origin validation; controlled by CAN_TEMPLATE_PHOTOS_V2_ENABLED",
+  "source": "Uploaded CAN OS photography batches, normalized JPEG files",
+  "files": [
+    {
+      "template": "heritage",
+      "role": "hero",
+      "key": "school-template-previews/v2/heritage/hero.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "story_01",
+      "key": "school-template-previews/v2/heritage/story_01.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "story_02",
+      "key": "school-template-previews/v2/heritage/story_02.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "program_01",
+      "key": "school-template-previews/v2/heritage/program_01.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "program_02",
+      "key": "school-template-previews/v2/heritage/program_02.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "program_03",
+      "key": "school-template-previews/v2/heritage/program_03.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "community_01",
+      "key": "school-template-previews/v2/heritage/community_01.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "community_02",
+      "key": "school-template-previews/v2/heritage/community_02.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "admissions",
+      "key": "school-template-previews/v2/heritage/admissions.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "portrait_01",
+      "key": "school-template-previews/v2/heritage/portrait_01.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "portrait_02",
+      "key": "school-template-previews/v2/heritage/portrait_02.jpg"
+    },
+    {
+      "template": "heritage",
+      "role": "portrait_03",
+      "key": "school-template-previews/v2/heritage/portrait_03.jpg"
+    },
+    {
+      "template": "community",
+      "role": "hero",
+      "key": "school-template-previews/v2/community/hero.jpg"
+    },
+    {
+      "template": "community",
+      "role": "story_01",
+      "key": "school-template-previews/v2/community/story_01.jpg"
+    },
+    {
+      "template": "community",
+      "role": "story_02",
+      "key": "school-template-previews/v2/community/story_02.jpg"
+    },
+    {
+      "template": "community",
+      "role": "program_01",
+      "key": "school-template-previews/v2/community/program_01.jpg"
+    },
+    {
+      "template": "community",
+      "role": "program_02",
+      "key": "school-template-previews/v2/community/program_02.jpg"
+    },
+    {
+      "template": "community",
+      "role": "program_03",
+      "key": "school-template-previews/v2/community/program_03.jpg"
+    },
+    {
+      "template": "community",
+      "role": "community_01",
+      "key": "school-template-previews/v2/community/community_01.jpg"
+    },
+    {
+      "template": "community",
+      "role": "community_02",
+      "key": "school-template-previews/v2/community/community_02.jpg"
+    },
+    {
+      "template": "community",
+      "role": "admissions",
+      "key": "school-template-previews/v2/community/admissions.jpg"
+    },
+    {
+      "template": "community",
+      "role": "portrait_01",
+      "key": "school-template-previews/v2/community/portrait_01.jpg"
+    },
+    {
+      "template": "community",
+      "role": "portrait_02",
+      "key": "school-template-previews/v2/community/portrait_02.jpg"
+    },
+    {
+      "template": "community",
+      "role": "portrait_03",
+      "key": "school-template-previews/v2/community/portrait_03.jpg"
+    },
+    {
+      "template": "modern",
+      "role": "hero",
+      "key": "school-template-previews/v2/modern/hero.jpg"
+    },
+    {
+      "template": "modern",
+      "role": "story_01",
+      "key": "school-template-previews/v2/modern/story_01.jpg"
+    },
+    {
+      "template": "modern",
+      "role": "story_02",
+      "key": "school-template-previews/v2/modern/story_02.jpg"
+    },
+    {
+      "template": "modern",
+      "role": "program_01",
+      "key": "school-template-previews/v2/modern/program_01.jpg"
+    },
+    {
+      "template": "modern",
+      "role": "program_02",
+      "key": "school-template-previews/v2/modern/program_02.jpg"
+    },
+    {
+      "template": "modern",
+      "role": "program_03",
+      "key": "school-template-previews/v2/modern/program_03.jpg"
+    },
+    {
+      "template": "bright",
+      "role": "hero",
+      "key": "school-template-previews/v2/bright/hero.jpg"
+    },
+    {
+      "template": "bright",
+      "role": "story_01",
+      "key": "school-template-previews/v2/bright/story_01.jpg"
+    },
+    {
+      "template": "bright",
+      "role": "story_02",
+      "key": "school-template-previews/v2/bright/story_02.jpg"
+    },
+    {
+      "template": "bright",
+      "role": "program_01",
+      "key": "school-template-previews/v2/bright/program_01.jpg"
+    },
+    {
+      "template": "bright",
+      "role": "program_02",
+      "key": "school-template-previews/v2/bright/program_02.jpg"
+    },
+    {
+      "template": "bright",
+      "role": "program_03",
+      "key": "school-template-previews/v2/bright/program_03.jpg"
+    },
+    {
+      "template": "summit",
+      "role": "hero",
+      "key": "school-template-previews/v2/summit/hero.jpg"
+    },
+    {
+      "template": "summit",
+      "role": "story_01",
+      "key": "school-template-previews/v2/summit/story_01.jpg"
+    },
+    {
+      "template": "summit",
+      "role": "story_02",
+      "key": "school-template-previews/v2/summit/story_02.jpg"
+    },
+    {
+      "template": "summit",
+      "role": "program_01",
+      "key": "school-template-previews/v2/summit/program_01.jpg"
+    },
+    {
+      "template": "summit",
+      "role": "program_02",
+      "key": "school-template-previews/v2/summit/program_02.jpg"
+    },
+    {
+      "template": "summit",
+      "role": "program_03",
+      "key": "school-template-previews/v2/summit/program_03.jpg"
+    },
+    {
+      "template": "campus",
+      "role": "hero",
+      "key": "school-template-previews/v2/campus/hero.jpg"
+    }
+  ]
+}
