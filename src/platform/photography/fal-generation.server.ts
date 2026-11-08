@@ -15,7 +15,7 @@ function credentials(injectedKey?:string):string {
   // Never put raw untrimmed secrets into HTTP header values.
   const key=(injectedKey ?? process.env.FAL_KEY)?.trim();
   if(!key)throw new Error("FAL_KEY is not configured on the server");
-  if(/[\\r\\n\\x00-\\x1F\\x7F]/.test(key))
+  if(/[\r\n\x00-\x1F\x7F]/.test(key))
     throw new Error("FAL_KEY contains invalid HTTP header characters");
   return key;
 }
