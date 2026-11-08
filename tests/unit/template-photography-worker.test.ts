@@ -1,9 +1,18 @@
 import {describe,expect,it} from "vitest";
 import {jpegDimensions} from "@/platform/photography/scheduled-production.server";
+import {normalizeFalKey} from "@/platform/photography/fal-generation.server";
 import {templatePhotographyRoles} from "@/domain/template-photography-production";
 import {siteTemplateIds} from "@/domain/site-theme";
 
 describe("4K template photography import checks",()=>{
+  it("accepts multiline copied fal keys without admitting HTTP header injection",()=>{
+    expect(normalizeFalKey("  id:secret\r\n")).toBe("id:secret");
+    expect(normalizeFalKey("id:\nse\tcret")).toBe("id:secret");
+    expect(normalizeFalKey(" id:\u200Bsecret ")).toBe("id:secret");
+    expect(()=>normalizeFalKey("bad\x00key")).toThrow(/invalid HTTP header characters/);
+    expect(()=>normalizeFalKey(" \n ")).toThrow(/empty after whitespace normalization/);
+  });
+
   it("requires a well-formed JPEG with an actual SOF marker",()=>{
     expect(jpegDimensions(new Uint8Array([137,80,78,71]))).toBeNull();
     expect(jpegDimensions(new Uint8Array([255,216,255,217]))).toBeNull();
