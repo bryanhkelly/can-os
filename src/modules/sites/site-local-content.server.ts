@@ -12,6 +12,15 @@ import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-pol
 import { DomainError } from "@/domain/errors";
 
 import { EventTypes } from "@/domain/event-types";
+/** PostgreSQL jsonb does not retain JavaScript object insertion order.
+ * Compare logical website documents without weakening baseline immutability. */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item,
+  );
+}
 type Reader = Pick<typeof db, "select">;
 
 /** Read ONLY the latest locally published content for the live website. */
@@ -102,7 +111,7 @@ export async function publishPartnerLocalContentWithinTransaction(
     if (original && input.operation === "restore") {
       content = { ...content, editorialBaseline: original };
     } else if (original &&
-      JSON.stringify(content.editorialBaseline) !== JSON.stringify(original)) {
+      canonicalJson(content.editorialBaseline) !== canonicalJson(original)) {
       throw new DomainError("CONFLICT", "Saved original website copy differs from the current draft; reload the saved baseline.");
     }
 
@@ -111,7 +120,7 @@ export async function publishPartnerLocalContentWithinTransaction(
     // Protected claims are screened again when the editor requests publication.
     const decision = input.operation === "draft"
       ? { status: "draft" as const, flaggedFields: [] as string[] } : classified;
-    if (latest && JSON.stringify(latest.content) === JSON.stringify(content) &&
+    if (latest && canonicalJson(latest.content) === canonicalJson(content) &&
       latest.status === decision.status) {
       if(actor.role === "site_admin" && decision.status === "published")
         await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
