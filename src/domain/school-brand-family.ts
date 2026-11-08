@@ -11,6 +11,7 @@ export type FamilyBrandContext = {
   siteName: string;
   branding: SiteLocalBranding;
   introduction?: string;
+  informationOnly?: boolean;
 };
 export type FamilyBrandEmailKind = "confirmation" | "update" | "survey";
 export type FamilyBrandPageKind = "landing" | "survey";
@@ -45,6 +46,11 @@ function design(context:FamilyBrandContext){
   return {brand,copy,shape};
 }
 const statusCopy="School in planning · Not accepting applications. No opening, admissions, tuition or authorization claims are made here.";
+function statusFor(context:FamilyBrandContext) {
+  return context.informationOnly
+    ? "School information invitation only · This page is not an application or an enrollment offer. Official admissions and opening approvals are managed separately."
+    : statusCopy;
+}
 const learningCopy="Explore structured, often asynchronous instruction; connect with adults for questions and academic support; and build confident independent learning habits.";
 
 function shell(context:FamilyBrandContext,title:string,body:string,preview:boolean,kind:FamilyBrandPageKind) {
@@ -96,11 +102,11 @@ function shell(context:FamilyBrandContext,title:string,body:string,preview:boole
     <style>${css}</style></head><body data-design="${brand.templateId}">
     <a class="skip" href="#main">Skip to content</a>
     ${preview?'<div class="preview" role="note">PRIVATE DESIGN PREVIEW · Forms do not submit or save data.</div>':""}
-    <div class="status" role="note">${statusCopy}</div>
+    <div class="status" role="note">${statusFor(context)}</div>
     <header class="top"><span class="brand"><span class="mark" aria-hidden="true">${escape(brand.monogram)}</span>${escape(brand.schoolName)}</span>
       <span class="eyebrow">${escape(copy.eyebrow)}</span></header>
     ${body}
-    <footer><strong>${escape(brand.schoolName)}</strong> · ${escape(copy.tagline)}<p>${statusCopy} A response is not a school application or an enrollment offer.</p>
+    <footer><strong>${escape(brand.schoolName)}</strong> · ${escape(copy.tagline)}<p>${statusFor(context)} A response is not a school application or an enrollment offer.</p>
       ${preview?'<p>Preview only. Nothing is saved or sent.</p>':'<p>To stop future updates, contact the school and request removal.</p>'}
     </footer></body></html>`;
 }
@@ -202,7 +208,7 @@ export function renderFamilyBrandEmail(context:FamilyBrandContext,kind:FamilyBra
    :`Your perspective helps shape a thoughtful school. Please tell us what matters most to your family in our three-minute survey.`;
  const cta=kind==="confirmation"?"Learn about the school":kind==="update"?"Read the school update":"Take the family survey";
  const bg=brand.theme.canvas,ink=brand.theme.ink,accent=brand.accent;
- const disclosure=`${statusCopy} Receiving this email alone does not opt you in to future updates.`;
+ const disclosure=`${statusFor(context)} Receiving this email alone does not opt you in to future updates.`;
  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title></head>
  <body style="margin:0;padding:0;background:${bg};color:${ink};font-family:${brand.theme.bodyFont}">
  <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escape(copy.tagline)} · School planning update.</div>
