@@ -63,14 +63,14 @@ export async function publishPartnerLocalContentWithinTransaction(
     }).from(sitePublications)
       .where(eq(sitePublications.siteId, site.id)).for("update").limit(1);
     if (!sitePublication) {
-      throw new Error("This Site needs a reserved public address before editing website copy");
+      throw new DomainError("UNAVAILABLE", "Reserve a school website address before saving a draft.");
     }
     const [latest] = await tx.select().from(siteLocalContentVersions)
       .where(eq(siteLocalContentVersions.siteId, site.id))
       .orderBy(desc(siteLocalContentVersions.revision)).limit(1);
     const currentRevision = latest?.revision ?? 0;
     if (input.expectedRevision !== currentRevision)
-      throw new Error("Website content was updated. Refresh before saving your changes.");
+      throw new DomainError("CONFLICT", "Website content revision changed; refresh before saving.");
 
     let content: SiteLocalContent;
     let restoredFromRevision: number | null = null;
@@ -103,7 +103,7 @@ export async function publishPartnerLocalContentWithinTransaction(
       content = { ...content, editorialBaseline: original };
     } else if (original &&
       JSON.stringify(content.editorialBaseline) !== JSON.stringify(original)) {
-      throw new Error("The original website copy cannot be replaced after its first save");
+      throw new DomainError("CONFLICT", "Saved original website copy differs from the current draft; reload the saved baseline.");
     }
 
     const classified = classifySiteLocalContent(content);
