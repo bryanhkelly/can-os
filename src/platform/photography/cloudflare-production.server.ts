@@ -106,16 +106,18 @@ export type PhotoCronResult={status:"disabled"|"active";scanned:number;submitted
 const legacyHeaderFailureCutoff="2026-11-08T19:50:00.000Z";
 const jobPrefix="school-template-production/v1/";
 function canRescue(job:JobState):boolean{
-  if(job.requestId||(job.rescueCount??0)!==0)return false;
-  // Legacy "reserved" jobs failed constructing an HTTP Authorization header,
-  // before fal.ai could accept or bill a request.
-  if(job.status==="reserved")
-    return job.updatedAt<legacyHeaderFailureCutoff &&
-      Date.now()-Date.parse(job.updatedAt)>5*60*1000;
-  // Exact preflight validation failure (before any provider network call).
-  // Allow a single retry, but only once a correctly formatted key is present.
-  return job.status==="rejected" &&
-    job.reason==="FAL_KEY contains invalid HTTP header characters";
+  // Never repeat a job that has a provider request ID: it might be billable.
+  if(job.requestId)return false;
+  // Only this exact local preflight error is guaranteed to have happened
+  // before any request reached fal.ai. Once the key is replaced, a single
+  // submission can proceed. A subsequent provider rejection has a different
+  // reason and will not be retried automatically.
+  if(job.status==="rejected")
+    return job.reason==="FAL_KEY contains invalid HTTP header characters";
+  // Older reserved jobs can be retried only once, after a short cooling period.
+  return job.status==="reserved" && (job.rescueCount??0)===0 &&
+    job.updatedAt<legacyHeaderFailureCutoff &&
+    Date.now()-Date.parse(job.updatedAt)>5*60*1000;
 }
 function safeError(error:unknown):string{
   if(!(error instanceof Error))return "Unknown provider submission failure";
