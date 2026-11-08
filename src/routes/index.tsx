@@ -29,7 +29,7 @@ function HomePage() {
     : getWorkspaceHome(session.role) : undefined;
   if (recovered) return (
     <WorkspaceShell title="Home" eyebrow="CAN OS">
-      <p role="status">The previous page could not be opened with your current account. You are home.</p>
+      <p role="status">The requested page could not be opened. You can open your workspace below; no account access changes were made.</p>
       {destination && <Link to={destination} className="mt-4 inline-block underline">Open my workspace</Link>}
     </WorkspaceShell>
   );
