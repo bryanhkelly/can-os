@@ -1,0 +1,51 @@
+name: Family brand integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/domain/school-brand-family.ts'
+      - 'src/domain/family-recruitment-interest.ts'
+      - 'src/modules/sites/site-family-brand.server.ts'
+      - 'src/modules/enrollment/family-invitations.server.ts'
+      - 'src/modules/enrollment/public-admissions-interest.server.ts'
+      - 'src/modules/communication/notification-email.server.ts'
+      - 'src/routes/family.interest.ts'
+      - 'src/routes/brand-preview.ts'
+      - 'src/routes/site-website.tsx'
+      - 'src/components/launch-studio/SchoolBrandPreview.tsx'
+      - 'tests/unit/school-brand-family.test.ts'
+      - 'docs/platform-route-contracts.json'
+      - '.github/workflows/family-brand-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  family:
+    name: ${{ matrix.target }} family brand tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [cloudflare, netlify]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Seven branded emails, landing pages and survey validation
+        run: npx vitest run tests/unit/school-brand-family.test.ts tests/unit/family-invitations.test.ts tests/unit/public-admissions-interest.test.ts
+      - name: Netlify production build
+        if: matrix.target == 'netlify'
+        run: npm run build
+      - name: Cloudflare Worker production build
+        if: matrix.target == 'cloudflare'
+        run: npm run build:cloudflare
+      - name: Canonical route ownership validation
+        if: matrix.target == 'netlify'
+        run: node scripts/check-platform-route-contracts.mjs --check
