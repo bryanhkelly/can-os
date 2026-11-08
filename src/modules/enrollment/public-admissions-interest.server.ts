@@ -289,10 +289,13 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
       } else if (!prior.contactConsentAt) {
         // A family can opt in after a prior no-contact survey. Create the
         // canonical follow-up only once under the recipient advisory lock.
-        const [existingAction] = await tx.select({id:actions.id}).from(actions)
+        const [existingAction] = await tx.select({id:actions.id,status:actions.status}).from(actions)
           .where(and(eq(actions.subjectType,"public_admissions_interest"),
             eq(actions.subjectId,prior.id),
             eq(actions.type,"public_admissions_interest_followup"))).limit(1);
+        if (existingAction && existingAction.status==="resolved") {
+          await tx.update(actions).set({status:"open"}).where(eq(actions.id,existingAction.id));
+        }
         if (!existingAction) {
           const [newAction] = await tx.insert(actions).values({
             type:"public_admissions_interest_followup",
