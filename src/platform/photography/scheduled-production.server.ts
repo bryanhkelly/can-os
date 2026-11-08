@@ -30,7 +30,7 @@ async function r2Write(key:string,pattern:RegExp,contents:Uint8Array,type:string
     contentType:type,expiresSeconds:120,preventOverwrite:createOnly});
   const response=await fetch(signed,{method:"PUT",redirect:"error",
     headers:{"Content-Type":type,...(createOnly?{"If-None-Match":"*"}:{})},
-    body:contents});
+    body:new Uint8Array(contents).buffer});
   if(createOnly&&[409,412].includes(response.status))return false;
   if(!response.ok)throw Error(`R2 write failure ${response.status}`);
   return true;
@@ -42,7 +42,8 @@ async function getCursor():Promise<number>{
   if(response.status===404)return 0;
   if(!response.ok)throw Error("R2 photography cursor unavailable");
   const value=await response.json() as {index?:number};
-  return Number.isInteger(value.index)&&value.index!>=0&&value.index!<84?value.index!:0;
+  return typeof value.index==="number" && Number.isInteger(value.index) &&
+    value.index>=0 && value.index<84 ? value.index : 0;
 }
 async function saveCursor(index:number){
   await r2Write(cursorKey,stateKeyPattern,jsonBytes({index}),"application/json");
@@ -102,7 +103,7 @@ export type ProductionOutcome={
   status:"disabled"|"active";
 };
 /**
- * Worker cron entry point. No public route. Max 2 new billable jobs per tick,
+ * Worker cron entry point. No public route. Max 4 new billable jobs per tick,
  * once per template/role, with a persistent R2 reservation made BEFORE billing.
  * Rejected jobs never retry automatically; there is no accidental spend loop.
  */
