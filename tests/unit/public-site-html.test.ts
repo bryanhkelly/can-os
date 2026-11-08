@@ -36,10 +36,10 @@ describe("standalone public site HTML", () => {
           branding:{...emptySiteLocalContent.branding,templateId}},
       };
       const privateHtml=renderPublicSiteHtml(page,{localPreview:true});
-      expect(privateHtml).toContain("school-template-previews/v1/");
+      expect(privateHtml).toContain("/template-photo/");
       expect(privateHtml).toContain("Illustrative template photography");
       const publicHtml=renderPublicSiteHtml(page);
-      expect(publicHtml).not.toContain("school-template-previews/v1/");
+      expect(publicHtml).not.toContain("/template-photo/");
       expect(publicHtml).not.toContain("Illustrative template photography");
     }
   });
@@ -666,7 +666,7 @@ describe("standalone public site HTML", () => {
 it("uses explicit sample photography only in the fictional private template preview",()=>{
  const page={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"School"},offerings:[],demonstration:true};
  const preview=renderPublicSiteHtml(page,{localPreview:true,sampleTemplate:"heritage"});
- expect(preview).toContain("/school-template-previews/v1/heritage/hero.jpg");
+ expect(preview).toContain("//template-photo/heritage/hero.jpg");
  expect(preview).not.toContain("data:image/svg+xml,");
  expect(renderPublicSiteHtml(page,{sampleTemplate:"heritage"})).not.toContain("/school-template-previews/");
  expect(renderPublicSiteHtml({...page,demonstration:false},{localPreview:true,sampleTemplate:"heritage"})).not.toContain("/school-template-previews/");
