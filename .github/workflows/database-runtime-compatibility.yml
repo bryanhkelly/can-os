@@ -1,0 +1,40 @@
+name: Database runtime compatibility
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/db/client.ts'
+      - 'src/cloudflare-demo.ts'
+      - 'tests/unit/database-request-scope.test.ts'
+      - 'tests/unit/cloudflare-database-entry.test.ts'
+      - '.github/workflows/database-runtime-compatibility.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    name: ${{ matrix.runtime }} build and database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [netlify, cloudflare]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Request-isolation and entry-point tests
+        run: npx vitest run tests/unit/database-request-scope.test.ts tests/unit/cloudflare-database-entry.test.ts
+      - name: Build Netlify server and client
+        if: matrix.runtime == 'netlify'
+        run: npm run build
+      - name: Build Cloudflare Worker
+        if: matrix.runtime == 'cloudflare'
+        run: npm run build:cloudflare
