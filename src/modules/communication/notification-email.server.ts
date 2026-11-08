@@ -14,6 +14,8 @@ export type NotificationEmailMessage = {
   to: string;
   subject: string;
   text: string;
+  /** Only HTML produced by a server-owned, escaped template. Never user HTML. */
+  html?: string;
   actionUrl?: string;
   attachments?: { filename: string; content: string; contentType: string }[];
 };
@@ -69,6 +71,7 @@ export async function sendNotificationEmail(
         to: [message.to],
         subject: message.subject,
         text,
+        ...(message.html ? { html: message.html } : {}),
         ...(message.attachments?.length ? {
           attachments: message.attachments.map(attachment => ({
             filename: attachment.filename,
