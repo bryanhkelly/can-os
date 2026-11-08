@@ -307,12 +307,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     </article>`;
   }).join("\n");
   const hasOpenApplications = !demo && (page.academicPrograms ?? []).some(program => program.applicationOpen === true);
-  const foundingFamilies = !hasOpenApplications && (page.academicPrograms ?? []).some(program =>
+  const foundingFamilies = !demo && !hasOpenApplications && (page.academicPrograms ?? []).some(program =>
     program.availability === "planned");
   const navigationCtaPath = availablePaths.includes("/admissions") && hasOpenApplications ? "/admissions" :
     availablePaths.includes("/academics") ? "/academics" :
     availablePaths.includes("/contact") ? "/contact" : "/";
-  const navigationCtaLabel = hasOpenApplications ? "Applications" :
+  const navigationCtaLabel = demo ? "Explore learning" : hasOpenApplications ? "Applications" :
     foundingFamilies ? "Founding families" :
     availablePaths.includes("/academics") ? "Explore programs" :
     availablePaths.includes("/contact") ? "Contact" : "Home";
@@ -627,10 +627,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // The parent journey uses only pages backed by approved public projections.
   // This navigation is shared by all schools and never fabricates availability.
   const exploreLinks = [
-    { path: "/academics", label: "Academics", description: "Discover our published learning programs." },
-    { path: "/school-day", label: "The school day", description: "Understand reviewed learning days and delivery patterns." },
-    { path: "/student-life", label: "Student life", description: "Explore published enrichment and activities." },
-    { path: "/admissions", label: "Admissions", description: "Learn about eligibility and available next steps." },
+    { path: "/academics", label: "Academics", description: demo ? "Explore purposeful, connected learning." : "Discover our published learning programs." },
+    { path: "/school-day", label: "The school day", description: demo ? "Discover a rhythm built for focus and connection." : "Understand reviewed learning days and delivery patterns." },
+    { path: "/student-life", label: "Student life", description: demo ? "Find creativity, friendship, and shared purpose." : "Explore published enrichment and activities." },
+    { path: "/admissions", label: "Admissions", description: demo ? "Picture a thoughtful journey toward the right fit." : "Learn about eligibility and available next steps." },
   ].filter(link => availablePaths.includes(link.path as PublicSitePath));
   const exploreSection = exploreLinks.length > 1
     ? `<section class="explore-section editorial-section" aria-labelledby="explore-title">
@@ -649,7 +649,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping young people discover their strengths—and what they can do with them.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
     story: homeStory,
     explore: exploreSection,
-    academics: programOverview,
+    academics: programOverview || (demo ? demoAcademicCards : ""),
     enrichment: page.offerings.length || (demo && local) ? enrichmentSection
       : !academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
     closing: demo ? `<section class="closing-action"><p class="tag">The possibilities ahead</p>
@@ -671,12 +671,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
     "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", demo ? "A day designed for more than lessons." : "What a day of learning looks like",
       demo ? "A thoughtful rhythm of independent discovery, academic guidance, and time to connect." : "See how learning is organized, with confirmed schedules and attendance details where available."),
-      reviewedSchoolDay + schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
-      (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : "")),
+      reviewedSchoolDay + (demo ? "" : schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
+      (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : ""))),
     "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "The right school changes what feels possible",
       demo ? "Explore an admissions journey centered on understanding each family's questions and finding the right fit." : "Choosing a school is a personal decision. Find reviewed admissions information and the next step currently available to your family."), admissionsNextSteps, demo ? "" : academicSection + disclosureSection),
     "/tuition": composePublicSiteInterior(templateId, secondaryHero("Planning your education", "Plan with confidence",
-      "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
+      demo ? "Understand how transparent tuition and financial assistance information could help families plan." : "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
     "/families": composePublicSiteInterior(templateId, secondaryHero("Supporting families", "Partners in your child’s education",
       demo ? "Because learning works best when the people who care about a student can stay connected." : "Discover the resources and support information currently available to families."),
       (serviceCards ? `<section aria-label="Verified family services" class="grid">${serviceCards}</section>` :
