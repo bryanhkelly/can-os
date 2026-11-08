@@ -10,14 +10,22 @@ import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 const endpoint="https://queue.fal.run/fal-ai/nano-banana-2";
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function credentials(injectedKey?:string):string {
-  // Secret-manager fields sometimes include trailing line endings from paste.
-  // Never put raw untrimmed secrets into HTTP header values.
-  const key=(injectedKey ?? process.env.FAL_KEY)?.trim();
-  if(!key)throw new Error("FAL_KEY is not configured on the server");
-  if(/[\r\n\x00-\x1F\x7F]/.test(key))
+/**
+ * fal.ai keys are single-line printable ASCII tokens. Normalize accidental
+ * whitespace and invisible formatting inserted by secret-manager copy/paste.
+ * Never log the raw or normalized value. Control bytes not known to be
+ * whitespace remain invalid and cannot be injected into Authorization.
+ */
+export function normalizeFalKey(raw:string|undefined):string {
+  if(!raw)throw new Error("FAL_KEY is not configured on the server");
+  const key=raw.replace(/[\s\u200B-\u200D\uFEFF]/g,"");
+  if(!key)throw new Error("FAL_KEY is empty after whitespace normalization");
+  if(/[^\x21-\x7E]/.test(key))
     throw new Error("FAL_KEY contains invalid HTTP header characters");
   return key;
+}
+function credentials(injectedKey?:string):string {
+  return normalizeFalKey(injectedKey ?? process.env.FAL_KEY);
 }
 function headers(injectedKey?:string):HeadersInit {
   return {"Authorization":`Key ${credentials(injectedKey)}`,"Content-Type":"application/json"};
