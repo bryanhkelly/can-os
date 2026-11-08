@@ -38,6 +38,8 @@ import {
 } from "@/domain/family-invitations";
 import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
+import { renderFamilyBrandEmail } from "@/domain/school-brand-family";
+import { readSiteFamilyBrand } from "@/modules/sites/site-family-brand.server";
 import {
   requestPublicFamilyStart,
 } from "./public-family-start.server";
@@ -120,6 +122,7 @@ export async function readPreopeningFamilyWelcome(batchId: string, recipientKey:
       email: recipient.email,
     },
     events: await listPublicInterestEventsForInvitation(batchId, recipientKey),
+    brand: await readSiteFamilyBrand(school.siteId),
   };
 }
 
@@ -599,10 +602,18 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   const responseUrl = new URL("/family/interest", origin);
   responseUrl.searchParams.set("invitationBatchId", batchId);
   responseUrl.searchParams.set("invitationRecipientKey", recipient.key);
+  const brand = await readSiteFamilyBrand(school.siteId);
+  const message = renderFamilyBrandEmail({
+    ...brand, introduction: metadata.introduction,
+  }, "survey", {
+    firstName: recipient.firstName,
+    actionUrl: responseUrl.toString(),
+  });
   const accepted = await sendNotificationEmail({
     to: recipient.email,
     subject,
-    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services.\n\nIf you would like updates from the school, you can request them here: ${responseUrl.toString()}\n\nThis invitation link expires 30 days after the invitation was created. Only an adult who wants follow-up should submit the form. No child details are requested; receiving this email alone does not opt you in.`,
+    html: message.html,
+    text: `${metadata.introduction}\n\n${message.text}\n\nThis invitation link expires 30 days after it was created. Only an adult who wants follow-up should submit the form.`,
   }, `${batchId}:${recipient.key}`);
   if (!accepted) throw new Error("Pre-opening family email was not accepted by the provider");
   return { requestId: recipient.key, created: true };
