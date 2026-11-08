@@ -204,7 +204,7 @@ export function renderFamilyBrandEmail(context:FamilyBrandContext,kind:FamilyBra
  const bg=brand.theme.canvas,ink=brand.theme.ink,accent=brand.accent;
  const disclosure=`${statusCopy} Receiving this email alone does not opt you in to future updates.`;
  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title></head>
- <body style="margin:0;padding:0;background:${bg};color:${ink};font-family:Arial,Helvetica,sans-serif">
+ <body style="margin:0;padding:0;background:${bg};color:${ink};font-family:${brand.theme.bodyFont}">
  <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escape(copy.tagline)} · School planning update.</div>
  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${bg}"><tr><td align="center" style="padding:24px 10px">
  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff">
@@ -213,7 +213,7 @@ export function renderFamilyBrandEmail(context:FamilyBrandContext,kind:FamilyBra
  <span style="font-size:18px;font-weight:700;letter-spacing:.06em"> &nbsp; ${name}</span>
  <p style="color:${accent};font-size:11px;letter-spacing:.13em;text-transform:uppercase;margin-bottom:0">${escape(copy.eyebrow)}</p></td></tr>
  <tr><td style="padding:35px 34px">
- <h1 style="font:700 35px/1.15 Georgia,serif;color:${ink};margin:0 0 20px">${heading}</h1>
+ <h1 style="font:700 35px/1.15 ${brand.theme.displayFont};color:${ink};margin:0 0 20px">${heading}</h1>
  <p style="font-size:16px;line-height:1.7;color:${ink}">${body}</p>
  ${context.introduction?.trim()?`<p style="font-size:16px;line-height:1.7;color:${ink}">${escape(context.introduction.trim().slice(0,1200))}</p>`:""}
  <p style="font-size:16px;line-height:1.7;color:${ink}">${escape(copy.lead)}</p>
