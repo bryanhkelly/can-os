@@ -55,6 +55,7 @@ export const Route=createFileRoute("/family/interest")({
         const kind=url.searchParams.get("view")==="survey"?"survey":"landing";
         return publicResponse(renderFamilyBrandPage({
           ...context.brand,introduction:context.introduction,
+          informationOnly:context.programStatus==="active",
         },kind,{
           preview:false,requestId:crypto.randomUUID(),batchId,recipientKey,
           firstName:context.invitedFamily.firstName,
@@ -123,7 +124,9 @@ export const Route=createFileRoute("/family/interest")({
               const url=new URL("/family/interest",request.url);
               url.searchParams.set("invitationBatchId",parsed.invitationBatchId);
               url.searchParams.set("invitationRecipientKey",parsed.invitationRecipientKey);
-              const template=renderFamilyBrandEmail(context.brand,"confirmation",{
+              const template=renderFamilyBrandEmail({ ...context.brand,
+                informationOnly:context.programStatus==="active",
+              },"confirmation",{
                 firstName:parsed.firstName,actionUrl:url.toString(),
               });
               await sendNotificationEmail({
