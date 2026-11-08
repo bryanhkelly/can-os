@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "can-os",
-  "main": "src/cloudflare-demo.ts",
+  "main": "src/server.ts",
   "compatibility_date": "2026-11-06",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
