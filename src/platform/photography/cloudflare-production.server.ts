@@ -270,7 +270,11 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
     const ready:string[]=[];
     for(const role of templatePhotographyRoles)
       if(await bucket.head(keyFor(t,role)))ready.push(role);
+    // Safe, public operational signal without request IDs, secrets or prompts.
+    const heroJob=await getJob(bucket,stateKey(t,"hero"));
     return Response.json({template:t,generated:ready.length,total:12,ready,
+      heroStatus:heroJob?.status??"unstarted",
+      heroError:heroJob?.status==="rejected"?heroJob.reason:undefined,
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
     }});
