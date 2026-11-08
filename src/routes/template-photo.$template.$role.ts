@@ -15,7 +15,7 @@ const family:Record<SiteTemplateId,string> = {
 const legacyFamily:Record<SiteTemplateId,string> = {
   ...family,classic:"heritage",campus:"community",
 };
-const allowedKey=/^school-template-previews\/v(?:1|2)\/(?:heritage|community|modern|bright|summit|campus)\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])\.jpg$/;
+const allowedKey=/^school-template-previews\/v(?:1|2|3)\/(?:heritage|community|modern|bright|summit|classic|campus)\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])\.jpg$/;
 const notFound=()=>new Response("Not found",{status:404,headers:{"Cache-Control":"no-store"}});
 /** Serve an exact public fictional sample from private R2; never expose credentials.
  * Only manifest-listed images are allowed, and v2 is gated until uploads pass QA.
@@ -25,22 +25,30 @@ export const Route=createFileRoute("/template-photo/$template/$role")({
     if(!templateIds.has(params.template)||!roles.has(params.role))return notFound();
     const template=params.template as SiteTemplateId;
     const role=params.role as TemplatePhotographyRole;
+    const generated=process.env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"
+      ? `school-template-previews/v3/${family[template]}/${role}.jpg`
+      : undefined;
     const staged=process.env.CAN_TEMPLATE_PHOTOS_V2_ENABLED==="true"
-      ? stagedManifest.files.find(f=>f.template===family[template]&&f.role===role)
+      ? stagedManifest.files.find(f=>f.template===family[template]&&f.role===role)?.key
       : undefined;
-    const fallback=role==="hero"||role==="story_01"
-      ? legacyManifest.files.find(f=>"template" in f &&
+    // Do not substitute the Heritage/Community family for the two unique designs.
+    const fallback=(template==="classic"||template==="campus") ? undefined :
+      role==="hero"||role==="story_01"
+        ? legacyManifest.files.find(f=>"template" in f &&
           f.template===legacyFamily[template] && f.role===role &&
-          f.preview_only==="no" && "width" in f && f.width>=1000)
-      : undefined;
-    const asset=staged ?? ((template==="classic"||template==="campus") &&
-      process.env.CAN_TEMPLATE_PHOTOS_V2_ENABLED==="true" ? undefined : fallback);
-    if(!asset||!allowedKey.test(asset.key))return notFound();
+          f.preview_only==="no" && "width" in f && f.width>=1000)?.key
+        : undefined;
     try{
-      const upstream=await fetch(signPrivateObjectUrl({
-        method:"GET",key:asset.key,keyPattern:allowedKey,expiresSeconds:30,
-      }),{method:"GET",redirect:"error"});
-      if(!upstream.ok || !upstream.body)return notFound();
+      let upstream:Response|null=null;
+      for(const key of [generated,staged,fallback]){
+        if(!key||!allowedKey.test(key))continue;
+        const candidate=await fetch(signPrivateObjectUrl({
+          method:"GET",key,keyPattern:allowedKey,expiresSeconds:30,
+        }),{method:"GET",redirect:"error"});
+        if(candidate.ok&&candidate.body){upstream=candidate;break;}
+        if(candidate.status!==404)return notFound();
+      }
+      if(!upstream||!upstream.body)return notFound();
       return new Response(upstream.body,{status:200,headers:{
         "Content-Type":"image/jpeg",
         "Cache-Control":"public, max-age=3600",
