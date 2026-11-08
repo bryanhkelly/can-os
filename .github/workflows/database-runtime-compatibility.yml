@@ -6,6 +6,10 @@ on:
     paths:
       - 'src/db/client.ts'
       - 'src/cloudflare-demo.ts'
+      - 'src/lib/access-return-recovery.tsx'
+      - 'src/routes/index.tsx'
+      - 'tests/unit/access-return-recovery.test.tsx'
+      - 'tests/unit/access-recovery-home.test.tsx'
       - 'tests/unit/database-request-scope.test.ts'
       - 'tests/unit/cloudflare-database-entry.test.ts'
       - '.github/workflows/database-runtime-compatibility.yml'
@@ -31,7 +35,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Request-isolation and entry-point tests
-        run: npx vitest run tests/unit/database-request-scope.test.ts tests/unit/cloudflare-database-entry.test.ts
+        run: npx vitest run tests/unit/database-request-scope.test.ts tests/unit/cloudflare-database-entry.test.ts tests/unit/access-return-recovery.test.tsx tests/unit/access-recovery-home.test.tsx
       - name: Build Netlify server and client
         if: matrix.runtime == 'netlify'
         run: npm run build
