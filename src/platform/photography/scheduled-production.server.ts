@@ -86,7 +86,8 @@ export function jpegDimensions(bytes:Uint8Array):{width:number;height:number}|nu
 }
 async function downloadImage(urlText:string,minimum:{width:number;height:number}){
   const url=new URL(urlText);
-  if(url.protocol!=="https:"||!(url.hostname==="fal.media"||url.hostname.endsWith(".fal.media")))
+  if(url.protocol!=="https:"||!(url.hostname==="fal.media"||url.hostname.endsWith(".fal.media")||
+    (url.hostname==="storage.googleapis.com" && url.pathname.startsWith("/falserverless/"))))
     throw Error("Image host not allowlisted");
   const response=await fetch(url.toString(),{redirect:"error"});
   if(!response.ok||Number(response.headers.get("content-length")||0)>25_000_000)
