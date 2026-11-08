@@ -108,11 +108,11 @@ export function createSchoolWebsiteEditorialBaseline(schoolName: string): SiteEd
   return {
     version: 1,
     fields: {
-      heroHeadline: "A place to belong. A future to build.",
-      welcomeMessage: "Purposeful learning, meaningful relationships, and room to discover what comes next.",
-      localDescription: `At ${name}, we believe young people have strengths worth discovering and potential worth developing. Our hope is to build a learning community shaped by curiosity, connection, and a shared commitment to helping students grow.`,
-      schoolVision: "We envision a learning community where students are known as individuals, encouraged to think deeply, and inspired to use their gifts to serve others.",
-      communityOutreach: "We hope to build meaningful connections with our neighbors, bringing families and community partners together around learning, service, and shared purpose.",
+      heroHeadline: "A school that sees the individual. A community that helps them grow.",
+      welcomeMessage: "Thoughtful academics, personal growth, and the relationships that help young people find their way forward.",
+      localDescription: `At ${name}, we are exploring a learning community where each student is more than a name on a roster. Our vision brings purposeful academic learning together with encouragement, meaningful relationships, and room for students to discover their strengths. We invite families to learn about the idea and help shape what comes next.`,
+      schoolVision: "We envision a place where students are challenged to think deeply, supported as individuals, and encouraged to use their gifts with purpose.",
+      communityOutreach: "A school can be more than a place to learn. We hope to connect families, neighbors, and community partners around shared opportunities to learn, contribute, and belong.",
     },
   };
 }
