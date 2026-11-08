@@ -1,7 +1,7 @@
 import {siteTemplateIds,type SiteTemplateId} from "@/domain/site-theme";
 import {schoolPhotographyBrief,templatePhotographyRoles} from "@/domain/template-photography-production";
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
-import {submitSchoolPhoto,schoolPhotoResult,schoolPhotoStatus} from "./fal-generation.server";
+import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult,schoolPhotoStatus} from "./fal-generation.server";
 import {jpegDimensions} from "./scheduled-production.server";
 
 /**
@@ -185,11 +185,14 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   if(env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE!=="true")return result;
   if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)
     throw Error("Missing photography production binding or key");
-  const bucket=env.TEMPLATE_PHOTO_BUCKET,falKey=env.FAL_KEY.trim();
+  const bucket=env.TEMPLATE_PHOTO_BUCKET;
   result.status="active";
-  // Fail without changing durable job states or sending chargeable requests
-  // when the stored secret contains invalid header characters. No key data logs.
-  if(!falKey || /[^\x21-\x7E]/.test(falKey)){
+  let falKey:string;
+  try{
+    // fal.ai keys cannot contain whitespace; strip accidental paste formatting
+    // locally before constructing the Authorization header.
+    falKey=normalizeFalKey(env.FAL_KEY);
+  }catch{
     console.error("CAN photo generation blocked: invalid FAL_KEY formatting");
     return result;
   }
