@@ -1,7 +1,7 @@
 import {createFileRoute} from "@tanstack/react-router";
 import legacyManifest from "@/domain/template-sample-assets.json";
 import stagedManifest from "@/domain/template-photography-v2.json";
-import {resolveSiteTemplateId, type SiteTemplateId} from "@/domain/site-theme";
+import {type SiteTemplateId} from "@/domain/site-theme";
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 import {signPrivateObjectUrl} from "@/platform/storage/r2";
 
@@ -15,7 +15,7 @@ const family:Record<SiteTemplateId,string> = {
 const legacyFamily:Record<SiteTemplateId,string> = {
   ...family,classic:"heritage",campus:"community",
 };
-const allowedKey=/^school-template-previews\\/v(?:1|2)\\/(?:heritage|community|modern|bright|summit|campus)\\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])\\.jpg$/;
+const allowedKey=/^school-template-previews\/v(?:1|2)\/(?:heritage|community|modern|bright|summit|campus)\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])\.jpg$/;
 const notFound=()=>new Response("Not found",{status:404,headers:{"Cache-Control":"no-store"}});
 /** Serve an exact public fictional sample from private R2; never expose credentials.
  * Only manifest-listed images are allowed, and v2 is gated until uploads pass QA.
