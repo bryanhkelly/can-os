@@ -6,6 +6,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "triggers": { "crons": ["*/5 * * * *"] },
+  "r2_buckets": [{ "binding": "TEMPLATE_PHOTO_BUCKET", "bucket_name": "can-os" }],
+  "observability": { "enabled": true, "logs": { "enabled": true } },
   "vars": { "CAN_TEMPLATE_PHOTOGRAPHY_GENERATE": "true" },
   "ratelimits": [
     { "name": "ACCESS_REQUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
