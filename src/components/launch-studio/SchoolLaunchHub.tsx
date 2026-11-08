@@ -63,7 +63,7 @@ const plannedModuleLanding: Record<PlannedSchoolHubModule, {intro:string; capabi
       {title:"Invitations",detail:"Invite families and track responses within the authorized school."},
       {title:"Recruitment pipeline",detail:"Organize follow-up and next steps while protecting family information."},
     ],
-    note:"Site-level recruitment forms, invitation sending and follow-up records are not enabled in this module.",
+    note:"Branded landing, survey and email previews are available below. Consented Program-linked family invitations use the existing registrar service; pre-Program Site-level outreach is not yet enabled.",
   },
   events:{
     intro:"Host interest meetings, campus tours, open houses and other opportunities for families to learn about your school.",
@@ -89,6 +89,25 @@ export function SchoolModuleHome({ module, siteId }: {module:PlannedSchoolHubMod
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{capability.detail}</p>
         </article>)}
       </div>
+      {module==="recruitment" && <section aria-label="Family brand experience" className="mt-7 border-t pt-5">
+        <h3 className="font-serif text-2xl">Explore your family-facing school brand</h3>
+        <p className="mt-2 text-sm text-muted-foreground">These read-only pages use your saved Website &amp; Brand design. No messages are sent and no responses are collected during previews.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {([
+            ["landing","Family interest landing"],
+            ["survey","Three-minute family survey"],
+            ["email-survey","Survey invitation email"],
+            ["email-confirmation","Interest confirmation email"],
+            ["email-update","Family update email"],
+          ] as const).map(([view,label]) => <a key={view}
+            href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex min-h-12 items-center rounded-lg border bg-background px-4 py-3 text-sm font-semibold text-primary">
+            {label} <ArrowRight className="ml-auto size-4"/>
+          </a>)}
+        </div>
+        <Link to="/launch/website" search={{siteId,returnToHub:true}} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Edit your school brand <ArrowRight className="ml-2 size-4"/></Link>
+      </section>}
       <p role="status" className="mt-6 border bg-muted p-4 text-sm">{plan.note}</p>
     </div>
     <aside className="border bg-card p-6">
