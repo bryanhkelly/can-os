@@ -80,7 +80,7 @@ describe("seven Site-specific family brand kits",()=>{
   expect(preview).toContain("Forms do not submit or save data");
   expect(preview).toContain('button type="submit" disabled');
   const mail=renderFamilyBrandEmail({...context("heritage"),introduction:'Hello <script>evil()</script>'},
-   "survey",{firstName:"<img>",preview:true,actionUrl:"javascript:alert(1)"});
+   "confirmation",{firstName:"<img>",preview:true,actionUrl:"javascript:alert(1)"});
   expect(mail.html).not.toContain("<script>");
   expect(mail.html).toContain("&lt;script&gt;");
   expect(mail.html).toContain("&lt;img&gt;");
