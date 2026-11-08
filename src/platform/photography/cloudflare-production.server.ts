@@ -207,9 +207,12 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   const jobs=await bucket.list({prefix:jobPrefix,limit:250});
   for(const object of jobs.objects){
     if(result.uploaded+result.inProgress+result.rejected>=5)break;
-    const matched=object.key.match(/^school-template-production\\/v1\\/([^/]+)\\/([^/]+)\\.json$/);
-    if(!matched||!templateSet.has(matched[1])||!roleSet.has(matched[2]))continue;
-    const t=matched[1] as SiteTemplateId,r=matched[2] as TemplatePhotographyRole;
+    const parts=object.key.split("/");
+    if(parts.length!==4||parts[0]!=="school-template-production"||
+       parts[1]!=="v1"||!parts[3].endsWith(".json"))continue;
+    const templatePart=parts[2],rolePart=parts[3].slice(0,-5);
+    if(!templateSet.has(templatePart)||!roleSet.has(rolePart))continue;
+    const t=templatePart as SiteTemplateId,r=rolePart as TemplatePhotographyRole;
     if(await bucket.head(keyFor(t,r)))continue;
     const job=await getJob(bucket,object.key);
     if(job?.status==="submitted"&&job.requestId){
