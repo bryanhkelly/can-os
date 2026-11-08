@@ -38,7 +38,7 @@ export function withIllustrativeLocalPreview(page: PublicSitePage): PublicSitePa
   const isValor = page.host === "valorschool.can-os.com" &&
     page.site.name === "Valor School";
   return {...page, localContent: isValor ? {...sample,
-    welcomeMessage:"Small-school connection. Big-world possibility.",
+    welcomeMessage:"A school that sees the individual. A community that helps them grow.",
     localDescription:"At Valor, imagine a school where students are known by name, ideas are taken seriously, and learning reaches beyond the screen. This fictional campus brings neighborhood connection together with a thoughtfully designed hybrid high-school experience.",
     schoolVision:"Curious minds. Courageous hearts. A community that sees what each student can become. Our sample vision pairs purposeful academic learning with meaningful relationships and room for discovery.",
     churchHistory:"Valor began as a design question: what would a school feel like if every young person had a place to belong, room to think independently, and adults who noticed their potential? This is a fictional origin story, not a real church history.",
@@ -348,15 +348,15 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // About. No invented academic facts or unapproved identity records are used.
   const homeStory = local && availablePaths.includes("/about") ? `<section class="home-story editorial-section" aria-labelledby="home-story-title">
     <div class="home-story-heading"><p class="tag">Our community</p>
-      <h2 id="home-story-title">${local.schoolVision ? "Known. Challenged. Inspired." : "More than a school. A community that cares."}</h2></div>
+      <h2 id="home-story-title">${local.schoolVision ? "A community where every student has room to grow." : "More than lessons. A place to be known."}</h2></div>
     <div class="home-story-copy"><p>${escapePublicHtml(local.localDescription || local.schoolVision ||
       local.churchHistory || local.leadershipWelcome || "Learn about the people and purpose behind this community.")}</p>
       <a class="text-action" href="/about">Get to know our school →</a></div>
   </section>` : "";
   const programOverview = academicCards ? `<section class="program-overview editorial-section" aria-labelledby="academic-title">
     <div class="program-overview-heading"><div><p class="tag">Learning pathways</p>
-      <h2 id="academic-title">Strong foundations. Room to discover more.</h2></div>
-      <p>Discover the academic programs and ways to learn available through this school. Program details and schedules appear below when confirmed.</p></div>
+      <h2 id="academic-title">Serious learning. A more personal path.</h2></div>
+      <p>Explore structured academic opportunities and different ways to learn. Program details and schedules are shown when confirmed.</p></div>
     <div class="grid">${academicCards}</div>
     <a class="text-action" href="/academics">Explore all academic programs →</a>
   </section>` : "";
@@ -548,7 +548,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ${faqItems.map(item=>`<details class="faq-item"><summary>${item.question}</summary><p>${item.answer}</p></details>`).join("")}
   </section>` : "";
   const admissionsNextSteps = `<section class="admissions-next-steps editorial-section" aria-labelledby="admissions-next-title">
-    <p class="tag">Your next step</p><h2 id="admissions-next-title">Start with the right information</h2>
+    <p class="tag">Planning your next step</p><h2 id="admissions-next-title">Find the answers you need to take the next step</h2>
     ${admissionExplanation ? `<p>${admissionExplanation}</p>` : ""}
     <p class="admissions-status">${hasOpenApplications
       ? "Applications are available for eligible approved programs, subject to identity verification and school review."
@@ -576,8 +576,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const exploreSection = exploreLinks.length > 1
     ? `<section class="explore-section editorial-section" aria-labelledby="explore-title">
       <div class="section-heading"><p class="tag">Explore the experience</p>
-      <h2 id="explore-title">Find what matters to your family</h2>
-      <p>Browse published information before taking your next step.</p></div>
+      <h2 id="explore-title">Start with what matters to your family</h2>
+      <p>Explore academics, daily learning, student experiences, and admissions information at your own pace.</p></div>
       <div class="explore-grid">${exploreLinks.map((link, index) =>
         `<a class="explore-link" href="${link.path}"><span class="explore-number">0${index + 1}</span>
         <span class="explore-copy"><strong>${link.label}</strong><span>${link.description}</span></span>
@@ -587,32 +587,32 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const homePage = composePublicSiteHome(templateId, {
     hero,
     vision: local?.schoolVision
-      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping students discover who they are and what they can become.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
+      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping young people discover their strengths—and what they can do with them.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
     story: homeStory,
     explore: exploreSection,
     academics: programOverview,
     enrichment: page.offerings.length || (demo && local) ? enrichmentSection
       : !academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
     closing: academicCards ? `<section class="closing-action"><p class="tag">Find your next step</p>
-      <h2>Let's discover what's possible together.</h2>
-      <p>Choosing a school matters. Explore available programs and see what might fit your family.</p>
-      <a href="/academics" class="hero-button">Explore approved programs</a></section>` : "",
+      <h2>Find the learning opportunity that fits your family.</h2>
+      <p>The right educational environment can make a lasting difference. Explore available programs, ask questions, and decide what fits your family.</p>
+      <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
     contact: reviewedContact || reviewedAddress ? contactSection : "",
   });
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
-    "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "Rooted in purpose. Growing through community.",
-      "Discover the people, purpose, and community shaping this school."), localSection, peopleSection),
-    "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Learning that builds knowledge, confidence, and curiosity.",
-      "Explore available academic offerings, learning approaches, and pathways for your child."), academicSection, approachSection),
+    "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
+      "Meet the vision, values, and local community behind this school."), localSection, peopleSection),
+    "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
+      "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", "Student life",
       "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
     "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", "What a day of learning looks like",
       "See how learning is organized, with confirmed schedules and attendance details where available."),
       reviewedSchoolDay + schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
       (availablePaths.includes("/contact") ? '<p class="public-next-step"><a href="/contact">Ask about school-day arrangements →</a></p>' : "")),
-    "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "Your family’s journey starts here",
-      "Explore the admissions process and the next step available for your family."), admissionsNextSteps, academicSection + disclosureSection),
+    "/admissions": composePublicSiteInterior(templateId, secondaryHero("For families", "The right school changes what feels possible",
+      "Choosing a school is a personal decision. Find reviewed admissions information and the next step currently available to your family."), admissionsNextSteps, academicSection + disclosureSection),
     "/tuition": composePublicSiteInterior(templateId, secondaryHero("Planning your education", "Plan with confidence",
       "Find published costs, assistance details, and ways to request information for your family."), tuitionSection),
     "/families": composePublicSiteInterior(templateId, secondaryHero("Supporting families", "Partners in your child’s education",
@@ -621,8 +621,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         demo ? `<section class="mission-split editorial-section"><div><p class="tag">Illustrative family experience</p><h2>Known by name. Connected by purpose.</h2></div><p>The Valor reference experience imagines meaningful communication, shared exhibitions and a connected school community. Actual services require separate configuration and approval.</p></section>` : "")),
     "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "Questions about joining",
       "Only reviewed public information appears here."), faqSection),
-    "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "We’d love to hear from you",
-      "Have questions? Explore available contact and inquiry options for your school."), contactSection + academicSection +
+    "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "Start a conversation about your child's education",
+      "Find the contact and inquiry options currently published by this school."), contactSection + academicSection +
       (availablePaths.includes("/faq") ? '<p class="public-next-step"><a href="/faq">See common admissions questions →</a></p>' : "")),
   };
   const pageTitle = path === "/" ? `${school} | Programs` :
