@@ -106,9 +106,16 @@ export type PhotoCronResult={status:"disabled"|"active";scanned:number;submitted
 const legacyHeaderFailureCutoff="2026-11-08T19:50:00.000Z";
 const jobPrefix="school-template-production/v1/";
 function canRescue(job:JobState):boolean{
-  return job.status==="reserved"&&!job.requestId&&!(job.rescueCount??0)&&
-    job.updatedAt<legacyHeaderFailureCutoff &&
-    Date.now()-Date.parse(job.updatedAt)>5*60*1000;
+  if(job.requestId||(job.rescueCount??0)!==0)return false;
+  // Legacy "reserved" jobs failed constructing an HTTP Authorization header,
+  // before fal.ai could accept or bill a request.
+  if(job.status==="reserved")
+    return job.updatedAt<legacyHeaderFailureCutoff &&
+      Date.now()-Date.parse(job.updatedAt)>5*60*1000;
+  // Exact preflight validation failure (before any provider network call).
+  // Allow a single retry, but only once a correctly formatted key is present.
+  return job.status==="rejected" &&
+    job.reason==="FAL_KEY contains invalid HTTP header characters";
 }
 function safeError(error:unknown):string{
   if(!(error instanceof Error))return "Unknown provider submission failure";
@@ -176,8 +183,14 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   if(env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE!=="true")return result;
   if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)
     throw Error("Missing photography production binding or key");
-  const bucket=env.TEMPLATE_PHOTO_BUCKET,falKey=env.FAL_KEY;
+  const bucket=env.TEMPLATE_PHOTO_BUCKET,falKey=env.FAL_KEY.trim();
   result.status="active";
+  // Fail without changing durable job states or sending chargeable requests
+  // when the stored secret contains invalid header characters. No key data logs.
+  if(!falKey || /[^\\x21-\\x7E]/.test(falKey)){
+    console.error("CAN photo generation blocked: invalid FAL_KEY formatting");
+    return result;
+  }
   // Verify exactly one full-size, delivered photo before launching 83 jobs.
   const firstTemplate:"community"="community",firstRole:"hero"="hero";
   if(!await bucket.head(keyFor(firstTemplate,firstRole))){
