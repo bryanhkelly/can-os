@@ -113,6 +113,7 @@ export async function readPreopeningFamilyWelcome(batchId: string, recipientKey:
   const { listPublicInterestEventsForInvitation } = await import("./interest-events.server");
   return {
     siteName: school.siteName,
+    organizationId:school.organizationId,
     programName: school.programName,
     programStatus: school.status,
     introduction: metadata.introduction,
