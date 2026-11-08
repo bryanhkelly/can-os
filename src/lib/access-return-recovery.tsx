@@ -6,6 +6,7 @@ import { getWorkspaceHome } from "@/components/shell/workspace-navigation.regist
 import { SITE_NAME } from "./site-config";
 import { accessReturnCookie } from "@/domain/access-navigation";
 import { hasFailedRead } from "./router-refresh";
+import { normalizeClientError } from "./client-error";
 import { useHydrated } from "./use-hydrated";
 
 export function hasPendingAccessReturn() {
@@ -17,9 +18,20 @@ function clearReturn() {
   document.cookie = `${accessReturnCookie}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
+/** Only a verified auth/permission failure should end the saved-page return.
+ * Network/database failures stay on the requested page and offer a retry. */
+function deniedLoaderResult(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  if ("ok" in value && value.ok === false) {
+    return "kind" in value && (value.kind === "authentication" || value.kind === "authorization");
+  }
+  return false;
+}
+
 export function AccessReturnRecovery({ children }: { children: ReactNode }) {
-  const failed = useMatches({ select: matches => matches.some(match =>
-    match.status === "error" || match.status === "notFound" || hasFailedRead(match.loaderData)) });
+  const denied = useMatches({ select: matches => matches.some(match =>
+    match.status === "notFound" ||
+      (hasFailedRead(match.loaderData) && deniedLoaderResult(match.loaderData))) });
   const loading = useMatches({ select: matches => matches.some(match => match.status === "pending") });
   const inAccess = useLocation({ select: location =>
     location.pathname === "/access" || location.pathname.startsWith("/access/") });
@@ -28,15 +40,27 @@ export function AccessReturnRecovery({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (pending && !inAccess && !loading) clearReturn();
   }, [pending, inAccess, loading]);
-  if (pending && !inAccess && failed) return <Navigate to="/" state={{ accessReturnFailed: true }} replace />;
+  if (pending && !inAccess && denied) return <Navigate to="/" state={{ accessReturnFailed: true }} replace />;
   return children;
 }
 
 export function AccessReturnError(props: ErrorComponentProps) {
   const hydrated = useHydrated();
   const pending = hydrated && hasPendingAccessReturn();
+  const classification = normalizeClientError(props.error);
+  const denied = classification.kind === "authentication" || classification.kind === "authorization";
   useEffect(() => { if (pending) clearReturn(); }, [pending]);
-  return pending ? <Navigate to="/" state={{ accessReturnFailed: true }} replace /> : <ErrorComponent {...props} />;
+  if (!pending) return <ErrorComponent {...props} />;
+  if (denied) return <Navigate to="/" state={{ accessReturnFailed: true }} replace />;
+  return <WorkspaceShell eyebrow={SITE_NAME} title="This page couldn't load"
+    subtitle="CAN OS could not complete the request. Your account may still be signed in.">
+    <nav aria-label="Retry page" className="mt-6 flex flex-wrap gap-4 text-sm font-semibold">
+      <button type="button" className="underline" onClick={() => window.location.reload()}>
+        Retry this page
+      </button>
+      <Link to="/home" className="underline">Go to my workspace</Link>
+    </nav>
+  </WorkspaceShell>;
 }
 
 export function AccessReturnNotFound() {
