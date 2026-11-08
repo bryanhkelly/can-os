@@ -10,6 +10,7 @@ import {jpegDimensions} from "./scheduled-production.server";
  */
 export interface TemplatePhotoBucket {
   head(key:string):Promise<{size:number}|null>;
+  list(options:{prefix:string;limit?:number}):Promise<{objects:Array<{key:string}>}>;
   get(key:string):Promise<{body:ReadableStream; text():Promise<string>}|null>;
   put(key:string,value:string|ArrayBuffer|ArrayBufferView,options?:{
     onlyIf?:{etagDoesNotMatch:string};
@@ -34,7 +35,7 @@ const stateKey=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
 const cursorKey="school-template-production/v1/cursor.json";
 type JobState={
   status:"reserved"|"submitted"|"completed"|"rejected";
-  requestId?:string;reason?:string;updatedAt:string;
+  requestId?:string;reason?:string;updatedAt:string;rescueCount?:number;
 };
 const now=()=>new Date().toISOString();
 const noStore={"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
@@ -93,59 +94,150 @@ export type PhotoCronResult={status:"disabled"|"active";scanned:number;submitted
   uploaded:number;inProgress:number;rejected:number};
 
 /**
- * Every 5m. Four new paid requests maximum per scheduled invocation, no
- * automatic reruns for rejected/reserved jobs. Cursor visits all 84 slots.
- * The R2 conditional reservation protects against parallel cron execution.
+ * Cloudflare cron generation is deliberately staged:
+ * 1) Make and verify the Community hero before spending on the other 83.
+ * 2) Poll submitted queue jobs each tick, independent of the submission cursor.
+ * 3) Issue at most two new billable requests per tick after the hero succeeds.
+ *
+ * Four pre-fix reservations from the Nov 8 invalid-header incident are eligible
+ * for a single carefully bounded recovery: their provider HTTP request was
+ * never sent, because the invalid header failed request construction.
  */
+const legacyHeaderFailureCutoff="2026-11-08T19:50:00.000Z";
+const jobPrefix="school-template-production/v1/";
+function canRescue(job:JobState):boolean{
+  return job.status==="reserved"&&!job.requestId&&!(job.rescueCount??0)&&
+    job.updatedAt<legacyHeaderFailureCutoff &&
+    Date.now()-Date.parse(job.updatedAt)>5*60*1000;
+}
+function safeError(error:unknown):string{
+  if(!(error instanceof Error))return "Unknown provider submission failure";
+  if(error.message.includes("FAL_KEY"))return error.message.slice(0,120);
+  if(error.message.startsWith("fal.ai request failed with HTTP"))
+    return error.message.slice(0,90);
+  if(error.message==="Invalid header value.")return "Invalid Authorization header";
+  return error.name==="TypeError"?"Provider connection failed":error.name.slice(0,64);
+}
+async function queuePhoto(bucket:TemplatePhotoBucket,
+  template:SiteTemplateId,role:TemplatePhotographyRole,key:string,
+  falKey:string,rescueJob?:JobState):Promise<boolean>{
+  // A durable reservation is persisted before invoking a billable provider.
+  // Rescue existing known-bad header reservations once, never indefinitely.
+  const rescueCount=rescueJob?1:0;
+  if(rescueJob){
+    await saveJob(bucket,key,{status:"reserved",rescueCount,updatedAt:now()});
+  }else{
+    const acquired=await saveJob(bucket,key,{status:"reserved",updatedAt:now()},true);
+    if(!acquired)return false;
+  }
+  try{
+    const response=await submitSchoolPhoto(template,role,falKey);
+    await saveJob(bucket,key,{status:"submitted",requestId:response.requestId,
+      rescueCount,updatedAt:now()});
+    return true;
+  }catch(error){
+    // Do not retry a failed request automatically: some network failures are
+    // ambiguous about whether the provider accepted and charged for the work.
+    await saveJob(bucket,key,{status:"rejected",rescueCount,
+      reason:safeError(error),updatedAt:now()});
+    console.error("CAN photo submission rejected",{
+      template,role,reason:safeError(error),
+    });
+    return false;
+  }
+}
+async function completePhoto(bucket:TemplatePhotoBucket,
+  template:SiteTemplateId,role:TemplatePhotographyRole,
+  job:JobState,falKey:string):Promise<"ready"|"pending"|"rejected">{
+  if(!job.requestId)return "rejected";
+  try{
+    const state=await schoolPhotoStatus(job.requestId,falKey);
+    if(state!=="COMPLETED")return "pending";
+    const brief=schoolPhotographyBrief(template,role);
+    const generated=await schoolPhotoResult(job.requestId,falKey);
+    const bytes=await inspectFile(generated.imageUrl,brief.minimum);
+    const target=keyFor(template,role);
+    await bucket.put(target,bytes,{onlyIf:{etagDoesNotMatch:"*"},
+      httpMetadata:{contentType:"image/jpeg"}});
+    if(!await bucket.head(target))throw Error("R2 file verification failed");
+    await saveJob(bucket,stateKey(template,role),{status:"completed",
+      requestId:job.requestId,updatedAt:now()});
+    return "ready";
+  }catch(error){
+    await saveJob(bucket,stateKey(template,role),{status:"rejected",
+      requestId:job.requestId,reason:safeError(error),updatedAt:now()});
+    console.error("CAN photo completion rejected",{template,role,reason:safeError(error)});
+    return "rejected";
+  }
+}
 export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promise<PhotoCronResult>{
   const result:PhotoCronResult={status:"disabled",scanned:0,submitted:0,
     uploaded:0,inProgress:0,rejected:0};
   if(env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE!=="true")return result;
-  if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)throw Error("Missing photography production binding or key");
+  if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)
+    throw Error("Missing photography production binding or key");
+  const bucket=env.TEMPLATE_PHOTO_BUCKET,falKey=env.FAL_KEY;
   result.status="active";
-  const bucket=env.TEMPLATE_PHOTO_BUCKET;
-  const cursor=await getCursor(bucket);
-  for(let offset=0;offset<6;offset++){
-    const {template,role}=keys[(cursor+offset)%keys.length]!;
+  // Verify exactly one full-size, delivered photo before launching 83 jobs.
+  const firstTemplate:"community"="community",firstRole:"hero"="hero";
+  if(!await bucket.head(keyFor(firstTemplate,firstRole))){
+    const key=stateKey(firstTemplate,firstRole),job=await getJob(bucket,key);
     result.scanned++;
-    const target=keyFor(template,role);
-    if(await bucket.head(target))continue;
-    const jobKey=stateKey(template,role),job=await getJob(bucket,jobKey);
-    if(!job){
-      if(result.submitted>=4)continue;
-      const reserved=await saveJob(bucket,jobKey,{status:"reserved",updatedAt:now()},true);
-      if(!reserved)continue;
-      // With a durable reservation, never retry a failed submission blindly:
-      // an API error could occur after the provider has already charged.
-      const submitted=await submitSchoolPhoto(template,role,env.FAL_KEY);
-      await saveJob(bucket,jobKey,{status:"submitted",requestId:submitted.requestId,updatedAt:now()});
-      result.submitted++;
-      continue;
-    }
-    if(job.status==="rejected"){result.rejected++;continue;}
-    if(job.status==="completed"||job.status==="reserved"||!job.requestId)continue;
-    if(result.uploaded>=4)continue;
-    try {
-      const status=await schoolPhotoStatus(job.requestId,env.FAL_KEY);
-      if(status!=="COMPLETED"){result.inProgress++;continue;}
-      const brief=schoolPhotographyBrief(template,role);
-      const photo=await schoolPhotoResult(job.requestId,env.FAL_KEY);
-      const bytes=await inspectFile(photo.imageUrl,brief.minimum);
-      await bucket.put(target,bytes,{onlyIf:{etagDoesNotMatch:"*"},
-        httpMetadata:{contentType:"image/jpeg"}});
-      if(!await bucket.head(target))throw Error("Generated file was not stored in R2");
-      await saveJob(bucket,jobKey,{status:"completed",requestId:job.requestId,updatedAt:now()});
-      result.uploaded++;
-    } catch(error) {
-      await saveJob(bucket,jobKey,{
-        status:"rejected",requestId:job.requestId,
-        reason:error instanceof Error?error.message.slice(0,160):"Unable to process generated file",
-        updatedAt:now(),
-      });
+    if(job?.status==="submitted"&&job.requestId){
+      const completed=await completePhoto(bucket,firstTemplate,firstRole,job,falKey);
+      if(completed==="ready")result.uploaded++;
+      else if(completed==="pending")result.inProgress++;
+      else result.rejected++;
+    }else if(!job||canRescue(job)){
+      if(await queuePhoto(bucket,firstTemplate,firstRole,key,falKey,job??undefined))
+        result.submitted++;
+      else result.rejected++;
+    }else if(job?.status==="rejected"){
       result.rejected++;
+      console.error("CAN first hero requires intervention",{
+        template:firstTemplate,role:firstRole,reason:job.reason??"unknown",
+      });
+    }
+    // Never spend on secondary roles until the first real 4K hero is verified.
+    return result;
+  }
+
+  // Revisit all pending queue IDs promptly. A cursor alone would require a
+  // 70-minute round trip before polling the earliest submitted request.
+  const jobs=await bucket.list({prefix:jobPrefix,limit:250});
+  for(const object of jobs.objects){
+    if(result.uploaded+result.inProgress+result.rejected>=5)break;
+    const matched=object.key.match(/^school-template-production\\/v1\\/([^/]+)\\/([^/]+)\\.json$/);
+    if(!matched||!templateSet.has(matched[1])||!roleSet.has(matched[2]))continue;
+    const t=matched[1] as SiteTemplateId,r=matched[2] as TemplatePhotographyRole;
+    if(await bucket.head(keyFor(t,r)))continue;
+    const job=await getJob(bucket,object.key);
+    if(job?.status==="submitted"&&job.requestId){
+      const completed=await completePhoto(bucket,t,r,job,falKey);
+      if(completed==="ready")result.uploaded++;
+      else if(completed==="pending")result.inProgress++;
+      else result.rejected++;
+    }else if(job&&canRescue(job)){
+      if(await queuePhoto(bucket,t,r,object.key,falKey,job))
+        result.submitted++;
+      else result.rejected++;
     }
   }
-  await setCursor(bucket,(cursor+6)%keys.length);
+
+  // Submit new jobs slowly, and stop on the first provider rejection.
+  const cursor=await getCursor(bucket);
+  let advance=0;
+  for(;advance<6;advance++){
+    if(result.submitted>=2||result.rejected>0)break;
+    const {template,role}=keys[(cursor+advance)%keys.length]!;
+    result.scanned++;
+    if(await bucket.head(keyFor(template,role)))continue;
+    const key=stateKey(template,role),job=await getJob(bucket,key);
+    if(job)continue;
+    if(await queuePhoto(bucket,template,role,key,falKey))result.submitted++;
+    else {result.rejected++;break;}
+  }
+  await setCursor(bucket,(cursor+advance)%keys.length);
   return result;
 }
 
