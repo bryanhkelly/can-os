@@ -12,6 +12,7 @@ export type FamilyBrandContext = {
   branding: SiteLocalBranding;
   introduction?: string;
   informationOnly?: boolean;
+  events?: readonly {title:string;startsAt:string;timezone:string;rsvpUrl:string}[];
 };
 export type FamilyBrandEmailKind = "confirmation" | "update" | "survey";
 export type FamilyBrandPageKind = "landing" | "survey";
@@ -145,6 +146,24 @@ export function renderFamilyBrandPage(context:FamilyBrandContext,kind:FamilyBran
    <div class="row"><article><strong>01 · Learn</strong><p>Follow structured, independently paced instructional material.</p></article>
    <article><strong>02 · Ask</strong><p>Get support from designated adults and academic staff when needed.</p></article>
    <article><strong>03 · Grow</strong><p>Receive feedback and develop stronger learning habits.</p></article></div></section>`;
+ const events=(context.events??[]).slice(0,6).map(event=>{
+   let when="Details to be confirmed";
+   try {
+     when=new Intl.DateTimeFormat("en-US",{
+       weekday:"long",month:"long",day:"numeric",hour:"numeric",minute:"2-digit",
+       timeZone:event.timezone,
+     }).format(new Date(event.startsAt));
+   }catch{/* A malformed event date must never break the family landing. */}
+   return `<li style="padding:12px 0;border-top:1px solid #00000025"><strong>${escape(event.title)}</strong>
+     <span style="display:block">${escape(when)}</span>
+     <a href="${safeHref(event.rsvpUrl)}">View event details</a></li>`;
+ }).join("");
+ const eventSection=events
+   ?`<section class="panel" style="margin-top:24px" aria-labelledby="family-events-heading">
+     <h2 id="family-events-heading">Family information events</h2>
+     <p>These are invitations to learn more, not admissions appointments or confirmed enrollment.</p>
+     <ul style="list-style:none;padding:0">${events}</ul></section>`
+   :"";
  const shared=inputs(context,params);
  const survey=`<div class="group"><strong>What grade levels are you interested in?</strong>
    <label class="choice"><input type="radio" name="grades" value="middle" required> Middle school (6–8)</label>
@@ -179,7 +198,7 @@ export function renderFamilyBrandPage(context:FamilyBrandContext,kind:FamilyBran
    <button type="submit"${params.preview?" disabled":""}>${kind==="survey"?"Submit family survey":"Request school updates"}</button>
    ${params.preview?'<p role="status" class="fine">This private design preview does not save responses.</p>':""}
    </form>`;
- const body=`<main id="main">${hero}<div class="main">${kind==="landing"?learning:""}
+ const body=`<main id="main">${hero}<div class="main">${kind==="landing"?learning+eventSection:""}
    <section style="margin:38px 0"><h2>What is available today?</h2>
      <p>You can explore the school's proposed approach and share feedback. Applications, confirmed tuition, opening dates and admission offers are not available through this invitation.</p>
    </section>${form}
