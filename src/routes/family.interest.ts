@@ -56,6 +56,7 @@ export const Route=createFileRoute("/family/interest")({
         return publicResponse(renderFamilyBrandPage({
           ...context.brand,introduction:context.introduction,
           informationOnly:context.programStatus==="active",
+          events:context.events,
         },kind,{
           preview:false,requestId:crypto.randomUUID(),batchId,recipientKey,
           firstName:context.invitedFamily.firstName,
