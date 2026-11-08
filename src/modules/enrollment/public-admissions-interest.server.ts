@@ -313,6 +313,13 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
           });
         }
       }
+      await emitEvent(tx,{
+        eventType:EventTypes.PublicAdmissionsInterestSurveyReceived,
+        aggregateType:"public_admissions_interest",aggregateId:prior.id,
+        siteId:school.siteId,organizationId:school.organizationId,programId:batch.programId,
+        payload:{responseKind:"survey",contactPreference:data.contactPreference??"unspecified",
+          contactConsent:followUpAllowed?"affirmative":"withdrawn"},
+      });
       await writeAudit(tx,{
         action:"admissions.invited_interest.survey_received",
         resourceType:"public_admissions_interest",resourceId:prior.id,
