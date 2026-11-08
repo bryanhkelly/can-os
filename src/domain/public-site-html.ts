@@ -176,7 +176,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       try {
         const url=new URL(candidate.src);
         if(url.protocol==="https:" && url.host===host &&
-          /^\\/media\\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(url.pathname) &&
+          /^\/media\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(url.pathname) &&
           !url.search && !url.hash)return candidate;
       }catch{ /* Invalid photo URL: never treat it as approved. */ }
     }
