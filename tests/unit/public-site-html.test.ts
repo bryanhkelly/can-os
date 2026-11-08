@@ -26,6 +26,24 @@ describe("standalone public site HTML", () => {
     }
   });
 
+  it("uses clearly labeled sample photography only in private previews without approved Site photos", () => {
+    for(const templateId of siteTemplateIds) {
+      const page={
+        host:"example-school.can-os.com",
+        site:{name:"Example School",organizationName:"Example Organization"},
+        offerings:[],
+        localContent:{...emptySiteLocalContent,
+          branding:{...emptySiteLocalContent.branding,templateId}},
+      };
+      const privateHtml=renderPublicSiteHtml(page,{localPreview:true});
+      expect(privateHtml).toContain("school-template-previews/v1/");
+      expect(privateHtml).toContain("Illustrative template photography");
+      const publicHtml=renderPublicSiteHtml(page);
+      expect(publicHtml).not.toContain("school-template-previews/v1/");
+      expect(publicHtml).not.toContain("Illustrative template photography");
+    }
+  });
+
   it("escapes all publisher-controlled text and contains no client script or private links", () => {
     expect(escapePublicHtml(`"&<>'`)).toBe("&quot;&amp;&lt;&gt;&#39;");
     const html = renderPublicSiteHtml({
