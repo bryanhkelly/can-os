@@ -105,9 +105,57 @@ describe("transactional church-local publication", () => {
       operation: "draft", expectedRevision: 2,
       content: { ...prior, welcomeMessage: "My newly customized words",
         editorialBaseline: alteredBaseline },
-    })).rejects.toThrow(/original website copy cannot be replaced/);
+    })).rejects.toMatchObject({ code: "CONFLICT" });
     expect(state.inserts).toHaveLength(0);
     expect(state.audit).not.toHaveBeenCalled();
+  });
+
+  it("accepts equivalent jsonb-reordered baselines when saving a new private brand", async () => {
+    const savedBaseline = {
+      version: 1 as const,
+      fields: {
+        communityOutreach: "Hope to serve our neighbors.",
+        heroHeadline: "A place to belong. A future to build.",
+        localDescription: "School-specific original story",
+        schoolVision: "A community of curiosity.",
+        welcomeMessage: "Purposeful learning and connection.",
+      },
+    };
+    const editingBaseline = {
+      version: 1 as const,
+      fields: {
+        heroHeadline: savedBaseline.fields.heroHeadline,
+        welcomeMessage: savedBaseline.fields.welcomeMessage,
+        localDescription: savedBaseline.fields.localDescription,
+        schoolVision: savedBaseline.fields.schoolVision,
+        communityOutreach: savedBaseline.fields.communityOutreach,
+      },
+    };
+    const previous = { ...copy, editorialBaseline: savedBaseline };
+    const next = {
+      ...copy, editorialBaseline: editingBaseline,
+      branding: { ...copy.branding, templateId: "summit" as const },
+    };
+    state.rows.push([{ siteId: "site-a" }], [revision(1, previous)]);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "draft", expectedRevision: 1, content: next,
+    })).resolves.toMatchObject({ changed: true, revision: 2, status: "draft" });
+    expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value)
+      .toMatchObject({ revision: 2, content: next, status: "draft" });
+  });
+
+  it("does not create a second revision when only JSON object order differs", async () => {
+    const previous = {
+      ...copy,
+      branding: { heroImage: null, templateId: "heritage" as const,
+        typographyId: "editorial" as const, paletteId: "signature" as const,
+        theme: "classic" as const },
+    };
+    state.rows.push([{ siteId: "site-a" }], [revision(1, previous, "draft")]);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "draft", expectedRevision: 1, content: copy,
+    })).resolves.toMatchObject({ changed: false, revision: 1, status: "draft" });
+    expect(state.inserts).toHaveLength(0);
   });
 
   it("explains the historical status constraint failure rather than reporting a successful draft", async () => {
