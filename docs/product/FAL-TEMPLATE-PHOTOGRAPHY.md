@@ -1,0 +1,37 @@
+# CAN OS — fal.ai template photography production
+
+This pipeline is **developer controlled**, not a public school website feature. Never call image generation from the website renderer, from a Site Admin's ordinary website preview, or automatically when a school is created. Generation incurs charges.
+
+## Secret
+
+Cloudflare Worker environment: `FAL_KEY` stored as a **Secret**, not plain text. The repository must never contain its value. The key is read by `src/platform/photography/fal-generation.server.ts` only on the server. Installing a Cloudflare secret does not make it available in local terminal/Netlify deployments; use an independent secret in any additional runner that genuinely requires it.
+
+## Production contracts
+
+- `src/domain/template-photography-production.ts` defines the seven styles, 12 scene roles, exact filenames, dimensions and two sequential batches of six.
+- `schoolPhotographyBatch(template, 1)` and `schoolPhotographyBatch(template, 2)` create complete photographic briefs; no generated composite sheets.
+- `submitSchoolPhoto(template,role)` queues **one** Nano Banana 2 image with 4K output and JPEG format. Queue request IDs are returned for tracking.
+- `schoolPhotoStatus(requestId)` polls an existing submission. `schoolPhotoResult(requestId)` retrieves its provider URL once complete.
+- **None of these methods is exposed as a public HTTP route.** An operator-facing, authenticated, rate-limited production workflow with persistent requests, review and spend limits must be built before any paid submissions are enabled.
+- A provider image URL is NOT a CAN OS template URL. Do not populate the active manifest until the actual file is downloaded, validated and uploaded to R2.
+- The first paid test should be ONE Community & Faith hero. Confirm that a 4K result actually meets the required 3840×2160 pixels; the provider's '4K' parameter is not itself proof of exact pixel geometry.
+
+## Completion requirements
+
+1. Add persistent operator job records and spending controls (maximum requests per run, explicit cost approval, retry budget).
+2. Add operator-only authentication/authorization separate from ordinary Site Admins.
+3. Submit one hero and store its request ID; check status and retrieve result after completion.
+4. Download only validated provider-hosted result URLs using an allowlisted endpoint, inspect pixel dimensions, quality and face/hand anomalies.
+5. Assign exact role filename and SHA-256; record source provider/model/request ID.
+6. Upload to the existing private R2 bucket under `school-template-previews/v2/{template}/{role}.jpg`; verify remote checksum, MIME and signed GET.
+7. Review crops at desktop/tablet/mobile, then explicitly accept or regenerate.
+8. Update `src/domain/template-photography-v2.json` using verified output facts and enable `CAN_TEMPLATE_PHOTOS_V2_ENABLED` only after missing-object checks. Do not enable prematurely.
+9. Verify both Cloudflare and Netlify image routes and rollback behavior independently.
+
+## Safety and integrity
+
+Fictional sample imagery is labeled and may appear only in private website/template demonstrations; never silently publish it as a real school's campus or students. Never attach fal output to a Site's approved school media record. Avoid repeated faces or falsely claimed institutional experiences. All image generation remains opt-in and chargeable.
+
+## Current status
+
+Code for creating briefs and communicating with the fal.ai queue has been committed. No generation has been triggered, no charges have been incurred by this code change, and the configured key has not been tested from this environment. The v2 asset manifest remains staged; the uploaded 43-image package is not yet uploaded to the production R2 bucket.
