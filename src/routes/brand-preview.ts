@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
 import { renderFamilyBrandPage,renderFamilyBrandEmail } from "@/domain/school-brand-family";
-import { createSchoolWebsiteStarterContent } from "@/domain/site-local-content";
+import { readSiteFamilyBrand } from "@/modules/sites/site-family-brand.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { getPartnerWebsitePreview } from "@/modules/sites/site-website-preview.server";
+import { requirePartnerWebsiteEditor } from "@/modules/sites/site-website-authorization.server";
 
 const querySchema=z.object({
   siteId:z.string().uuid(),
@@ -46,10 +46,11 @@ export const Route=createFileRoute("/brand-preview")({
    }
    if(actor.grantSiteId!==input.data.siteId)return failure(403,"Switch to the authorized school membership.");
    try {
-    const view=await getPartnerWebsitePreview(actor);
-    if(view.siteId!==input.data.siteId)return failure(403,"School access is unavailable.");
-    const content=view.editingContent??createSchoolWebsiteStarterContent(view.siteName);
-    const context={siteName:view.siteName,branding:{...content.branding,heroImage:null}};
+    const site=await requirePartnerWebsiteEditor(actor);
+    if(site.id!==input.data.siteId)return failure(403,"School access is unavailable.");
+    // Read only current safe Site brand tokens; no academic catalog, photo
+    // collection or full Website Studio preview is needed for collateral.
+    const context=await readSiteFamilyBrand(site.id);
     const selection=(name:string)=>{
       const href=new URL("/brand-preview",url);
       href.searchParams.set("siteId",input.data.siteId);
