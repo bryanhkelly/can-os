@@ -11,8 +11,12 @@ const endpoint="https://queue.fal.run/fal-ai/nano-banana-2";
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function credentials(injectedKey?:string):string {
-  const key=injectedKey ?? process.env.FAL_KEY;
-  if(!key||!key.trim())throw new Error("FAL_KEY is not configured on the server");
+  // Secret-manager fields sometimes include trailing line endings from paste.
+  // Never put raw untrimmed secrets into HTTP header values.
+  const key=(injectedKey ?? process.env.FAL_KEY)?.trim();
+  if(!key)throw new Error("FAL_KEY is not configured on the server");
+  if(/[\\r\\n\\x00-\\x1F\\x7F]/.test(key))
+    throw new Error("FAL_KEY contains invalid HTTP header characters");
   return key;
 }
 function headers(injectedKey?:string):HeadersInit {
