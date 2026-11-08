@@ -4,7 +4,7 @@ import {submitSchoolPhoto,schoolPhotoStatus,schoolPhotoResult} from "./fal-gener
 import {signPrivateObjectUrl} from "@/platform/storage/r2";
 
 const photoKeyPattern=/^school-template-previews\/v3\/(?:heritage|community|modern|bright|summit|classic|campus)\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])\.jpg$/;
-const stateKeyPattern=/^school-template-production\/v1\/(?:heritage|community|modern|bright-futures|summit|classic|campus)\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])\.json$/;
+const stateKeyPattern=/^school-template-production\/v1\/(?:(?:heritage|community|modern|bright-futures|summit|classic|campus)\/(?:hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])|cursor)\.json$/;
 const family={heritage:"heritage",community:"community",modern:"modern","bright-futures":"bright",
   summit:"summit",classic:"classic",campus:"campus"} as const;
 type State={status:"reserved"|"submitted"|"completed"|"rejected";requestId?:string;reason?:string};
@@ -36,6 +36,18 @@ async function r2Write(key:string,pattern:RegExp,contents:Uint8Array,type:string
   return true;
 }
 const jsonBytes=(value:unknown)=>new TextEncoder().encode(JSON.stringify(value));
+const cursorKey="school-template-production/v1/cursor.json";
+async function getCursor():Promise<number>{
+  const response=await r2Read(cursorKey,stateKeyPattern);
+  if(response.status===404)return 0;
+  if(!response.ok)throw Error("R2 photography cursor unavailable");
+  const value=await response.json() as {index?:number};
+  return Number.isInteger(value.index)&&value.index!>=0&&value.index!<84?value.index!:0;
+}
+async function saveCursor(index:number){
+  await r2Write(cursorKey,stateKeyPattern,jsonBytes({index}),"application/json");
+}
+
 async function setState(key:string,value:State,createOnly=false){
   return r2Write(key,stateKeyPattern,jsonBytes(value),"application/json",createOnly);
 }
@@ -100,42 +112,47 @@ export async function runScheduledTemplatePhotography():Promise<ProductionOutcom
   if(!process.env.FAL_KEY)throw Error("fal.ai production key missing");
   const outcome:ProductionOutcome={status:"active",inspected:0,queued:0,
     completed:0,pending:0,rejected:0};
-  for(const template of siteTemplateIds){
-    for(const role of templatePhotographyRoles){
-      if(outcome.queued>=2&&outcome.completed>=2)return outcome;
-      const fileKey=keyFor(template,role),jobKey=stateFor(template,role);
-      outcome.inspected++;
-      if(await r2Head(fileKey))continue;
-      const state=await getState(jobKey);
-      if(!state){
-        if(outcome.queued>=2)continue;
-        // Reserve once before sending a chargeable request to fal.ai.
-        if(!await setState(jobKey,{status:"reserved"},true))continue;
-        const submitted=await submitSchoolPhoto(template,role);
-        await setState(jobKey,{status:"submitted",requestId:submitted.requestId});
-        outcome.queued++;
-        continue;
-      }
-      if(state.status==="rejected"){outcome.rejected++;continue;}
-      if(state.status!=="submitted"||!state.requestId)continue;
-      if(outcome.completed>=2)continue;
-      const status=await schoolPhotoStatus(state.requestId);
-      if(status!=="COMPLETED"){outcome.pending++;continue;}
-      const brief=schoolPhotographyBrief(template,role);
-      try{
-        const result=await schoolPhotoResult(state.requestId);
-        const image=await downloadImage(result.imageUrl,brief.minimum);
-        const uploaded=await r2Write(fileKey,photoKeyPattern,image,"image/jpeg",true);
-        if(!uploaded&&!await r2Head(fileKey))throw Error("Concurrent image upload missing");
-        await setState(jobKey,{status:"completed",requestId:state.requestId});
-        outcome.completed++;
-      }catch(error){
-        // No automatic paid retry: report error for manual operator inspection.
-        await setState(jobKey,{status:"rejected",requestId:state.requestId,
-          reason:error instanceof Error?error.message.slice(0,100):"Image verification failed"});
-        outcome.rejected++;
-      }
+  // Bound each cron tick to six candidates. A durable cursor guarantees
+  // coverage without hitting Workers' subrequest budget on 84-image libraries.
+  // Hero roles are processed first across all seven designs.
+  const jobs=templatePhotographyRoles.flatMap(role=>
+    siteTemplateIds.map(template=>({template,role})));
+  const cursor=await getCursor();
+  for(let offset=0;offset<6;offset++){
+    const {template,role}=jobs[(cursor+offset)%jobs.length]!;
+    const fileKey=keyFor(template,role),jobKey=stateFor(template,role);
+    outcome.inspected++;
+    if(await r2Head(fileKey))continue;
+    const state=await getState(jobKey);
+    if(!state){
+      if(outcome.queued>=4)continue;
+      // Reserve exactly once before initiating a billable generation.
+      if(!await setState(jobKey,{status:"reserved"},true))continue;
+      const submitted=await submitSchoolPhoto(template,role);
+      await setState(jobKey,{status:"submitted",requestId:submitted.requestId});
+      outcome.queued++;
+      continue;
+    }
+    if(state.status==="rejected"){outcome.rejected++;continue;}
+    if(state.status!=="submitted"||!state.requestId)continue;
+    if(outcome.completed>=4)continue;
+    const status=await schoolPhotoStatus(state.requestId);
+    if(status!=="COMPLETED"){outcome.pending++;continue;}
+    const brief=schoolPhotographyBrief(template,role);
+    try{
+      const result=await schoolPhotoResult(state.requestId);
+      const image=await downloadImage(result.imageUrl,brief.minimum);
+      const uploaded=await r2Write(fileKey,photoKeyPattern,image,"image/jpeg",true);
+      if(!uploaded&&!await r2Head(fileKey))throw Error("Concurrent image upload missing");
+      await setState(jobKey,{status:"completed",requestId:state.requestId});
+      outcome.completed++;
+    }catch(error){
+      // No automatic paid retry; leave a durable review state.
+      await setState(jobKey,{status:"rejected",requestId:state.requestId,
+        reason:error instanceof Error?error.message.slice(0,100):"Image verification failed"});
+      outcome.rejected++;
     }
   }
+  await saveCursor((cursor+6)%jobs.length);
   return outcome;
 }
