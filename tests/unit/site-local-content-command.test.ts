@@ -232,7 +232,7 @@ describe("transactional church-local publication", () => {
   it("rejects stale writes and unrelated Site actors before inserting content", async () => {
     state.rows.push([{ siteId: "site-a" }], [revision(2)]);
     await expect(publishPartnerLocalContent(actor, { operation: "save", expectedRevision: 1, content: copy }))
-      .rejects.toThrow(/updated/);
+      .rejects.toMatchObject({ code: "CONFLICT" });
     expect(state.inserts).toEqual([]);
 
     state.denied = true;
