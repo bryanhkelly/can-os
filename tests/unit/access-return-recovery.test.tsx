@@ -49,8 +49,8 @@ describe("post-sign-in return recovery", () => {
     expect(html).toContain('href="/access"');
     expect(html).not.toContain("permission");
   });
-  it.each(["FORBIDDEN", "AUTHENTICATION_REQUIRED", "UNAVAILABLE", "VALIDATION_FAILED", "CONFLICT", "UNEXPECTED"])(
-    "sends a failed %s saved-page read home using actual router outcomes", async code => {
+  it.each(["FORBIDDEN", "AUTHENTICATION_REQUIRED"])(
+    "recovers a confirmed %s access denial, without treating all failures as permissions", async code => {
       const root = createRootRoute();
       const route = createRoute({ getParentRoute: () => root, path: "/safeguarding",
         loader: safeLoader(async () => { throw { code }; }, { onUnexpectedError: vi.fn() }) });
@@ -67,9 +67,39 @@ describe("post-sign-in return recovery", () => {
     },
   );
 
-  it.each(["error", "notFound"])("recovers a %s route", status => {
+  it.each(["UNAVAILABLE", "VALIDATION_FAILED", "CONFLICT", "UNEXPECTED"])(
+    "keeps a %s failed read on its own page rather than fabricating a permissions denial", async code => {
+      const root = createRootRoute();
+      const route = createRoute({ getParentRoute: () => root, path: "/safeguarding",
+        loader: safeLoader(async () => { throw { code }; }, { onUnexpectedError: vi.fn() }) });
+      const router = createRouter({ routeTree: root.addChildren([route]),
+        history: createMemoryHistory({ initialEntries: ["/safeguarding"] }), isServer: true });
+      await router.load();
+      vi.stubGlobal("document", { cookie: "can_os_access_return=1" });
+      state.matches = router.state.matches;
+      const html = renderRecovery();
+      expect(html).toContain("Requested page");
+      expect(html).not.toContain('data-to="/"');
+    },
+  );
+
+  it("does not convert a transient session read failure into an account denial", () => {
     vi.stubGlobal("document", { cookie: "can_os_access_return=1" });
-    state.matches = [{ status }];
+    state.matches = [{ status: "success", loaderData: {
+      session: null, error: "Unable to load your workspace session. Please try again.",
+    } }];
+    expect(renderRecovery()).toContain("Requested page");
+  });
+
+  it("retains the page when an unexpected router error occurs", () => {
+    vi.stubGlobal("document", { cookie: "can_os_access_return=1" });
+    state.matches = [{ status: "error" }];
+    expect(renderRecovery()).toContain("Requested page");
+  });
+
+  it("recovers a genuinely missing route", () => {
+    vi.stubGlobal("document", { cookie: "can_os_access_return=1" });
+    state.matches = [{ status: "notFound" }];
     expect(renderRecovery()).toContain('data-to="/"');
   });
 
@@ -94,10 +124,21 @@ describe("post-sign-in return recovery", () => {
     expect(browserDocument.cookie).toBe("can_os_access_return=1");
   });
 
-  it("recovers rendering errors as well as loader errors", () => {
+  it("offers explicit retry for render errors and does not expose private exception details", () => {
     vi.stubGlobal("document", { cookie: "can_os_access_return=1" });
-    expect(renderToStaticMarkup(createElement(AccessReturnError, { error: new Error("render failed") })))
-      .toContain('data-to="/"');
+    const html = renderToStaticMarkup(createElement(AccessReturnError, {
+      error: new Error("internal sensitive SQL details"),
+    }));
+    expect(html).toContain("Retry this page");
+    expect(html).toContain("Go to my workspace");
+    expect(html).not.toContain('data-to="/"');
+    expect(html).not.toContain("sensitive SQL");
+  });
+  it("continues to recover a confirmed authorization error", () => {
+    vi.stubGlobal("document", { cookie: "can_os_access_return=1" });
+    const authError = Object.assign(new Error("Not allowed"), { code: "FORBIDDEN" });
+    const html = renderToStaticMarkup(createElement(AccessReturnError, { error: authError }));
+    expect(html).toContain('data-to="/"');
   });
 
   it("recovers missing destinations", () => {
