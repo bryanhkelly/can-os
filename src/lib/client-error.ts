@@ -44,6 +44,7 @@ export function normalizeClientError(error: unknown, fallback?: string): ClientE
     CONFERENCE_NOT_ENDED: "validation",
     ATTENDANCE_CONFLICT: "conflict",
     LAUNCH_LOCATION_UNSUPPORTED: "validation", LAUNCH_LOCATION_MISMATCH: "validation",
+    SITE_LOCATION_AMENDMENT_REQUIRED: "conflict",
   } as const;
   return {
     code,
