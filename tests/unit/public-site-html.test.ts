@@ -54,7 +54,7 @@ describe("standalone public site HTML", () => {
     expect(html).not.toContain("guardian/enrichment");
     expect(html).not.toContain("studentProfileId");
   });
-  it("makes synthetic local previews navigable with eligible, consent-gated inquiry forms", () => {
+  it("makes synthetic local previews fully navigable without real inquiry or enrollment submission", () => {
     const original={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"Synthetic school"},
       demonstration:true,offerings:[],academicPrograms:[{programId:"school-a",title:"Hybrid High School",
       typeLabel:"High school",summary:"A fictional example",grades:{min:"9",max:"12"},
@@ -71,18 +71,15 @@ describe("standalone public site HTML", () => {
       expect(html).toContain('href="/published-site?site=valorschool"');
       expect(html).not.toContain('href="/academics"');
       expect(html).not.toContain('action="/apply"');
-      if(["/", "/academics", "/admissions", "/contact"].includes(path)) {
-        expect(html).toContain('action="/published-site/inquiry?site=valorschool"');
-      } else {
-        expect(html).not.toContain("<form");
-      }
+      expect(html).not.toContain("<form");
+      expect(html).toContain("DEMONSTRATION SCHOOL");
       expect(html).toContain('content="noindex,nofollow"');
     }
     const academics=renderPublicSiteHtml(preview,{path:"/academics",localPreview:true,
       localPreviewSlug:"valorschool",localPreviewSubmissionsEnabled:true,
       makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
-    expect(academics).toContain('id="program-inquiry-school-a"');
-    expect(academics).toContain("I agree to be contacted about this program.");
+    expect(academics).toContain("Hybrid High School");
+    expect(academics).not.toContain('id="program-inquiry-school-a"');
     expect(academics).not.toContain("Applications available · identity verification required");
     expect(renderPublicSiteHtml(preview,{path:"/student-life",localPreview:true,
       localPreviewSlug:"valorschool"})).toContain("Robotics &amp; Design Lab");
@@ -90,6 +87,35 @@ describe("standalone public site HTML", () => {
       localPreviewSlug:"valorschool",makeRequestId:()=>"11111111-1111-4111-8111-111111111111"});
     expect(readOnly).not.toContain("<form");
     expect(availablePublicSitePaths(original)).not.toContain("/about");
+  });
+
+  it("offers a complete, compelling fictional prospectus without fabricated enrollment actions", () => {
+    const demo=withIllustrativeLocalPreview({
+      host:"showcase.can-os.com",
+      site:{name:"Showcase Academy",organizationName:"Community Partner"},
+      demonstration:true,offerings:[],
+    });
+    const paths=availablePublicSitePaths(demo);
+    expect(paths).toHaveLength(10);
+    const checks: Array<[typeof paths[number],string]> = [
+      ["/academics","Humanities &amp; Communication"],
+      ["/student-life","Robotics &amp; Design Lab"],
+      ["/school-day","Time to focus. Space to connect."],
+      ["/admissions","Discover the school. Picture your place in it."],
+      ["/tuition","An investment you can understand."],
+      ["/families","In the loop. In the conversation."],
+      ["/faq","The questions that matter most."],
+      ["/contact","A good school conversation starts"],
+    ];
+    for(const [path,copy] of checks) {
+      const html=renderPublicSiteHtml(demo,{path,makeRequestId:()=> "123"});
+      expect(html).toContain(copy);
+      expect(html).toContain("DEMONSTRATION SCHOOL");
+      expect(html).not.toContain("<form");
+      expect(html).not.toContain("Illustrative family experience");
+      expect(html).toContain('content="noindex,nofollow"');
+    }
+    expect(availablePublicSitePaths({...demo,demonstration:false})).not.toContain("/academics");
   });
 
   it("routes locally previewed application forms through the canonical verification endpoint only when authorized",()=>{
@@ -564,7 +590,7 @@ describe("standalone public site HTML", () => {
     const demonstration = renderPublicSiteHtml({ ...page, demonstration: true });
     expect(ordinary).not.toContain('class="demo-banner"');
     expect(demonstration).toContain('class="demo-banner"');
-    expect(demonstration).toContain("Fictional Learning Academy is a fictional demonstration school.");
+    expect(demonstration).toContain("Fictional Learning Academy is fictional.");
     expect(demonstration).not.toContain("Valor is a fictional");
     const hostedDemo = renderPublicSiteHtml({...page, demonstration: true}, {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
