@@ -1,3 +1,5 @@
+import {liveCloudflarePhotoEnv} from "@/platform/photography/cloudflare-runtime.server";
+import {readBoundTemplatePhotoStatus} from "@/platform/photography/cloudflare-production.server";
 import {createFileRoute} from "@tanstack/react-router";
 import {siteTemplateIds,type SiteTemplateId} from "@/domain/site-theme";
 import {templatePhotographyRoles} from "@/domain/template-photography-production";
@@ -14,6 +16,9 @@ const unavailable=(code:number)=>Response.json({error:code===404?"Unknown templa
 /** Only public, fictional photo availability. No job IDs, R2 keys or secrets. */
 export const Route=createFileRoute("/template-photo-status")({
   server:{handlers:{GET:async({request})=>{
+    const nativeEnv=await liveCloudflarePhotoEnv();
+    if(nativeEnv)return readBoundTemplatePhotoStatus(request,nativeEnv);
+
     const url=new URL(request.url),name=url.searchParams.get("template");
     if(!name||!siteTemplateIds.includes(name as SiteTemplateId))return unavailable(404);
     const template=name as SiteTemplateId;
