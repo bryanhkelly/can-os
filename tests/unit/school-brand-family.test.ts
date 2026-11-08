@@ -69,7 +69,7 @@ describe("seven Site-specific family brand kits",()=>{
   }
   expect(bodies.size).toBe(21);
   expect(familyBrandEmailSubject("confirmation","Hillside Academy"))
-    .toBe("Thank you for your interest in Hillside Academy");
+    .toBe("Thank you for connecting with Hillside Academy");
  });
 
  it("never sends from private previews and escapes school-controlled text",()=>{
