@@ -24,6 +24,16 @@ const securityHeaders = {
 };
 
 export default {
+  scheduled(_event: unknown,_env: DemoEnvironment,ctx:{waitUntil(task:Promise<unknown>):void}) {
+    // The only paid image-production entry point is Worker cron. Never invoke
+    // generation from a school website request or authenticated private preview.
+    ctx.waitUntil(import("./platform/photography/scheduled-production.server")
+      .then(({runScheduledTemplatePhotography})=>runScheduledTemplatePhotography())
+      .then(result=>console.info("CAN template photography tick",result))
+      .catch(error=>console.error("CAN template photography tick failed",{
+        errorType:error instanceof Error?error.name:"unknown",
+      })));
+  },
   async fetch(request: Request, env: DemoEnvironment): Promise<Response> {
     const url = new URL(request.url);
     const host = request.headers.get("host");
