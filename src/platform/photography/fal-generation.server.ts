@@ -10,13 +10,13 @@ import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 const endpoint="https://queue.fal.run/fal-ai/nano-banana-2";
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function credentials():string {
-  const key=process.env.FAL_KEY;
+function credentials(injectedKey?:string):string {
+  const key=injectedKey ?? process.env.FAL_KEY;
   if(!key||!key.trim())throw new Error("FAL_KEY is not configured on the server");
   return key;
 }
-function headers():HeadersInit {
-  return {"Authorization":`Key ${credentials()}`,"Content-Type":"application/json"};
+function headers(injectedKey?:string):HeadersInit {
+  return {"Authorization":`Key ${credentials(injectedKey)}`,"Content-Type":"application/json"};
 }
 async function safeJson(response:Response):Promise<Record<string,unknown>> {
   if(!response.ok)throw new Error(`fal.ai request failed with HTTP ${response.status}`);
@@ -35,11 +35,11 @@ export type FalPhotographyJob={
 
 /** Enqueue one image; never automatically submit an entire batch. */
 export async function submitSchoolPhoto(
-  template:SiteTemplateId,role:TemplatePhotographyRole,
+  template:SiteTemplateId,role:TemplatePhotographyRole,injectedKey?:string,
 ):Promise<FalPhotographyJob>{
   const brief=schoolPhotographyBrief(template,role);
   const response=await fetch(endpoint,{
-    method:"POST",headers:headers(),
+    method:"POST",headers:headers(injectedKey),
     body:JSON.stringify({
       prompt:brief.prompt,aspect_ratio:brief.aspect_ratio,
       resolution:"4K",output_format:"jpeg",
@@ -57,10 +57,10 @@ export async function submitSchoolPhoto(
 }
 
 /** Poll by validated ID only. Never follow URLs supplied by the provider. */
-export async function schoolPhotoStatus(requestId:string):Promise<"IN_QUEUE"|"IN_PROGRESS"|"COMPLETED"> {
+export async function schoolPhotoStatus(requestId:string,injectedKey?:string):Promise<"IN_QUEUE"|"IN_PROGRESS"|"COMPLETED"> {
   if(!uuid.test(requestId))throw new Error("Invalid request identifier");
   const result=await safeJson(await fetch(`${endpoint}/requests/${requestId}/status`,{
-    headers:headers(),method:"GET",cache:"no-store",
+    headers:headers(injectedKey),method:"GET",cache:"no-store",
   }));
   if(result.status!=="IN_QUEUE"&&result.status!=="IN_PROGRESS"&&result.status!=="COMPLETED")
     throw new Error("Unknown fal.ai queue state");
@@ -71,7 +71,7 @@ export async function schoolPhotoStatus(requestId:string):Promise<"IN_QUEUE"|"IN
  * Returned provider URL is not a public CAN OS media URL and must never go into
  * the website image manifest before download, resolution/quality checks and R2 upload.
  */
-export async function schoolPhotoResult(requestId:string):Promise<{imageUrl:string}> {
+export async function schoolPhotoResult(requestId:string,injectedKey?:string):Promise<{imageUrl:string}> {
   if(!uuid.test(requestId))throw new Error("Invalid request identifier");
   const result=await safeJson(await fetch(`${endpoint}/requests/${requestId}`,{
     headers:headers(),method:"GET",cache:"no-store",
