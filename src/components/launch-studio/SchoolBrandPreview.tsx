@@ -6,13 +6,14 @@ import {
 type Props = {
   schoolName: string;
   branding: SiteLocalBranding;
+  siteId: string;
 };
 
 /**
  * A live, private identity preview. This is not a campaign, a publication
  * action, or permission to reuse example photography from the ZIP assets.
  */
-export function SchoolBrandPreview({ schoolName, branding }: Props) {
+export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
   const brand = resolveSchoolBrand(schoolName, branding);
   const wordmark = schoolBrandSvgDataUrl(schoolName, branding);
   const filename = (schoolName.toLowerCase().normalize("NFKD")
@@ -93,10 +94,36 @@ export function SchoolBrandPreview({ schoolName, branding }: Props) {
               A message from your school
             </p>
           </div>
-          <p className="p-2 text-xs text-muted-foreground">Email header concept · not connected to sending</p>
+          <p className="p-2 text-xs text-muted-foreground">Branded email header · live invitation transport uses approved school templates</p>
         </div>
       </div>
     </div>
+    <section aria-labelledby="brand-family-application-title" className="mt-5 border-t pt-5">
+      <h4 id="brand-family-application-title" className="font-semibold">Family-facing brand applications</h4>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Open full-page versions of the branded family-interest page, survey, and three email layouts.
+        All seven school designs use the same saved Site colors and typography.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {([
+          ["landing","Family-interest landing page"],
+          ["survey","Three-minute family survey"],
+          ["email-survey","Survey invitation email"],
+          ["email-confirmation","Interest confirmation email"],
+          ["email-update","Family update email"],
+        ] as const).map(([view,label])=><a key={view}
+          href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
+          target="_blank" rel="noopener noreferrer"
+          className="inline-flex min-h-12 items-center rounded-md border bg-background px-4 py-3 text-sm font-semibold text-primary hover:bg-muted">
+            {label} <span aria-hidden="true" className="ml-auto">↗</span>
+          </a>)}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Previews are private and read-only, using the last saved school design (or a starter if none is saved).
+        Save your current changes before opening them. Previews do not send messages or collect responses.
+        Approved Program-linked invitations are sent separately through the existing recruitment service.
+      </p>
+    </section>
     <p className="mt-3 text-xs text-muted-foreground">
       This is a preview of the current editable design. Save private draft to retain changes.
       Downloading a logo does not publish your website or activate family communications.
