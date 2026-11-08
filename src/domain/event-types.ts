@@ -155,6 +155,7 @@ export const EventTypes = {
   TermCreated: "TermCreated",
   AdmissionsInquiryCreated: "AdmissionsInquiryCreated",
   PublicAdmissionsInterestReceived: "PublicAdmissionsInterestReceived",
+  PublicAdmissionsInterestSurveyReceived: "PublicAdmissionsInterestSurveyReceived",
   PublicAdmissionsInterestStatusChanged: "PublicAdmissionsInterestStatusChanged",
   PublicAdmissionsInterestConverted: "PublicAdmissionsInterestConverted",
   PublicFamilyStartRequested: "PublicFamilyStartRequested",
