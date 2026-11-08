@@ -129,11 +129,24 @@ export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocal
   };
 }
 
-/** Demo sites use the same high-quality starter rather than fictional program
- * or church-history claims in the text fields. A separate global sample marker
- * remains visible in private previews. */
+/** Rich fictional copy for explicitly synthetic read-only previews only.
+ * This is never used to seed a real school's published institutional claims.
+ * The renderer supplies a persistent demonstration disclosure. */
 export function createIllustrativeSchoolContent(schoolName: string): SiteLocalContent {
-  return createSchoolWebsiteStarterContent(schoolName);
+  const starter = createSchoolWebsiteStarterContent(schoolName);
+  const name = schoolName.trim().slice(0, 80) || "Our School";
+  const fields: SiteEditorialBaseline["fields"] = {
+    heroHeadline: "A school that sees the individual. A community that helps them grow.",
+    welcomeMessage: "A place to think deeply, find your people, and discover what you can become.",
+    localDescription: `At ${name}, every learner brings a story worth knowing. Purposeful academics, creative discovery, and genuine connections come together in a community where questions are welcomed, ideas are taken seriously, and growth is celebrated. Here, education is about more than preparing for the next test. It's about preparing to make a difference.`,
+    schoolVision: "To inspire thoughtful learners who pursue challenging ideas with confidence, care for their neighbors, and recognize their ability to make a meaningful contribution.",
+    communityOutreach: "The community is part of the learning experience. Collaborative projects, creative showcases, and service opportunities help students connect what they discover with the people and places around them.",
+  };
+  return {
+    ...starter,
+    ...fields,
+    editorialBaseline: {version:1,fields},
+  };
 }
 
 /** Reset precisely one suggested editorial answer. Previously authored,
