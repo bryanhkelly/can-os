@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
 import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
+import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
@@ -419,7 +420,7 @@ function LocalWebsiteCopyEditor({
     if (outcome.status === "saved" || outcome.status === "refresh-failed")
       markSaved(submitted, outcome.value.revision);
     else if (outcome.status === "failed" &&
-      /website content was updated/i.test(mutationErrorMessage(outcome.error, ""))) {
+      normalizeClientError(outcome.error).code === "CONFLICT") {
       // Surface the current revision without discarding what this editor typed.
       await router.invalidate().catch(() => undefined);
     }
@@ -456,7 +457,7 @@ function LocalWebsiteCopyEditor({
     if (outcome.status === "saved" || outcome.status === "refresh-failed")
       markSaved(submitted, outcome.value.revision);
     else if (outcome.status === "failed" &&
-      /website content was updated/i.test(mutationErrorMessage(outcome.error, ""))) {
+      normalizeClientError(outcome.error).code === "CONFLICT") {
       // Surface the current revision without discarding what this editor typed.
       await router.invalidate().catch(() => undefined);
     }
