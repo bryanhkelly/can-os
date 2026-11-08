@@ -5,6 +5,7 @@ import { physicalSiteAddressSchema, draftSiteContactSchema, siteInformationSchem
 import { eq, and, inArray, ne, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSiteSetupScope, assertSiteLocationProgramScope, siteSetupReadableProgramIds } from "@/domain/site-setup-scope";
 import { db } from "@/db/client";
@@ -46,7 +47,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
       if(same && typeof site.metadata.sitePhysicalAddressRevision==="string")
         return {siteId:site.id,updated:false,revision:site.updatedAt.toISOString(),reviewRequested:false};
       if(site.updatedAt.toISOString()!==data.expectedRevision)
-        throw new Error("This Site changed since you opened it. Refresh before saving to avoid overwriting another editor.");
+        throw new DomainError("CONFLICT", "Site revision has changed.");
       const attached=await tx.select({id:programs.id,status:programs.status}).from(programs)
         .where(eq(programs.siteId,site.id));
       const attachedIds=attached.map(item=>item.id);
@@ -74,7 +75,7 @@ export const updateLaunchSiteAddress = createServerFn({method:"POST"})
         attached.some(p=>p.status==="active" || p.status==="ready") ||
         approvedConfigurations.length>0 || publishedPrograms.length>0 ||
         approvedServices.length>0)
-        throw new Error("This school has active, approved, or published records. Ask your CAN launch coordinator for a controlled location amendment and independent re-review; the saved address has not changed.");
+        throw new DomainError("SITE_LOCATION_AMENDMENT_REQUIRED");
       const nextRevision=nextSiteConfigurationRevision(site.updatedAt);
       const [changed]=await tx.update(sites).set({
         address,metadata:{...site.metadata,sitePhysicalAddressRevision:nextRevision.toISOString()},
