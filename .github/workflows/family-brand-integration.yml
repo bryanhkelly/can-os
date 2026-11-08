@@ -16,6 +16,7 @@ on:
       - 'src/components/launch-studio/SchoolBrandPreview.tsx'
       - 'src/components/launch-studio/SchoolLaunchHub.tsx'
       - 'tests/unit/school-brand-family.test.ts'
+      - 'tests/unit/family-brand-route.test.ts'
       - 'docs/platform-route-contracts.json'
       - '.github/workflows/family-brand-integration.yml'
   workflow_dispatch:
@@ -40,7 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Seven branded emails, landing pages and survey validation
-        run: npx vitest run tests/unit/school-brand-family.test.ts tests/unit/family-invitations.test.ts tests/unit/public-admissions-interest.test.ts tests/unit/family-invitation-sender.test.ts tests/unit/notification-provider-timeouts.test.ts tests/unit/school-brand-identity.test.tsx
+        run: npx vitest run tests/unit/family-brand-route.test.ts tests/unit/school-brand-family.test.ts tests/unit/family-invitations.test.ts tests/unit/public-admissions-interest.test.ts tests/unit/family-invitation-sender.test.ts tests/unit/notification-provider-timeouts.test.ts tests/unit/school-brand-identity.test.tsx
       - name: Netlify production build
         if: matrix.target == 'netlify'
         run: npm run build
