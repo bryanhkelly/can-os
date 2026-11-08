@@ -1,4 +1,5 @@
 import handler from "@tanstack/react-start/server-entry";
+import type {PhotoWorkerEnv} from "./platform/photography/cloudflare-production.server";
 import { withRequestDatabase } from "./db/client";
 import { classifyPublicSiteRequest } from "./domain/public-site-host-routing";
 import { publicSiteDomain } from "./domain/public-site-address";
@@ -7,7 +8,7 @@ interface RateLimiter {
   limit(input: { key: string }): Promise<{ success: boolean }>;
 }
 
-interface DemoEnvironment {
+interface DemoEnvironment extends PhotoWorkerEnv {
   ACCESS_REQUEST_LIMIT: RateLimiter;
   ACCESS_VERIFY_LIMIT: RateLimiter;
   CAN_PUBLIC_SITE_DOMAIN?: string;
@@ -24,14 +25,13 @@ const securityHeaders = {
 };
 
 export default {
-  scheduled(_event: unknown,_env: DemoEnvironment,ctx:{waitUntil(task:Promise<unknown>):void}) {
-    // The only paid image-production entry point is Worker cron. Never invoke
-    // generation from a school website request or authenticated private preview.
-    ctx.waitUntil(import("./platform/photography/scheduled-production.server")
-      .then(({runScheduledTemplatePhotography})=>runScheduledTemplatePhotography())
+  scheduled(_event: unknown,env:DemoEnvironment,ctx:{waitUntil(task:Promise<unknown>):void}) {
+    ctx.waitUntil(import("./platform/photography/cloudflare-production.server")
+      .then(({runBoundTemplatePhotoProduction})=>runBoundTemplatePhotoProduction(env))
       .then(result=>console.info("CAN template photography tick",result))
       .catch(error=>console.error("CAN template photography tick failed",{
         errorType:error instanceof Error?error.name:"unknown",
+        message:error instanceof Error?error.message.slice(0,140):"unknown",
       })));
   },
   async fetch(request: Request, env: DemoEnvironment): Promise<Response> {
@@ -42,6 +42,17 @@ export default {
     );
     if ((host && host.toLowerCase() !== url.host.toLowerCase()) || decision.kind !== "platform") {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
+    }
+
+    // Direct R2 bindings avoid S3 signed requests for production template
+    // photography. Only exact, read-only public sample routes are intercepted.
+    if(url.pathname==="/template-photo-status"){
+      const {readBoundTemplatePhotoStatus}=await import("./platform/photography/cloudflare-production.server");
+      return readBoundTemplatePhotoStatus(request,env);
+    }
+    if(url.pathname.startsWith("/template-photo/")){
+      const {readBoundTemplatePhoto}=await import("./platform/photography/cloudflare-production.server");
+      return readBoundTemplatePhoto(request,env);
     }
 
     if (request.method === "POST") {
