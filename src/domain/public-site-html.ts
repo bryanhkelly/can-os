@@ -367,7 +367,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const programOverview = academicCards ? `<section class="program-overview editorial-section" aria-labelledby="academic-title">
     <div class="program-overview-heading"><div><p class="tag">Learning pathways</p>
       <h2 id="academic-title">Serious learning. A more personal path.</h2></div>
-      <p>Explore structured academic opportunities and different ways to learn. Program details and schedules are shown when confirmed.</p></div>
+      <p>${demo ? "Strong academic foundations create the freedom to explore new interests, ask better questions, and discover how far an idea can go." : "Explore structured academic opportunities and different ways to learn. Program details and schedules are shown when confirmed."}</p></div>
     <div class="grid">${academicCards}</div>
     <a class="text-action" href="/academics">Explore all academic programs →</a>
   </section>` : "";
@@ -459,7 +459,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <h3>${escapePublicHtml(program.title)}</h3>
       <p>${escapePublicHtml(modes || "Contact the school for delivery details")}</p>
       ${program.delivery.onsite && days !== null ? `<p>${days} onsite days per week</p>` : ""}
-      ${approvedScheduleHtml || `<p class="availability">Exact schedules and days are confirmed by the school; this overview
+      ${demo ? "" : approvedScheduleHtml || `<p class="availability">Exact schedules and days are confirmed by the school; this overview
       does not imply a Monday–Friday schedule or that the program is operating.</p>`}</article>`;
   }).join("");
   const schoolDayProgramNav = (page.academicPrograms?.length ?? 0) > 1
@@ -664,11 +664,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
     "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
-      "Meet the vision, values, and local community behind this school."), localSection, peopleSection),
+      demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection),
     "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
-      "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection),
-    "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", "Student life",
-      "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
+      demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection),
+    "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", demo ? "Find your people. Follow your curiosity." : "Student life",
+      demo ? "From creative exploration to service and student-led projects, the most memorable lessons often happen together." : "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
     "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", demo ? "A day designed for more than lessons." : "What a day of learning looks like",
       demo ? "A thoughtful rhythm of independent discovery, academic guidance, and time to connect." : "See how learning is organized, with confirmed schedules and attendance details where available."),
       reviewedSchoolDay + (demo ? "" : schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
@@ -812,7 +812,7 @@ ${composePublicSiteChrome(templateId, {
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
-  main: `<main id="main-content">\n  ${options?.localPreview ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>`,
+  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${pageContent[path]}\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Demonstration only · No applications, enrollment or payments.</p>' : ""}</footer>`,
 })}
 </body>
