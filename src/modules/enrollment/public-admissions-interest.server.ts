@@ -263,6 +263,7 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
     const [prior] = await tx.select({
       id: publicAdmissionsInterests.id,
       message: publicAdmissionsInterests.message,
+      contactConsentAt: publicAdmissionsInterests.contactConsentAt,
     }).from(publicAdmissionsInterests).where(and(
       eq(publicAdmissionsInterests.invitationBatchId, data.invitationBatchId),
       eq(publicAdmissionsInterests.invitationRecipientKey, data.invitationRecipientKey),
@@ -270,21 +271,43 @@ export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestIn
     const followUpAllowed = data.responseKind !== "survey" || data.contactPreference !== "none";
     if (prior) {
       if (data.responseKind !== "survey") return;
-      // A later survey enriches the same canonical family interest rather than
-      // inventing a second lead or bypassing its unique recipient key.
+      const currentMessage = [prior.message, data.message].filter(Boolean).join("\n").slice(0,500);
+      const consentChanged = Boolean(prior.contactConsentAt) !== followUpAllowed;
+      if (currentMessage === prior.message && !consentChanged) return;
       await tx.update(publicAdmissionsInterests).set({
-        message: [prior.message, data.message].filter(Boolean).join("\n").slice(0,500),
-        ...(followUpAllowed ? {} : { contactConsentAt: null }),
+        message: currentMessage,
+        contactConsentAt: followUpAllowed ? prior.contactConsentAt ?? new Date() : null,
         updatedAt: new Date(),
       }).where(eq(publicAdmissionsInterests.id, prior.id));
       if (!followUpAllowed) {
-        // An explicit "no follow-up" response withdraws prior contact consent.
         await tx.update(actions).set({status:"resolved"}).where(and(
           eq(actions.subjectType,"public_admissions_interest"),
           eq(actions.subjectId,prior.id),
           eq(actions.type,"public_admissions_interest_followup"),
           eq(actions.status,"open"),
         ));
+      } else if (!prior.contactConsentAt) {
+        // A family can opt in after a prior no-contact survey. Create the
+        // canonical follow-up only once under the recipient advisory lock.
+        const [existingAction] = await tx.select({id:actions.id}).from(actions)
+          .where(and(eq(actions.subjectType,"public_admissions_interest"),
+            eq(actions.subjectId,prior.id),
+            eq(actions.type,"public_admissions_interest_followup"))).limit(1);
+        if (!existingAction) {
+          const [newAction] = await tx.insert(actions).values({
+            type:"public_admissions_interest_followup",
+            subjectType:"public_admissions_interest",subjectId:prior.id,
+            title:"Follow up on invited family interest",
+            organizationId:school.organizationId,siteId:school.siteId,programId:batch.programId,
+            status:"open",priority:"normal",metadata:{source:"staff_invitation"},
+          }).returning({id:actions.id});
+          if (!newAction) throw new Error("Unable to create school follow-up");
+          await emitEvent(tx,{
+            eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:newAction.id,
+            siteId:school.siteId,organizationId:school.organizationId,programId:batch.programId,
+            payload:{type:"public_admissions_interest_followup",subjectId:prior.id},
+          });
+        }
       }
       await writeAudit(tx,{
         action:"admissions.invited_interest.survey_received",
