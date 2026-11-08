@@ -35,3 +35,13 @@ Fictional sample imagery is labeled and may appear only in private website/templ
 ## Current status
 
 Code for creating briefs and communicating with the fal.ai queue has been committed. No generation has been triggered, no charges have been incurred by this code change, and the configured key has not been tested from this environment. The v2 asset manifest remains staged; the uploaded 43-image package is not yet uploaded to the production R2 bucket.
+
+## Scheduled production implementation — November 8, 2026
+
+The Cloudflare Worker now contains a `scheduled` handler, registered by `wrangler.jsonc` to run every five minutes. The generation flag `CAN_TEMPLATE_PHOTOGRAPHY_GENERATE=true` is set in Wrangler configuration. This **does not mean that the live Worker has been deployed**.
+
+The scheduled worker reserves each job in private R2 before a paid fal request, submits up to four new jobs per tick, checks existing queue jobs, validates downloaded JPEG dimensions and stores accepted outputs in `school-template-previews/v3/<family>/<role>.jpg`. A persistent cursor prevents traversing all 84 roles in one Worker event. Rejected and reserved records require operator inspection instead of automatically incurring further charges. The total planned library is seven templates × twelve roles = 84 independent images. Use `CAN_TEMPLATE_PHOTOGRAPHY_GENERATE=false` to stop submitting and processing jobs.
+
+The private website image resolver points to `/template-photo/<template>/<role>` and prefers existing validated v3 objects, with narrow fallback for older sample assets; public school-owned media remains separate. A read-only route at `/template-photo-status?template=community` reports progress by template once code is deployed.
+
+**Deployment is mandatory.** The Netlify site was confirmed running an older November 5 commit, and the Cloudflare public status URL showed the app's 404 page on November 8; neither observation constitutes a successful production deploy. Deployment requires an authenticated Cloudflare session or an authorized CI runner. Once deployed, verify the Worker has the `FAL_KEY` secret and the existing `CAN_R2_ACCOUNT_ID`, `CAN_R2_BUCKET`, `CAN_R2_ACCESS_KEY_ID`, and `CAN_R2_SECRET_ACCESS_KEY` secrets. Do not print secret values. Verify a real 4K hero R2 object and rendered template image before considering the process operational.
