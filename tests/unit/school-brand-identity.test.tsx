@@ -65,13 +65,15 @@ describe("Website & Brand Studio", () => {
 
   it("previews and exports the school-specific brand without publishing or sending", () => {
     const html = renderToStaticMarkup(<SchoolBrandPreview
+      siteId="f1000000-0000-4000-8000-000000000003"
       schoolName="Barton Academy"
       branding={{...emptySiteLocalContent.branding, templateId:"community"}}/>);
     expect(html).toContain("Barton Academy");
     expect(html).toContain("Community &amp; Faith");
     expect(html).toContain("Download SVG wordmark");
     expect(html).toContain("barton-academy-wordmark.svg");
-    expect(html).toContain("Email header concept");
+    expect(html).toContain("Branded email header");
+    expect(html).toContain("Family-facing brand applications");
     expect(html).not.toContain("<form");
     expect(html).not.toContain("<script");
   });
