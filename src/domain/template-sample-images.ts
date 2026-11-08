@@ -39,6 +39,10 @@ export function templateSampleImage(
   template: SiteTemplateId,
   role: TemplatePhotographyRole,
 ): string | null {
+  // The v3 image route checks R2 availability, serves verified generated photos,
+  // and uses legacy approved template samples while generation is incomplete.
+  if (process.env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE === "true")
+    return `/template-photo/${encodeURIComponent(template)}/${encodeURIComponent(role)}`;
   if (process.env.CAN_TEMPLATE_PHOTOS_V2_ENABLED === "true") {
     const match = stagedManifest.files.find(file =>
       file.template === stagedFamily[template] && file.role === role);
