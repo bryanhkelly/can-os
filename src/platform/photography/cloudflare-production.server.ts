@@ -706,7 +706,7 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
     for(const item of tracked.objects){
       const parts=item.key.split("/");
       if(parts.length!==4||parts[1]!=="v1"||!templateSet.has(parts[2])||
-        !roleSet.has(parts[3].replace(/\\.json$/,"")))continue;
+        !roleSet.has(parts[3].replace(/\.json$/,"")))continue;
       const job=await getJob(bucket,item.key);
       if(job?.status==="submitted"||job?.status==="reserved")submittedAll++;
       if(job?.status==="rejected")rejectedAll++;
