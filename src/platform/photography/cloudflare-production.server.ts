@@ -71,8 +71,9 @@ async function inspectFile(resultUrl:string,minimum:{width:number;height:number}
     url=new URL(target,url);
     result=undefined;
   }
-  if(!result||!result.ok||
-    Number(result.headers.get("content-length")||0)>25_000_000)
+  if(!result)throw Error("Generated media response missing");
+  if(!result.ok)throw Error(`Generated media HTTP ${result.status}`);
+  if(Number(result.headers.get("content-length")||0)>25_000_000)
     throw Error("Generated file unavailable or exceeds size limit");
   const bytes=await result.arrayBuffer();
   if(bytes.byteLength<4096||bytes.byteLength>25_000_000)
@@ -166,7 +167,8 @@ function canRescue(job:JobState):boolean{
 function safeError(error:unknown):string{
   if(!(error instanceof Error))return "Unknown provider submission failure";
   if(error.message.includes("FAL_KEY"))return error.message.slice(0,120);
-  if(error.message.startsWith("fal.ai request failed with HTTP"))
+  if(error.message.startsWith("fal.ai request failed with HTTP")||
+     /^Generated media HTTP [0-9]{3}$/.test(error.message))
     return error.message.slice(0,90);
   if(error.message==="Invalid header value.")return "Invalid Authorization header";
   const verifiableFailures=new Set([
@@ -261,13 +263,17 @@ async function completePhoto(bucket:TemplatePhotoBucket,
     // request, and never lose the known completed asset URL.
     const attempts=(job.importAttempts??0)+1;
     const reason=stage+":"+safeError(error);
-    const terminal=attempts>=8 ||
+    const terminal=attempts>=30 ||
       reason.includes("Unsupported image source") ||
       reason.includes("does not meet required resolution") ||
       reason.includes("invalid size");
+    // Network failures are non-billable; back off instead of rejecting the
+    // already-paid fal result permanently after a few cron ticks.
+    const retryDelayMs=Math.min(60*60*1000,15_000*2**Math.min(attempts,8));
     await saveJob(bucket,stateKeyPath,{
       ...job,status:terminal?"rejected":"submitted",assetUrl,
       importAttempts:attempts,reason,updatedAt:now(),
+      nextAttemptAt:terminal?undefined:new Date(Date.now()+retryDelayMs).toISOString(),
     });
     console.error("CAN photo import attempt",{
       template,role,stage,attempts,terminal,reason,
