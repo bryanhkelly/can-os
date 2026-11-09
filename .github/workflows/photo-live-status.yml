@@ -18,7 +18,7 @@ permissions:
 
 concurrency:
   group: photo-live-status
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   monitor:
@@ -34,14 +34,10 @@ jobs:
         env:
           PHOTO_REPORT_PATH: /tmp/can-os-photo-live.md
       - name: Update single operations issue from live API
-        if: always()
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if [ -s /tmp/can-os-photo-live.md ]; then
-            gh issue edit 274 --body-file /tmp/can-os-photo-live.md
-          else
-            printf '# CAN OS photography monitor\n\nNo usable status response was produced by GitHub Actions. Check the workflow job logs.\n' > /tmp/can-os-photo-live.md
-            gh issue edit 274 --body-file /tmp/can-os-photo-live.md
-          fi
+          test -s /tmp/can-os-photo-live.md
+          gh issue edit 274 --body-file /tmp/can-os-photo-live.md
