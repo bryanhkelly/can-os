@@ -1,4 +1,4 @@
-name: Template photo pipeline — Summit pilot
+name: Template photo pipeline — seven-template readiness
 
 on:
   workflow_dispatch:
@@ -7,12 +7,16 @@ on:
     paths:
       - "src/platform/photography/**"
       - "src/domain/template-photography-production.ts"
+      - "src/domain/template-photo-responsive.ts"
+      - "src/domain/public-site-html.ts"
       - "src/routes/template-photo*"
       - "src/cloudflare-demo.ts"
       - "src/server.ts"
       - "vite.cloudflare.config.ts"
       - "wrangler.jsonc"
       - "tests/unit/template-photo-cron.test.ts"
+      - "tests/unit/template-photo-responsive.test.ts"
+      - "scripts/check-template-photo-library.mjs"
       - ".github/workflows/template-photo-pipeline.yml"
 
 permissions:
@@ -34,15 +38,18 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify fal.ai to R2 mock end-to-end (no API charges)
-        run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts
+        run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts tests/unit/template-photo-responsive.test.ts
       - name: Build Cloudflare Worker
         run: npm run build:cloudflare
 
   verify-live:
+    if: github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 14
     steps:
+      - name: Inventory all seven templates and their 84 roles (read only)
+        run: node scripts/check-template-photo-library.mjs
       - name: Check public R2-backed Summit pilot
         env:
           BASE: "https://can-os.bryanhkelly.workers.dev"
