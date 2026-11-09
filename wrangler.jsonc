@@ -8,7 +8,7 @@
   "triggers": { "crons": ["* * * * *"] },
   "r2_buckets": [{ "binding": "TEMPLATE_PHOTO_BUCKET", "bucket_name": "can-os" }],
   "observability": { "enabled": true, "logs": { "enabled": true } },
-  "vars": { "CAN_TEMPLATE_PHOTOGRAPHY_GENERATE": "true" },
+  "vars": { "CAN_TEMPLATE_PHOTOGRAPHY_GENERATE": "true", "CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT": "false", "CAN_TEMPLATE_PHOTOGRAPHY_BULK": "false" },
   "ratelimits": [
     { "name": "ACCESS_REQUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
     { "name": "ACCESS_VERIFY_LIMIT", "namespace_id": "1002", "simple": { "limit": 40, "period": 60 } }
