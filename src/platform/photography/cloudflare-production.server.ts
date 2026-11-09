@@ -442,6 +442,8 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
         (heroJob?.status==="submitted"&&heroJob.importAttempts)
           ?heroJob.reason:undefined),
       heroImportAttempts:heroJob?.importAttempts??0,
+      heroLastAttemptAt:heroJob?.updatedAt,
+      heroNextRetryAt:heroJob?.nextAttemptAt,
       newSubmissionsEnabled:env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true",
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
