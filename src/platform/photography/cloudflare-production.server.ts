@@ -1,7 +1,7 @@
 import {siteTemplateIds,type SiteTemplateId} from "@/domain/site-theme";
 import {schoolPhotographyBrief,templatePhotographyRoles} from "@/domain/template-photography-production";
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
-import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult,schoolPhotoStatus} from "./fal-generation.server";
+import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult} from "./fal-generation.server";
 import {jpegDimensions} from "./scheduled-production.server";
 
 /**
@@ -21,6 +21,7 @@ export interface PhotoWorkerEnv {
   TEMPLATE_PHOTO_BUCKET?:TemplatePhotoBucket;
   FAL_KEY?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_GENERATE?:string;
+  CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_BULK?:string;
 }
 const templateSet=new Set<string>(siteTemplateIds);
@@ -155,7 +156,8 @@ function canRescue(job:JobState):boolean{
   // submission can proceed. A subsequent provider rejection has a different
   // reason and will not be retried automatically.
   if(job.status==="rejected")
-    return job.reason==="FAL_KEY contains invalid HTTP header characters";
+    return (job.rescueCount??0)===0 &&
+      job.reason==="FAL_KEY contains invalid HTTP header characters";
   // Older reserved jobs can be retried only once, after a short cooling period.
   return job.status==="reserved" && (job.rescueCount??0)===0 &&
     job.updatedAt<legacyHeaderFailureCutoff &&
@@ -217,19 +219,16 @@ async function queuePhoto(bucket:TemplatePhotoBucket,
  */
 async function completePhoto(bucket:TemplatePhotoBucket,
   template:SiteTemplateId,role:TemplatePhotographyRole,
-  job:JobState,falKey:string):Promise<"ready"|"pending"|"rejected">{
+  job:JobState,falKey:string,jobPath=stateKey(template,role)):Promise<"ready"|"pending"|"rejected">{
   if(!job.requestId)return "rejected";
-  const stateKeyPath=stateKey(template,role);
+  const stateKeyPath=jobPath;
   let stage="queue-status";
   let assetUrl=job.assetUrl;
   try{
     if(!assetUrl){
-      // Existing completed Community request is explicitly confirmed by the
-      // provider. For all other jobs poll the queue until COMPLETED.
-      if(job.requestId!==communityHeroCompletedFalRequestId){
-        const status=await schoolPhotoStatus(job.requestId,falKey);
-        if(status!=="COMPLETED")return "pending";
-      }
+      // Fetch the completed result directly. fal's result endpoint returns
+      // images[0].url; a separate queue-status network hop is unnecessary and
+      // was preventing completed requests from reaching R2 when it failed.
       stage="result-url";
       const completed=await schoolPhotoResult(job.requestId,falKey);
       assetUrl=completed.imageUrl;
