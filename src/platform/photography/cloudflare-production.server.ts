@@ -193,8 +193,13 @@ async function completePhoto(bucket:TemplatePhotoBucket,
   job:JobState,falKey:string):Promise<"ready"|"pending"|"rejected">{
   if(!job.requestId)return "rejected";
   try{
-    const state=await schoolPhotoStatus(job.requestId,falKey);
-    if(state!=="COMPLETED")return "pending";
+    // For the user's confirmed HTTP-200 Community hero, the queue state
+    // may already have aged out. Request the retained completed result
+    // directly; do not submit a second billable generation.
+    if(job.requestId!==communityHeroCompletedFalRequestId){
+      const state=await schoolPhotoStatus(job.requestId,falKey);
+      if(state!=="COMPLETED")return "pending";
+    }
     const brief=schoolPhotographyBrief(template,role);
     const generated=await schoolPhotoResult(job.requestId,falKey);
     const bytes=await inspectFile(generated.imageUrl,brief.minimum);
